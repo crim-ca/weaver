@@ -49,6 +49,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_
 from weaver.utils import (
     AWS_S3_BUCKET_REFERENCE_PATTERN,
     AWS_S3_REGIONS,
+    Lazify,
     NullType,
     OutputMethod,
     PathMatchingMethod,
@@ -100,6 +101,31 @@ AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
 AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
+
+
+def test_lazify():
+    called_counter = [0]
+
+    def call():
+        called_counter[0] += 1
+        return "test"
+
+    # validate handling of caching/lazy formatting
+    text = Lazify(call)
+    assert isinstance(text, str)
+    assert isinstance(text, Lazify)
+    assert text != "test"
+    assert called_counter[0] == 0
+    assert repr(text) == "Lazify(tests.test_utils.call) <lazy>"
+    assert called_counter[0] == 0
+    assert f"{text!s}" == "test"
+    assert called_counter[0] == 1
+    assert repr(text) == "Lazify(tests.test_utils.call) <computed>"
+    assert f"{text!s}" == "test"  # expect cached value reused
+    assert called_counter[0] == 1, "computed value should have been cached and reused"
+
+    # validate core string methods
+    assert text.upper() == "TEST", "other string operations are expected to work seamlessly as any normal string"
 
 
 def test_null_operators():

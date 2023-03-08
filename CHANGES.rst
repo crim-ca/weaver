@@ -36,6 +36,9 @@ Changes:
   settings for the |ogc-proc-ext-quotation-short| extension. Old value will still be checked for backward compatibility.
 - Renamed ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait`` to better align with the corresponding
   parameter for quotation. Old value will still be checked for backward compatibility.
+- Add ``Lazify`` utility class for holding a string with delayed computation and caching that returns its representation
+  on-demand during formatting or other string operations to reduce the impact of its long generation. This can be used
+  with a callable returning a string representation that can be discarded without invocation on inactive logging levels.
 
 .. |ogc-proc-ext-billing-short| replace:: Billing
 .. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing

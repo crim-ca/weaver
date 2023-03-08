@@ -226,6 +226,51 @@ AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
 )
 
 
+class Lazify(str):
+    """
+    Wraps the callable for evaluation only on explicit call or string formatting.
+
+    Once string representation has been computed, it will be cached to avoid regenerating it on following calls.
+    """
+
+    def __init__(self, func):
+        # type: (Callable[[], Return]) -> None
+        """
+        Initialize the lazy-string representation.
+
+        :param func: Callable that should return the computed string formatting.
+        """
+        if not callable(func):
+            raise ValueError("Invalid lazify operation. Input must be a callable.")
+        self.func = func
+        self._str = None
+
+    def __getattribute__(self, item):
+        # type: (str) -> Any
+        if item in ["__str__", "__repr__", "__call__"]:
+            return str.__getattribute__(self, item)
+        if item in ["__class__", "_str", "func"]:
+            return object.__getattribute__(self, item)
+        _str = self.__call__()
+        return getattr(str, item)(_str)
+
+    def __call__(self):
+        # type: () -> Return
+        if self._str is None:
+            self._str = self.func()
+        return self._str
+
+    def __str__(self):
+        # type: () -> str
+        return f"{self.__call__()!s}"
+
+    def __repr__(self):
+        # type: () -> str
+        func_name = fully_qualified_name(self.func)
+        str_status = "<lazy>" if self._str is None else "<computed>"
+        return f"{self.__class__.__name__}({func_name}) {str_status}"
+
+
 class CaseInsensitive(str):
     __str = None
 
