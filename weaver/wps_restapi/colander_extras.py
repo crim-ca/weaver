@@ -671,6 +671,13 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
             self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
 
         try:
+            # if schema_type was defined with an instance instead of the class type,
+            # we must pass it by "typ" keyword to avoid an error in base class calling 'schema_type()'
+            # one case were using an instance is valid is for 'colander.Mapping(unknown="<handling-method>")'
+            schema_type_def = getattr(self, "schema_type", None)
+            if isinstance(schema_type_def, colander.SchemaType):
+                kwargs["typ"] = schema_type_def
+                kwargs["unknown"] = getattr(schema_type_def, "unknown", "ignore")
             super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
             ExtendedSchemaBase._validate(self)
         except Exception as exc:
