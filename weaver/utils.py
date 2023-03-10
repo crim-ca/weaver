@@ -3189,7 +3189,10 @@ def fetch_directory(location,                           # type: str
                                          include=include, exclude=exclude, matcher=matcher)
     else:
         raise ValueError(f"Unknown scheme for directory location [{location}].")
-    listing = list(sorted(listing, key=lambda _file: _file["Content-Location"] if out_method.META else _file))
+    listing = list(sorted(
+        listing,
+        key=lambda _file: _file["Content-Location"] if out_method == OutputMethod.META else _file
+    ))
     if LOGGER.isEnabledFor(logging.DEBUG):
         for item in listing:
             LOGGER.debug("Resolved file [%s] from [%s] directory listing.", item, location)
