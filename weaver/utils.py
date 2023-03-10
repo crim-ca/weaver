@@ -252,7 +252,7 @@ class Lazify(str):
         if item in ["__class__", "_str", "func"]:
             return object.__getattribute__(self, item)
         _str = self.__call__()
-        return getattr(str, item)(_str)
+        return str.__getattribute__(_str, item)
 
     def __call__(self):
         # type: () -> Return
@@ -1901,12 +1901,10 @@ def request_extra(method,                           # type: AnyRequestMethod
                 resp = _request_call(*request_args)
             else:
                 resp = cache_request(*request_args)
-            if (
-                (allowed_codes and resp.status_code in allowed_codes)
-                or resp.status_code < (500 if only_server_errors else 400)
-            ):
-                if resp.status_code >= 400:  # don't invalidate if successful, otherwise we never cache!
-                    invalidate_region(caching_args)
+            if allowed_codes:  # check by itself first if specified to bypass following check of error codes
+                if resp.status_code in allowed_codes:
+                    return resp
+            elif resp.status_code < (500 if only_server_errors else 400):
                 return resp
             invalidate_region(caching_args)
             reason = getattr(resp, "reason", type(resp).__name__)

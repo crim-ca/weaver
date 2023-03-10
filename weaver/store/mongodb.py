@@ -425,12 +425,22 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         is_call = islambda(function_dict)
         if (
             (is_call and not isinstance(process, (Process, ProcessWPS, str)))
-            or (isinstance(function_dict, dict) and type(process) not in function_dict)
+            or (
+                isinstance(function_dict, dict)
+                and type(process) not in function_dict
+                and not issubclass(type(process), tuple(function_dict))
+            )
         ):
             raise ProcessInstanceError(f"Unsupported process type '{fully_qualified_name(process)}'")
         if is_call:
             return function_dict()
-        return function_dict[type(process)]()  # noqa
+        else:
+            proc_type = type(process)
+            for proc_cls in function_dict:  # type: ignore
+                if issubclass(proc_type, proc_cls):
+                    proc_type = proc_cls
+                    break
+        return function_dict[proc_type]()  # noqa
 
     def _get_process_id(self, process):
         # type: (Union[AnyProcessRef, AnyProcess]) -> str

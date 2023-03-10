@@ -125,7 +125,11 @@ def test_lazify():
     assert called_counter[0] == 1, "computed value should have been cached and reused"
 
     # validate core string methods
-    assert text.upper() == "TEST", "other string operations are expected to work seamlessly as any normal string"
+    msg = "other string operations are expected to work seamlessly as any normal string"
+    assert text.upper() == "TEST", msg
+    assert text.lower() == "test", msg
+    assert text.title() == "Test", msg
+    assert text.title().join([text.lower(), text.upper()]) == "testTestTEST", msg
 
 
 def test_null_operators():

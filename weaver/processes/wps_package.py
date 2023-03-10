@@ -958,7 +958,7 @@ def get_auth_requirements(requirement, headers):
                         f"Supported schemes are: {supported_schemes}."
                     )
                 auth_scheme = auth_scheme.capitalize()
-            auth = DockerAuthentication(auth_scheme, auth_token, link_ref_docker)
+            auth = DockerAuthentication(link_ref_docker, auth_scheme, auth_token)
             LOGGER.debug("Authentication details for Docker image reference in Application Package correctly parsed.")
             return auth
 

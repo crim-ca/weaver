@@ -75,6 +75,7 @@ from cornice_swagger.converters.schema import (
     TypeConversionDispatcher,
     TypeConverter,
     ValidatorConversionDispatcher,
+    convert_oneof_validator_factory,
     convert_range_validator,
     convert_regex_validator
 )
@@ -2390,10 +2391,10 @@ class DecimalTypeConverter(NumberTypeConverter):
 
 
 class MoneyTypeConverter(DecimalTypeConverter):
-    pattern = re.compile("^[0-9]+.[0-9]+$")
     convert_validator = ValidatorConversionDispatcher(
-        convert_range_validator(colander.Range(min=0)),
-        convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
+        convert_range_validator,
+        convert_regex_validator,
+        convert_oneof_validator_factory(),
     )
 
 

@@ -1380,10 +1380,13 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert "jobID: " in lines[0]  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+            for line in lines:
+                if line.startswith("jobID: "):
+                    job_id = line.split(":")[-1].strip()
+                    break
 
-            job_id = lines[0].split(":")[-1].strip()
             lines = mocked_sub_requests(
                 self.app, run_command,
                 [
@@ -1795,7 +1798,12 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert len(lines) > 1, "should be indented, pretty printed"
-        assert lines[0] == f"jobID: {self.test_job.id}"
+        for line in lines:
+            if line.startswith("jobID: "):
+                assert line == f"jobID: {self.test_job.id}"
+                break
+        else:
+            raise AssertionError("JobID not found for validation.")
 
     def test_output_format_xml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"

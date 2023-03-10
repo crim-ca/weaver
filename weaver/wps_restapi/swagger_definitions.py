@@ -25,7 +25,7 @@ import duration
 import jsonschema
 import yaml
 from babel.numbers import list_currencies
-from colander import All, DateTime, Email, Length, Money, OneOf, Range, drop, null, required
+from colander import All, DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
@@ -3649,7 +3649,10 @@ class PriceAmount(ExtendedSchemaNode):
     schema_type = Money()
     format = "decimal"  # https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730
     description = "Monetary value of the price."
-    validator = Range(min=0)
+    validator = All(
+        Range(min=0),
+        Regex(re.compile("^[0-9]+.[0-9]+$"), msg="Number must be formatted as currency decimal."),
+    )
 
 
 class PriceCurrency(ExtendedSchemaNode):

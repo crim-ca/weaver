@@ -98,7 +98,7 @@ def upload_file(request):
         path,
         download_headers=False,
         location_headers=False,
-        content_headers=True,
+        content_headers=False,
     )
     headers["Content-Location"] = get_vault_url(vault_file, request)
     return HTTPOk(json=data, headers=headers)
