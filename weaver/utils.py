@@ -137,6 +137,7 @@ if TYPE_CHECKING:
         "backoff_factor": NotRequired[Number],
         "headers": NotRequired[AnyHeadersContainer],
         "cookies": NotRequired[AnyCookiesContainer],
+        "stream": NotRequired[bool],
     }, total=False)
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
@@ -1754,6 +1755,43 @@ def _request_cached(method, url, kwargs):
     return _request_call(method, url, kwargs)
 
 
+def _patch_cached_request_stream(response, stream=False):
+    # type: (AnyResponseType, bool) -> None
+    """
+    Preserves a cached copy of a streamed response contents to allow resolution when reloaded from cache.
+
+    When response contents are streamed, the resulting :class:`Response` object does not contain the contents until the
+    aggregated result is obtained by calling :meth:`Response.contents`, :meth:`Response.text` or :meth:`Response.`json`
+    methods. If no function ends up being called to aggregate the chunks with :meth:`Response.contents`, and instead
+    makes use of one of the interator :meth:`Response.iter_contents`, :meth:`Response.iter_lines` or
+    :meth:`Response.__iter__` methods, the object stored in cache ends up in an invalid state where it believes
+    contents were already consumed (cannot re-iterate), but are not available anymore to provide them on following
+    request calls that reloads it from cache. This patches the object by caching the contents after iterating the
+    chunks to allow them to be retrieved for future cached requests.
+    """
+    if stream:
+        # content not yet consumed, first request call just freshly cached
+        # don't consume the content, otherwise it might break calling code
+        # instead, reapply the same chunk yield, but keep a copy for reuse
+        if not getattr(response, "_content_consumed", False):
+
+            iter_content = getattr(response, "iter_content")
+
+            def cached_iter_content(*_, **__):
+                cached_content = b""
+                for chunk in iter_content(*_, **__):
+                    cached_content += chunk
+                    yield chunk
+                # Cache the result, which would be done after calling 'response.content',
+                # but which is not automatically accomplished when calling 'iter_content'.
+                # Setting '_content' will allow reuse of the chunks by simulated iterator.
+                # (see 'requests/models.Response.iter_content' definition)
+                setattr(response, "_content", cached_content)
+                setattr(response, "_content_consumed", True)
+
+            setattr(response, "iter_content", cached_iter_content)
+
+
 @retry_on_cache_error
 def request_extra(method,                           # type: AnyRequestMethod
                   url,                              # type: str
@@ -1884,6 +1922,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     known_req_opts -= {"url", "method"}  # add as unknown to always remove them since they are passed by arguments
     for req_opt in set(request_kwargs) - known_req_opts:
         request_kwargs.pop(req_opt)
+    stream = request_kwargs.get("stream", False)
     region = cache_request._arg_region  # noqa
     request_args = (method, url, request_kwargs)
     caching_args = (cache_request, region, *request_args)
@@ -1901,6 +1940,7 @@ def request_extra(method,                           # type: AnyRequestMethod
                 resp = _request_call(*request_args)
             else:
                 resp = cache_request(*request_args)
+                _patch_cached_request_stream(resp, stream)
             if allowed_codes:  # check by itself first if specified to bypass following check of error codes
                 if resp.status_code in allowed_codes:
                     return resp

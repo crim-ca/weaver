@@ -63,6 +63,8 @@ Fixes:
   by ``_sort_first`` and ``_sort_after`` control attributes.
 - Fix request cache always invalidated when no explicit ``allowed_codes`` where provided in ``request_extra``, although
   the request succeeded, causing caching optimization to never actually be used on following requests in this case.
+- Fix cached requests misbehaving when combined with ``stream=True`` argument due to contents not being stored in the
+  object for following requests, causing them to raise ``StreamConsumedError`` when calling the chunk iterator again.
 
 .. _changes_4.29.0:
 

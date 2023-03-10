@@ -2,6 +2,7 @@
 
 import contextlib
 import inspect
+import io
 import itertools
 import json
 import os
@@ -681,8 +682,60 @@ def test_request_extra_cache_non_default_func(cache_enabled):
         setup_cache({})  # ensure reset since globally applied
 
 
+def test_request_extra_cached_stream_iter_content():
+    test_called = [0]
+    test_json = {"test": "DATA", "number": 123}
+    test_text = json.dumps(test_json)
+    test_content = str2bytes(test_text)
+
+    class ChunkedSteam(io.BytesIO):
+        def stream(self, chunk=1, **_):
+            chunk = chunk or 1
+            while True:
+                data = self.read(chunk)
+                if not data:
+                    return
+                yield data
+
+    def mock_request(*_, **__):
+        test_called[0] += 1
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        mocked_resp.raw = ChunkedSteam(test_content)
+        return mocked_resp
+
+    try:
+        cache_settings = {f"cache.request.enabled": str(True)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+
+            # WARNING:
+            #   Very important to have 'autospec' to replicate the 'stream' argument here,
+            #   since the signature is used to filter valid params of 'requests.Session.request'.
+            #   Otherwise, 'MagicMock' checked instead, and the 'stream' argument gets dropped.
+            with mock.patch("requests.Session.request", side_effect=mock_request, autospec=True):
+                for _ in range(5):
+                    resp = request_extra("GET", "https://mocked.com", stream=True)
+                    assert resp.status_code == 200
+                    # below fails with StreamConsumedError if cached request did not transfer content properly
+                    body = b""
+                    for part in resp.iter_content(5):
+                        body += part
+                    assert body == test_content
+                    # other handlers should also be valid
+                    assert resp.json() == test_json
+                    assert resp.text == test_text
+                    assert resp.content == test_content
+
+        # NOTE: if this check fails, its probably due to the debugger causing a second call
+        assert test_called[0] == 1, "Caching should have been applied."
+
+    finally:
+        setup_cache({})  # ensure reset since globally applied
+
+
 @pytest.mark.parametrize(
-    "location,expected",
+    "location, expected",
     [
         ("https://mocked-file-server.com/dir/", "dir"),
         ("https://mocked-file-server.com/dir/sub/", "sub"),
