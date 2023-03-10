@@ -427,15 +427,16 @@ def get_any_value(info, default=None, file=True, data=True, pop=False, key=False
     return default
 
 
-def get_any_message(info):
-    # type: (JSON) -> str
+def get_any_message(info, default=""):
+    # type: (JSON, str) -> str
     """
-    Retrieves a dictionary 'value'-like key using multiple common variations [message].
+    Retrieves a dictionary 'value'-like key using multiple common variations [message, description, detail].
 
-    :param info: dictionary that potentially contains a 'message'-like key.
-    :returns: value of the matched 'message'-like key or an empty string if not found.
+    :param info: Dictionary that potentially contains a 'message'-like key.
+    :param default: Default message if no variation could be matched.
+    :returns: value of the matched 'message'-like key or the default string if not found.
     """
-    return info.get("message", "").strip()
+    return (info.get("message") or info.get("description") or info.get("detail") or default).strip()
 
 
 def get_registry(container=None, nothrow=False):
@@ -1808,7 +1809,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     local file path. The path should be absolute to ensure it to be correctly resolved.
 
     All access errors due to file permissions return 403 status code, and missing file returns 404.
-    Any other :py:exc:`IOError` types are converted to a 400 responses.
+    Any other :py:exc:`IOError` types are converted to 400 responses.
 
     .. seealso::
         - :class:`FileAdapter`

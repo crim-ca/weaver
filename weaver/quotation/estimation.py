@@ -28,6 +28,7 @@ from weaver.store.base import StoreProcesses, StoreQuotes
 from weaver.utils import (
     fully_qualified_name,
     get_any_id,
+    get_any_message,
     get_any_value,
     get_header,
     get_href_headers,
@@ -78,11 +79,11 @@ class CurrencyConverter(object):
     """
     Generic definition of a currency converter.
     """
-    url: str
-    name: str
-    token: str = ""
-    json: bool = True
-    parser: Callable[[Union[JSON, str]], Union[Number, str]]
+    url = None      # type: str
+    name = None     # type: str
+    token = ""      # type: str
+    json = True     # type: bool
+    parser = None   # type: Callable[[Union[JSON, str]], Union[Number, str]]
 
     def __init__(self, name, url, parser, **kwargs):
         # type: (str, str, Callable[[Union[JSON, str]], Number], **Any) -> None
@@ -169,8 +170,8 @@ CURRENCY_CONVERTERS = {cvt.name: cvt for cvt in [
 ]}  # type: Dict[str, CurrencyConverter]
 
 
-def get_quote_estimator_config(process):
-    # type: (Process) -> JSON
+def get_quote_estimator_config(process, ignore_error=False):
+    # type: (Process, bool) -> JSON
     """
     Obtain the estimator from the process after validation.
     """
@@ -184,6 +185,8 @@ def get_quote_estimator_config(process):
             "Could not load quote estimator for process [%s]. Reverting to default.",
             process.id, exc_info=exc,
         )
+        if not ignore_error:
+            raise
     return {}
 
 
@@ -257,7 +260,7 @@ def prepare_quote_estimator_config(quote, process):
     # FIXME: handle quotation outputs (?)
     #   Quotation output are only pseudo-definitions for chaining applications in a Workflow
     #   (i.e.: for providing the next process's quotation inputs).
-    #   There is no way to do this at the moment, as submitted execution/quotation outputs are "requested" outputs
+    #   There is no way to do this for now, as submitted execution/quotation outputs are "requested" outputs
     #   (transmission mode, format, etc.) and not "expected" outputs (value/href).
     # process_output_types = {get_any_id(i_def): i_def["type"] for i_def in process.outputs}
     # quotation_outputs = convert_output_params_schema(quote.parameters.get("outputs", {}), JobInputsOutputsSchema.OGC)
@@ -272,7 +275,7 @@ def get_currency(request=None):
     # type: (Optional[AnyRequestType]) -> str
     settings = get_settings(request)
     currency = get_header("X-Weaver-Currency", request.headers)
-    currency = sd.PriceCurrency(missing=None).get("currency").deserialize(currency)
+    currency = sd.PriceCurrency(name="currency", missing=None).deserialize(currency)
     currency = currency or settings.get("weaver.quotation_currency_default") or "USD"
     return currency
 
@@ -347,9 +350,13 @@ def estimate_process_quote(quote, process, settings=None):
                 auto_remove=True,
                 remove=True,
             )
-        quote.results = simplejson.loads(out_quote_json, use_decimal=True)
+        results = simplejson.loads(out_quote_json, use_decimal=True)
+        outputs = results.pop("outputs", {})
+        if outputs:
+            quote.outputs = outputs
+        quote.results = results
         quote.price = convert_exchange_rate(quote.amount, quote.currency)
-        quote.seconds = int(quote.results.get("duration", {}).get("estimate", 0))
+        quote.seconds = int(results.get("duration", {}).get("estimate", 0))
         quote.process = process
     except QuoteException:
         raise
@@ -360,7 +367,7 @@ def estimate_process_quote(quote, process, settings=None):
     return quote
 
 
-def estimate_workflow_quote(quote, process, settings=None):
+def estimate_workflow_quote(quote, process, settings=None):  # pragma: no cover  # FIXME: experimental workflow quotes
     # type: (Quote, Process, Optional[AnySettingsContainer]) -> Quote
     """
     Loop :term:`Workflow` sub-:term:`Process` steps to get their respective :term:`Quote`.
@@ -370,6 +377,7 @@ def estimate_workflow_quote(quote, process, settings=None):
     quote_steps = []
     quote_params = []
     workflow_steps = get_package_workflow_steps(process_url)
+    next_step_params = quote.processParameters
     for step in workflow_steps:
         # retrieve quote from provider ADES
         # TODO: data source mapping
@@ -379,8 +387,17 @@ def estimate_workflow_quote(quote, process, settings=None):
         # FIXME: how to estimate data transfer if remote process (?)
         # FIXME: how to produce intermediate process inputs (?) - remove xfail in functional test once resolved
         # FIXME: must consider fan-out in case of parallel steps
-        data = {"inputs": [], "outputs": []}
-        resp = request_extra("POST", process_quote_url, json=data, headers={"Prefer": "respond-async"})
+        headers = {"Prefer": "respond-async", "Accept": ContentType.APP_JSON}
+        resp = request_extra("POST", process_quote_url, json=next_step_params, headers=headers)
+        if resp.status_code not in [200, 201, 202]:
+            step_name = step["name"]
+            LOGGER.error("Quote estimation for step process [%s] under [%s] failed.", step_name, process.id)
+            msg = get_any_message(resp.json(), default="unspecified error")
+            raise QuoteEstimationError(
+                f"Error HTTP response [{resp.status_code}] from Quote Estimation of step Process [{step_name}] "
+                f"under Workflow Process [{process.id}], with detail: [{msg}]."
+            )
+
         href = resp.headers.get("Location")
         status = QuoteStatus.SUBMITTED
         retry = 0
@@ -388,7 +405,7 @@ def estimate_workflow_quote(quote, process, settings=None):
         while status != QuoteStatus.COMPLETED and abort > 0:
             wait = wait_secs(retry)
             retry += 1
-            resp = request_extra("GET", href)
+            resp = request_extra("GET", href, headers={"Accept": ContentType.APP_JSON})
             if resp.status_code != 200:
                 abort -= 1
                 wait = 5
@@ -398,25 +415,26 @@ def estimate_workflow_quote(quote, process, settings=None):
                 if status == QuoteStatus.COMPLETED:
                     quote_steps.append(href)
                     quote_params.append(body)
+                    # FIXME: need to map previous step output ID to next step input IDs based on Workflow!
+                    # FIXME: when expected next step input is a complex href, how to make it from quote output 'size'?
+                    next_step_params = {"inputs": body.get("outputs", {})}
                     break
                 if status == QuoteStatus.FAILED or status is None:
-                    LOGGER.error("Quote estimation for sub-process [%s] under [%s] failed.", step["name"], process.id)
+                    LOGGER.error("Quote estimation for step process [%s] under [%s] failed.", step["name"], process.id)
                     break
             if abort <= 0:
                 time.sleep(wait)
     if len(workflow_steps) != len(quote_params):
         raise QuoteEstimationError("Could not obtain intermediate quote estimations for all Workflow steps.")
 
-    # FIXME: what if different currencies are defined (?)
-    currency = "USD"
     params = {
-        "price": 0,
-        "currency": currency,
+        "amount": 0,
+        "currency": quote.currency,
         "seconds": 0,
         "steps": quote_steps,
     }
     for step_params in quote_params:
-        params["price"] += step_params["price"]
+        params["amount"] += convert_exchange_rate(step_params["amount"], quote.currency)
         params["seconds"] += step_params["estimatedSeconds"]
 
     quote.update(**params)
@@ -449,10 +467,11 @@ def execute_quote_estimator(task, quote_id):
     quote.status = QuoteStatus.PROCESSING
     q_store.update_quote(quote)
     try:
-        if process.type == ProcessType.WORKFLOW:
-            quote = estimate_workflow_quote(quote, process, settings=settings)
-        else:
-            quote = estimate_process_quote(quote, process, settings=settings)
+        quote_estimator = estimate_process_quote
+        if process.type == ProcessType.WORKFLOW and not process.estimator:
+            LOGGER.warning("Task [%s] using fallback step-processes for quote estimation [%s]", task_id, quote_id)
+            quote_estimator = estimate_workflow_quote
+        quote = quote_estimator(quote, process, settings=settings)
         quote.detail = "Quote processing complete."
         quote.status = QuoteStatus.COMPLETED
         LOGGER.info("Quote estimation complete [%s]. Task: [%s]", quote.id, task_id)

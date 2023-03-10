@@ -12,6 +12,7 @@ properties:
     type: number
     minimum: 0.0
 additionalProperties:
+  description: "Additional quotation estimate details with rundown of values contributing in the total cost."
   $ref: "#/definitions/QuoteEstimateValue"
 
 definitions:

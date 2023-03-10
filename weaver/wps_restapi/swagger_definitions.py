@@ -24,7 +24,8 @@ from typing import TYPE_CHECKING
 import duration
 import jsonschema
 import yaml
-from colander import DateTime, Email, Length, Money, OneOf, Range, drop, null, required
+from babel.numbers import list_currencies
+from colander import All, DateTime, Email, Length, Money, OneOf, Range, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
@@ -87,6 +88,7 @@ from weaver.wps_restapi.colander_extras import (
     PermissiveSequenceSchema,
     SchemeURL,
     SemanticVersion,
+    StrictMappingSchema,
     StringOneOf,
     StringRange,
     XMLObject
@@ -96,8 +98,9 @@ from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # 
 
 if TYPE_CHECKING:
     from typing import Any, Union
+    from typing_extensions import TypedDict
 
-    from weaver.typedefs import JSON, DatetimeIntervalType, SettingsType, TypedDict
+    from weaver.typedefs import JSON, DatetimeIntervalType, SettingsType
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -191,7 +194,7 @@ PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"
 PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
 
 PROCESSES_LISTING_FIELD_FIRST = ["description", "processes", "providers"]
-PROCESSES_LISTING_FIELD_AFTER = ["page", "limit", "total", "links"]
+PROCESSES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "id",
@@ -208,7 +211,10 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
 JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
-JOBS_LISTING_FIELD_AFTER = ["page", "limit", "total", "links"]
+JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
+
+QUOTES_LISTING_FIELD_FIRST = ["description", "quotations"]
+QUOTES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 #########################################################
 # Examples
@@ -1845,7 +1851,8 @@ class QuoteEstimatorConfigurationSchema(ExtendedMappingSchema):
     description = "Quote Estimator Configuration"
 
     def deserialize(self, cstruct):
-        return validate_node_schema(self, cstruct)
+        schema = ExtendedMappingSchema(_schema=self._schema)  # avoid recursion
+        return validate_node_schema(schema, cstruct)
 
 
 class QuoteEstimatorWeightedParameterSchema(ExtendedMappingSchema):
@@ -3297,16 +3304,22 @@ class CreatedJobStatusSchema(DescriptionSchema):
     location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
 
 
-class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
-    bill = UUID(description="ID of the created bill.")
+class PagingBodySchema(ExtendedMappingSchema):
+    # don't use defaults if missing, otherwise we might report incorrect values compared to actual contents
+    count = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=0),
+                               description="Number of items returned within this paged result.")
+    limit = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=1, max=1000),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml",
+                               description="Maximum number of items returned per page.")
+    page = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=0),
+                              description="Paging index.")
+    total = ExtendedSchemaNode(Integer(), missing=drop, validator=Range(min=0),
+                               description="Total number of items regardless of paging.")
 
 
-class GetPagingJobsSchema(ExtendedMappingSchema):
+class GetPagingJobsSchema(PagingBodySchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/jobList.yaml"  # technically, no 'links' yet, but added after by oneOf
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000),
-                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
-    page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
 class JobCategoryFilters(PermissiveMappingSchema):
@@ -3627,8 +3640,8 @@ class QuoteStatusSchema(ExtendedSchemaNode):
 
 
 class PartialQuoteSchema(ExtendedMappingSchema):
-    id = UUID(description="Quote ID.")
     status = QuoteStatusSchema()
+    quoteID = UUID(description="Quote ID.")
     processID = ProcessIdentifierTag(description="Process identifier corresponding to the quote definition.")
 
 
@@ -3641,9 +3654,12 @@ class PriceAmount(ExtendedSchemaNode):
 
 class PriceCurrency(ExtendedSchemaNode):
     schema_type = String()
-    validator = Length(min=3, max=3)
     description = "Currency code in ISO-4217 format."
     default = "USD"  # most common online
+    validator = All(
+        Length(min=3, max=3),
+        OneOf(list_currencies()),
+    )
 
 
 class PriceSchema(ExtendedMappingSchema):
@@ -3673,6 +3689,29 @@ class QuoteEstimateValue(PermissiveMappingSchema):
     cost = PositiveNumber(default=0, missing=0.0)
 
 
+class QuoteStepChainedInputLiteral(StrictMappingSchema, QuoteEstimatorWeightedParameterSchema):
+    value = AnyLiteralType()
+
+
+class QuoteStepChainedInputComplex(StrictMappingSchema, QuoteEstimatorWeightedParameterSchema):
+    size = PositiveNumber()
+
+
+class QuoteStepChainedInput(OneOfKeywordSchema):
+    _one_of = [
+        QuoteStepChainedInputLiteral(),
+        QuoteStepChainedInputComplex(),
+    ]
+
+
+class QuoteStepOutputParameters(ExtendedMappingSchema):
+    description = "Outputs from a quote estimation to be chained as inputs for a following Workflow step."
+    output_id = QuoteStepChainedInput(
+        variable="{output-id}",
+        description="Mapping of output to chain as input for quote estimation.",
+    )
+
+
 class QuoteProcessResults(PermissiveMappingSchema):
     _schema = f"{WEAVER_SCHEMA_URL}/quotation/quote-estimation-result.yaml"
     description = (
@@ -3700,7 +3739,6 @@ class UserIdSchema(OneOfKeywordSchema):
 class StepQuotation(PartialQuoteSchema):
     detail = ExtendedSchemaNode(String(), description="Detail about quote processing.", missing=None)
     price = PriceSchema(description="Estimated price for process execution.")
-    currency = ExtendedSchemaNode(String(), description="Currency code in ISO-4217 format.", missing=None)
     expire = ExtendedSchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
     created = ExtendedSchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
     userID = UserIdSchema(description="User ID that requested the quote.", missing=required, default=None)
@@ -3712,6 +3750,7 @@ class StepQuotation(PartialQuoteSchema):
                                     description="Estimated duration of process execution in ISO-8601 format.")
     processParameters = QuoteProcessParameters(title="QuoteProcessParameters")
     results = QuoteProcessResults(title="QuoteProcessResults", default={})
+    outputs = QuoteStepOutputParameters(missing=drop)
 
 
 class StepQuotationList(ExtendedSequenceSchema):
@@ -3720,6 +3759,10 @@ class StepQuotationList(ExtendedSequenceSchema):
 
 
 class Quotation(StepQuotation):
+    paid = ExtendedSchemaNode(Boolean(), default=False, description=(
+        "Indicates if the quote as been paid by the user. "
+        "This is mandatory in order to execute the job corresponding to the produced quote."
+    ))
     steps = StepQuotationList(missing=drop)
 
 
@@ -3741,13 +3784,22 @@ class QuotationList(ExtendedSequenceSchema):
     quote = UUID(description="Quote ID.")
 
 
-class QuotationListSchema(ExtendedMappingSchema):
+class QuotationListSchema(PagingBodySchema):
+    _sort_first = QUOTES_LISTING_FIELD_FIRST
+    _sort_after = QUOTES_LISTING_FIELD_AFTER
+
     quotations = QuotationList()
 
 
+class CreatedQuotedJobStatusSchema(PartialQuoteSchema, CreatedJobStatusSchema):
+    billID = UUID(description="ID of the created bill.")
+
+
 class BillSchema(ExtendedMappingSchema):
-    id = UUID(description="Bill ID.")
+    billID = UUID(description="Bill ID.")
     quoteID = UUID(description="Original quote ID that produced this bill.", missing=drop)
+    processID = ProcessIdentifierTag()
+    jobID = JobID()
     title = ExtendedSchemaNode(String(), description="Name of the bill.")
     description = ExtendedSchemaNode(String(), missing=drop)
     price = PriceSchema(description="Price associated to the bill.")
@@ -5386,16 +5438,19 @@ class PostProcessJobsEndpointXML(LocalProcessPath):
     )
 
 
-class GetJobsQueries(ExtendedMappingSchema):
+class PagingQueries(ExtendedMappingSchema):
+    page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
+    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=1000),
+                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
+
+
+class GetJobsQueries(PagingQueries):
     # note:
     #   This schema is also used to generate any missing defaults during filter parameter handling.
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
     detail = ExtendedSchemaNode(QueryBoolean(), default=False, example=True, missing=drop,
                                 description="Provide job details instead of IDs.")
     groups = JobGroupsCommaSeparated()
-    page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=10000),
-                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     min_duration = ExtendedSchemaNode(
         Integer(allow_string=True), name="minDuration", missing=drop, default=null, validator=Range(min=0),
         schema=f"{OGC_API_PROC_PART1_PARAMETERS}/minDuration.yaml",
@@ -5500,10 +5555,7 @@ class ProcessQuoteEndpoint(LocalProcessPath, QuotePath):
     querystring = LocalProcessQuery()
 
 
-class GetQuotesQueries(ExtendedMappingSchema):
-    page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
-    limit = ExtendedSchemaNode(Integer(), missing=10, default=10, validator=Range(min=1, max=10000),
-                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
+class GetQuotesQueries(PagingQueries):
     process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
@@ -5851,11 +5903,8 @@ class ProcessListingLinks(ExtendedMappingSchema):
     links = LinkList(missing=drop)
 
 
-class ProcessListingMetadata(ExtendedMappingSchema):
+class ProcessListingMetadata(PagingBodySchema):
     description = "Metadata relative to the listed processes."
-    page = ExtendedSchemaNode(Integer(), misisng=drop, default=None, validator=Range(min=0))
-    limit = ExtendedSchemaNode(Integer(), missing=drop, default=None, validator=Range(min=1),
-                               schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
     total = ExtendedSchemaNode(Integer(), description="Total number of local processes, or also including all "
                                                       "remote processes across providers if requested.")
 
@@ -6030,6 +6079,12 @@ class FailedSyncJobResponse(CompletedJobResponse):
     description = "Job submitted and failed synchronous execution. See server logs for more details."
 
 
+class InvalidJobParametersResponse(ExtendedMappingSchema):
+    description = "Job parameters failed validation."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class OkDeleteProcessJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
@@ -6144,6 +6199,12 @@ class AcceptedQuoteResponse(ExtendedMappingSchema):
     )
     header = ResponseHeaders()
     body = PartialQuoteSchema()
+
+
+class QuotePaymentRequiredResponse(ServerErrorBaseResponseSchema):
+    description = "Quoted process execution refused due to missing payment."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetQuoteInfoResponse(ExtendedMappingSchema):
@@ -6530,7 +6591,7 @@ post_provider_process_job_responses = {
     "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
     "204": NoContentJobResultsResponse(description="success"),
-    "400": FailedSyncJobResponse(),
+    "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -6539,7 +6600,7 @@ post_process_jobs_responses = {
     "200": CompletedJobResponse(description="success"),
     "201": CreatedLaunchJobResponse(description="success"),
     "204": NoContentJobResultsResponse(description="success"),
-    "400": FailedSyncJobResponse(),
+    "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
@@ -6722,11 +6783,14 @@ get_quote_responses = {
 post_quotes_responses = {
     "201": CreatedQuoteResponse(),
     "202": AcceptedQuoteResponse(),
+    "400": InvalidJobParametersResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
+    "400": InvalidJobParametersResponse(),
+    "402": QuotePaymentRequiredResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }

@@ -39,6 +39,11 @@ Changes:
 - Add ``Lazify`` utility class for holding a string with delayed computation and caching that returns its representation
   on-demand during formatting or other string operations to reduce the impact of its long generation. This can be used
   with a callable returning a string representation that can be discarded without invocation on inactive logging levels.
+- Add ``count`` field to `JSON` output of endpoints that support paging to provide the number of items returned within
+  the paged result. Adjust the ``/quotations`` endpoint that was using it instead of ``total`` like it was done on other
+  listing endpoints.
+- Add ``detail`` query parameter for the ``/quotations`` endpoint to allow listing of `Quote` summary details instead
+  of only IDs by default, similarly to the ``/jobs`` endpoint.
 
 .. |ogc-proc-ext-billing-short| replace:: Billing
 .. _ogc-proc-exc-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing

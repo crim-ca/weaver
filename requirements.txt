@@ -1,5 +1,6 @@
 -r requirements-sys.txt
 alembic
+babel
 beaker
 beautifulsoup4
 # AWS support (S3 buckets)

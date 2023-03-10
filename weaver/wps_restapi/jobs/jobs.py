@@ -96,17 +96,21 @@ def get_queried_jobs(request):
     items, total = store.find_jobs(request=request, group_by=groups, **filters)
     body = {"total": total}
 
-    def _job_list(jobs):  # type: (Iterable[Job]) -> List[JSON]
-        return [j.json(settings) if detail else j.id for j in jobs]
+    def _job_list(_jobs):  # type: (Iterable[Job]) -> List[JSON]
+        return [j.json(settings) if detail else j.id for j in _jobs]
 
     paging = {}
     if groups:
+        count = 0
         for grouped_jobs in items:
-            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
-        body.update({"groups": items})
+            jobs = _job_list(grouped_jobs["jobs"])
+            grouped_jobs["jobs"] = jobs
+            count += len(jobs)
+        body.update({"groups": items, "count": count})
     else:
-        paging = {"page": filters["page"], "limit": filters["limit"]}
-        body.update({"jobs": _job_list(items), **paging})
+        jobs = _job_list(items)
+        paging = {"page": filters["page"], "limit": filters["limit"], "count": len(jobs)}
+        body.update({"jobs": jobs, **paging})
     try:
         body.update({"links": get_job_list_links(total, filters, request)})
     except IndexError as exc:

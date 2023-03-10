@@ -3,12 +3,13 @@ from typing import TYPE_CHECKING
 
 import colander
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
-from pyramid.httpexceptions import HTTPAccepted, HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+from pyramid.httpexceptions import HTTPAccepted, HTTPCreated, HTTPOk, HTTPPaymentRequired, HTTPUnprocessableEntity
+from pyramid.settings import asbool
 
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
-from weaver.exceptions import QuoteNotFound, log_unhandled_exceptions
+from weaver.exceptions import log_unhandled_exceptions
 from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
@@ -26,6 +27,7 @@ from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
 from weaver.utils import as_int, get_header, get_settings, parse_prefer_header_execute_mode
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
+from weaver.wps_restapi.quotation.utils import get_quote
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnyViewResponse, PyramidRequest
@@ -48,10 +50,20 @@ def request_quote(request):
         (process.type not in [ProcessType.APPLICATION, ProcessType.WORKFLOW]) or
         (process.type == ProcessType.WORKFLOW and weaver_config not in WeaverFeature.REMOTE)
     ):
-        raise HTTPBadRequest(json={
+        raise HTTPUnprocessableEntity(json={
             "title": "UnsupportedOperation",
-            "detail": f"Unsupported quoting process type '{process.type}' on '{weaver_config}' instance.",
-            "status": HTTPBadRequest.code,
+            "detail": f"Unsupported quotation for process type '{process.type}' on '{weaver_config}' instance.",
+            "status": HTTPUnprocessableEntity.code,
+            "instance": process.href(settings)
+        })
+    if not get_quote_estimator_config(process, ignore_error=True):
+        raise HTTPUnprocessableEntity(json={
+            "title": "UnsupportedOperation",
+            "detail": (
+                f"Unsupported quotation for process '{process.id}'. "
+                "It does not provide an estimator configuration."
+            ),
+            "status": HTTPUnprocessableEntity.code,
             "instance": process.href(settings)
         })
 
@@ -64,7 +76,6 @@ def request_quote(request):
             "error": exc.__class__.__name__,
             "value": exc.value
         })
-
     validate_process_io(process, process_params)
 
     quote_store = get_db(request).get_store(StoreQuotes)
@@ -170,6 +181,7 @@ def get_quote_list(request):
 
     page = int(request.params.get("page", "0"))
     limit = int(request.params.get("limit", "10"))
+    detail = asbool(request.params.get("detail", False))
     filters = {
         "process_id": request.params.get("process", None) or request.matchdict.get("process_id", None),
         "page": page,
@@ -177,13 +189,17 @@ def get_quote_list(request):
         "sort": request.params.get("sort", Sort.CREATED),
     }
     store = get_db(request).get_store(StoreQuotes)
-    items, count = store.find_quotes(**filters)
-    return HTTPOk(json={
-        "count": count,
+    items, total = store.find_quotes(**filters)
+    quotes = [quote.partial() if detail else quote.id for quote in items]
+    data = {
         "page": page,
         "limit": limit,
-        "quotes": [quote.id for quote in items]
-    })
+        "count": len(quotes),
+        "total": total,
+        "quotations": quotes
+    }
+    body = sd.QuotationListSchema().deserialize(data)
+    return HTTPOk(json=body)
 
 
 @sd.process_quote_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -196,12 +212,7 @@ def get_quote_info(request):
     """
     Get quote information.
     """
-    quote_id = request.matchdict.get("quote_id")
-    store = get_db(request).get_store(StoreQuotes)
-    try:
-        quote = store.fetch_by_id(quote_id)
-    except QuoteNotFound:
-        raise HTTPNotFound("Could not find quote with specified 'quote_id'.")
+    quote = get_quote(request)
     return HTTPOk(json=quote.json())
 
 
@@ -215,11 +226,18 @@ def execute_quote(request):
     """
     Execute a quoted process.
     """
-    quote_info = get_quote_info(request).json["quote"]
+    quote = get_quote(request)
+    if not quote.paid:
+        raise HTTPPaymentRequired(json={
+            "title": "Payment Required",
+            "detail": sd.QuotePaymentRequiredResponse.description,
+            "status": HTTPPaymentRequired.code,
+            "value": str(quote.id),
+        })
+
     quote_bill_info = {
-        "quote": quote_info.get("id"),
-        "price": quote_info.get("price"),
-        "currency": quote_info.get("currency")
+        "quote": quote.id,
+        "price": quote.price,
     }
     job_resp = submit_local_job(request)
     job_json = job_resp.json
@@ -227,5 +245,9 @@ def execute_quote(request):
     user_id = str(request.authenticated_userid)
     store = get_db(request).get_store(StoreBills)
     bill = store.save_bill(Bill(user=user_id, job=job_id, **quote_bill_info))
-    job_json.update({"bill": bill.id})
-    return HTTPCreated(json=job_json)
+    job_json.update({
+        "billID": bill.id,
+        "quoteID": quote.id,
+    })
+    data = sd.CreatedQuoteExecuteResponse().deserialize(job_json)
+    return HTTPCreated(json=data)

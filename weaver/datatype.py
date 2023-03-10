@@ -57,7 +57,7 @@ from weaver.utils import (
     request_extra
 )
 from weaver.visibility import Visibility
-from weaver.warning import NonBreakingExceptionWarning
+from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_client, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -92,6 +92,7 @@ if TYPE_CHECKING:
         Price,
         QuoteProcessParameters,
         QuoteProcessResults,
+        QuoteStepOutputParameters,
         Statistics
     )
     from weaver.visibility import AnyVisibility
@@ -2654,7 +2655,54 @@ class Process(Base):
         return process_map[process_key](**self.params_wps)
 
 
-class Quote(Base):
+class PriceMixin(Base, abc.ABC):
+    @property
+    def amount(self):
+        # type: () -> Decimal
+        """
+        amount of the current quote.
+        """
+        return Decimal(str(self.get("amount", "0.0")))
+
+    @amount.setter
+    def amount(self, amount):
+        # type: (Union[Decimal, float, str]) -> None
+        if not isinstance(amount, Decimal):
+            try:
+                amount = Decimal(str(amount))
+            except (ConversionSyntax, ValueError, TypeError):
+                raise ValueError(f"Field '{self.__name__}.amount' must be a floating point number.")
+        self["amount"] = amount
+
+    @property
+    def currency(self):
+        # type: () -> str
+        """
+        Currency of the quote price.
+        """
+        currency = self.get("currency")
+        return currency or "USD"
+
+    @currency.setter
+    def currency(self, currency):
+        # type: (str) -> None
+        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
+            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
+        self["currency"] = currency
+
+    @property
+    def price(self):
+        # type: () -> Price
+        return {"amount": self.amount, "currency": self.currency}
+
+    @price.setter
+    def price(self, price):
+        # type: (Price) -> None
+        self.amount = price["amount"]
+        self.currency = price["currency"]
+
+
+class Quote(PriceMixin, Base):
     """
     Dictionary that contains quote information.
 
@@ -2681,6 +2729,44 @@ class Quote(Base):
             self["expire"] = now() + timedelta(days=1)
         if "id" not in self:
             self["id"] = uuid.uuid4()
+
+    # NOTE:
+    #   Assume that a quote payment would be submitted and validated by an external operation.
+    #   Do not allow it within the scope of this object to avoid incorrect handling/reporting.
+    #   Only allow it when creating the object, which would be loaded from the database with
+    #   external payment applied beforehand if provided.
+
+    def __setitem__(self, key, value):
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).__setitem__(key, value)
+
+    def __setattr__(self, key, value):
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).__setattr__(key, value)
+
+    def setdefault(self, key, default):  # noqa
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).setdefault(key, default)
+
+    def update(self, mapping, **__):
+        if mapping.pop("paid", None) is not None:
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+        super(Quote, self).update(mapping, **__)
+
+    @property
+    def paid(self):
+        # type: () -> bool
+        return self.get("paid", False)
+
+    @paid.setter
+    def paid(self, _):
+        warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
 
     @property
     def id(self):
@@ -2834,56 +2920,29 @@ class Quote(Base):
     def results(self, data):
         # type: (QuoteProcessResults) -> None
         try:
-            sd.QuoteProcessResults().deserialize(data)
+            results = sd.QuoteProcessResults().deserialize(data)
         except colander.Invalid:
             LOGGER.error("Invalid process results for quote submission.\n%s", repr_json(data, indent=2))
             raise TypeError("Invalid process results for quote submission.")
-        self["results"] = data
+        self["results"] = results
 
     @property
-    def amount(self):
-        # type: () -> Decimal
+    def outputs(self):
+        # type: () -> QuoteStepOutputParameters
         """
-        amount of the current quote.
+        Quote estimation outputs for a following step quote estimation.
         """
-        return Decimal(str(self.get("amount", "0.0")))
+        return self.get("outputs") or {}
 
-    @amount.setter
-    def amount(self, amount):
-        # type: (Union[Decimal, float, str]) -> None
-        if not isinstance(amount, Decimal):
-            try:
-                amount = Decimal(str(amount))
-            except (ConversionSyntax, ValueError, TypeError):
-                raise ValueError(f"Field '{self.__name__}.amount' must be a floating point number.")
-        self["amount"] = amount
-
-    @property
-    def currency(self):
-        # type: () -> str
-        """
-        Currency of the quote price.
-        """
-        currency = self.get("currency")
-        return currency or "USD"
-
-    @currency.setter
-    def currency(self, currency):
-        # type: (str) -> None
-        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
-            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
-        self["currency"] = currency
-
-    @property
-    def price(self):
-        # type: () -> Price
-        return {"amount": self.amount, "currency": self.currency}
-
-    @price.setter
-    def price(self, price):
-        # type: (Price) -> None
-        self.amount = price["amount"]
-        self.currency = price["currency"]
+    @outputs.setter
+    def outputs(self, data):
+        # type: (QuoteStepOutputParameters) -> None
+        try:
+            outputs = sd.QuoteStepOutputParameters().deserialize(data)
+        except colander.Invalid:
+            LOGGER.error("Invalid quote estimation outputs for next step submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid quote estimation outputs for next step submission.")
+        self["outputs"] = outputs
 
     expire = LocalizedDateTimeProperty(doc="Quote expiration datetime.")
     created = LocalizedDateTimeProperty(doc="Quote creation datetime.", default_now=True)
@@ -2902,7 +2961,9 @@ class Quote(Base):
             "id": self.id,
             "detail": self.detail,
             "status": self.status,
-            "price": self.price,
+            "paid": self.paid,
+            "amount": str(self.amount),  # preserve precision with representation as is
+            "currency": self.currency,
             "user": self.user,
             "process": self.process,
             "steps": self.steps,
@@ -2910,6 +2971,7 @@ class Quote(Base):
             "expire": self.expire,
             "seconds": self.seconds,
             "results": self.results,
+            "outputs": self.outputs,
             "parameters": self.parameters,
         }
 
@@ -2919,8 +2981,8 @@ class Quote(Base):
         Submitted :term:`Quote` representation with minimal details until evaluation is completed.
         """
         data = {
-            "id": self.id,
             "status": self.status,
+            "quoteID": self.id,
             "processID": self.process
         }
         return sd.PartialQuoteSchema().deserialize(data)
@@ -2968,7 +3030,7 @@ class Quote(Base):
         return quote_url
 
 
-class Bill(Base):
+class Bill(PriceMixin, Base):
     """
     Dictionary that contains bill information.
 
@@ -3035,20 +3097,6 @@ class Bill(Base):
         return dict.__getitem__(self, "job")
 
     @property
-    def price(self):
-        """
-        Price of the current quote.
-        """
-        return self.get("price", 0.0)
-
-    @property
-    def currency(self):
-        """
-        Currency of the quote price.
-        """
-        return self.get("currency")
-
-    @property
     def created(self):
         """
         Quote creation datetime.
@@ -3077,7 +3125,6 @@ class Bill(Base):
             "quote": self.quote,
             "job": self.job,
             "price": self.price,
-            "currency": self.currency,
             "created": self.created,
             "title": self.title,
             "description": self.description,
@@ -3085,4 +3132,10 @@ class Bill(Base):
 
     def json(self):
         # type: () -> JSON
+        data = self.dict()
+        data.update({
+            "billID": self.id,
+            "quoteID": self.quote,
+            "jobID": self.job,
+        })
         return sd.BillSchema().deserialize(self)

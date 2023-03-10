@@ -88,7 +88,11 @@ def get_processes(request):
 
         body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
         if not with_providers:
-            paging = {"page": paging.get("page"), "limit": paging.get("limit")}  # remove other params
+            paging = {  # remove other params
+                "page": paging.get("page"),
+                "limit": paging.get("limit"),
+                "count": len(processes),
+            }
             body.update(paging)
         else:
             paging = {}  # disable to remove paging-related links

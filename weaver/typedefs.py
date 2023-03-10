@@ -445,6 +445,11 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+    QuoteStepOutput = Union[
+        TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True),
+        TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True),
+    ]
+    QuoteStepOutputParameters = Dict[str, QuoteStepOutput]
     QuoteProcessResults = TypedDict("QuoteProcessResults", {
         "flat": NotRequired[Number],
         "memory": NotRequired[Number],
@@ -453,6 +458,7 @@ if TYPE_CHECKING:
         "cpu": NotRequired[Number],
         "gpu": NotRequired[Number],
         "total": NotRequired[Number],
+        "outputs": NotRequired[QuoteStepOutputParameters]
     }, total=False)
     Price = TypedDict("Price", {
         "amount": Decimal,
