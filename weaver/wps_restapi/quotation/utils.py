@@ -34,7 +34,7 @@ def check_quotation_supported(container):
         return False
     weaver_config = get_weaver_configuration(settings)
     if weaver_config not in WeaverFeature.QUOTING:
-        LOGGER.info(f"Unsupported quotation requests for configuration '%s'.", weaver_config)
+        LOGGER.info("Unsupported quotation requests for configuration '%s'.", weaver_config)
         return False
     return True
 

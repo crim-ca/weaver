@@ -139,7 +139,7 @@ if TYPE_CHECKING:
         "cookies": NotRequired[AnyCookiesContainer],
     }, total=False)
     RequestCachingKeywords = Dict[str, AnyValueType]
-    RequestCachingFunction = Callable[[AnyRequestMethod, str,  RequestCachingKeywords], Response]
+    RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
 
     MetadataResult = TypedDict("MetadataResult", {
         "Date": str,
@@ -2685,7 +2685,7 @@ def fetch_files_s3(location,                            # type: str
 
 def fetch_files_url(file_references,                    # type: Iterable[str]
                     out_dir,                            # type: Path
-                    out_method,                         # type: AnyOutputMethod 
+                    out_method,                         # type: AnyOutputMethod
                     base_url,                           # type: str
                     include=None,                       # type: Optional[List[str]]
                     exclude=None,                       # type: Optional[List[str]]
