@@ -820,6 +820,8 @@ class Format(ExtendedMappingSchema):
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
+    _ext_schema_fields = []  # exclude "$schema" added on each sub-deserialize (too verbose, only for reference)
+
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)

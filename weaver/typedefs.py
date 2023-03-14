@@ -832,7 +832,7 @@ if TYPE_CHECKING:
     ProcessExecution = TypedDict("ProcessExecution", {
         "mode": NotRequired[AnyExecuteMode],
         "response": NotRequired[AnyExecuteResponse],
-        "inputs": Required[ExecutionInputs],
-        "outputs": Required[ExecutionOutputs],
+        "inputs": NotRequired[ExecutionInputs],
+        "outputs": NotRequired[ExecutionOutputs],
         "notification_email": NotRequired[str],
     }, total=False)

@@ -1187,8 +1187,13 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     _extension = "_ext_schema_ref"
     _ext_schema_fields = ["_schema", "_id"]
 
+    # typings and attributes to help IDEs flag that the field is available/overridable
+    _schema = None          # type: str
+    _id = None              # type: str
+
     def __init__(self, *args, **kwargs):
-        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
+        schema_fields = self._schema_fields
+        for schema_key in schema_fields:
             schema_field = schema_key[1:]
             schema_ref = kwargs.pop(schema_field, None)
             if self._is_schema_ref(schema_ref):
@@ -1196,7 +1201,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SchemaRefMappingSchema._extension, True)
 
-        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
+        for schema_key in schema_fields:
             schema_field = f"${schema_key[1:]}"
             sort_first = getattr(self, "_sort_first", [])
             sort_after = getattr(self, "_sort_after", [])
@@ -1208,6 +1213,10 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         # type: (Any) -> bool
         return isinstance(schema_ref, str) and URL.match_object.match(schema_ref)
 
+    @property
+    def _schema_fields(self):
+        return getattr(self, "_ext_schema_fields", SchemaRefMappingSchema._ext_schema_fields)
+
     def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
         if not isinstance(cstruct, dict):
             return cstruct
@@ -1215,10 +1224,11 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
             return cstruct
 
         schema_result = {}
-        for schema_key in SchemaRefMappingSchema._ext_schema_fields:
-            schema_field = f"${schema_key[1:]}"
+        schema_fields = self._schema_fields
+        for schema_key in schema_fields:
             schema_ref = getattr(self, schema_key, None)
             if self._is_schema_ref(schema_ref):
+                schema_field = f"${schema_key[1:]}"
                 schema = ExtendedSchemaNode(
                     colander.String(),
                     name=schema_field,
