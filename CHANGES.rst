@@ -65,6 +65,10 @@ Fixes:
   the request succeeded, causing caching optimization to never actually be used on following requests in this case.
 - Fix cached requests misbehaving when combined with ``stream=True`` argument due to contents not being stored in the
   object for following requests, causing them to raise ``StreamConsumedError`` when calling the chunk iterator again.
+- Fix execution payloads for functional tests using ``WorkflowRESTScatterCopyNetCDF``, ``WorkflowRESTSelectCopyNetCDF``,
+  ``WorkflowWPS1ScatterCopyNetCDF`` and``WorkflowWPS1SelectCopyNetCDF`` processes, which requested invalid output
+  identifiers. Those erroneous definitions were detected using the new `Process` execution I/O pre-validation against
+  the corresponding `Process` descriptions on `Job` submission.
 
 .. _changes_4.29.0:
 

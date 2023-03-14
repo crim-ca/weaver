@@ -986,7 +986,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         .. note::
             Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
-            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+            location cannot be mocked by the test suite. Employ local test paths as if they were already fetched.
         """
 
         with contextlib.ExitStack() as stack:

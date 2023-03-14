@@ -745,7 +745,10 @@ def validate_process_io(process, payload):
             raise OWSInvalidParameterValue(json={
                 "code": "InvalidParameterValue",
                 "name": io_type,
-                "description": f"Submitted execution {io_type} contain unknown identifiers to the process description.",
+                "description": (
+                    f"Submitted execution {io_type} contain unknown identifiers to the process description. "
+                    f"Valid {io_type} identifiers are: {sorted(list(io_process_map))}."
+                ),
                 "value": list(unknown_ids),
             })
         for io_id, io_proc in io_process_map.items():
