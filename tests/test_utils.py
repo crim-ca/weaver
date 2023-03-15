@@ -95,6 +95,7 @@ if TYPE_CHECKING:
     from responses import _Body as BodyType  # noqa: W0212
 
     from tests.utils import S3Scheme
+    from weaver.utils import AnyDownloadOutputMethod
     from weaver.typedefs import AnyRequestType, HeadersType
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
@@ -659,7 +660,7 @@ def test_request_extra_cache_non_default_func(cache_enabled):
     test_called = [0]
 
     @cache_region(test_region)
-    def mock_request(*args):
+    def mock_request(*_):
         test_called[0] += 1
         mocked_resp = Response()
         mocked_resp.status_code = HTTPOk.code
@@ -1046,7 +1047,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
     ]),
 ])
 def test_fetch_directory_local(listing_dir,     # type: str
-                               out_method,      # type: OutputMethod
+                               out_method,      # type: AnyDownloadOutputMethod
                                include,         # type: Optional[List[str]]
                                exclude,         # type: Optional[List[str]]
                                matcher,         # type: PathMatchingMethod

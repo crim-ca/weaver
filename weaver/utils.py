@@ -2973,7 +2973,7 @@ def adjust_directory_local(location,                            # type: Path
 
 def adjust_directory_local(location,                            # type: Path
                            out_dir,                             # type: Path
-                           out_method,                          # type: OutputMethod
+                           out_method,                          # type: AnyOutputMethod
                            include=None,                        # type: Optional[List[str]]
                            exclude=None,                        # type: Optional[List[str]]
                            matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
