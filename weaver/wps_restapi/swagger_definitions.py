@@ -3647,13 +3647,20 @@ class PartialQuoteSchema(ExtendedMappingSchema):
     processID = ProcessIdentifierTag(description="Process identifier corresponding to the quote definition.")
 
 
+class DecimalRegex(Regex):
+    # because the received value can be a Decimal,
+    # the pattern match object cannot perform regex check directly on it
+    def __call__(self, node, value):
+        return super().__call__(node, str(value))
+
+
 class PriceAmount(ExtendedSchemaNode):
     schema_type = Money()
     format = "decimal"  # https://github.com/OAI/OpenAPI-Specification/issues/845#issuecomment-378139730
     description = "Monetary value of the price."
     validator = All(
         Range(min=0),
-        Regex(re.compile("^[0-9]+.[0-9]+$"), msg="Number must be formatted as currency decimal."),
+        DecimalRegex(re.compile("^[0-9]+.[0-9]+$"), msg="Number must be formatted as currency decimal."),
     )
 
 
