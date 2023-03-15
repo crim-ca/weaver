@@ -705,7 +705,7 @@ def test_request_extra_cached_stream_iter_content():
         return mocked_resp
 
     try:
-        cache_settings = {f"cache.request.enabled": str(True)}
+        cache_settings = {"cache.request.enabled": str(True)}
         with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
             setup_cache(cache_settings)
 
