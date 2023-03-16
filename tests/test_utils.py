@@ -66,6 +66,7 @@ from weaver.utils import (
     get_request_options,
     get_sane_name,
     get_secure_directory_name,
+    get_secure_filename,
     get_ssl_verify_option,
     get_url_without_query,
     is_update_version,
@@ -103,6 +104,22 @@ AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
 AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
+
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    """
+    Fixture automatically applied for all test combinations in this module to reset caches and their configurations.
+
+    This is to minimize the impact of caches incorrectly reset, which could cause invalid initial states between tests
+    or between distinct parametrization values for a same test.
+
+    .. seealso::
+        See the ``WARNING`` note on :func:`setup_cache` import.
+    """
+    setup_cache({})
+    yield  # test
+    setup_cache({})
 
 
 def test_lazify():
@@ -736,6 +753,30 @@ def test_request_extra_cached_stream_iter_content():
 
 
 @pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("file.txt", "file.txt"),
+        ("file_.txt", "file_.txt"),
+        ("file__.txt", "file__.txt"),
+        ("_file_.txt", "_file_.txt"),
+        ("__file.txt", "__file.txt"),
+        ("_file_text_.txt", "_file_text_.txt"),
+        ("_.file_text_.txt", "_file_text_.txt"),
+        ("__.file_text_.txt", "__file_text_.txt"),
+        ("__.file.text_.txt", "__file.text_.txt"),
+        ("_file.text_.txt", "_file.text_.txt"),
+        (".file.text_.txt", "file.text_.txt"),
+        (".file.text.txt", "file.text.txt"),
+        ("./.file.text.txt", "file.text.txt"),
+        ("../.file.text.txt", "file.text.txt"),
+    ]
+)
+def test_get_secure_filename(name, expected):
+    result = get_secure_filename(name)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
     "location, expected",
     [
         ("https://mocked-file-server.com/dir/", "dir"),
@@ -763,7 +804,7 @@ def test_get_secure_directory_name_uuid():
 
 
 @pytest.mark.parametrize(
-    "include_dir_heading,include_separators,include_code_format,include_table_format,include_modified_date",
+    "include_dir_heading, include_separators, include_code_format, include_table_format, include_modified_date",
     itertools.product((True, False), repeat=5)
 )
 def test_fetch_directory_html(include_dir_heading,       # type: bool
@@ -912,7 +953,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
 
 
 # expect_files[i] = (Path, IsLink)
-@pytest.mark.parametrize("listing_dir,out_method,include,exclude,matcher,expect_files", [
+@pytest.mark.parametrize("listing_dir, out_method, include, exclude, matcher, expect_files", [
     ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("dir/", True),
         ("dir/file.txt", False),
@@ -1089,7 +1130,7 @@ def test_fetch_directory_local(listing_dir,     # type: str
         assert out_dirs == expect_dirs, f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
-@pytest.mark.parametrize("listing_dir,include,exclude,matcher,expect_files", [
+@pytest.mark.parametrize("listing_dir, include, exclude, matcher, expect_files", [
     ("dir/", None, None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
         "dir/sub/file.tmp",
@@ -1331,7 +1372,7 @@ def test_fetch_file_remote_with_request():
         res_path = os.path.join(res_dir, tmp_name)
         try:
             make_dirs(res_dir, exist_ok=True)
-            fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
+            fetch_file(tmp_http, res_dir, retry=tmp_retry + 1, cache=False)
             assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"
             assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
@@ -1341,7 +1382,149 @@ def test_fetch_file_remote_with_request():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-def test_fetch_file_http_content_disposition_filename():
+# use string format specifiers to fill computed test values generated after parametrized test instantiation
+@pytest.mark.parametrize(
+    "index, parameters",
+    enumerate([
+        (f"{{tmp_file}}", {
+            "Content-Disposition": f"attachment; filename=\"{{tmp_file}}\";filename*=UTF-8''{{tmp_file}}"
+        }),
+        (f"{{tmp_file}}", {  # unusual spacing/order does not matter
+            "Content-Disposition": f" filename*=UTF-8''{{tmp_file}};   filename=\"{{tmp_file}}\";attachment;"
+        }),
+        (f"{{tmp_file}}", {
+            "Content-Disposition": f"attachment; filename=\"{{tmp_file}}\""
+        }),
+        (f"{{tmp_file}}", {
+            "Content-Disposition": f"attachment; filename={{tmp_file}}"
+        }),
+        # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
+        # normally drops any leading or trailing underscores, although they are perfectly valid.
+        # Tests would sporadically fail if not added explicitly depending on whether the temporary
+        # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
+        (f"{{tmp_name}}_.{{tmp_ext}}", {
+            "Content-Disposition": f"attachment; filename={{tmp_name}}_.{{tmp_ext}}"
+        }),
+        (f"_{{tmp_name}}.{{tmp_ext}}", {
+            "Content-Disposition": f"attachment; filename=_{{tmp_name}}.{{tmp_ext}}"
+        }),
+        (f"__{{tmp_name}}__.{{tmp_ext}}", {
+            "Content-Disposition": f"attachment; filename=__{{tmp_name}}__.{{tmp_ext}}"
+        }),
+        (f"{{tmp_ascii}}", {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
+            "Content-Disposition": f"attachment; filename=\"{{tmp_normal}}\";filename*=UTF-8''{{tmp_escape}}"
+        }),
+        (f"{{tmp_ascii}}", {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
+            "Content-Disposition": f"attachment; filename=\"{{tmp_escape}}\";filename*=UTF-8''{{tmp_normal}}"
+        }),
+        (f"{{tmp_ascii}}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": f"attachment; filename=\"{{tmp_normal}}\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": f"attachment; filename=\"{{tmp_escape}}\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Disposition": "attachment; filename*=UTF-8''火"
+        }),
+        ("fire.txt", {
+            "Content-Disposition": "attachment; filename=\"fire.txt\"; filename*=UTF-8''火.txt"
+        }),
+        ("fire", {  # disallowed character and missing extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
+        }),
+        (f"{{tmp_default}}", {  # disallowed character and missing extension even if partial characters allowed
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+        }),
+        (f"{{tmp_txt_ext}}", {  # disallowed character and missing extension even if partial characters allowed
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+        }),
+        (f"{{tmp_txt_ext}}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+        }),
+        (f"{{tmp_txt_ext}}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
+        }),
+        (f"{{tmp_txt_ext}}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
+        }),
+        (f"{{tmp_txt_ext}}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
+        }),
+        (f"{{tmp_default}}", {  # disallowed character
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"large_火\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename*=UTF-8''simple"
+        }),
+        (f"{{tmp_default}}", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=UTF-8''simple"  # missing the '*'
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename=\"simple\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''simple"
+        }),
+        ("simple-encode", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple\"; filename*=UTF-8''simple-encode"
+        }),
+        ("simple.txt", {  # valid characters, extension takes precedence over content-type
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple.txt\""
+        }),
+        (f"{{tmp_default}}", {  # empty header
+            "Content-Disposition": ""
+        }),
+        (f"{{tmp_default}}", {  # missing header
+        }),
+        (f"{{tmp_default}}", {  # missing filename
+            "Content-Disposition": "attachment"
+        }),
+        (f"{{tmp_default}}", {  # invalid filename
+            "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
+        }),
+        (f"{{tmp_default}}", {  # invalid filename
+            "Content-Disposition": "attachment; filename*=UTF-8''exec(print(\"test\"))"
+        }),
+        (f"{{tmp_default}}", {  # invalid encoding
+            "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
+        }),
+        ("GOOD.json", {  # valid encoding and allowed characters after escape
+            "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
+        }),
+    ])
+)
+def test_fetch_file_http_content_disposition_filename(index, parameters):
+    # type: (int, Tuple[str, HeadersType]) -> None
+
     tmp_dir = tempfile.gettempdir()
     with contextlib.ExitStack() as stack:
         tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))  # noqa
@@ -1360,6 +1543,12 @@ def test_fetch_file_http_content_disposition_filename():
         tmp_name, tmp_ext = tmp_file.rsplit(".", 1)
         tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
+        test_params = locals()
+        target, headers = parameters
+        target = target.format(**locals())
+        for hdr, val in headers.items():
+            headers[hdr] = val.format(**locals())
+
         def mock_response(__request, test_headers):
             # type: (AnyRequestType, HeadersType) -> Tuple[int, HeadersType, str]
             test_headers["Content-Length"] = str(len(tmp_text))
@@ -1370,124 +1559,15 @@ def test_fetch_file_http_content_disposition_filename():
         req_mock = stack.enter_context(responses.RequestsMock())
         try:
             make_dirs(res_dir, exist_ok=True)
-            for i, (target, headers) in enumerate([
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
-                }),
-                (tmp_file, {  # unusual spacing/order does not matter
-                    "Content-Disposition": f" filename*=UTF-8''{tmp_file};   filename=\"{tmp_file}\";attachment;"
-                }),
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\""
-                }),
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename={tmp_file}"
-                }),
-                # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
-                # normally drops any leading or trailing underscores, although they are perfectly valid.
-                # Tests would sporadically fail if not added explicitly depending on whether the temporary
-                # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
-                (f"{tmp_name}_.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename={tmp_name}_.{tmp_ext}"
-                }),
-                (f"_{tmp_name}.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename=_{tmp_name}.{tmp_ext}"
-                }),
-                (f"__{tmp_name}__.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename=__{tmp_name}__.{tmp_ext}"
-                }),
-                (tmp_ascii, {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
-                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
-                }),
-                (tmp_ascii, {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
-                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
-                }),
-                (tmp_ascii, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\""
-                }),
-                (tmp_default, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": "attachment; filename*=UTF-8''火"
-                }),
-                ("fire.txt", {
-                    "Content-Disposition": "attachment; filename=\"fire.txt\"; filename*=UTF-8''火.txt"
-                }),
-                (tmp_txt_ext, {  # disallowed character and missing extension, but use extension by content-type
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
-                }),
-                (tmp_default, {  # disallowed character and missing extension even if partial characters allowed
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
-                }),
-                (tmp_txt_ext, {  # disallowed character and missing extension even if partial characters allowed
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
-                }),
-                (tmp_txt_ext, {  # disallowed character
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"large_火\""
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple\""
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=UTF-8''simple"
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple\"; filename=UTF-8''simple"
-                }),
-                ("simple.txt", {  # valid characters, extension takes precedence over content-type
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple.txt\""
-                }),
-                (tmp_default, {  # empty header
-                    "Content-Disposition": ""
-                }),
-                (tmp_default, {  # missing header
-                }),
-                (tmp_default, {  # missing filename
-                    "Content-Disposition": "attachment"
-                }),
-                (tmp_default, {  # invalid filename
-                    "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
-                }),
-                (tmp_default, {  # invalid encoding
-                    "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
-                }),
-                ("GOOD.json", {  # valid encoding and allowed characters after escape
-                    "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
-                })
-            ]):
-                req_mock.remove("GET", tmp_http)  # reset previous iter
-                req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
-                try:
-                    res_path = fetch_file(tmp_http, res_dir)
-                except Exception as exc:
-                    raise AssertionError(f"Unexpected exception for test [{i}] with: [{headers}]. Exception: [{exc}]")
-                assert res_path == os.path.join(res_dir, target), f"Not expected name for test [{i}] with: [{headers}]"
-                assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
-                assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
+            req_mock.remove("GET", tmp_http)  # reset previous iter
+            req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
+            try:
+                res_path = fetch_file(tmp_http, res_dir)
+            except Exception as exc:
+                raise AssertionError(f"Unexpected exception for test [{index}] with: [{headers}]. Exception: [{exc}]")
+            assert res_path == os.path.join(res_dir, target), f"Not expected name for test [{index}] with: [{headers}]"
+            assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
+            assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
         except Exception:
             raise
         finally:

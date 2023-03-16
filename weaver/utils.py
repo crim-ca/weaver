@@ -27,7 +27,8 @@ import colander
 import pytz
 import requests
 import yaml
-from beaker.cache import cache_region, region_invalidate
+from beaker.cache import Cache, cache_managers, cache_region, cache_regions, region_invalidate
+from beaker.container import MemoryNamespaceManager
 from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
@@ -184,8 +185,17 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 ])
 
 # note: word characters also match unicode in this case
-FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
-FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
+FILE_NAME_LOOSE_PATTERN = re.compile(
+    r"^"
+    r"(?P<filename>[\w\-.]+)"
+    r"(?<!\.$)$"  # extension optional, but not only a dot if provided
+)
+FILE_NAME_QUOTE_PATTERN = re.compile(
+    r"^(?P<quote>\"?)"  # optional quotes allowed [...]
+    rf"({FILE_NAME_LOOSE_PATTERN.pattern[1:-1]})"
+    r"(?P=quote)$"      # [...] but must be balanced
+
+)
 
 if sys.version_info >= (3, 7):
     _LITERAL_VALUES_ATTRIBUTE = "__args__"
@@ -1510,8 +1520,8 @@ def get_caller_name(skip=2, base_class=False):
     return ".".join(name)
 
 
-def setup_cache(settings):
-    # type: (SettingsType) -> None
+def setup_cache(settings, reset=True):
+    # type: (SettingsType, bool) -> None
     """
     Prepares the settings with default caching options.
     """
@@ -1522,6 +1532,9 @@ def setup_cache(settings):
             cache_key = key.replace("beaker.cache.", "cache.")
             cache_val = settings.get(key)
             settings.setdefault(cache_key, cache_val)
+            settings.pop(key)  # ensure the old name variant doesn't persist (for reset)
+    if reset:
+        reset_cache()
     # apply defaults to avoid missing items during runtime
     settings["cache.regions"] = "doc, request, result, quotation"
     settings.setdefault("cache.type", "memory")
@@ -1534,6 +1547,32 @@ def setup_cache(settings):
     settings.setdefault("cache.quotation.enabled", "true")
     settings.setdefault("cache.quotation.expire", "3600")  # consider API limits and rate-limiting, caching for 1h
     set_cache_regions_from_settings(settings)
+
+
+def reset_cache(regions=None):
+    # type: (Optional[List[str]]) -> None
+    """
+    Invalidates caches for all regions and functions decorated by :func:`beaker.cache.cache_region` or manually cached.
+
+    :param regions:
+        List of specific regions to reset. Others are unmodified.
+        If omitted, clear all caches regardless of regions.
+    """
+    # because of references maintained within different objects, we must clear both managers and the caches,
+    # although they should technically refer to same definitions, but should still be "not yet" stored as manager
+    managers = list(cache_managers.values()) + [
+        Cache._get_cache(region_name, region_settings)
+        for region_name, region_settings in cache_regions.items()
+    ]
+    for cache in managers:  # type: Cache
+        if regions and cache.namespace_name not in regions:  # pragma: no cover
+            continue
+        # Force an explicit clear for memory manager, even though following 'do_remove' and 'clear' should collapse
+        # the full processing chain itself... Seems to not properly resolve in some cases (threading/timing/weak-refs)?
+        if isinstance(cache.namespace, MemoryNamespaceManager):
+            cache.namespace.namespaces.clear()
+        cache.namespace.do_remove()
+        cache.clear()
 
 
 def invalidate_region(caching_args):
@@ -1981,6 +2020,8 @@ def get_secure_filename(file_name):
     new_name = file_name.rstrip("_")
     suffix = "_" * (len(file_name) - len(new_name))
     file_name = new_name
+    while ".." in file_name:
+        file_name = file_name.replace("..", ".")
     return f"{prefix}{secure_filename(file_name)}{suffix}"
 
 
@@ -2054,11 +2095,11 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
         for file_name_var in [file_name_star, file_name_param]:
             try:
                 file_name_maybe = (file_name_var or "").rsplit("/", 1)[-1].strip().replace(" ", "_")
-                file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
+                file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)["filename"]
                 file_name_secure, file_ext_secure = os.path.splitext(get_secure_filename(file_name_maybe))
                 if (
-                    file_name_maybe and file_name_secure and file_ext_secure and  # characters with ASCII equivalents
-                    (3 < len(file_name_maybe) < 256) and  # ensure minimal length respected
+                    file_name_maybe and file_name_secure and  # minimum length is one valid character if no extension
+                    len(file_name_maybe) < 256 and  # ensure maximum length respected, including the extension
                     len(file_name_maybe) == len(f"{file_name_secure}{file_ext_secure}")  # skip if dropped characters
                 ):
                     file_name = file_name_maybe
@@ -2067,15 +2108,28 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
             except (IndexError, TypeError):
                 LOGGER.debug("Discarding Content-Disposition preferred file name due to failed validation.")
 
+    file_url = None
     if not file_name:
-        file_name = urlparse(file_reference).path.split("/")[-1]
+        file_url = file_name = urlparse(file_reference).path.split("/")[-1]
         LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
 
+    # Check secure name/extension components individually since a default extension could be resolved if not explicitly
+    # provided through 'Content-Disposition' header. Consider that explicitly provided no-extension file name is valid.
     file_name, file_ext = os.path.splitext(file_name)
     file_name = get_secure_filename(file_name)
-    file_ext = f".{get_secure_filename(file_ext)}" if file_ext else f".{get_secure_filename(content_type_ext)}"
-    if not FILE_NAME_LOOSE_PATTERN.match(file_name) or not FILE_NAME_LOOSE_PATTERN.match(file_ext):
-        raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
+    file_ext = get_secure_filename(file_ext) if file_ext or file_url is None else get_secure_filename(content_type_ext)
+    if not FILE_NAME_LOOSE_PATTERN.match(file_name):
+        raise ValueError(
+            f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. "
+            "Aborting download."
+        )
+    if file_ext and not FILE_NAME_LOOSE_PATTERN.match(file_ext):
+        raise ValueError(
+            f"Invalid file extension [{file_ext!s}] resolved from URL [{file_reference}]. "
+            "Aborting download."
+        )
+    elif file_ext:
+        file_ext = f".{file_ext}"
 
     file_name = f"{file_name}{file_ext}"
     file_path = os.path.join(file_outdir, file_name)
