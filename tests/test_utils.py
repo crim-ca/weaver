@@ -1386,44 +1386,44 @@ def test_fetch_file_remote_with_request():
 @pytest.mark.parametrize(
     "index, parameters",
     enumerate([
-        (f"{{tmp_file}}", {
-            "Content-Disposition": f"attachment; filename=\"{{tmp_file}}\";filename*=UTF-8''{{tmp_file}}"
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
         }),
-        (f"{{tmp_file}}", {  # unusual spacing/order does not matter
-            "Content-Disposition": f" filename*=UTF-8''{{tmp_file}};   filename=\"{{tmp_file}}\";attachment;"
+        ("{tmp_file}", {  # unusual spacing/order does not matter
+            "Content-Disposition": " filename*=UTF-8''{tmp_file};   filename=\"{tmp_file}\";attachment;"
         }),
-        (f"{{tmp_file}}", {
-            "Content-Disposition": f"attachment; filename=\"{{tmp_file}}\""
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename=\"{tmp_file}\""
         }),
-        (f"{{tmp_file}}", {
-            "Content-Disposition": f"attachment; filename={{tmp_file}}"
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename={tmp_file}"
         }),
         # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
         # normally drops any leading or trailing underscores, although they are perfectly valid.
         # Tests would sporadically fail if not added explicitly depending on whether the temporary
         # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
-        (f"{{tmp_name}}_.{{tmp_ext}}", {
-            "Content-Disposition": f"attachment; filename={{tmp_name}}_.{{tmp_ext}}"
+        ("{tmp_name}_.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename={tmp_name}_.{tmp_ext}"
         }),
-        (f"_{{tmp_name}}.{{tmp_ext}}", {
-            "Content-Disposition": f"attachment; filename=_{{tmp_name}}.{{tmp_ext}}"
+        ("_{tmp_name}.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename=_{tmp_name}.{tmp_ext}"
         }),
-        (f"__{{tmp_name}}__.{{tmp_ext}}", {
-            "Content-Disposition": f"attachment; filename=__{{tmp_name}}__.{{tmp_ext}}"
+        ("__{tmp_name}__.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename=__{tmp_name}__.{tmp_ext}"
         }),
-        (f"{{tmp_ascii}}", {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
-            "Content-Disposition": f"attachment; filename=\"{{tmp_normal}}\";filename*=UTF-8''{{tmp_escape}}"
+        ("{tmp_ascii}", {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
+            "Content-Disposition": "attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
         }),
-        (f"{{tmp_ascii}}", {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
-            "Content-Disposition": f"attachment; filename=\"{{tmp_escape}}\";filename*=UTF-8''{{tmp_normal}}"
+        ("{tmp_ascii}", {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
+            "Content-Disposition": "attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
         }),
-        (f"{{tmp_ascii}}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-            "Content-Disposition": f"attachment; filename=\"{{tmp_normal}}\""
+        ("{tmp_ascii}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": "attachment; filename=\"{tmp_normal}\""
         }),
-        (f"{{tmp_default}}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-            "Content-Disposition": f"attachment; filename=\"{{tmp_escape}}\""
+        ("{tmp_default}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": "attachment; filename=\"{tmp_escape}\""
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Disposition": "attachment; filename*=UTF-8''火"
         }),
         ("fire.txt", {
@@ -1433,42 +1433,42 @@ def test_fetch_file_remote_with_request():
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
         }),
-        (f"{{tmp_default}}", {  # disallowed character and missing extension even if partial characters allowed
+        ("{tmp_default}", {  # disallowed character and missing extension even if partial characters allowed
             "Content-Disposition": "attachment; filename*=UTF-8''large_火"
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
         }),
-        (f"{{tmp_txt_ext}}", {  # disallowed character and missing extension even if partial characters allowed
+        ("{tmp_txt_ext}", {  # disallowed character and missing extension even if partial characters allowed
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": "attachment; filename*=UTF-8''large_火"
         }),
-        (f"{{tmp_txt_ext}}", {  # disallowed character
+        ("{tmp_txt_ext}", {  # disallowed character
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
         }),
-        (f"{{tmp_txt_ext}}", {  # disallowed character
+        ("{tmp_txt_ext}", {  # disallowed character
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
         }),
-        (f"{{tmp_txt_ext}}", {  # disallowed character
+        ("{tmp_txt_ext}", {  # disallowed character
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
         }),
-        (f"{{tmp_txt_ext}}", {  # disallowed character
+        ("{tmp_txt_ext}", {  # disallowed character
             "Content-Type": ContentType.TEXT_PLAIN,
             "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
         }),
-        (f"{{tmp_default}}", {  # disallowed character
+        ("{tmp_default}", {  # disallowed character
             "Content-Type": ContentType.APP_JSON,
             "Content-Disposition": "attachment; filename=\"large_火\""
         }),
@@ -1480,7 +1480,7 @@ def test_fetch_file_remote_with_request():
             "Content-Type": ContentType.APP_JSON,
             "Content-Disposition": "attachment; filename*=UTF-8''simple"
         }),
-        (f"{{tmp_default}}", {  # valid characters, with no extension
+        ("{tmp_default}", {  # valid characters, with no extension
             "Content-Type": ContentType.APP_JSON,
             "Content-Disposition": "attachment; filename=UTF-8''simple"  # missing the '*'
         }),
@@ -1500,21 +1500,21 @@ def test_fetch_file_remote_with_request():
             "Content-Type": ContentType.APP_JSON,
             "Content-Disposition": "attachment; filename=\"simple.txt\""
         }),
-        (f"{{tmp_default}}", {  # empty header
+        ("{tmp_default}", {  # empty header
             "Content-Disposition": ""
         }),
-        (f"{{tmp_default}}", {  # missing header
+        ("{tmp_default}", {  # missing header
         }),
-        (f"{{tmp_default}}", {  # missing filename
+        ("{tmp_default}", {  # missing filename
             "Content-Disposition": "attachment"
         }),
-        (f"{{tmp_default}}", {  # invalid filename
+        ("{tmp_default}", {  # invalid filename
             "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
         }),
-        (f"{{tmp_default}}", {  # invalid filename
+        ("{tmp_default}", {  # invalid filename
             "Content-Disposition": "attachment; filename*=UTF-8''exec(print(\"test\"))"
         }),
-        (f"{{tmp_default}}", {  # invalid encoding
+        ("{tmp_default}", {  # invalid encoding
             "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
         }),
         ("GOOD.json", {  # valid encoding and allowed characters after escape
