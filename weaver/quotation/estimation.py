@@ -2,14 +2,13 @@ import copy
 import logging
 import tempfile
 import time
-
-import requests
-import yaml
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import colander
+import requests
 import simplejson
+import yaml
 from beaker.cache import cache_region
 from bs4 import BeautifulSoup
 from pyramid_celery import celery_app as app
@@ -334,7 +333,7 @@ def estimate_process_quote(quote, process, settings=None):
     auth_params = {}
     if quote_docker_usr and quote_docker_pwd:
         auth_params = {"auth_username": quote_docker_usr, "auth_password": quote_docker_pwd}
-    docker_ref = DockerAuthentication("Basic", auth_link=quote_docker_img, **auth_params)
+    docker_ref = DockerAuthentication(quote_docker_img, "Basic", **auth_params)
     docker_client = pull_docker(docker_ref)
     if not docker_client:
         raise QuoteEstimationError("Unable to retrieve quote estimator Docker image reference from settings.")

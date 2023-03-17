@@ -13,7 +13,6 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
-import colander
 import datetime
 import inspect
 import os
@@ -21,6 +20,7 @@ import re
 from copy import copy
 from typing import TYPE_CHECKING
 
+import colander
 import duration
 import jsonschema
 import yaml
@@ -1347,7 +1347,7 @@ class NumericType(OneOfKeywordSchema):
     ]
 
 
-class Decimal(ExtendedSchemaNode):
+class DecimalType(ExtendedSchemaNode):
     schema_type = colander.Decimal
     format = "decimal"
 
@@ -1357,7 +1357,7 @@ class PositiveNumber(AnyOfKeywordSchema):
     Represents a literal number, integer or float, of positive value.
     """
     _any_of = [
-        Decimal(validator=Range(min=0.0)),
+        DecimalType(validator=Range(min=0.0)),
         ExtendedSchemaNode(Float(), validator=Range(min=0.0)),
         ExtendedSchemaNode(Integer(), validator=Range(min=0)),
     ]

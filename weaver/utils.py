@@ -151,7 +151,7 @@ if TYPE_CHECKING:
         "Content-Location": NotRequired[str],
         "Content-Disposition": NotRequired[str],
     }, total=False)
-    _OutputMethod = "OutputMethod"  # type: TypeAlias
+    _OutputMethod = "OutputMethod"  # type: TypeAlias  # pylint: disable=C0103,invalid-name
     AnyMetadataOutputMethod = Literal[
         _OutputMethod.META,
     ]
@@ -165,7 +165,7 @@ if TYPE_CHECKING:
     AnyOutputMethod = Union[AnyMetadataOutputMethod, AnyDownloadOutputMethod]
     AnyOutputResult = Union[MetadataResult, DownloadResult]
 
-    FilterType = TypeVar("FilterType")
+    FilterType = TypeVar("FilterType")  # pylint: disable=C0103,invalid-name
 
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
@@ -2123,12 +2123,12 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
             f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. "
             "Aborting download."
         )
-    if file_ext and not FILE_NAME_LOOSE_PATTERN.match(file_ext):
-        raise ValueError(
-            f"Invalid file extension [{file_ext!s}] resolved from URL [{file_reference}]. "
-            "Aborting download."
-        )
-    elif file_ext:
+    if file_ext:
+        if not FILE_NAME_LOOSE_PATTERN.match(file_ext):
+            raise ValueError(
+                f"Invalid file extension [{file_ext!s}] resolved from URL [{file_reference}]. "
+                "Aborting download."
+            )
         file_ext = f".{file_ext}"
 
     file_name = f"{file_name}{file_ext}"

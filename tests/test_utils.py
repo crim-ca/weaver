@@ -753,7 +753,7 @@ def test_request_extra_cached_stream_iter_content():
 
 
 @pytest.mark.parametrize(
-    "name, expected",
+    ["name", "expected"],
     [
         ("file.txt", "file.txt"),
         ("file_.txt", "file_.txt"),
@@ -777,7 +777,7 @@ def test_get_secure_filename(name, expected):
 
 
 @pytest.mark.parametrize(
-    "location, expected",
+    ["location", "expected"],
     [
         ("https://mocked-file-server.com/dir/", "dir"),
         ("https://mocked-file-server.com/dir/sub/", "sub"),
@@ -804,7 +804,13 @@ def test_get_secure_directory_name_uuid():
 
 
 @pytest.mark.parametrize(
-    "include_dir_heading, include_separators, include_code_format, include_table_format, include_modified_date",
+    [
+        "include_dir_heading",
+        "include_separators",
+        "include_code_format",
+        "include_table_format",
+        "include_modified_date",
+    ],
     itertools.product((True, False), repeat=5)
 )
 def test_fetch_directory_html(include_dir_heading,       # type: bool
@@ -953,7 +959,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
 
 
 # expect_files[i] = (Path, IsLink)
-@pytest.mark.parametrize("listing_dir, out_method, include, exclude, matcher, expect_files", [
+@pytest.mark.parametrize(["listing_dir", "out_method", "include", "exclude", "matcher", "expect_files"], [
     ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("dir/", True),
         ("dir/file.txt", False),
@@ -1130,7 +1136,7 @@ def test_fetch_directory_local(listing_dir,     # type: str
         assert out_dirs == expect_dirs, f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
-@pytest.mark.parametrize("listing_dir, include, exclude, matcher, expect_files", [
+@pytest.mark.parametrize(["listing_dir", "include", "exclude", "matcher", "expect_files"], [
     ("dir/", None, None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
         "dir/sub/file.tmp",
@@ -1250,7 +1256,7 @@ def test_fetch_directory_unknown_content_type():
                 fetch_directory("https://random.location.com/dir/", tmpdir)
 
 
-@pytest.mark.parametrize("source_link, out_method, result_link", [
+@pytest.mark.parametrize(["source_link", "out_method", "result_link"], [
     (False, OutputMethod.LINK, True),
     (False, OutputMethod.COPY, False),
     (False, OutputMethod.MOVE, False),
@@ -1384,7 +1390,7 @@ def test_fetch_file_remote_with_request():
 
 # use string format specifiers to fill computed test values generated after parametrized test instantiation
 @pytest.mark.parametrize(
-    "index, parameters",
+    ["index", "parameters"],
     enumerate([
         ("{tmp_file}", {
             "Content-Disposition": "attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
@@ -1543,11 +1549,26 @@ def test_fetch_file_http_content_disposition_filename(index, parameters):
         tmp_name, tmp_ext = tmp_file.rsplit(".", 1)
         tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
-        test_params = locals()
+        test_params = {
+            "tmp_dir": tmp_dir,
+            "tmp_json": tmp_json.name,
+            "tmp_data": tmp_data,
+            "tmp_text": tmp_text,
+            "tmp_random": tmp_random,
+            "tmp_default": tmp_default,
+            "tmp_txt_ext": tmp_txt_ext,
+            "tmp_normal": tmp_normal,
+            "tmp_escape": tmp_escape,
+            "tmp_ascii": tmp_ascii,
+            "tmp_file": tmp_file,
+            "tmp_name": tmp_name,
+            "tmp_ext": tmp_ext,
+            "tmp_http": tmp_http,
+        }
         target, headers = parameters
-        target = target.format(**locals())
+        target = target.format(**test_params)
         for hdr, val in headers.items():
-            headers[hdr] = val.format(**locals())
+            headers[hdr] = val.format(**test_params)
 
         def mock_response(__request, test_headers):
             # type: (AnyRequestType, HeadersType) -> Tuple[int, HeadersType, str]
@@ -1576,7 +1597,7 @@ def test_fetch_file_http_content_disposition_filename(index, parameters):
 
 @mocked_aws_config
 @mocked_aws_s3
-@pytest.mark.parametrize("s3_scheme, s3_region", [
+@pytest.mark.parametrize(["s3_scheme", "s3_region"], [
     ("s3", "ca-central-1"),
     ("s3", "us-east-2"),
     ("s3", "eu-west-1"),
@@ -1607,7 +1628,7 @@ def test_fetch_file_unknown_scheme():
             fetch_file("unknown://random.location.com/dir/file.txt", tmpdir)
 
 
-@pytest.mark.parametrize("options, parameters, configuration", [
+@pytest.mark.parametrize(["options", "parameters", "configuration"], [
     (
         {"timeout": 10},
         {},
@@ -1674,7 +1695,7 @@ def test_resolve_s3_http_options(options, parameters, configuration):
 @mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
 @mocked_aws_s3
 @pytest.mark.parametrize(
-    "s3_url, expect_region, expect_url",
+    ["s3_url", "expect_region", "expect_url"],
     [
         (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
         for region in AWS_S3_REGION_SUBSET_WITH_MOCK
@@ -1748,7 +1769,7 @@ def test_resolve_s3_from_http_invalid(s3_url_invalid):
         resolve_s3_from_http(s3_url_invalid)
 
 
-@pytest.mark.parametrize("s3_reference, expect_region, expect_bucket, expect_path", [
+@pytest.mark.parametrize(["s3_reference", "expect_region", "expect_bucket", "expect_path"], [
     (
         "s3://some-bucket/",
         None,
@@ -1812,7 +1833,7 @@ def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect
     assert s3_path == expect_path
 
 
-@pytest.mark.parametrize("s3_reference, valid", [
+@pytest.mark.parametrize(["s3_reference", "valid"], [
     ("s3://", False),
     ("s3://test", False),
     ("s3://test/", True),
@@ -1942,7 +1963,7 @@ def test_localize_datetime():
     assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)
 
 
-@pytest.mark.parametrize("query,params,expected", [
+@pytest.mark.parametrize(["query", "params", "expected"], [
     ("key1=val1;key2=val21,val22;key3=val3;key4", {},
      {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
     ("key1='  value 1  '  ; key2 = val2 ", {},
@@ -1965,7 +1986,7 @@ def test_parse_kvp(query, params, expected):
     assert result == expected
 
 
-@pytest.mark.parametrize("headers,support,expected", [
+@pytest.mark.parametrize(["headers", "support", "expected"], [
     # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
     ({}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
      (ExecuteMode.SYNC, 10, {})),
@@ -1996,7 +2017,7 @@ def test_prefer_header_execute_mode(headers, support, expected):
     assert result == expected
 
 
-@pytest.mark.parametrize("number,binary,unit,expect", [
+@pytest.mark.parametrize(["number", "binary", "unit", "expect"], [
     (1.234, False, "B", "1.234 B"),
     (10_000_000, False, "B", "10.000 MB"),
     (10_000_000, True, "B", "9.537 MiB"),
@@ -2017,7 +2038,7 @@ def test_apply_number_with_unit(number, binary, unit, expect):
     assert result == expect
 
 
-@pytest.mark.parametrize("number,binary,expect", [
+@pytest.mark.parametrize(["number", "binary", "expect"], [
     ("1 B", None, 1),
     # note: 'k' lower
     ("1k", False, 1_000),            # normal
@@ -2062,7 +2083,7 @@ def custom_handler_valid(exception):
     return "sporadic error" in str(exception)
 
 
-@pytest.mark.parametrize("errors,raises,conditions,retries", [
+@pytest.mark.parametrize(["errors", "raises", "conditions", "retries"], [
     ([True, False, None], TypeError, ValueError, 2),    # first ValueError handled, second raises TypeError directly
     ([True, False, None], ValueError, ValueError, 0),   # first ValueError handled but re-raised since retries exhausted
     ([True, None], None, ValueError, 2),                # first ValueError handled, second succeeds

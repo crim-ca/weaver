@@ -117,7 +117,7 @@ def test_auth_docker_image_registry_format():
             pytest.fail(f"Unexpected failure when [{docker_input}] was expected to be valid: [{exc}]")
     for docker_input in invalid_references:
         try:
-            DockerAuthentication("Basic", token, docker_input)
+            DockerAuthentication(docker_input, "Basic", token)
         except (TypeError, ValueError):
             pass
         else:
