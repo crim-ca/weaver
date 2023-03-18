@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
+from weaver.datatype import DockerAuthentication
 from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteException
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
     from celery.app.task import Task
     from requests import Response
 
-    from weaver.datatype import DockerAuthentication, Process, Quote
+    from weaver.datatype import Process, Quote
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.utils import RequestCachingKeywords
     from weaver.typedefs import (
@@ -80,7 +81,7 @@ class CurrencyConverter(object):
     """
     url = None      # type: str
     name = None     # type: str
-    token = ""      # type: str
+    token = ""      # type: str  # nosec: B105
     json = True     # type: bool
     parser = None   # type: Callable[[Union[JSON, str]], Union[Number, str]]
 
@@ -342,10 +343,11 @@ def estimate_process_quote(quote, process, settings=None):
         quote_config = prepare_quote_estimator_config(quote, process)
         with tempfile.NamedTemporaryFile(suffix=".yaml", encoding="utf-8") as quote_file:
             yaml.safe_dump(quote_config, quote_file, indent=2, sort_keys=False, encoding="utf-8", allow_unicode=True)
+            tmp_config_path = "/tmp/quote-config.yaml"  # nosec: B108
             out_quote_json = docker_client.containers.run(
                 docker_ref.image,
-                ["--json", "--detail", "--config", "/tmp/quote-config.yaml"],
-                volumes={quote_file.name: {"bind": "/tmp/quote-config.yaml", "mode": "ro"}},
+                ["--json", "--detail", "--config", tmp_config_path],
+                volumes={quote_file.name: {"bind": tmp_config_path, "mode": "ro"}},
                 auto_remove=True,
                 remove=True,
             )
