@@ -1924,7 +1924,6 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
     .. code-block:: text
 
         Header-Name: Header-Value
-
     """
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
