@@ -84,10 +84,14 @@
 .. |quote-estimator| replace:: *Quote Estimator*
 .. _quote-estimator: :ref:`quotation_quote_estimator`
 .. |quote-estimation-config| replace:: *Quote Estimator Configuration*
-.. _quote-estimation-config: ./schemas/quotation/quote-estimator.yaml
+.. _quote-estimation-config: ../../../weaver/schemas/quotation/quote-estimator.yaml
 .. |quote-estimation-result| replace:: *Quote Estimation Result*
-.. _quote-estimation-result: ./schemas/quotation/quote-estimation-result.yaml
+.. _quote-estimation-result: ../../../weaver/schemas/quotation/quote-estimation-result.yaml
+.. |ONNX-long| replace:: *Open Neural Network Exchange* (ONNX)
+.. |ONNX| replace:: ONNX
 .. _ONNX: https://onnx.ai/
+.. |OpenAPI-spec| replace:: OpenAPI Specification
+.. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report

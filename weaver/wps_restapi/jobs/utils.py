@@ -534,7 +534,7 @@ def get_job_submission_response(body, headers, error=False):
 def validate_service_process(request):
     # type: (PyramidRequest) -> Tuple[Optional[str], Optional[str]]
     """
-    Verifies that any :term:`Service` or :term:`Process` specified by path or query are valid.
+    Verifies that any :term:`Provider` or :term:`Process` specified by path or query are valid.
 
     :raises HTTPException: Relevant HTTP error with details if validation failed.
     :returns: Validated and existing service and process if specified.

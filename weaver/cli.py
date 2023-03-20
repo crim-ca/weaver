@@ -918,7 +918,7 @@ class WeaverClient(object):
               (:rfc:`7230#section-3.2.2`).
             - Multi Vault-Token parsing accomplished by :func:`weaver.vault.utils.parse_vault_token`.
             - More details about formats and operations related to :term:`Vault` are provided
-              in :ref:`file_vault_token` and :ref:`vault` chapters.
+              in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
         :return: Updated inputs or the result of a failing intermediate request.
@@ -1120,7 +1120,7 @@ class WeaverClient(object):
 
         .. seealso::
             More details about formats and operations related to :term:`Vault` are provided
-            in :ref:`file_vault_token` and :ref:`vault` chapters.
+            in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param file_path: Location of the file to be uploaded.
         :param content_type:

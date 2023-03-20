@@ -520,7 +520,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | Required if ``weaver.quotation`` is enabled.
   |
-  | See :ref:`quotation` for more details on the feature.
+  | See :ref:`quote_estimation` for more details on the feature.
 
 .. versionadded:: 4.30
 
@@ -532,7 +532,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
     provided through some other means when requested by the :term:`Docker` daemon.
     Should be combined with ``weaver.quotation_docker_password``.
   |
-  | See :ref:`quotation` for more details on the feature.
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
 
 .. versionadded:: 4.30
 
@@ -544,7 +544,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
     provided through some other means when requested by the :term:`Docker` daemon.
     Should be combined with ``weaver.quotation_docker_username``.
   |
-  | See :ref:`quotation` for more details on the feature.
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
 
 .. versionadded:: 4.30
 
@@ -554,10 +554,10 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   | Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
   |
   | It is up to the specified |quote-estimator|_ algorithm defined by ``weaver.quotation_docker_image`` and
-    employed by the various :term:`Process` to ensure that the returned :term:`Quote` estimation cost makes
+    employed by the various :term:`Process` to ensure that the returned :ref:`quote_estimation` cost makes
     sense according to the specified default currency.
   |
-  | See :ref:`quotation` for more details on the feature.
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
 
 .. versionadded:: 4.30
 
@@ -623,7 +623,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 - | ``weaver.quotation_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
   |
-  | Defines the maximum duration allowed for running a :term:`Quote` estimation in `synchronous` mode.
+  | Defines the maximum duration allowed for running a :ref:`quote_estimation` in `synchronous` mode.
   |
   | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
   | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.

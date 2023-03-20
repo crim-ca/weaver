@@ -62,7 +62,7 @@ WPS-1/2
 
 This kind of process corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
 (depending of supported version) prior to :ref:`proc_wps_rest` specification. When an |ogc-api-proc|_ description is
-deployed in `Weaver` using an URL reference to an WPS-1/2 process through the use of a :ref:`app_pkg_wps` requirement,
+deployed in `Weaver` using an URL reference to an WPS-1/2 process through the use of a :ref:`app_pkg_wps1` requirement,
 `Weaver` parses and converts the :term:`XML` or :term:`JSON` body of the :term:`WPS` response and registers the process
 locally. This allows a remote server offering limited functionalities (e.g.: no REST bindings supported)
 to provide them through `Weaver`.
@@ -398,7 +398,7 @@ that define the process references and expected inputs/outputs.
 
 .. versionchanged:: 4.20
 
-With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update` below), a registered
+With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update>` below), a registered
 :term:`Process` specified only by ``{processID}`` will retrieve the latest revision of that :term:`Process`.
 A specific older revision can be obtained by adding the tagged version in the path (``{processID}:{version}``) or
 adding the request query parameter ``version``.
@@ -596,7 +596,7 @@ and parametrization of various input/output combinations. Let's employ the follo
 
 .. versionchanged:: 4.20
 
-With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update` section), a registered
+With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update>` section), a registered
 :term:`Process` specified only by ``{processID}`` will execute the latest revision of that :term:`Process`. An older
 revision can be executed by adding the tagged version in the path (``{processID}:{version}``) or adding the request
 query parameter ``version``.

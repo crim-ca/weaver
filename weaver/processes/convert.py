@@ -713,7 +713,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
 def xml_wps2cwl(wps_process_response, settings):
     # type: (Response, AnySettingsContainer) -> Tuple[CWL, JSON]
     """
-    Obtains the :term:`CWL` definition that corresponds to an :term:`XML` :term:`WPS-1` process.
+    Obtains the :term:`CWL` definition that corresponds to an :term:`XML` :term:`WPS` process.
 
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`, and builds the
     associated :term:`CWL` package in conformance to :data:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.

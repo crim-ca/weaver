@@ -1040,7 +1040,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
 
         .. seealso::
-            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_wps1_builtin_rest_docker_scatter_requirements`.
         """
 
@@ -1080,7 +1080,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
 
         .. seealso::
-            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements`.
         """
 

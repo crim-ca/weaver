@@ -11,24 +11,19 @@ Quotation and Billing
 
 
 .. todo::
+    - Summary description
     - Refer to |ogc-proc-ext-quotation|_ and |ogc-proc-ext-billing|_
     - Refer to :ref:`conf_quotation`
-    - Detail API endpoints
-      - include design UML schemas (request/response state flow)
-    - Link between Quotation, Execution and Billing
-    - Detail |quote-estimator|
-      - |quote-estimation-config|_ schema
-      - |quote-estimation-result|_ schema
-      - purpose/description
-      - models vs constants, |ONNX|_ generalization
-    - Detail |currency-converter| (see ``weaver/quotation/estimation.py``)
 
+.. _quote_estimation:
 .. _quotation_quote_estimator:
 
-Quote Estimator
-===============
+Quote Estimation
+================
 
 .. todo::
+    - purpose/description
+    - Detail |quote-estimator|
 
 .. _quotation_estimator_model:
 
@@ -36,6 +31,7 @@ Quote Estimator Model
 ---------------------
 
 .. todo::
+    models vs constants, |ONNX-long|_ generalization
 
 .. _quotation_estimator_config:
 
@@ -43,6 +39,7 @@ Quote Estimator Configuration
 -----------------------------
 
 .. todo::
+    |quote-estimation-config|_ schema
 
 .. _quotation_estimation_result:
 
@@ -50,6 +47,7 @@ Quote Estimation Result
 -----------------------
 
 .. todo::
+    |quote-estimation-result|_ schema
 
 .. _quotation_billing:
 
@@ -57,6 +55,7 @@ Billing
 ==========
 
 .. todo::
+    - Link between Quotation, Execution and Billing
 
 .. _quotation_currency_conversion:
 
@@ -64,6 +63,7 @@ Currency Conversion
 ===================
 
 .. todo::
+    - Detail |currency-converter| (see ``weaver/quotation/estimation.py``)
 
 .. _quotation_api_examples:
 
@@ -71,3 +71,6 @@ API and Examples
 ================
 
 .. todo::
+    - Detail API endpoints
+    - Example requests
+    - include design UML schemas (request/response state flow)
