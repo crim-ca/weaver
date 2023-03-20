@@ -418,6 +418,8 @@ linkcheck_ignore = [
     r"./config.*",
     r"./docs.*",
     r"docs/source/.*",
+    r"weaver/schemas/quotation/quote-estimator.yaml",
+    r"weaver/schemas/quotation/quote-estimation-result.yaml",
     # inter-reference between document page and section headers
     # when link is itself a documentation reference, they are not resolved correctly, but this works with text replaces
     r":ref:`.*`",

@@ -476,7 +476,7 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
     the :term:`WPS` context against provided :term:`CWL` ``id``\s of the same I/O section **will be dropped**, as they
     ultimately would have no purpose during :term:`CWL` execution.
 
-    This does not apply in the case of referenced :ref:`WPS-1/2` processes since no :term:`CWL` is available in the
+    This does not apply in the case of referenced :ref:`proc_wps_12` processes since no :term:`CWL` is available in the
     first place.
 
 .. _cwl-io-types:

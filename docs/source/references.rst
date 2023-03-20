@@ -69,8 +69,9 @@
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-api-proc| replace:: OGC API - Processes
+.. |ogc-api-proc| replace:: `OGC API - Processes`
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
+.. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
 .. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
@@ -88,6 +89,7 @@
 .. |quote-estimation-result| replace:: *Quote Estimation Result*
 .. _quote-estimation-result: ../../../weaver/schemas/quotation/quote-estimation-result.yaml
 .. |ONNX-long| replace:: *Open Neural Network Exchange* (ONNX)
+.. _ONNX-long: `ONNX`_
 .. |ONNX| replace:: ONNX
 .. _ONNX: https://onnx.ai/
 .. |OpenAPI-spec| replace:: OpenAPI Specification

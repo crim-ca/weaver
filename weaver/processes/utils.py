@@ -1003,7 +1003,7 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
     """
     Registers remote :term:`WPS` providers and/or processes as specified from the configuration file.
 
-    Loads a ``wps_processes.yml`` file and registers  processes under `WPS-1/2`_ providers to the
+    Loads a ``wps_processes.yml`` file and registers  processes under :ref:`proc_wps_12` providers to the
     current `Weaver` instance as equivalent :term:`OGC API - Processes` instances.
 
     References listed under ``processes`` are registered statically (by themselves, unchanging snapshot).

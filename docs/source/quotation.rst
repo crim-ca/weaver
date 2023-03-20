@@ -39,7 +39,11 @@ Quote Estimator Configuration
 -----------------------------
 
 .. todo::
-    |quote-estimation-config|_ schema
+    describe
+
+.. literalinclude:: ../../weaver/schemas/quotation/quote-estimator.yaml
+    :caption: |quote-estimation-config|_ schema
+    :language: yaml
 
 .. _quotation_estimation_result:
 
@@ -47,7 +51,11 @@ Quote Estimation Result
 -----------------------
 
 .. todo::
-    |quote-estimation-result|_ schema
+    describe
+
+.. literalinclude:: ../../weaver/schemas/quotation/quote-estimation-result.yaml
+    :caption: |quote-estimation-result|_ schema
+    :language: yaml
 
 .. _quotation_billing:
 

@@ -1873,8 +1873,14 @@ def set_parser_sections(parser):
 
 
 class ValidateAuthHandlerAction(argparse.Action):
+    """
+    Action that will validate that the input argument references an authentication handler that can be resolved.
+    """
     def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
+        """
+        Validate the referenced authentication handler implementation.
+        """
         if not (auth_handler_ref and isinstance(auth_handler_ref, str)):
             return None
         auth_handler = import_target(auth_handler_ref)
@@ -1892,10 +1898,16 @@ class ValidateAuthHandlerAction(argparse.Action):
 
 
 class ValidateMethodAction(argparse.Action):
+    """
+    Action that will validate that the input argument one of the accepted HTTP methods.
+    """
     methods = ["GET", "HEAD", "POST", "PUT", "DELETE"]
 
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
+        """
+        Validate the method value.
+        """
         if values not in self.methods:
             allow = ", ".join(self.methods)
             error = f"Value '{values}' is not a valid HTTP method, must be one of [{allow}]."
@@ -1904,9 +1916,21 @@ class ValidateMethodAction(argparse.Action):
 
 
 class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
+    """
+    Action that will validate that the input argument is a correctly formed HTTP header name.
+
+    Each header should be provided as a separate option using format:
+
+    .. code-block:: text
+
+        Header-Name: Header-Value
+
+    """
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
-
+        """
+        Validate the header value.
+        """
         # items are received one by one with successive calls to this method on each matched (repeated) option
         # gradually convert them to header representation
         super(ValidateHeaderAction, self).__call__(parser, namespace, values, option_string)
@@ -1933,8 +1957,14 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
 
 
 class ValidateNonZeroPositiveNumberAction(argparse.Action):
+    """
+    Action that will validate that the input argument is a positive number greater than zero.
+    """
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
+        """
+        Validate the value.
+        """
         if not isinstance(values, (float, int)):
             raise argparse.ArgumentError(self, f"Value '{values} is not numeric.")
         if not values >= 1:
@@ -2004,7 +2034,7 @@ class ParagraphFormatter(argparse.HelpFormatter):
         last_index = len(paragraphs) - 1
         help_text = ""
         for i, block in enumerate(paragraphs):
-            # process each paragraph individually so it fills the available width space
+            # process each paragraph individually, so it fills the available width space
             # then remove option information line to keep only formatted text and indent the line for next one
             action.help = block
             help_block = super(ParagraphFormatter, self)._format_action(action)

@@ -719,16 +719,16 @@ fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems afte
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
 .PHONY: docs-build
-docs-build: clean-docs	## generate HTML documentation with Sphinx
+docs-build:		## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
 	@-echo "Documentation available: file://$(APP_ROOT)/docs/build/html/index.html"
 
 .PHONY: docs-only
-docs-only: docs-build	  ## generate HTML documentation with Sphinx (alias)
+docs-only: docs-build	## generate HTML documentation with Sphinx (alias)
 
 .PHONY: docs
-docs: install-doc docs-only  ## generate HTML documentation with Sphinx after dependencies installation
+docs: install-doc clean-docs docs-only	## generate HTML documentation with Sphinx after dependencies installation
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 
