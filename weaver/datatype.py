@@ -2660,7 +2660,7 @@ class PriceMixin(Base, abc.ABC):
     def amount(self):
         # type: () -> Decimal
         """
-        amount of the current quote.
+        Amount of the current quote.
         """
         return Decimal(str(self.get("amount", "0.0")))
 
