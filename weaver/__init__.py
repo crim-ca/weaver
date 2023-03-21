@@ -12,7 +12,7 @@ LOGGER = logging.getLogger(__name__)
 WEAVER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 WEAVER_ROOT_DIR = os.path.abspath(os.path.dirname(WEAVER_MODULE_DIR))
 WEAVER_CONFIG_DIR = os.path.abspath(os.path.join(WEAVER_ROOT_DIR, "config"))
-WEAVER_SCHEMA_DIR = os.path.abspath(os.path.join(WEAVER_ROOT_DIR, "schemas"))
+WEAVER_SCHEMA_DIR = os.path.abspath(os.path.join(WEAVER_MODULE_DIR, "schemas"))
 sys.path.insert(0, WEAVER_ROOT_DIR)
 sys.path.insert(0, WEAVER_MODULE_DIR)
 

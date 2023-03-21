@@ -907,6 +907,8 @@ class ResultFormat(FormatDescription):
     Format employed for reference results respecting 'OGC API - Processes' schemas.
     """
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
+    _ext_schema_fields = []  # exclude "$schema" added on each sub-deserialize (too verbose, only for reference)
+
     mediaType = MediaType(String())
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
@@ -1875,6 +1877,7 @@ class QuoteEstimatorInputParametersSchema(ExtendedMappingSchema):
         variable="{input-id}",
         title="QuoteEstimatorInputParameters",
         description="Mapping of input definitions for quote estimation.",
+        missing=drop,  # because only weight expected, if missing/invalid, ignore mapping (1.0 applied by default later)
     )
 
 
@@ -1884,6 +1887,7 @@ class QuoteEstimatorOutputParametersSchema(ExtendedMappingSchema):
         variable="{output-id}",
         title="QuoteEstimatorOutputParameters",
         description="Mapping of output definitions for quote estimation.",
+        missing=drop,  # because only weight expected, if missing/invalid, ignore mapping (1.0 applied by default later)
     )
 
 
@@ -6957,12 +6961,19 @@ def validate_node_schema(schema_node, cstruct):
     schema_node.deserialize(cstruct)
     schema_file = schema_node._schema.replace(WEAVER_SCHEMA_URL, WEAVER_SCHEMA_DIR)
     schema_path = []
+    schema_ref = ""
     if "#" in schema_file:
         schema_file, schema_ref = schema_file.split("#", 1)
         schema_path = [ref for ref in schema_ref.split("/") if ref]
-    schema = load_file(schema_file)
+        schema_ref = f"#{schema_ref}"
+    schema_base = schema = load_file(schema_file)
     if schema_path:
         for part in schema_path:
             schema = schema[part]
-    jsonschema.validate(cstruct, schema)
+
+    # ensure local schema can find relative $ref, since the provided reference can be a sub-schema (with "#/...")
+    scheme_uri = f"file://{schema_file}" if schema_file.startswith("/") else schema_file
+    validator = jsonschema.validators.validator_for(schema_base)
+    validator.resolver = jsonschema.RefResolver(base_uri=scheme_uri, referrer=schema_base)
+    validator(schema_base).validate(cstruct, schema)  # raises if invalid
     return cstruct

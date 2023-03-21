@@ -228,8 +228,12 @@ def prepare_quote_estimator_config(quote, process):
     # Estimators are allowed to use different IDs than the process IDs, as long as they define a relevant mapping.
     # Avoid checking all estimator mappings, simply provide all inputs, and let them pick-and-choose what they need.
     for input_id, input_param in quotation_inputs.items():
-        input_key = get_any_value(input_param, key=True)
-        input_val = input_param[input_key]
+        if isinstance(input_param, dict):
+            input_key = get_any_value(input_param, key=True)
+            input_val = input_param[input_key]
+        else:
+            input_key = "value"
+            input_val = input_param
         estimator_inputs.setdefault(input_id, {})  # type: ignore
         estimator_inputs[input_id].setdefault("weight", 1.0)
         input_type = process_input_types[input_id]

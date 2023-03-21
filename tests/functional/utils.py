@@ -52,7 +52,7 @@ if TYPE_CHECKING:
         SettingsType
     )
 
-    ReferenceType = Literal["deploy", "describe", "execute", "package"]
+    ReferenceType = Literal["deploy", "describe", "execute", "package", "quotation", "estimator"]
 
 
 class ResourcesUtil(object):
@@ -136,7 +136,7 @@ class ResourcesUtil(object):
 
         :param process: Process identifier.
         :param ref_type:
-            Content reference type to retrieve {deploy, execute, package}.
+            Content reference type to retrieve {deploy, execute, package, quotation}.
             Required if no name or location provided.
         :param ref_name:
             Explicit name to look for. Can be just the name or with extension.
@@ -196,6 +196,18 @@ class ResourcesUtil(object):
                         f"{process}/{process}.cwl",
                         f"{process}/{process.lower()}.cwl",
                         f"{process}/{process.title()}.cwl",
+                    ]
+                elif ref_type == "quotation":
+                    ref_search = [
+                        f"Quotation_{process}.json",
+                        f"{process}/quotation.json",
+                        f"{process}/Quotation_{process}.json",
+                    ]
+                elif ref_type == "estimator":
+                    ref_search = [
+                        f"Estimator_{process}.json",
+                        f"{process}/estimator.json",
+                        f"{process}/Estimator_{process}.json",
                     ]
                 else:
                     raise ValueError(f"unknown reference type: {ref_type}")
