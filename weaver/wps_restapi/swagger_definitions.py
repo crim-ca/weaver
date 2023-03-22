@@ -3680,7 +3680,11 @@ class PriceCurrency(ExtendedSchemaNode):
 
 class PriceSchema(ExtendedMappingSchema):
     amount = PriceAmount()
-    currency = PriceCurrency()
+    currency = PriceCurrency(description=(
+        "Until processed by the quotation estimator for the process, corresponds to the user-requested currency. "
+        "Once processed, the corresponding currency will be applied if exchange rates could be resolved. "
+        "Otherwise, the estimator-specific or API-wide default currency value will be used. "
+    ))
 
     def __json__(self, value):
         """
@@ -3743,6 +3747,10 @@ class QuoteProcessResults(PermissiveMappingSchema):
     cpu = QuoteEstimateValue(missing=drop)
     gpu = QuoteEstimateValue(missing=drop)
     total = PositiveNumber(default=0.0)
+    currency = PriceCurrency(missing=drop, description=(
+        "Optional currency employed by the estimator to produce the quote. "
+        "API-wide default currency employed if not specified."
+    ))
 
 
 class UserIdSchema(OneOfKeywordSchema):

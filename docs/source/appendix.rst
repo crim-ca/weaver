@@ -177,6 +177,14 @@ Glossary
             - :ref:`quotation`
             - :ref:`conf_quotation`
 
+    Quote Estimator
+    Quotation Estimator
+        A model that can provide cost estimations regarding the execution of a :term:`Process` to form a term:`Quote`.
+
+        .. seealso::
+            - :ref:`quotation_estimator_model`
+            - :ref:`conf_quotation`
+
     Request Options
         Configuration settings that can be defined for `Weaver` in order to automatically insert additional
         HTTP request parameters, authentication or other any relevant rules when target URLs are matched.

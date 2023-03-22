@@ -1509,9 +1509,6 @@ class DockerAuthentication(Authentication):
     .. seealso::
         :ref:`app_pkg_docker`
     """
-    # note:
-    #   Below regex does not match *every* possible name, but rather ones that need authentication.
-    #   Public DockerHub images for example do not require authentication, and are therefore not matched.
     DOCKER_LINK_REGEX = re.compile(r"""
         (?:^(?P<uri>
             # protocol
@@ -1637,12 +1634,17 @@ class DockerAuthentication(Authentication):
         return dict.__getitem__(self, "registry")
 
     @property
-    def docker(self):
+    def reference(self):
         # type: () -> str
         """
-        Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull <reference>``.
+        Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull {reference}``.
         """
-        return self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+        img = self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+        if ":" not in self.image:
+            return f"{img}:latest"
+        return img
+
+    docker = reference  # backward compatibility
 
     @property
     def repository(self):
@@ -1650,7 +1652,7 @@ class DockerAuthentication(Authentication):
         """
         Obtains the full :term:`Docker` repository reference without any tag.
         """
-        return self.docker.rsplit(":", 1)[0]
+        return self.reference.rsplit(":", 1)[0]
 
     @property
     def tag(self):
@@ -1658,7 +1660,7 @@ class DockerAuthentication(Authentication):
         """
         Obtain the requested tag from the :term:`Docker` reference.
         """
-        repo_tag = self.docker.rsplit(":", 1)
+        repo_tag = self.image.rsplit(":", 1)
         if len(repo_tag) < 2:
             return None
         return repo_tag[-1]

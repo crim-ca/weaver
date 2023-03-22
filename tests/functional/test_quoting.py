@@ -3,6 +3,7 @@ import os
 import random
 from typing import TYPE_CHECKING
 
+import docker
 import mock
 import pytest
 import yaml
@@ -10,6 +11,7 @@ import yaml
 from tests.functional import APP_PKG_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests
+from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import DockerAuthentication
 from weaver.execute import ExecuteTransmissionMode
 from weaver.processes.utils import pull_docker
@@ -227,18 +229,45 @@ class WpsQuotationTest(WpsConfigBase):
 
 @pytest.mark.functional
 @pytest.mark.quotation
-class WpsQuotationRealEstimatorTest(ResourcesUtil, WpsConfigBase):
+class WpsQuotationEstimatorDockerTest(ResourcesUtil, WpsConfigBase):
+    """
+    Perform tests using an actual :term:`Quotation Estimator` with a minimalistic :term:`Docker` implementation.
+
+    Contrary to :class:`WpsQuotationTest`, the :term:`Quotation` operation is not mocked to validate the full pipeline.
+
+    .. note::
+        To simplify and speedup the creation of the :term:`Docker` used as :term:`Quotation Estimator`, and to keep the
+        tests relatively fast to complete, a mock definition is employed to return the specified value directly.
+
+    .. note::
+        The tests do not attempt to validate the :term:`Quotation Estimator` operation itself, but rather evaluate the
+        schema validation and data transfer between the various steps, while considering different input types.
+    """
+
     @classmethod
     def setup_docker(cls):
         # type: () -> SettingsType
-        image = os.getenv("WEAVER_TEST_QUOTATION_DOCKER_IMAGE")
+        """
+        Setup the reference :term:`Docker` implementation to employ.
+
+        The test can be reused with a mock :term:`Quotation Estimator`, or an actual implementation, for validation.
+        """
+        image = os.getenv("WEAVER_TEST_QUOTATION_DOCKER_IMAGE", "mock")
         usr = os.getenv("WEAVER_TEST_QUOTATION_DOCKER_USERNAME") or None
         pwd = os.getenv("WEAVER_TEST_QUOTATION_DOCKER_PASSWORD") or None
         if not image:
-            pytest.xfail("Cannot run test without quotation estimator docker image.")
-        auth = DockerAuthentication(image, auth_username=usr, auth_password=pwd)
-        if not pull_docker(auth):
-            pytest.xfail("Cannot run test without quotation estimator docker image.")
+            pytest.fail("Cannot run test without quotation estimator docker image.")
+        if image == "mock":
+            client = docker.from_env()
+            path = os.path.join(WEAVER_ROOT_DIR, "tests/quotation")
+            image = "weaver-tests/mock-quotation-estimator:latest"
+            result = client.api.build(path, tag=image, rm=True, nocache=True)
+            result = list(result)  # build output message stream
+            assert any(b"Successfully built" in line for line in result), result
+        else:
+            auth = DockerAuthentication(image, auth_username=usr, auth_password=pwd)
+            if not pull_docker(auth):
+                pytest.fail("Cannot run test without quotation estimator docker image.")
         settings = {
             "weaver.quotation_docker_image": image,
             "weaver.quotation_docker_username": usr,
@@ -256,7 +285,7 @@ class WpsQuotationRealEstimatorTest(ResourcesUtil, WpsConfigBase):
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
         cls.settings.update(cls.setup_docker())
-        super(WpsQuotationRealEstimatorTest, cls).setUpClass()
+        super(WpsQuotationEstimatorDockerTest, cls).setUpClass()
         cls.deploy_test_processes()
 
     @classmethod
@@ -278,14 +307,16 @@ class WpsQuotationRealEstimatorTest(ResourcesUtil, WpsConfigBase):
             body = {"inputs": {"message": "123456789"}}
             path = sd.process_quotes_service.path.format(process_id="Echo")
             resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)
-            assert resp.status_code == 201
+            assert resp.status_code == 202
 
-        quote = resp.json["QuoteID"]
+        quote = resp.json["quoteID"]
         path = sd.quote_service.path.format(process_id="Echo", quote_id=quote)
         resp = mocked_sub_requests(self.app, "GET", path, headers=self.json_headers)
+        total = len(body["inputs"]["message"])
         assert resp.status_code == 200
         assert resp.json["status"] == QuoteStatus.COMPLETED
-        assert resp.json["total"] == 1
+        assert resp.json["price"]["amount"] == total
+        assert resp.json["results"]["total"] == total
 
     def test_quotation_complex_input(self):
         raise

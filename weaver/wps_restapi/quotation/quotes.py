@@ -85,7 +85,7 @@ def request_quote(request):
         "process": process.id,
         "processParameters": process_params,
         "user": quote_user,
-        "currency": quote_currency,
+        "currency": quote_currency,  # requested currency until evaluated, overridden if exchange rate not resolvable
     }
     quote = Quote(**quote_info)
     quote = quote_store.save_quote(quote)

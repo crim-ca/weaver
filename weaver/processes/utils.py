@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import colander
 import docker
 import yaml
+from docker.errors import ImageNotFound
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -1229,6 +1230,7 @@ def pull_docker(docker_auth, logger=LOGGER):
     """
     client = None
     image = None
+    ref = docker_auth.reference
     try:
         # load from env is the same as CLI call
         client = docker.from_env()
@@ -1242,22 +1244,26 @@ def pull_docker(docker_auth, logger=LOGGER):
         #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
         #   With re-auth, body *could* contain an identity token depending on auth method.
         if docker_auth.credentials:
-            logger.debug("Retrieving image from Docker registry or cache.")
+            logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
             body = client.login(reauth=True, **docker_auth.credentials)
             if body.get("Status") != "Login Succeeded":
-                logger.debug("Failed authentication to Docker private registry.")
+                logger.debug("Failed authentication to Docker private registry [%s].", docker_auth.registry)
                 return None
         else:
-            logger.warning("Expecting public access for image in Docker registry.")
-        logger.debug("Retrieving image from Docker registry or cache.")
+            logger.warning("Expecting public access for image [%s] in Docker registry.", ref)
+        logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
         # docker client pulls all available images when no tag, provide the default to limit
-        tag = docker_auth.tag or "latest"
-        image = client.images.pull(docker_auth.repository, tag)  # actual pull or resolved from cache
+        try:
+            tag = docker_auth.tag or "latest"
+            image = client.images.pull(docker_auth.repository, tag)  # actual pull or raise ImageNotFound
+        except ImageNotFound:
+            image = client.images.get(ref)  # resolved from cache or raise ImageNotFound
+            LOGGER.warning("Failed pull of image [%s] from Docker registry, but found it in cache.", ref)
     except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
         logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
                      exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
     if not image or docker_auth.docker not in image.tags:
-        logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
+        logger.debug("Failed authorization or could not retrieve Docker image [%s] from private registry.", ref)
         return None
-    logger.debug("Docker image retrieved.")
+    logger.debug("Docker image [%s] retrieved.", ref)
     return client

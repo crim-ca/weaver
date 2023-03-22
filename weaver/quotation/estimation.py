@@ -234,13 +234,22 @@ def prepare_quote_estimator_config(quote, process):
         else:
             input_key = "value"
             input_val = input_param
+        input_array = isinstance(input_val, list)
+        if any(isinstance(val, str) for val in (input_val if input_array else [input_val])):
+            LOGGER.warning(
+                "Converting quotation estimator input [%s] with string value [%s] to its content length.",
+                input_id, input_val,
+            )
+            if input_array:
+                input_val = [len(val) if isinstance(val, str) else val for val in input_val]
+            else:
+                input_val = len(input_val)
         estimator_inputs.setdefault(input_id, {})  # type: ignore
         estimator_inputs[input_id].setdefault("weight", 1.0)
         input_type = process_input_types[input_id]
         if input_type == "literal" and input_key in ["data", "value"]:
             estimator_inputs[input_id]["value"] = input_val
         elif input_type == "complex" and input_key == "href":
-            input_array = isinstance(input_val, list)
             input_info = [
                 get_href_headers(
                     href,
@@ -275,8 +284,8 @@ def prepare_quote_estimator_config(quote, process):
     return estimator_config
 
 
-def get_currency(request=None):
-    # type: (Optional[AnyRequestType]) -> str
+def get_currency(request):
+    # type: (AnyRequestType) -> str
     settings = get_settings(request)
     currency = get_header("X-Weaver-Currency", request.headers)
     currency = sd.PriceCurrency(name="currency", missing=None).deserialize(currency)
@@ -290,16 +299,16 @@ def request_convert_cost(method, url, kwargs):
     return requests.request(method, url, **kwargs)
 
 
-def convert_exchange_rate(amount, convert_currency):
-    # type: (Decimal, str) -> Price
+def convert_exchange_rate(amount, convert_currency, original_currency=None):
+    # type: (Decimal, str, Optional[str]) -> Price
     """
     Convert the cost value using the requested currency.
     """
-    default_currency = get_currency()
+    settings = get_settings()
+    default_currency = original_currency or settings.get("weaver.quotation_currency_default") or "USD"
     if not convert_currency:
         return {"amount": amount, "currency": default_currency}
 
-    settings = get_settings()
     converter_type = settings.get("weaver.quotation_currency_converter")
     if converter_type not in CURRENCY_CONVERTERS:
         LOGGER.warning("No converter specified in settings to obtain quote amount in requested currency.")
@@ -345,22 +354,24 @@ def estimate_process_quote(quote, process, settings=None):
 
     try:
         quote_config = prepare_quote_estimator_config(quote, process)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", encoding="utf-8") as quote_file:
+        with tempfile.NamedTemporaryFile(suffix=".yaml", mode="w", encoding="utf-8") as quote_file:
             yaml.safe_dump(quote_config, quote_file, indent=2, sort_keys=False, encoding="utf-8", allow_unicode=True)
+            quote_file.flush()
+            quote_file.seek(0)
             tmp_config_path = "/tmp/quote-config.yaml"  # nosec: B108
             out_quote_json = docker_client.containers.run(
                 docker_ref.image,
                 ["--json", "--detail", "--config", tmp_config_path],
                 volumes={quote_file.name: {"bind": tmp_config_path, "mode": "ro"}},
-                auto_remove=True,
                 remove=True,
             )
         results = simplejson.loads(out_quote_json, use_decimal=True)
         outputs = results.pop("outputs", {})
         if outputs:
             quote.outputs = outputs
+        estimator_currency = results.get("currency")  # optional
         quote.results = results
-        quote.price = convert_exchange_rate(quote.amount, quote.currency)
+        quote.price = convert_exchange_rate(quote.amount, quote.currency, estimator_currency)
         quote.seconds = int(results.get("duration", {}).get("estimate", 0))
         quote.process = process
     except QuoteException:

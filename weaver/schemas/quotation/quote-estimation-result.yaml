@@ -11,6 +11,14 @@ properties:
   total:
     type: number
     minimum: 0.0
+  currency:
+    description: |
+      Currency of the quote.
+      If the estimator does not provide a specific currency, the API-wide value will be employed.
+      See `weaver.quotation_currency_default` in *Configuration of Quotation Estimation* documentation.
+    type: string
+    minLength: 3
+    maxLength: 3
 additionalProperties:
   description: "Additional quotation estimate details with rundown of values contributing in the total cost."
   $ref: "#/definitions/QuoteEstimateValue"
