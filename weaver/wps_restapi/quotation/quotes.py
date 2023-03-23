@@ -30,9 +30,27 @@ from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.wps_restapi.quotation.utils import get_quote
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyViewResponse, PyramidRequest
+    from typing import Type, Union
+
+    from weaver.typedefs import AnySettingsContainer, AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_quote_response(quote,           # type: Quote
+                       http_class,      # type: Union[Type[HTTPOk], Type[HTTPCreated]]
+                       schema_class,    # type: Type[colander.SchemaNode]
+                       description,     # type: str
+                       settings,        # type: AnySettingsContainer
+                       ):               # type: (...) -> Union[HTTPOk, HTTPCreated]
+    """
+    Validate the quote contents and generate the response with its relevant details.
+    """
+    data = quote.json()
+    data.update({"description": description})
+    data.update({"links": quote.links(settings)})
+    data = schema_class().deserialize(data)
+    return http_class(json=data)
 
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
@@ -103,11 +121,8 @@ def request_quote(request):
             pass
         if result.ready():
             quote = quote_store.fetch_by_id(quote.id)
-            data = quote.json()
-            data.update({"description": sd.CreatedQuoteResponse.description})
-            data.update({"links": quote.links(settings)})
-            data = sd.CreatedQuoteResponse().deserialize(data)
-            return HTTPCreated(json=data)
+            resp = get_quote_response(quote, HTTPCreated, sd.QuoteSchema, sd.CreatedQuoteResponse.description, settings)
+            return resp
         else:
             LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
             # sync not respected, therefore must drop it
@@ -213,7 +228,8 @@ def get_quote_info(request):
     Get quote information.
     """
     quote = get_quote(request)
-    return HTTPOk(json=quote.json())
+    resp = get_quote_response(quote, HTTPOk, sd.QuoteSchema, sd.OkGetQuoteInfoResponse.description, request)
+    return resp
 
 
 @sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,

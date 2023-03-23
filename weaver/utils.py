@@ -1146,7 +1146,7 @@ def get_href_headers(path,                      # type: str
     """
     Obtain headers applicable for the provided file or directory reference.
 
-    :param path: File to describe.
+    :param path: File to describe. Either a local path or remote URL.
     :param download_headers:
         If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
         If the reference is a directory, this parameter is ignored, since files must be retrieved individually.
@@ -1161,7 +1161,7 @@ def get_href_headers(path,                      # type: str
     :return: Headers for the reference.
     """
     href = path
-    if not any(href.startswith(proto) for proto in ["http", "https", "s3"]):
+    if not any(href.startswith(proto) for proto in ["file", "http", "https", "s3"]):
         href = f"file://{os.path.abspath(path)}"
     f_enc = None
 
@@ -1199,6 +1199,7 @@ def get_href_headers(path,                      # type: str
             f_enc = resp.content_encoding
 
         else:
+            path = path.split("file://", 1)[-1]
             stat = os.stat(path)
             f_type = content_type
             f_size = stat.st_size

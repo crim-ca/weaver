@@ -18,6 +18,7 @@ import inspect
 import os
 import re
 from copy import copy
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import colander
@@ -3704,9 +3705,9 @@ class QuoteProcessParameters(PermissiveMappingSchema, ExecuteInputOutputs):
 
 class QuoteEstimateValue(PermissiveMappingSchema):
     description = "Details of an estimated value, with it attributed rate and resulting cost."
-    estimate = PositiveNumber(default=0, missing=None)
-    rate = PositiveNumber(default=0, missing=None)
-    cost = PositiveNumber(default=0, missing=0.0)
+    estimate = PositiveNumber(default=Decimal("0.0"), missing=None)
+    rate = PositiveNumber(default=Decimal("1.0"), missing=None)
+    cost = PositiveNumber(default=Decimal("0.0"), missing=Decimal("0.0"))
 
 
 class QuoteStepChainedInputLiteral(StrictMappingSchema, QuoteEstimatorWeightedParameterSchema):
@@ -3746,7 +3747,7 @@ class QuoteProcessResults(PermissiveMappingSchema):
     duration = QuoteEstimateValue(missing=drop)
     cpu = QuoteEstimateValue(missing=drop)
     gpu = QuoteEstimateValue(missing=drop)
-    total = PositiveNumber(default=0.0)
+    total = PositiveNumber(default=Decimal("0.0"))
     currency = PriceCurrency(missing=drop, description=(
         "Optional currency employed by the estimator to produce the quote. "
         "API-wide default currency employed if not specified."
@@ -3795,13 +3796,18 @@ class QuoteStepReferenceList(ExtendedSequenceSchema):
     ref = ReferenceURL()
 
 
-class QuoteSummary(PartialQuoteSchema):
+class QuoteBase(ExtendedMappingSchema):
+    price = PriceSchema(description=(
+        "Total price of the quote including all estimated costs and step processes if applicable."
+    ))
+
+
+class QuoteSummary(PartialQuoteSchema, QuoteBase):
     steps = QuoteStepReferenceList()
-    total = PriceSchema(description="Total of the quote including step processes if applicable.")
 
 
-class QuoteSchema(Quotation):
-    total = PriceSchema(description="Total of the quote including step processes if applicable.")
+class QuoteSchema(Quotation, QuoteBase):
+    pass
 
 
 class QuotationList(ExtendedSequenceSchema):

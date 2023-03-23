@@ -1,6 +1,7 @@
 import contextlib
 import os
 import random
+import tempfile
 from typing import TYPE_CHECKING
 
 import docker
@@ -301,16 +302,18 @@ class WpsQuotationEstimatorDockerTest(ResourcesUtil, WpsConfigBase):
             assert resp.status_code == 200
 
     def test_quotation_literal_input(self):
+        proc = "Echo"
+
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_celery("weaver.quotation.estimation.execute_quote_estimator"):
                 stack_exec.enter_context(mock_exec_proc)
             body = {"inputs": {"message": "123456789"}}
-            path = sd.process_quotes_service.path.format(process_id="Echo")
+            path = sd.process_quotes_service.path.format(process_id=proc)
             resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)
-            assert resp.status_code == 202
+            assert resp.status_code in [201, 202]
 
         quote = resp.json["quoteID"]
-        path = sd.quote_service.path.format(process_id="Echo", quote_id=quote)
+        path = sd.quote_service.path.format(process_id=proc, quote_id=quote)
         resp = mocked_sub_requests(self.app, "GET", path, headers=self.json_headers)
         total = len(body["inputs"]["message"])
         assert resp.status_code == 200
@@ -319,7 +322,32 @@ class WpsQuotationEstimatorDockerTest(ResourcesUtil, WpsConfigBase):
         assert resp.json["results"]["total"] == total
 
     def test_quotation_complex_input(self):
-        raise
+        proc = "ReadFile"
+        size = 123
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_celery("weaver.quotation.estimation.execute_quote_estimator"):
+                stack_exec.enter_context(mock_exec_proc)
+
+            with tempfile.NamedTemporaryFile(suffix=".txt", mode="wb") as tmp_file:
+                tmp_file.write(b"0" * size)
+                tmp_file.flush()
+                tmp_file.seek(0)
+
+                body = {"inputs": {"file": {"href": f"file://{tmp_file.name}"}}}
+                path = sd.process_quotes_service.path.format(process_id=proc)
+                resp = mocked_sub_requests(self.app, "POST", path, json=body,
+                                           headers=self.json_headers, only_local=True)
+                assert resp.status_code in [201, 202]
+
+        quote = resp.json["quoteID"]
+        path = sd.quote_service.path.format(process_id=proc, quote_id=quote)
+        resp = mocked_sub_requests(self.app, "GET", path, headers=self.json_headers)
+
+        assert resp.status_code == 200
+        assert resp.json["status"] == QuoteStatus.COMPLETED
+        assert resp.json["price"]["amount"] == size
+        assert resp.json["results"]["total"] == size
 
 
 def test_validate_quote_estimator_config():

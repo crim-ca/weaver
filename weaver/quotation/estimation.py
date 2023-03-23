@@ -18,7 +18,7 @@ from weaver.datatype import DockerAuthentication
 from weaver.exceptions import QuoteConversionError, QuoteEstimationError, QuoteException
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
-from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.constants import WPS_COMPLEX, WPS_LITERAL, JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
@@ -225,17 +225,23 @@ def prepare_quote_estimator_config(quote, process):
     quotation_inputs = convert_input_values_schema(quote.parameters.get("inputs", {}), JobInputsOutputsSchema.OGC)
     estimator_config = copy.deepcopy(process.estimator)
     estimator_inputs = estimator_config.get("inputs", {})  # type: EstimatorInputs
+
     # Estimators are allowed to use different IDs than the process IDs, as long as they define a relevant mapping.
     # Avoid checking all estimator mappings, simply provide all inputs, and let them pick-and-choose what they need.
     for input_id, input_param in quotation_inputs.items():
+        input_type = process_input_types[input_id]
         if isinstance(input_param, dict):
             input_key = get_any_value(input_param, key=True)
             input_val = input_param[input_key]
         else:
-            input_key = "value"
+            input_key = "value" if input_type == WPS_LITERAL else "href"
             input_val = input_param
         input_array = isinstance(input_val, list)
-        if any(isinstance(val, str) for val in (input_val if input_array else [input_val])):
+
+        # handle string conversion
+        if input_type == WPS_LITERAL and any(
+            isinstance(val, str) for val in (input_val if input_array else [input_val])
+        ):
             LOGGER.warning(
                 "Converting quotation estimator input [%s] with string value [%s] to its content length.",
                 input_id, input_val,
@@ -244,12 +250,12 @@ def prepare_quote_estimator_config(quote, process):
                 input_val = [len(val) if isinstance(val, str) else val for val in input_val]
             else:
                 input_val = len(input_val)
+
         estimator_inputs.setdefault(input_id, {})  # type: ignore
         estimator_inputs[input_id].setdefault("weight", 1.0)
-        input_type = process_input_types[input_id]
-        if input_type == "literal" and input_key in ["data", "value"]:
+        if input_type == WPS_LITERAL:
             estimator_inputs[input_id]["value"] = input_val
-        elif input_type == "complex" and input_key == "href":
+        elif input_type == WPS_COMPLEX:
             input_info = [
                 get_href_headers(
                     href,
@@ -260,7 +266,7 @@ def prepare_quote_estimator_config(quote, process):
                 for href in (input_val if input_array else [input_val])
             ]
             input_size = [
-                get_header("Content-Length", info, default=0)
+                int(get_header("Content-Length", info, default=0))
                 for info in input_info
             ]
             estimator_inputs[input_id]["size"] = input_size if input_array else input_size[0]
@@ -305,8 +311,10 @@ def convert_exchange_rate(amount, convert_currency, original_currency=None):
     Convert the cost value using the requested currency.
     """
     settings = get_settings()
-    default_currency = original_currency or settings.get("weaver.quotation_currency_default") or "USD"
-    if not convert_currency:
+    default_currency = original_currency or settings.get("weaver.quotation_currency_default")
+    if not isinstance(default_currency, str) or len(default_currency) != 3:
+        default_currency = "USD"
+    if not convert_currency or not isinstance(convert_currency, str) or len(convert_currency) != 3:
         return {"amount": amount, "currency": default_currency}
 
     converter_type = settings.get("weaver.quotation_currency_converter")
@@ -369,9 +377,11 @@ def estimate_process_quote(quote, process, settings=None):
         outputs = results.pop("outputs", {})
         if outputs:
             quote.outputs = outputs
+        results = sd.QuoteProcessResults().deserialize(results)
         estimator_currency = results.get("currency")  # optional
+        estimator_total = results["total"]
         quote.results = results
-        quote.price = convert_exchange_rate(quote.amount, quote.currency, estimator_currency)
+        quote.price = convert_exchange_rate(estimator_total, quote.currency, estimator_currency)
         quote.seconds = int(results.get("duration", {}).get("estimate", 0))
         quote.process = process
     except QuoteException:

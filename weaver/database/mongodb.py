@@ -1,12 +1,15 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
+import decimal
 import logging
 import uuid
 import warnings
 from typing import TYPE_CHECKING, overload
 
+import bson
 import pymongo
 import pymongo.errors
+from bson.codec_options import TypeCodec, TypeRegistry
 
 from weaver.database.base import DatabaseInterface
 from weaver.store.mongodb import (
@@ -199,6 +202,22 @@ class MongoDatabase(DatabaseInterface):
         LOGGER.info("Database up-to-date with: %s", db_info)
 
 
+class DecimalCodec(TypeCodec):
+    """
+    Converter that will automatically perform necessary encoding/decoding of decimal types for `MongoDB`.
+    """
+    python_type = decimal.Decimal
+    bson_type = bson.Decimal128
+
+    def transform_python(self, value):
+        # type: (decimal.Decimal) -> bson.Decimal128
+        return DecimalCodec.bson_type(value)
+
+    def transform_bson(self, value):
+        # type: (bson.Decimal128) -> decimal.Decimal
+        return value.to_decimal()
+
+
 def get_mongodb_connection(container):
     # type: (AnySettingsContainer) -> Database
     """
@@ -210,15 +229,19 @@ def get_mongodb_connection(container):
         if settings.get(setting, None) is None:
             warnings.warn(f"Setting '{setting}' not defined in registry, using default [{default}].")
             settings[setting] = default
-    client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False,
-                                 # Must specify representation since PyMongo 4.0 and also to avoid Python 3.6 error
-                                 #  https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
-                                 uuidRepresentation="pythonLegacy",
-                                 # Require that datetime objects be returned with timezone awareness.
-                                 # This ensures that missing 'tzinfo' does not get misinterpreted as locale time when
-                                 # loading objects from DB, since by default 'datetime.datetime' employs 'tzinfo=None'
-                                 # for locale naive datetime objects, while MongoDB stores Date in ISO-8601 format.
-                                 tz_aware=True)
+    client = pymongo.MongoClient(
+        settings["mongodb.host"], int(settings["mongodb.port"]),
+        connect=False,
+        # Must specify representation since PyMongo 4.0 and also to avoid Python 3.6 error
+        #  https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
+        uuidRepresentation="pythonLegacy",
+        # Require that datetime objects be returned with timezone awareness.
+        # This ensures that missing 'tzinfo' does not get misinterpreted as locale time when
+        # loading objects from DB, since by default 'datetime.datetime' employs 'tzinfo=None'
+        # for locale naive datetime objects, while MongoDB stores Date in ISO-8601 format.
+        tz_aware=True,
+        type_registry=TypeRegistry([DecimalCodec()]),
+    )
     return client[settings["mongodb.db_name"]]
 
 
