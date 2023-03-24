@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.30.0:
+
+`4.30.0 <https://github.com/crim-ca/weaver/tree/4.30.0>`_ (2023-03-24)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.quotation = true|false`` setting that allows control over the activation of all endpoints and operations
   related to the `OGC API - Processes` |ogc-proc-ext-billing-short|_ and |ogc-proc-ext-quotation-short|_ extensions.
 - Add support to configure a quotation estimation algorithm for each respective `Process` with new requests
