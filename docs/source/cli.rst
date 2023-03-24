@@ -356,7 +356,7 @@ any stored results from a successful execution.
 
 Sample Output:
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/job_dismiss_success.json
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_dismissed_success.json
     :language: json
 
 .. _cli_example_status:
@@ -406,7 +406,7 @@ Accomplishes the :term:`Job` listing request to obtain known :term:`Job` definit
 
 Sample Output:
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/job_listing.json
+.. literalinclude:: ../../weaver/wps_restapi/examples/jobs_listing.json
     :language: json
 
 .. _cli_example_monitor:

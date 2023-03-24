@@ -3675,7 +3675,7 @@ class PriceCurrency(ExtendedSchemaNode):
     default = "USD"  # most common online
     validator = All(
         Length(min=3, max=3),
-        OneOf(list_currencies()),
+        OneOf(sorted(list_currencies())),
     )
 
 
@@ -3683,8 +3683,8 @@ class PriceSchema(ExtendedMappingSchema):
     amount = PriceAmount()
     currency = PriceCurrency(description=(
         "Until processed by the quotation estimator for the process, corresponds to the user-requested currency. "
-        "Once processed, the corresponding currency will be applied if exchange rates could be resolved. "
-        "Otherwise, the estimator-specific or API-wide default currency value will be used. "
+        "Once processed, the requested currency will be applied for the amount if exchange rates could be resolved. "
+        "Otherwise, the estimator-specific or API-wide default currency value will be used for the estimated amount."
     ))
 
     def __json__(self, value):

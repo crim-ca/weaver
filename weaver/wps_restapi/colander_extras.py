@@ -2399,6 +2399,11 @@ class VariableObjectTypeConverter(ExtendedObjectTypeConverter):
 class DecimalTypeConverter(NumberTypeConverter):
     format = "decimal"
 
+    def convert_type(self, schema_node):
+        result = super(DecimalTypeConverter, self).convert_type(schema_node)
+        result.setdefault("format", DecimalTypeConverter.format)
+        return result
+
 
 class MoneyTypeConverter(DecimalTypeConverter):
     convert_validator = ValidatorConversionDispatcher(

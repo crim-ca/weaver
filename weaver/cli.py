@@ -2082,6 +2082,10 @@ class ArgumentParserFixedRequiredArgs(argparse.ArgumentParser):
 
 
 class WeaverSubParserAction(argparse._SubParsersAction):  # noqa: W0212
+    """
+    Parser that provides fixes for proper representation of `Weaver` :term:`CLI` operations.
+    """
+
     def add_parser(self, *args, **kwargs):  # type: ignore
         sub_parser = super(WeaverSubParserAction, self).add_parser(*args, **kwargs)
         parser = getattr(self, "parser", None)  # type: WeaverArgumentParser
