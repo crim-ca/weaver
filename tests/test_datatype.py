@@ -72,7 +72,7 @@ def test_auth_docker_image_registry_format():
     docker_hub = DockerAuthentication.DOCKER_REGISTRY_DEFAULT_URI
     valid_references = [
         ("docker-registry.crim.ca/repo/image",
-         "docker-registry.crim.ca/repo/image", "docker-registry.crim.ca", "repo/image"),
+         "docker-registry.crim.ca/repo/image:latest", "docker-registry.crim.ca", "repo/image"),
         ("docker-registry.crim.ca/repo/image:latest",
          "docker-registry.crim.ca/repo/image:latest", "docker-registry.crim.ca", "repo/image:latest"),
         ("docker-registry.crim.ca/repo/image:1.0.0",
@@ -87,13 +87,13 @@ def test_auth_docker_image_registry_format():
         ("https://index.docker.io/v1/repo/image:test",
          "repo/image:test", docker_hub, "repo/image:test"),
         ("registry.example.com/org/image-name",
-         "registry.example.com/org/image-name", "registry.example.com", "org/image-name"),
+         "registry.example.com/org/image-name:latest", "registry.example.com", "org/image-name"),
         ("registry.example.com/org/image-name:version",
          "registry.example.com/org/image-name:version", "registry.example.com", "org/image-name:version"),
         ("repository/image-name:version",
          "repository/image-name:version", docker_hub, "repository/image-name:version"),
         ("repository/image-name",
-         "repository/image-name", docker_hub, "repository/image-name"),
+         "repository/image-name:latest", docker_hub, "repository/image-name"),
     ]
     invalid_references = [
         # missing repo part, not allowed local/public images
