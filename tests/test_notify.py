@@ -1,6 +1,6 @@
 import pytest
 
-from notify import encrypt_email
+from weaver.notify import encrypt_email
 
 
 def test_encrypt_email_valid():

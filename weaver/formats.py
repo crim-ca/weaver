@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
     from weaver.base import PropertyDataTypeT
-    from weaver.typedefs import JSON, AnyRequestType
+    from weaver.typedefs import AnyRequestType, JSON
 
 LOGGER = logging.getLogger(__name__)
 

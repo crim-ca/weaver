@@ -18,7 +18,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
 
-    from weaver.datatype import Service, Process
+    from weaver.datatype import Process, Service
     from weaver.typedefs import JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)

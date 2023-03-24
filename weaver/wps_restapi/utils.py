@@ -24,12 +24,12 @@ if TYPE_CHECKING:
 
     from weaver.formats import ContentType
     from weaver.typedefs import (
-        CWL,
-        JSON,
         AnyCallableWrapped,
         AnyRequestType,
         AnySettingsContainer,
+        CWL,
         HeadersType,
+        JSON,
         Params,
         Return
     )

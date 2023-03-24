@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
 
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion, ProcessExecution, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
 
 
 # pylint: disable=C0103,invalid-name

@@ -49,17 +49,17 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Process, Quote
     from weaver.quotation.status import AnyQuoteStatus
-    from weaver.utils import RequestCachingKeywords
     from weaver.typedefs import (
         AnyRequestMethod,
         AnyRequestType,
         AnySettingsContainer,
         AnyUUID,
         AnyValueType,
-        Number,
         JSON,
+        Number,
         Price
     )
+    from weaver.utils import RequestCachingKeywords
 
     EstimatorInputLiteral = TypedDict("EstimatorInputLiteral", {
         "value": Union[AnyValueType, List[AnyValueType]],

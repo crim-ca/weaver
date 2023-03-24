@@ -57,6 +57,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple, Union
 
+    from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
         AnyHeadersContainer,
         AnyRequestType,
@@ -66,14 +67,13 @@ if TYPE_CHECKING:
         AnyValueType,
         ExecutionResultArray,
         ExecutionResultObject,
-        ExecutionResultValue,
         ExecutionResults,
+        ExecutionResultValue,
         HeadersTupleType,
         JSON,
         PyramidRequest,
         SettingsType
     )
-    from weaver.processes.constants import JobInputsOutputsSchemaType
 
 LOGGER = get_task_logger(__name__)
 

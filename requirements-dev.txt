@@ -12,7 +12,7 @@ doc8>=0.8.1
 docformatter==1.5.0     # add support of config file
 flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
 flynt
-isort>=4.3.21,<5
+isort>=5
 mock<4
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)

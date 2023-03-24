@@ -68,7 +68,7 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_out
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON, CWL_AnyRequirements, CWL_RequirementsDict, Number
+    from weaver.typedefs import CWL_AnyRequirements, CWL_RequirementsDict, JSON, Number
 
 EDAM_PLAIN = f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}"
 OGC_NETCDF = f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}"

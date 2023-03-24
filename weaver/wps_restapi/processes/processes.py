@@ -47,7 +47,7 @@ from weaver.wps_restapi.processes.utils import get_process_list_links, get_proce
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
+    from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 

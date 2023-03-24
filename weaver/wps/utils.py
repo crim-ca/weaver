@@ -37,7 +37,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Dict, Union, Optional
+    from typing import Dict, Optional, Union
 
     from weaver.typedefs import AnyAcceptLanguageHeader, AnyRequestType, AnySettingsContainer, HeadersType, ProcessOWS
 

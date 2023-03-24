@@ -83,12 +83,14 @@ from weaver.utils import (
     resolve_s3_http_options,
     resolve_s3_reference,
     retry_on_condition,
-    setup_cache,  # WARNING: make sure to reset after use since state is applied globally, could break other tests
     str2bytes,
     validate_s3,
     xml_path_elements,
     xml_strip_ns
 )
+
+# WARNING: make sure to reset cache after use since state is applied globally, could break other tests
+from weaver.utils import setup_cache  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Type
@@ -96,8 +98,8 @@ if TYPE_CHECKING:
     from responses import _Body as BodyType  # noqa: W0212
 
     from tests.utils import S3Scheme
-    from weaver.utils import AnyDownloadOutputMethod
     from weaver.typedefs import AnyRequestType, HeadersType
+    from weaver.utils import AnyDownloadOutputMethod
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET

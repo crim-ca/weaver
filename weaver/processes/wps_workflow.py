@@ -32,14 +32,14 @@ if TYPE_CHECKING:
     from cwltool.pathmapper import PathMapper
     from cwltool.utils import CWLObjectType, CWLOutputType, JobsGeneratorType
 
+    from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.typedefs import (
         CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_RequirementsList,
         CWL_ToolPathObject,
-        JobProcessDefinitionCallback,
+        JobProcessDefinitionCallback
     )
-    from weaver.processes.wps_process_base import WpsProcessInterface
 
     MonitorFunction = Optional[Callable[[Popen[str]], None]]
 

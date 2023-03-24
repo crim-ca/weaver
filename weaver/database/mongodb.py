@@ -28,11 +28,11 @@ if TYPE_CHECKING:
     from pymongo.database import Database
 
     from weaver.database.base import (
-        StoreSelector,
         StoreBillsSelector,
         StoreJobsSelector,
         StoreProcessesSelector,
         StoreQuotesSelector,
+        StoreSelector,
         StoreServicesSelector,
         StoreVaultSelector
     )

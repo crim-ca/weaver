@@ -101,7 +101,7 @@ if TYPE_CHECKING:
     from typing import Any, Union
     from typing_extensions import TypedDict
 
-    from weaver.typedefs import JSON, DatetimeIntervalType, SettingsType
+    from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 

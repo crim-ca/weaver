@@ -98,7 +98,6 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, NoReturn, NotRequired, Required, TypedDict
     from urllib.parse import ParseResult
 
-    from pywps.app import WPSRequest
     from owslib.ows import BoundingBox
     from owslib.wps import (
         BoundingBoxDataInput,
@@ -107,6 +106,7 @@ if TYPE_CHECKING:
         Output as OWS_Output_Base,
         Process as ProcessOWS
     )
+    from pywps.app import WPSRequest
     from requests.models import Response
 
     from weaver.processes.constants import JobInputsOutputsSchemaType, ProcessSchemaType, WPS_DataType
@@ -114,12 +114,12 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_Input_Type,
         CWL_IO_ComplexType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
         CWL_IO_Value,
-        CWL_Input_Type,
         CWL_Output_Type,
         ExecutionInputs,
         ExecutionInputsList,
@@ -768,7 +768,7 @@ def ogcapi2cwl_process(payload, reference):
     :param reference: URL where the :term:`Process` is located.
     :returns: Updated :term:`CWL` package with the reference to the :term:`Process`.
     """
-    from weaver.processes.utils import load_package_file, is_cwl_package  # pylint: disable=C0415  # circular import
+    from weaver.processes.utils import is_cwl_package, load_package_file  # pylint: disable=C0415  # circular import
 
     payload_copy = copy.deepcopy(payload)
     process_info = payload_copy.get("process", payload)  # type: JSON  # OLD/OGC schemas nested process or at root

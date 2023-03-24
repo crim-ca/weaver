@@ -44,8 +44,8 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Job
     from weaver.typedefs import (
-        AnyRequestType,
         AnyHeadersContainer,
+        AnyRequestType,
         HeadersType,
         HTTPValid,
         JSON,

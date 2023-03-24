@@ -11,9 +11,9 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
-    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     from weaver.compat import Version
 
@@ -47,28 +47,28 @@ if TYPE_CHECKING:
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
-    from pyramid.httpexceptions import HTTPException, HTTPSuccessful, HTTPRedirection
+    from pyramid.config import Configurator
+    from pyramid.httpexceptions import HTTPException, HTTPRedirection, HTTPSuccessful
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.response import Response as PyramidResponse
     from pyramid.testing import DummyRequest
-    from pyramid.config import Configurator
     from pywps import Process as ProcessWPS
     from pywps.app import WPSRequest
     from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
     from requests import PreparedRequest, Request as RequestsRequest
     from requests.models import Response as RequestsResponse
     from requests.structures import CaseInsensitiveDict
-    from webob.acceptparse import AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader
-    from webob.headers import ResponseHeaders, EnvironHeaders
+    from webob.acceptparse import AcceptLanguageInvalidHeader, AcceptLanguageNoHeader, AcceptLanguageValidHeader
+    from webob.headers import EnvironHeaders, ResponseHeaders
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.datatype import Process, Service
     from weaver.status import AnyStatusType
     from weaver.visibility import AnyVisibility
 

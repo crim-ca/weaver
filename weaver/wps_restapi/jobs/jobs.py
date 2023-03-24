@@ -4,11 +4,11 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
 
-from notify import encrypt_email
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
+from weaver.notify import encrypt_email
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
@@ -30,7 +30,7 @@ from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 if TYPE_CHECKING:
     from typing import Iterable, List
 
-    from weaver.typedefs import JSON, AnyResponseType, PyramidRequest
+    from weaver.typedefs import AnyResponseType, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
 

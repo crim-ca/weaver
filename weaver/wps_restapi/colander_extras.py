@@ -93,8 +93,8 @@ if TYPE_CHECKING:
         OpenAPISchema,
         OpenAPISchemaAllOf,
         OpenAPISchemaAnyOf,
-        OpenAPISchemaOneOf,
         OpenAPISchemaNot,
+        OpenAPISchemaOneOf,
         OpenAPISpecification,
         OpenAPISpecInfo,
         OpenAPISpecParameter

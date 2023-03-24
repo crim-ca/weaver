@@ -19,9 +19,9 @@ if TYPE_CHECKING:
         AnyServiceRef,
         AnyUUID,
         AnyVersion,
+        DatetimeIntervalType,
         ExecutionInputs,
         ExecutionOutputs,
-        DatetimeIntervalType,
         JSON,
         SettingsType,
         TypedDict

@@ -68,10 +68,10 @@ if TYPE_CHECKING:
             AnyRequestType,
             AnyResponseType,
             CWL,
-            JSON,
             ExecutionInputsMap,
             ExecutionResults,
-            HeadersType
+            HeadersType,
+            JSON
         )
     except ImportError:
         # avoid linter issue

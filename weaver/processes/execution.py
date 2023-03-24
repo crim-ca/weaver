@@ -62,8 +62,8 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from uuid import UUID
     from typing import Dict, List, Optional, Tuple, Union
+    from uuid import UUID
 
     from celery.app.task import Task
     from pyramid.request import Request
@@ -73,14 +73,14 @@ if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
     from weaver.typedefs import (
-        JSON,
         AnyAcceptLanguageHeader,
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
         CeleryResult,
-        HeadersType,
         HeaderCookiesType,
+        HeadersType,
+        JSON,
         ProcessExecution,
         SettingsType,
         Statistics
