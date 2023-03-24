@@ -207,6 +207,16 @@ class ProcessSchema(Constants):
     WPS = "WPS"
 
 
+class JobInputsOutputsSchema(Constants):
+    """
+    Schema selector to represent a :term:`Job` output results.
+    """
+    OGC_STRICT = "ogc+strict"
+    OLD_STRICT = "old+strict"
+    OGC = "ogc"
+    OLD = "old"
+
+
 if TYPE_CHECKING:
     from typing import Union
 
@@ -234,6 +244,14 @@ if TYPE_CHECKING:
         CWL_REQUIREMENT_TIME_LIMIT,
         CWL_REQUIREMENT_WORK_REUSE,
     ]
-    ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD]
+    ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD, ProcessSchema.WPS]
+
     WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
     WPS_DataType = Union[Literal[WPS_LITERAL, WPS_BOUNDINGBOX], WPS_ComplexType]
+
+    JobInputsOutputsSchemaType = Literal[
+        JobInputsOutputsSchema.OGC_STRICT,
+        JobInputsOutputsSchema.OLD_STRICT,
+        JobInputsOutputsSchema.OGC,
+        JobInputsOutputsSchema.OLD
+    ]

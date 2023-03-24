@@ -6,5 +6,5 @@ inputs:
   - id: index_json
     value: 1
 outputs:
-  - id: output_files
+  - id: output  # type: File
     transmissionMode: reference

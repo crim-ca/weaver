@@ -14,4 +14,4 @@ files = {
         "application/json; charset=UTF-8"
     )
 }
-requests.post("https://weaver.example.com/vault", files=files)
+requests.post("https://weaver.example.com/vault", files=files, timeout=5)

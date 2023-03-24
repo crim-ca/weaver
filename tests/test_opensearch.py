@@ -23,7 +23,7 @@ from weaver.wps_restapi.processes import processes
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Type
 
-    from weaver.typedefs import JSON, DataSourceOpenSearch
+    from weaver.typedefs import DataSourceOpenSearch, JSON
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 

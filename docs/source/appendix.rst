@@ -18,6 +18,10 @@ Glossary
         | Corresponds to a region, often provided by :term:`OGC` :term:`WKT` definition, employed for :term:`OpenSearch`
           queries in the context of :term:`EOImage` inputs.
 
+    API
+        | Application Programming Interface
+        | Most typically, referring to the use of HTTP requests following an :term:`OpenAPI` specification.
+
     Application Package
         General term that refers to *"what and how to execute"* the :term:`Process`. Application Packages provide the
         core details about the execution methodology of the underlying operation that defines the :term:`Process`, and
@@ -26,7 +30,16 @@ Glossary
         defined by another similar approach. See the :ref:`Application Package` section for all relevant details.
 
     AWS
-        Amazon Web Services
+        | Amazon Web Services
+        | In the context of `Weaver`, most often referring specifically to the use of :term:`S3` buckets.
+
+    Bill
+    Billing
+        Result from :ref:`quotation_billing` following :ref:`quote_estimation` when enabled on the `Weaver` instance.
+
+        .. seealso::
+            - :ref:`quotation`
+            - :ref:`conf_quotation`
 
     CLI
         | Command Line Interface
@@ -124,17 +137,29 @@ Glossary
         and responses, as well as :term:`I/O` definitions for :term:`Process` description.
 
         .. seealso::
-            https://spec.openapis.org/oas/v3.1.0
+            |OpenAPI-spec|_
 
     OGC
         |ogc|_
 
     OGC API - Processes
-        The new API that defines JSON REST-binding representation of :term:`WPS` :term:`Process` collection.
+        The new :term:`API` that defines :term:`JSON` REST-binding representation
+        of :term:`WPS` :term:`Process` collection.
+
+    ONNX
+        The |ONNX-long|_ standard is an open format employed for sharing machine learning model representations
+        with an agnostic approach across frameworks, tools, runtimes, and compilers.
+
+        .. seealso::
+            :ref:`quotation_estimator_model`
 
     OpenSearch
         Protocol of lookup and retrieval of remotely stored files.
         Please refer to :ref:`OpenSearch Data Source` for details.
+
+    OWS
+        | :term:`OGC` Web Services
+        | Family of services including :term:`WPS`, defined prior to the family of :term:`OGC` :term:`API` standards.
 
     Process
         Entity that describes the required inputs, produced outputs, and any applicable metadata for the execution of
@@ -143,6 +168,22 @@ Glossary
     Provider
         Entity that offers an ensemble of :term:`Process` under it. It is typically a reference to a remote service,
         where any :term:`Process` it provides is fetched dynamically on demand.
+
+    Quote
+    Quotation
+        Result from :ref:`quote_estimation` when enabled on the `Weaver` instance.
+
+        .. seealso::
+            - :ref:`quotation`
+            - :ref:`conf_quotation`
+
+    Quote Estimator
+    Quotation Estimator
+        A model that can provide cost estimations regarding the execution of a :term:`Process` to form a term:`Quote`.
+
+        .. seealso::
+            - :ref:`quotation_estimator_model`
+            - :ref:`conf_quotation`
 
     Request Options
         Configuration settings that can be defined for `Weaver` in order to automatically insert additional

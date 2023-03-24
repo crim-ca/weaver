@@ -53,7 +53,7 @@ The first main components is the ``class: CommandLineTool`` that tells `Weaver` 
 
 The other important sections are ``inputs`` and ``outputs``. These define which parameters will be expected and
 produced by the described application. `Weaver` supports most formats and types as specified by |cwl-spec|_.
-See `Inputs/Outputs Type`_ for more details.
+See :ref:`cwl-io-types` for more details.
 
 
 .. _app_pkg_script:
@@ -290,7 +290,7 @@ CWL Workflow
 `Weaver` also supports :term:`CWL` ``class: Workflow``. When an :term:`Application Package` is defined this way, the
 |process-deploy-op|_ will attempt to resolve each ``step`` as another process. The reference to the :term:`CWL`
 definition can be placed in any location supported as for the case of atomic processes
-(see details about :ref:`supported package locations <WPS-REST>`).
+(see details about :ref:`supported package locations <proc_ogc_api>`).
 
 The following :term:`CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
 local processes of match IDs.
@@ -460,7 +460,7 @@ Other fields are discussed afterward in specific sections.
     +-----------------------------------+----------------------------------------+----------------------------------+
 
 The :term:`WPS` example above requires a ``format`` field for the corresponding :term:`CWL` ``File`` type in order to
-distinguish it from a plain string. More details are available in `Inputs/Outputs Type`_ below about this requirement.
+distinguish it from a plain string. More details are available in :ref:`cwl-io-types` below about this requirement.
 
 Finally, it is to be noted that above :term:`CWL` and :term:`WPS` definitions can be specified in
 the :ref:`Deploy <proc_op_deploy>` request body with any of the following variations:
@@ -476,9 +476,10 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
     the :term:`WPS` context against provided :term:`CWL` ``id``\s of the same I/O section **will be dropped**, as they
     ultimately would have no purpose during :term:`CWL` execution.
 
-    This does not apply in the case of referenced :ref:`WPS-1/2` processes since no :term:`CWL` is available in the
+    This does not apply in the case of referenced :ref:`proc_wps_12` processes since no :term:`CWL` is available in the
     first place.
 
+.. _cwl-io-types:
 
 Inputs/Outputs Type
 -----------------------
@@ -551,7 +552,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | :sup:`(6)`             | with Media-Type validation and staging     |
 |                      |                         |                        | according to the applicable scheme.        |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``Directory``        | ``Complex``             | :term:`JSON`           | :ref:`Directory Reference <dir-type>`      |
+| ``Directory``        | ``Complex``             | :term:`JSON`           | :ref:`Directory Reference <cwl-dir>`       |
 |                      |                         | :sup:`(6)`             | handled as nested ``Files`` to stage.      |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 
@@ -705,6 +706,8 @@ The following ``Directory`` listing formats are supported.
     |                                                           | in :ref:`aws_s3_ref`.                                |
     +-----------------------------------------------------------+------------------------------------------------------+
 
+.. _cwl-file-format:
+
 File Format
 -----------------------
 
@@ -770,16 +773,18 @@ for example that if the user provided ``application/x-netcdf`` on the :term:`WPS
 the :term:`CWL` side, both resulting contexts will have both of those formats combined. `Weaver` will not favour one
 location over the other, but will rather merge them if they can be resolved into different and valid entities.
 
-Since ``formats`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`Inputs/Outputs Type`) and
+Since ``formats`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`cwl-io-types`) and
 that :term:`Media-Types` are easier to provide in this context, it is *recommended* to provide all of them in the
-:term:`WPS` definition. Alternatively, the :ref:`Inputs/Outputs Schema` representation also located within the
+:term:`WPS` definition. Alternatively, the :ref:`oas_io_schema` representation also located within the
 :term:`WPS` I/O definitions can be used to provide ``contentMediaType``.
 
 Above examples present the minimal content of ``formats`` :term:`JSON` objects
 (i.e.: ``mimeType`` or ``mediaType`` value), but other fields, such as ``encoding`` and ``schema``
 can be provided as well to further refine the specific format supported by the corresponding :term:`I/O` definition.
 These fields are directly mapped, merged and combined against complementary details provided with ``contentMediaType``,
-and ``contentEncoding`` and ``contentSchema`` within an :term:`OAS` schema (see :ref:`Inputs/Outputs Schema`).
+and ``contentEncoding`` and ``contentSchema`` within an :term:`OAS` schema (see :ref:`oas_io_schema`).
+
+.. _cwl-file-format-output:
 
 Output File Format
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -808,6 +813,7 @@ in the expected output format, which usually requires a *toggle* input specifyin
 providing a multi-format output. It is instead recommended to produce multiple processes with a fixed output format for
 each case.
 
+.. _cwl-allowed-values:
 
 Allowed Values
 -----------------------
@@ -929,7 +935,7 @@ Basic Type Definitions
 
 Alternatively to parameters presented in previous sections, and employed for representing
 :ref:`Multiple and Optional Values`, :ref:`Allowed Values` specifications, supported :ref:`File Format` definitions
-and/or :ref:`Inputs/Outputs Type` identification, the :term:`OpenAPI` specification can be employed to entirely
+and/or :ref:`cwl-io-types` identification, the :term:`OpenAPI` specification can be employed to entirely
 define the :term:`I/O` schema. More specifically, this is accomplished by providing an :term:`OAS`-compliant structure
 under the ``schema`` field of each corresponding :term:`I/O`. This capability allows each :term:`Process` to be
 compliant with :term:`OGC API - Processes` specification that requires this detail in

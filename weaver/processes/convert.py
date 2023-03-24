@@ -10,7 +10,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -74,6 +74,7 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPES,
     WPS_OUTPUT,
     WPS_REFERENCE,
+    JobInputsOutputsSchema,
     ProcessSchema
 )
 from weaver.utils import (
@@ -94,9 +95,9 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
+    from typing_extensions import Literal, NoReturn, NotRequired, Required, TypedDict
     from urllib.parse import ParseResult
 
-    from pywps.app import WPSRequest
     from owslib.ows import BoundingBox
     from owslib.wps import (
         BoundingBoxDataInput,
@@ -105,36 +106,36 @@ if TYPE_CHECKING:
         Output as OWS_Output_Base,
         Process as ProcessOWS
     )
+    from pywps.app import WPSRequest
     from requests.models import Response
 
-    from weaver.processes.constants import ProcessSchemaType, WPS_DataType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, ProcessSchemaType, WPS_DataType
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_Input_Type,
         CWL_IO_ComplexType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
         CWL_IO_Value,
-        CWL_Input_Type,
         CWL_Output_Type,
         ExecutionInputs,
         ExecutionInputsList,
+        ExecutionInputsMap,
         ExecutionOutputs,
+        ExecutionOutputsList,
+        ExecutionOutputsMap,
         JobValueFile,
         JSON,
-        Literal,
-        NotRequired,
         OpenAPISchema,
         OpenAPISchemaArray,
         OpenAPISchemaKeyword,
         OpenAPISchemaObject,
         OpenAPISchemaProperty,
-        OpenAPISchemaReference,
-        TypedDict
+        OpenAPISchemaReference
     )
-    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
@@ -146,13 +147,26 @@ if TYPE_CHECKING:
     OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexDataInput]
     OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
-    JSON_IO_Type = JSON
+    JSON_Format = TypedDict("JSON_Format", {
+        "mime_type": Required[str],
+        "encoding": NotRequired[Optional[str]],
+        "schema": NotRequired[Optional[str]],
+        "maximumMegabytes": NotRequired[Optional[int]],
+        "default": NotRequired[bool],
+    }, total=True)
+    JSON_IO_TypeBase = TypedDict("JSON_IO_TypeBase", {
+        "id": Required[str],
+        "type": Required[str],
+        "identifier": NotRequired[str],
+    }, total=False)
+    JSON_IO_Type = Union[JSON, JSON_IO_TypeBase]
     JSON_IO_TypedInfo = TypedDict("JSON_IO_TypedInfo", {
         "type": WPS_DataType,
-        "data_type": Optional[str],
-        "data_uom": Optional[bool],
+        "data_type": NotRequired[Optional[str]],
+        "data_uom": NotRequired[Optional[bool]],
         "minOccurs": NotRequired[int],
         "maxOccurs": NotRequired[int],
+        "supported_formats": NotRequired[List[JSON_Format]],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
@@ -162,6 +176,7 @@ if TYPE_CHECKING:
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
     DataInputType = TypedDict("DataInputType", {
         "data": Union[float, int, bool, str],
+        "format": NotRequired[JSON_Format],
         # ** any other params
     }, total=False)
 
@@ -698,7 +713,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
 def xml_wps2cwl(wps_process_response, settings):
     # type: (Response, AnySettingsContainer) -> Tuple[CWL, JSON]
     """
-    Obtains the :term:`CWL` definition that corresponds to an :term:`XML` :term:`WPS-1` process.
+    Obtains the :term:`CWL` definition that corresponds to an :term:`XML` :term:`WPS` process.
 
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON`, and builds the
     associated :term:`CWL` package in conformance to :data:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
@@ -753,7 +768,7 @@ def ogcapi2cwl_process(payload, reference):
     :param reference: URL where the :term:`Process` is located.
     :returns: Updated :term:`CWL` package with the reference to the :term:`Process`.
     """
-    from weaver.processes.utils import load_package_file, is_cwl_package  # pylint: disable=C0415  # circular import
+    from weaver.processes.utils import is_cwl_package, load_package_file  # pylint: disable=C0415  # circular import
 
     payload_copy = copy.deepcopy(payload)
     process_info = payload_copy.get("process", payload)  # type: JSON  # OLD/OGC schemas nested process or at root
@@ -1393,29 +1408,51 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     return convert_input_values_schema(inputs, ProcessSchema.OLD)
 
 
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionInputsMap
+    ...
+
+
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionInputsList
+    ...
+
+
+@overload
+def convert_input_values_schema(inputs, schema):
+    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    ...
+
+
 def convert_input_values_schema(inputs, schema):
     # type: (ExecutionInputs, JobInputsOutputsSchemaType) -> ExecutionInputs
     """
     Convert execution input values between equivalent formats.
+
+    .. seealso::
+        - :func:`convert_output_params_schema`
+        - :func:`normalize_ordered_io` for I/O definitions.
 
     :param inputs: Inputs to convert.
     :param schema: Desired schema.
     :return: Converted inputs.
     """
     if isinstance(schema, str):
-        schema = schema.upper()
+        schema = schema.lower().split("+", 1)[0]
     if (
-        (schema == ProcessSchema.OGC and isinstance(inputs, dict)) or
-        (schema == ProcessSchema.OLD and isinstance(inputs, list))
+        (schema == JobInputsOutputsSchema.OGC and isinstance(inputs, dict)) or
+        (schema == JobInputsOutputsSchema.OLD and isinstance(inputs, list))
     ):
         return inputs
     if (
-        (schema == ProcessSchema.OGC and not isinstance(inputs, list)) or
-        (schema == ProcessSchema.OLD and not isinstance(inputs, dict))
+        (schema == JobInputsOutputsSchema.OGC and not isinstance(inputs, list)) or
+        (schema == JobInputsOutputsSchema.OLD and not isinstance(inputs, dict))
     ):
         name = fully_qualified_name(inputs)
         raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
-    if schema == ProcessSchema.OGC:
+    if schema == JobInputsOutputsSchema.OGC:
         input_dict = {}
         for input_item in inputs:
             input_id = get_any_id(input_item, pop=True)
@@ -1434,7 +1471,7 @@ def convert_input_values_schema(inputs, schema):
                 input_prev.append(input_data)
                 input_dict[input_id] = input_prev
         return input_dict
-    if schema == ProcessSchema.OLD:
+    if schema == JobInputsOutputsSchema.OLD:
         input_list = []
         for input_id, input_value in inputs.items():
             # list must be flattened with repeating ID
@@ -1459,6 +1496,24 @@ def convert_input_values_schema(inputs, schema):
     raise NotImplementedError(f"Unknown conversion format of input values for schema: [{schema}]")
 
 
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionOutputsMap
+    ...
+
+
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionOutputsList
+    ...
+
+
+@overload
+def convert_output_params_schema(inputs, schema):
+    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    ...
+
+
 def convert_output_params_schema(outputs, schema):
     # type: (ExecutionOutputs, JobInputsOutputsSchemaType) -> ExecutionOutputs
     """
@@ -1468,30 +1523,34 @@ def convert_output_params_schema(outputs, schema):
         These outputs are not *values* (i.e.: *results*), but *submitted* :term:`Job` outputs for return definitions.
         Contents are transferred as-is without any consideration of ``value`` or ``href`` fields.
 
+    .. seealso::
+        - :func:`convert_input_values_schema`
+        - :func:`normalize_ordered_io` for I/O definitions.
+
     :param outputs: Outputs to convert.
     :param schema: Desired schema.
     :return: Converted outputs.
     """
     if isinstance(schema, str):
-        schema = schema.upper()
+        schema = schema.lower().split("+")[0]
     if (
-        (schema == ProcessSchema.OGC and isinstance(outputs, dict)) or
-        (schema == ProcessSchema.OLD and isinstance(outputs, list))
+        (schema == JobInputsOutputsSchema.OGC and isinstance(outputs, dict)) or
+        (schema == JobInputsOutputsSchema.OLD and isinstance(outputs, list))
     ):
         return outputs
     if (
-        (schema == ProcessSchema.OGC and not isinstance(outputs, list)) or
-        (schema == ProcessSchema.OLD and not isinstance(outputs, dict))
+        (schema == JobInputsOutputsSchema.OGC and not isinstance(outputs, list)) or
+        (schema == JobInputsOutputsSchema.OLD and not isinstance(outputs, dict))
     ):
         name = fully_qualified_name(outputs)
         raise ValueError(f"Unknown conversion method to schema [{schema}] for outputs of type [{name}]: {outputs}")
-    if schema == ProcessSchema.OGC:
+    if schema == JobInputsOutputsSchema.OGC:
         out_dict = {}
         for out in outputs:
             out_id = get_any_id(out, pop=True)
             out_dict[out_id] = out
         return out_dict
-    if schema == ProcessSchema.OLD:
+    if schema == JobInputsOutputsSchema.OLD:
         out_list = [{"id": out} for out in outputs]
         for out in out_list:
             out.update(outputs[out["id"]])
@@ -2454,6 +2513,7 @@ def json2wps_field(field_info, field_category):
     elif field_category == "supported_formats":
         fmt = None
         field_info = field_info.copy()
+        field_info.pop("$schema", None)
         # pywps doesn't allow 'default' field in init, remove if found, but preserve it indirectly
         default = get_field(field_info, "default", search_variations=False, pop_found=True)
         if isinstance(field_info, dict):
@@ -2825,12 +2885,13 @@ def wps2json_job_payload(wps_request, wps_process):
 def get_field(io_object,
               field,
               search_variations=False,
+              extra_variations=None,
               only_variations=False,
               pop_found=False,
               key=False,
               default=null,
               ):
-    # type: (Union[JSON, object], str, bool, bool, bool, bool, Any) -> Any
+    # type: (Union[JSON, object], str, bool, Optional[List[str]], bool, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -2847,6 +2908,7 @@ def get_field(io_object,
     :param io_object: Any I/O representation, either as a class instance or JSON container.
     :param field: Name of the field to look for, either as property or key name based on input object type.
     :param search_variations: If enabled, search for all variations to the field name to attempt search until matched.
+    :param extra_variations: Additional field names to consider as search variations, with priority over field mapping.
     :param only_variations: If enabled, skip the first 'basic' field and start search directly with field variations.
     :param pop_found: If enabled, whenever a match is found by field or variations, remove that entry from the object.
     :param key: If enabled, whenever a match is found by field or variations, return matched key instead of the value.
@@ -2864,8 +2926,10 @@ def get_field(io_object,
             value = getattr(io_object, field, null)
             if value is not null:
                 return field if key else value
-    if search_variations and field in WPS_FIELD_MAPPING:
-        for var in WPS_FIELD_MAPPING[field]:
+    variations = extra_variations or []
+    if search_variations or variations:
+        variations += WPS_FIELD_MAPPING.get(field, [])
+        for var in variations:
             value = get_field(io_object, var, search_variations=False, only_variations=False, pop_found=pop_found)
             if value is not null:
                 return var if key else value
@@ -2959,13 +3023,20 @@ def normalize_ordered_io(io_section, order_hints=None):
         Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
         In this case the :paramref:`order_hints` is required to ensure same order.
 
+    This function is intended for parsing I/O from :term:`Process` descriptions, :term:`Application Package` and other
+    definitions that employ a ``"type"`` field. For submitted execution I/O values, refer to other relevant functions.
+
+    .. seealso::
+        - :func:`convert_input_values_schema`
+        - :func:`convert_output_params_schema`
+
     :param io_section: Definition contained under the ``inputs`` or ``outputs`` fields.
     :param order_hints: Optional/partial I/O definitions hinting an order to sort unsorted-dict I/O.
     :returns: I/O specified as list of dictionary definitions with preserved order (as good as possible).
     """
     if isinstance(io_section, list):
         return io_section
-    io_list = []
+    io_list = []  # type: List[JSON]
     io_dict = OrderedDict()
     if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
         # convert the hints themselves to list if they are provided as mapping

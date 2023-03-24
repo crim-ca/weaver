@@ -41,7 +41,6 @@ def _parse_requirements(file_path, requirements, links):
     :param file_path: file path to the requirements file.
     :param requirements: pre-initialized set in which to store extracted package requirements.
     :param links: pre-initialized set in which to store extracted link reference requirements.
-    :returns: None
     """
     with open(file_path, "r") as requirements_file:
         for line in requirements_file:

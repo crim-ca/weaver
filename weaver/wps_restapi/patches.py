@@ -17,6 +17,7 @@ class NoAutoHeadList(list):
     """
     List that does not allow addition of HTTP HEAD method object references unless allowed once.
     """
+
     allow_once = False
 
     def append(self, __object):

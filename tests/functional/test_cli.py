@@ -191,7 +191,10 @@ class TestWeaverClient(TestWeaverClientBase):
         result = self.process_listing_op(self.client.processes, with_providers=True)
         assert len(result.body["processes"]) > 0, "Local processes should be reported as well along with providers."
         assert "providers" in result.body
-        assert result.body["providers"] == [
+        providers = result.body["providers"]
+        for prov in providers:
+            prov.pop("$schema", None)
+        assert providers == [
             {"id": prov1.name, "processes": resources.TEST_EMU_WPS1_PROCESSES},
             {"id": prov2.name, "processes": resources.TEST_HUMMINGBIRD_WPS1_PROCESSES},
             {"id": prov3.name, "processes": resources.TEST_REMOTE_SERVER_WPS1_PROCESSES},
@@ -373,7 +376,10 @@ class TestWeaverClient(TestWeaverClientBase):
         assert "output" in result.body["outputs"]
         assert result.body["outputs"]["output"]["title"] == "output"
         assert result.body["outputs"]["output"]["description"] == "Output file with echo message."
-        assert result.body["outputs"]["output"]["formats"] == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
+        output_formats = result.body["outputs"]["output"]["formats"]
+        for out_fmt in output_formats:
+            out_fmt.pop("$schema", None)
+        assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert result.body["description"] == (
             "Dummy process that simply echo's back the input message for testing purposes."
@@ -1191,6 +1197,11 @@ class TestWeaverCLI(TestWeaverClientBase):
             out_cwl_fmt = {"default": False, "mediaType": io_fmt}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
+            # ignore schema specifications for comparison only of contents
+            in_schema.pop("$schema", None)
+            out_schema.pop("$schema", None)
+            for out_fmt in out_formats:
+                out_fmt.pop("$schema", None)
             # if any of the below definitions don't include user-provided information,
             # CLI did not combine it as intended prior to sending deployment request
             assert in_schema == in_oas  # injected by user provided process description
@@ -1369,10 +1380,13 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert "jobID: " in lines[0]  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+            for line in lines:
+                if line.startswith("jobID: "):
+                    job_id = line.split(":")[-1].strip()
+                    break
 
-            job_id = lines[0].split(":")[-1].strip()
             lines = mocked_sub_requests(
                 self.app, run_command,
                 [
@@ -1784,7 +1798,12 @@ class TestWeaverCLI(TestWeaverClientBase):
             only_local=True,
         )
         assert len(lines) > 1, "should be indented, pretty printed"
-        assert lines[0] == f"jobID: {self.test_job.id}"
+        for line in lines:
+            if line.startswith("jobID: "):
+                assert line == f"jobID: {self.test_job.id}"
+                break
+        else:
+            raise AssertionError("JobID not found for validation.")
 
     def test_output_format_xml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"

@@ -14,11 +14,11 @@ Weaver
 Weaver (the nest-builder)
   *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.
   Some of these nests are the largest structures to be built by birds.*
-  (`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_).
+  [`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_].
 
   *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic
   nesting habits instead.*
-  (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
+  [`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_]
 
 `Weaver` is an OGC-API flavored |ems| that allows the execution of workflows chaining various
 applications and |wps| inputs and outputs. Remote execution is deferred by the `EMS` to one or many

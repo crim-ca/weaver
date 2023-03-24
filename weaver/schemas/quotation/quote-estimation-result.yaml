@@ -1,0 +1,44 @@
+---
+$id: https://raw.githubusercontent.com/crim-ca/weaver/master/schemas/quotation/quote-estimation-result.yaml
+$schema: http://json-schema.org/draft-07/schema#
+description: |
+  Quote Estimation Result produced by an algorithm that takes as input the Quote Estimator configuration.
+
+type: object
+required:
+  - total
+properties:
+  total:
+    type: number
+    minimum: 0.0
+  currency:
+    description: |
+      Currency of the quote.
+      If the estimator does not provide a specific currency, the API-wide value will be employed.
+      See `weaver.quotation_currency_default` in *Configuration of Quotation Estimation* documentation.
+    type: string
+    minLength: 3
+    maxLength: 3
+additionalProperties:
+  description: "Additional quotation estimate details with rundown of values contributing in the total cost."
+  $ref: "#/definitions/QuoteEstimateValue"
+
+definitions:
+  QuoteEstimateValue:
+    type: object
+    required:
+      - cost
+    properties:
+      estimate:
+        type:
+          - number
+          - "null"
+        minimum: 0.0
+      rate:
+        type:
+          - number
+          - "null"
+        minimum: 0.0
+      cost:
+        type: number
+        minimum: 0.0

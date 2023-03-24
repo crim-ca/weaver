@@ -33,14 +33,15 @@ from weaver.exceptions import (
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
+from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
     get_any_id,
     get_any_value,
-    get_file_headers,
     get_header,
+    get_href_headers,
     get_path_kvp,
     get_sane_name,
     get_settings,
@@ -50,13 +51,13 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.constants import JobInputsOutputsSchema
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple, Union
 
+    from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
         AnyHeadersContainer,
         AnyRequestType,
@@ -66,14 +67,13 @@ if TYPE_CHECKING:
         AnyValueType,
         ExecutionResultArray,
         ExecutionResultObject,
-        ExecutionResultValue,
         ExecutionResults,
+        ExecutionResultValue,
         HeadersTupleType,
         JSON,
         PyramidRequest,
         SettingsType
     )
-    from weaver.wps_restapi.constants import JobInputsOutputsSchemaType
 
 LOGGER = get_task_logger(__name__)
 
@@ -477,7 +477,7 @@ def get_job_results_response(job, container, headers=None):
         if out_type == "href":
             out_path = map_wps_output_location(out_data, container, exists=True, url=False)
             out_type = out_info.get("type")  # noqa
-            out_headers = get_file_headers(out_path, download_headers=True, content_headers=True, content_type=out_type)
+            out_headers = get_href_headers(out_path, download_headers=True, content_headers=True, content_type=out_type)
             resp = FileResponse(out_path)
             resp.headers.update(out_headers)
             resp.headers.update(headers)
@@ -534,7 +534,7 @@ def get_job_submission_response(body, headers, error=False):
 def validate_service_process(request):
     # type: (PyramidRequest) -> Tuple[Optional[str], Optional[str]]
     """
-    Verifies that any :term:`Service` or :term:`Process` specified by path or query are valid.
+    Verifies that any :term:`Provider` or :term:`Process` specified by path or query are valid.
 
     :raises HTTPException: Relevant HTTP error with details if validation failed.
     :returns: Validated and existing service and process if specified.

@@ -36,18 +36,18 @@ if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
     from weaver.typedefs import (
-        JSON,
         AnyCookiesContainer,
         AnyHeadersContainer,
         AnyResponseType,
         CookiesTupleType,
-        CWL_RuntimeInputsMap,
         CWL_ExpectedOutputs,
+        CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
         JobInputs,
+        JobMonitorReference,
         JobOutputs,
         JobResults,
-        JobMonitorReference,
+        JSON,
         UpdateStatusPartialFunction
     )
     from weaver.wps.service import WorkerRequest

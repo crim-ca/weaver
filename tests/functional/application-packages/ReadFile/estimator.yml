@@ -1,0 +1,70 @@
+---
+$schema: "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/schemas/quotation/quote-estimator.yaml"
+
+# NOTE: to be filled by quotation execution
+#inputs:
+#  # metadata that describes the expected process inputs
+#  file:
+#    size: 209715200  # 200 MiB
+
+config:
+  # rates applied for this quote estimation of the process
+  # for this example, assume a base rate and a process that highly depends on variable memory usage
+  # other estimator/rates could be added as needed for advanced use cases: [duration, storage, GPU usage, CPU, usage]
+  flat_rate: 10
+  memory_rate: 0.005
+  memory_estimator:
+    # mapping of any ONNX-compatible model to process inputs
+    # this is a pretrained model that should be obtained from some previous usage analysis of the process
+    inputs:
+      input: file
+    output: variable
+    model:
+      irVersion: '8'
+      producerName: skl2onnx
+      producerVersion: '1.13'
+      domain: ai.onnx
+      modelVersion: '0'
+      docString: ''
+      opsetImport:
+        - domain: ai.onnx.ml
+          version: '1'
+        - domain: ''
+          version: '17'
+      graph:
+        name: test-read-file-estimator
+        node:
+          - input:
+              - input
+            output:
+              - variable
+            name: LinearRegressor
+            opType: LinearRegressor
+            attribute:
+              - name: coefficients
+                floats:
+                  - 7.394776e-08
+                type: FLOATS
+              - name: intercepts
+                floats:
+                  - 10.522503
+                type: FLOATS
+            domain: ai.onnx.ml
+        input:
+          - name: input
+            type:
+              tensorType:
+                elemType: 1
+                shape:
+                  dim:
+                    - { }
+                    - dimValue: '1'
+        output:
+          - name: variable
+            type:
+              tensorType:
+                elemType: 1
+                shape:
+                  dim:
+                    - { }
+                    - dimValue: '1'

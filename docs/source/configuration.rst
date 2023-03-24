@@ -237,30 +237,27 @@ they are optional and which default value or operation is applied in each situat
 
 .. versionadded:: 4.15
 
-- | ``weaver.exec_sync_max_wait = <int>`` [:class:`int`, seconds]
+- | ``weaver.execute_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
   |
   | Defines the maximum duration allowed for running a :term:`Job` execution in `synchronous` mode.
   |
   | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
-  | Ensure `Celery`_ worker is configured as specified below.
+  | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
 
 .. versionadded:: 4.15
+.. versionchanged:: 4.30
+    Renamed from ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait``.
 
-- | ``weaver.quote_sync_max_wait = <int>`` [:class:`int`, seconds]
-  | (default: ``20``)
-  |
-  | Defines the maximum duration allowed for running a :term:`Quote` estimation in `synchronous` mode.
-  |
-  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
-  | Ensure `Celery`_ worker is configured as specified below.
+.. _conf_celery:
 
-.. note::
+Configuration of Celery with MongoDB Backend
+============================================
 
-    Since `Weaver` employs `Celery`_ as task queue manager and `MongoDB`_ as backend, relevant settings for the
-    |celery-config|_ and the |celery-mongo|_ should be employed. Processing of task jobs and results reporting
-    is accomplished according to the specific implementation of these services. Therefore, all applicable settings
-    and extensions should be available for custom server configuration and scaling as needed.
+Since `Weaver` employs `Celery`_ as task queue manager and `MongoDB`_ as backend, relevant settings for the
+|celery-config|_ and the |celery-mongo|_ should be employed. Processing of task jobs and results reporting
+is accomplished according to the specific implementation of these services. Therefore, all applicable settings
+and extensions should be available for custom server configuration and scaling as needed.
 
 .. warning::
     In order to support `synchronous` execution, the ``RESULT_BACKEND`` setting **MUST** be defined.
@@ -496,6 +493,143 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
     development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
     basis using :term:`Request Options` for acceptable cases.
 
+.. _conf_quotation:
+
+Configuration of Quotation Estimation
+============================================
+
+.. versionadded:: 4.30
+
+Following parameters are relevant when using |ogc-proc-ext-quotation|_.
+If this feature is not desired, simply provide ``weaver.quotation = false`` in the ``weaver.ini`` configuration file,
+and all corresponding functionalities, including `API` endpoints, will be disabled.
+
+- | ``weaver.quotation = true|false`` [:class:`bool`-like]
+  | (default: ``true``)
+  |
+  | Enable support of |ogc-proc-ext-quotation|_.
+  |
+  | See :ref:`quotation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_docker_image = <image-reference>`` [:class:`str`]
+  |
+  | Specifies the :term:`Docker` image used as |quote-estimator|_ to evaluate a :term:`Quote`
+    for the eventual :term:`Process` execution.
+  |
+  | Required if ``weaver.quotation`` is enabled.
+  |
+  | See :ref:`quote_estimation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_docker_username = <username>`` [:class:`str`]
+  |
+  | Username to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  |
+  | Only required if the :term:`Docker` image is not accessible publicly or already
+    provided through some other means when requested by the :term:`Docker` daemon.
+    Should be combined with ``weaver.quotation_docker_password``.
+  |
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_docker_password = <username>`` [:class:`str`]
+  |
+  | Password to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  |
+  | Only required if the :term:`Docker` image is not accessible publicly or already
+    provided through some other means when requested by the :term:`Docker` daemon.
+    Should be combined with ``weaver.quotation_docker_username``.
+  |
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_currency_default = <CURRENCY>`` [:class:`str`]
+  | (default: ``USD``)
+  |
+  | Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
+  |
+  | It is up to the specified |quote-estimator|_ algorithm defined by ``weaver.quotation_docker_image`` and
+    employed by the various :term:`Process` to ensure that the returned :ref:`quote_estimation` cost makes
+    sense according to the specified default currency.
+  |
+  | See :ref:`quotation_currency_conversion` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_currency_converter = <converter>`` [:class:`str`]
+  |
+  | Reference currency converter to employ for retrieving conversion rates.
+  |
+  | Valid values are:
+  | - `openexchangerates <https://docs.openexchangerates.org/reference/convert>`_
+  | - `currencylayer <https://currencylayer.com/documentation>`_
+  | - `exchangeratesapi <https://exchangeratesapi.io/documentation/>`_
+  | - `fixer <https://fixer.io/documentation>`_
+  | - `scrapper <https://www.x-rates.com/table/?from=USD&amount=1>`_
+  | - ``custom``
+  |
+  | In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
+    Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
+    could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
+    In such case, the conversion will not be performed and will remain in the default currency.
+  |
+  | If a ``custom`` URL is desired, the ``weaver.quotation_currency_custom_url`` parameter should also be provided.
+  |
+  | If none is provided, conversion rates will not be applied and currencies
+    will always use ``weaver.quotation_currency_default``.
+  |
+  | See :ref:`quotation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_currency_custom_url = <URL>`` [:class:`str`]
+  |
+  | Reference ``custom`` currency converter URL pattern to employ for retrieving conversion rates.
+  |
+  | This applies only when using ``weaver.quotation_currency_converter = custom``
+  |
+  | The specified URL will be used to perform a ``GET`` request.
+    This URL should contain the relevant query or path parameters to perform the request.
+    Parameters can be specified using templating (``{<param>}``), with parameters
+    names ``token``, ``from``, ``to`` and ``amount`` to perform the conversion.
+    The query parameter ``token`` will be filled by ``weaver.quotation_currency_token``, while remaining values will
+    be provided based on the source and target currency conversion requirements.
+    The response body should be in :term:`JSON` with minimally the conversion ``result`` field located at the root.
+    The same caching policy will be applied as for the other API references.
+  |
+  | If none is provided, conversion rates will not be applied and currencies
+    will always use ``weaver.quotation_currency_default``.
+  |
+  | See :ref:`quotation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_currency_token = <API access token>`` [:class:`str`]
+  |
+  | Password to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  |
+  | Only required if the :term:`Docker` image is not accessible publicly or already
+    provided through some other means when requested by the :term:`Docker` daemon.
+    Should be combined with ``weaver.quotation_docker_username``.
+  | See :ref:`quotation` for more details on the feature.
+
+.. versionadded:: 4.30
+
+- | ``weaver.quotation_sync_max_wait = <int>`` [:class:`int`, seconds]
+  | (default: ``20``)
+  |
+  | Defines the maximum duration allowed for running a :ref:`quote_estimation` in `synchronous` mode.
+  |
+  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
+  | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
+
+.. versionchanged:: 4.30
+    Renamed from ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait``.
 
 .. _conf_vault:
 

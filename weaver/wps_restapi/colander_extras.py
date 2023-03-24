@@ -75,13 +75,14 @@ from cornice_swagger.converters.schema import (
     TypeConversionDispatcher,
     TypeConverter,
     ValidatorConversionDispatcher,
+    convert_oneof_validator_factory,
     convert_range_validator,
     convert_regex_validator
 )
 from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
+    from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
     from typing_extensions import Literal
 
     from cornice import Service as CorniceService
@@ -92,8 +93,8 @@ if TYPE_CHECKING:
         OpenAPISchema,
         OpenAPISchemaAllOf,
         OpenAPISchemaAnyOf,
-        OpenAPISchemaOneOf,
         OpenAPISchemaNot,
+        OpenAPISchemaOneOf,
         OpenAPISpecification,
         OpenAPISpecInfo,
         OpenAPISpecParameter
@@ -535,7 +536,7 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
         #    (e.g.: float("1.23").is_integer() -> False, but still not a float)
         #  - furthermore, True/False are considered 'int', so must double check for 'bool'
         if not isinstance(num, int) or isinstance(num, bool):
-            raise ValueError("Value is not a Integer number (Boolean, Float and String not allowed).")
+            raise ValueError("Value is not an Integer number (Boolean, Float and String not allowed).")
         return num
 
     def serialize(self, node, appstruct):
@@ -671,6 +672,13 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
             self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
 
         try:
+            # if schema_type was defined with an instance instead of the class type,
+            # we must pass it by "typ" keyword to avoid an error in base class calling 'schema_type()'
+            # one case were using an instance is valid is for 'colander.Mapping(unknown="<handling-method>")'
+            schema_type_def = getattr(self, "schema_type", None)
+            if isinstance(schema_type_def, colander.SchemaType):
+                kwargs["typ"] = schema_type_def
+                kwargs["unknown"] = getattr(schema_type_def, "unknown", "ignore")
             super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
             ExtendedSchemaBase._validate(self)
         except Exception as exc:
@@ -1165,6 +1173,81 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return result
 
 
+class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
+    """
+    Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
+
+    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
+    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
+    deserialized JSON result.
+
+    Alternatively, the parameters ``schema`` and ``id`` can be passed as keyword arguments when instantiating the
+    schema node.
+    """
+    _extension = "_ext_schema_ref"
+    _ext_schema_fields = ["_schema", "_id"]
+
+    # typings and attributes to help IDEs flag that the field is available/overridable
+    _schema = None          # type: str
+    _id = None              # type: str
+
+    def __init__(self, *args, **kwargs):
+        schema_fields = self._schema_fields
+        for schema_key in schema_fields:
+            schema_field = schema_key[1:]
+            schema_ref = kwargs.pop(schema_field, None)
+            if self._is_schema_ref(schema_ref):
+                setattr(self, schema_key, schema_ref)
+        super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
+        setattr(self, SchemaRefMappingSchema._extension, True)
+
+        for schema_key in schema_fields:
+            schema_field = f"${schema_key[1:]}"
+            sort_first = getattr(self, "_sort_first", [])
+            sort_after = getattr(self, "_sort_after", [])
+            if schema_field not in sort_first + sort_after:
+                setattr(self, "_sort_first", [schema_field] + list(sort_first))
+
+    @staticmethod
+    def _is_schema_ref(schema_ref):
+        # type: (Any) -> bool
+        return isinstance(schema_ref, str) and URL.match_object.match(schema_ref)
+
+    @property
+    def _schema_fields(self):
+        return getattr(self, "_ext_schema_fields", SchemaRefMappingSchema._ext_schema_fields)
+
+    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+        if not isinstance(cstruct, dict):
+            return cstruct
+        if not getattr(self, SchemaRefMappingSchema._extension, False):
+            return cstruct
+
+        schema_result = {}
+        schema_fields = self._schema_fields
+        for schema_key in schema_fields:
+            schema_ref = getattr(self, schema_key, None)
+            if self._is_schema_ref(schema_ref):
+                schema_field = f"${schema_key[1:]}"
+                schema = ExtendedSchemaNode(
+                    colander.String(),
+                    name=schema_field,
+                    title=schema_field,
+                    missing=schema_ref,
+                    default=schema_ref,
+                    validator=colander.OneOf([schema_ref])
+                )
+                schema_result[schema_field] = schema.deserialize(cstruct.get(schema_field))
+
+        schema_result.update(cstruct)
+        return schema_result
+
+    @staticmethod
+    @abstractmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
+
 class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNode, ExtendedSchemaBase):
     """
     Base schema node with support of extended functionalities.
@@ -1181,17 +1264,26 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         - :class:`VariableSchemaNode`
     """
     _extension = "_ext_combined"
+    _ext_first = [
+        DropableSchemaNode,
+        DefaultSchemaNode,
+        VariableSchemaNode,
+    ]  # type: Iterable[Type[ExtendedNodeInterface]]
+    _ext_after = [
+        SchemaRefMappingSchema,
+        SortableMappingSchema,
+    ]  # type: Iterable[Type[ExtendedNodeInterface]]
 
     @staticmethod
     @abstractmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    def _deserialize_extensions(self, cstruct):
+    def _deserialize_extensions(self, cstruct, extensions):
         result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
-        for node in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: Type[ExtendedNodeInterface]
+        for node in extensions:  # type: Type[ExtendedNodeInterface]
             # important not to break if result is 'colander.null' since Dropable and Default
             # schema node implementations can substitute it with their appropriate value
             if result is colander.drop:
@@ -1202,7 +1294,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
 
     def deserialize(self, cstruct):
         schema_type = _get_schema_type(self)
-        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_first)
 
         try:
             # process usual base operation with extended result
@@ -1239,7 +1331,8 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
-        return SortableMappingSchema._deserialize_impl(self, result)
+        result = ExtendedSchemaNode._deserialize_extensions(self, result, ExtendedSchemaNode._ext_after)
+        return result
 
 
 class ExpandStringList(colander.SchemaNode):
@@ -1353,8 +1446,9 @@ class ExtendedMappingSchema(
     DefaultSchemaNode,
     DropableSchemaNode,
     VariableSchemaNode,
+    SchemaRefMappingSchema,
     SortableMappingSchema,
-    colander.MappingSchema
+    colander.MappingSchema,
 ):
     """
     Combines multiple extensions of :class:`colander.MappingSchema` handle their corresponding keywords.
@@ -1368,6 +1462,7 @@ class ExtendedMappingSchema(
         - :class:`VariableSchemaNode`
         - :class:`ExtendedSchemaNode`
         - :class:`ExtendedSequenceSchema`
+        - :class:`SchemaRefMappingSchema`
         - :class:`SortableMappingSchema`
         - :class:`PermissiveMappingSchema`
     """
@@ -1603,7 +1698,9 @@ class KeywordMapper(ExtendedMappingSchema):
             # otherwise, only null/drop/default are to be processed
             # since nested keyword schemas are not necessarily mappings, deserialize only extended features
             # using 'ExtendedSchemaNode.deserialize' would raise "not a mapping" if nested schemas is something else
-            return ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+            cstruct = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_first)
+            cstruct = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_after)
+            return cstruct
 
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
@@ -2142,7 +2239,13 @@ class ExtendedTypeConverter(TypeConverter):
         pattern = getattr(schema_node, "pattern", None)
         if isinstance(pattern, RegexPattern):
             setattr(schema_node, "pattern", pattern.pattern)
-        return super(ExtendedTypeConverter, self).convert_type(schema_node)
+        result = super(ExtendedTypeConverter, self).convert_type(schema_node)
+        if isinstance(schema_node, SortableMappingSchema) and result.get("type") == "object":
+            props = result.get("properties", {})
+            if props:
+                props = schema_node._order_deserialize(props, schema_node._sort_first, schema_node._sort_after)
+                result["properties"] = props
+        return result
 
 
 class KeywordTypeConverter(TypeConverter):
@@ -2152,9 +2255,11 @@ class KeywordTypeConverter(TypeConverter):
 
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
-        keyword_schema = {
+        keyword_schema = super(KeywordTypeConverter, self).convert_type(schema_node)
+        keyword_schema.pop("type", None)
+        keyword_schema.update({
             keyword: []
-        }
+        })
 
         for item_schema in schema_node.get_keyword_items():
             obj_instance = _make_node_instance(item_schema)
@@ -2177,9 +2282,11 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
     def convert_type(self, schema_node):
         # type: (OneOfKeywordSchema) -> OpenAPISchemaOneOf
         keyword = schema_node.get_keyword_name()
-        one_of_obj = {
+        one_of_obj = super(KeywordTypeConverter, self).convert_type(schema_node)
+        one_of_obj.pop("type", None)
+        one_of_obj.update({
             keyword: []
-        }
+        })
 
         for item_schema in schema_node.get_keyword_items():
             item_obj = _make_node_instance(item_schema)
@@ -2247,12 +2354,18 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
 
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchemaNot
-        result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
+        result = ExtendedObjectTypeConverter(self.dispatcher).convert_type(schema_node)
         result["additionalProperties"] = False
         return result
 
 
-class VariableObjectTypeConverter(ObjectTypeConverter):
+class ExtendedObjectTypeConverter(ExtendedTypeConverter, ObjectTypeConverter):
+    """
+    Object convert for mapping type with extended capabilities.
+    """
+
+
+class VariableObjectTypeConverter(ExtendedObjectTypeConverter):
     """
     Object convertor with ``additionalProperties`` for each ``properties`` marked as :class:`VariableSchemaNode`.
     """
@@ -2286,12 +2399,17 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
 class DecimalTypeConverter(NumberTypeConverter):
     format = "decimal"
 
+    def convert_type(self, schema_node):
+        result = super(DecimalTypeConverter, self).convert_type(schema_node)
+        result.setdefault("format", DecimalTypeConverter.format)
+        return result
+
 
 class MoneyTypeConverter(DecimalTypeConverter):
-    pattern = re.compile("^[0-9]+.[0-9]{2}$")
     convert_validator = ValidatorConversionDispatcher(
-        convert_range_validator(colander.Range(min=0)),
-        convert_regex_validator(colander.Regex(pattern, msg="Number must be formatted as currency decimal."))
+        convert_range_validator,
+        convert_regex_validator,
+        convert_oneof_validator_factory(),
     )
 
 
@@ -2485,6 +2603,25 @@ class OAS3DefinitionHandler(DefinitionHandler):
                     schema.pop(param)
                 schema["$ref"] = schema_ref
         return schema_ret
+
+    def _process_items(self,
+                       schema,      # type: Dict[str, Any]
+                       list_type,   # type: Literal["oneOf", "allOf", "anyOf", "not"]
+                       item_list,   # type: List[Dict[str, Any]]
+                       depth,       # type: int
+                       base_name,   # type: str
+                       ):           # type: (...) -> Dict[str, Any]
+        """
+        Generates recursive schema definitions with JSON ref pointers for nested keyword objects.
+
+        Contrary to the original implementation, preserves additional metadata like the object title, description, etc.
+        """
+        schema_ref = super(OAS3DefinitionHandler, self)._process_items(schema, list_type, item_list, depth, base_name)
+        schema_def = self.definition_registry[base_name]
+        schema_meta = schema.copy()
+        schema_meta.pop(list_type)  # don't undo refs generated by processing
+        schema_def.update(schema_meta)
+        return schema_ref
 
 
 class OAS3ParameterHandler(ParameterHandler):

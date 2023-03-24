@@ -27,7 +27,6 @@ from urllib.parse import parse_qsl, urlparse
 import colander
 import cwltool
 import cwltool.docker
-import docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
@@ -95,7 +94,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import ProcessType
-from weaver.processes.utils import load_package_file, map_progress
+from weaver.processes.utils import load_package_file, map_progress, pull_docker
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -159,8 +158,8 @@ if TYPE_CHECKING:
         CWL_AnyRequirements,
         CWL_IO_ComplexType,
         CWL_Requirement,
-        CWL_RequirementsDict,
         CWL_RequirementNames,
+        CWL_RequirementsDict,
         CWL_Results,
         CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
@@ -959,7 +958,7 @@ def get_auth_requirements(requirement, headers):
                         f"Supported schemes are: {supported_schemes}."
                     )
                 auth_scheme = auth_scheme.capitalize()
-            auth = DockerAuthentication(auth_scheme, auth_token, link_ref_docker)
+            auth = DockerAuthentication(link_ref_docker, auth_scheme, auth_token)
             LOGGER.debug("Authentication details for Docker image reference in Application Package correctly parsed.")
             return auth
 
@@ -1442,35 +1441,8 @@ class WpsPackage(Process):
                               "mismatching registered Process Authentication Docker reference.")
             return None
 
-        image = None
-        try:
-            # load from env is the same as CLI call
-            client = docker.from_env()
-            # following login does not update '~/.docker/config.json' by design, but can use it if available
-            # session remains active only within the client
-            # Note:
-            #   Force re-auth to ensure credentials are validated against remote registry and API Status is returned.
-            #   This way, even if the auth were pre-resolved, we make sure they are still valid.
-            #   This is important mostly because Docker images could still be present in cache, so pull doesn't occur.
-            # Warning:
-            #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
-            #   With re-auth, body *could* contain an identity token depending on auth method.
-            body = client.login(reauth=True, **process.auth.credentials)
-            if body.get("Status") != "Login Succeeded":
-                self.logger.debug("Failed authentication to Docker private registry.")
-                return False
-            self.logger.debug("Retrieving image from Docker registry or cache.")
-            # docker client pulls all available images when no tag, provide the default to limit
-            tag = process.auth.tag or "latest"
-            image = client.images.pull(process.auth.repository, tag)  # actual pull or resolved from cache
-        except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
-            self.logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
-                              exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
-        if not image or process.auth.docker not in image.tags:
-            self.logger.debug("Failed authorization or could not retrieve Docker image from private registry.")
-            return False
-        self.logger.debug("Docker image retrieved.")
-        return True
+        client = pull_docker(process.auth, self.logger)
+        return client is not None
 
     def setup_runtime(self):
         # type: () -> Dict[str, AnyValueType]

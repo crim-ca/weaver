@@ -68,12 +68,12 @@ if TYPE_CHECKING:
     from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
-        JSON,
         AnyHeadersContainer,
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
         HeadersType,
+        JSON,
         Path,
         SettingsType
     )
@@ -459,8 +459,10 @@ def mocked_sub_requests(app,                # type: TestApp
     """
     # pylint: disable=R1260,too-complex  # FIXME
 
-    from weaver.wps_restapi.swagger_definitions import FileLocal, ReferenceURL
     from requests.sessions import Session as RealSession
+
+    from weaver.wps_restapi.swagger_definitions import FileLocal, ReferenceURL
+
     real_request = RealSession.request
     real_signature = inspect.signature(real_request)
 

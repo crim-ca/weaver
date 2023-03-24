@@ -15,7 +15,7 @@ from weaver.exceptions import log_unhandled_exceptions
 from weaver.formats import get_allowed_extensions
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
 from weaver.store.base import StoreVault
-from weaver.utils import get_file_headers
+from weaver.utils import get_href_headers
 from weaver.vault.utils import (
     REGEX_VAULT_FILENAME,
     decrypt_from_vault,
@@ -94,7 +94,12 @@ def upload_file(request):
     data = {"description": sd.OkVaultFileUploadedResponse.description}
     data.update(vault_file.json())
     path = get_vault_path(vault_file, request)
-    headers = get_file_headers(path)
+    headers = get_href_headers(
+        path,
+        download_headers=False,
+        location_headers=False,
+        content_headers=False,
+    )
     headers["Content-Location"] = get_vault_url(vault_file, request)
     return HTTPOk(json=data, headers=headers)
 
@@ -113,8 +118,13 @@ def describe_file(request):
     tmp_file = None
     try:
         tmp_file = decrypt_from_vault(vault_file, path, delete_encrypted=False)
-        headers = get_file_headers(tmp_file, download_headers=True,
-                                   content_headers=True, content_type=vault_file.format)
+        headers = get_href_headers(
+            tmp_file,
+            download_headers=True,
+            location_headers=False,
+            content_headers=True,
+            content_type=vault_file.format,
+        )
         headers["Content-Location"] = get_vault_url(vault_file, request)
     finally:
         if os.path.isfile(tmp_file):
@@ -144,7 +154,13 @@ def download_file(request):
 
     path = get_vault_path(vault_file, request)
     out_path = decrypt_from_vault(vault_file, path, delete_encrypted=True)
-    headers = get_file_headers(out_path, download_headers=True, content_headers=True, content_type=vault_file.format)
+    headers = get_href_headers(
+        out_path,
+        download_headers=True,
+        location_headers=False,
+        content_headers=True,
+        content_type=vault_file.format,
+    )
     request.environ["wsgi.file_wrapper"] = FileIterAndDelete
     resp = FileResponse(out_path, request=request)
     resp.headers.update(headers)
