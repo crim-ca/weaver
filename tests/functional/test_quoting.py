@@ -295,7 +295,7 @@ class WpsQuotationEstimatorDockerTest(ResourcesUtil, WpsConfigBase):
             deploy = cls.retrieve_payload(name, "deploy", local=True)
             package = cls.retrieve_payload(name, "package", local=True)
             estimator = cls.retrieve_payload(name, "estimator", local=True)
-            deploy["executionUnit"][0] = {"unit": package}
+            deploy["executionUnit"][0] = {"unit": package}  # pylint: disable=E1136
             cls.deploy_process(deploy, process_id=name)
             path = sd.process_estimator_service.path.format(process_id=name)
             resp = mocked_sub_requests(cls.app, "PUT", path, json=estimator, headers=cls.json_headers, only_local=True)

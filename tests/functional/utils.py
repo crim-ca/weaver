@@ -93,7 +93,7 @@ class ResourcesUtil(object):
     @overload
     def retrieve_payload(cls,
                          process,           # type: str
-                         ref_type=None,     # type: Literal["execute"]
+                         ref_type=None,     # type: Literal["execute", "quotation"]
                          ref_name=None,     # type: Optional[str]
                          ref_found=False,   # type: Literal[False]
                          location=None,     # type: Optional[str]
@@ -111,6 +111,18 @@ class ResourcesUtil(object):
                          location=None,     # type: Optional[str]
                          local=False,       # type: bool
                          ):                 # type: (...) -> CWL
+        ...
+
+    @classmethod
+    @overload
+    def retrieve_payload(cls,
+                         process,           # type: str
+                         ref_type=None,     # type: Literal["estimator"]
+                         ref_name=None,     # type: Optional[str]
+                         ref_found=False,   # type: Literal[False]
+                         location=None,     # type: Optional[str]
+                         local=False,       # type: bool
+                         ):                 # type: (...) -> Dict[str, JSON]
         ...
 
     @classmethod
