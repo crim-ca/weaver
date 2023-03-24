@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPNotFound
 from pyramid.settings import asbool
 
-from weaver.database import get_db
 from weaver.config import WeaverFeature, get_weaver_configuration
+from weaver.database import get_db
 from weaver.exceptions import QuoteNotFound
 from weaver.store.base import StoreQuotes
 from weaver.utils import get_settings

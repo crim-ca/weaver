@@ -21,11 +21,12 @@ from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.constants import WPS_COMPLEX, WPS_LITERAL, JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema
 from weaver.processes.types import ProcessType
-from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.processes.utils import pull_docker
+from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.quotation.status import QuoteStatus
 from weaver.store.base import StoreProcesses, StoreQuotes
 from weaver.utils import (
+    Lazify,
     fully_qualified_name,
     get_any_id,
     get_any_message,
@@ -33,7 +34,6 @@ from weaver.utils import (
     get_header,
     get_href_headers,
     get_settings,
-    Lazify,
     request_extra,
     wait_secs
 )

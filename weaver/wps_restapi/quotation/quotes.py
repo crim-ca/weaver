@@ -14,8 +14,8 @@ from weaver.execute import ExecuteMode
 from weaver.formats import OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.execution import validate_process_io
-from weaver.processes.utils import get_process
 from weaver.processes.types import ProcessType
+from weaver.processes.utils import get_process
 from weaver.quotation.estimation import (
     execute_quote_estimator,
     get_currency,
