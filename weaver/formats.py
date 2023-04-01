@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
     from weaver.base import PropertyDataTypeT
-    from weaver.typedefs import JSON, AnyRequestType
+    from weaver.typedefs import AnyRequestType, JSON
 
 LOGGER = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ class OutputFormat(Constants):
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[str, AnyOutputFormat], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, str], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 
@@ -536,7 +536,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
           (N.B.: literal non-official MIME-type reference will be returned even if an official synonym exists).
         - If there is no match but ``must_exist=True`` **AND** ``allow_synonym=True``, retry the call with the
           synonym if available, or move to next step. Skip this step if ``allow_synonym=False``.
-        - Returns a single ``None`` as there is not match (directly or synonym).
+        - Returns a single ``None`` as there is no match (directly or synonym).
 
     Note:
         In situations where ``must_exist=False`` is used and that the namespace and/or full format URL cannot be
@@ -546,7 +546,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         used only for literal string comparison or pre-processing steps to evaluate formats.
 
     :param mime_type: Some reference, namespace'd or literal (possibly extended) MIME-type string.
-    :param make_reference: Construct the full URL reference to the resolved MIME-type. Otherwise return tuple details.
+    :param make_reference: Construct the full URL reference to the resolved MIME-type. Otherwise, return tuple details.
     :param must_exist:
         Return result only if it can be resolved to an official MIME-type (or synonym if enabled), otherwise ``None``.
         Non-official MIME-type can be enforced if disabled, in which case `IANA` namespace/URL is used as it preserves

@@ -72,7 +72,7 @@ def test_auth_docker_image_registry_format():
     docker_hub = DockerAuthentication.DOCKER_REGISTRY_DEFAULT_URI
     valid_references = [
         ("docker-registry.crim.ca/repo/image",
-         "docker-registry.crim.ca/repo/image", "docker-registry.crim.ca", "repo/image"),
+         "docker-registry.crim.ca/repo/image:latest", "docker-registry.crim.ca", "repo/image"),
         ("docker-registry.crim.ca/repo/image:latest",
          "docker-registry.crim.ca/repo/image:latest", "docker-registry.crim.ca", "repo/image:latest"),
         ("docker-registry.crim.ca/repo/image:1.0.0",
@@ -87,13 +87,13 @@ def test_auth_docker_image_registry_format():
         ("https://index.docker.io/v1/repo/image:test",
          "repo/image:test", docker_hub, "repo/image:test"),
         ("registry.example.com/org/image-name",
-         "registry.example.com/org/image-name", "registry.example.com", "org/image-name"),
+         "registry.example.com/org/image-name:latest", "registry.example.com", "org/image-name"),
         ("registry.example.com/org/image-name:version",
          "registry.example.com/org/image-name:version", "registry.example.com", "org/image-name:version"),
         ("repository/image-name:version",
          "repository/image-name:version", docker_hub, "repository/image-name:version"),
         ("repository/image-name",
-         "repository/image-name", docker_hub, "repository/image-name"),
+         "repository/image-name:latest", docker_hub, "repository/image-name"),
     ]
     invalid_references = [
         # missing repo part, not allowed local/public images
@@ -107,7 +107,7 @@ def test_auth_docker_image_registry_format():
     token = str(uuid.uuid4())
     for docker_input, docker_ref, docker_registry, docker_image in valid_references:
         try:
-            auth = DockerAuthentication("Basic", token, docker_input)
+            auth = DockerAuthentication(docker_input, "Basic", token)
             assert auth.token == token, f"Testing: [{docker_input}]"
             assert auth.registry == docker_registry, f"Testing: [{docker_input}]"
             assert auth.image == docker_image, f"Testing: [{docker_input}]"
@@ -117,7 +117,7 @@ def test_auth_docker_image_registry_format():
             pytest.fail(f"Unexpected failure when [{docker_input}] was expected to be valid: [{exc}]")
     for docker_input in invalid_references:
         try:
-            DockerAuthentication("Basic", token, docker_input)
+            DockerAuthentication(docker_input, "Basic", token)
         except (TypeError, ValueError):
             pass
         else:
@@ -150,12 +150,37 @@ def test_auth_docker_image_from_parent_params():
     assert auth.registry == registry
 
     # not extra fields remaining
-    auth_docker = DockerAuthentication(scheme, token, link)
+    auth_docker = DockerAuthentication(link, scheme, token)
     auth_docker.id = auth.id  # noqa  # randomly generated for both, must be passed down
     assert auth == auth_docker
     assert dict(auth_docker) == dict(auth_docker)
     for field in ["auth_link", "auth_token", "auth_type", "auth_image"]:
         assert field not in auth
+
+
+def test_auth_docker_image_from_credentials():
+    registry = "registry.gitlab.com"
+    image = "crim.ca/category/group/project:1.2.3"
+    link = f"{registry}/{image}"
+    usr, pwd = "random", "12345"  # nosec
+    auth_docker = DockerAuthentication(link, auth_username=usr, auth_password=pwd)
+    assert auth_docker.link == link
+    assert auth_docker.token
+    assert usr not in auth_docker.token and pwd not in auth_docker.token
+    assert auth_docker.credentials["username"] == usr
+    assert auth_docker.credentials["password"] == pwd
+    assert auth_docker.credentials["registry"] == registry
+
+
+def test_auth_docker_image_public():
+    registry = "registry.gitlab.com"
+    image = "crim.ca/category/group/project:1.2.3"
+    link = f"{registry}/{image}"
+    auth_docker = DockerAuthentication(link)
+    assert auth_docker.link == link
+    assert auth_docker.registry == registry
+    assert not auth_docker.token
+    assert not auth_docker.credentials
 
 
 def test_process_io_schema_ignore_uri():

@@ -2,6 +2,7 @@
 
 import contextlib
 import inspect
+import io
 import itertools
 import json
 import os
@@ -18,6 +19,7 @@ import mock
 import pytest
 import pytz
 import responses
+from beaker.cache import cache_region
 from mypy_boto3_s3.literals import RegionName
 from pyramid.httpexceptions import (
     HTTPConflict,
@@ -48,6 +50,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_
 from weaver.utils import (
     AWS_S3_BUCKET_REFERENCE_PATTERN,
     AWS_S3_REGIONS,
+    Lazify,
     NullType,
     OutputMethod,
     PathMatchingMethod,
@@ -63,6 +66,7 @@ from weaver.utils import (
     get_request_options,
     get_sane_name,
     get_secure_directory_name,
+    get_secure_filename,
     get_ssl_verify_option,
     get_url_without_query,
     is_update_version,
@@ -85,6 +89,9 @@ from weaver.utils import (
     xml_strip_ns
 )
 
+# WARNING: make sure to reset cache after use since state is applied globally, could break other tests
+from weaver.utils import setup_cache  # isort:skip # noqa: E402
+
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Type
 
@@ -92,12 +99,58 @@ if TYPE_CHECKING:
 
     from tests.utils import S3Scheme
     from weaver.typedefs import AnyRequestType, HeadersType
+    from weaver.utils import AnyDownloadOutputMethod
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
 AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
 # pylint: disable=R1732,W1514  # not using with open + encoding
+
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    """
+    Fixture automatically applied for all test combinations in this module to reset caches and their configurations.
+
+    This is to minimize the impact of caches incorrectly reset, which could cause invalid initial states between tests
+    or between distinct parametrization values for a same test.
+
+    .. seealso::
+        See the ``WARNING`` note on :func:`setup_cache` import.
+    """
+    setup_cache({})
+    yield  # test
+    setup_cache({})
+
+
+def test_lazify():
+    called_counter = [0]
+
+    def call():
+        called_counter[0] += 1
+        return "test"
+
+    # validate handling of caching/lazy formatting
+    text = Lazify(call)
+    assert isinstance(text, str)
+    assert isinstance(text, Lazify)
+    assert text != "test"
+    assert called_counter[0] == 0
+    assert repr(text) == "Lazify(tests.test_utils.call) <lazy>"
+    assert called_counter[0] == 0
+    assert f"{text!s}" == "test"
+    assert called_counter[0] == 1
+    assert repr(text) == "Lazify(tests.test_utils.call) <computed>"
+    assert f"{text!s}" == "test"  # expect cached value reused
+    assert called_counter[0] == 1, "computed value should have been cached and reused"
+
+    # validate core string methods
+    msg = "other string operations are expected to work seamlessly as any normal string"
+    assert text.upper() == "TEST", msg
+    assert text.lower() == "test", msg
+    assert text.title() == "Test", msg
+    assert text.title().join([text.lower(), text.upper()]) == "testTestTEST", msg
 
 
 def test_null_operators():
@@ -545,7 +598,7 @@ def test_request_extra_intervals():
             sleep_counter["called_count"] += 1
             sleep_counter["called_with"].append(delay)
 
-    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
             with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
                 intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
@@ -583,7 +636,7 @@ def test_request_extra_zero_values():
         sleep_counter["called_count"] += 1
         sleep_counter["called_with"].append(delay)
 
-    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
             with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
                 # if backoff is not correctly handled as explicit zero, the default backoff value would be used
@@ -598,8 +651,135 @@ def test_request_extra_zero_values():
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
 
 
+@pytest.mark.parametrize("cache_enabled", [False, True])
+def test_request_extra_cache_requests_applied(cache_enabled):
+    def mock_request(*_, **__):
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        return mocked_resp
+
+    try:
+        cache_settings = {"cache.request.enabled": str(cache_enabled)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+            with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+                resp = request_extra("GET", "https://valid.com")
+                assert resp.status_code == HTTPOk.code
+                assert mocked_request.called
+                resp = request_extra("GET", "https://valid.com")
+                assert resp.status_code == HTTPOk.code
+                assert mocked_request.call_count == 1 if cache_enabled else 2
+    finally:
+        setup_cache({})  # ensure reset since globally applied
+
+
+@pytest.mark.parametrize("cache_enabled", [False, True])
+def test_request_extra_cache_non_default_func(cache_enabled):
+    test_region = "result"
+    test_called = [0]
+
+    @cache_region(test_region)
+    def mock_request(*_):
+        test_called[0] += 1
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        return mocked_resp
+
+    try:
+        cache_settings = {f"cache.{test_region}.enabled": str(cache_enabled)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+            with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+                resp = request_extra("GET", "https://valid.com", cache_request=mock_request)
+                assert resp.status_code == HTTPOk.code
+                assert test_called[0]
+                assert not mocked_request.called
+                resp = request_extra("GET", "https://valid.com", cache_request=mock_request)
+                assert resp.status_code == HTTPOk.code
+                assert test_called[0] == 1 if cache_enabled else 2
+                assert not mocked_request.called
+    finally:
+        setup_cache({})  # ensure reset since globally applied
+
+
+def test_request_extra_cached_stream_iter_content():
+    test_called = [0]
+    test_json = {"test": "DATA", "number": 123}
+    test_text = json.dumps(test_json)
+    test_content = str2bytes(test_text)
+
+    class ChunkedSteam(io.BytesIO):
+        def stream(self, chunk=1, **_):
+            chunk = chunk or 1
+            while True:
+                data = self.read(chunk)
+                if not data:
+                    return
+                yield data
+
+    def mock_request(*_, **__):
+        test_called[0] += 1
+        mocked_resp = Response()
+        mocked_resp.status_code = HTTPOk.code
+        mocked_resp.raw = ChunkedSteam(test_content)
+        return mocked_resp
+
+    try:
+        cache_settings = {"cache.request.enabled": str(True)}
+        with mock.patch("weaver.utils.get_settings", return_value=cache_settings):
+            setup_cache(cache_settings)
+
+            # WARNING:
+            #   Very important to have 'autospec' to replicate the 'stream' argument here,
+            #   since the signature is used to filter valid params of 'requests.Session.request'.
+            #   Otherwise, 'MagicMock' checked instead, and the 'stream' argument gets dropped.
+            with mock.patch("requests.Session.request", side_effect=mock_request, autospec=True):
+                for _ in range(5):
+                    resp = request_extra("GET", "https://mocked.com", stream=True)
+                    assert resp.status_code == 200
+                    # below fails with StreamConsumedError if cached request did not transfer content properly
+                    body = b""
+                    for part in resp.iter_content(5):
+                        body += part
+                    assert body == test_content
+                    # other handlers should also be valid
+                    assert resp.json() == test_json
+                    assert resp.text == test_text
+                    assert resp.content == test_content
+
+        # NOTE: if this check fails, its probably due to the debugger causing a second call
+        assert test_called[0] == 1, "Caching should have been applied."
+
+    finally:
+        setup_cache({})  # ensure reset since globally applied
+
+
 @pytest.mark.parametrize(
-    "location,expected",
+    ["name", "expected"],
+    [
+        ("file.txt", "file.txt"),
+        ("file_.txt", "file_.txt"),
+        ("file__.txt", "file__.txt"),
+        ("_file_.txt", "_file_.txt"),
+        ("__file.txt", "__file.txt"),
+        ("_file_text_.txt", "_file_text_.txt"),
+        ("_.file_text_.txt", "_file_text_.txt"),
+        ("__.file_text_.txt", "__file_text_.txt"),
+        ("__.file.text_.txt", "__file.text_.txt"),
+        ("_file.text_.txt", "_file.text_.txt"),
+        (".file.text_.txt", "file.text_.txt"),
+        (".file.text.txt", "file.text.txt"),
+        ("./.file.text.txt", "file.text.txt"),
+        ("../.file.text.txt", "file.text.txt"),
+    ]
+)
+def test_get_secure_filename(name, expected):
+    result = get_secure_filename(name)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ["location", "expected"],
     [
         ("https://mocked-file-server.com/dir/", "dir"),
         ("https://mocked-file-server.com/dir/sub/", "sub"),
@@ -626,7 +806,13 @@ def test_get_secure_directory_name_uuid():
 
 
 @pytest.mark.parametrize(
-    "include_dir_heading,include_separators,include_code_format,include_table_format,include_modified_date",
+    [
+        "include_dir_heading",
+        "include_separators",
+        "include_code_format",
+        "include_table_format",
+        "include_modified_date",
+    ],
     itertools.product((True, False), repeat=5)
 )
 def test_fetch_directory_html(include_dir_heading,       # type: bool
@@ -775,7 +961,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
 
 
 # expect_files[i] = (Path, IsLink)
-@pytest.mark.parametrize("listing_dir,out_method,include,exclude,matcher,expect_files", [
+@pytest.mark.parametrize(["listing_dir", "out_method", "include", "exclude", "matcher", "expect_files"], [
     ("dir/", OutputMethod.LINK, None, None, PathMatchingMethod.REGEX, [
         ("dir/", True),
         ("dir/file.txt", False),
@@ -910,7 +1096,7 @@ class TemporaryLinkableDirectory(tempfile.TemporaryDirectory):
     ]),
 ])
 def test_fetch_directory_local(listing_dir,     # type: str
-                               out_method,      # type: OutputMethod
+                               out_method,      # type: AnyDownloadOutputMethod
                                include,         # type: Optional[List[str]]
                                exclude,         # type: Optional[List[str]]
                                matcher,         # type: PathMatchingMethod
@@ -952,7 +1138,7 @@ def test_fetch_directory_local(listing_dir,     # type: str
         assert out_dirs == expect_dirs, f"Out dir: [{out_dir}], Test dir:\n{repr_json(test_dir_files, indent=2)}"
 
 
-@pytest.mark.parametrize("listing_dir,include,exclude,matcher,expect_files", [
+@pytest.mark.parametrize(["listing_dir", "include", "exclude", "matcher", "expect_files"], [
     ("dir/", None, None, PathMatchingMethod.REGEX, [
         "dir/file.txt",
         "dir/sub/file.tmp",
@@ -1072,7 +1258,7 @@ def test_fetch_directory_unknown_content_type():
                 fetch_directory("https://random.location.com/dir/", tmpdir)
 
 
-@pytest.mark.parametrize("source_link, out_method, result_link", [
+@pytest.mark.parametrize(["source_link", "out_method", "result_link"], [
     (False, OutputMethod.LINK, True),
     (False, OutputMethod.COPY, False),
     (False, OutputMethod.MOVE, False),
@@ -1194,7 +1380,7 @@ def test_fetch_file_remote_with_request():
         res_path = os.path.join(res_dir, tmp_name)
         try:
             make_dirs(res_dir, exist_ok=True)
-            fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
+            fetch_file(tmp_http, res_dir, retry=tmp_retry + 1, cache=False)
             assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"
             assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
@@ -1204,7 +1390,149 @@ def test_fetch_file_remote_with_request():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-def test_fetch_file_http_content_disposition_filename():
+# use string format specifiers to fill computed test values generated after parametrized test instantiation
+@pytest.mark.parametrize(
+    ["index", "parameters"],
+    enumerate([
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
+        }),
+        ("{tmp_file}", {  # unusual spacing/order does not matter
+            "Content-Disposition": " filename*=UTF-8''{tmp_file};   filename=\"{tmp_file}\";attachment;"
+        }),
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename=\"{tmp_file}\""
+        }),
+        ("{tmp_file}", {
+            "Content-Disposition": "attachment; filename={tmp_file}"
+        }),
+        # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
+        # normally drops any leading or trailing underscores, although they are perfectly valid.
+        # Tests would sporadically fail if not added explicitly depending on whether the temporary
+        # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
+        ("{tmp_name}_.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename={tmp_name}_.{tmp_ext}"
+        }),
+        ("_{tmp_name}.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename=_{tmp_name}.{tmp_ext}"
+        }),
+        ("__{tmp_name}__.{tmp_ext}", {
+            "Content-Disposition": "attachment; filename=__{tmp_name}__.{tmp_ext}"
+        }),
+        ("{tmp_ascii}", {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
+            "Content-Disposition": "attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
+        }),
+        ("{tmp_ascii}", {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
+            "Content-Disposition": "attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
+        }),
+        ("{tmp_ascii}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": "attachment; filename=\"{tmp_normal}\""
+        }),
+        ("{tmp_default}", {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
+            "Content-Disposition": "attachment; filename=\"{tmp_escape}\""
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Disposition": "attachment; filename*=UTF-8''火"
+        }),
+        ("fire.txt", {
+            "Content-Disposition": "attachment; filename=\"fire.txt\"; filename*=UTF-8''火.txt"
+        }),
+        ("fire", {  # disallowed character and missing extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
+        }),
+        ("{tmp_default}", {  # disallowed character and missing extension even if partial characters allowed
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+        }),
+        ("{tmp_txt_ext}", {  # disallowed character and missing extension even if partial characters allowed
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火"
+        }),
+        ("{tmp_txt_ext}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
+        }),
+        ("{tmp_txt_ext}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
+        }),
+        ("{tmp_txt_ext}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
+        }),
+        ("{tmp_txt_ext}", {  # disallowed character
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
+        }),
+        ("{tmp_default}", {  # disallowed character
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"large_火\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename*=UTF-8''simple"
+        }),
+        ("{tmp_default}", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=UTF-8''simple"  # missing the '*'
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename=\"simple\""
+        }),
+        ("simple", {  # valid characters, with no extension
+            "Content-Type": ContentType.TEXT_PLAIN,
+            "Content-Disposition": "attachment; filename*=UTF-8''simple"
+        }),
+        ("simple-encode", {  # valid characters, with no extension
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple\"; filename*=UTF-8''simple-encode"
+        }),
+        ("simple.txt", {  # valid characters, extension takes precedence over content-type
+            "Content-Type": ContentType.APP_JSON,
+            "Content-Disposition": "attachment; filename=\"simple.txt\""
+        }),
+        ("{tmp_default}", {  # empty header
+            "Content-Disposition": ""
+        }),
+        ("{tmp_default}", {  # missing header
+        }),
+        ("{tmp_default}", {  # missing filename
+            "Content-Disposition": "attachment"
+        }),
+        ("{tmp_default}", {  # invalid filename
+            "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
+        }),
+        ("{tmp_default}", {  # invalid filename
+            "Content-Disposition": "attachment; filename*=UTF-8''exec(print(\"test\"))"
+        }),
+        ("{tmp_default}", {  # invalid encoding
+            "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
+        }),
+        ("GOOD.json", {  # valid encoding and allowed characters after escape
+            "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
+        }),
+    ])
+)
+def test_fetch_file_http_content_disposition_filename(index, parameters):
+    # type: (int, Tuple[str, HeadersType]) -> None
+
     tmp_dir = tempfile.gettempdir()
     with contextlib.ExitStack() as stack:
         tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))  # noqa
@@ -1223,6 +1551,27 @@ def test_fetch_file_http_content_disposition_filename():
         tmp_name, tmp_ext = tmp_file.rsplit(".", 1)
         tmp_http = f"http://weaver.mock/{tmp_random}"  # pseudo endpoint where file name is not directly visible
 
+        test_params = {
+            "tmp_dir": tmp_dir,
+            "tmp_json": tmp_json.name,
+            "tmp_data": tmp_data,
+            "tmp_text": tmp_text,
+            "tmp_random": tmp_random,
+            "tmp_default": tmp_default,
+            "tmp_txt_ext": tmp_txt_ext,
+            "tmp_normal": tmp_normal,
+            "tmp_escape": tmp_escape,
+            "tmp_ascii": tmp_ascii,
+            "tmp_file": tmp_file,
+            "tmp_name": tmp_name,
+            "tmp_ext": tmp_ext,
+            "tmp_http": tmp_http,
+        }
+        target, headers = parameters
+        target = target.format(**test_params)
+        for hdr, val in headers.items():
+            headers[hdr] = val.format(**test_params)
+
         def mock_response(__request, test_headers):
             # type: (AnyRequestType, HeadersType) -> Tuple[int, HeadersType, str]
             test_headers["Content-Length"] = str(len(tmp_text))
@@ -1233,124 +1582,15 @@ def test_fetch_file_http_content_disposition_filename():
         req_mock = stack.enter_context(responses.RequestsMock())
         try:
             make_dirs(res_dir, exist_ok=True)
-            for i, (target, headers) in enumerate([
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\";filename*=UTF-8''{tmp_file}"
-                }),
-                (tmp_file, {  # unusual spacing/order does not matter
-                    "Content-Disposition": f" filename*=UTF-8''{tmp_file};   filename=\"{tmp_file}\";attachment;"
-                }),
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename=\"{tmp_file}\""
-                }),
-                (tmp_file, {
-                    "Content-Disposition": f"attachment; filename={tmp_file}"
-                }),
-                # Special cases where 'werkzeug.utils.secure_filename' called within the fetch function
-                # normally drops any leading or trailing underscores, although they are perfectly valid.
-                # Tests would sporadically fail if not added explicitly depending on whether the temporary
-                # file created by 'tempfile.NamedTemporaryFile' used a name with trailing underscore or not.
-                (f"{tmp_name}_.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename={tmp_name}_.{tmp_ext}"
-                }),
-                (f"_{tmp_name}.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename=_{tmp_name}.{tmp_ext}"
-                }),
-                (f"__{tmp_name}__.{tmp_ext}", {
-                    "Content-Disposition": f"attachment; filename=__{tmp_name}__.{tmp_ext}"
-                }),
-                (tmp_ascii, {  # valid character, but normalized UTF-8 into ASCII equivalent (e.g.: no accent)
-                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\";filename*=UTF-8''{tmp_escape}"
-                }),
-                (tmp_ascii, {  # disallowed escape character in 'filename', but 'filename*' is valid and used first
-                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\";filename*=UTF-8''{tmp_normal}"
-                }),
-                (tmp_ascii, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-                    "Content-Disposition": f"attachment; filename=\"{tmp_normal}\""
-                }),
-                (tmp_default, {  # disallowed escape character in 'filename' (ASCII-only), reject since no alternative
-                    "Content-Disposition": f"attachment; filename=\"{tmp_escape}\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": "attachment; filename*=UTF-8''火"
-                }),
-                ("fire.txt", {
-                    "Content-Disposition": "attachment; filename=\"fire.txt\"; filename*=UTF-8''火.txt"
-                }),
-                (tmp_txt_ext, {  # disallowed character and missing extension, but use extension by content-type
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename=\"fire\"; filename*=UTF-8''火"
-                }),
-                (tmp_default, {  # disallowed character and missing extension even if partial characters allowed
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
-                }),
-                (tmp_txt_ext, {  # disallowed character and missing extension even if partial characters allowed
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火"
-                }),
-                (tmp_txt_ext, {  # disallowed character
-                    "Content-Type": ContentType.TEXT_PLAIN,
-                    "Content-Disposition": "attachment; filename*=UTF-8''large_火.txt"
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"{quote('火')}\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"{quote('火')}.txt\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Disposition": f"attachment; filename=\"large_{quote('火')}.txt\""
-                }),
-                (tmp_default, {  # disallowed character
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"large_火\""
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple\""
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=UTF-8''simple"
-                }),
-                (tmp_default, {  # valid characters, but missing extension
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple\"; filename=UTF-8''simple"
-                }),
-                ("simple.txt", {  # valid characters, extension takes precedence over content-type
-                    "Content-Type": ContentType.APP_JSON,
-                    "Content-Disposition": "attachment; filename=\"simple.txt\""
-                }),
-                (tmp_default, {  # empty header
-                    "Content-Disposition": ""
-                }),
-                (tmp_default, {  # missing header
-                }),
-                (tmp_default, {  # missing filename
-                    "Content-Disposition": "attachment"
-                }),
-                (tmp_default, {  # invalid filename
-                    "Content-Disposition": "attachment; filename*=UTF-8''exec%20'echo%20test'"
-                }),
-                (tmp_default, {  # invalid encoding
-                    "Content-Disposition": "attachment; filename*=random''%47%4F%4F%44.json"
-                }),
-                ("GOOD.json", {  # valid encoding and allowed characters after escape
-                    "Content-Disposition": "attachment; filename*=UTF-8''%47%4F%4F%44.json"
-                })
-            ]):
-                req_mock.remove("GET", tmp_http)  # reset previous iter
-                req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
-                try:
-                    res_path = fetch_file(tmp_http, res_dir)
-                except Exception as exc:
-                    raise AssertionError(f"Unexpected exception for test [{i}] with: [{headers}]. Exception: [{exc}]")
-                assert res_path == os.path.join(res_dir, target), f"Not expected name for test [{i}] with: [{headers}]"
-                assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
-                assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
+            req_mock.remove("GET", tmp_http)  # reset previous iter
+            req_mock.add_callback("GET", tmp_http, callback=lambda req: mock_response(req, headers))
+            try:
+                res_path = fetch_file(tmp_http, res_dir)
+            except Exception as exc:
+                raise AssertionError(f"Unexpected exception for test [{index}] with: [{headers}]. Exception: [{exc}]")
+            assert res_path == os.path.join(res_dir, target), f"Not expected name for test [{index}] with: [{headers}]"
+            assert os.path.isfile(res_path), f"File [{tmp_http}] should be accessible under [{res_path}]"
+            assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
         except Exception:
             raise
         finally:
@@ -1359,7 +1599,7 @@ def test_fetch_file_http_content_disposition_filename():
 
 @mocked_aws_config
 @mocked_aws_s3
-@pytest.mark.parametrize("s3_scheme, s3_region", [
+@pytest.mark.parametrize(["s3_scheme", "s3_region"], [
     ("s3", "ca-central-1"),
     ("s3", "us-east-2"),
     ("s3", "eu-west-1"),
@@ -1390,7 +1630,7 @@ def test_fetch_file_unknown_scheme():
             fetch_file("unknown://random.location.com/dir/file.txt", tmpdir)
 
 
-@pytest.mark.parametrize("options, parameters, configuration", [
+@pytest.mark.parametrize(["options", "parameters", "configuration"], [
     (
         {"timeout": 10},
         {},
@@ -1457,7 +1697,7 @@ def test_resolve_s3_http_options(options, parameters, configuration):
 @mocked_aws_config(default_region=MOCK_AWS_REGION)  # check that URL can be different from default
 @mocked_aws_s3
 @pytest.mark.parametrize(
-    "s3_url, expect_region, expect_url",
+    ["s3_url", "expect_region", "expect_url"],
     [
         (f"https://s3.{region}.amazonaws.com/test/file.txt", region, "s3://test/file.txt")
         for region in AWS_S3_REGION_SUBSET_WITH_MOCK
@@ -1531,7 +1771,7 @@ def test_resolve_s3_from_http_invalid(s3_url_invalid):
         resolve_s3_from_http(s3_url_invalid)
 
 
-@pytest.mark.parametrize("s3_reference, expect_region, expect_bucket, expect_path", [
+@pytest.mark.parametrize(["s3_reference", "expect_region", "expect_bucket", "expect_path"], [
     (
         "s3://some-bucket/",
         None,
@@ -1595,7 +1835,7 @@ def test_resolve_s3_reference(s3_reference, expect_region, expect_bucket, expect
     assert s3_path == expect_path
 
 
-@pytest.mark.parametrize("s3_reference, valid", [
+@pytest.mark.parametrize(["s3_reference", "valid"], [
     ("s3://", False),
     ("s3://test", False),
     ("s3://test/", True),
@@ -1725,7 +1965,7 @@ def test_localize_datetime():
     assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)
 
 
-@pytest.mark.parametrize("query,params,expected", [
+@pytest.mark.parametrize(["query", "params", "expected"], [
     ("key1=val1;key2=val21,val22;key3=val3;key4", {},
      {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
     ("key1='  value 1  '  ; key2 = val2 ", {},
@@ -1748,7 +1988,7 @@ def test_parse_kvp(query, params, expected):
     assert result == expected
 
 
-@pytest.mark.parametrize("headers,support,expected", [
+@pytest.mark.parametrize(["headers", "support", "expected"], [
     # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
     ({}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
      (ExecuteMode.SYNC, 10, {})),
@@ -1779,7 +2019,7 @@ def test_prefer_header_execute_mode(headers, support, expected):
     assert result == expected
 
 
-@pytest.mark.parametrize("number,binary,unit,expect", [
+@pytest.mark.parametrize(["number", "binary", "unit", "expect"], [
     (1.234, False, "B", "1.234 B"),
     (10_000_000, False, "B", "10.000 MB"),
     (10_000_000, True, "B", "9.537 MiB"),
@@ -1800,7 +2040,7 @@ def test_apply_number_with_unit(number, binary, unit, expect):
     assert result == expect
 
 
-@pytest.mark.parametrize("number,binary,expect", [
+@pytest.mark.parametrize(["number", "binary", "expect"], [
     ("1 B", None, 1),
     # note: 'k' lower
     ("1k", False, 1_000),            # normal
@@ -1845,7 +2085,7 @@ def custom_handler_valid(exception):
     return "sporadic error" in str(exception)
 
 
-@pytest.mark.parametrize("errors,raises,conditions,retries", [
+@pytest.mark.parametrize(["errors", "raises", "conditions", "retries"], [
     ([True, False, None], TypeError, ValueError, 2),    # first ValueError handled, second raises TypeError directly
     ([True, False, None], ValueError, ValueError, 0),   # first ValueError handled but re-raised since retries exhausted
     ([True, None], None, ValueError, 2),                # first ValueError handled, second succeeds

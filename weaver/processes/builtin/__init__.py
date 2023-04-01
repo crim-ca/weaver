@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from cwltool.context import RuntimeContext
     from cwltool.pathmapper import PathMapper
 
-    from weaver.typedefs import CWL, JSON, AnyRegistryContainer, CWL_RequirementsList, TypedDict
+    from weaver.typedefs import AnyRegistryContainer, CWL, CWL_RequirementsList, JSON, TypedDict
 
     BuiltinResourceMap = TypedDict("BuiltinResourceMap", {
         "package": str,

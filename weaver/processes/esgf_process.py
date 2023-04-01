@@ -11,8 +11,9 @@ from weaver.status import Status
 from weaver.utils import fetch_file
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
     from typing import Dict, List, Tuple
+
+    from weaver.typedefs import JSON
 
 LAST_PERCENT_REGEX = re.compile(r".+ (\d{1,3})$")
 

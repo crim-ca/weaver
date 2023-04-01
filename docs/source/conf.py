@@ -17,11 +17,15 @@
 # pylint: disable=C0103,invalid-name
 # pylint: disable=C0209,consider-using-f-string
 
-import json
 import logging
 import os
 import re
 import sys
+
+# for OpenAPI generation
+import simplejson as json
+from pyramid.config import Configurator
+from sphinx.domains.std import warn_missing_reference
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -35,11 +39,7 @@ sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
 sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
-
-# for api generation
 from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
-from pyramid.config import Configurator  # isort:skip # noqa: E402
-from sphinx.domains.std import warn_missing_reference  # isort:skip # noqa: E402
 
 DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, __meta__.__name__)
 
@@ -58,7 +58,7 @@ extensions = [
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
     "cloud_sptheme.ext.autodoc_sections",   # allow sections in docstrings code
-    "sphinx.ext.githubpages",   # for publishing the doc to github pages
+    "sphinx.ext.githubpages",   # for publishing the doc to GitHub pages
     "sphinx.ext.todo",          # support directives
     "sphinx.ext.viewcode",      # add links to highlighted source code
     "sphinx.ext.intersphinx",   # add links to other projects documentation
@@ -104,7 +104,7 @@ api_spec_json = get_openapi_json(http_host="example", http_scheme="https", use_d
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, "w") as f:
-    json.dump(api_spec_json, f)
+    json.dump(api_spec_json, f, use_decimal=True)
 
 redoc = [{
     "name": __meta__.__title__,
@@ -418,6 +418,8 @@ linkcheck_ignore = [
     r"./config.*",
     r"./docs.*",
     r"docs/source/.*",
+    r"weaver/schemas/quotation/quote-estimator.yaml",
+    r"weaver/schemas/quotation/quote-estimation-result.yaml",
     # inter-reference between document page and section headers
     # when link is itself a documentation reference, they are not resolved correctly, but this works with text replaces
     r":ref:`.*`",

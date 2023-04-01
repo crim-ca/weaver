@@ -19,6 +19,7 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |currency-converter| replace:: *Currency Converter*
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
 .. |cwl-home| replace:: CWL Homepage
@@ -68,14 +69,31 @@
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-api-proc| replace:: OGC API - Processes
+.. |ogc-api-proc| replace:: `OGC API - Processes`
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
+.. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
 .. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
 .. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
 .. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
+.. |ogc-proc-ext-billing| replace:: OGC API - Processes - Billing extension
+.. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
+.. |ogc-proc-ext-quotation| replace:: OGC API - Processes - Quotation extension
+.. _ogc-proc-ext-quotation: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+.. |quote-estimator| replace:: *Quote Estimator*
+.. _quote-estimator: :ref:`quotation_quote_estimator`
+.. |quote-estimation-config| replace:: *Quote Estimator Configuration*
+.. _quote-estimation-config: ../../../weaver/schemas/quotation/quote-estimator.yaml
+.. |quote-estimation-result| replace:: *Quote Estimation Result*
+.. _quote-estimation-result: ../../../weaver/schemas/quotation/quote-estimation-result.yaml
+.. |ONNX-long| replace:: *Open Neural Network Exchange* (ONNX)
+.. _ONNX-long: `ONNX`_
+.. |ONNX| replace:: ONNX
+.. _ONNX: https://onnx.ai/
+.. |OpenAPI-spec| replace:: OpenAPI Specification
+.. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report

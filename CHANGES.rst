@@ -18,6 +18,71 @@ Fixes:
 ------
 - No change.
 
+.. _changes_4.30.0:
+
+`4.30.0 <https://github.com/crim-ca/weaver/tree/4.30.0>`_ (2023-03-24)
+========================================================================
+
+Changes:
+--------
+- Add ``weaver.quotation = true|false`` setting that allows control over the activation of all endpoints and operations
+  related to the `OGC API - Processes` |ogc-proc-ext-billing-short|_ and |ogc-proc-ext-quotation-short|_ extensions.
+- Add support to configure a quotation estimation algorithm for each respective `Process` with new requests
+  using ``GET``, ``PUT``, ``DELETE`` methods on ``/processes/{processID}/estimator`` endpoint. The configured
+  algorithm is provided by a reference `Docker` image defined by ``weaver.quotation_docker_[...]`` settings.
+  The algorithm itself expects a highly customizable configuration to estimate quotation parameters based on
+  conceptual categories, as defined by the |quote-estimator-config|_ schema optionally using versatile `ONNX`_
+  definitions. The `Docker` operation should return a JSON matching the |quote-estimation-result|_ schema, which is
+  parsed and included in the produced `Quote` based on provided `Process` execution parameters.
+- Add `Process` execution I/O pre-validation against the `Process` description before submitting the `Job` to avoid
+  unnecessary allocation of computing resources for erroneous cases that can easily be detected in advance.
+- Add ``$schema`` references to source `OGC API - Processes` or other schema registries for applicable content
+  definitions in responses.
+- Add missing `OGC API - Processes` schema references with published definitions
+  under ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/`` when applicable.
+- Add ``links`` request query parameter to ``/processes`` and ``/providers/{providerID}/processes`` listing to
+  provide control over reporting of ``links`` for each `Process` summary item. By default, ``link=true`` and
+  automatically disable it when ``detail=false`` is specified.
+- Add missing ``405`` response schema for all `OpenAPI` endpoints as handled by the API when the requested HTTP method
+  is not applicable for the given path.
+- Renamed ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait`` to better align with new configuration
+  settings for the |ogc-proc-ext-quotation-short| extension. Old value will still be checked for backward compatibility.
+- Renamed ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait`` to better align with the corresponding
+  parameter for quotation. Old value will still be checked for backward compatibility.
+- Add ``Lazify`` utility class for holding a string with delayed computation and caching that returns its representation
+  on-demand during formatting or other string operations to reduce the impact of its long generation. This can be used
+  with a callable returning a string representation that can be discarded without invocation on inactive logging levels.
+- Add ``count`` field to `JSON` output of endpoints that support paging to provide the number of items returned within
+  the paged result. Adjust the ``/quotations`` endpoint that was using it instead of ``total`` like it was done on other
+  listing endpoints.
+- Add ``detail`` query parameter for the ``/quotations`` endpoint to allow listing of `Quote` summary details instead
+  of only IDs by default, similarly to the ``/jobs`` endpoint.
+
+.. |ogc-proc-ext-billing-short| replace:: Billing
+.. _ogc-proc-ext-billing-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
+.. |ogc-proc-ext-quotation-short| replace:: Quotation
+.. _ogc-proc-ext-quotation-short: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
+.. |quote-estimator-config| replace:: *Quote Estimator Configuration*
+.. _quote-estimator-config: weaver/schemas/quotation/quote-estimator.yaml
+.. |quote-estimation-result| replace:: *Quote Estimation Result*
+.. _quote-estimation-result: weaver/schemas/quotation/quote-estimation-result.yaml
+.. _ONNX: https://onnx.ai/
+
+Fixes:
+------
+- Fix schema meta fields (``title``, ``summary``, ``description``, etc.) not being rendered in `OpenAPI` output for
+  keyword schemas (``allOf``, ``anyOf``, ``oneOf``, ``not``).
+- Fix schema definitions not being rendered in `OpenAPI` into the requested order
+  by ``_sort_first`` and ``_sort_after`` control attributes.
+- Fix request cache always invalidated when no explicit ``allowed_codes`` where provided in ``request_extra``, although
+  the request succeeded, causing caching optimization to never actually be used on following requests in this case.
+- Fix cached requests misbehaving when combined with ``stream=True`` argument due to contents not being stored in the
+  object for following requests, causing them to raise ``StreamConsumedError`` when calling the chunk iterator again.
+- Fix execution payloads for functional tests using ``WorkflowRESTScatterCopyNetCDF``, ``WorkflowRESTSelectCopyNetCDF``,
+  ``WorkflowWPS1ScatterCopyNetCDF`` and``WorkflowWPS1SelectCopyNetCDF`` processes, which requested invalid output
+  identifiers. Those erroneous definitions were detected using the new `Process` execution I/O pre-validation against
+  the corresponding `Process` descriptions on `Job` submission.
+
 .. _changes_4.29.0:
 
 `4.29.0 <https://github.com/crim-ca/weaver/tree/4.29.0>`_ (2023-03-07)

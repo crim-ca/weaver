@@ -92,8 +92,10 @@ feature/providers:
   - tests/functional/test_wps_provider.py
   - tests/wps_restapi/test_providers.py
 
-feature/quoting:
-  - weaver/wps_restapi/quotation
+feature/quotation:
+  - weaver/quotation/**/*
+  - weaver/wps_restapi/quotation/**
+  - docs/source/quotation.rst
 
 feature/vault:
   - weaver/vault/**/*

@@ -18,6 +18,7 @@ import pytest
 from pyramid import testing
 from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
+
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
@@ -986,7 +987,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         .. note::
             Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
-            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+            location cannot be mocked by the test suite. Employ local test paths as if they were already fetched.
         """
 
         with contextlib.ExitStack() as stack:
@@ -1040,7 +1041,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
 
         .. seealso::
-            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_wps1_builtin_rest_docker_scatter_requirements`.
         """
 
@@ -1080,7 +1081,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
 
         .. seealso::
-            Inverse :term:`WPS-1` / :term:`OGC API - Processes` process references from
+            Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
             :meth:`test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements`.
         """
 

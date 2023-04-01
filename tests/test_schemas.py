@@ -83,7 +83,7 @@ def test_url_schemes(url, schema, valid):
             )
 
 
-@pytest.mark.parametrize("test_format, result", [
+@pytest.mark.parametrize("test_format, expect_format", [
     (
         {"mimeType": ContentType.APP_JSON},
         {"mimeType": ContentType.APP_JSON}),
@@ -111,7 +111,7 @@ def test_url_schemes(url, schema, valid):
         {"mediaType": ContentType.APP_JSON,
          "schema": f"https://www.iana.org/assignments/media-types/{ContentType.APP_JSON}"}),
 ])
-def test_format_variations(test_format, result):
+def test_format_variations(test_format, expect_format):
     """
     Test format parsing for deployment payload.
 
@@ -125,6 +125,8 @@ def test_format_variations(test_format, result):
     """
     format_schema = sd.DeploymentFormat()
     try:
-        assert format_schema.deserialize(test_format) == result
+        result_format = format_schema.deserialize(test_format)
+        result_format.pop("$schema", None)
+        assert result_format == expect_format
     except colander.Invalid:
         pytest.fail(f"Expected format to be valid: [{test_format}]")

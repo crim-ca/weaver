@@ -47,7 +47,7 @@ from weaver.wps_restapi.processes.utils import get_process_list_links, get_proce
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
+    from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def get_processes(request):
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
-        results = get_processes_filtered_by_valid_schemas(request)
+        results = get_processes_filtered_by_valid_schemas(request, detail=detail)
         processes, invalid_processes, paging, with_providers, total_processes = results
         if invalid_processes:
             raise HTTPServiceUnavailable(
@@ -88,7 +88,11 @@ def get_processes(request):
 
         body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
         if not with_providers:
-            paging = {"page": paging.get("page"), "limit": paging.get("limit")}  # remove other params
+            paging = {  # remove other params
+                "page": paging.get("page"),
+                "limit": paging.get("limit"),
+                "count": len(processes),
+            }
             body.update(paging)
         else:
             paging = {}  # disable to remove paging-related links

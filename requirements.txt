@@ -1,5 +1,6 @@
 -r requirements-sys.txt
 alembic
+babel
 beaker
 beautifulsoup4
 # AWS support (S3 buckets)
@@ -42,7 +43,8 @@ duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
 # (https://github.com/KipCrossing/geotiff/pull/59)
-geotiff!=0.2.6,!=0.2.7
+geotiff!=0.2.6,!=0.2.7; python_version <= "3.6"
+geotiff>=0.2.8; python_version >= "3.7"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
@@ -62,6 +64,9 @@ mako
 # employed by cwltool -> schema-salad -> mistune
 mistune>=2.0.3,<2.1
 mypy_boto3_s3
+numpy>=1.19.5; python_version == "3.6"  # pyup: ignore
+numpy>=1.21.6; python_version == "3.7"  # pyup: ignore
+numpy>=1.22.2; python_version >= "3.8"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.28.1

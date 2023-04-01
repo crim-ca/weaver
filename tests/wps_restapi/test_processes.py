@@ -17,6 +17,7 @@ import pytest
 import stopit
 import webtest.app
 import yaml
+from pywps.inout import LiteralInput
 
 from tests import resources
 from tests.utils import (
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
 
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import CWL, JSON, AnyHeadersContainer, AnyVersion, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
 
 
 @pytest.yield_fixture(name="assert_cwl_no_warn_unknown_hint")
@@ -189,6 +190,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @staticmethod
     def get_process_execute_template(test_input="not-specified"):
+        # type: (str) -> ProcessExecution
         """
         Provides execute process bare minimum template definition.
 
@@ -2107,21 +2109,45 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         # get basic mock/data templates
         name = fully_qualified_name(self)
-        execute_mock_data_tests = []
-        for i in range(2):
+
+        # define a process without inputs
+        process_no_inputs = WpsTestProcess(identifier="process_no_inputs", inputs=[])
+        self.process_store.save_process(process_no_inputs)
+        self.process_store.set_visibility(process_no_inputs.identifier, Visibility.PUBLIC)
+        execute_no_inputs = self.get_process_execute_template()
+        execute_no_inputs.pop("inputs")
+
+        # define a process with default input
+        default_inputs = [
+            LiteralInput("test_input", "Input Required", data_type="string"),
+            LiteralInput("other_input", "Input Optional", data_type="string", default="omitted", min_occurs=0)
+        ]
+        process_default_input = WpsTestProcess(identifier="process_default_input", inputs=default_inputs)
+        self.process_store.save_process(process_default_input)
+        self.process_store.set_visibility(process_default_input.identifier, Visibility.PUBLIC)
+        execute_default_input = self.get_process_execute_template("input-required")  # other input omitted
+        assert len(execute_default_input["inputs"]) == 1
+        assert not any("input_default" in input_exec for input_exec in execute_default_input["inputs"])
+
+        execute_no_outputs = self.get_process_execute_template()
+        execute_no_outputs.pop("outputs")
+
+        execute_no_out_mode = self.get_process_execute_template()
+        execute_no_out_mode["outputs"][0].pop("transmissionMode")  # should resolve to default value
+
+        # define and run tests
+        execute_mock_data_tests = [
+            (process_no_inputs.identifier, execute_no_inputs),
+            (process_default_input.identifier, execute_default_input),
+            (self.process_public.identifier, execute_no_outputs),
+            (self.process_public.identifier, execute_no_out_mode),
+        ]
+        for i, (proc_execute, data_execute) in enumerate(execute_mock_data_tests):
             mock_execute = mocked_process_job_runner(f"job-{name}-{i}")
-            data_execute = self.get_process_execute_template(f"{name}-{i}")
-            execute_mock_data_tests.append((mock_execute, data_execute))
-
-        # apply modifications for testing
-        execute_mock_data_tests[0][1].pop("inputs")  # no inputs valid (although it can be required for WPS process)
-        execute_mock_data_tests[0][1]["outputs"][0].pop("transmissionMode")  # should resolve to default value
-
-        for mock_execute, data_execute in execute_mock_data_tests:
             with contextlib.ExitStack() as stack:
                 for exe in mock_execute:
                     stack.enter_context(exe)
-                path = f"/processes/{self.process_public.identifier}/jobs"
+                path = f"/processes/{proc_execute}/jobs"
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 

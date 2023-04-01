@@ -4,11 +4,11 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
 
-from notify import encrypt_email
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
+from weaver.notify import encrypt_email
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
@@ -30,7 +30,7 @@ from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 if TYPE_CHECKING:
     from typing import Iterable, List
 
-    from weaver.typedefs import JSON, AnyResponseType, PyramidRequest
+    from weaver.typedefs import AnyResponseType, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
 
@@ -96,17 +96,21 @@ def get_queried_jobs(request):
     items, total = store.find_jobs(request=request, group_by=groups, **filters)
     body = {"total": total}
 
-    def _job_list(jobs):  # type: (Iterable[Job]) -> List[JSON]
-        return [j.json(settings) if detail else j.id for j in jobs]
+    def _job_list(_jobs):  # type: (Iterable[Job]) -> List[JSON]
+        return [j.json(settings) if detail else j.id for j in _jobs]
 
     paging = {}
     if groups:
+        count = 0
         for grouped_jobs in items:
-            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
-        body.update({"groups": items})
+            jobs = _job_list(grouped_jobs["jobs"])
+            grouped_jobs["jobs"] = jobs
+            count += len(jobs)
+        body.update({"groups": items, "count": count})
     else:
-        paging = {"page": filters["page"], "limit": filters["limit"]}
-        body.update({"jobs": _job_list(items), **paging})
+        jobs = _job_list(items)
+        paging = {"page": filters["page"], "limit": filters["limit"], "count": len(jobs)}
+        body.update({"jobs": jobs, **paging})
     try:
         body.update({"links": get_job_list_links(total, filters, request)})
     except IndexError as exc:

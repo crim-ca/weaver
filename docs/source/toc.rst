@@ -12,6 +12,7 @@ Table of Contents
     tutorial
     processes
     package
+    quotation
     Examples <examples.rst>
     OpenAPI Specification <api.rst>
     Weaver CLI and Client <cli.rst>

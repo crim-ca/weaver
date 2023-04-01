@@ -22,7 +22,6 @@ from weaver.processes.constants import ProcessSchema
 from weaver.utils import fully_qualified_name
 
 
-# pylint: disable=C0103,invalid-name
 class WpsProviderBase(unittest.TestCase):
     remote_provider_name = None
     settings = {}
@@ -61,7 +60,6 @@ class WpsProviderBase(unittest.TestCase):
         self.job_store = setup_mongodb_jobstore(self.config)
 
 
-# pylint: disable=C0103,invalid-name
 class WpsRestApiProvidersTest(WpsProviderBase):
     remote_provider_name = "test-remote-provider"
     settings = {
@@ -627,7 +625,6 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
 
 
-# pylint: disable=C0103,invalid-name
 class WpsProviderLocalOnlyTest(WpsProviderBase):
     """
     Validate that operations are preemptively forbidden for a local-only instance.

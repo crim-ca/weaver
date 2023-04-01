@@ -15,11 +15,14 @@ if TYPE_CHECKING:
     from weaver.sort import AnySortType
     from weaver.status import AnyStatusSearch
     from weaver.typedefs import (
+        AnyProcessRef,
+        AnyServiceRef,
         AnyUUID,
         AnyVersion,
+        DatetimeIntervalType,
         ExecutionInputs,
         ExecutionOutputs,
-        DatetimeIntervalType,
+        JSON,
         SettingsType,
         TypedDict
     )
@@ -85,7 +88,7 @@ class StoreProcesses(StoreInterface):
 
     @abc.abstractmethod
     def delete_process(self, process_id, visibility=None):
-        # type: (str, Optional[AnyVisibility]) -> bool
+        # type: (AnyProcessRef, Optional[AnyVisibility]) -> bool
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -102,27 +105,37 @@ class StoreProcesses(StoreInterface):
 
     @abc.abstractmethod
     def fetch_by_id(self, process_id, visibility=None):
-        # type: (str, Optional[AnyVisibility]) -> Process
+        # type: (AnyProcessRef, Optional[AnyVisibility]) -> Process
         raise NotImplementedError
 
     @abc.abstractmethod
     def find_versions(self, process_id, version_format=VersionFormat.OBJECT):
-        # type: (str, VersionFormat) -> List[AnyVersion]
+        # type: (AnyProcessRef, VersionFormat) -> List[AnyVersion]
         raise NotImplementedError
 
     @abc.abstractmethod
     def update_version(self, process_id, version):
-        # type: (str, AnyVersion) -> Process
+        # type: (AnyProcessRef, AnyVersion) -> Process
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_estimator(self, process_id):
+        # type: (AnyProcessRef) -> JSON
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def set_estimator(self, process_id, estimator):
+        # type: (AnyProcessRef, JSON) -> None
         raise NotImplementedError
 
     @abc.abstractmethod
     def get_visibility(self, process_id):
-        # type: (str) -> AnyVisibility
+        # type: (AnyProcessRef) -> AnyVisibility
         raise NotImplementedError
 
     @abc.abstractmethod
     def set_visibility(self, process_id, visibility):
-        # type: (str, AnyVisibility) -> None
+        # type: (AnyProcessRef, AnyVisibility) -> None
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -137,8 +150,8 @@ class StoreJobs(StoreInterface):
     @abc.abstractmethod
     def save_job(self,
                  task_id,                   # type: str
-                 process,                   # type: str
-                 service=None,              # type: Optional[str]
+                 process,                   # type: AnyProcessRef
+                 service=None,              # type: Optional[AnyServiceRef]
                  inputs=None,               # type: Optional[ExecutionInputs]
                  outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool

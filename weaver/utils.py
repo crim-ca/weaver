@@ -27,7 +27,8 @@ import colander
 import pytz
 import requests
 import yaml
-from beaker.cache import cache_region, region_invalidate
+from beaker.cache import Cache, cache_managers, cache_region, cache_regions, region_invalidate
+from beaker.container import MemoryNamespaceManager
 from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
@@ -74,19 +75,19 @@ if TYPE_CHECKING:
         AnyStr,
         Callable,
         Dict,
-        List,
         IO,
         Iterable,
         Iterator,
+        List,
         MutableMapping,
         NoReturn,
         Optional,
+        Tuple,
         Type,
         TypeVar,
-        Tuple,
         Union
     )
-    from typing_extensions import NotRequired, TypedDict, TypeGuard
+    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard
 
     from mypy_boto3_s3.client import S3Client
 
@@ -96,12 +97,12 @@ if TYPE_CHECKING:
         AnyCallable,
         AnyCallableAnyArgs,
         AnyCookiesContainer,
-        AnyKey,
         AnyHeadersContainer,
-        AnySettingsContainer,
+        AnyKey,
         AnyRegistryContainer,
         AnyRequestMethod,
         AnyResponseType,
+        AnySettingsContainer,
         AnyUUID,
         AnyValueType,
         AnyVersion,
@@ -110,8 +111,8 @@ if TYPE_CHECKING:
         KVP,
         KVP_Item,
         Literal,
-        OpenAPISchema,
         Number,
+        OpenAPISchema,
         Params,
         Path,
         Return,
@@ -137,41 +138,34 @@ if TYPE_CHECKING:
         "backoff_factor": NotRequired[Number],
         "headers": NotRequired[AnyHeadersContainer],
         "cookies": NotRequired[AnyCookiesContainer],
+        "stream": NotRequired[bool],
     }, total=False)
+    RequestCachingKeywords = Dict[str, AnyValueType]
+    RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
 
-    ResponseMetadata = TypedDict("ResponseMetadata", {
-        "RequestId": str,
-        "HTTPStatusCode": int,
-        "HTTPHeaders": HeadersType,
-        "RetryAttempts": int,
-    }, total=True)
-    S3FileContent = TypedDict("S3FileContent", {
-        "Key": str,
-        "LastModified": datetime,
-        "ETag": str,
-        "Size": int,
-        "StorageClass": Literal[
-            "STANDARD",
-            "REDUCED_REDUNDANCY",
-            "GLACIER",
-            "STANDARD_IA",
-            "ONEZONE_IA",
-            "INTELLIGENT_TIERING",
-            "DEEP_ARCHIVE",
-            "OUTPOSTS",
-            "GLACIER_IR"
-        ],
-    }, total=True)
-    S3DirectoryListingResponse = TypedDict("S3DirectoryListingResponse", {
-        "ResponseMetadata": ResponseMetadata,
-        "IsTruncated": bool,
-        "Contents": List[S3FileContent],
-        "Name": str,  # bucket
-        "Prefix": Optional[str],
-        "MaxKeys": int,
-        "KeyCount": int,
-        "EncodingType": Literal["url"],
-    }, total=True)
+    MetadataResult = TypedDict("MetadataResult", {
+        "Date": str,
+        "Last-Modified": str,
+        "Content-Type": NotRequired[str],
+        "Content-Length": NotRequired[str],
+        "Content-Location": NotRequired[str],
+        "Content-Disposition": NotRequired[str],
+    }, total=False)
+    _OutputMethod = "OutputMethod"  # type: TypeAlias  # pylint: disable=C0103,invalid-name
+    AnyMetadataOutputMethod = Literal[
+        _OutputMethod.META,
+    ]
+    DownloadResult = Path
+    AnyDownloadOutputMethod = Literal[
+        _OutputMethod.AUTO,
+        _OutputMethod.COPY,
+        _OutputMethod.LINK,
+        _OutputMethod.MOVE,
+    ]
+    AnyOutputMethod = Union[AnyMetadataOutputMethod, AnyDownloadOutputMethod]
+    AnyOutputResult = Union[MetadataResult, DownloadResult]
+
+    FilterType = TypeVar("FilterType")  # pylint: disable=C0103,invalid-name
 
     OriginalClass = TypeVar("OriginalClass")
     ExtenderMixin = TypeVar("ExtenderMixin")
@@ -191,8 +185,17 @@ SUPPORTED_FILE_SCHEMES = frozenset([
 ])
 
 # note: word characters also match unicode in this case
-FILE_NAME_QUOTE_PATTERN = re.compile(r"^\"?([\w\-.]+\.\w+)\"?$")  # extension required, permissive extra quotes
-FILE_NAME_LOOSE_PATTERN = re.compile(r"^[\w\-.]+$")  # no extension required
+FILE_NAME_LOOSE_PATTERN = re.compile(
+    r"^"
+    r"(?P<filename>[\w\-.]+)"
+    r"(?<!\.$)$"  # extension optional, but not only a dot if provided
+)
+FILE_NAME_QUOTE_PATTERN = re.compile(
+    r"^(?P<quote>\"?)"  # optional quotes allowed [...]
+    rf"({FILE_NAME_LOOSE_PATTERN.pattern[1:-1]})"
+    r"(?P=quote)$"      # [...] but must be balanced
+
+)
 
 if sys.version_info >= (3, 7):
     _LITERAL_VALUES_ATTRIBUTE = "__args__"
@@ -232,6 +235,51 @@ AWS_S3_BUCKET_REFERENCE_PATTERN = re.compile(
     r"(?P<path>(?:/$|/[\w.-]+)+)"  # sub-dir and file-key path, minimally only dir trailing slash
     r"$"
 )
+
+
+class Lazify(str):
+    """
+    Wraps the callable for evaluation only on explicit call or string formatting.
+
+    Once string representation has been computed, it will be cached to avoid regenerating it on following calls.
+    """
+
+    def __init__(self, func):
+        # type: (Callable[[], Return]) -> None
+        """
+        Initialize the lazy-string representation.
+
+        :param func: Callable that should return the computed string formatting.
+        """
+        if not callable(func):
+            raise ValueError("Invalid lazify operation. Input must be a callable.")
+        self.func = func
+        self._str = None
+
+    def __getattribute__(self, item):
+        # type: (str) -> Any
+        if item in ["__str__", "__repr__", "__call__"]:
+            return str.__getattribute__(self, item)
+        if item in ["__class__", "_str", "func"]:
+            return object.__getattribute__(self, item)
+        _str = self.__call__()
+        return str.__getattribute__(_str, item)
+
+    def __call__(self):
+        # type: () -> Return
+        if self._str is None:
+            self._str = self.func()
+        return self._str
+
+    def __str__(self):
+        # type: () -> str
+        return f"{self.__call__()!s}"
+
+    def __repr__(self):
+        # type: () -> str
+        func_name = fully_qualified_name(self.func)
+        str_status = "<lazy>" if self._str is None else "<computed>"
+        return f"{self.__class__.__name__}({func_name}) {str_status}"
 
 
 class CaseInsensitive(str):
@@ -390,15 +438,16 @@ def get_any_value(info, default=None, file=True, data=True, pop=False, key=False
     return default
 
 
-def get_any_message(info):
-    # type: (JSON) -> str
+def get_any_message(info, default=""):
+    # type: (JSON, str) -> str
     """
-    Retrieves a dictionary 'value'-like key using multiple common variations [message].
+    Retrieves a dictionary 'value'-like key using multiple common variations [message, description, detail].
 
-    :param info: dictionary that potentially contains a 'message'-like key.
-    :returns: value of the matched 'message'-like key or an empty string if not found.
+    :param info: Dictionary that potentially contains a 'message'-like key.
+    :param default: Default message if no variation could be matched.
+    :returns: value of the matched 'message'-like key or the default string if not found.
     """
-    return info.get("message", "").strip()
+    return (info.get("message") or info.get("description") or info.get("detail") or default).strip()
 
 
 def get_registry(container=None, nothrow=False):
@@ -437,6 +486,7 @@ def get_header(header_name,         # type: str
                header_container,    # type: AnyHeadersContainer
                default=None,        # type: Optional[str], Optional[Union[str, List[str]]], bool
                pop=False,           # type: bool
+               concat=False,        # type: bool
                ):                   # type: (...) -> Optional[Union[str, List[str]]]
     """
     Find the specified header within a header container.
@@ -444,14 +494,23 @@ def get_header(header_name,         # type: str
     Retrieves :paramref:`header_name` by fuzzy match (independently of upper/lower-case and underscore/dash) from
     various framework implementations of *Headers*.
 
-    :param header_name: header to find.
-    :param header_container: where to look for :paramref:`header_name`.
-    :param default: returned value if :paramref:`header_container` is invalid or :paramref:`header_name` is not found.
-    :param pop: remove the matched header(s) by name from the input container.
+    :param header_name: Header to find.
+    :param header_container: Where to look for :paramref:`header_name`.
+    :param default: Returned value if :paramref:`header_container` is invalid or :paramref:`header_name` is not found.
+    :param pop: Remove the matched header(s) by name from the input container.
+    :param concat:
+        Allow parts of the header name to be concatenated without hyphens/underscores.
+        This can be the case in some :term:`S3` responses.
+        Disabled by default to avoid unexpected mismatches, notably for shorter named headers.
+    :returns: Found header if applicable, or the default value.
     """
     def fuzzy_name(_name):
         # type: (str) -> str
         return _name.lower().replace("-", "_")
+
+    def concat_name(_name):
+        # type: (str) -> str
+        return _name.replace("-", " ").replace("_", " ").capitalize().replace(" ", "")
 
     if header_container is None:
         return default
@@ -462,7 +521,7 @@ def get_header(header_name,         # type: str
         headers = header_container.items()
     header_name = fuzzy_name(header_name)
     for i, (h, v) in enumerate(list(headers)):
-        if fuzzy_name(h) == header_name:
+        if fuzzy_name(h) == header_name or (concat and concat_name(h) == concat_name(header_name)):
             if pop:
                 if isinstance(header_container, dict):
                     del header_container[h]
@@ -614,13 +673,13 @@ def parse_prefer_header_execute_mode(
     :param header_container: Request headers to retrieve preference, if any available.
     :param supported_modes:
         Execute modes that are permitted for the operation that received the ``Prefer`` header.
-        Resolved mode will respect this constrain following specification requirements of :term:`OGC API - Processes`.
+        Resolved mode will respect this constraint following specification requirements of :term:`OGC API - Processes`.
     :param wait_max:
         Maximum wait time enforced by the server. If requested wait time is greater, ``wait`` preference will not be
-        applied and will fallback to asynchronous response.
+        applied and will fall back to asynchronous response.
     :return:
         Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
-        Maximum wait time indicates duration until synchronous response should fallback to asynchronous response.
+        Maximum wait time indicates duration until synchronous response should fall back to asynchronous response.
     :raises HTTPBadRequest: If contents of ``Prefer`` are not valid.
     """
 
@@ -1076,38 +1135,101 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_file_headers(path, download_headers=False, content_headers=False, content_type=None):
-    # type: (str, bool, bool, Optional[str]) -> HeadersType
+def get_href_headers(path,                      # type: str
+                     download_headers=False,    # type: bool
+                     location_headers=True,     # type: bool
+                     content_headers=False,     # type: bool
+                     content_type=None,         # type: Optional[str]
+                     settings=None,             # type: Optional[SettingsType]
+                     **option_kwargs,           # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                         # type: (...) -> MetadataResult
     """
-    Obtain headers applicable for the provided file.
+    Obtain headers applicable for the provided file or directory reference.
 
-    :param path: File to describe.
-    :param download_headers: If enabled, add the attachment filename for downloading the file.
-    :param content_headers: If enabled, add ``Content-`` prefixed headers.
-    :param content_type: Explicit ``Content-Type`` to provide. Otherwise, use default guessed by file system.
-    :return: Headers for the file.
+    :param path: File to describe. Either a local path or remote URL.
+    :param download_headers:
+        If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
+        If the reference is a directory, this parameter is ignored, since files must be retrieved individually.
+    :param location_headers:
+        If enabled, add the ``Content-Location`` header referring to the input location.
+    :param content_headers: If enabled, add other relevant ``Content-`` prefixed headers.
+    :param content_type:
+        Explicit ``Content-Type`` to provide.
+        Otherwise, use default guessed by file system (often ``application/octet-stream``).
+        If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+    :param settings: Application settings to pass down to relevant utility functions.
+    :return: Headers for the reference.
     """
-    stat = os.stat(path)
-    headers = {}
+    href = path
+    if not any(href.startswith(proto) for proto in ["file", "http", "https", "s3"]):
+        href = f"file://{os.path.abspath(path)}"
+    f_enc = None
+
+    # handle directory
+    if path.endswith("/"):
+        download_headers = False
+        listing = fetch_directory(href, out_dir="", out_method=OutputMethod.META, settings=settings, **option_kwargs)
+        f_modified = sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1]
+        f_size = sum(get_header("Size", meta) for meta in listing)
+        f_type = ContentType.APP_DIR
+
+    # handle single file
+    else:
+        options, kwargs = resolve_scheme_options(**option_kwargs)
+        configs = get_request_options("HEAD", href, settings)
+        options["http"].update(**configs)
+
+        if path.startswith("s3://") or path.startswith("https://s3."):
+            s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+            s3_region = options["s3"].pop("region_name", None)
+            s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+            s3_bucket, file_key = path[5:].split("/", 1)
+            s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
+            f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
+            f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
+            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+
+        elif path.startswith("http://") or path.startswith("https://"):
+            resp = request_extra("HEAD", href, **options["http"])
+            if not resp.status_code == 200:
+                raise ValueError(f"Could not obtain file reference metadata from [{href}]")
+            f_modified = resp.last_modified
+            f_type = content_type or resp.content_type
+            f_size = resp.content_length
+            f_enc = resp.content_encoding
+
+        else:
+            path = path.split("file://", 1)[-1]
+            stat = os.stat(path)
+            f_type = content_type
+            f_size = stat.st_size
+            f_modified = datetime.fromtimestamp(stat.st_mtime)
+
+    headers = {"Content-Location": href} if location_headers else {}
     if content_headers:
-        c_type, c_enc = guess_file_contents(path)
-        if c_type == ContentType.APP_OCTET_STREAM:  # default
-            f_ext = os.path.splitext(path)[-1]
-            c_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+        c_type, c_enc = guess_file_contents(href)
+        if not f_type:
+            if c_type == ContentType.APP_OCTET_STREAM:  # default
+                f_ext = os.path.splitext(path)[-1]
+                f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
+            else:
+                f_type = c_type
+        if not f_enc:
+            f_enc = c_enc
         headers.update({
-            "Content-Type": content_type or c_type,
-            "Content-Encoding": c_enc or "",
-            "Content-Length": str(stat.st_size)
+            "Content-Type": f_type,
+            "Content-Encoding": f_enc or "",
+            "Content-Length": str(f_size),
         })
         if download_headers:
             headers.update({
                 "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
             })
-    f_modified = get_file_header_datetime(datetime.fromtimestamp(stat.st_mtime))
-    f_created = get_file_header_datetime(datetime.fromtimestamp(stat.st_ctime))
+    f_current = get_file_header_datetime(now())
+    f_modified = get_file_header_datetime(f_modified)
     headers.update({
-        "Date": f_created,
-        "Last-Modified": f_modified
+        "Date": f_current,
+        "Last-Modified": f_modified,
     })
     return headers
 
@@ -1399,8 +1521,8 @@ def get_caller_name(skip=2, base_class=False):
     return ".".join(name)
 
 
-def setup_cache(settings):
-    # type: (SettingsType) -> None
+def setup_cache(settings, reset=True):
+    # type: (SettingsType, bool) -> None
     """
     Prepares the settings with default caching options.
     """
@@ -1411,8 +1533,11 @@ def setup_cache(settings):
             cache_key = key.replace("beaker.cache.", "cache.")
             cache_val = settings.get(key)
             settings.setdefault(cache_key, cache_val)
+            settings.pop(key)  # ensure the old name variant doesn't persist (for reset)
+    if reset:
+        reset_cache()
     # apply defaults to avoid missing items during runtime
-    settings.setdefault("cache.regions", "doc, request, result")
+    settings["cache.regions"] = "doc, request, result, quotation"
     settings.setdefault("cache.type", "memory")
     settings.setdefault("cache.doc.enable", "false")
     settings.setdefault("cache.doc.expired", "3600")
@@ -1420,7 +1545,35 @@ def setup_cache(settings):
     settings.setdefault("cache.request.expire", "60")
     settings.setdefault("cache.result.enabled", "false")
     settings.setdefault("cache.result.expire", "3600")
+    settings.setdefault("cache.quotation.enabled", "true")
+    settings.setdefault("cache.quotation.expire", "3600")  # consider API limits and rate-limiting, caching for 1h
     set_cache_regions_from_settings(settings)
+
+
+def reset_cache(regions=None):
+    # type: (Optional[List[str]]) -> None
+    """
+    Invalidates caches for all regions and functions decorated by :func:`beaker.cache.cache_region` or manually cached.
+
+    :param regions:
+        List of specific regions to reset. Others are unmodified.
+        If omitted, clear all caches regardless of regions.
+    """
+    # because of references maintained within different objects, we must clear both managers and the caches,
+    # although they should technically refer to same definitions, but should still be "not yet" stored as manager
+    managers = list(cache_managers.values()) + [
+        Cache._get_cache(region_name, region_settings)
+        for region_name, region_settings in cache_regions.items()
+    ]
+    for cache in managers:  # type: Cache
+        if regions and cache.namespace_name not in regions:  # pragma: no cover
+            continue
+        # Force an explicit clear for memory manager, even though following 'do_remove' and 'clear' should collapse
+        # the full processing chain itself... Seems to not properly resolve in some cases (threading/timing/weak-refs)?
+        if isinstance(cache.namespace, MemoryNamespaceManager):
+            cache.namespace.namespaces.clear()
+        cache.namespace.do_remove()
+        cache.clear()
 
 
 def invalidate_region(caching_args):
@@ -1462,8 +1615,8 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
     return True
 
 
-def get_no_cache_option(request_headers, request_options):
-    # type: (HeadersType, SettingsType) -> bool
+def get_no_cache_option(request_headers, **cache_options):
+    # type: (HeadersType, **bool) -> bool
     """
     Obtains the No-Cache result from request headers and configured request options.
 
@@ -1471,13 +1624,14 @@ def get_no_cache_option(request_headers, request_options):
         - :meth:`Request.headers`
         - :func:`get_request_options`
 
-    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``
-    :param request_options: specific request options that could define ``cache: True|False``
+    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``.
+    :param cache_options: specific request options that could define ``cache[_enabled]: True|False``.
     :return: whether to disable cache or not
     """
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
-    no_cache = no_cache is True or request_options.get("cache", True) is False
+    cache_params = ["cache", "cache_enabled"]
+    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
     return no_cache
 
 
@@ -1620,7 +1774,7 @@ def retry_on_cache_error(func):
 
 
 def _request_call(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValueType]) -> Response
+    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
     """
@@ -1634,26 +1788,65 @@ def _request_call(method, url, kwargs):
 
 @cache_region("request")
 def _request_cached(method, url, kwargs):
-    # type: (str, str, Dict[str, AnyValueType]) -> Response
+    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
     return _request_call(method, url, kwargs)
 
 
+def _patch_cached_request_stream(response, stream=False):
+    # type: (AnyResponseType, bool) -> None
+    """
+    Preserves a cached copy of a streamed response contents to allow resolution when reloaded from cache.
+
+    When response contents are streamed, the resulting :class:`Response` object does not contain the contents until the
+    aggregated result is obtained by calling :meth:`Response.contents`, :meth:`Response.text` or :meth:`Response.`json`
+    methods. If no function ends up being called to aggregate the chunks with :meth:`Response.contents`, and instead
+    makes use of one of the interator :meth:`Response.iter_contents`, :meth:`Response.iter_lines` or
+    :meth:`Response.__iter__` methods, the object stored in cache ends up in an invalid state where it believes
+    contents were already consumed (cannot re-iterate), but are not available anymore to provide them on following
+    request calls that reloads it from cache. This patches the object by caching the contents after iterating the
+    chunks to allow them to be retrieved for future cached requests.
+    """
+    if stream:
+        # content not yet consumed, first request call just freshly cached
+        # don't consume the content, otherwise it might break calling code
+        # instead, reapply the same chunk yield, but keep a copy for reuse
+        if not getattr(response, "_content_consumed", False):
+
+            iter_content = getattr(response, "iter_content")
+
+            def cached_iter_content(*_, **__):
+                cached_content = b""
+                for chunk in iter_content(*_, **__):
+                    cached_content += chunk
+                    yield chunk
+                # Cache the result, which would be done after calling 'response.content',
+                # but which is not automatically accomplished when calling 'iter_content'.
+                # Setting '_content' will allow reuse of the chunks by simulated iterator.
+                # (see 'requests/models.Response.iter_content' definition)
+                setattr(response, "_content", cached_content)
+                setattr(response, "_content_consumed", True)
+
+            setattr(response, "iter_content", cached_iter_content)
+
+
 @retry_on_cache_error
-def request_extra(method,                       # type: AnyRequestMethod
-                  url,                          # type: str
-                  retries=None,                 # type: Optional[int]
-                  backoff=None,                 # type: Optional[Number]
-                  intervals=None,               # type: Optional[List[Number]]
-                  retry_after=True,             # type: bool
-                  allowed_codes=None,           # type: Optional[List[int]]
-                  only_server_errors=True,      # type: bool
-                  ssl_verify=None,              # type: Optional[bool]
-                  settings=None,                # type: Optional[AnySettingsContainer]
-                  **request_kwargs,             # type: Any  # RequestOptions
-                  ):                            # type: (...) -> AnyResponseType
+def request_extra(method,                           # type: AnyRequestMethod
+                  url,                              # type: str
+                  retries=None,                     # type: Optional[int]
+                  backoff=None,                     # type: Optional[Number]
+                  intervals=None,                   # type: Optional[List[Number]]
+                  retry_after=True,                 # type: bool
+                  allowed_codes=None,               # type: Optional[List[int]]
+                  only_server_errors=True,          # type: bool
+                  ssl_verify=None,                  # type: Optional[bool]
+                  cache_request=_request_cached,    # type: RequestCachingFunction
+                  cache_enabled=True,               # type: bool
+                  settings=None,                    # type: Optional[AnySettingsContainer]
+                  **request_kwargs,                 # type: Any  # RequestOptions
+                  ):                                # type: (...) -> AnyResponseType
     """
     Standard library :mod:`requests` with additional functional utilities.
 
@@ -1694,7 +1887,7 @@ def request_extra(method,                       # type: AnyRequestMethod
     local file path. The path should be absolute to ensure it to be correctly resolved.
 
     All access errors due to file permissions return 403 status code, and missing file returns 404.
-    Any other :py:exc:`IOError` types are converted to a 400 responses.
+    Any other :py:exc:`IOError` types are converted to 400 responses.
 
     .. seealso::
         - :class:`FileAdapter`
@@ -1726,6 +1919,8 @@ def request_extra(method,                       # type: AnyRequestMethod
     :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
     :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
+    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
+    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
     :param settings: Additional settings from which to retrieve configuration details for requests.
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
@@ -1760,16 +1955,17 @@ def request_extra(method,                       # type: AnyRequestMethod
     # process request
     resp = None
     failures = []
-    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), request_options)
+    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), cache_enabled=cache_enabled, **request_options)
     # remove leftover options unknown to requests method in case of multiple entries
     # see 'requests.request' detailed signature for applicable args
     known_req_opts = set(inspect.signature(requests.Session.request).parameters)
     known_req_opts -= {"url", "method"}  # add as unknown to always remove them since they are passed by arguments
     for req_opt in set(request_kwargs) - known_req_opts:
         request_kwargs.pop(req_opt)
-    region = "request"
+    stream = request_kwargs.get("stream", False)
+    region = cache_request._arg_region  # noqa
     request_args = (method, url, request_kwargs)
-    caching_args = (_request_cached, region, *request_args)
+    caching_args = (cache_request, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
             code = resp.status_code if resp else None
@@ -1783,12 +1979,12 @@ def request_extra(method,                       # type: AnyRequestMethod
             if no_cache:
                 resp = _request_call(*request_args)
             else:
-                resp = _request_cached(*request_args)
-            if allowed_codes and len(allowed_codes):
+                resp = cache_request(*request_args)
+                _patch_cached_request_stream(resp, stream)
+            if allowed_codes:  # check by itself first if specified to bypass following check of error codes
                 if resp.status_code in allowed_codes:
                     return resp
             elif resp.status_code < (500 if only_server_errors else 400):
-                invalidate_region(caching_args)
                 return resp
             invalidate_region(caching_args)
             reason = getattr(resp, "reason", type(resp).__name__)
@@ -1825,6 +2021,8 @@ def get_secure_filename(file_name):
     new_name = file_name.rstrip("_")
     suffix = "_" * (len(file_name) - len(new_name))
     file_name = new_name
+    while ".." in file_name:
+        file_name = file_name.replace("..", ".")
     return f"{prefix}{secure_filename(file_name)}{suffix}"
 
 
@@ -1898,11 +2096,11 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
         for file_name_var in [file_name_star, file_name_param]:
             try:
                 file_name_maybe = (file_name_var or "").rsplit("/", 1)[-1].strip().replace(" ", "_")
-                file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)[1]
+                file_name_maybe = FILE_NAME_QUOTE_PATTERN.match(file_name_maybe)["filename"]
                 file_name_secure, file_ext_secure = os.path.splitext(get_secure_filename(file_name_maybe))
                 if (
-                    file_name_maybe and file_name_secure and file_ext_secure and  # characters with ASCII equivalents
-                    (3 < len(file_name_maybe) < 256) and  # ensure minimal length respected
+                    file_name_maybe and file_name_secure and  # minimum length is one valid character if no extension
+                    len(file_name_maybe) < 256 and  # ensure maximum length respected, including the extension
                     len(file_name_maybe) == len(f"{file_name_secure}{file_ext_secure}")  # skip if dropped characters
                 ):
                     file_name = file_name_maybe
@@ -1911,15 +2109,28 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
             except (IndexError, TypeError):
                 LOGGER.debug("Discarding Content-Disposition preferred file name due to failed validation.")
 
+    file_url = None
     if not file_name:
-        file_name = urlparse(file_reference).path.split("/")[-1]
+        file_url = file_name = urlparse(file_reference).path.split("/")[-1]
         LOGGER.debug("Using default file name from URL path fragment: [%s]", file_name)
 
+    # Check secure name/extension components individually since a default extension could be resolved if not explicitly
+    # provided through 'Content-Disposition' header. Consider that explicitly provided no-extension file name is valid.
     file_name, file_ext = os.path.splitext(file_name)
     file_name = get_secure_filename(file_name)
-    file_ext = f".{get_secure_filename(file_ext)}" if file_ext else f".{get_secure_filename(content_type_ext)}"
-    if not FILE_NAME_LOOSE_PATTERN.match(file_name) or not FILE_NAME_LOOSE_PATTERN.match(file_ext):
-        raise ValueError(f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. Aborting download.")
+    file_ext = get_secure_filename(file_ext) if file_ext or file_url is None else get_secure_filename(content_type_ext)
+    if not FILE_NAME_LOOSE_PATTERN.match(file_name):
+        raise ValueError(
+            f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. "
+            "Aborting download."
+        )
+    if file_ext:
+        if not FILE_NAME_LOOSE_PATTERN.match(file_ext):
+            raise ValueError(
+                f"Invalid file extension [{file_ext!s}] resolved from URL [{file_reference}]. "
+                "Aborting download."
+            )
+        file_ext = f".{file_ext}"
 
     file_name = f"{file_name}{file_ext}"
     file_path = os.path.join(file_outdir, file_name)
@@ -2070,10 +2281,10 @@ def resolve_s3_reference(s3_reference):
             )
         if s3_arn_match["type_name"] == "outpost":
             parts = s3_arn_match["path"].split("/", 4)
-            bucket_name = s3_arn_match["bucket"] + "/".join(parts[:3])
+            s3_bucket = s3_arn_match["bucket"] + "/".join(parts[:3])
             file_key = "/".join(parts[3:])
         elif s3_arn_match["type_name"] == "accesspoint":
-            bucket_name = s3_arn_match["bucket"]
+            s3_bucket = s3_arn_match["bucket"]
             file_key = s3_arn_match["path"]
         else:
             raise ValueError(
@@ -2083,7 +2294,7 @@ def resolve_s3_reference(s3_reference):
         s3_region = s3_arn_match["region"]
     else:
         s3_region = None  # default or predefined by caller
-        bucket_name, file_key = s3_ref.split("/", 1)
+        s3_bucket, file_key = s3_ref.split("/", 1)
     # files must always be relative without prefixed '/'
     # directory should always contain the trailing '/'
     if s3_reference.endswith("/"):
@@ -2091,7 +2302,7 @@ def resolve_s3_reference(s3_reference):
             file_key += "/"
     else:
         file_key = file_key.lstrip("/")
-    return bucket_name, file_key, s3_region
+    return s3_bucket, file_key, s3_region
 
 
 def resolve_s3_http_options(**request_kwargs):
@@ -2159,10 +2370,13 @@ class OutputMethod(ExtendedEnum):
     """
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
+    # download operations
     AUTO = "auto"
     LINK = "link"
     MOVE = "move"
     COPY = "copy"
+    # metadata operations
+    META = "meta"
 
 
 def fetch_file(file_reference,                      # type: str
@@ -2222,13 +2436,13 @@ def fetch_file(file_reference,                      # type: str
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
-        bucket_name, file_key, s3_region_ref = resolve_s3_reference(file_reference)
+        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_reference)
         if s3_region and s3_region_ref and s3_region != s3_region_ref:
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
         s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-        s3_client.download_file(bucket_name, file_key, file_path, Callback=callback)
+        s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
     elif file_reference.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
         if file_reference.startswith("https://s3.") or urlparse(file_reference).hostname.endswith(".amazonaws.com"):
@@ -2258,7 +2472,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> str
+    # type: (str, str, OutputMethod) -> AnyOutputResult
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2288,13 +2502,15 @@ def adjust_file_local(file_reference, file_outdir, out_method):
 
     :param file_reference: Original location of the file.
     :param file_outdir: Target directory of the file.
-    :param out_method: Method employed to handle the generation of the output file.
-    :returns: Output file location.
+    :param out_method: Method employed to handle the generation of the output.
+    :returns: Output file location or metadata.
     """
     file_loc = os.path.realpath(file_reference)
     file_name = os.path.basename(file_loc)  # resolve any different name to use the original
     file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
+    if out_method == OutputMethod.META:
+        return get_href_headers(file_loc, download_header=True, content_headers=True)
     if out_method == OutputMethod.MOVE and os.path.isfile(file_path):
         LOGGER.debug("Reference [%s] cannot be moved to path [%s] (already exists)", file_reference, file_path)
         raise OSError("Cannot move file, already in output directory!")
@@ -2322,17 +2538,22 @@ def adjust_file_local(file_reference, file_outdir, out_method):
     return file_path
 
 
-def filter_directory_forbidden(listing):
-    # type: (Iterable[str]) -> Iterator[str]
+def filter_directory_forbidden(listing, key=None):
+    # type: (Iterable[FilterType], Optional[Callable[[...], str]]) -> Iterator[FilterType]
     """
     Filters out items that should always be removed from directory listing results.
     """
+    if key is None:
+        def key(_):
+            return _
+
     is_in = frozenset({"..", "../", "./"})
     equal = frozenset({"."})  # because of file extensions, cannot check 'part in item'
     for item in listing:
-        if any(part in item for part in is_in):
+        path = key(item)
+        if any(part in path for part in is_in):
             continue
-        if any(part == item for part in equal):
+        if any(part == path for part in equal):
             continue
         yield item
 
@@ -2342,8 +2563,12 @@ class PathMatchingMethod(ExtendedEnum):
     REGEX = "regex"
 
 
-def filter_directory_patterns(listing, include, exclude, matcher):
-    # type: (Iterable[str], Optional[Iterable[str]], Optional[Iterable[str]], PathMatchingMethod) -> List[str]
+def filter_directory_patterns(listing,      # type: Iterable[FilterType]
+                              include,      # type: Optional[Iterable[str]]
+                              exclude,      # type: Optional[Iterable[str]]
+                              matcher,      # type: PathMatchingMethod
+                              key=None,     # type: Optional[Callable[[...], str]]
+                              ):            # type: (...) -> List[FilterType]
     """
     Filters a list of files according to a set of include/exclude patterns.
 
@@ -2367,8 +2592,13 @@ def filter_directory_patterns(listing, include, exclude, matcher):
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
+    :param key: Function to retrieve the file key (path) from objects containing it to be filtered.
     :return: Filtered files.
     """
+    if key is None:
+        def key(_):
+            return _
+
     listing_include = include or []
     listing_exclude = exclude or []
     if listing_include or listing_exclude:
@@ -2382,8 +2612,8 @@ def filter_directory_patterns(listing, include, exclude, matcher):
             raise ValueError(f"Unknown path pattern matching method: [{matcher}]")
         filtered = [
             item for item in listing if (
-                not any(is_match(re_excl, item) for re_excl in listing_exclude)
-                or any(is_match(re_incl, item) for re_incl in listing_include)
+                not any(is_match(re_excl, key(item)) for re_excl in listing_exclude)
+                or any(is_match(re_incl, key(item)) for re_incl in listing_include)
             )
         ]
         LOGGER.debug("Filtering directory listing\n"
@@ -2396,14 +2626,41 @@ def filter_directory_patterns(listing, include, exclude, matcher):
     return listing
 
 
-def download_files_s3(location,                         # type: str
-                      out_dir,                          # type: Path
-                      include=None,                     # type: Optional[List[str]]
-                      exclude=None,                     # type: Optional[List[str]]
-                      matcher=PathMatchingMethod.GLOB,  # type: PathMatchingMethod
-                      settings=None,                    # type: Optional[SettingsType]
-                      **option_kwargs,                  # type: Any  # Union[SchemeOptions, RequestOptions]
-                      ):                                # type: (...) -> List[str]
+@overload
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyMetadataOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[MetadataResult]
+    ...
+
+
+@overload
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyDownloadOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[DownloadResult]
+    ...
+
+
+def fetch_files_s3(location,                            # type: str
+                   out_dir,                             # type: Path
+                   out_method,                          # type: AnyOutputMethod
+                   include=None,                        # type: Optional[List[str]]
+                   exclude=None,                        # type: Optional[List[str]]
+                   matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                   settings=None,                       # type: Optional[SettingsType]
+                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   ):                                   # type: (...) -> List[AnyOutputResult]
     """
     Download all listed S3 files references under the output directory using the provided S3 bucket and client.
 
@@ -2415,6 +2672,7 @@ def download_files_s3(location,                         # type: str
 
     :param location: S3 bucket location (with ``s3://`` scheme) targeted to retrieve files.
     :param out_dir: Desired output location of downloaded files.
+    :param out_method: Method employed to handle the generation of the output.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
@@ -2432,21 +2690,37 @@ def download_files_s3(location,                         # type: str
     s3_params = resolve_s3_http_options(**options["http"], **kwargs)
     s3_region = options["s3"].pop("region_name", None)
     s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-    bucket_name, dir_key = location[5:].split("/", 1)
+    s3_bucket, dir_key = location[5:].split("/", 1)
     base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
 
     # adjust patterns with full paths to ensure they still work with retrieved relative S3 keys
     include = [incl.replace(base_url, "", 1) if incl.startswith(base_url) else incl for incl in include or []]
     exclude = [excl.replace(base_url, "", 1) if excl.startswith(base_url) else excl for excl in exclude or []]
 
-    LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", bucket_name, s3_region or "default")
-    s3_dir_resp = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=dir_key)
-    LOGGER.debug("Fetched S3 directory [%s] listing contents:\n%s", location, repr_json(s3_dir_resp))
-    s3_files = (file["Key"] for file in s3_dir_resp["Contents"])  # definitions with relative paths (like patterns)
-    s3_files = (path for path in s3_files if not path.endswith("/"))
-    s3_files = filter_directory_forbidden(s3_files)
-    s3_files = filter_directory_patterns(s3_files, include, exclude, matcher)
-    s3_files = list(s3_files)
+    LOGGER.debug("Resolved S3 Bucket [%s] and Region [%s] for download of files.", s3_bucket, s3_region or "default")
+    s3_paging = s3_client.get_paginator("list_objects_v2")
+    LOGGER.debug("Fetching S3 directory [%s] listing.", location)
+    s3_files = (  # definitions with relative paths (like patterns)
+        file
+        for s3_dir_resp in s3_paging.paginate(Bucket=s3_bucket, Prefix=dir_key)
+        for file in s3_dir_resp["Contents"]
+    )
+    s3_files = (file for file in s3_files if not file["Key"].endswith("/"))
+    s3_files = filter_directory_forbidden(s3_files, key=lambda _file: _file["Key"])
+    s3_files = filter_directory_patterns(s3_files, include, exclude, matcher, key=lambda _file: _file["Key"])
+
+    if out_method == OutputMethod.META:
+        # FIXME: extra metadata needed?
+        #   Key/Size/LastModified available from listing directly
+        #   ContentType needs head object additional request per item
+        # s3_meta = (s3_client.head_object(Bucket=s3_bucket, Key=file_key) for file_key in s3_files)
+        # s3_meta = (file_meta["ResponseMetadata"]["HTTPHeaders"] for file_meta in s3_meta)
+        for file_meta in s3_files:  # type: MetadataResult
+            file_key = file_meta.pop("Key")
+            file_meta["Content-Location"] = f"{base_url}{file_key}"
+        return list(s3_files)
+
+    s3_files = [file["Key"] for file in s3_files]
 
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
@@ -2483,7 +2757,7 @@ def download_files_s3(location,                         # type: str
         raise ValueError(f"No files specified for download from reference [{base_url}].")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = (
-            executor.submit(_download_file, s3_client, bucket_name, file_key, out_dir)
+            executor.submit(_download_file, s3_client, s3_bucket, file_key, out_dir)
             for file_key in s3_files
         )
         for future in as_completed(futures):
@@ -2502,15 +2776,16 @@ def download_files_s3(location,                         # type: str
             )
 
 
-def download_files_url(file_references,                     # type: Iterable[str]
-                       out_dir,                             # type: Path
-                       base_url,                            # type: str
-                       include=None,                        # type: Optional[List[str]]
-                       exclude=None,                        # type: Optional[List[str]]
-                       matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
-                       settings=None,                       # type: Optional[SettingsType]
-                       **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
-                       ):                                   # type: (...) -> Iterator[str]
+def fetch_files_url(file_references,                    # type: Iterable[str]
+                    out_dir,                            # type: Path
+                    out_method,                         # type: AnyOutputMethod
+                    base_url,                           # type: str
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[SettingsType]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> Iterator[AnyOutputResult]
     """
     Download all listed files references under the output directory.
 
@@ -2524,6 +2799,7 @@ def download_files_url(file_references,                     # type: Iterable[str
 
     :param file_references: Relative or full URL paths of the files to download.
     :param out_dir: Desired output location of downloaded files.
+    :param out_method: Method employed to handle the generation of the output.
     :param base_url:
         If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
         allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
@@ -2558,6 +2834,19 @@ def download_files_url(file_references,                     # type: Iterable[str
     file_refs_relative = {os.path.join(base_url, path) for path in file_refs_relative}
     file_references = sorted(list(set(file_refs_relative) | set(file_refs_absolute)))
 
+    if out_method == OutputMethod.META:
+        return [
+            get_href_headers(
+                url,
+                download_headers=True,
+                location_headers=True,
+                content_headers=True,
+                settings=settings,
+                **option_kwargs
+            )
+            for url in file_references
+        ]
+
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
     sub_dirs = {os.path.split(path)[0] for path in file_references if "://" not in path or path.startswith(base_url)}
@@ -2589,7 +2878,8 @@ def download_files_url(file_references,                     # type: Iterable[str
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
         _out_dir = os.path.split(_out_file)[0]
         try:
-            return fetch_file(_file_path, _out_dir, settings=settings, callback=_abort_callback, **option_kwargs)
+            return fetch_file(_file_path, _out_dir, out_method=out_method,
+                              settings=settings, callback=_abort_callback, **option_kwargs)
         except Exception as exc:
             LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)
             task_kill_event.set()
@@ -2610,17 +2900,46 @@ def download_files_url(file_references,                     # type: Iterable[str
             yield future.result()
 
 
-def download_files_html(html_data,                          # type: str
-                        out_dir,                            # type: Path
-                        base_url,                           # type: str
-                        include=None,                       # type: Optional[List[str]]
-                        exclude=None,                       # type: Optional[List[str]]
-                        matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
-                        settings=None,                      # type: Optional[AnySettingsContainer]
-                        **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
-                        ):                                  # type: (...) -> Iterator[str]
+@overload
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyMetadataOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[MetadataResult]
+    ...
+
+
+@overload
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyDownloadOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[DownloadResult]
+    ...
+
+
+def fetch_files_html(html_data,                         # type: str
+                     out_dir,                           # type: Path
+                     out_method,                        # type: AnyOutputMethod
+                     base_url,                          # type: str
+                     include=None,                      # type: Optional[List[str]]
+                     exclude=None,                      # type: Optional[List[str]]
+                     matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
+                     settings=None,                     # type: Optional[AnySettingsContainer]
+                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     ):                                 # type: (...) -> Iterator[AnyOutputResult]
     """
-    Downloads files retrieved from a directory listing provided as an index of plain HTML with file references.
+    Retrieves files from a directory listing provided as an index of plain HTML with file references.
 
     If the index itself provides directories that can be browsed down, the tree hierarchy will be downloaded
     recursively by following links. In such case, links are ignored if they cannot be resolved as a nested index pages.
@@ -2633,10 +2952,11 @@ def download_files_html(html_data,                          # type: str
     - https://mirrors.edge.kernel.org/pub/ (listing within a formatted table with multiple other metadata fields)
 
     .. seealso::
-        :func:`download_files_url`
+        :func:`fetch_files_url`
 
     :param html_data: HTML data contents with files references to download.
-    :param out_dir: Desired output location of downloaded files.
+    :param out_dir: Desired output location of retrieved files.
+    :param out_method: Method employed to handle the generation of the output.
     :param base_url:
         If full URL are specified, corresponding files will be retrieved using the appropriate scheme per file
         allowing flexible data sources. Otherwise, any relative locations use this base URL to resolve the full
@@ -2677,20 +2997,42 @@ def download_files_html(html_data,                          # type: str
                     yield _sub_ref
 
     files = list(_list_refs(base_url, html_data))
-    return download_files_url(
-        files, out_dir, base_url,
+    return fetch_files_url(
+        files, out_dir, out_method, base_url,
         include=include, exclude=exclude, matcher=matcher,
         settings=settings, **option_kwargs
     )
 
 
+@overload
 def adjust_directory_local(location,                            # type: Path
                            out_dir,                             # type: Path
-                           out_method,                          # type: OutputMethod
+                           out_method,                          # type: AnyMetadataOutputMethod
                            include=None,                        # type: Optional[List[str]]
                            exclude=None,                        # type: Optional[List[str]]
                            matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
-                           ):                                   # type: (...) -> List[Path]
+                           ):                                   # type: (...) -> List[MetadataResult]
+    ...
+
+
+@overload
+def adjust_directory_local(location,                            # type: Path
+                           out_dir,                             # type: Path
+                           out_method,                          # type: AnyDownloadOutputMethod
+                           include=None,                        # type: Optional[List[str]]
+                           exclude=None,                        # type: Optional[List[str]]
+                           matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                           ):                                   # type: (...) -> List[DownloadResult]
+    ...
+
+
+def adjust_directory_local(location,                            # type: Path
+                           out_dir,                             # type: Path
+                           out_method,                          # type: AnyOutputMethod
+                           include=None,                        # type: Optional[List[str]]
+                           exclude=None,                        # type: Optional[List[str]]
+                           matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
+                           ):                                   # type: (...) -> List[AnyOutputResult]
     """
     Adjusts the input directory reference to the output location with the requested handling method.
 
@@ -2738,7 +3080,7 @@ def adjust_directory_local(location,                            # type: Path
 
     :param location: Local reference to the source directory.
     :param out_dir: Local reference to the output directory.
-    :param out_method: Method employed to handle the generation of the output directory.
+    :param out_method: Method employed to handle the generation of the output.
     :param include: Any matching patterns for files that should be explicitly included.
     :param exclude: Any matching patterns for files that should be excluded unless included.
     :param matcher: Pattern matching method to evaluate if a file path matches include and exclude definitions.
@@ -2769,6 +3111,9 @@ def adjust_directory_local(location,                            # type: Path
     extras = [os.path.join(out_dir, path) for path in extras]
     desired = [os.path.join(loc_dir, path) for path in filtered]
     filtered = list(sorted(os.path.join(out_dir, path) for path in filtered))
+
+    if out_method == OutputMethod.META:
+        return [get_href_headers(path, download_headers=True, content_headers=True) for path in filtered]
 
     if loc_dir == out_dir:
         if not extras:
@@ -2836,6 +3181,20 @@ def list_directory_recursive(directory, relative=False):
             yield file_name if relative else os.path.join(path, file_name)
 
 
+@overload
+def fetch_directory(location,                           # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_method=OutputMethod.AUTO,       # type: AnyMetadataOutputMethod
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> List[MetadataResult]
+    ...
+
+
 def fetch_directory(location,                           # type: str
                     out_dir,                            # type: Path
                     *,                                  # force named keyword arguments after
@@ -2845,7 +3204,7 @@ def fetch_directory(location,                           # type: str
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
                     **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
-                    ):                                  # type: (...) -> List[str]
+                    ):                                  # type: (...) -> List[AnyOutputResult]
     """
     Fetches all files that can be listed from a directory in local or remote location.
 
@@ -2853,9 +3212,9 @@ def fetch_directory(location,                           # type: str
         - :func:`fetch_reference`
         - :func:`resolve_scheme_options`
         - :func:`adjust_directory_local`
-        - :func:`download_files_html`
-        - :func:`download_files_s3`
-        - :func:`download_files_url`
+        - :func:`fetch_files_html`
+        - :func:`fetch_files_s3`
+        - :func:`fetch_files_url`
 
     .. note::
         When using include/exclude filters, items that do not match a valid entry from the real listing are ignored.
@@ -2882,36 +3241,37 @@ def fetch_directory(location,                           # type: str
     LOGGER.debug("Fetching directory reference: [%s] using options:\n%s", location, repr_json(option_kwargs))
     if location.startswith("s3://"):
         LOGGER.debug("Fetching listed files under directory resolved as S3 bucket reference.")
-        listing = download_files_s3(location, out_dir,
-                                    include=include, exclude=exclude, matcher=matcher, **option_kwargs)
+        listing = fetch_files_s3(location, out_dir, out_method,
+                                 include=include, exclude=exclude, matcher=matcher,
+                                 settings=settings, **option_kwargs)
     elif location.startswith("https://s3."):
         LOGGER.debug("Fetching listed files under directory resolved as HTTP-like S3 bucket reference.")
         s3_ref, s3_region = resolve_s3_from_http(location)
         option_kwargs["s3_region_name"] = s3_region
-        listing = download_files_s3(s3_ref, out_dir,
-                                    include=include, exclude=exclude,
-                                    settings=settings, **option_kwargs)
+        listing = fetch_files_s3(s3_ref, out_dir, out_method,
+                                 include=include, exclude=exclude,
+                                 settings=settings, **option_kwargs)
     elif location.startswith("http://") or location.startswith("https://"):
         # Next two lines are added to match behavior of `download_files_s3` and replicate input directory name
         # in output location
         loc_path = get_secure_directory_name(location_without_query)
         out_dir = os.path.join(out_dir, loc_path)
         LOGGER.debug("Fetch directory resolved as remote HTTP reference. Will attempt listing contents.")
-        resp = request_extra("GET", location)
+        resp = request_extra("GET", location, **option_kwargs)
         if resp.status_code != 200:
             LOGGER.error("Invalid response [%s] for directory listing from [%s]", resp.status_code, location)
             raise ValueError(f"Cannot parse directory location [{location}] from [{resp.status_code}] response.")
         ctype = get_header("Content-Type", resp.headers, default=ContentType.TEXT_HTML)
         if any(_type in ctype for _type in [ContentType.TEXT_HTML] + list(ContentType.ANY_XML)):
-            listing = download_files_html(resp.text, out_dir, location,
-                                          include=include, exclude=exclude, matcher=matcher,
-                                          settings=settings, **option_kwargs)
+            listing = fetch_files_html(resp.text, out_dir, out_method, location,
+                                       include=include, exclude=exclude, matcher=matcher,
+                                       settings=settings, **option_kwargs)
         elif ContentType.APP_JSON in ctype:
             body = resp.json()  # type: JSON
             if isinstance(body, list) and all(isinstance(file, str) for file in body):
-                listing = download_files_url(body, out_dir, location,
-                                             include=include, exclude=exclude, matcher=matcher,
-                                             settings=settings, **option_kwargs)
+                listing = fetch_files_url(body, out_dir, out_method, location,
+                                          include=include, exclude=exclude, matcher=matcher,
+                                          settings=settings, **option_kwargs)
             else:
                 LOGGER.error("Invalid JSON from [%s] is not a list of files:\n%s", location, repr_json(body))
                 raise ValueError(f"Cannot parse directory location [{location}] "
@@ -2924,7 +3284,10 @@ def fetch_directory(location,                           # type: str
                                          include=include, exclude=exclude, matcher=matcher)
     else:
         raise ValueError(f"Unknown scheme for directory location [{location}].")
-    listing = list(sorted(listing))
+    listing = list(sorted(
+        listing,
+        key=lambda _file: _file["Content-Location"] if out_method == OutputMethod.META else _file
+    ))
     if LOGGER.isEnabledFor(logging.DEBUG):
         for item in listing:
             LOGGER.debug("Resolved file [%s] from [%s] directory listing.", item, location)

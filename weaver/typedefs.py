@@ -9,10 +9,11 @@ if TYPE_CHECKING:
     import typing
     import uuid
     from datetime import datetime
+    from decimal import Decimal
     from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
-    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     from weaver.compat import Version
 
@@ -46,28 +47,28 @@ if TYPE_CHECKING:
     from celery.app import Celery
     from celery.result import AsyncResult, EagerResult, GroupResult, ResultSet
     from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Process as ProcessOWS, WPSExecution
-    from pyramid.httpexceptions import HTTPException, HTTPSuccessful, HTTPRedirection
+    from pyramid.config import Configurator
+    from pyramid.httpexceptions import HTTPException, HTTPRedirection, HTTPSuccessful
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.response import Response as PyramidResponse
     from pyramid.testing import DummyRequest
-    from pyramid.config import Configurator
     from pywps import Process as ProcessWPS
     from pywps.app import WPSRequest
     from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
     from requests import PreparedRequest, Request as RequestsRequest
     from requests.models import Response as RequestsResponse
     from requests.structures import CaseInsensitiveDict
-    from webob.acceptparse import AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader
-    from webob.headers import ResponseHeaders, EnvironHeaders
+    from webob.acceptparse import AcceptLanguageInvalidHeader, AcceptLanguageNoHeader, AcceptLanguageValidHeader
+    from webob.headers import EnvironHeaders, ResponseHeaders
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.datatype import Process
     from weaver.status import AnyStatusType
     from weaver.visibility import AnyVisibility
 
@@ -329,7 +330,9 @@ if TYPE_CHECKING:
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
-    AnyProcessClass = Union[Type[Process], Type[ProcessWPS]]
+    AnyProcessRef = Union[Process, str]
+    AnyProcessClass = Union[Type[Process], Type[ProcessWPS], Type[str]]
+    AnyServiceRef = Union[Service, str]
 
     # update_status(message, progress, status, *args, **kwargs)
     UpdateStatusPartialFunction = TypeVar(
@@ -442,6 +445,25 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
+    QuoteStepOutput = Union[
+        TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True),
+        TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True),
+    ]
+    QuoteStepOutputParameters = Dict[str, QuoteStepOutput]
+    QuoteProcessResults = TypedDict("QuoteProcessResults", {
+        "flat": NotRequired[Number],
+        "memory": NotRequired[Number],
+        "storage": NotRequired[Number],
+        "duration": NotRequired[Number],
+        "cpu": NotRequired[Number],
+        "gpu": NotRequired[Number],
+        "total": NotRequired[Number],
+        "outputs": NotRequired[QuoteStepOutputParameters]
+    }, total=False)
+    Price = TypedDict("Price", {
+        "amount": Decimal,
+        "currency": str,
+    }, total=True)
 
     # job execution statistics
     ApplicationStatistics = TypedDict("ApplicationStatistics", {
@@ -810,6 +832,7 @@ if TYPE_CHECKING:
     ProcessExecution = TypedDict("ProcessExecution", {
         "mode": NotRequired[AnyExecuteMode],
         "response": NotRequired[AnyExecuteResponse],
-        "inputs": Required[ExecutionInputs],
-        "outputs": Required[ExecutionOutputs],
+        "inputs": NotRequired[ExecutionInputs],
+        "outputs": NotRequired[ExecutionOutputs],
+        "notification_email": NotRequired[str],
     }, total=False)

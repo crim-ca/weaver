@@ -3,6 +3,12 @@
 #   - https://github.com/github/issue-labeler
 
 
+feature/AWS:
+  - '(Bucket|bucket)'
+  - Amazon
+  - AWS
+  - S3
+
 feature/CWL:
   - '(CWL|cwl)'
   - 'workflow'
@@ -10,11 +16,20 @@ feature/CWL:
 feature/oas:
   - '(OpenAPI|openapi)'
   - '(Swagger|swagger)'
+  - OAS
   - cornice
   - colander
 
 feature/docker:
   - '(Docker|docker)'
+
+feature/quotation:
+  - '(Quote|quote)'
+  - '(Quotation|quotation)'
+  - '(Bill|bill)'
+  - '(Billing|billing)'
+  - '(Estimator|estimator)'
+  - '(Estimation|estimation)'
 
 feature/vault:
   - '(Vault|vault)'

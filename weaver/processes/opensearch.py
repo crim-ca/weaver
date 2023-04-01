@@ -20,7 +20,7 @@ from weaver.utils import get_any_id, request_extra
 if TYPE_CHECKING:
     from typing import Deque, Dict, Iterable, Iterator, List, Optional, Tuple
 
-    from weaver.processes.convert import WPS_Input_Type, JSON_IO_Type
+    from weaver.processes.convert import JSON_IO_Type, WPS_Input_Type
     from weaver.typedefs import AnySettingsContainer, DataSourceOpenSearch, JSON
 
 LOGGER = logging.getLogger("PACKAGE")

@@ -12,6 +12,7 @@ import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
+from decimal import ConversionSyntax, Decimal
 from io import BytesIO
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from secrets import compare_digest, token_hex
@@ -56,13 +57,14 @@ from weaver.utils import (
     request_extra
 )
 from weaver.visibility import Visibility
-from weaver.warning import NonBreakingExceptionWarning
+from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
 from weaver.wps.utils import get_wps_client, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
+    from typing_extensions import TypeAlias
 
     from owslib.wps import WebProcessingService
 
@@ -74,24 +76,31 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyLogLevel,
         AnyProcess,
+        AnyProcessRef,
         AnyRequestType,
+        AnyServiceRef,
         AnySettingsContainer,
         AnyUUID,
         AnyVersion,
+        CWL,
         ExecutionInputs,
         ExecutionOutputs,
-        Number,
-        CWL,
         JSON,
         Link,
         Metadata,
+        Number,
+        Price,
         QuoteProcessParameters,
+        QuoteProcessResults,
+        QuoteStepOutputParameters,
         Statistics
     )
     from weaver.visibility import AnyVisibility
 
     AnyParams = Dict[str, Any]
-    AnyAuthentication = Union["Authentication", "DockerAuthentication"]
+    _Authentication: TypeAlias = "Authentication"
+    _DockerAuthentication: TypeAlias = "DockerAuthentication"
+    AnyAuthentication = Union[_Authentication, _DockerAuthentication]
 
 LOGGER = getLogger(__name__)
 
@@ -795,7 +804,9 @@ class Job(Base):
 
     @service.setter
     def service(self, service):
-        # type: (Optional[str]) -> None
+        # type: (Optional[AnyServiceRef]) -> None
+        if isinstance(service, Service):
+            service = service.id
         if not isinstance(service, str) or service is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.service'")
         self["service"] = service
@@ -813,7 +824,9 @@ class Job(Base):
 
     @process.setter
     def process(self, process):
-        # type: (Optional[str]) -> None
+        # type: (Optional[AnyProcessRef]) -> None
+        if isinstance(process, Process):
+            process = process.id
         if not isinstance(process, str) or process is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.process'")
         self["process"] = process
@@ -1377,14 +1390,21 @@ class Authentication(Base):
     Authentication details to store details required for process operations.
     """
 
-    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, Optional[str], **Any) -> None
+    def __init__(self, auth_scheme, auth_token=None, auth_username=None, auth_password=None, auth_link=None, **kwargs):
+        # type: (str, Optional[str], Optional[str], Optional[str], Optional[str], **Any) -> None
         super(Authentication, self).__init__(**kwargs)
         # ensure values are provided and of valid format
+        if auth_token and (auth_username or auth_password):
+            raise ValueError(
+                "Cannot initialize Authentication method with token and username/password credentials simultaneously."
+            )
+        if not auth_token and auth_username and auth_password:
+            auth = self.from_credentials(auth_username, auth_password, auth_link=auth_link, **kwargs)
+            auth_scheme, auth_token = auth.scheme, auth.token
         self.scheme = auth_scheme
         if auth_link:
             self.link = auth_link
-        self.token = auth_token
+        self.token = auth_token or ""
         self.setdefault("id", uuid.uuid4())
 
     @property
@@ -1451,6 +1471,15 @@ class Authentication(Base):
         }
 
     @classmethod
+    def from_credentials(cls, username, password, **params):
+        # type: (str, str, **Any) -> AnyAuthentication
+        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
+        params.setdefault("auth_type", cls.type)
+        params["auth_scheme"] = "Basic"
+        params["auth_token"] = token
+        return cls.from_params(**params)
+
+    @classmethod
     def from_params(cls, **params):
         # type: (**Any) -> AnyAuthentication
         """
@@ -1461,7 +1490,8 @@ class Authentication(Base):
                 params[f"auth_{param}"] = params[param]
         auth_type = params.pop("auth_type", None)
         params.pop("type", None)  # remove type that must be enforced by specialized class property
-        auth_cls = list(filter(lambda auth: auth_type == auth.type.value, [DockerAuthentication, VaultFile]))
+        auth_known = [DockerAuthentication, VaultFile]
+        auth_cls = list(filter(lambda auth: auth_type in [auth.type, auth.type.value], auth_known))
         if not auth_cls:
             raise TypeError(f"Unknown authentication type: {auth_type!s}")
         auth_obj = auth_cls[0](**params)
@@ -1479,9 +1509,6 @@ class DockerAuthentication(Authentication):
     .. seealso::
         :ref:`app_pkg_docker`
     """
-    # note:
-    #   Below regex does not match *every* possible name, but rather ones that need authentication.
-    #   Public DockerHub images for example do not require authentication, and are therefore not matched.
     DOCKER_LINK_REGEX = re.compile(r"""
         (?:^(?P<uri>
             # protocol
@@ -1534,15 +1561,16 @@ class DockerAuthentication(Authentication):
 
     # NOTE:
     #   Specific parameter names are important for reload from database using 'Authentication.from_params'
-    def __init__(self, auth_scheme, auth_token, auth_link, **kwargs):
-        # type: (str, str, str, **Any) -> None
+    def __init__(self, auth_link, auth_scheme="Basic", auth_token=None, **kwargs):
+        # type: (str, str, Optional[str], **Any) -> None
         """
         Initialize the authentication reference for pulling a Docker image from a protected registry.
 
-        :param auth_scheme: Authentication scheme (Basic, Bearer, etc.)
-        :param auth_token: Applied token or credentials according to specified scheme.
         :param auth_link: Fully qualified Docker registry image link (``{registry-url}/{image}:{label}``).
-        :param kwargs: Additional parameters for loading contents already parsed from database.
+        :param auth_scheme: Authentication scheme (Basic, Bearer, etc.) if required.
+        :param kwargs:
+            Additional parameters including authentication token, username/password credentials according
+            to specified scheme, and other definitions to load contents already parsed from database.
         """
         matches = re.match(self.DOCKER_LINK_REGEX, auth_link)
         if not matches:
@@ -1571,7 +1599,7 @@ class DockerAuthentication(Authentication):
         self["image"] = image
         self["registry"] = registry
         super(DockerAuthentication, self).__init__(
-            auth_scheme, auth_token, auth_link=auth_link, **kwargs
+            auth_scheme, auth_token=auth_token, auth_link=auth_link, **kwargs
         )
 
     @property
@@ -1606,12 +1634,17 @@ class DockerAuthentication(Authentication):
         return dict.__getitem__(self, "registry")
 
     @property
-    def docker(self):
+    def reference(self):
         # type: () -> str
         """
-        Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull <reference>``.
+        Obtains the full reference required when doing :term:`Docker` operations such as ``docker pull {reference}``.
         """
-        return self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+        img = self.image if self.registry == self.DOCKER_REGISTRY_DEFAULT_URI else f"{self.registry}/{self.image}"
+        if ":" not in self.image:
+            return f"{img}:latest"
+        return img
+
+    docker = reference  # backward compatibility
 
     @property
     def repository(self):
@@ -1619,7 +1652,7 @@ class DockerAuthentication(Authentication):
         """
         Obtains the full :term:`Docker` repository reference without any tag.
         """
-        return self.docker.rsplit(":", 1)[0]
+        return self.reference.rsplit(":", 1)[0]
 
     @property
     def tag(self):
@@ -1627,7 +1660,7 @@ class DockerAuthentication(Authentication):
         """
         Obtain the requested tag from the :term:`Docker` reference.
         """
-        repo_tag = self.docker.rsplit(":", 1)
+        repo_tag = self.image.rsplit(":", 1)
         if len(repo_tag) < 2:
             return None
         return repo_tag[-1]
@@ -2007,7 +2040,6 @@ class Process(Base):
                 mime_type = get_field(fmt, "mime_type", pop_found=True, search_variations=True)
                 if mime_type is not null:
                     fmt["mediaType"] = mime_type
-
             output_desc = get_field(_output, "abstract", search_variations=True, pop_found=True)
             if output_desc:
                 _output["description"] = output_desc
@@ -2199,6 +2231,20 @@ class Process(Base):
         return Process._recursive_replace(obj, 1, 0)
 
     @property
+    def estimator(self):
+        # type: () -> JSON
+        return self.get("estimator") or {}
+
+    @estimator.setter
+    def estimator(self, estimator):
+        # type: (Optional[JSON]) -> None
+        if not isinstance(estimator, dict) or estimator is None:
+            raise ValueError(
+                f"Estimator value '{estimator}' is not valid for '{self.__name__}.estimator'. Must be JSON."
+            )
+        self["estimator"] = estimator
+
+    @property
     def visibility(self):
         # type: () -> Visibility
         return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
@@ -2264,7 +2310,8 @@ class Process(Base):
             "package": self._encode(self.package),
             "payload": self._encode(self.payload),
             "visibility": self.visibility,
-            "auth": self.auth.params() if self.auth else None
+            "auth": self.auth.params() if self.auth else None,
+            "estimator": self.estimator or None,
         }
 
     @property
@@ -2467,16 +2514,20 @@ class Process(Base):
         # process fields directly at root + I/O as mappings
         return sd.ProcessDescriptionOGC().deserialize(process)
 
-    def summary(self, revision=False):
-        # type: (bool) -> JSON
+    def summary(self, revision=False, links=True, container=None):
+        # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON
         """
         Obtains the JSON serializable summary representation of the process.
 
         :param revision: Replace the process identifier by the complete tag representation.
+        :param links: Include process links in summary.
+        :param container: Application settings or database container to retrieve links and avoid reconnections.
         """
         data = self.dict()
         if revision:
             data["id"] = self.tag
+        if links:
+            data["links"] = self.links(container=container)
         return sd.ProcessSummary().deserialize(data)
 
     @staticmethod
@@ -2607,7 +2658,54 @@ class Process(Base):
         return process_map[process_key](**self.params_wps)
 
 
-class Quote(Base):
+class PriceMixin(Base, abc.ABC):
+    @property
+    def amount(self):
+        # type: () -> Decimal
+        """
+        Amount of the current quote.
+        """
+        return Decimal(str(self.get("amount", "0.0")))
+
+    @amount.setter
+    def amount(self, amount):
+        # type: (Union[Decimal, float, str]) -> None
+        if not isinstance(amount, Decimal):
+            try:
+                amount = Decimal(str(amount))
+            except (ConversionSyntax, ValueError, TypeError):
+                raise ValueError(f"Field '{self.__name__}.amount' must be a floating point number.")
+        self["amount"] = amount
+
+    @property
+    def currency(self):
+        # type: () -> str
+        """
+        Currency of the quote price.
+        """
+        currency = self.get("currency")
+        return currency or "USD"
+
+    @currency.setter
+    def currency(self, currency):
+        # type: (str) -> None
+        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
+            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
+        self["currency"] = currency
+
+    @property
+    def price(self):
+        # type: () -> Price
+        return {"amount": self.amount, "currency": self.currency}
+
+    @price.setter
+    def price(self, price):
+        # type: (Price) -> None
+        self.amount = price["amount"]
+        self.currency = price["currency"]
+
+
+class Quote(PriceMixin, Base):
     """
     Dictionary that contains quote information.
 
@@ -2634,6 +2732,44 @@ class Quote(Base):
             self["expire"] = now() + timedelta(days=1)
         if "id" not in self:
             self["id"] = uuid.uuid4()
+
+    # NOTE:
+    #   Assume that a quote payment would be submitted and validated by an external operation.
+    #   Do not allow it within the scope of this object to avoid incorrect handling/reporting.
+    #   Only allow it when creating the object, which would be loaded from the database with
+    #   external payment applied beforehand if provided.
+
+    def __setitem__(self, key, value):
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).__setitem__(key, value)
+
+    def __setattr__(self, key, value):
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).__setattr__(key, value)
+
+    def setdefault(self, key, default):  # noqa
+        if key == "paid":
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+            return
+        super(Quote, self).setdefault(key, default)
+
+    def update(self, mapping, **__):
+        if mapping.pop("paid", None) is not None:
+            warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
+        super(Quote, self).update(mapping, **__)
+
+    @property
+    def paid(self):
+        # type: () -> bool
+        return self.get("paid", False)
+
+    @paid.setter
+    def paid(self, _):
+        warnings.warn("Quote payment immutable.", UnsupportedOperationWarning)
 
     @property
     def id(self):
@@ -2705,7 +2841,9 @@ class Quote(Base):
 
     @process.setter
     def process(self, process):
-        # type: (str) -> None
+        # type: (AnyProcessRef) -> None
+        if isinstance(process, Process):
+            process = process.tag
         if not isinstance(process, str) or not len(process):
             raise ValueError(f"Field '{self.__name__}.process' must be a string.")
         self["process"] = process
@@ -2771,39 +2909,43 @@ class Quote(Base):
             raise TypeError("Invalid process parameters for quote submission.")
         self["parameters"] = data
 
-    processParameters = parameters  # noqa  # backward compatible alias
+    processParameters = inputs = parameters  # noqa  # backward compatible alias
 
     @property
-    def price(self):
-        # type: () -> float  # FIXME: decimal?
+    def results(self):
+        # type: () -> QuoteProcessResults
         """
-        Price of the current quote.
+        Process execution results following quote estimation.
         """
-        return self.get("price", 0.0)
+        return self.get("results") or {}
 
-    @price.setter
-    def price(self, price):
-        # type: (float) -> None
-        if not isinstance(price, float):
-            raise ValueError(f"Field '{self.__name__}.price' must be a floating point number.")
-        self["price"] = price
+    @results.setter
+    def results(self, data):
+        # type: (QuoteProcessResults) -> None
+        try:
+            results = sd.QuoteProcessResults().deserialize(data)
+        except colander.Invalid:
+            LOGGER.error("Invalid process results for quote submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid process results for quote submission.")
+        self["results"] = results
 
     @property
-    def currency(self):
-        # type: () -> Optional[str]
+    def outputs(self):
+        # type: () -> QuoteStepOutputParameters
         """
-        Currency of the quote price.
+        Quote estimation outputs for a following step quote estimation.
         """
-        currency = self.get("currency")
-        if not self.price:  # zero/undefined price valid to have no currency
-            return currency
-        return currency or "CAN"    # some default if not specified but price is defined
+        return self.get("outputs") or {}
 
-    @currency.setter
-    def currency(self, currency):
-        if not isinstance(currency, str) or not re.match(r"^[A-Z]{3}$", currency):
-            raise ValueError(f"Field '{self.__name__}.currency' must be an ISO-4217 currency string code.")
-        self["currency"] = currency
+    @outputs.setter
+    def outputs(self, data):
+        # type: (QuoteStepOutputParameters) -> None
+        try:
+            outputs = sd.QuoteStepOutputParameters().deserialize(data)
+        except colander.Invalid:
+            LOGGER.error("Invalid quote estimation outputs for next step submission.\n%s", repr_json(data, indent=2))
+            raise TypeError("Invalid quote estimation outputs for next step submission.")
+        self["outputs"] = outputs
 
     expire = LocalizedDateTimeProperty(doc="Quote expiration datetime.")
     created = LocalizedDateTimeProperty(doc="Quote creation datetime.", default_now=True)
@@ -2822,7 +2964,8 @@ class Quote(Base):
             "id": self.id,
             "detail": self.detail,
             "status": self.status,
-            "price": self.price,
+            "paid": self.paid,
+            "amount": str(self.amount),  # preserve precision with representation as is
             "currency": self.currency,
             "user": self.user,
             "process": self.process,
@@ -2830,6 +2973,8 @@ class Quote(Base):
             "created": self.created,
             "expire": self.expire,
             "seconds": self.seconds,
+            "results": self.results,
+            "outputs": self.outputs,
             "parameters": self.parameters,
         }
 
@@ -2839,8 +2984,8 @@ class Quote(Base):
         Submitted :term:`Quote` representation with minimal details until evaluation is completed.
         """
         data = {
-            "id": self.id,
             "status": self.status,
+            "quoteID": self.id,
             "processID": self.process
         }
         return sd.PartialQuoteSchema().deserialize(data)
@@ -2873,7 +3018,7 @@ class Quote(Base):
         links = [
             {"href": quote_url, "rel": "self", "title": "Quote details."},
             {"href": proc_href, "rel": "process-meta", "title": "Process description."},
-            {"href": exec_href, "rel": "quoted-execution", "title": "Process execution using quote submission."},
+            {"href": exec_href, "rel": "quotation", "title": "Process execution using quote submission."},
         ]
         return links
 
@@ -2888,7 +3033,7 @@ class Quote(Base):
         return quote_url
 
 
-class Bill(Base):
+class Bill(PriceMixin, Base):
     """
     Dictionary that contains bill information.
 
@@ -2955,20 +3100,6 @@ class Bill(Base):
         return dict.__getitem__(self, "job")
 
     @property
-    def price(self):
-        """
-        Price of the current quote.
-        """
-        return self.get("price", 0.0)
-
-    @property
-    def currency(self):
-        """
-        Currency of the quote price.
-        """
-        return self.get("currency")
-
-    @property
     def created(self):
         """
         Quote creation datetime.
@@ -2997,7 +3128,6 @@ class Bill(Base):
             "quote": self.quote,
             "job": self.job,
             "price": self.price,
-            "currency": self.currency,
             "created": self.created,
             "title": self.title,
             "description": self.description,
@@ -3005,4 +3135,10 @@ class Bill(Base):
 
     def json(self):
         # type: () -> JSON
+        data = self.dict()
+        data.update({
+            "billID": self.id,
+            "quoteID": self.quote,
+            "jobID": self.job,
+        })
         return sd.BillSchema().deserialize(self)

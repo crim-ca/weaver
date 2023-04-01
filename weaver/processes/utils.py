@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
 import colander
+import docker
 import yaml
+from docker.errors import ImageNotFound
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -30,7 +32,7 @@ from weaver.config import (
     get_weaver_configuration
 )
 from weaver.database import get_db
-from weaver.datatype import Process, Service
+from weaver.datatype import DockerAuthentication, Process, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
     MissingIdentifierValue,
@@ -72,7 +74,10 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, List, Optional, Tuple, Union
+
+    from docker.client import DockerClient
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -84,10 +89,10 @@ if TYPE_CHECKING:
         FileSystemPathType,
         JSON,
         Literal,
-        ProcessDeployment,
-        PyramidRequest,
         NotRequired,
         Number,
+        ProcessDeployment,
+        PyramidRequest,
         SettingsType,
         TypedDict
     )
@@ -105,8 +110,8 @@ if TYPE_CHECKING:
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
-def get_process(process_id=None, request=None, settings=None, revision=True):
-    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], bool) -> Process
+def get_process(process_id=None, request=None, settings=None, store=None, revision=True):
+    # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], Optional[StoreProcesses], bool) -> Process
     """
     Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
@@ -125,11 +130,12 @@ def get_process(process_id=None, request=None, settings=None, revision=True):
     :param request: When no explicit ID specified, try to find information from the request.
     :param settings:
         Application settings for database connection. Can be guessed from local thread or request object if not given.
+    :param store: Database process store reference.
     :param revision:
         When parsing the :term:`Process` ID (either explicit or from request), indicate if any tagged revision
         specifier should be used or dropped.
     """
-    store = get_db(settings or request).get_store(StoreProcesses)
+    store = store or get_db(settings or request).get_store(StoreProcesses)
     try:
         if process_id is None and request is not None:
             process_id = resolve_process_tag(request)
@@ -345,6 +351,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     )
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
+    payload.pop("$schema", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -449,8 +456,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # don't leave them there as they would be seen as if the 'Process' class generated the field
     if "links" in process_info:
         process_info["additional_links"] = process_info.pop("links")
+    # remove schema to avoid later deserialization error if different, but remaining content is valid
+    # also, avoid storing this field in the process object, regenerate it as needed during responses
+    process_info.pop("$schema", None)
 
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
         if isinstance(overwrite, Process):
@@ -483,7 +492,7 @@ def _save_deploy_process(process, override, container):
         db = get_db(container)
         store = db.get_store(StoreProcesses)
         new_process = store.save_process(process, overwrite=override)
-        process_summary = new_process.summary()
+        process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
             "type": "ProcessRegistrationError",
@@ -995,7 +1004,7 @@ def register_wps_processes_from_config(container, wps_processes_file_path=None):
     """
     Registers remote :term:`WPS` providers and/or processes as specified from the configuration file.
 
-    Loads a ``wps_processes.yml`` file and registers  processes under `WPS-1/2`_ providers to the
+    Loads a ``wps_processes.yml`` file and registers  processes under :ref:`proc_wps_12` providers to the
     current `Weaver` instance as equivalent :term:`OGC API - Processes` instances.
 
     References listed under ``processes`` are registered statically (by themselves, unchanging snapshot).
@@ -1205,3 +1214,56 @@ def register_cwl_processes_from_config(container):
     elif register_count != register_total:
         LOGGER.warning("Partial registration of CWL processes, only %s/%s succeeded.", register_count, register_total)
     return register_count
+
+
+def pull_docker(docker_auth, logger=LOGGER):
+    # type: (DockerAuthentication, Logger) -> Optional[DockerClient]
+    """
+    Pulls the referenced Docker image to local cache from an optionally secured registry.
+
+    If the Docker image is already available locally, simply validates it.
+    Authentication are applied as necessary using the provided parameters.
+
+    :param docker_auth: Docker reference with optional authentication parameters.
+    :param logger: Alternative logger reference to log status messages about the operation.
+    :returns: Docker client to perform further operations with the retrieved or validated image. None if failed.
+    """
+    client = None
+    image = None
+    ref = docker_auth.reference
+    try:
+        # load from env is the same as CLI call
+        client = docker.from_env()
+        # following login does not update '~/.docker/config.json' by design, but can use it if available
+        # session remains active only within the client
+        # Note:
+        #   Force re-auth to ensure credentials are validated against remote registry and API Status is returned.
+        #   This way, even if the auth were pre-resolved, we make sure they are still valid.
+        #   This is important mostly because Docker images could still be present in cache, so pull doesn't occur.
+        # Warning:
+        #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
+        #   With re-auth, body *could* contain an identity token depending on auth method.
+        if docker_auth.credentials:
+            logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+            body = client.login(reauth=True, **docker_auth.credentials)
+            if body.get("Status") != "Login Succeeded":
+                logger.debug("Failed authentication to Docker private registry [%s].", docker_auth.registry)
+                return None
+        else:
+            logger.warning("Expecting public access for image [%s] in Docker registry.", ref)
+        logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+        # docker client pulls all available images when no tag, provide the default to limit
+        try:
+            tag = docker_auth.tag or "latest"
+            image = client.images.pull(docker_auth.repository, tag)  # actual pull or raise ImageNotFound
+        except ImageNotFound:
+            image = client.images.get(ref)  # resolved from cache or raise ImageNotFound
+            LOGGER.warning("Failed pull of image [%s] from Docker registry, but found it in cache.", ref)
+    except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
+        logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+                     exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
+    if not image or docker_auth.docker not in image.tags:
+        logger.debug("Failed authorization or could not retrieve Docker image [%s] from private registry.", ref)
+        return None
+    logger.debug("Docker image [%s] retrieved.", ref)
+    return client
