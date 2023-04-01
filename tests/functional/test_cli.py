@@ -459,7 +459,7 @@ class TestWeaverClient(TestWeaverClientBase):
         Test a typical case of :term:`Job` execution, result retrieval and download, but with manual monitoring.
 
         Manual monitoring can be valid in cases where a *very* long :term:`Job` must be executed, and the user does
-        not intend to wait after it. This avoids leaving some shell/notebook/etc. open of a long time and provide a
+        not intend to wait for it. This avoids leaving some shell/notebook/etc. open of a long time and provide a
         massive ``timeout`` value. Instead, the user can simply re-call :meth:`WeaverClient.monitor` at a later time
         to resume monitoring. Other situation can be if the connection was dropped or script runner crashed, and the
         want to pick up monitoring again.
@@ -480,7 +480,7 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body.get("status") == Status.SUCCEEDED
         links = result.body.get("links")
         assert isinstance(links, list)
-        assert len(list(filter(lambda _link: _link["rel"].endswith("results"), links))) == 1
+        assert len([_link for _link in links if _link["rel"].endswith("results")]) == 1
 
         # first test to get job results details, but not downloading yet
         result = mocked_sub_requests(self.app, self.client.results, job_id)

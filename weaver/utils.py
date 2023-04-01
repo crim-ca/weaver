@@ -1146,6 +1146,7 @@ def get_href_headers(path,                      # type: str
     """
     Obtain headers applicable for the provided file or directory reference.
 
+    :rtype: object
     :param path: File to describe. Either a local path or remote URL.
     :param download_headers:
         If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
@@ -2044,6 +2045,29 @@ def get_secure_directory_name(location):
     return unique_directory_name
 
 
+def get_secure_path(location):
+    # type: (str) -> str
+    """
+    Obtain a secure path location with validation of each nested component.
+    """
+    # consider path with potential scheme
+    parts = location.split("://", 1)
+    if len(parts) > 1:
+        scheme, ref = parts
+    else:
+        scheme, ref = None, parts[0]
+
+    # validate parts
+    parts = ref.split("/")
+    for i, part in enumerate(parts):
+        parts[i] = get_secure_filename(part)
+    start = "/" if ref.startswith("/") else ""
+    trail = "/" if ref.endswith("/") and ref != "/" else ""
+    secure_ref = start + "/".join(path for path in parts if path) + trail
+    secure_loc = f"{scheme}://{secure_ref}" if scheme else secure_ref
+    return secure_loc
+
+
 def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
     """
@@ -2421,37 +2445,38 @@ def fetch_file(file_reference,                      # type: str
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
     :raises ValueError: when the reference scheme cannot be identified.
     """
-    if file_reference.startswith("file://"):
-        file_reference = file_reference[7:]
-    file_href = file_reference
-    file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_href = file_reference  # keep original for reporting in case of error
+    if file_href.startswith("file://"):
+        file_href = file_href[7:]
+    file_name = os.path.basename(os.path.realpath(file_href))  # resolve any different name to use the original
     file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
-    if os.path.isfile(file_reference):
+    if os.path.isfile(file_href):
         LOGGER.debug("Fetch file resolved as local reference.")
+        file_href = get_secure_path(file_href)
         file_path = adjust_file_local(file_href, file_outdir, out_method)
-    elif file_reference.startswith("s3://"):
+    elif file_href.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
-        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_reference)
+        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_href)
         if s3_region and s3_region_ref and s3_region != s3_region_ref:
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
         s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
         s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
-    elif file_reference.startswith("http"):
+    elif file_href.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
-        if file_reference.startswith("https://s3.") or urlparse(file_reference).hostname.endswith(".amazonaws.com"):
+        if file_href.startswith("https://s3.") or urlparse(file_href).hostname.endswith(".amazonaws.com"):
             LOGGER.debug("Detected HTTP-like S3 bucket file reference. Retrying file fetching with S3 reference.")
-            s3_ref, s3_region = resolve_s3_from_http(file_reference)
+            s3_ref, s3_region = resolve_s3_from_http(file_href)
             option_kwargs.pop("s3_region", None)
             return fetch_file(s3_ref, file_outdir, settings=settings, s3_region_name=s3_region, **option_kwargs)
         file_path = download_file_http(
-            file_reference,
+            file_href,
             file_outdir,
             settings=settings,
             callback=callback,
@@ -2459,7 +2484,7 @@ def fetch_file(file_reference,                      # type: str
             **kwargs
         )
     else:
-        scheme = file_reference.split("://")
+        scheme = file_reference.split("://", 1)
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
         raise ValueError(
             f"Unresolved location and/or fetch file scheme: '{scheme!s}', "
@@ -3122,13 +3147,16 @@ def adjust_directory_local(location,                            # type: Path
         LOGGER.debug("Local directory reference [%s] matches output, but desired listing differs. "
                      "Removing additional items:\n%s", loc_dir, repr_json(extras))
         for file_path in extras:
-            os.remove(file_path)
+            file_path = get_secure_path(file_path)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
         return filtered
 
     # Any operation (islink, remove, etc.) that must operate on the link itself rather than the directory it points
     # to must not have the final '/' in the path. Otherwise, the link path (without final '/') is resolved before
     # evaluating the operation, which make them attempt their call on the real directory itself.
     link_dir = location.rstrip("/")
+    link_dir = get_secure_path(link_dir)
 
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
         LOGGER.debug("References under [%s] cannot be placed under target path [%s] "

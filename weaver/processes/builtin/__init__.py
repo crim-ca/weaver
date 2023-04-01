@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from cwltool.context import RuntimeContext
     from cwltool.pathmapper import PathMapper
 
-    from weaver.typedefs import AnyRegistryContainer, CWL, CWL_RequirementsList, JSON, TypedDict
+    from weaver.typedefs import AnySettingsContainer, CWL, CWL_RequirementsList, JSON, TypedDict
 
     BuiltinResourceMap = TypedDict("BuiltinResourceMap", {
         "package": str,
@@ -123,11 +123,17 @@ def _get_builtin_package(process_id, package):
 
 
 def register_builtin_processes(container):
-    # type: (AnyRegistryContainer) -> None
+    # type: (AnySettingsContainer) -> None
     """
     Registers every ``builtin`` CWL package to the processes database.
 
     CWL definitions must be located within the :mod:`weaver.processes.builtin` module.
+
+    .. note::
+        Although any settings can be provided as input, it is better to specify a
+        :class:`pyramid.registry.Registry` or :class:`pyramid.request.Request` instance
+        in order to retrieve any pre-established database connection stored as reference.
+        Specifying configuration settings will force recreation of a new database connection.
     """
     restapi_url = get_wps_restapi_base_url(container)
     builtin_apps_mapping = _get_builtin_reference_mapping(os.path.abspath(os.path.dirname(__file__)))

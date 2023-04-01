@@ -44,6 +44,7 @@ from weaver.utils import (
     get_href_headers,
     get_path_kvp,
     get_sane_name,
+    get_secure_path,
     get_settings,
     get_weaver_url,
     is_uuid
@@ -295,6 +296,7 @@ def make_result_link(result_id, result, job_id, settings):
             loc = os.path.join(str(job_id), f"{result_id}{suffix}.txt")
             url = f"{wps_url}/{loc}"
             path = os.path.join(out, loc)
+            path = get_secure_path(path)
             with open(path, mode="w", encoding=enc) as out_file:
                 out_file.write(val)
         else:

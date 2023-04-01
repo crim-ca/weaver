@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 import mock
 import pytest
+from pytest_server_fixtures.http import SimpleHTTPTestServer
 from pyramid import testing
 from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
@@ -992,14 +993,21 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            # jsonarray2netcdf cannot use local paths anymore for nested NetCDF, provide them through tmp file server
+            file_server = stack.enter_context(SimpleHTTPTestServer())
+            file_server.start()
+            nc_dir = file_server.document_root
+            nc_url = file_server.uri
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_path = os.path.join(tmp_dir, nc_name)
-                nc_refs.append(f"file://{nc_path}")
-                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
+                nc_path = os.path.join(nc_dir, nc_name)
+                nc_href = f"{nc_url}/{nc_name}"
+                nc_refs.append(nc_href)
+                with open(nc_path, mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
                 json.dump(nc_refs, tmp_file)  # must match execution body
 

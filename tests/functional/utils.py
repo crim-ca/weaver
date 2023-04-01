@@ -164,7 +164,7 @@ class ResourcesUtil(object):
             if local:
                 var_locations = [APP_PKG_ROOT]
             else:
-                base_url = "https://raw.githubusercontent.com/"
+                base_url = "https://raw.githubusercontent.com"
                 var_locations = list(dict.fromkeys([  # don't use set to preserve this prioritized order
                     APP_PKG_ROOT,
                     os.getenv("TEST_GITHUB_SOURCE_URL"),

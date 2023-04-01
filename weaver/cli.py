@@ -1010,7 +1010,7 @@ class WeaverClient(object):
             Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
             they were executed synchronously, provide the :paramref:`monitor` argument. This offers more flexibility
             over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
-            errors that could occur for long running processes, since status is pooled iteratively rather than waiting.
+            errors that could occur for long-running processes, since status is pooled iteratively rather than waiting.
 
         :param process_id: Identifier of the local or remote process to execute.
         :param provider_id: Identifier of the provider from which to locate a remote process to execute.

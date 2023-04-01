@@ -12,7 +12,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Disallow ``builtin`` `Processes` expecting a user-provided input path to run with local file references such that
+  they must respect any configured server-side remote file access rules instead of bypassing security validations
+  through resolved local paths.
+- Add multiple validation checks for more secure file paths handling when retrieving contents from remote locations.
 
 Fixes:
 ------

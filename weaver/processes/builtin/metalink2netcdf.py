@@ -16,18 +16,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver import xml_util  # isort:skip # noqa: E402
+from weaver import WEAVER_ROOT_DIR, xml_util  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import validate_file_reference  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
+PACKAGE_BASE = __file__.split(WEAVER_ROOT_DIR.rstrip("/") + "/")[-1].rsplit(PACKAGE_NAME)[0]
+PACKAGE_MODULE = f"{PACKAGE_BASE}{PACKAGE_NAME}".replace("/", ".")
 
 # setup logger since it is not run from the main 'weaver' app
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger(PACKAGE_MODULE)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.2"
+__version__ = "1.3"
 __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
@@ -38,23 +41,24 @@ def m2n(metalink_reference, index, output_dir):
         "Got arguments: metalink_reference=%s index=%s output_dir=%s", metalink_reference, index, output_dir
     )
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
-    LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
+    LOGGER.info("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
             raise ValueError(f"Output dir [{output_dir}] does not exist.")
+        validate_file_reference(metalink_reference)
         with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
-            LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
+            LOGGER.info("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
-            LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
+            LOGGER.info("Reading Metalink file: [%s]", metalink_path)
             xml_data = xml_util.parse(metalink_path)
-            LOGGER.debug("Parsing Metalink file references.")
+            LOGGER.info("Parsing Metalink file references.")
             nc_file_url = xml_data.xpath(f"string(//metalink/file[{index}]/metaurl)")
-            LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
-            LOGGER.debug("NetCDF file URL : %s", nc_file_url)
+            LOGGER.info("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
+            LOGGER.info("NetCDF file URL : %s", nc_file_url)
             fetch_file(nc_file_url, output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
-        LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
+        LOGGER.info("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 

@@ -67,6 +67,7 @@ from weaver.utils import (
     get_sane_name,
     get_secure_directory_name,
     get_secure_filename,
+    get_secure_path,
     get_ssl_verify_option,
     get_url_without_query,
     is_update_version,
@@ -803,6 +804,20 @@ def test_get_secure_directory_name_uuid():
     with mock.patch("uuid.uuid4", side_effect=mock_uuid):
         result = get_secure_directory_name(invalid_location)
         assert result == fake_uuid
+
+
+@pytest.mark.parametrize(
+    ["test_path", "expect_path"],
+    [
+        ("/tmp/././/../.././test.txt", "/tmp/test.txt"),
+        ("./../../../../../tmp/test.txt", "tmp/test.txt"),
+        ("file://./../../../../../tmp/test.txt", "file://tmp/test.txt"),
+    ]
+)
+def test_get_secure_path(test_path, expect_path):
+    # type: (str, str) -> None
+    result = get_secure_path(test_path)
+    assert result == expect_path
 
 
 @pytest.mark.parametrize(
