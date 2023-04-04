@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
-    MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType, List[AnyValueType]]]
+    MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType], List[AnyValueType]]
     MongodbAggregateSortOrder = Dict[str, int]
     MongodbAggregateSortExpression = TypedDict("MongodbAggregateSortExpression", {
         "$sort": MongodbAggregateSortOrder,
