@@ -2027,7 +2027,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         name = fully_qualified_name(self)
 
         # define a process without inputs
-        process_no_inputs = WpsTestProcess(identifier="process_no_inputs", inputs=[])
+        process_no_inputs = WpsTestProcess(identifier="process_no_inputs")
         self.process_store.save_process(process_no_inputs)
         self.process_store.set_visibility(process_no_inputs.identifier, Visibility.PUBLIC)
         execute_no_inputs = self.get_process_execute_template()
@@ -2038,7 +2038,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             LiteralInput("test_input", "Input Required", data_type="string"),
             LiteralInput("other_input", "Input Optional", data_type="string", default="omitted", min_occurs=0)
         ]
-        process_default_input = WpsTestProcess(identifier="process_default_input", inputs=default_inputs)
+        process_default_input = WpsTestProcess(identifier="process_default_input")
         self.process_store.save_process(process_default_input)
         self.process_store.set_visibility(process_default_input.identifier, Visibility.PUBLIC)
         execute_default_input = self.get_process_execute_template("input-required")  # other input omitted
