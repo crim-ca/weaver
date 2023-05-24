@@ -1,10 +1,11 @@
 from typing import TYPE_CHECKING
 
-from pywps import ComplexInput, LiteralOutput, ComplexOutput
+from pywps import ComplexInput, LiteralOutput, ComplexOutput, Format
 from pywps.app import Process
 from pywps.inout import LiteralInput
 from pywps.validator.mode import MODE
 
+from weaver.formats import ContentType
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT
 from weaver.processes.convert import json2wps_field, json2wps_io
 from weaver.processes.types import ProcessType
@@ -14,149 +15,80 @@ if TYPE_CHECKING:
 
     from weaver.processes.wps_package import ANY_IO_Type
 
-DATA_FORMAT_COMPLEX = {
-    "mime_type": "application/json",
-    "encoding": "",
-    "schema": {
-        "oneOf": [
-            {
-                "type": "string",
-                "contentMediaType": "application/json"
-            },
-            {
-                "type": "object",
-                "properties":
-                    {
-                        "property1": {"type": "string"},
-                        "property2": {"type": "string",
-                                      "format": "uri"},
-                        "property3": {"type": "number"},
-                        "property4": {"type": "string",
-                                      "format": "date-time"},
-                        "property5": {"type": "boolean"}
-                    },
-                "required": ["property1", "property5"]
-            }
-        ]
-    },
-    "extension": ""
-}
+DATA_FORMAT_COMPLEX = Format(mime_type=ContentType.APP_JSON,
+                             extension=".json",
+                             schema={
+                                 "properties": {
+                                     "property1": {
+                                         "type": "string"
+                                     },
+                                     "property2": {
+                                         "type": "string",
+                                         "format": "uri"
+                                     },
+                                     "property3": {
+                                         "type": "number"
+                                     },
+                                     "property4": {
+                                         "type": "string",
+                                         "format": "date-time"
+                                     },
+                                     "property5": {
+                                         "type": "boolean"
+                                     }
+                                 },
+                                 "required": [
+                                     "property1",
+                                     "property5"
+                                 ],
+                                 "type": "object"
+                             })
 
-DATA_FORMAT_GEOMETRY = {
-    "mime_type": "application/gml+xml; version=3.2",
-    "encoding": "",
-    "schema": {
-        "type": "array",
-        "items": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "application/gml+xml; version=3.2",
-                    "contentSchema": "http://schemas.opengis.net/gml/3.2.1"
-                                     "/geometryBasic2d.xsd"
-                },
-                {
-                    "type": "string",
-                    "contentMediaType": "application/json",
-                    "contentSchema": "http://schemas.opengis.net/ogcapi"
-                                     "/features/part1/1.0/openapi/schemas"
-                                     "/geometryGeoJSON.yaml"
-                }
-            ],
-            "allOf": [
-                {
-                    "format": "geojson-geometry"
-                },
-                {
-                    "$ref": "http://schemas.opengis.net/ogcapi/features/part1/1"
-                            ".0/openapi/schemas/geometryGeoJSON.yaml"
-                }
-            ]
-        }
-    }
-}
+DATA_FORMAT_GEOMETRY = [Format(mime_type="application/gml+xml; version=3.2",
+                               schema="http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
+                               extension=".gml"),
+                        Format(mime_type=ContentType.APP_JSON,
+                               schema="http://schemas.opengis.net/ogcapi/features/part1/1.0"
+                                      "/openapi/schemas/geometryGeoJSON.yaml",
+                               extension=".json")]
 
-DATA_FORMAT_IMAGES = {
-    "mime_type": "application/tiff; application=geotiff",
-    "encoding": "binary",
-    "schema": {
-        "oneOf": [
-            {
-                "type": "string",
-                "contentEncoding": "binary",
-                "contentMediaType": "application/tiff; application=geotiff"
-            },
-            {
-                "type": "string",
-                "contentEncoding": "binary",
-                "contentMediaType": "application/jp2"
-            }
-        ]
-    }
-}
+DATA_FORMAT_IMAGES = [Format(mime_type=ContentType.IMAGE_GEOTIFF, encoding="binary", extension=".tiff"),
+                      Format(mime_type="application/jp2", encoding="binary", extension=".jp2")]
 
-DATA_FORMAT_FEATURES_COLLECTION = {
-    "mime_type": "application/json",
-    "encoding": "",
-    "schema": {
-        "oneOf": [
-            {
-                "type": "string",
-                "contentMediaType": "application/gml+xml; version=3.2"
-            },
-            {
-                "type": "string",
-                "contentSchema": "https://schemas.opengis.net/kml/2.3"
-                                 "/ogckml23.xsd",
-                "contentMediaType": "application/vnd.google-earth.kml"
-                                    "+xml"
-            },
-            {
-                "allOf": [
-                    {
-                        "format": "geojson-feature-collection"
-                    },
-                    {
-                        "$ref": "https://geojson.org/schema"
-                                "/FeatureCollection.json"
-                    }
-                ]
-            }
-        ]
-    }
-}
+DATA_FORMAT_FEATURES_COLLECTION = [Format(mime_type="application/gml+xml; version=3.2",
+                                          schema="http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
+                                          extension=".gml"),
+                                   Format(mime_type="application/vnd.google-earth.kml+xml",
+                                          schema="https://schemas.opengis.net/kml/2.3/ogckml23.xsd",
+                                          extension=".kml")]
 
 
 class EchoProcess(Process):
     """
-    Test WPS process that implement the OGC echo process
+    Builtin process that implement the OGC echo process
     """
 
-    type = ProcessType.TEST  # allows to map WPS class
+    type = ProcessType.BUILTIN
 
     def __init__(self):
         # type: () -> None
         """
-        Initialize the test process with the definition of the OGC echo process.
+        Initialize the process with the definition of the OGC echo process.
         """
 
         title = "Echo Process"
         version = "1.0.0"
-        metadata = [{
-            "description": "This process accepts and number of input and simple echoes each input as an output."
-        }]
         inputs = [json2wps_io(i, WPS_INPUT) if isinstance(i, dict) else i for i in self.__get_inputs()]
         outputs = [json2wps_io(o, WPS_OUTPUT) if isinstance(o, dict) else o for o in self.__get_outputs()]
-        metadata = [json2wps_field(meta, "metadata") for meta in metadata]
 
         super(EchoProcess, self).__init__(
-            "echo-process",
             self._handler,
+            "echo_process",
             title=title,
+            abstract="This process accepts and number of input and simple echoes each input as an output.",
             version=version,
             inputs=inputs,
             outputs=outputs,
-            metadata=metadata,
             store_supported=True,
             status_supported=True
         )
@@ -211,8 +143,8 @@ class EchoProcess(Process):
                                       "Geometry input",
                                       abstract="This is an example of a geometry input.  In this case the geometry "
                                                "can be expressed as a GML of GeoJSON geometry.",
-                                      data_format=DATA_FORMAT_GEOMETRY,
-                                      supported_formats=[DATA_FORMAT_GEOMETRY],
+                                      data_format=DATA_FORMAT_GEOMETRY[0],
+                                      supported_formats=DATA_FORMAT_GEOMETRY,
                                       min_occurs=2,
                                       max_occurs=5,
                                       mode=MODE.NONE)
@@ -227,8 +159,8 @@ class EchoProcess(Process):
                                              "base64-encoded string or referenced using the link.yaml schema.  The "
                                              "use of a base64-encoded string is implied by the specification and does "
                                              "not need to be specified in the definition of the input.",
-                                    data_format=DATA_FORMAT_IMAGES,
-                                    supported_formats=[DATA_FORMAT_IMAGES],
+                                    data_format=DATA_FORMAT_IMAGES[0],
+                                    supported_formats=DATA_FORMAT_IMAGES,
                                     min_occurs=1,
                                     max_occurs=150,
                                     mode=MODE.NONE)
@@ -239,8 +171,8 @@ class EchoProcess(Process):
                                                          "that can be encoded in one of three ways. As a GeoJSON "
                                                          "feature collection, as a GML feature collection retrieved "
                                                          "from a WFS or as a KML document.",
-                                                data_format=DATA_FORMAT_FEATURES_COLLECTION,
-                                                supported_formats=[DATA_FORMAT_FEATURES_COLLECTION])
+                                                data_format=DATA_FORMAT_FEATURES_COLLECTION[0],
+                                                supported_formats=DATA_FORMAT_FEATURES_COLLECTION)
 
         return [string_input, date_input, measure_input, double_input,
                 array_input, complex_object_input, geometry_input,
@@ -275,22 +207,26 @@ class EchoProcess(Process):
 
         complex_object_output = ComplexOutput("complex_object_output",
                                               title="Complex Object Output Example",
+                                              supported_formats=[DATA_FORMAT_COMPLEX],
                                               data_format=DATA_FORMAT_COMPLEX,
                                               mode=MODE.NONE)
 
         geometry_output = ComplexOutput("geometry_output",
                                         title="Geometry output",
-                                        data_format=DATA_FORMAT_GEOMETRY,
+                                        supported_formats=DATA_FORMAT_GEOMETRY,
+                                        data_format=DATA_FORMAT_GEOMETRY[0],
                                         mode=MODE.NONE)
 
         images_output = ComplexOutput("images_output",
                                       title="Inline Images Value Output",
-                                      data_format=DATA_FORMAT_IMAGES,
+                                      supported_formats=DATA_FORMAT_IMAGES,
+                                      data_format=DATA_FORMAT_IMAGES[0],
                                       mode=MODE.NONE)
 
         feature_collection_output = ComplexOutput("feature_collection_output",
                                                   title="Feature Collection Output Example",
-                                                  data_format=DATA_FORMAT_FEATURES_COLLECTION)
+                                                  supported_formats=DATA_FORMAT_FEATURES_COLLECTION,
+                                                  data_format=DATA_FORMAT_FEATURES_COLLECTION[0])
 
         return [string_output, date_output, measure_output, double_output,
                 array_output, complex_object_output, geometry_output,
