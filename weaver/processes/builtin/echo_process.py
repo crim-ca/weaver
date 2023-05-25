@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from weaver.processes.wps_package import ANY_IO_Type
 
+# TODO Change schema link (WEAVER_SCHEMA_ECHO_PROCESS_URL) to (WEAVER_SCHEMA_URL) before merging into main
 DATA_FORMAT_COMPLEX = Format(mime_type=ContentType.APP_JSON,
                              extension=".json",
                              schema=f"{WEAVER_SCHEMA_ECHO_PROCESS_URL}/echo_process/complex_input_schema.json")
