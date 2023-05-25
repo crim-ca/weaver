@@ -964,7 +964,12 @@ class WeaverClient(object):
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
-                update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
+                if isinstance(inputs[input_id], list):
+                    if update_inputs[input_id] == input_data:
+                        update_inputs[input_id] = []
+                    update_inputs[input_id].append({"href": vault_href, "format": {"mediaType": ctype}})
+                else:
+                    update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
 
         auth_headers = {}
         if auth_tokens:
