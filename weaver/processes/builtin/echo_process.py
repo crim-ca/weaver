@@ -3,12 +3,15 @@ from typing import TYPE_CHECKING
 from pywps import ComplexInput, LiteralOutput, ComplexOutput, Format
 from pywps.app import Process
 from pywps.inout import LiteralInput
+from pywps.inout.literaltypes import AllowedValue
+from pywps.validator.allowed_value import ALLOWEDVALUETYPE, RANGECLOSURETYPE
 from pywps.validator.mode import MODE
 
 from weaver.formats import ContentType
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT
-from weaver.processes.convert import json2wps_field, json2wps_io
+from weaver.processes.convert import json2wps_io
 from weaver.processes.types import ProcessType
+from weaver.wps_restapi.swagger_definitions import WEAVER_SCHEMA_ECHO_PROCESS_URL
 
 if TYPE_CHECKING:
     from typing import List, Optional
@@ -17,32 +20,7 @@ if TYPE_CHECKING:
 
 DATA_FORMAT_COMPLEX = Format(mime_type=ContentType.APP_JSON,
                              extension=".json",
-                             schema={
-                                 "properties": {
-                                     "property1": {
-                                         "type": "string"
-                                     },
-                                     "property2": {
-                                         "type": "string",
-                                         "format": "uri"
-                                     },
-                                     "property3": {
-                                         "type": "number"
-                                     },
-                                     "property4": {
-                                         "type": "string",
-                                         "format": "date-time"
-                                     },
-                                     "property5": {
-                                         "type": "boolean"
-                                     }
-                                 },
-                                 "required": [
-                                     "property1",
-                                     "property5"
-                                 ],
-                                 "type": "object"
-                             })
+                             schema=f"{WEAVER_SCHEMA_ECHO_PROCESS_URL}/echo_process/complex_input_schema.json")
 
 DATA_FORMAT_GEOMETRY = [Format(mime_type="application/gml+xml; version=3.2",
                                schema="http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
@@ -120,6 +98,11 @@ class EchoProcess(Process):
                                     abstract="This is an example of a DOUBLE literal input that is bounded between a "
                                              "value greater than 0 and 10.  The default value is 5.",
                                     data_type="float",
+                                    default=5.0,
+                                    allowed_values=AllowedValue(allowed_type=ALLOWEDVALUETYPE.RANGE,
+                                                                minval=0,
+                                                                maxval=10,
+                                                                range_closure=RANGECLOSURETYPE.OPENCLOSED),
                                     mode=MODE.SIMPLE)
 
         array_input = LiteralInput("array_input",

@@ -162,6 +162,9 @@ OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1}/examples"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
+WEAVER_SCHEMA_ECHO_PROCESS_VERSION = "implement-example-process"
+WEAVER_SCHEMA_ECHO_PROCESS_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/" \
+                                 f"{WEAVER_SCHEMA_ECHO_PROCESS_VERSION}/weaver/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
