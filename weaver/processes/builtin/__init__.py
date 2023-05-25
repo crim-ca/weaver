@@ -17,7 +17,7 @@ from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
 from weaver.execute import ExecuteControlOption
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
-from weaver.processes.echo_process import EchoProcess
+from weaver.processes.builtin.echo_process import EchoProcess
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_process_definition
 from weaver.store.base import StoreProcesses
