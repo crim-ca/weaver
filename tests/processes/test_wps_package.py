@@ -427,13 +427,15 @@ def test_cwl_extension_requirements_no_error():
                 with pytest.raises(cwltool.process.ValidationException) as exc_info:
                     _load_package_content(cwl, "test")
                 message = str(exc_info.value)
-                assert all(
-                    info in message for info in [
-                        "checking field `requirements`",
-                        "Field `class` contains undefined reference to",
-                        CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
-                    ]
-                ), "Validation error should have been caused by missing CWL CUDA extension schema, not something else."
+                valid_msg = [
+                    "checking field `requirements`",
+                    "Field `class` contains undefined reference to",
+                    CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
+                ]
+                assert all(info in message for info in valid_msg), (
+                    "Validation error should have been caused by missing CWL CUDA extension schema. "
+                    f"It was instead caused by: [{message}] not one of {valid_msg}"
+                )
 
     # no error expected after when supported schema extensions are applied
     # here we reset the caches again to ensure the standard schema are overridden by the custom selection of extensions
