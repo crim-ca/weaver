@@ -432,9 +432,10 @@ def test_cwl_extension_requirements_no_error():
                     "Field `class` contains undefined reference to",
                     CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
                 ]
-                assert all(info in message for info in valid_msg), (
+                assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
                     "Validation error should have been caused by missing CWL CUDA extension schema. "
-                    f"It was instead caused by: [{message}] not one of {valid_msg}"
+                    f"Error message must contain all following items: {valid_msg}. "
+                    f"Some items were missing in: \n{message}"
                 )
 
     # no error expected after when supported schema extensions are applied
@@ -454,13 +455,16 @@ def test_cwl_extension_requirements_no_error():
     with pytest.raises(cwltool.process.ValidationException) as exc_info:
         _load_package_content(cwl_old, "test")
     message = str(exc_info.value)
-    assert all(
-        info in message for info in [
-            "checking field `requirements`",
-            "Field `class` contains undefined reference to",
-            CWL_REQUIREMENT_TIME_LIMIT.split(":", 1)[-1],
-        ]
-    ), "Validation error should have been caused by missing CWL ToolTimeLimit extension schema, not something else."
+    valid_msg = [
+        "checking field `requirements`",
+        "Field `class` contains undefined reference to",
+        CWL_REQUIREMENT_TIME_LIMIT.split(":", 1)[-1],
+    ]
+    assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
+        "Validation error should have been caused by missing CWL ToolTimeLimit extension schema. "
+        f"Error message must contain all following items: {valid_msg}. "
+        f"Some items were missing in: \n{message}"
+    )
 
     # test unsupported schema extension to ensure still disallowed
     cwl["requirements"] = {
@@ -472,10 +476,13 @@ def test_cwl_extension_requirements_no_error():
     with pytest.raises(cwltool.process.ValidationException) as exc_info:
         _load_package_content(cwl, "test")
     message = str(exc_info.value)
-    assert all(
-        info in message for info in [
-            "checking field `requirements`",
-            "Field `class` contains undefined reference to",
-            CWL_REQUIREMENT_PROCESS_GENERATOR,
-        ]
-    ), "Validation failure should have been caused by unsupported CWL extension schema, not something else."
+    valid_msg = [
+        "checking field `requirements`",
+        "Field `class` contains undefined reference to",
+        CWL_REQUIREMENT_PROCESS_GENERATOR,
+    ]
+    assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
+        "Validation failure should have been caused by an unsupported CWL extension schema. "
+        f"Error message must contain all following items: {valid_msg}. "
+        f"Some items were missing in: \n{message}"
+    )
