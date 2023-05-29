@@ -58,7 +58,7 @@
 .. |esgf-cwt-git| replace:: ESGF Compute API
 .. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
-.. _edam-link: http://edamontology.org/
+.. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
 .. |metalink| replace:: Metalink
