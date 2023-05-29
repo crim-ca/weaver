@@ -23,7 +23,7 @@ DATA_FORMAT_COMPLEX = Format(mime_type=ContentType.APP_JSON,
                              extension=".json",
                              schema=f"{WEAVER_SCHEMA_ECHO_PROCESS_URL}/echo_process/complex_input_schema.json")
 
-DATA_FORMAT_GEOMETRY = [Format(mime_type="application/gml+xml; version=3.2",
+DATA_FORMAT_GEOMETRY = [Format(mime_type="application/gml+xml",
                                schema="http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
                                extension=".gml"),
                         Format(mime_type=ContentType.APP_JSON,
@@ -31,10 +31,10 @@ DATA_FORMAT_GEOMETRY = [Format(mime_type="application/gml+xml; version=3.2",
                                       "/openapi/schemas/geometryGeoJSON.yaml",
                                extension=".json")]
 
-DATA_FORMAT_IMAGES = [Format(mime_type=ContentType.IMAGE_GEOTIFF, encoding="binary", extension=".tiff"),
+DATA_FORMAT_IMAGES = [Format(mime_type="image/tiff", encoding="binary", extension=".tiff"),
                       Format(mime_type="application/jp2", encoding="binary", extension=".jp2")]
 
-DATA_FORMAT_FEATURES_COLLECTION = [Format(mime_type="application/gml+xml; version=3.2",
+DATA_FORMAT_FEATURES_COLLECTION = [Format(mime_type="application/gml+xml",
                                           schema="http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
                                           extension=".gml"),
                                    Format(mime_type="application/vnd.google-earth.kml+xml",
@@ -47,25 +47,25 @@ class EchoProcess(Process):
     Builtin process that implement the OGC echo process
     """
 
-    type = ProcessType.BUILTIN
+    type = ProcessType.WPS_LOCAL
+    identifier = "echo_process"
+    title = "Echo Process"
+    version = "1.0.0"
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self, *_, **__):
+        # type: (*Any, **Any) -> None
         """
         Initialize the process with the definition of the OGC echo process.
         """
-
-        title = "Echo Process"
-        version = "1.0.0"
         inputs = [json2wps_io(i, WPS_INPUT) if isinstance(i, dict) else i for i in self.__get_inputs()]
         outputs = [json2wps_io(o, WPS_OUTPUT) if isinstance(o, dict) else o for o in self.__get_outputs()]
 
         super(EchoProcess, self).__init__(
             self._handler,
-            "echo_process",
-            title=title,
+            self.identifier,
+            title=self.title,
             abstract="This process accepts and number of input and simple echoes each input as an output.",
-            version=version,
+            version=self.version,
             inputs=inputs,
             outputs=outputs,
             store_supported=True,
@@ -218,13 +218,13 @@ class EchoProcess(Process):
 
     def _handler(self, request, response):
         response.update_status(f"Echo process Output from process {self.identifier}...", 0)
-        response.outputs["string_output"].data = request.inputs["string_input"].data
-        response.outputs["date_output"].data = request.inputs["date_input"].data
-        response.outputs["measure_output"].data = request.inputs["measure_input"].data
-        response.outputs["double_output"].data = request.inputs["double_input"].data
-        response.outputs["array_output"].data = request.inputs["array_input"].data
-        response.outputs["complex_object_output"].data = request.inputs["complex_object_input"].data
-        response.outputs["geometry_output"].data = request.inputs["geometry_input"].data
-        response.outputs["images_output"].data = request.inputs["images_input"].data
-        response.outputs["feature_collection_output"].data = request.inputs["feature_collection_input"].data
+        response.outputs["string_output"].data = request.inputs["string_input"][0].data
+        response.outputs["date_output"].data = request.inputs["date_input"][0].data
+        response.outputs["measure_output"].data = request.inputs["measure_input"][0].data
+        response.outputs["double_output"].data = request.inputs["double_input"][0].data
+        response.outputs["array_output"].data = [element.data for element in request.inputs["array_input"]]
+        response.outputs["complex_object_output"].data = request.inputs["complex_object_input"][0].data
+        response.outputs["geometry_output"].data = [element.data for element in request.inputs["geometry_input"]]
+        response.outputs["images_output"].data = [element.data for element in request.inputs["images_input"]]
+        response.outputs["feature_collection_output"].data = request.inputs["feature_collection_input"][0].data
         return response

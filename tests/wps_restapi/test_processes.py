@@ -40,6 +40,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, E
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
+from weaver.processes.echo_process import EchoProcess
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file, ows_context_href
@@ -58,9 +59,9 @@ if TYPE_CHECKING:
 
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
-    remote_server = None    # type: str
-    settings = {}           # type: SettingsType
-    config = None           # type: Configurator
+    remote_server = None  # type: str
+    settings = {}  # type: SettingsType
+    config = None  # type: Configurator
 
     @classmethod
     def setUpClass(cls):
@@ -92,10 +93,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
         self.process_private = WpsTestProcess(identifier="process_private")
+        self.echo_process = EchoProcess()
         self.process_store.save_process(self.process_public)
         self.process_store.save_process(self.process_private)
+        self.process_store.save_process(self.echo_process)
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
+        self.process_store.set_visibility(self.echo_process.identifier, Visibility.PUBLIC)
 
     def get_process_deploy_template(self, process_id=None, cwl=None, schema=ProcessSchema.OLD):
         # type: (Optional[str], Optional[CWL], ProcessSchemaType) -> JSON
@@ -146,6 +150,78 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             ],
             "outputs": [
                 {"id": "test_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE}
+            ],
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+        }
+
+    @staticmethod
+    def get_echo_process_execute_inputs(complex_json_file, geometry_file_1, geometry_file_2,
+                                        image_file, feature_collection_file):
+        # type: () -> ProcessExecution
+        """
+        Provides execute echo process bare minimum template definition.
+
+        Contents correspond to required I/O for echo process :class:`weaver.processes.wps_testing.EchoProcess`.
+        """
+        return {
+            "inputs": [
+                {"id": "string_input",
+                 "data": "Value1"},
+                {"id": "date_input",
+                 "data": "2023-05-23"},
+                {"id": "measure_input",
+                 "data": 20.5},
+                {"id": "double_input",
+                 "data": 30.1},
+                {"id": "array_input",
+                 "data": [1, 2, 3, 4]},
+                {"id": "complex_object_input",
+                 "data": {
+                     "class": "File",
+                     "path": complex_json_file
+                 }},
+                {"id": "geometry_input",
+                 "data": [
+                     {
+                         "class": "File",
+                         "path": geometry_file_1
+                     },
+                     {
+                         "class": "File",
+                         "path": geometry_file_2
+                     }
+                 ]},
+                {"id": "images_input",
+                 "data": {
+                     "class": "File",
+                     "path": image_file
+                 }},
+                {"id": "feature_collection_input",
+                 "data": {
+                     "class": "File",
+                     "path": feature_collection_file
+                 }},
+            ],
+            "outputs": [
+                {"id": "string_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "date_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "measure_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "double_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "array_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "complex_object_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "geometry_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "images_output",
+                 "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "feature_collection_output",
                  "transmissionMode": ExecuteTransmissionMode.VALUE}
             ],
             "mode": ExecuteMode.ASYNC,
@@ -655,7 +731,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert proc["inputs"][0]["id"] == "input-1"
             assert proc["inputs"][0]["minOccurs"] == 1
             assert proc["inputs"][0]["maxOccurs"] == 1
-            assert "formats" not in proc["inputs"][0]   # literal data doesn't have "formats"
+            assert "formats" not in proc["inputs"][0]  # literal data doesn't have "formats"
             assert len(proc["outputs"]) == 1
             assert proc["outputs"][0]["id"] == "output"
             assert "minOccurs" not in proc["outputs"][0]
@@ -668,11 +744,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self,
-                                                       deploy_payload,          # type: JSON
-                                                       expected_process_id,     # type: str
-                                                       headers=None,            # type: Optional[AnyHeadersContainer]
-                                                       assert_io=True,          # type: bool
-                                                       ):                       # type: (...) -> JSON
+                                                       deploy_payload,  # type: JSON
+                                                       expected_process_id,  # type: str
+                                                       headers=None,  # type: Optional[AnyHeadersContainer]
+                                                       assert_io=True,  # type: bool
+                                                       ):  # type: (...) -> JSON
         """
         Deploy, make visible and obtain process description.
 
@@ -781,11 +857,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
 
     def deploy_process_CWL_direct(self,
-                                  content_type,                         # type: ContentType
-                                  graph_count=0,                        # type: int
-                                  process_id="test-direct-cwl-json",    # type: str
-                                  version=None,                         # type: Optional[AnyVersion]
-                                  ):                                    # type: (...) -> Tuple[CWL, JSON]
+                                  content_type,  # type: ContentType
+                                  graph_count=0,  # type: int
+                                  process_id="test-direct-cwl-json",  # type: str
+                                  version=None,  # type: Optional[AnyVersion]
+                                  ):  # type: (...) -> Tuple[CWL, JSON]
         cwl = {}
         cwl_core = self.get_cwl_docker_python_version(cwl_version=None, process_id=process_id)
         cwl_base = {"cwlVersion": "v1.0"}
@@ -1305,7 +1381,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         body = {
             "processDescription": {
-                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,    # must tell which process from GetCapabilities
+                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,  # must tell which process from GetCapabilities
                 "href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL,  # this one should be used
             },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -1759,8 +1835,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "should also be applied at the same time since the operation replaces the new process definition (PUT)."
         )
         assert (
-            "description" not in body["processSummary"] or  # if undefined, dropped from body
-            body["processSummary"]["description"] != desc_v1["description"]  # just in case, check otherwise
+                "description" not in body["processSummary"] or  # if undefined, dropped from body
+                body["processSummary"]["description"] != desc_v1["description"]  # just in case, check otherwise
         ), (
             "Description should not have remained from previous version since this is a replacement (PUT),"
             "not a revision update (PATCH)."

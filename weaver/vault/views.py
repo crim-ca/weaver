@@ -70,7 +70,7 @@ def upload_file(request):
 
     # save file to disk from request contents
     # note: 'vault_file.name' includes everything after 'vault_dir' (<id>/<original_name.ext>)
-    vault_file = VaultFile("")
+    vault_file = VaultFile("", file_format=req_file.type)
     vault_dir = get_vault_dir(request)
     vault_fs = LocalFileStorage(vault_dir)
     vault_fs.extensions = get_allowed_extensions()
