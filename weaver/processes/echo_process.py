@@ -218,13 +218,19 @@ class EchoProcess(Process):
 
     def _handler(self, request, response):
         response.update_status(f"Echo process Output from process {self.identifier}...", 0)
+
         response.outputs["string_output"].data = request.inputs["string_input"][0].data
         response.outputs["date_output"].data = request.inputs["date_input"][0].data
         response.outputs["measure_output"].data = request.inputs["measure_input"][0].data
         response.outputs["double_output"].data = request.inputs["double_input"][0].data
-        response.outputs["array_output"].data = [element.data for element in request.inputs["array_input"]]
         response.outputs["complex_object_output"].data = request.inputs["complex_object_input"][0].data
-        response.outputs["geometry_output"].data = [element.data for element in request.inputs["geometry_input"]]
-        response.outputs["images_output"].data = [element.data for element in request.inputs["images_input"]]
         response.outputs["feature_collection_output"].data = request.inputs["feature_collection_input"][0].data
+
+        for index in range(len(request.inputs["array_input"])):
+            response.outputs["array_output"].data[index] = request.inputs["array_input"][index].data
+        for index in range(len(request.inputs["geometry_input"])):
+            response.outputs["geometry_output"].data[index] = request.inputs["geometry_input"][index].data
+        for index in range(len(request.inputs["images_input"])):
+            response.outputs["images_output"].data[index] = request.inputs["images_input"][index].data
+
         return response
