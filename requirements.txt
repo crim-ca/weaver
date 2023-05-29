@@ -100,4 +100,5 @@ simplejson
 urlmatch
 xmltodict
 webob
-werkzeug>2
+# avoid error related to query string parsing (https://github.com/pallets/werkzeug/issues/2710)
+werkzeug>2,<2.3
