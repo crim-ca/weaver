@@ -40,7 +40,6 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, E
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
-from weaver.processes.echo_process import EchoProcess
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file, ows_context_href
@@ -93,13 +92,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
         self.process_private = WpsTestProcess(identifier="process_private")
-        self.echo_process = EchoProcess()
         self.process_store.save_process(self.process_public)
         self.process_store.save_process(self.process_private)
-        self.process_store.save_process(self.echo_process)
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
-        self.process_store.set_visibility(self.echo_process.identifier, Visibility.PUBLIC)
 
     def get_process_deploy_template(self, process_id=None, cwl=None, schema=ProcessSchema.OLD):
         # type: (Optional[str], Optional[CWL], ProcessSchemaType) -> JSON
@@ -150,78 +146,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             ],
             "outputs": [
                 {"id": "test_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE}
-            ],
-            "mode": ExecuteMode.ASYNC,
-            "response": ExecuteResponse.DOCUMENT,
-        }
-
-    @staticmethod
-    def get_echo_process_execute_inputs(complex_json_file, geometry_file_1, geometry_file_2,
-                                        image_file, feature_collection_file):
-        # type: () -> ProcessExecution
-        """
-        Provides execute echo process bare minimum template definition.
-
-        Contents correspond to required I/O for echo process :class:`weaver.processes.wps_testing.EchoProcess`.
-        """
-        return {
-            "inputs": [
-                {"id": "string_input",
-                 "data": "Value1"},
-                {"id": "date_input",
-                 "data": "2023-05-23"},
-                {"id": "measure_input",
-                 "data": 20.5},
-                {"id": "double_input",
-                 "data": 30.1},
-                {"id": "array_input",
-                 "data": [1, 2, 3, 4]},
-                {"id": "complex_object_input",
-                 "data": {
-                     "class": "File",
-                     "path": complex_json_file
-                 }},
-                {"id": "geometry_input",
-                 "data": [
-                     {
-                         "class": "File",
-                         "path": geometry_file_1
-                     },
-                     {
-                         "class": "File",
-                         "path": geometry_file_2
-                     }
-                 ]},
-                {"id": "images_input",
-                 "data": {
-                     "class": "File",
-                     "path": image_file
-                 }},
-                {"id": "feature_collection_input",
-                 "data": {
-                     "class": "File",
-                     "path": feature_collection_file
-                 }},
-            ],
-            "outputs": [
-                {"id": "string_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "date_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "measure_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "double_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "array_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "complex_object_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "geometry_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "images_output",
-                 "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "feature_collection_output",
                  "transmissionMode": ExecuteTransmissionMode.VALUE}
             ],
             "mode": ExecuteMode.ASYNC,

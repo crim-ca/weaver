@@ -17,7 +17,6 @@ from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
 from weaver.execute import ExecuteControlOption
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
-from weaver.processes.echo_process import EchoProcess
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_package import get_process_definition
 from weaver.store.base import StoreProcesses
@@ -173,10 +172,7 @@ def register_builtin_processes(container):
         ))
 
     # registration of missing/updated apps automatically applied with 'default_processes'
-    store = get_db(container).get_store(StoreProcesses, default_processes=builtin_processes)
-    echo_process = EchoProcess()
-    store.save_process(echo_process)
-    store.set_visibility(echo_process.identifier, Visibility.PUBLIC)
+    get_db(container).get_store(StoreProcesses, default_processes=builtin_processes)
 
 
 class BuiltinProcessJobBase(CommandLineJob):

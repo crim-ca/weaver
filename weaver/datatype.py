@@ -2640,11 +2640,9 @@ class Process(Base):
         from weaver.processes.wps_default import HelloWPS
         from weaver.processes.wps_package import WpsPackage
         from weaver.processes.wps_testing import WpsTestProcess
-        from weaver.processes.echo_process import EchoProcess
 
         process_map = {
             HelloWPS.identifier: HelloWPS,
-            EchoProcess.identifier: EchoProcess,
             ProcessType.TEST: WpsTestProcess,
             ProcessType.APPLICATION: WpsPackage,    # single CWL package
             ProcessType.BUILTIN: WpsPackage,        # local scripts
