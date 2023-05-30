@@ -968,11 +968,9 @@ class WeaverClient(object):
                     if update_inputs[input_id] == input_data:
                         update_inputs[input_id] = []
                     update_inputs[input_id].append({"href": vault_href,
-                                                    "type": ctype,
                                                     "format": {"mediaType": ctype}})
                 else:
                     update_inputs[input_id] = {"href": vault_href,
-                                               "type": ctype,
                                                "format": {"mediaType": ctype}}
 
         auth_headers = {}
