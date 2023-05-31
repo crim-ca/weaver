@@ -57,6 +57,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
     from typing_extensions import Literal
+
     from requests import Response
 
     # avoid failing sphinx-argparse documentation
@@ -1183,9 +1184,9 @@ class WeaverClient(object):
         base = self._get_url(url)
         path = f"{base}/vault"
 
-        open_function = open(file_path, "r", encoding="utf-8")
+        open_function = open(file_path, "r", encoding="utf-8")  # pylint: disable=R1732
         if content_encoding == "base64":
-            open_function =  open(file_path, "rb")
+            open_function = open(file_path, "rb")  # pylint: disable=R1732
 
         files = {
             "file": (

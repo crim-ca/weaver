@@ -4657,9 +4657,10 @@ class CWLInputType(OneOfKeywordSchema):
 
 
 class CWLInputMap(PermissiveMappingSchema):
+    io_info = IO_INFO_IDS.format(first="CWL", second="WPS", what="input")
+    description = f"{io_info} (Note: '{{input-id}}' is a variable corresponding for each identifier)"
     input_id = CWLInputType(variable="{input-id}", title="CWLInputDefinition",
-                            description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
-                                        " (Note: '{input-id}' is a variable corresponding for each identifier)")
+                            description=description)
 
 
 class CWLInputItem(CWLInputObject):
@@ -4706,9 +4707,10 @@ class CWLOutputType(OneOfKeywordSchema):
 
 
 class CWLOutputMap(ExtendedMappingSchema):
+    io_info = IO_INFO_IDS.format(first="CWL", second="WPS", what="output")
+    description = f"{io_info} (Note: '{{output-id}}' is a variable corresponding for each identifier)"
     output_id = CWLOutputType(variable="{output-id}", title="CWLOutputDefinition",
-                              description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
-                                          " (Note: '{output-id}' is a variable corresponding for each identifier)")
+                              description=description)
 
 
 class CWLOutputItem(CWLOutputObject):
