@@ -1374,6 +1374,8 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
         cwl_fmt_type = input_data.get("format")
         if isinstance(cwl_fmt_type, str):
             fmt = get_format(cwl_fmt_type)
+            if "encoding" in input_data:
+                fmt.encoding = input_data["encoding"]
             input_file["format"] = fmt.json
         return input_file
 
