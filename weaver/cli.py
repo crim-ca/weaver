@@ -8,7 +8,7 @@ import os
 import re
 import sys
 import time
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import yaml
@@ -56,7 +56,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
-
+    from typing_extensions import Literal
     from requests import Response
 
     # avoid failing sphinx-argparse documentation
