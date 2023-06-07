@@ -1,0 +1,14 @@
+[
+    {
+        "id": "output",
+        "default_type": "application/csv",
+        "alternatives": [
+            [
+                "application/csv",
+                "application/xml",
+                "application/application/x-yaml",
+                "application/json"
+            ]
+        ]
+    }
+]

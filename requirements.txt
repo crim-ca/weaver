@@ -53,6 +53,7 @@ json2xml<3.19.0; python_version <= "3.6"  # pyup: ignore
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 json2xml>=3.20.0; python_version >= "3.7"
 jsonschema>=3.0.1
+
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -101,3 +102,12 @@ urlmatch
 xmltodict
 webob
 werkzeug>2
+
+
+# added by grol
+fpdf
+Pillow
+jinja2
+pandas
+json2xml
+cairosvg

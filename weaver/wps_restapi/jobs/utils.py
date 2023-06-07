@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import colander
 from celery.utils.log import get_task_logger
+from humanfriendly.terminal import output
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
@@ -31,12 +32,13 @@ from weaver.exceptions import (
     ServiceNotFound
 )
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_format, repr_json
+from weaver.formats import ContentType, get_format, repr_json, get_extension
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.tranform import transform
 from weaver.utils import (
     get_any_id,
     get_any_value,
@@ -76,6 +78,55 @@ if TYPE_CHECKING:
     )
 
 LOGGER = get_task_logger(__name__)
+
+
+def get_job_possible_output_formats(job):
+    """
+    Based on job output media-type, retrieve transformer possibilities (conversions)
+    """
+    outputs = []
+
+    for o in job.results:
+        outputs.append({
+            "output_id": o["identifier"],
+            "default_type": o["mimeType"],
+            "alternatives": [f for f in [fam for fam in transform.FAMILIES if
+                                         o["mimeType"] in fam and "/pdf" not in o["mimeType"]]]
+        })
+    return outputs
+
+
+def get_link(output_id, mime_type, url):
+    return {
+        "href": url + "/" + output_id + "?f=" + mime_type, "rel": "output:" + output_id,
+        "type": mime_type, "title": "Link to job " + output_id + " result in " + mime_type
+    }
+
+
+def get_all_possible_formats_links(request, job):
+    """
+    Get direct links to all outputs in any possible format
+    """
+    try:
+        links = []
+        url = request.url
+        links.append({
+            "href": url[:url.rfind('/')] + "/transforms", "rel": "up",
+            "type": ContentType.APP_JSON, "title": "List of possible output formats."
+        })
+
+        for o in job.results:
+            mt = o["mimeType"]
+            # Default one
+            links.append(get_link(o["identifier"], mt, url))
+            # Get the others
+            for fs in [fam for fam in transform.FAMILIES if mt in fam and "/pdf" not in mt]:
+                links.extend([get_link(o["identifier"], f, url) for f in fs if f != mt])
+
+        return links
+    except Exception as ex:
+        print(ex)
+        return []
 
 
 def get_job(request):
@@ -249,6 +300,7 @@ def get_job_list_links(job_total, filters, request):
             "href": parent_url, "rel": "up",
             "type": ContentType.APP_JSON, "title": "Parent collection for which listed jobs apply."
         })
+
     return links
 
 
@@ -309,12 +361,12 @@ def make_result_link(result_id, result, job_id, settings):
     return links
 
 
-def get_results(job,                                # type: Job
-                container,                          # type: AnySettingsContainer
-                value_key=None,                     # type: Optional[str]
+def get_results(job,  # type: Job
+                container,  # type: AnySettingsContainer
+                value_key=None,  # type: Optional[str]
                 schema=JobInputsOutputsSchema.OLD,  # type: JobInputsOutputsSchemaType
-                link_references=False,              # type: bool
-                ):                                  # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
+                link_references=False,  # type: bool
+                ):  # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 
@@ -458,7 +510,7 @@ def get_job_results_response(job, container, headers=None):
     if results:
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
         out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
-        out_info = out_vals[0][-1]        # type: ExecutionResultValue
+        out_info = out_vals[0][-1]  # type: ExecutionResultValue
         out_type = get_any_value(out_info, key=True)
         out_data = get_any_value(out_info)
 

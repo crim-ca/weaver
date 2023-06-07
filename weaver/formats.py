@@ -77,7 +77,7 @@ class ContentType(Constants):
     APP_YAML = "application/x-yaml"
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
-    IMAGE_OGC_GEOTIFF = "mage/tiff; application=geotiff"
+    IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
@@ -89,6 +89,8 @@ class ContentType(Constants):
     TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
     VIDEO_MPEG = "video/mpeg"
+
+
 
     # special handling
     ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
