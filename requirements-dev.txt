@@ -33,3 +33,13 @@ typing_extensions
 WebTest
 wsgiproxy
 WSGIProxy2
+
+# transformer
+fpdf
+Pillow
+pandas
+cairosvg
+multipagetiff
+# gdal
+rasterio
+python-magic
