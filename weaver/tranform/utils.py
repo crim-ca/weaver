@@ -1,5 +1,8 @@
 import json
 import os
+import shutil
+import tarfile
+import tempfile
 
 from celery.utils.log import get_task_logger
 
@@ -7,7 +10,7 @@ LOGGER = get_task_logger(__name__)
 
 
 def is_image(i):
-    return i.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.gif', '.svg'))
+    return i.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.gif'))
 
 
 def is_svg(i):
@@ -18,7 +21,7 @@ def is_png(i):
     return i.lower().endswith(".png")
 
 
-def is_tif(i):
+def is_tiff(i):
     return i.lower().endswith(".tif") or i.lower().endswith(".tiff")
 
 
@@ -35,8 +38,8 @@ def write_content(fp, content):
     if isinstance(content, dict):
         content = json.dumps(content)
 
-    with open(fp, "w") as xml_file:
-        xml_file.write(content)
+    with open(fp, "w") as f:
+        f.write(content)
 
 
 def get_file_extension(filename, dot=True):
@@ -55,3 +58,22 @@ def get_file_extension(filename, dot=True):
 
     ext = os.path.splitext(filename.lower())[1]
     return _handle_dot(ext)
+
+
+def write_images(images, output_file, ext="png"):
+    with tempfile.TemporaryDirectory() as tmp_path:
+        imgs = []
+        for i, img in enumerate(images):
+            ip = os.path.join(tmp_path, str(i).zfill(4)) + "." + ext
+            img.save(ip), imgs.append(img)
+
+        if len(imgs) > 1:
+            if not output_file.endswith(".tar.gz"):
+                output_file += ".tar.gz"
+
+            with tarfile.open(output_file, "w:gz") as tar:
+                for fn in os.listdir(tmp_path):
+                    p = os.path.join(tmp_path, fn)
+                    tar.add(p, arcname=fn)
+        else:
+            shutil.copy(imgs[0], output_file)

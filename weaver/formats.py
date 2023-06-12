@@ -82,6 +82,7 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
+    IMAGE_SVG_XML = "image/svg+xml"
     MULTI_PART_FORM = "multipart/form-data"
     TEXT_ENRICHED = "text/enriched"
     TEXT_HTML = "text/html"
@@ -89,6 +90,7 @@ class ContentType(Constants):
     TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
     VIDEO_MPEG = "video/mpeg"
+
 
 
 
@@ -224,6 +226,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_OCTET_STREAM: "",
     ContentType.APP_FORM: "",
     ContentType.MULTI_PART_FORM: "",
+    ContentType.IMAGE_SVG_XML: ".svg",
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,

@@ -3,6 +3,8 @@ import csv
 import json
 import os.path
 import shutil
+import tarfile
+import tempfile
 
 import jinja2
 import pandas as pd
@@ -20,8 +22,10 @@ from pyramid.response import FileResponse
 
 from weaver.formats import get_extension
 from weaver.tranform.png2svg import rgba_image_to_svg_contiguous
+from weaver.tranform.tiff import Tiff
 
-from weaver.tranform.utils import is_png, is_gif, is_svg, write_content, get_content, is_image
+from weaver.tranform.utils import is_png, is_gif, is_svg, write_content, get_content, is_image, is_tiff, \
+    get_file_extension
 
 LOGGER = get_task_logger(__name__)
 
@@ -34,7 +38,7 @@ HTML_CONTENT = """<html>
 FAMILIES = [
     ["text/plain", "text/html", "application/pdf"],
     ["image/png", "image/gif", "image/jpeg", "image/tiff", "image/svg+xml", "application/pdf"],
-    ["application/csv", "application/xml", "application/application/x-yaml", "application/json"]
+    ["text/csv", "application/xml", "application/x-yaml", "application/json"]
 ]
 
 
@@ -50,7 +54,6 @@ def exception_handler(func):
 
     return inner_function
 
-
 @exception_handler
 def image_to_any(i, o):
     # exit if no transformation needed
@@ -59,41 +62,66 @@ def image_to_any(i, o):
             shutil.copy(i, o)
         return
 
+    if is_tiff(i):
+        tif = Tiff(i)
+        return images_to_any(tif.get_images(), o)
+
     if is_gif(i):
-        Image.open(i).convert('RGB').save(i + '.jpg')
-        image_to_any(i + '.jpg', o)
-        return
+        return images_to_any([Image.open(i).convert('RGB')], o)
 
-    if is_image(i) and is_image(o):
-        im = Image.open(i)
-        clrs = im.getpixel((0, 0))
-
-        if is_png(o) and len(clrs) == 3:
-            im.putalpha(0)
-            im.save(o)
-        elif not is_png(o) and len(clrs) == 4:
-            im.load()
-            bg = Image.new("RGB", im.size, (255, 255, 255))
-            bg.paste(im, mask=im.split()[3])
-            bg.save(o)
-        else:
-            im.save(o)
-
-    elif is_svg(i) and is_image(o):
+    if is_svg(i):
         png = i + ".png"
         svg2png(open(i, 'rb').read(), write_to=open(png, 'wb'))
-        if not is_png(o):
-            image_to_any(png, o)
-    elif is_svg(o) and is_image(i):
-        if not is_png(i):
-            png = i + ".png"
-            im = Image.open(i)
-            im.putalpha(0)
-            im.save(png)
-        else:
-            png = i
-        write_content(o, rgba_image_to_svg_contiguous(Image.open(png)))
+        i = png
 
+    return images_to_any([Image.open(i)], o)
+
+
+def images_to_any(ims, o):
+    ret = []
+    with tempfile.TemporaryDirectory() as tmp_path:
+        _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_file_extension(o))
+        for im in ims:
+            clrs = im.getpixel((0, 0))
+            if not isinstance(clrs, tuple):
+                im = im.convert('RGB')
+                clrs = im.getpixel((0, 0))
+            if is_image(_o):
+                if is_png(_o) and len(clrs) == 3:
+                    im.putalpha(0)
+                    im.save(_o)
+
+                if not is_png(_o) and len(clrs) == 4:
+                    im.load()
+                    bg = Image.new("RGB", im.size, (255, 255, 255))
+                    bg.paste(im, mask=im.split()[3])
+                    bg.save(_o)
+                else:
+                    im.save(_o)
+
+            elif is_svg(_o):
+                width, height = im.size
+                basewidth = 300
+                if max(width, height) > basewidth:
+                    wpercent = (basewidth / float(im.size[0]))
+                    hsize = int((float(im.size[1]) * float(wpercent)))
+                    im = im.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+                if len(clrs) == 3:
+                    im.putalpha(0)
+
+                write_content(_o, rgba_image_to_svg_contiguous(im))
+            ret.append(_o)
+
+        if len(ret) == 1:
+            shutil.copy(ret[0], o)
+        else:
+            if not o.endswith(".tar.gz"):
+                o += ".tar.gz"
+
+            with tarfile.open(o, "w:gz") as tar:
+                for fn in ret:
+                    p = os.path.join(tmp_path, fn)
+                    tar.add(p, arcname=fn)
 
 @exception_handler
 def any_to_html(i, o):
@@ -117,8 +145,13 @@ def any_to_pdf(i, o):
         pdf.cell(200, 10, txt=get_content(i), ln=1, align='L')
         pdf.output(o)
     else:
-        im = image.convert('RGB')
-        im.save(o, save_all=True, append_images=[im])
+        if is_tiff(i):
+            tiff = Tiff(i)
+            ims = tiff.get_images()
+        else:
+            ims = [image.convert('RGB')]
+
+        ims[0].save(o, save_all=True, append_images=ims)
 
 
 @exception_handler
@@ -239,8 +272,6 @@ class Transform:
                         # to Plain
                         if "plain" in self.wmt:
                             html_to_txt(self.file_path, self.output_path)
-
-                elif "application/" in self.cmt:
                     # CSV
                     if "csv" in self.cmt:
                         # to JSON
@@ -252,6 +283,8 @@ class Transform:
                         # to YAML
                         if "yaml" in self.wmt:
                             csv_to_yaml(self.file_path, self.output_path)
+                elif "application/" in self.cmt:
+
                     # JSON
                     if "json" in self.cmt:
                         # to CSV
@@ -287,6 +320,8 @@ class Transform:
                     # Potential conversion
                     if "image/" in self.wmt:
                         image_to_any(self.file_path, self.output_path)
+                        if not os.path.exists(self.output_path) and os.path.exists(self.output_path + ".tar.gz"):
+                            self.output_path += ".tar.gz"
                     # PDF conversion
                     if "pdf" in self.wmt:
                         any_to_pdf(self.file_path, self.output_path)

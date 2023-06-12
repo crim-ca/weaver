@@ -102,12 +102,3 @@ urlmatch
 xmltodict
 webob
 werkzeug>2
-
-
-# added by grol
-fpdf
-Pillow
-jinja2
-pandas
-json2xml
-cairosvg

@@ -58,9 +58,7 @@ WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, WPS_NO_INPUTS_ID
 )
 
-WPS_TRANFORM_IMAGE_RESSOURCE = os.path.join(RESOURCES_PATH, "transform", "logo_crim.png")
-WPS_TRANFORM_DATAS_RESSOURCE = os.path.join(RESOURCES_PATH, "transform", "avocado.csv")
-WPS_TRANFORM_TEXT_RESSOURCE = os.path.join(RESOURCES_PATH, "transform", "avocado.csv")
+WPS_TRANFORM_RESSOURCES = os.path.join(RESOURCES_PATH, "transform")
 
 
 def _load_path(file_path, text=False, xml=False):

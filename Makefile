@@ -228,10 +228,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw install-transform	## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev  ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip install-dev install-transform ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -297,6 +297,22 @@ install-npm-remarklint: install-npm    ## install remark-lint dependency for 'ch
 		 	remark-preset-lint-recommended \
 		 	remark-preset-lint-markdown-style-guide \
 	)
+
+y.PHONY: install-transform
+install-transform:   install-trfm-dependencies #install-gdal
+
+
+#.PHONY: install-gdal
+#install-gdal:    ## install GDAL
+#	@echo "Installing conda packages for GDAL"
+#	@bash -c '$(CONDA_CMD) conda install -c conda-forge gdal'
+#	@echo "Install GDAL complete."
+
+.PHONY: install-trfm-dependencies
+install-trfm-dependencies:   ## install required dependencies for Transformer
+	@echo "Install required dependencies for Transformer"
+	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-trfm.txt"'
+	@echo "Install with pip complete."
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -532,6 +548,7 @@ check-security-deps-only: mkdir-reports  ## run security checks on package depen
 			-r "$(APP_ROOT)/requirements-dev.txt" \
 			-r "$(APP_ROOT)/requirements-doc.txt" \
 			-r "$(APP_ROOT)/requirements-sys.txt" \
+			-r "$(APP_ROOT)/requirements-trfm.txt" \
 			$(SAFETY_IGNORE) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
@@ -834,6 +851,14 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 	docker rmi -f "$(APP_NAME):latest" || true
 	docker rmi -f "$(APP_NAME):base" || true
 
+.PHONY: transformer
+fix-fstring-only: mkdir-reports
+	@echo "Fixing code string formats substitutions to f-string definitions..."
+	@-rm -f "$(REPORTS_DIR)/fixed-fstring.txt"
+	@bash -c '$(CONDA_CMD) \
+		flynt $(FLYNT_FLAGS) "$(APP_ROOT)" \
+		1> >(tee "$(REPORTS_DIR)/fixed-fstring.txt")'
+
 ## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
 .PHONY: start
@@ -848,3 +873,5 @@ stop: 		## kill application instance(s) started with gunicorn (pserve)
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
+
+
