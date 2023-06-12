@@ -30,6 +30,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from tests.transform.test_tranform import test_transformations
 from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
@@ -1586,6 +1587,10 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             sd.Execute().deserialize({"outputs": {"random": {"transmissionMode": "bad"}}})
 
     def test_job_transforms(self):
+        # First try transformation engine
+        test_transformations()
+
+        # Then try transformation in action
         path = f"/jobs/{self.job_info[0].id}/outputs"
         resp = self.app.get(path, headers=self.json_headers)
         for link in resp.json["links"]:
