@@ -102,3 +102,13 @@ urlmatch
 xmltodict
 webob
 werkzeug>2
+
+# transformer
+fpdf
+Pillow
+pandas
+cairosvg
+multipagetiff
+# gdal
+rasterio
+python-magic
