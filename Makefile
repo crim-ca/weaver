@@ -228,10 +228,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw install-transform	## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev install-transform ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip  ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -298,21 +298,21 @@ install-npm-remarklint: install-npm    ## install remark-lint dependency for 'ch
 		 	remark-preset-lint-markdown-style-guide \
 	)
 
-y.PHONY: install-transform
-install-transform:   install-trfm-dependencies #install-gdal
-
-
-#.PHONY: install-gdal
-#install-gdal:    ## install GDAL
-#	@echo "Installing conda packages for GDAL"
-#	@bash -c '$(CONDA_CMD) conda install -c conda-forge gdal'
-#	@echo "Install GDAL complete."
-
-.PHONY: install-trfm-dependencies
-install-trfm-dependencies:   ## install required dependencies for Transformer
-	@echo "Install required dependencies for Transformer"
-	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-trfm.txt"'
-	@echo "Install with pip complete."
+#y.PHONY: install-transform
+#install-transform:   install-trfm-dependencies #install-gdal
+#
+#
+##.PHONY: install-gdal
+##install-gdal:    ## install GDAL
+##	@echo "Installing conda packages for GDAL"
+##	@bash -c '$(CONDA_CMD) conda install -c conda-forge gdal'
+##	@echo "Install GDAL complete."
+#
+#.PHONY: install-trfm-dependencies
+#install-trfm-dependencies:   ## install required dependencies for Transformer
+#	@echo "Install required dependencies for Transformer"
+#	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-trfm.txt"'
+#	@echo "Install with pip complete."
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
