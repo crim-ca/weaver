@@ -228,10 +228,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw install-transform ## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip  ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip install-transform ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -298,15 +298,15 @@ install-npm-remarklint: install-npm    ## install remark-lint dependency for 'ch
 		 	remark-preset-lint-markdown-style-guide \
 	)
 
-#y.PHONY: install-transform
-#install-transform:   install-trfm-dependencies #install-gdal
-#
-#
-##.PHONY: install-gdal
-##install-gdal:    ## install GDAL
-##	@echo "Installing conda packages for GDAL"
-##	@bash -c '$(CONDA_CMD) conda install -c conda-forge gdal'
-##	@echo "Install GDAL complete."
+y.PHONY: install-transform
+install-transform: install-cairo-dependencies       # install-trfm-dependencies install-gdal
+
+
+#.PHONY: install-gdal
+#install-gdal:    ## install GDAL
+#	@echo "Installing conda packages for GDAL"
+#	@bash -c '$(CONDA_CMD) conda install -c conda-forge gdal'
+#	@echo "Install GDAL complete."
 #
 #.PHONY: install-trfm-dependencies
 #install-trfm-dependencies:   ## install required dependencies for Transformer
@@ -314,6 +314,12 @@ install-npm-remarklint: install-npm    ## install remark-lint dependency for 'ch
 #	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-trfm.txt"'
 #	@echo "Install with pip complete."
 
+.PHONY: install-cairo-dependencies
+install-cairo-dependencies:   ## install required dependencies for Transformer
+	@[ -f "$(shell which cairo)" ] || ( \
+		echo "Binary package manager cairo not found. Attempting to install it."; \
+		apt-get install libpangocairo-1.0-0 \
+	)
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
 .PHONY: clean

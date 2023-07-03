@@ -15,7 +15,7 @@ pyramid.debug_routematch = false
 pyramid.default_locale_name = en
 
 # mongodb
-mongodb.host = mongodb
+mongodb.host = 127.0.0.1
 mongodb.port = 27017
 mongodb.db_name = weaver
 
@@ -48,7 +48,7 @@ cache.quotation.enabled = true
 #   EMS:     current instance dispatches execution to other remote ADES or WPS providers
 #   HYBRID:  current instance does both ADES and EMS roles with flexible combinations depending on situation
 weaver.configuration = HYBRID
-weaver.url = http://localhost:4001
+weaver.url = http://127.0.0.1:4002
 
 # Static endpoint to external schema locations for reference in responses.
 # If not provided, the current instance OpenAPI JSON path is employed instead.
@@ -63,7 +63,7 @@ weaver.log_level =
 # SSL verification should be enabled for secured connections
 # setting is available for convenience, debug purposes and local environments
 # preferably, use specific request options
-weaver.ssl_verify = true
+weaver.ssl_verify = false
 # file with request options to be used with 'weaver.utils.request_extra'
 # see 'requests_options.yml.example'
 weaver.request_options =
@@ -111,7 +111,7 @@ weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
 weaver.wps_output_s3_bucket =
 weaver.wps_output_s3_region =
-weaver.wps_workdir =
+weaver.wps_workdir = /tmp/weaver/wps_workdir
 
 # --- Weaver WPS metadata ---
 # all attributes under "metadata:main" can be specified as 'weaver.wps_metadata_<field>'
@@ -171,7 +171,7 @@ weaver.vault_dir = /tmp/vault
 ###
 [celery]
 #USE_CELERYCONFIG = True
-BROKER_URL = mongodb://mongodb:27017/celery
+BROKER_URL = mongodb://127.0.0.1:27017/celery
 # Result backend is required for SYNC execution.
 #   Using only the backend type matching the broker URL will automatically resolve to use it database location.
 #   For an alternative result location, provide the full backend directly rather than using "mongodb_backend_settings".
@@ -191,7 +191,7 @@ RESULT_BACKEND = mongodb
 
 # --- gunicorn ---
 use = egg:gunicorn#main
-bind = 0.0.0.0:4001
+bind = 127.0.0.1:4002
 workers = 10
 timeout = 10
 

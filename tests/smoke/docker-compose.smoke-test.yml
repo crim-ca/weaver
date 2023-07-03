@@ -17,7 +17,7 @@ services:
     ports:
       - "4001:4001"
     volumes:
-      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ../../config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
     networks:
       - default
     restart: "no"
@@ -28,5 +28,5 @@ services:
     links:
       - mongodb
     volumes:
-      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ../../config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
     restart: "no"

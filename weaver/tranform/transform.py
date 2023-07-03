@@ -138,12 +138,14 @@ def any_to_html(i, o):
 def any_to_pdf(i, o):
     image = Image.open(i) if is_image(i) else None
 
+    new_pdf = FPDF(orientation='P', unit='pt', format='A4')
+
     if image is None:
-        pdf = FPDF(orientation='P', unit='mm', format='A4')
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=get_content(i), ln=1, align='L')
-        pdf.output(o)
+
+        new_pdf.add_page()
+        new_pdf.set_font("Arial", size=12)
+        new_pdf.multi_cell(0, 10, txt=get_content(i), align='L')
+
     else:
         if is_tiff(i):
             tiff = Tiff(i)
@@ -151,7 +153,32 @@ def any_to_pdf(i, o):
         else:
             ims = [image.convert('RGB')]
 
-        ims[0].save(o, save_all=True, append_images=ims)
+        new_pdf.set_margins(10, 10)
+
+        pdf_width = new_pdf.w - 20
+        pdf_height = new_pdf.h - 20
+
+        for im in ims:
+            image_w, image_h = im.size
+
+            if image_w > image_h:
+                new_pdf.add_page(orientation='L')
+                _w = pdf_height
+                _h = pdf_width
+            else:
+                new_pdf.add_page(orientation='P')
+                _h = pdf_height
+                _w = pdf_width
+
+            while image_h > _h or image_w > _w:
+                image_h *= 0.999
+                image_w *= 0.999
+
+            new_pdf.image(im, x=(_w - image_w) / 2, y=(_h - image_h) / 2, w=image_w, h=image_h)
+
+    new_pdf.output(o, 'F')
+
+        #ims[0].save(o, save_all=True, append_images=ims)
 
 
 @exception_handler

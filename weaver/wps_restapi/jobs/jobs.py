@@ -256,9 +256,10 @@ def get_job_outputs(request):
     schema = get_schema_query(request.params.get("schema"))
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
-
+    LOGGER.warning("taratata")
     links = job.links(request, self_link="outputs")
     f_links = get_all_possible_formats_links(request, job)
+    LOGGER.warning(str(f_links))
     if len(f_links) > 0: links.extend(f_links)
 
     outputs.update({"links": links})

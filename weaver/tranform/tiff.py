@@ -2,7 +2,6 @@ import multipagetiff as mtif
 import numpy as np
 import rasterio
 from PIL import Image, UnidentifiedImageError
-# from osgeo import gdal
 
 from weaver.tranform.utils import write_images
 
@@ -44,19 +43,6 @@ class Tiff:
 
             self.crs = self.dataset.crs
 
-            # go = gdal.Open(self.fp)
-            # self.description = go.GetDescription()
-            # self.metadatas = go.GetMetadata()
-            #
-            # self.bands_metadatas = {}
-            #
-            # for i in self.range:
-            #     try:
-            #         band = go.GetRasterBand(i)
-            #         self.bands_metadatas[i] = band.GetMetadata()
-            #     except:
-            #         pass
-
     @property
     def range(self):
         return range(1, self.nb_bands + 1)
@@ -68,18 +54,6 @@ class Tiff:
             return None
         except:
             raise
-
-    # def get_value_at(self, x, y):
-    #     try:
-    #         return self.dataset.index(x, y)
-    #     except:
-    #         raise
-    #
-    # def get_coords(self, x, y):
-    #     try:
-    #         return self.dataset.xy(x, y)
-    #     except:
-    #         raise
 
     def get_images(self, red_band: int = 1, green_band: int = 2, blue_band: int = 3):
         if self.is_geotiff:
@@ -100,26 +74,5 @@ class Tiff:
                 imlist.append(Image.fromarray(m))
             return imlist
 
-            # imlist[0].save(out_tiff, save_all=True, append_images=imlist[1:])
-
     def convert_to_png(self, output_file, red: int = 1, green: int = 2, blue: int = 3):
         write_images(self.get_images(red, green, blue), output_file, ext="png")
-
-    # def convert_to_jpg(self, output_file, red: int = 1, green: int = 2, blue: int = 3):
-    #     if self.is_geotiff:
-    #         indexes = ["-b " + str(i) for i in [red, green, blue] if i in self.range]
-    #
-    #         options_list = [
-    #             '-ot Byte',
-    #             '-of JPEG'
-    #         ]
-    #         options_list.extend(indexes)
-    #         options_string = " ".join(options_list)
-    #
-    #         gdal.Translate(
-    #             output_file,
-    #             self.fp,
-    #             options=options_string
-    #         )
-    #     else:
-    #         write_images(self.get_images(red, green, blue), output_file, ext="jpg")

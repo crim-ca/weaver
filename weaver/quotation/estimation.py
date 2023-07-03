@@ -367,7 +367,7 @@ def estimate_process_quote(quote, process, settings=None):
             quote_file.flush()
             quote_file.seek(0)
             tmp_config_path = "/tmp/quote-config.yaml"  # nosec: B108
-            out_quote_json = docker_client.containers.run(
+            out_quote_json = docker_client.containers.process(
                 docker_ref.image,
                 ["--json", "--detail", "--config", tmp_config_path],
                 volumes={quote_file.name: {"bind": tmp_config_path, "mode": "ro"}},
