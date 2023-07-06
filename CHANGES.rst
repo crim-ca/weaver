@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix broken Docker build of ``weaver-worker`` image due to unresolved ``docker-ce-cli`` package.
+  Installation is updated according to the reference documentation (https://docs.docker.com/engine/install/debian/).
 
 .. _changes_4.30.0:
 
