@@ -24,7 +24,7 @@ import pyramid.httpexceptions
 import requests.exceptions
 from cryptography.fernet import Fernet
 from dateutil.parser import parse as dt_parse
-from docker.auth import decode_auth
+from docker.auth import decode_auth  # pylint: disable=E0611
 from owslib.util import ServiceException as OWSServiceException
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS

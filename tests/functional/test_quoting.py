@@ -259,7 +259,7 @@ class WpsQuotationEstimatorDockerTest(ResourcesUtil, WpsConfigBase):
         if not image:
             pytest.fail("Cannot run test without quotation estimator docker image.")
         if image == "mock":
-            client = docker.from_env()
+            client = docker.from_env()  # pylint: disable=I1101
             path = os.path.join(WEAVER_ROOT_DIR, "tests/quotation")
             image = "weaver-tests/mock-quotation-estimator:latest"
             result = client.api.build(path, tag=image, rm=True, nocache=True)

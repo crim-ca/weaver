@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import colander
 import docker
 import yaml
-from docker.errors import ImageNotFound
+from docker.errors import ImageNotFound  # pylint: disable=E0611
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -1233,7 +1233,7 @@ def pull_docker(docker_auth, logger=LOGGER):
     ref = docker_auth.reference
     try:
         # load from env is the same as CLI call
-        client = docker.from_env()
+        client = docker.from_env()  # pylint: disable=I1101
         # following login does not update '~/.docker/config.json' by design, but can use it if available
         # session remains active only within the client
         # Note:
