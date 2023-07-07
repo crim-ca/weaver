@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_4.30.1:
+
+`4.30.1 <https://github.com/crim-ca/weaver/tree/4.30.1>`_ (2023-07-07)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix broken Docker build of ``weaver-worker`` image due to unresolved ``docker-ce-cli`` package.
   Installation is updated according to the reference documentation (https://docs.docker.com/engine/install/debian/).
 - Fix incorrect stream reader type (``bytes`` instead of ``str``) for some handlers in ``open_module_resource_file``.
