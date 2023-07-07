@@ -578,7 +578,7 @@ class XMLObject(object):
     The value of ``title`` provided as option or
 
     .. seealso::
-        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#user-content-xml-object
+        - https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#xml-object
         - https://swagger.io/docs/specification/data-models/representing-xml/
     """
     attribute = None    # define the corresponding node object as attribute instead of field

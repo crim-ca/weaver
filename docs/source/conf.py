@@ -444,7 +444,9 @@ linkcheck_ignore = [
     "https://ogc-ems.crim.ca/.*",
     "https://ogc-ades.crim.ca/.*",
     "https://ogc.crim.ca/.*",
-    "https://github.com/*.rst#*",
+    "https://github.com/.*\\.rst#.*",
+    # GitHub anchors causing problems
+    "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#xml-object",
 ]
 
 linkcheck_timeout = 30
