@@ -159,7 +159,7 @@ class WpsProcessInterface(abc.ABC):
         self.update_status("Execution of remote process execution completed successfully.",
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
 
-    def prepare(self):
+    def prepare(self):  # noqa: B027  # intentionally not an abstract method to allow no-op
         # type: () -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.

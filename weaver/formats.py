@@ -102,7 +102,7 @@ class OutputFormat(Constants):
     """
     JSON = classproperty(fget=lambda self: "json", doc="""
     Representation as :term:`JSON` (object), which can still be manipulated in code.
-    """)
+    """)  # noqa: F811  # false-positive redefinition of JSON typing
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
     Representation as :term:`JSON` content formatted as string with indentation and newlines.

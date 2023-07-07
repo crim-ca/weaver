@@ -579,10 +579,9 @@ In the :term:`WPS` context, three data types exist, namely ``Literal``, ``Boundi
     As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
     The schema definition exists in :term:`WPS` and :term:`OAS` contexts but is not handled by any :term:`CWL` type
     conversion yet. This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
-    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
+    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ in the meantime.
 
 .. [#] |wkt-example|_
-.. [#] |wkt-format|_
 
 As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
 which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be

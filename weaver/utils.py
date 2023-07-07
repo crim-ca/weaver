@@ -4,6 +4,7 @@ import fnmatch
 import functools
 import importlib.util
 import inspect
+import io
 import logging
 import os
 import posixpath
@@ -33,7 +34,6 @@ from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
 from celery.app import Celery
-from jsonschema.validators import RefResolver as JsonSchemaRefResolver
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -66,6 +66,11 @@ from weaver.formats import ContentType, get_content_type, get_extension, repr_js
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
+
+try:  # refactor in jsonschema==4.18.0
+    from jsonschema.validators import _RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
+except ImportError:
+    from jsonschema.validators import RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
 
 if TYPE_CHECKING:
     import importlib.abc
@@ -1055,7 +1060,7 @@ def import_target(target, default_root=None):
 
 
 def open_module_resource_file(module, file_path):
-    # type: (Union[str, ModuleType], str) -> IO[bytes]
+    # type: (Union[str, ModuleType], str) -> IO[str]
     """
     Opens a resource (data file) from an installed module.
 
@@ -1070,7 +1075,8 @@ def open_module_resource_file(module, file_path):
             reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
         except AttributeError:
             reader = loader  # noqa
-        return reader.open_resource(file_path)
+        buffer = reader.open_resource(file_path)
+        return io.TextIOWrapper(buffer, encoding="utf-8")
     except AttributeError:
         path = os.path.join(module.__path__[0], file_path)
         return open(path, mode="r", encoding="utf-8")
