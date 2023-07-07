@@ -141,8 +141,9 @@ class MongoDatabase(DatabaseInterface):
                     if "settings" not in store_kwargs:
                         store_kwargs["settings"] = self._settings
                     self._stores[store_type] = store(
+                        *store_args,
                         collection=getattr(self.get_session(), store_type),
-                        *store_args, **store_kwargs
+                        **store_kwargs,
                     )
                 return self._stores[store_type]
         raise NotImplementedError(f"Database '{self.type}' cannot find matching store '{store_type}'.")

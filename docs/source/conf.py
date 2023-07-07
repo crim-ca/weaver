@@ -444,6 +444,7 @@ linkcheck_ignore = [
     "https://ogc-ems.crim.ca/.*",
     "https://ogc-ades.crim.ca/.*",
     "https://ogc.crim.ca/.*",
+    "https://github.com/*.rst#*",
 ]
 
 linkcheck_timeout = 30

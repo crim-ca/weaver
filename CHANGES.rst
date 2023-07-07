@@ -20,7 +20,8 @@ Fixes:
   Installation is updated according to the reference documentation (https://docs.docker.com/engine/install/debian/).
 - Fix incorrect stream reader type (``bytes`` instead of ``str``) for some handlers in ``open_module_resource_file``.
 - Fix invalid ``jsonschema.validators.RefResolver`` reference in ``jsonschema>=4.18.0`` caused by refactor
-  (see https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst#v4180
+  (see https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst#v4180,
+  https://python-jsonschema.readthedocs.io/en/v4.18.0/api/jsonschema/validators/#jsonschema.validators._RefResolver
   and `python-jsonschema/jsonschema#1049 <https://github.com/python-jsonschema/jsonschema/pull/1049>`_).
 
 .. _changes_4.30.0:

@@ -1086,7 +1086,8 @@ def mocked_dismiss_process():
         with mock_celery_revoke:
             yield   # for direct use by context or decorator
     finally:
-        return mock_celery_revoke  # for use by combined ExitStack context  # pylint: disable=W0150.lost-exception
+        # used by ExitStack context, which would handle the exception appropriately
+        return mock_celery_revoke  # noqa: B012  # pylint: disable=W0150,lost-exception
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
