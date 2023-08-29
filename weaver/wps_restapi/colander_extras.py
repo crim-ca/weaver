@@ -578,7 +578,7 @@ class XMLObject(object):
     The value of ``title`` provided as option or
 
     .. seealso::
-        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#user-content-xml-object
+        - https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#xml-object
         - https://swagger.io/docs/specification/data-models/representing-xml/
     """
     attribute = None    # define the corresponding node object as attribute instead of field
@@ -614,7 +614,7 @@ class ExtendedSchemaMeta(colander._SchemaMeta):
     pass
 
 
-class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
+class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):  # pylint: disable=E1139
     """
     Utility base node definition that initializes additional parameters at creation time of any other extended schema.
 
@@ -638,6 +638,8 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def __init__(self, *args, **kwargs):
+        # pylint: disable=E0203
+
         schema_name = _get_node_name(self, schema_name=True)
         schema_type = _get_schema_type(self, check=True)
         if isinstance(self, XMLObject):
@@ -2310,7 +2312,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
                 # fields that are shared across all the oneOf sub-items
                 # pass down the original title of that object to refer to that schema reference
                 obj_shared = ExtendedMappingSchema(title=shared_title)
-                obj_shared.children = schema_node.children
+                obj_shared.children = schema_node.children  # pylint: disable=W0201
                 obj_one_of = item_obj.clone()
                 obj_one_of.title = one_of_title
                 all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_shared, obj_one_of])

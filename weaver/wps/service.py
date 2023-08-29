@@ -307,7 +307,7 @@ class WorkerService(ServiceWPS):
         execution = WPSExecution(version="2.0", url="localhost")
         xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=job.execution_mode, lineage=True)
         wps_request = WorkerRequest(http_headers=headers)
-        wps_request.identifier = process_id
+        wps_request.identifier = process_id  # pylint: disable=W0201
         wps_request.check_and_set_language(job.accept_language)
         wps_request.set_version("2.0.0")
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
@@ -317,7 +317,7 @@ class WorkerService(ServiceWPS):
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
         #  but this is needed since this job is running within Celery worker already async
         #  (daemon process can't have children processes).
-        wps_request.status = "false"
+        wps_request.status = "false"  # pylint: disable=W0201
 
         # When 'execute' is called, pywps will in turn call 'prepare_process_for_execution',
         # which then setups and retrieves currently loaded 'local' processes.

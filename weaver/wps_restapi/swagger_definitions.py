@@ -4613,7 +4613,6 @@ class CWLTypeList(ExtendedSequenceSchema):
 
 
 class CWLType(OneOfKeywordSchema):
-    title = "CWL Type"
     _one_of = [
         CWLTypeBase(summary="CWL type definition."),
         CWLTypeList(summary="Combination of allowed CWL types."),
@@ -4663,7 +4662,7 @@ class CWLInputItem(CWLInputObject):
 
 
 class CWLInputList(ExtendedSequenceSchema):
-    input = CWLInputItem(title="Input", description=f"Input specification. {CWL_DOC_MESSAGE}")
+    input = CWLInputItem(description=f"Input specification. {CWL_DOC_MESSAGE}")
 
 
 class CWLInputEmpty(EmptyMappingSchema):
@@ -4729,7 +4728,7 @@ class CWLCommandParts(ExtendedSequenceSchema):
 class CWLCommand(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(String(), title="String command."),
-        CWLCommandParts(title="Command Parts")
+        CWLCommandParts(title="CommandParts", summary="Command Parts")
     ]
 
 
