@@ -130,7 +130,7 @@ Below are examples of possible commands:
 
     weaver capabilities \
         -u ${WEAVER_URL} \
-        -aH requests_magpie.MagpieAuth \
+        -aC requests_magpie.MagpieAuth \
         -aU ${MAGPIE_URL} \
         -aI ${MAGPIE_USERNAME} \
         -aP ${MAGPIE_PASSWORD}

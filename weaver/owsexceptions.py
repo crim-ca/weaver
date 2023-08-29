@@ -121,7 +121,7 @@ class OWSException(Response, Exception):
         return body
 
     def prepare(self, environ):
-        if not self.body:
+        if not self.body:  # pylint: disable=E0203,W0201
             accept_value = environ.get("HTTP_ACCEPT", "")
             accept = create_accept_header(accept_value)
 
@@ -140,7 +140,7 @@ class OWSException(Response, Exception):
 
                 # json exception response should not have status 200
                 if self.status_code == HTTPOk.code:
-                    self.status = HTTPInternalServerError.code
+                    self.status = HTTPInternalServerError.code  # pylint: disable=E0203,W0201
 
                 class JsonPageTemplate(object):
                     def __init__(self, excobj):
@@ -170,8 +170,8 @@ class OWSException(Response, Exception):
             page = page_template.substitute(**args)
             if isinstance(page, str):
                 page = page.encode(self.charset if self.charset else "UTF-8")
-            self.app_iter = [page]
-            self.body = page
+            self.app_iter = [page]  # pylint: disable=E0203,W0201
+            self.body = page  # pylint: disable=E0203,W0201
 
     @property
     def wsgi_response(self):

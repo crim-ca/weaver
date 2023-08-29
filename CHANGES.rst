@@ -18,6 +18,26 @@ Fixes:
 ------
 - No change.
 
+.. _changes_4.30.1:
+
+`4.30.1 <https://github.com/crim-ca/weaver/tree/4.30.1>`_ (2023-07-07)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix broken Docker build of ``weaver-worker`` image due to unresolved ``docker-ce-cli`` package.
+  Installation is updated according to the reference documentation (https://docs.docker.com/engine/install/debian/).
+- Fix incorrect stream reader type (``bytes`` instead of ``str``) for some handlers in ``open_module_resource_file``.
+- Fix invalid ``jsonschema.validators.RefResolver`` reference in ``jsonschema>=4.18.0`` caused by refactor
+  (see https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst#v4180,
+  https://python-jsonschema.readthedocs.io/en/v4.18.0/api/jsonschema/validators/#jsonschema.validators._RefResolver
+  and `python-jsonschema/jsonschema#1049 <https://github.com/python-jsonschema/jsonschema/pull/1049>`_).
+- Fix multiple linting checks, documentation dependencies and link references.
+
 .. _changes_4.30.0:
 
 `4.30.0 <https://github.com/crim-ca/weaver/tree/4.30.0>`_ (2023-03-24)
