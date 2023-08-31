@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix import error of ``pywps.response.WPSResponse`` moved to ``pywps.response.basic.WPSResponse`` in ``pywps>=4.5.2``.
 
 .. _changes_4.30.1:
 

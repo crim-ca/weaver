@@ -4,16 +4,17 @@ from configparser import ConfigParser
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+import pywps
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
 from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
-from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
 from requests.structures import CaseInsensitiveDict
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
+from weaver.compat import Version
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
@@ -37,6 +38,11 @@ from weaver.wps.utils import (
 )
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import get_job_submission_response
+
+if Version(pywps.__version__) >= Version("4.5.2"):
+    from pywps.response.basic import WPSResponse
+else:
+    from pywps.response import WPSResponse  # noqa
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
