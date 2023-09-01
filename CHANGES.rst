@@ -17,7 +17,8 @@ Changes:
   as ``$schema`` parameter returned in under the `OpenAPI` schema for the `CWL` component employed by `Weaver`
   (fixes `#547 <https://github.com/crim-ca/weaver/issues/547>`_).
 - Add ``$schema`` field auto-insertion into the generated `OpenAPI` schema definition by ``CorniceSwagger`` when
-  corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute.
+  corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute
+  (fixes `#157 <https://github.com/crim-ca/weaver/issues/157>`_).
 
 .. _changes_4.30.1:
 
