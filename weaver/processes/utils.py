@@ -355,6 +355,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)
+    payload.pop("$id", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -462,6 +463,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # remove schema to avoid later deserialization error if different, but remaining content is valid
     # also, avoid storing this field in the process object, regenerate it as needed during responses
     process_info.pop("$schema", None)
+    process_info.pop("$id", None)
 
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
