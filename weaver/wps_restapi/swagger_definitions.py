@@ -121,6 +121,10 @@ DOC_URL = f"{__meta__.__documentation_url__}/en/latest"
 
 CWL_VERSION = "v1.2"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
+CWL_SCHEMA_BRANCH = "1.2.1_proposed"
+CWL_SCHEMA_PATH = "json-schema/cwl.yaml"
+CWL_SCHEMA_REPO = f"https://raw.githubusercontent.com/common-workflow-language/cwl-{CWL_VERSION}"
+CWL_SCHEMA_URL = f"{CWL_SCHEMA_REPO}/{CWL_SCHEMA_BRANCH}/{CWL_SCHEMA_PATH}"
 CWL_BASE_URL = "https://www.commonwl.org"
 CWL_SPEC_URL = f"{CWL_BASE_URL}/#Specification"
 CWL_USER_GUIDE_URL = f"{CWL_BASE_URL}/user_guide"
@@ -4807,7 +4811,8 @@ class CWLApp(PermissiveMappingSchema):
 
 
 class CWL(CWLBase, CWLApp):
-    _sort_first = ["cwlVersion", "id", "class"]
+    _schema = CWL_SCHEMA_URL
+    _sort_first = ["$schema", "cwlVersion", "id", "class"]
 
 
 class Unit(ExtendedMappingSchema):
@@ -4936,7 +4941,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -4953,7 +4958,7 @@ class Result(ExtendedMappingSchema):
     """
     Result outputs obtained from a successful process job execution.
     """
-    example_ref = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/results.yaml"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
         description=(
@@ -5214,9 +5219,9 @@ class CWLGraphList(ExtendedSequenceSchema):
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
-            "Graph definition that defines *exactly one* CWL application package represented as list. "
+            "Graph definition that defines *exactly one* CWL Application Package represented as list. "
             "Multiple definitions simultaneously deployed is NOT supported currently."
-            # "Graph definition that combines one or many CWL application packages within a single payload. "
+            # "Graph definition that combines one or many CWL Application Packages within a single payload. "
             # "If a single application is given (list of one item), it will be deployed as normal CWL by itself. "
             # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
             # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
@@ -6005,7 +6010,7 @@ class OkGetProcessInfoResponse(ExtendedMappingSchema):
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = NoContent()
+    body = CWL()
 
 
 class OkGetProcessPayloadSchema(ExtendedMappingSchema):

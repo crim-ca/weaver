@@ -2233,7 +2233,25 @@ class NotKeywordSchema(KeywordMapper):
         return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
-class ExtendedTypeConverter(TypeConverter):
+class SchemaRefConverter(TypeConverter):
+    """
+    Converter that will add :term:`OpenAPI` ``$schema`` and ``$id`` references if they are provided in the schema node.
+    """
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
+        result = super(SchemaRefConverter, self).convert_type(schema_node)
+        if isinstance(schema_node, SchemaRefMappingSchema):
+            # apply any resolved schema references at the top of the definition
+            result_ref = SchemaRefMappingSchema._deserialize_impl(schema_node, {})
+            result_ref.update(result)
+            result = result_ref
+        return result
+
+
+class ExtendedTypeConverter(SchemaRefConverter):
+    """
+    Base converter with support of `Extended` schema type definitions.
+    """
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema
         # base type converters expect raw pattern string
@@ -2250,7 +2268,7 @@ class ExtendedTypeConverter(TypeConverter):
         return result
 
 
-class KeywordTypeConverter(TypeConverter):
+class KeywordTypeConverter(SchemaRefConverter):
     """
     Generic keyword converter that builds schema with a list of sub-schemas under the keyword.
     """
