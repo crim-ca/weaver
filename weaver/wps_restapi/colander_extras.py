@@ -80,7 +80,7 @@ from cornice_swagger.converters.schema import (
     convert_regex_validator
 )
 from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
-from jsonschema.validators import Draft202012Validator
+from jsonschema.validators import Draft7Validator
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
@@ -1195,7 +1195,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
 
     # typings and attributes to help IDEs flag that the field is available/overridable
 
-    _schema_meta = Draft202012Validator.META_SCHEMA["$schema"]  # type: str
+    _schema_meta = Draft7Validator.META_SCHEMA["$schema"]  # type: str
     _schema_meta_include = False    # type: bool
     _schema = None                  # type: str
     _schema_include = True          # type: bool
