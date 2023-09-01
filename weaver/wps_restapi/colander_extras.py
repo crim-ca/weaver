@@ -80,6 +80,7 @@ from cornice_swagger.converters.schema import (
     convert_regex_validator
 )
 from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
+from jsonschema.validators import Draft202012Validator
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
@@ -1179,31 +1180,36 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     """
     Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
 
-    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
-    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
-    deserialized JSON result.
+    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` with a valid URL,
+    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to
+    the deserialized :term:`OpenAPI` schema using :class:`SchemaRefConverter`, and to the deserialized :term:`JSON`
+    content, respectively. When injecting the ``$id`` reference into the :term:`JSON` object, the ``$schema`` will
+    instead refer to the ``schema_meta`` attribute that default to the :term:`JSON` meta-schema.
 
-    Alternatively, the parameters ``schema`` and ``id`` can be passed as keyword arguments when instantiating the
-    schema node.
+    Alternatively, the parameters ``schema`` and ``schema_meta`` can be passed as keyword arguments when instantiating
+    the schema node. The references injection can be disabled with ``schema_meta_include`` and ``schema_include``.
     """
     _extension = "_ext_schema_ref"
-    _ext_schema_fields = ["_schema", "_id"]
+    _ext_schema_options = ["_schema_meta", "_schema_meta_include", "_schema", "_schema_include"]
+    _ext_schema_fields = ["_id", "_schema"]
 
     # typings and attributes to help IDEs flag that the field is available/overridable
-    _schema = None          # type: str
-    _id = None              # type: str
+
+    _schema_meta = Draft202012Validator.META_SCHEMA["$schema"]  # type: str
+    _schema_meta_include = False    # type: bool
+    _schema = None                  # type: str
+    _schema_include = True          # type: bool
 
     def __init__(self, *args, **kwargs):
-        schema_fields = self._schema_fields
-        for schema_key in schema_fields:
+        for schema_key in self._schema_options:
             schema_field = schema_key[1:]
-            schema_ref = kwargs.pop(schema_field, None)
-            if self._is_schema_ref(schema_ref):
-                setattr(self, schema_key, schema_ref)
+            schema_value = kwargs.pop(schema_field, None)
+            if schema_value not in ["", None]:
+                setattr(self, schema_key, schema_value)
         super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SchemaRefMappingSchema._extension, True)
 
-        for schema_key in schema_fields:
+        for schema_key in self._schema_fields:
             schema_field = f"${schema_key[1:]}"
             sort_first = getattr(self, "_sort_first", [])
             sort_after = getattr(self, "_sort_after", [])
@@ -1216,21 +1222,25 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return isinstance(schema_ref, str) and URL.match_object.match(schema_ref)
 
     @property
+    def _schema_options(self):
+        return getattr(self, "_ext_schema_options", SchemaRefMappingSchema._ext_schema_options)
+
+    @property
     def _schema_fields(self):
         return getattr(self, "_ext_schema_fields", SchemaRefMappingSchema._ext_schema_fields)
 
-    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+    def _schema_deserialize(self, cstruct, schema_meta, schema_id):
+        # type: (OpenAPISchema, Optional[str], Optional[str]) -> OpenAPISchema
         if not isinstance(cstruct, dict):
             return cstruct
         if not getattr(self, SchemaRefMappingSchema._extension, False):
             return cstruct
 
         schema_result = {}
-        schema_fields = self._schema_fields
-        for schema_key in schema_fields:
-            schema_ref = getattr(self, schema_key, None)
+        schema_fields = [("schema", schema_meta), ("id", schema_id)]
+        for schema_key, schema_ref in schema_fields:
             if self._is_schema_ref(schema_ref):
-                schema_field = f"${schema_key[1:]}"
+                schema_field = f"${schema_key}"
                 schema = ExtendedSchemaNode(
                     colander.String(),
                     name=schema_field,
@@ -1243,6 +1253,21 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
 
         schema_result.update(cstruct)
         return schema_result
+
+    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+        schema_id = schema_meta = None
+        schema_id_include = getattr(self, "_schema_include", False)
+        schema_meta_include = getattr(self, "_schema_meta_include", False)
+        if schema_meta_include:
+            schema_meta = getattr(self, "_schema_meta", None)
+        if schema_id_include:
+            schema_id = getattr(self, "_schema", None)
+        if schema_id or schema_meta:
+            return self._schema_deserialize(cstruct, schema_meta, schema_id)
+        return cstruct
+
+    def convert_type(self, cstruct):  # pylint: disable=W0222,signature-differs
+        return SchemaRefMappingSchema._deserialize_impl(self, cstruct)
 
     @staticmethod
     @abstractmethod
@@ -2242,7 +2267,7 @@ class SchemaRefConverter(TypeConverter):
         result = super(SchemaRefConverter, self).convert_type(schema_node)
         if isinstance(schema_node, SchemaRefMappingSchema):
             # apply any resolved schema references at the top of the definition
-            result_ref = SchemaRefMappingSchema._deserialize_impl(schema_node, {})
+            result_ref = SchemaRefMappingSchema.convert_type(schema_node, {})
             result_ref.update(result)
             result = result_ref
         return result

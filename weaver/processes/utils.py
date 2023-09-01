@@ -195,7 +195,7 @@ def _check_deploy(payload):
     """
     message = "Process deployment definition is invalid."
     try:
-        results = sd.Deploy().deserialize(payload)
+        results = sd.Deploy(schema_meta_include=False, schema_include=False).deserialize(payload)
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
@@ -239,7 +239,10 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitList(
+                schema_meta_include=False,
+                schema_include=False,
+            ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "

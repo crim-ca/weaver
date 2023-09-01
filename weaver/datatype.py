@@ -2510,9 +2510,9 @@ class Process(Base):
             for io_type in ["inputs", "outputs"]:
                 process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
             process.update({"process": dict(process)})
-            return sd.ProcessDescriptionOLD().deserialize(process)
+            return sd.ProcessDescriptionOLD(schema_meta_include=True).deserialize(process)
         # process fields directly at root + I/O as mappings
-        return sd.ProcessDescriptionOGC().deserialize(process)
+        return sd.ProcessDescriptionOGC(schema_meta_include=True).deserialize(process)
 
     def summary(self, revision=False, links=True, container=None):
         # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON

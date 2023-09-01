@@ -5950,7 +5950,7 @@ class ProcessesListing(ProcessCollection, ProcessListingLinks):
 
 
 class MultiProcessesListing(DescriptionSchema, ProcessesListing, ProvidersProcessesCollection, ProcessListingMetadata):
-    pass
+    _schema_meta_include = True
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
