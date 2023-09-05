@@ -1494,6 +1494,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_none = sd.Execute().deserialize({})
         job_none.pop("$schema", None)
+        job_none.pop("$id", None)
         assert job_none == {
             "inputs": {},
             "outputs": {},
@@ -1503,6 +1504,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_none = sd.Execute().deserialize({"outputs": {"random": default_trans_mode}})
         job_in_none.pop("$schema", None)
+        job_in_none.pop("$id", None)
         assert job_in_none == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1512,6 +1514,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_dict = sd.Execute().deserialize({"inputs": {}, "outputs": {"random": default_trans_mode}})
         job_in_empty_dict.pop("$schema", None)
+        job_in_empty_dict.pop("$id", None)
         assert job_in_empty_dict == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1521,6 +1524,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_list = sd.Execute().deserialize({"inputs": [], "outputs": {"random": default_trans_mode}})
         job_in_empty_list.pop("$schema", None)
+        job_in_empty_list.pop("$id", None)
         assert job_in_empty_list == {
             "inputs": [],
             "outputs": {"random": default_trans_mode},
@@ -1530,6 +1534,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_none = sd.Execute().deserialize({"inputs": {"random": "ok"}})
         job_out_none.pop("$schema", None)
+        job_out_none.pop("$id", None)
         assert job_out_none == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1539,6 +1544,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_dict = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": {}})
         job_out_empty_dict.pop("$schema", None)
+        job_out_empty_dict.pop("$id", None)
         assert job_out_empty_dict == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1548,6 +1554,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_list = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": []})
         job_out_empty_list.pop("$schema", None)
+        job_out_empty_list.pop("$id", None)
         assert job_out_empty_list == {
             "inputs": {"random": "ok"},
             "outputs": [],
@@ -1560,6 +1567,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
         })
         job_out_defined.pop("$schema", None)
+        job_out_defined.pop("$id", None)
         assert job_out_defined == {
             "inputs": {"random": "ok"},
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},

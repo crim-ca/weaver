@@ -12,11 +12,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add the official `CWL` `JSON` schema reference
+  (`common-workflow-language/cwl-v1.2#256 <https://github.com/common-workflow-language/cwl-v1.2/pull/256>`_)
+  as ``$schema`` parameter returned in under the `OpenAPI` schema for the `CWL` component employed by `Weaver`
+  (fixes `#547 <https://github.com/crim-ca/weaver/issues/547>`_).
+- Add ``$schema`` field auto-insertion into the generated `OpenAPI` schema definition by ``CorniceSwagger`` when
+  corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute
+  (fixes `#157 <https://github.com/crim-ca/weaver/issues/157>`_).
 
 Fixes:
 ------
-- No change.
+- Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
 
 .. _changes_4.30.1:
 
@@ -725,7 +731,7 @@ Changes:
   The previous schema for deployment with nested ``process`` field remains supported for backward compatibility.
 
 .. |ogc-app-pkg| replace:: OGC Application Package
-.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 
 Fixes:
 ------

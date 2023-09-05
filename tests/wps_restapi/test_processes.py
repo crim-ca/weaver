@@ -977,6 +977,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             cwl_out = cwl["outputs"]["output"]
             cwl_out["id"] = "output"
             cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
             assert pkg == cwl
 
             # process description should have been generated with relevant I/O
