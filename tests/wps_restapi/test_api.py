@@ -114,6 +114,13 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert "openapi" in resp.json
         assert "basePath" in resp.json
 
+    def test_openapi_includes_schema(self):
+        resp = self.testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert "$id" in body["components"]["schemas"]["CWL"]
+        assert body["components"]["schemas"]["CWL"]["$id"] == sd.CWL_SCHEMA_URL
+
     def test_status_unauthorized_and_forbidden(self):
         """
         Validates that 401/403 status codes are correctly handled and that the appropriate one is returned.

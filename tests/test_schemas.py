@@ -127,6 +127,7 @@ def test_format_variations(test_format, expect_format):
     try:
         result_format = format_schema.deserialize(test_format)
         result_format.pop("$schema", None)
+        result_format.pop("$id", None)
         assert result_format == expect_format
     except colander.Invalid:
         pytest.fail(f"Expected format to be valid: [{test_format}]")

@@ -121,6 +121,10 @@ DOC_URL = f"{__meta__.__documentation_url__}/en/latest"
 
 CWL_VERSION = "v1.2"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
+CWL_SCHEMA_BRANCH = "1.2.1_proposed"
+CWL_SCHEMA_PATH = "json-schema/cwl.yaml"
+CWL_SCHEMA_REPO = f"https://raw.githubusercontent.com/common-workflow-language/cwl-{CWL_VERSION}"
+CWL_SCHEMA_URL = f"{CWL_SCHEMA_REPO}/{CWL_SCHEMA_BRANCH}/{CWL_SCHEMA_PATH}"
 CWL_BASE_URL = "https://www.commonwl.org"
 CWL_SPEC_URL = f"{CWL_BASE_URL}/#Specification"
 CWL_USER_GUIDE_URL = f"{CWL_BASE_URL}/user_guide"
@@ -146,12 +150,12 @@ OGC_API_SCHEMA_CORE = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-core"
 OGC_API_EXAMPLES_CORE = f"{OGC_API_SCHEMA_BASE}/core/examples"
 # FIXME: OGC OpenAPI schema restructure (https://github.com/opengeospatial/ogcapi-processes/issues/319)
 # OGC_API_SCHEMA_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-dru"
-OGC_API_SCHEMA_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_undeploy/standard/openapi/schemas"
+OGC_API_SCHEMA_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-dru"
 OGC_API_EXAMPLES_EXT_DEPLOY = f"{OGC_API_SCHEMA_BASE}/extensions/deploy_replace_undeploy/examples"
 # not available yet:
-OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/extensions/billing/standard/openapi/schemas"
-OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/extensions/quotation/standard/openapi/schemas"
-OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/extensions/workflows/standard/openapi/schemas"
+OGC_API_SCHEMA_EXT_BILL = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-billing"
+OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-quotation"
+OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-workflows"
 
 # official/published references
 OGC_API_PROC_PART1 = "https://schemas.opengis.net/ogcapi/processes/part1/1.0"
@@ -820,8 +824,8 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
+    _schema_include = False  # exclude "$id" added on each sub-deserialize (too verbose, only for reference)
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
-    _ext_schema_fields = []  # exclude "$schema" added on each sub-deserialize (too verbose, only for reference)
 
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
     encoding = ExtendedSchemaNode(String(), missing=drop)
@@ -4807,7 +4811,8 @@ class CWLApp(PermissiveMappingSchema):
 
 
 class CWL(CWLBase, CWLApp):
-    _sort_first = ["cwlVersion", "id", "class"]
+    _schema = CWL_SCHEMA_URL
+    _sort_first = ["$schema", "cwlVersion", "id", "class"]
 
 
 class Unit(ExtendedMappingSchema):
@@ -4936,7 +4941,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -4953,7 +4958,7 @@ class Result(ExtendedMappingSchema):
     """
     Result outputs obtained from a successful process job execution.
     """
-    example_ref = f"{OGC_API_PROC_PART1_SCHEMAS}/result.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/results.yaml"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
         description=(
@@ -5214,9 +5219,9 @@ class CWLGraphList(ExtendedSequenceSchema):
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
-            "Graph definition that defines *exactly one* CWL application package represented as list. "
+            "Graph definition that defines *exactly one* CWL Application Package represented as list. "
             "Multiple definitions simultaneously deployed is NOT supported currently."
-            # "Graph definition that combines one or many CWL application packages within a single payload. "
+            # "Graph definition that combines one or many CWL Application Packages within a single payload. "
             # "If a single application is given (list of one item), it will be deployed as normal CWL by itself. "
             # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
             # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
@@ -5945,7 +5950,7 @@ class ProcessesListing(ProcessCollection, ProcessListingLinks):
 
 
 class MultiProcessesListing(DescriptionSchema, ProcessesListing, ProvidersProcessesCollection, ProcessListingMetadata):
-    pass
+    _schema_meta_include = True
 
 
 class OkGetProcessesListResponse(ExtendedMappingSchema):
@@ -6005,7 +6010,7 @@ class OkGetProcessInfoResponse(ExtendedMappingSchema):
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = NoContent()
+    body = CWL()
 
 
 class OkGetProcessPayloadSchema(ExtendedMappingSchema):

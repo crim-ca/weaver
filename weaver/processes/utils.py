@@ -195,7 +195,7 @@ def _check_deploy(payload):
     """
     message = "Process deployment definition is invalid."
     try:
-        results = sd.Deploy().deserialize(payload)
+        results = sd.Deploy(schema_meta_include=False, schema_include=False).deserialize(payload)
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
@@ -239,7 +239,10 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitList(
+                schema_meta_include=False,
+                schema_include=False,
+            ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
@@ -352,6 +355,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)
+    payload.pop("$id", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -459,6 +463,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # remove schema to avoid later deserialization error if different, but remaining content is valid
     # also, avoid storing this field in the process object, regenerate it as needed during responses
     process_info.pop("$schema", None)
+    process_info.pop("$id", None)
 
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
