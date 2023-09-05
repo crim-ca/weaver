@@ -13,8 +13,8 @@ from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
 from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from weaver.wps_restapi.swagger_definitions import CWL_SCHEMA_URL
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 
 @pytest.mark.functional
