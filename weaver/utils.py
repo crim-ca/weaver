@@ -3488,7 +3488,7 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
     """
     # cleanup various escape characters and u'' stings
     replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\n'", "'"), ("\"", "\'"),
-                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("'. ", ""), ("'. '", ""),
+                ("u\'", "\'"), ("u\"", "\'"), ("'. ", ""), ("'. '", ""),
                 ("}'", "}"), ("'{", "{")]
     if remove_indents:
         replaces.extend([("\\", " "), ("  ", " ")])
