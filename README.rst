@@ -331,7 +331,7 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |ogc-api-proc-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
 .. _`OGC API - Processes - Part 2: Deploy, Replace, Undeploy`: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-apppkg| replace:: `OGC Application Package`
-.. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+.. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
