@@ -143,7 +143,10 @@ def get_provider(request):
     Get a provider definition (GetCapabilities).
     """
     service, _ = get_service(request)
-    return HTTPOk(json=service.summary(request))
+    data = get_schema_ref(sd.ProviderSummarySchema, request, ref_name=False)
+    info = service.summary(request)
+    data.update(info)
+    return HTTPOk(json=data)
 
 
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],

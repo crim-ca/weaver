@@ -3053,6 +3053,7 @@ class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, De
     url = URL(description="Endpoint of the service provider.")
     type = ExtendedSchemaNode(String())
 
+    _schema_meta_include = True
     _sort_first = PROVIDER_DESCRIPTION_FIELD_FIRST
     _sort_after = PROVIDER_DESCRIPTION_FIELD_AFTER
 

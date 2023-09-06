@@ -25,6 +25,7 @@ Fixes:
 - Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
 - Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
   to schema validation incorrectly preventing it.
+- Fix ``GET /providers/{provider_id}`` response using ``$schema`` instead of ``$id`` to provide its content schema.
 
 .. _changes_4.30.1:
 
