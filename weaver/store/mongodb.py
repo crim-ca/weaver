@@ -891,7 +891,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         result = self.collection.delete_one({"id": job_id})
         return result.deleted_count == 1
 
-    def c(self, job_id):
+    def fetch_by_id(self, job_id):
         # type: (AnyUUID) -> Job
         """
         Gets job for given ``job_id`` from `MongoDB` storage.
