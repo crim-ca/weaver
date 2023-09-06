@@ -45,6 +45,7 @@ from weaver.processes.convert import (
     get_cwl_io_type,
     get_io_type_category,
     is_cwl_complex_type,
+    json2oas_io,
     json2wps_allowed_values,
     json2wps_datatype,
     merge_io_formats,
@@ -268,6 +269,49 @@ def test_any2cwl_io_from_oas():
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
+
+
+@pytest.mark.parametrize(
+    ["test_io", "expect"],
+    [
+        (
+            {
+                "literalDataDomains": [
+                    {"default": True, "dataType": {"name": "integer"}, "valueDefinition": [1, 2, 3]}
+                ],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "type": "integer",
+                "enum": [1, 2, 3],
+            },
+        ),
+        (
+            {
+                "literalDataDomains": [
+                    {"default": True, "dataType": {"name": "integer"}, "valueDefinition": [1, 2, 3]}
+                ],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 2,
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "integer",
+                    "enum": [1, 2, 3],
+                },
+                "minItems": 0,
+                "maxItems": 2,
+            },
+        )
+    ]
+)
+def test_json2oas_io(test_io, expect):
+    copy_io = deepcopy(test_io)  # can get modified by function
+    assert json2oas_io(test_io) == expect, f"Failed for [{copy_io}]"
 
 
 @pytest.mark.parametrize("expect, test_io", [

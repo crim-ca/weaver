@@ -1973,10 +1973,10 @@ def json2oas_io_allowed_values(io_base, io_allowed):
             if vals:
                 data_enum = {"type": _typ, "enum": vals}
                 data_enum.update(io_base)
-                if _typ == "number" and all(val for val in io_allowed if isinstance(val, float)):
-                    data_enum.update(json2oas_io_literal_data_type("double"))
                 if _typ == "number" and all(val for val in io_allowed if isinstance(val, int)):
                     data_enum.update(json2oas_io_literal_data_type("integer"))
+                elif _typ == "number" and all(val for val in io_allowed if isinstance(val, float)):
+                    data_enum.update(json2oas_io_literal_data_type("double"))
                 item_variation.append(data_enum)
         return item_variation
     if isinstance(io_allowed, list) and all(isinstance(val_def, dict) for val_def in io_allowed):

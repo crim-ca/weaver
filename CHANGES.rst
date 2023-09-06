@@ -23,6 +23,8 @@ Changes:
 Fixes:
 ------
 - Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
+- Fix `WPS` I/O ``integer`` literal data conversion to `OpenAPI` I/O ``schema`` definition injecting an
+  invalid ``format: double`` property due to type checking with ``float`` succeeding against ``int`` values.
 
 .. _changes_4.30.1:
 
