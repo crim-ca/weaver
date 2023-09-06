@@ -31,7 +31,10 @@ services:
       # WARNING: see detail in 'worker' definition
       - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
     networks:
+      # network 'default' is created by default by docker-compose
+      # adjust to whichever service that offers HTTP access if using more advanced networking definitions
       - default
+      - mongodb
     restart: always
     logging: *default-logging
 
@@ -49,6 +52,7 @@ services:
       #   This avoids Weaver-API to be able to run Docker commands directly.
       #   Furthermore, only the Worker has the 'docker-cli' preinstalled.
       - docker-proxy
+      - mongodb
     links:
       - mongodb
     volumes:
@@ -103,6 +107,7 @@ services:
     # WARNING:
     #   Never expose this container's port to a public network.
     #   Other containers that require docker (weaver-worker) should communicate only through 'docker-proxy' network.
+    #   Other networks such as database connection should also be avoided to get components separated.
     networks:
       - docker-proxy
     logging: *default-logging
@@ -116,11 +121,12 @@ services:
     container_name: mongodb
     volumes:
       - /data/mongodb_persist:/data/db
-    # MongoDB crash with permission denied errors if the command is not overridden like this
-    command: bash -c 'chown -R mongodb:mongodb /data && chmod -R 755 /data && mongod'
+    networks:
+      - mongodb
     restart: always
     logging: *default-logging
 
 networks:
+  mongodb: {}
   docker-proxy:
     driver: bridge
