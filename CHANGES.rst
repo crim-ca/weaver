@@ -23,6 +23,7 @@ Changes:
 Fixes:
 ------
 - Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
+- Fix ``GET /providers/{provider_id}`` response using ``$schema`` instead of ``$id`` to provide its content schema.
 
 .. _changes_4.30.1:
 
