@@ -1340,6 +1340,7 @@ class AnyLiteralType(OneOfKeywordSchema):
             description="Literal data type representing a boolean flag.",
         ),
         ExtendedSchemaNode(
+            # pylint: disable=C0301,line-too-long
             # FIXME: support byte/binary type (string + format:byte) ?
             #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
             #   see if we can use 'encoding' parameter available for below 'String' schema-type to handle this?
