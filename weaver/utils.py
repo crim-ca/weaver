@@ -3481,15 +3481,32 @@ def assert_sane_name(name, min_len=3, max_len=None):
         raise InvalidIdentifierValue(f"Invalid name : {name}")
 
 
-def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
-    # type: (str, bool, bool) -> str
+def clean_json_text_body(body, remove_newlines=True, remove_indents=True, convert_quotes=True):
+    # type: (str, bool, bool, bool) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\n'", "'"), ("\"", "\'"),
-                ("u\'", "\'"), ("u\"", "\'"), ("'. ", ""), ("'. '", ""),
-                ("}'", "}"), ("'{", "{")]
+    replaces = [
+        (",\n", ", "),
+        ("\\n", " "),
+        (" \n", " "),
+        ("\n'", "'"),
+        ("u\'", "\'"),
+        ("u\"", "\""),
+        ("'. ", ""),
+        ("'. '", ""),
+        ("}'", "}"),
+        ("'{", "{"),
+    ]
+    patterns = [
+        (re.compile(r"(\w+)('{2,})([\s\]\}\)]+)"), "\\1'\\3"),
+        (re.compile(r"([\s\[\{\(]+)('{2,})(\w+)"), "\\1'\\3"),
+        (re.compile(r"(\w+)(\"{2,})([\s\]\}\)]+)"), "\\1\"\\3"),
+        (re.compile(r"([\s\[\{\(]+)(\"{2,})(\w+)"), "\\1\"\\3"),
+    ]
+    if convert_quotes:
+        replaces.extend([("\"", "\'")])
     if remove_indents:
         replaces.extend([("\\", " "), ("  ", " ")])
     else:
@@ -3501,6 +3518,8 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
+    for _from, _to in patterns:
+        body = re.sub(_from, _to, body)
 
     if remove_newlines:
         body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
@@ -3511,8 +3530,13 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
         body_clean = body
 
     # re-process without newlines to remove escapes created by concat of lines
-    if any(rf in body_clean for rf in replaces_from):
-        body_clean = clean_json_text_body(body_clean, remove_newlines=remove_newlines, remove_indents=remove_indents)
+    if any(rf in body_clean if isinstance(rf, str) else re.match(rf, body) for rf in replaces_from):
+        body_clean = clean_json_text_body(
+            body_clean,
+            remove_newlines=remove_newlines,
+            remove_indents=remove_indents,
+            convert_quotes=convert_quotes,
+        )
     return body_clean
 
 
