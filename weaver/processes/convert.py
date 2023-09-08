@@ -2861,10 +2861,10 @@ def wps2json_job_payload(wps_request, wps_process):
         for input_value in input_list:
             input_data = input_value.get("data")
             input_href = input_value.get("href")
-            if input_data:
-                data["inputs"].append({"id": iid, "data": input_data})
-            elif input_href:
+            if input_href:  # when href is provided, it must always be non-empty
                 data["inputs"].append({"id": iid, "href": input_href})
+            else:  # no check if value to allow possible empty string, numeric zero or explicit null
+                data["inputs"].append({"id": iid, "data": input_data})
     output_ids = list(wps_request.outputs)
     for output in wps_process.outputs:
         oid = output.identifier
