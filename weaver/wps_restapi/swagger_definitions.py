@@ -4582,12 +4582,18 @@ class CWLTypeString(ExtendedSchemaNode):
     validator = OneOf(PACKAGE_TYPE_POSSIBLE_VALUES)
 
 
-class CWLTypeSymbolValues(OneOfKeywordSchema):
-    _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(String()),
-    ]
+# NOTE: CWL Enum does not support non-string values
+#   - https://github.com/common-workflow-language/cwl-v1.2/issues/267
+#   - https://github.com/common-workflow-language/common-workflow-language/issues/764
+#   - https://github.com/common-workflow-language/common-workflow-language/issues/907
+# class CWLTypeSymbolValues(OneOfKeywordSchema):
+#     _one_of = [
+#         ExtendedSchemaNode(Float()),
+#         ExtendedSchemaNode(Integer()),
+#         ExtendedSchemaNode(String()),
+#     ]
+class CWLTypeSymbolValues(ExtendedSchemaNode):
+    schema_type = String
 
 
 class CWLTypeSymbols(ExtendedSequenceSchema):

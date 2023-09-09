@@ -2,6 +2,7 @@
 Conversion functions between corresponding data structures.
 """
 import copy
+import inspect
 import json
 import logging
 import os
@@ -582,6 +583,64 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         }
 
 
+def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols):
+    # type: (Union[str, Type[null]], List[AnyValueType]) -> CWL_IO_Type
+    """
+    Converts the I/O definition to a :term:`CWL` I/O that allows `Enum`-like functionality for various literal types.
+
+    In the event of an explicit ``string`` as base type, :term:`CWL` directly supports ``type: enum``. Other basic
+    types are not directly supported, and must instead perform manual validation against the set of allowed values.
+
+    .. seealso::
+        - https://github.com/common-workflow-language/cwl-v1.2/issues/267
+        - https://github.com/common-workflow-language/common-workflow-language/issues/764
+        - https://github.com/common-workflow-language/common-workflow-language/issues/907
+
+    :param cwl_io_type: Basic type for which allowed values should apply.
+    :param cwl_io_symbols: Allowed values to restrict the I/O definition.
+    :return: Converted definition as CWL Enum or with relevant value validation as applicable for the type.
+    """
+    if cwl_io_type not in PACKAGE_BASIC_TYPES:
+        return {}
+    if cwl_io_type == "string":
+        return {"type": {"type": PACKAGE_ENUM_BASE, "symbols": cwl_io_symbols}}
+    if cwl_io_type not in PACKAGE_NUMERIC_TYPES:
+        LOGGER.warning(
+            "Could not resolve conversion of CWL I/O as Enum for type '%s'. "
+            "Ignoring value validation against specified allowed values: %s.",
+            cwl_io_type,
+            cwl_io_symbols,
+        )
+        return {"type": cwl_io_type}
+
+    if not (
+        (all(isinstance(value, bool) for value in cwl_io_symbols) and cwl_io_type == "boolean") or
+        (all(isinstance(value, int) for value in cwl_io_symbols) and cwl_io_type in PACKAGE_INTEGER_TYPES) or
+        (all(isinstance(value, float) for value in cwl_io_symbols) and cwl_io_type in PACKAGE_FLOATING_TYPES)
+    ):
+        LOGGER.warning(
+            "Incompatible CWL I/O type '%s' detected for specified allowed values: %s. "
+            "Will use generic CWL 'Any' type instead.",
+            cwl_io_type,
+            cwl_io_symbols,
+        )
+        cwl_io_type = "Any"
+
+    cwl_js_value_from = inspect.cleandoc(f"""
+    ${{
+        const values = {json.dumps(cwl_io_symbols)};
+        if (values.includes(self)) {{
+            return self;
+        }}
+        else {{
+            throw "value " + self + " is not an allowed value from " + values;
+        }}
+    }}
+    """)
+
+    return {"type": cwl_io_type, "inputBinding": {"valueFrom": cwl_js_value_from}}
+
+
 def any2cwl_io(wps_io, io_select):
     # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], IO_Select_Type) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
@@ -612,7 +671,8 @@ def any2cwl_io(wps_io, io_select):
             LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
-            cwl_io["type"] = {"type": PACKAGE_ENUM_BASE, "symbols": wps_allow}
+            cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow)
+            cwl_io.update(cwl_io_enum)
         else:
             cwl_io["type"] = cwl_io_type
     # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
