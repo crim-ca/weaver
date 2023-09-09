@@ -5,9 +5,22 @@ from weaver.store.base import StoreInterface
 
 if TYPE_CHECKING:
     from typing import Any, Type, Union
-    from typing_extensions import Literal
 
-    from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
+    from weaver.store.base import (
+        StoreBills,
+        StoreBillsType,
+        StoreJobs,
+        StoreJobsType,
+        StoreProcesses,
+        StoreProcessesType,
+        StoreQuotes,
+        StoreQuotesType,
+        StoreServices,
+        StoreServicesType,
+        StoreTypeName,
+        StoreVault,
+        StoreVaultType,
+    )
     from weaver.typedefs import AnySettingsContainer, JSON
 
     AnyStore = Union[
@@ -18,20 +31,12 @@ if TYPE_CHECKING:
         StoreServices,
         StoreVault
     ]
-    StoreTypeName = Literal[
-        StoreBills.type,
-        StoreJobs.type,
-        StoreProcesses.type,
-        StoreQuotes.type,
-        StoreServices.type,
-        StoreVault.type
-    ]
-    StoreBillsSelector = Union[Type[StoreBills], Literal[StoreBills.type]]
-    StoreJobsSelector = Union[Type[StoreJobs], Literal[StoreJobs.type]]
-    StoreProcessesSelector = Union[Type[StoreProcesses], Literal[StoreProcesses.type]]
-    StoreQuotesSelector = Union[Type[StoreQuotes], Literal[StoreQuotes.type]]
-    StoreServicesSelector = Union[Type[StoreServices], Literal[StoreServices.type]]
-    StoreVaultSelector = Union[Type[StoreVault], Literal[StoreVault.type]]
+    StoreBillsSelector = Union[Type[StoreBills], StoreBillsType]
+    StoreJobsSelector = Union[Type[StoreJobs], StoreJobsType]
+    StoreProcessesSelector = Union[Type[StoreProcesses], StoreProcessesType]
+    StoreQuotesSelector = Union[Type[StoreQuotes], StoreQuotesType]
+    StoreServicesSelector = Union[Type[StoreServices], StoreServicesType]
+    StoreVaultSelector = Union[Type[StoreVault], StoreVaultType]
     StoreSelector = Union[
         StoreBillsSelector,
         StoreJobsSelector,
@@ -39,7 +44,6 @@ if TYPE_CHECKING:
         StoreQuotesSelector,
         StoreServicesSelector,
         StoreVaultSelector,
-        StoreTypeName
     ]
 
 
@@ -62,7 +66,7 @@ class DatabaseInterface(metaclass=abc.ABCMeta):
         if isinstance(store_type, type) and issubclass(store_type, StoreInterface):
             return store_type.type
         if isinstance(store_type, str):
-            return store_type
+            return store_type  # type: ignore
         raise TypeError(f"Unsupported store type selector: [{store_type}] ({type(store_type)})")
 
     @overload

@@ -142,6 +142,7 @@ if TYPE_CHECKING:
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
+    from weaver.processes.constants import IO_Select_Type
     from weaver.processes.convert import (
         ANY_IO_Type,
         CWL_Input_Type,
@@ -605,7 +606,7 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, str, bool) -> List[PKG_IO_Type]
+    # type: (CWLFactoryCallable, IO_Select_Type, bool) -> List[PKG_IO_Type]
     """
     Retrieves I/O definitions from a validated :class:`CWLFactoryCallable`.
 

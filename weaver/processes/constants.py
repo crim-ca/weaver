@@ -1,16 +1,23 @@
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Union, get_args
 
 from weaver.base import Constants
 
-WPS_INPUT = "input"
-WPS_OUTPUT = "output"
+IO_Select_Input = Literal["input"]
+IO_Select_Output = Literal["output"]
+IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]
+WPS_INPUT = get_args(IO_Select_Input)[0]
+WPS_OUTPUT = get_args(IO_Select_Output)[0]
 WPS_COMPLEX = "complex"
 WPS_BOUNDINGBOX = "bbox"
-WPS_LITERAL = "literal"
-WPS_REFERENCE = "reference"
-WPS_COMPLEX_DATA = "ComplexData"
+WPS_Literal_Type = Literal["literal"]
+WPS_Reference_Type = Literal["reference"]
+WPS_Complex_Type = Literal["ComplexData"]
+WPS_Category_Type = Union[WPS_Literal_Type, WPS_Reference_Type, WPS_Complex_Type]
+WPS_LITERAL = get_args(WPS_Literal_Type)[0]
+WPS_REFERENCE = get_args(WPS_Reference_Type)[0]
+WPS_COMPLEX_DATA = get_args(WPS_Complex_Type)[0]
 WPS_LITERAL_DATA_BOOLEAN = frozenset(["bool", "boolean"])
 WPS_LITERAL_DATA_DATETIME = frozenset(["date", "time", "dateTime"])
 WPS_LITERAL_DATA_FLOAT = frozenset(["scale", "angle", "float", "double"])
@@ -151,8 +158,11 @@ Set of all :term:`CWL` requirements or hints that are supported for deployment o
 
 # CWL package types and extensions
 PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
-PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
-PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_SIMPLE_TYPES | {"null", "Any"})
+PACKAGE_INTEGER_TYPES = frozenset(["int", "integer", "long"])
+PACKAGE_FLOATING_TYPES = frozenset(["float", "double"])
+PACKAGE_NUMERIC_TYPES = frozenset(PACKAGE_INTEGER_TYPES | PACKAGE_FLOATING_TYPES)
+PACKAGE_BASIC_TYPES = frozenset({"string", "boolean"} | PACKAGE_NUMERIC_TYPES)
+PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_BASIC_TYPES | {"null", "Any"})
 PACKAGE_FILE_TYPE = "File"
 PACKAGE_DIRECTORY_TYPE = "Directory"
 PACKAGE_COMPLEX_TYPES = frozenset([PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE])
@@ -160,10 +170,10 @@ PACKAGE_ENUM_BASE = "enum"
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
 PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
-PACKAGE_ARRAY_ITEMS = frozenset(PACKAGE_SIMPLE_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
+PACKAGE_ARRAY_ITEMS = frozenset(PACKAGE_BASIC_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
 PACKAGE_ARRAY_TYPES = frozenset([f"{item}[]" for item in PACKAGE_ARRAY_ITEMS])
 # string values the lowest 'type' field can have by itself (as simple mapping {type: <type-string>})
-PACKAGE_TYPE_NULLABLE = frozenset(PACKAGE_SIMPLE_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
+PACKAGE_TYPE_NULLABLE = frozenset(PACKAGE_BASIC_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
 # shortcut notations that can be employed to convert basic types into corresponding array or nullable variants
 PACKAGE_SHORTCUTS = frozenset(
     {f"{typ}?" for typ in PACKAGE_TYPE_NULLABLE} |

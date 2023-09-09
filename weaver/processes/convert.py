@@ -38,6 +38,7 @@ from weaver.formats import (
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    IO_Select_Type,
     OAS_ARRAY_TYPES,
     OAS_COMPLEX_TYPES,
     OAS_KEYWORD_TYPES,
@@ -59,6 +60,11 @@ from weaver.processes.constants import (
     PACKAGE_ENUM_BASE,
     PACKAGE_FILE_TYPE,
     PACKAGE_LITERAL_TYPES,
+    PACKAGE_BASIC_TYPES,
+    PACKAGE_NUMERIC_TYPES,
+    PACKAGE_FLOATING_TYPES,
+    PACKAGE_INTEGER_TYPES,
+    WPS_Category_Type,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
@@ -95,7 +101,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
-    from typing_extensions import Literal, NoReturn, NotRequired, Required, TypedDict
+    from typing_extensions import Literal, NotRequired, Required, TypedDict
     from urllib.parse import ParseResult
 
     from owslib.ows import BoundingBox
@@ -116,6 +122,7 @@ if TYPE_CHECKING:
         CWL,
         CWL_Input_Type,
         CWL_IO_ComplexType,
+        CWL_IO_DataType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
@@ -139,8 +146,6 @@ if TYPE_CHECKING:
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
-    IO_Select_Type = Literal[WPS_INPUT, WPS_OUTPUT]
-    IO_Category_Type = Literal[WPS_LITERAL, WPS_BOUNDINGBOX, WPS_COMPLEX]
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
@@ -473,7 +478,7 @@ def _get_multi_json_references(output, container):
 
 
 def get_io_type_category(io_info):
-    # type: (ANY_IO_Type) -> IO_Category_Type
+    # type: (ANY_IO_Type) -> WPS_Category_Type
     """
     Guesses the applicable I/O type with provided information from any known I/O structure.
     """
@@ -805,16 +810,16 @@ def ogcapi2cwl_process(payload, reference):
     else:
         # if no CWL could be resolved, generate I/O from process
         io_ns = {}  # type: Dict[str, str]
-        for io_select in ["input", "output"]:
+        for io_select in [WPS_INPUT, WPS_OUTPUT]:
             io_holder = f"{io_select}s"  # type: Literal["inputs", "outputs"]  # noqa
             io_struct = copy.deepcopy(process_info.get(io_holder, {}))
             io_struct = normalize_ordered_io(io_struct)
-            cwl_pkg[io_holder] = {}  # type: Dict[str, CWL_IO_Type]
+            cwl_pkg[io_holder] = {}  # type: Dict[str, CWL_IO_Type]  # noqa
             for io_def in io_struct:
                 io_id = get_field(io_def, "identifier", search_variations=True)
                 cwl_io, cwl_ns = any2cwl_io(io_def, io_select)
                 cwl_io.pop("id", None)  # remove duplicate since provided as key
-                cwl_pkg[io_holder][io_id] = cwl_io
+                cwl_pkg[io_holder][io_id] = cwl_io  # type: ignore
                 io_ns.update(cwl_ns)
         cwl_pkg.update({"$namespaces": io_ns} if io_ns else {})
 
@@ -1060,12 +1065,16 @@ class CWLIODefinition(object):
     Name (or identifier) or the I/O.
     """
 
-    type: "Union[CWL_IO_LiteralType, CWL_IO_ComplexType]" = None
+    type: "Union[CWL_IO_LiteralType, CWL_IO_ComplexType, CWL_IO_DataType]" = None
     """
     Type of the :term:`CWL` I/O.
 
     If :attr:`enum` is ``True``, represents the enum base type.
     If :attr:`array` is ``True``, represents the item type.
+
+    .. note::
+        Before resolution with :func:`parse_cwl_array_type`, this attribute can temporarily hold any :term:`CWL` type
+        structure (list, dict, nested types, etc.). After parsing, it will be resolved to the basic string type.
     """
 
     null: bool = False
@@ -1133,8 +1142,8 @@ def get_cwl_io_type(io_info, strict=True):
 
     CWL allows multiple distinct types (e.g.: ``string`` and ``int`` simultaneously), but not WPS inputs.
     WPS allows only different amount of *same type* through ``minOccurs`` and ``maxOccurs``.
-    Considering WPS conversion, we can also have following definition ``["null", <type>, <array-type>]`` (same type).
-    Whether single or array-like type, the base type can be extracted.
+    Considering WPS conversion, we can also have the following definition ``["null", <type>, <array-type>]`` will all
+    basic types matching exactly. Whether single or array-like type, the base type can be extracted.
 
     :param io_info: :term:`CWL` definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
@@ -1410,19 +1419,13 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
 
 @overload
 def convert_input_values_schema(inputs, schema):
-    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionInputsMap
+    # type: (ExecutionInputs, JobInputsOutputsSchema.OGC) -> ExecutionInputsMap
     ...
 
 
 @overload
 def convert_input_values_schema(inputs, schema):
-    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionInputsList
-    ...
-
-
-@overload
-def convert_input_values_schema(inputs, schema):
-    # type: (ExecutionInputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    # type: (ExecutionInputs, JobInputsOutputsSchema.OLD) -> ExecutionInputsList
     ...
 
 
@@ -1498,19 +1501,13 @@ def convert_input_values_schema(inputs, schema):
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OGC]) -> ExecutionOutputsMap
+    # type: (ExecutionOutputs, JobInputsOutputsSchema.OGC) -> ExecutionOutputsMap
     ...
 
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.OLD]) -> ExecutionOutputsList
-    ...
-
-
-@overload
-def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, Literal[JobInputsOutputsSchema.WPS]) -> NoReturn
+    # type: (ExecutionOutputs, JobInputsOutputsSchema.OLD) -> ExecutionOutputsList
     ...
 
 
@@ -1660,7 +1657,7 @@ def repr2json_input_values(inputs):
         else:
             val_key = "value"
         values.extend([{"id": str_id, val_key: val.pop("data"), **val} for val in arr_val])
-    return values
+    return values  # type: ignore
 
 
 def any2cwl_literal_datatype(io_type):
