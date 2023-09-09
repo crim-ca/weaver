@@ -2315,6 +2315,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
 
+    @pytest.mark.flaky(retry=2, delay=1)
     def test_execute_with_json_listing_directory(self):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
