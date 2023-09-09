@@ -109,7 +109,7 @@ def get_wps_restapi_base_url(container):
     return weaver_rest_url.rstrip("/").strip()
 
 
-def get_schema_ref(schema, container=None, ref_type="$schema", ref_name=True):
+def get_schema_ref(schema, container=None, ref_type="$id", ref_name=True):
     # type: (colander.SchemaNode, Optional[AnySettingsContainer], str, True) -> Dict[str, str]
     """
     Generates the JSON OpenAPI schema reference relative to the current `Weaver` instance.
@@ -123,7 +123,7 @@ def get_schema_ref(schema, container=None, ref_type="$schema", ref_name=True):
 
     :param schema: schema-node instance or type for which to generate the OpenAPI reference.
     :param container: application settings to retrieve the base URL of the schema location.
-    :param ref_type: key employed to form the reference (e.g.: "$schema", "$ref", "@schema", etc.)
+    :param ref_type: key employed to form the reference (e.g.: "$id", "$ref", "$schema", "@id", etc.).
     :param ref_name: indicate if the plain name should also be included under field ``"schema"``.
     :return: OpenAPI schema reference
     """

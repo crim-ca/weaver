@@ -1314,8 +1314,6 @@ class BoundingBoxInputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
-# FIXME: support byte/binary type (string + format:byte) ?
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
 class AnyLiteralType(OneOfKeywordSchema):
     """
     Submitted values that correspond to literal data.
@@ -1326,10 +1324,30 @@ class AnyLiteralType(OneOfKeywordSchema):
         - :class:`AnyLiteralDefaultType`
     """
     _one_of = [
-        ExtendedSchemaNode(Float(), description="Literal data type representing a floating point number."),
-        ExtendedSchemaNode(Integer(), description="Literal data type representing an integer number."),
-        ExtendedSchemaNode(Boolean(), description="Literal data type representing a boolean flag."),
-        ExtendedSchemaNode(String(), description="Literal data type representing a generic string."),
+        ExtendedSchemaNode(
+            Float(),
+            title="LiteralDataFloat",
+            description="Literal data type representing a floating point number.",
+        ),
+        ExtendedSchemaNode(
+            Integer(),
+            title="LiteralDataInteger",
+            description="Literal data type representing an integer number.",
+        ),
+        ExtendedSchemaNode(
+            Boolean(),
+            title="LiteralDataBoolean",
+            description="Literal data type representing a boolean flag.",
+        ),
+        ExtendedSchemaNode(
+            # pylint: disable=C0301,line-too-long
+            # FIXME: support byte/binary type (string + format:byte) ?
+            #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
+            #   see if we can use 'encoding' parameter available for below 'String' schema-type to handle this?
+            String(allow_empty=True),  # valid to submit a process with empty string
+            title="LiteralDataString",
+            description="Literal data type representing a generic string.",
+        ),
     ]
 
 
@@ -3036,6 +3054,7 @@ class ProviderSummarySchema(DescriptionType, ProviderPublic, DescriptionMeta, De
     url = URL(description="Endpoint of the service provider.")
     type = ExtendedSchemaNode(String())
 
+    _schema_meta_include = True
     _sort_first = PROVIDER_DESCRIPTION_FIELD_FIRST
     _sort_after = PROVIDER_DESCRIPTION_FIELD_AFTER
 
@@ -3489,14 +3508,9 @@ class ExecuteInputFile(AnyOfKeywordSchema):
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
 # FIXME: does not support bbox
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/bbox.yaml
-class ExecuteInputInlineValue(OneOfKeywordSchema):
+class ExecuteInputInlineValue(AnyLiteralType):
+    title = "ExecuteInputInlineValue"
     description = "Execute input value provided inline."
-    _one_of = [
-        ExtendedSchemaNode(Float(), title="ExecuteInputValueFloat"),
-        ExtendedSchemaNode(Integer(), title="ExecuteInputValueInteger"),
-        ExtendedSchemaNode(Boolean(), title="ExecuteInputValueBoolean"),
-        ExtendedSchemaNode(String(), title="ExecuteInputValueString"),
-    ]
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml

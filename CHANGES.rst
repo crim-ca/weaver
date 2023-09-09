@@ -23,6 +23,10 @@ Changes:
 Fixes:
 ------
 - Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
+- Fix ``GET /providers/{provider_id}`` response using ``$schema`` instead of ``$id`` to provide its content schema.
+- Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
+  to schema validation incorrectly preventing it.
+- Fix human-readable `JSON`-like content cleanup to preserve sequences of quotes corresponding to valid empty strings.
 - Fix `WPS` I/O ``integer`` literal data conversion to `OpenAPI` I/O ``schema`` definition injecting an
   invalid ``format: double`` property due to type checking with ``float`` succeeding against ``int`` values.
 - Fix `CWL` I/O value validation for ``enum``-like definitions from corresponding `OpenAPI` and `WPS` I/O.

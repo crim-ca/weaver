@@ -1951,6 +1951,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert resp.content_type == ContentType.APP_JSON
 
+    def test_execute_process_valid_empty_string(self):
+        """
+        Ensure that a process expecting an input string parameter can be provided as empty (not resolved as "missing").
+        """
+        path = f"/processes/{self.process_public.identifier}/jobs"
+        data = self.get_process_execute_template(test_input="")
+
+        with contextlib.ExitStack() as stack:
+            for exe in mocked_process_job_runner():
+                stack.enter_context(exe)
+            resp = self.app.post_json(path, params=data, headers=self.json_headers)
+            assert resp.status_code == 201, "Expected job submission without inputs created without error."
+            job = self.job_store.fetch_by_id(resp.json["jobID"])
+            assert job.inputs[0]["data"] == "", "Input value should be an empty string."
+
     def test_execute_process_missing_required_params(self):
         """
         Validate execution against missing parameters.
