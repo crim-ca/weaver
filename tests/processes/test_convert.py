@@ -23,16 +23,16 @@ from weaver.exceptions import PackageTypeError
 from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
+    IO_INPUT,
+    IO_OUTPUT,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_TYPES,
-    WPS_INPUT,
     WPS_LITERAL,
     WPS_LITERAL_DATA_TYPES,
-    WPS_OUTPUT,
     ProcessSchema
 )
-from weaver.processes.convert import _are_different_and_set  # noqa: W0212
+from weaver.processes.convert import _are_different_and_set, _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
@@ -272,6 +272,143 @@ def test_any2cwl_io_from_oas():
 
 
 @pytest.mark.parametrize(
+    ["io_select", "test_io", "expect"],
+    [
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "enum",
+                    "symbols": ["1", "2", "3"],
+                },
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 2,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["1", "2", "3"],
+                    },
+                },
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "symbols": ["1", "2", "3"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["1", "2", "3"],
+                        },
+                    },
+                ]
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "id": "test",
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3])},
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 2,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3])},
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "symbols": ["1", "2", "3"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["1", "2", "3"],
+                        },
+                    },
+                ]
+            },
+        ),
+    ]
+)
+def test_any2cwl_io_enum(io_select, test_io, expect):
+    cwl_io, _ = any2cwl_io(test_io, io_select)  # type: ignore
+    assert cwl_io == expect
+
+
+@pytest.mark.parametrize(
     ["test_io", "expect"],
     [
         (
@@ -379,7 +516,7 @@ def test_cwl2wps_io_null_or_array_of_enums():
             {"type": "array", "items": {"type": "enum", "symbols": allowed_values}},  # but also this for maxOccurs>1
         ],
     }
-    wps_io = cwl2wps_io(io_info, WPS_INPUT)
+    wps_io = cwl2wps_io(io_info, IO_INPUT)
     assert isinstance(wps_io, LiteralInput)
     assert wps_io.min_occurs == 0
     assert wps_io.max_occurs == PACKAGE_ARRAY_MAX_SIZE
@@ -407,7 +544,7 @@ def test_cwl2wps_io_null_or_array_of_enums():
 def test_cwl2wps_io_raise_mixed_types(test_type):
     io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
-        cwl2wps_io(io_info, WPS_INPUT)
+        cwl2wps_io(io_info, IO_INPUT)
 
 
 def test_cwl2wps_io_record_format():
@@ -424,7 +561,7 @@ def test_cwl2wps_io_record_format():
         "outputBinding": {"glob": "*.json"},
         "format": f"file:///tmp/tmp-random-dir/package#{ContentType.APP_JSON}",
     }
-    wps_io = cwl2wps_io(cwl_io_record, WPS_OUTPUT)
+    wps_io = cwl2wps_io(cwl_io_record, IO_OUTPUT)
     assert isinstance(wps_io, ComplexOutput)
     assert len(wps_io.supported_formats) == 1
     assert isinstance(wps_io.supported_formats[0], Format)

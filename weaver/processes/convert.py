@@ -39,6 +39,8 @@ from weaver.formats import (
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    IO_INPUT,
+    IO_OUTPUT,
     IO_Select_Type,
     OAS_ARRAY_TYPES,
     OAS_COMPLEX_TYPES,
@@ -71,7 +73,6 @@ from weaver.processes.constants import (
     WPS_COMPLEX_DATA,
     WPS_COMPLEX_TYPES,
     WPS_DATA_TYPES,
-    WPS_INPUT,
     WPS_LITERAL,
     WPS_LITERAL_DATA_BOOLEAN,
     WPS_LITERAL_DATA_DATETIME,
@@ -79,7 +80,6 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_INTEGER,
     WPS_LITERAL_DATA_STRING,
     WPS_LITERAL_DATA_TYPES,
-    WPS_OUTPUT,
     WPS_REFERENCE,
     JobInputsOutputsSchema,
     ProcessSchema
@@ -539,7 +539,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
                 if cwl_io_ref and cwl_io_fmt:
                     cwl_ns.update(cwl_io_ref)
                 break
-            if io_select == WPS_OUTPUT and len(fmt) > 1:
+            if io_select == IO_OUTPUT and len(fmt) > 1:
                 break  # don't use any format because we cannot enforce one
             cwl_ns_multi = {}
             cwl_fmt_multi = []
@@ -571,7 +571,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
                        "More explicit format could be considered for %s '%s'.",
                        ContentType.TEXT_PLAIN, cwl_io_txt, ContentType.ANY, cwl_io_any, io_select, cwl_id)
         cwl_io_ext = cwl_io_any
-    if io_select == WPS_OUTPUT:
+    if io_select == IO_OUTPUT:
         # Method 'weaver.processes.wps_process_base.WpsProcessInterface.stage_results' uses the produced glob
         # pattern below of generated output definitions from WPS items that don't offer any hint about the expected
         # file naming format or specification.
@@ -583,8 +583,27 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         }
 
 
-def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols):
-    # type: (Union[str, Type[null]], List[AnyValueType]) -> CWL_IO_Type
+def _get_cwl_js_value_from(cwl_io_symbols):
+    # type: (List[AnyValueType]) -> str
+    """
+    Obtain the JavaScript ``valueFrom`` definition for a :term:`CWL` input of non-``string`` allowed values.
+    """
+    cwl_js_value_from = inspect.cleandoc(f"""
+    ${{
+        const values = {json.dumps(cwl_io_symbols)};
+        if (values.includes(self)) {{
+            return self;
+        }}
+        else {{
+            throw "value " + self + " is not an allowed value from " + values;
+        }}
+    }}
+    """)
+    return cwl_js_value_from
+
+
+def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select):
+    # type: (Union[str, Type[null]], List[AnyValueType], IO_Select_Type) -> CWL_IO_Type
     """
     Converts the I/O definition to a :term:`CWL` I/O that allows `Enum`-like functionality for various literal types.
 
@@ -595,6 +614,10 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols):
         - https://github.com/common-workflow-language/cwl-v1.2/issues/267
         - https://github.com/common-workflow-language/common-workflow-language/issues/764
         - https://github.com/common-workflow-language/common-workflow-language/issues/907
+
+    .. warning::
+        Because ``valueFrom`` can only be used with ``inputBinding``, any output providing a set of allowed values
+        that are not ``string``-based will be ignored when converted to :term:`CWL` I/O.
 
     :param cwl_io_type: Basic type for which allowed values should apply.
     :param cwl_io_symbols: Allowed values to restrict the I/O definition.
@@ -626,18 +649,10 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols):
         )
         cwl_io_type = "Any"
 
-    cwl_js_value_from = inspect.cleandoc(f"""
-    ${{
-        const values = {json.dumps(cwl_io_symbols)};
-        if (values.includes(self)) {{
-            return self;
-        }}
-        else {{
-            throw "value " + self + " is not an allowed value from " + values;
-        }}
-    }}
-    """)
+    if io_select != IO_INPUT:
+        return {"type": cwl_io_type}
 
+    cwl_js_value_from = _get_cwl_js_value_from(cwl_io_symbols)
     return {"type": cwl_io_type, "inputBinding": {"valueFrom": cwl_js_value_from}}
 
 
@@ -671,7 +686,7 @@ def any2cwl_io(wps_io, io_select):
             LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
-            cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow)
+            cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow, io_select)
             cwl_io.update(cwl_io_enum)
         else:
             cwl_io["type"] = cwl_io_type
@@ -681,7 +696,7 @@ def any2cwl_io(wps_io, io_select):
 
     # FIXME: multi-outputs (https://github.com/crim-ca/weaver/issues/25)
     # min/max occurs can only be in inputs, outputs are enforced min/max=1 by WPS
-    if io_select == WPS_INPUT:
+    if io_select == IO_INPUT:
         wps_default = get_field(wps_io, "default", search_variations=True)
         wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
         # field 'default' must correspond to a fallback "value", not a default "format"
@@ -762,7 +777,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
 
     # generate CWL for WPS-1 using parsed WPS-3
     cwl_package = wps2cwl_requirement(wps_service_url, wps_process.identifier)
-    for io_select in [WPS_INPUT, WPS_OUTPUT]:
+    for io_select in [IO_INPUT, IO_OUTPUT]:
         io_section = f"{io_select}s"
         cwl_package[io_section] = []
         for wps_io in process_info[io_section]:
@@ -870,7 +885,7 @@ def ogcapi2cwl_process(payload, reference):
     else:
         # if no CWL could be resolved, generate I/O from process
         io_ns = {}  # type: Dict[str, str]
-        for io_select in [WPS_INPUT, WPS_OUTPUT]:
+        for io_select in [IO_INPUT, IO_OUTPUT]:
             io_holder = f"{io_select}s"  # type: Literal["inputs", "outputs"]  # noqa
             io_struct = copy.deepcopy(process_info.get(io_holder, {}))
             io_struct = normalize_ordered_io(io_struct)
@@ -1324,18 +1339,18 @@ def cwl2wps_io(io_info, io_select):
     Converts input/output parameters from CWL types to WPS types.
 
     :param io_info: parsed IO of a CWL file
-    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
+    :param io_select: :py:data:`IO_INPUT` or :py:data:`IO_OUTPUT` to specify desired WPS type conversion.
     :returns: corresponding IO in WPS format
     """
     is_input = False
     is_output = False
     # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
-    if io_select == WPS_INPUT:
+    if io_select == IO_INPUT:
         is_input = True
         io_literal = LiteralInput       # type: Union[Type[LiteralInput], Type[LiteralOutput]]
         io_complex = ComplexInput       # type: Union[Type[ComplexInput], Type[ComplexOutput]]
         # io_bbox = BoundingBoxInput      # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
-    elif io_select == WPS_OUTPUT:
+    elif io_select == IO_OUTPUT:
         is_output = True
         io_literal = LiteralOutput      # type: Union[Type[LiteralInput], Type[LiteralOutput]]
         io_complex = ComplexOutput      # type: Union[Type[ComplexInput], Type[ComplexOutput]]
@@ -2660,7 +2675,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
     Converts an I/O from a JSON dict to PyWPS types.
 
     :param io_info: I/O in JSON dict format.
-    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
+    :param io_select: :py:data:`IO_INPUT` or :py:data:`IO_OUTPUT` to specify desired WPS type conversion.
     :return: corresponding I/O in WPS format.
     """
 
@@ -2746,7 +2761,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         if data_type in WPS_LITERAL_DATA_TYPES and data_type not in LITERAL_DATA_TYPES:
             data_type = any2wps_literal_datatype(data_type, is_value=False, pywps=True)
         io_info["data_type"] = data_type
-    if io_select == WPS_INPUT:
+    if io_select == IO_INPUT:
         if ("max_occurs", "unbounded") in io_info.items():
             io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
         if io_type in WPS_COMPLEX_TYPES:
@@ -2770,7 +2785,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
                 io_info.pop("allowed_values", None)
             io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
-    elif io_select == WPS_OUTPUT:
+    elif io_select == IO_OUTPUT:
         # following not allowed for PyWPS instance creation,
         # but they are useful for other steps, so forward them afterward
         io_min = io_info.pop("min_occurs", null)
@@ -3241,7 +3256,7 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
 
     :param wps_io_list: list of :term:`WPS` I/O (as json) passed during process deployment.
     :param cwl_io_list: list of :term:`CWL` I/O converted to :term:`WPS`-like I/O for counter-validation.
-    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
+    :param io_select: :py:data:`IO_INPUT` or :py:data:`IO_OUTPUT` to specify desired WPS type conversion.
     :returns: list of updated :term:`JSON` I/O combing :term:`CWL`, :term:`WPS` and :term:`OpenAPI` specifications.
     """
     if not isinstance(cwl_io_list, list):

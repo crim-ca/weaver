@@ -7,8 +7,9 @@ from weaver.base import Constants
 IO_Select_Input = Literal["input"]
 IO_Select_Output = Literal["output"]
 IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]
-WPS_INPUT = get_args(IO_Select_Input)[0]
-WPS_OUTPUT = get_args(IO_Select_Output)[0]
+IO_INPUT = get_args(IO_Select_Input)[0]
+IO_OUTPUT = get_args(IO_Select_Output)[0]
+
 WPS_COMPLEX = "complex"
 WPS_BOUNDINGBOX = "bbox"
 WPS_Literal_Type = Literal["literal"]
