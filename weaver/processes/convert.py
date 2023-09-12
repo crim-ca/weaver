@@ -583,27 +583,66 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         }
 
 
-def _get_cwl_js_value_from(cwl_io_symbols):
-    # type: (List[AnyValueType]) -> str
+def _get_cwl_js_value_from(cwl_io_symbols, allow_unique, allow_array):
+    # type: (List[AnyValueType], bool, bool) -> str
     """
     Obtain the JavaScript ``valueFrom`` definition for a :term:`CWL` input of non-``string`` allowed values.
     """
-    cwl_js_value_from = inspect.cleandoc(f"""
-    ${{
-        const values = {json.dumps(cwl_io_symbols)};
-        if (values.includes(self)) {{
+    cwl_js_value_from_const = f"const values = {json.dumps(cwl_io_symbols)};"
+    cwl_js_value_from_array = """
+        if (self.every(item => values.includes(item))) {
             return self;
-        }}
-        else {{
-            throw "value " + self + " is not an allowed value from " + values;
-        }}
-    }}
-    """)
+        }
+        else {
+            throw "invalid value(s) in [" + self + "] are not all allowed values from [" + values + "]";
+        }
+    """
+    cwl_js_value_from_unique = """
+        if (values.includes(self)) {
+            return self;
+        }
+        else {
+            throw "invalid value " + self + " is not an allowed value from [" + values + "]";
+        }
+    """
+
+    if allow_unique and not allow_array:
+        cwl_js_value_from = inspect.cleandoc(f"""
+            ${{
+                if (Array.isArray(self)) {{
+                    throw "invalid value " + self + " does not match expected type";
+                }}
+                {cwl_js_value_from_const}
+                {cwl_js_value_from_unique}
+            }}
+        """)
+    elif not allow_unique and allow_array:
+        cwl_js_value_from = f"""
+            ${{
+                if (!Array.isArray(self)) {{
+                    throw "invalid value " + self + " does not match expected type";
+                }}
+                {cwl_js_value_from_const}
+                {cwl_js_value_from_array}
+            }}
+        """
+    else:
+        cwl_js_value_from = f"""
+            ${{
+                {cwl_js_value_from_const}
+                if (Array.isArray(self)) {{
+                    {cwl_js_value_from_array}
+                }}
+                else {{
+                    {cwl_js_value_from_unique}
+                }}
+            }}
+        """
     return cwl_js_value_from
 
 
-def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select):
-    # type: (Union[str, Type[null]], List[AnyValueType], IO_Select_Type) -> CWL_IO_Type
+def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, allow_array):
+    # type: (Union[str, Type[null]], List[AnyValueType], IO_Select_Type, bool, bool) -> CWL_IO_Type
     """
     Converts the I/O definition to a :term:`CWL` I/O that allows `Enum`-like functionality for various literal types.
 
@@ -652,7 +691,7 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select):
     if io_select != IO_INPUT:
         return {"type": cwl_io_type}
 
-    cwl_js_value_from = _get_cwl_js_value_from(cwl_io_symbols)
+    cwl_js_value_from = _get_cwl_js_value_from(cwl_io_symbols, allow_unique, allow_array)
     return {"type": cwl_io_type, "inputBinding": {"valueFrom": cwl_js_value_from}}
 
 
@@ -680,13 +719,20 @@ def any2cwl_io(wps_io, io_select):
         wps_io_cat = get_field(wps_io, "type", search_variations=False)
         wps_io_type = get_field(wps_io, "data_type", search_variations=False)
 
+    wps_default = get_field(wps_io, "default", search_variations=True)
+    wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
+    wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
+    is_min_null = wps_min_occ in [0, "0"]
+    allow_unique = wps_min_occ in [0, "0", 1, "1"]
+    allow_array = wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1)
+
     if wps_io_cat not in list(WPS_COMPLEX_TYPES):
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
         if cwl_io_type is null:
             LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
-            cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow, io_select)
+            cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow, io_select, allow_unique, allow_array)
             cwl_io.update(cwl_io_enum)
         else:
             cwl_io["type"] = cwl_io_type
@@ -697,19 +743,15 @@ def any2cwl_io(wps_io, io_select):
     # FIXME: multi-outputs (https://github.com/crim-ca/weaver/issues/25)
     # min/max occurs can only be in inputs, outputs are enforced min/max=1 by WPS
     if io_select == IO_INPUT:
-        wps_default = get_field(wps_io, "default", search_variations=True)
-        wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
         # field 'default' must correspond to a fallback "value", not a default "format"
-        is_min_null = wps_min_occ in [0, "0"]
-        if wps_default != null and not isinstance(wps_default, dict):
-            cwl_io["default"] = wps_default
         # NOTE:
         #   Don't set any 'default' field here (neither 'null' string or 'None' type) if no value was provided
         #   since those are interpreted by CWL as literal string 'null' (for 'string' type) or null object.
-        #   Instead, 'null' entry is added to 'type' to indicate drop/ignore missing input.
+        #   Instead, 'null' string entry is added to 'type' to indicate drop/ignore missing input.
+        if wps_default != null and not isinstance(wps_default, dict):
+            cwl_io["default"] = wps_default
 
-        wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
-        if wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1):
+        if allow_array:
             cwl_array = {
                 "type": PACKAGE_ARRAY_BASE,
                 "items": cwl_io["type"]

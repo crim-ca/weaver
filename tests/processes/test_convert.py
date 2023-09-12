@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 import yaml
+from cwltool.errors import WorkflowException
+from cwltool.factory import Factory as CWLFactory
 from owslib.wps import ComplexData, Input as OWSInput
 from pywps.inout.formats import Format
 from pywps.inout.inputs import ComplexInput, LiteralInput
@@ -354,7 +356,7 @@ def test_any2cwl_io_from_oas():
             {
                 "id": "test",
                 "type": "int",
-                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3])},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
             },
         ),
         (
@@ -370,7 +372,7 @@ def test_any2cwl_io_from_oas():
             {
                 "id": "test",
                 "type": {"type": "array", "items": "int"},
-                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3])},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
             },
         ),
         (
@@ -387,25 +389,157 @@ def test_any2cwl_io_from_oas():
                 "id": "test",
                 "type": [
                     "null",
-                    {
-                        "type": "enum",
-                        "symbols": ["1", "2", "3"],
-                    },
+                    "int",
                     {
                         "type": "array",
-                        "items": {
-                            "type": "enum",
-                            "symbols": ["1", "2", "3"],
-                        },
+                        "items": "int",
                     },
-                ]
+                ],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
             },
         ),
     ]
 )
-def test_any2cwl_io_enum(io_select, test_io, expect):
+def test_any2cwl_io_enum_convert(io_select, test_io, expect):
     cwl_io, _ = any2cwl_io(test_io, io_select)  # type: ignore
     assert cwl_io == expect
+
+
+@pytest.mark.parametrize(
+    ["test_io", "test_input", "expect_valid"],
+    [
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            1,
+            True,
+        ),
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            [1],
+            False,
+        ),
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            ["1"],
+            False,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            [1],
+            True,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            1,
+            False,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            ["1"],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            None,
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            1,
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1],
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [0],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1, 4],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1, 2.3],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            0,
+            False,
+        ),
+    ]
+)
+def test_any2cwl_io_enum_validate(test_io, test_input, expect_valid):
+    cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": "echo",
+        "requirements": {
+            "InlineJavascriptRequirement": {}
+        },
+        "inputs": {
+            "input": test_io,
+        },
+        "outputs": {
+            "output": "stdout",
+        }
+    }
+    factory = CWLFactory()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(cwl, tmp_file)
+        tmp_file.flush()
+        tool = factory.make(f"file://{tmp_file.name}")
+    inputs = {"input": test_input}
+    if expect_valid:
+        tool(**inputs)
+    else:
+        with pytest.raises(WorkflowException):
+            tool(**inputs)
 
 
 @pytest.mark.parametrize(
