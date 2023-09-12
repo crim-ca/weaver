@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         StoreServicesType,
         StoreTypeName,
         StoreVault,
-        StoreVaultType,
+        StoreVaultType
     )
     from weaver.typedefs import AnySettingsContainer, JSON
 

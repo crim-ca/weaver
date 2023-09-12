@@ -78,7 +78,7 @@ from weaver.processes.constants import (
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE,
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
     DEFAULT_FORMAT,

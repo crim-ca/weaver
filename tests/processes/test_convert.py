@@ -34,7 +34,8 @@ from weaver.processes.constants import (
     WPS_LITERAL_DATA_TYPES,
     ProcessSchema
 )
-from weaver.processes.convert import _are_different_and_set, _get_cwl_js_value_from  # noqa: W0212
+from weaver.processes.convert import _are_different_and_set  # noqa: W0212
+from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,

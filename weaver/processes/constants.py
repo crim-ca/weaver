@@ -1,21 +1,22 @@
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, Union, get_args
+from typing import TYPE_CHECKING, Union, get_args
+from typing_extensions import Literal
 
 from weaver.base import Constants
 
-IO_Select_Input = Literal["input"]
-IO_Select_Output = Literal["output"]
-IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]
-IO_INPUT = get_args(IO_Select_Input)[0]
-IO_OUTPUT = get_args(IO_Select_Output)[0]
+IO_Select_Input = Literal["input"]  # pylint: disable=C0103
+IO_Select_Output = Literal["output"]  # pylint: disable=C0103
+IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]  # pylint: disable=C0103
+IO_INPUT = get_args(IO_Select_Input)[0]  # pylint: disable=C0103
+IO_OUTPUT = get_args(IO_Select_Output)[0]  # pylint: disable=C0103
 
 WPS_COMPLEX = "complex"
 WPS_BOUNDINGBOX = "bbox"
-WPS_Literal_Type = Literal["literal"]
-WPS_Reference_Type = Literal["reference"]
-WPS_Complex_Type = Literal["ComplexData"]
-WPS_Category_Type = Union[WPS_Literal_Type, WPS_Reference_Type, WPS_Complex_Type]
+WPS_Literal_Type = Literal["literal"]  # pylint: disable=C0103
+WPS_Reference_Type = Literal["reference"]  # pylint: disable=C0103
+WPS_Complex_Type = Literal["ComplexData"]  # pylint: disable=C0103
+WPS_Category_Type = Union[WPS_Literal_Type, WPS_Reference_Type, WPS_Complex_Type]  # pylint: disable=C0103
 WPS_LITERAL = get_args(WPS_Literal_Type)[0]
 WPS_REFERENCE = get_args(WPS_Reference_Type)[0]
 WPS_COMPLEX_DATA = get_args(WPS_Complex_Type)[0]
@@ -229,10 +230,6 @@ class JobInputsOutputsSchema(Constants):
 
 
 if TYPE_CHECKING:
-    from typing import Union
-
-    from weaver.typedefs import Literal
-
     # pylint: disable=invalid-name
     CWL_RequirementNames = Literal[
         CWL_REQUIREMENT_APP_BUILTIN,
