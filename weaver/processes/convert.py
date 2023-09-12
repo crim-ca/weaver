@@ -39,6 +39,7 @@ from weaver.formats import (
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     IO_INPUT,
     IO_OUTPUT,
     OAS_ARRAY_TYPES,
@@ -773,6 +774,29 @@ def any2cwl_io(wps_io, io_select):
     return cwl_io, cwl_ns
 
 
+def _patch_cwl_enum_js_requirement(cwl_package):
+    # type: (CWL) -> None
+    """
+    Applies the JavaScript requirement to validate a pseudo-``Enum`` applied to a :term:`CWL` input definition.
+
+    .. seealso::
+        - :func:`any2cwl_io`
+        - :func:`_convert_cwl_io_enum`
+        - :func:`_get_cwl_js_value_from`
+    """
+    cwl_items = cwl_package.get("inputs", [])
+    if isinstance(cwl_items, dict):
+        cwl_items = list(cwl_items.values())
+    for cwl_input in cwl_items:
+        cwl_value_from = cwl_input.get("inputBinding", {}).get("valueFrom", {})
+        if isinstance(cwl_value_from, str):
+            cwl_value_from = cwl_value_from.strip()
+            if cwl_value_from.startswith("${") and cwl_value_from.endswith("}"):
+                cwl_package.setdefault("requirements", {})
+                cwl_package["requirements"].setdefault(CWL_REQUIREMENT_INLINE_JAVASCRIPT, {})
+                return  # early exit, no need to check more
+
+
 def wps2cwl_requirement(wps_service_url, wps_process_id):
     # type: (Union[str, ParseResult], str) -> JSON
     """
@@ -829,6 +853,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url, wps_provider_name=N
                 if "$namespaces" not in cwl_package:
                     cwl_package["$namespaces"] = {}
                 cwl_package["$namespaces"].update(cwl_ns)
+    _patch_cwl_enum_js_requirement(cwl_package)
     return cwl_package, process_info
 
 
@@ -952,6 +977,7 @@ def ogcapi2cwl_process(payload, reference):
         }
     }
     cwl_package.update(cwl_pkg)  # type: ignore
+    _patch_cwl_enum_js_requirement(cwl_package)
     payload_copy["executionUnit"] = [{"unit": cwl_package}]
     payload_copy["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     return cwl_package, payload_copy
@@ -2279,6 +2305,7 @@ def oas2json_io_literal(io_info):
         io_allow.update(io_info)  # noqa
         io_allow["data_type"] = data_type
         domains = any2json_literal_data_domains(io_allow)
+        io_json["allowed_values"] = io_allow["allowed_values"]  # propagate to help CWL resolution of enum later on
         io_json["literalDataDomains"] = domains
     return io_json
 

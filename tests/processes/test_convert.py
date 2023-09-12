@@ -25,6 +25,8 @@ from weaver.exceptions import PackageTypeError
 from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     IO_INPUT,
     IO_OUTPUT,
     WPS_BOUNDINGBOX,
@@ -58,7 +60,8 @@ from weaver.processes.convert import (
     parse_cwl_enum_type,
     repr2json_input_values,
     set_field,
-    wps2json_io
+    wps2json_io,
+    xml_wps2cwl
 )
 from weaver.utils import null
 
@@ -1796,3 +1799,99 @@ def test_ogcapi2cwl_process_without_extra():
     body["executionUnit"] = [{"unit": cwl}]
     body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     assert info == body, "Process information should be updated with minimal details since no CWL detected in input."
+
+
+
+@pytest.mark.parametrize(
+    ["input_str", "input_int", "input_float"],
+    [
+        # OpenAPI schema references
+        (
+            {"schema": {"type": "string", "enum": ["a", "b", "c"]}},
+            {"schema": {"type": "integer", "enum": [1, 2, 3]}},
+            {"schema": {"type": "number", "format": "float", "enum": [1.2, 3.4]}},
+        ),
+        # OGC-API input definitions
+        (
+            {"data_type": "string", "allowed_values": ["a", "b", "c"]},
+            {"data_type": "integer", "allowed_values": [1, 2, 3]},
+            {"data_type": "float", "allowed_values": [1.2, 3.4]},
+        ),
+    ]
+)
+def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
+    """
+    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+
+    .. seealso::
+        - :func:`test_any2cwl_io_enum_convert`
+        - :func:`test_any2cwl_io_enum_validate`
+    """
+    href = "https://remote-server.com/processes/test-process"
+    body = {
+        "inputs": {
+            "enum-str": input_str,
+            "enum-int": input_int,
+            "enum-float": input_float,
+        },
+        "outputs": {
+            "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
+        }
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+
+    assert cwl["inputs"]["enum-str"]["type"] == {"type": "enum", "symbols": ["a", "b", "c"]}
+    assert cwl["inputs"]["enum-int"]["type"] == "int"
+    assert "symbols" not in cwl["inputs"]["enum-int"]
+    cwl_value_from = cwl["inputs"]["enum-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1, 2, 3]" in cwl_value_from
+    assert cwl["inputs"]["enum-float"]["type"] == "float"
+    assert "symbols" not in cwl["inputs"]["enum-float"]
+    cwl_value_from = cwl["inputs"]["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4]" in cwl_value_from
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_OGC_API: {"process": href}}
+
+
+def test_xml_wps2cwl_enum_updated():
+    """
+    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+
+    .. seealso::
+        - :func:`test_any2cwl_io_enum_convert`
+        - :func:`test_any2cwl_io_enum_validate`
+    """
+    raise NotImplementedError   # FIXME
+
+    proc = "test-process"
+    prov = "https://remote-server.com"
+    href = f"{prov}?service=WPS&version=1.0.0&request=DescribeProcess&identifier={proc}"
+    body = {
+        "inputs": {
+            "enum-str": input_str,
+            "enum-int": input_int,
+            "enum-float": input_float,
+        },
+        "outputs": {
+            "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
+        }
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+
+    assert cwl["inputs"]["enum-str"]["type"] == {"type": "enum", "symbols": ["a", "b", "c"]}
+    assert cwl["inputs"]["enum-int"]["type"] == "int"
+    assert "symbols" not in cwl["inputs"]["enum-int"]
+    cwl_value_from = cwl["inputs"]["enum-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1, 2, 3]" in cwl_value_from
+    assert cwl["inputs"]["enum-float"]["type"] == "float"
+    assert "symbols" not in cwl["inputs"]["enum-float"]
+    cwl_value_from = cwl["inputs"]["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4]" in cwl_value_from
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_WPS1: {"provider": prov, "process": proc}}
