@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from pywps.app import Process
 from pywps.inout import LiteralInput, LiteralOutput
 
-from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT
+from weaver.processes.constants import IO_INPUT, IO_OUTPUT
 from weaver.processes.convert import json2wps_field, json2wps_io
 from weaver.processes.types import ProcessType
 
@@ -40,8 +40,8 @@ class WpsTestProcess(Process):
             inputs = [LiteralInput("test_input", "Input Request", data_type="string")]
         if outputs is None:
             outputs = [LiteralOutput("test_output", "Output response", data_type="string")]
-        inputs = [json2wps_io(i, WPS_INPUT) if isinstance(i, dict) else i for i in inputs]
-        outputs = [json2wps_io(o, WPS_OUTPUT) if isinstance(o, dict) else o for o in outputs]
+        inputs = [json2wps_io(i, IO_INPUT) if isinstance(i, dict) else i for i in inputs]
+        outputs = [json2wps_io(o, IO_OUTPUT) if isinstance(o, dict) else o for o in outputs]
         metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", [])]
 
         super(WpsTestProcess, self).__init__(

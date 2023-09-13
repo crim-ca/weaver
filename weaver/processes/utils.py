@@ -870,8 +870,8 @@ def parse_wps_process_config(config_entry):
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
     # if explicit name was provided, validate it (assert fail if not),
-    # otherwise replace silently bad character since since is requested to be inferred
-    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
+    # otherwise replace silently bad character since it is requested to be inferred
+    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name), min_len=1)
     svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
@@ -919,7 +919,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
     for wps_process in wps_processes:
-        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier)}"
+        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier, min_len=1)}"
         wps_pid = wps_process.identifier
         proc_url = f"{service_url}?service=WPS&request=DescribeProcess&identifier={wps_pid}&version={wps.version}"
         svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE
