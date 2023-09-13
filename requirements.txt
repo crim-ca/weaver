@@ -20,9 +20,6 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
 celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
 celery[mongodb]>=5.2.2,<6; sys_platform != "win32" and python_version >= "3.7"
-# technically, >=5.2 preferred to resolve security issue, but dependency resolver cannot find it
-# FIXME: drop support? more recent versions not avilable for end-of-life python
-celery[mongodb]>=5.1,<5.2; sys_platform != "win32" and python_version <= "3.6"  # rq.filter: >=5.1,<5.2 # pyup: ignore
 cffi
 colander<2
 cornice
@@ -35,20 +32,17 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
-cwltool==3.1.20230719185429; python_version <= "3.6"  # pyup: ignore
 cwltool==3.1.20230906142556; python_version >= "3.7"
 docker
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
 # (https://github.com/KipCrossing/geotiff/pull/59)
-geotiff!=0.2.6,!=0.2.7; python_version <= "3.6"
 geotiff>=0.2.8; python_version >= "3.7"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
-json2xml<3.19.0; python_version <= "3.6"  # pyup: ignore
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 json2xml>=3.20.0; python_version >= "3.7"
 jsonschema>=3.0.1
@@ -63,7 +57,6 @@ mako
 # employed by cwltool -> schema-salad -> mistune
 mistune>=2.0.3,<2.1
 mypy_boto3_s3
-numpy>=1.19.5; python_version == "3.6"  # pyup: ignore
 numpy>=1.21.6; python_version == "3.7"  # pyup: ignore
 numpy>=1.22.2; python_version >= "3.8"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
@@ -74,7 +67,6 @@ psutil
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
-pymongo>=3.12.0,<4; python_version <= "3.6"
 pymongo>=4; python_version >= "3.7"     # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 pyramid>=1.7.3
 pyramid_beaker>=0.8
@@ -84,7 +76,6 @@ python-dateutil
 pyramid_rewrite
 pyramid_storage
 pytz
-pywps==4.5.1; python_version <= "3.6"  # pyup: ignore
 pywps==4.5.2; python_version >= "3.7"
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
