@@ -1,6 +1,6 @@
 import abc
-from typing import TYPE_CHECKING, get_args
-from typing_extensions import Literal
+from typing import TYPE_CHECKING
+from typing_extensions import Literal, get_args
 
 from weaver.utils import VersionFormat
 

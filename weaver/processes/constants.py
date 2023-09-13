@@ -1,7 +1,7 @@
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Union, get_args
-from typing_extensions import Literal
+from typing import TYPE_CHECKING, Union
+from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
