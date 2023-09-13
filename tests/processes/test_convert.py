@@ -20,7 +20,8 @@ from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
-from tests.utils import assert_equal_any_order
+from tests import resources
+from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
 from weaver.exceptions import PackageTypeError
 from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
 from weaver.processes.constants import (
@@ -1801,7 +1802,6 @@ def test_ogcapi2cwl_process_without_extra():
     assert info == body, "Process information should be updated with minimal details since no CWL detected in input."
 
 
-
 @pytest.mark.parametrize(
     ["input_str", "input_int", "input_float"],
     [
@@ -1840,22 +1840,34 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
     }
     cwl, info = ogcapi2cwl_process(body, href)
     assert info is not body, "copy should be created, not inplace modifications"
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_OGC_API: {"process": href}}
 
     assert cwl["inputs"]["enum-str"]["type"] == {"type": "enum", "symbols": ["a", "b", "c"]}
+    assert "inputBinding" not in cwl["inputs"]["enum-str"]
+
     assert cwl["inputs"]["enum-int"]["type"] == "int"
     assert "symbols" not in cwl["inputs"]["enum-int"]
     cwl_value_from = cwl["inputs"]["enum-int"]["inputBinding"]["valueFrom"].strip()
     assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
     assert "[1, 2, 3]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
     assert cwl["inputs"]["enum-float"]["type"] == "float"
     assert "symbols" not in cwl["inputs"]["enum-float"]
     cwl_value_from = cwl["inputs"]["enum-float"]["inputBinding"]["valueFrom"].strip()
     assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
     assert "[1.2, 3.4]" in cwl_value_from
-    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
-    assert cwl["hints"] == {CWL_REQUIREMENT_APP_OGC_API: {"process": href}}
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
 
 
+@mocked_remote_server_requests_wps1([
+    resources.TEST_REMOTE_SERVER_URL,
+    resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+    [resources.WPS_LITERAL_ENUM_IO_XML]
+])
 def test_xml_wps2cwl_enum_updated():
     """
     Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
@@ -1864,34 +1876,58 @@ def test_xml_wps2cwl_enum_updated():
         - :func:`test_any2cwl_io_enum_convert`
         - :func:`test_any2cwl_io_enum_validate`
     """
-    raise NotImplementedError   # FIXME
+    prov = resources.TEST_REMOTE_SERVER_URL
+    href = f"{prov}?service=WPS&version=1.0.0&request=DescribeProcess&identifier={resources.WPS_LITERAL_ENUM_IO_ID}"
+    body = resources.load_resource("wps_literal_enum_io.xml")
+    resp = MockedResponse()
+    resp.url = href
+    resp.content = body
+    cwl, _ = xml_wps2cwl(resp, {})  # type: ignore
+    cwl_inputs = {cwl_io["id"]: cwl_io for cwl_io in cwl["inputs"]}
 
-    proc = "test-process"
-    prov = "https://remote-server.com"
-    href = f"{prov}?service=WPS&version=1.0.0&request=DescribeProcess&identifier={proc}"
-    body = {
-        "inputs": {
-            "enum-str": input_str,
-            "enum-int": input_int,
-            "enum-float": input_float,
-        },
-        "outputs": {
-            "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
-        }
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_WPS1: {"provider": prov, "process": resources.WPS_LITERAL_ENUM_IO_ID}}
+
+    assert cwl_inputs["enum-str"]["type"] == [
+        "null",
+        {"type": "enum", "symbols": ["A", "B", "C"]}
+    ]
+    assert "inputBinding" not in cwl_inputs["enum-str"]
+
+    assert cwl_inputs["enum-array-str"]["type"] == {
+        "type": "array",
+        "items": {"type": "enum", "symbols": ["A", "B", "C"]}
     }
-    cwl, info = ogcapi2cwl_process(body, href)
-    assert info is not body, "copy should be created, not inplace modifications"
+    assert "inputBinding" not in cwl_inputs["enum-array-str"]
 
-    assert cwl["inputs"]["enum-str"]["type"] == {"type": "enum", "symbols": ["a", "b", "c"]}
-    assert cwl["inputs"]["enum-int"]["type"] == "int"
-    assert "symbols" not in cwl["inputs"]["enum-int"]
-    cwl_value_from = cwl["inputs"]["enum-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_inputs["enum-int"]["type"] == ["null", "int"]
+    assert "symbols" not in cwl_inputs["enum-int"]
+    cwl_value_from = cwl_inputs["enum-int"]["inputBinding"]["valueFrom"].strip()
     assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
     assert "[1, 2, 3]" in cwl_value_from
-    assert cwl["inputs"]["enum-float"]["type"] == "float"
-    assert "symbols" not in cwl["inputs"]["enum-float"]
-    cwl_value_from = cwl["inputs"]["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl_inputs["enum-array-int"]["type"] == {"type": "array", "items": "int"}
+    assert "symbols" not in cwl_inputs["enum-array-int"]
+    cwl_value_from = cwl_inputs["enum-array-int"]["inputBinding"]["valueFrom"].strip()
     assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
-    assert "[1.2, 3.4]" in cwl_value_from
-    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
-    assert cwl["hints"] == {CWL_REQUIREMENT_APP_WPS1: {"provider": prov, "process": proc}}
+    assert "[1, 2, 3]" in cwl_value_from
+    assert "values.includes(self)" not in cwl_value_from
+    assert "self.every(item => values.includes(item))" in cwl_value_from
+
+    assert cwl_inputs["enum-float"]["type"] == "float"
+    assert "symbols" not in cwl_inputs["enum-float"]
+    cwl_value_from = cwl_inputs["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4, 5.6]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl_inputs["enum-array-float"]["type"] == ["null", "float", {"type": "array", "items": "float"}]
+    assert "symbols" not in cwl_inputs["enum-array-float"]
+    cwl_value_from = cwl_inputs["enum-array-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4, 5.6]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" in cwl_value_from
