@@ -38,6 +38,9 @@ Fixes:
   `common-workflow-language#764 <https://github.com/common-workflow-language/common-workflow-language/issues/764>`_ and
   `common-workflow-language#907 <https://github.com/common-workflow-language/common-workflow-language/issues/907>`_).
 - Fix typing definitions for certain ``Literal`` references for proper resolution involving values stored in constants.
+- Fix ``get_sane_name`` checks performed on `Process` ID and `Service` name to use ``min_len=1`` in order to allow
+  valid `WPS` process definition on existing servers to resolve references that are shorter than the previous default
+  of 3 characters.
 
 .. _changes_4.30.1:
 

@@ -544,7 +544,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for pkg in package_mock:
                 stack.enter_context(pkg)
             path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
@@ -568,6 +568,30 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+    def test_deploy_process_short_name(self):
+        process_name = "x"
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        process_data["processDescription"]["visibility"] = Visibility.PUBLIC
+        process_data["processDescription"]["outputs"] = {"output": {"schema": {"type": "string"}}}
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
+            assert resp.status_code == 201
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["processSummary"]["id"] == process_name
+            assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+            # perform get to make sure all name checks in the chain, going through db save/load, are validated
+            path = f"{path}/{process_name}"
+            query = {"schema": ProcessSchema.OLD}
+            resp = self.app.get(path, headers=self.json_headers, params=query, expect_errors=False)
+            assert resp.status_code == 200
+            assert resp.json["process"]["id"] == process_name
 
     def test_deploy_process_bad_name(self):
         process_name = f"{self.fully_qualified_test_process_name()}..."

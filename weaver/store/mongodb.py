@@ -113,6 +113,7 @@ class MongodbStore(object):
             raise TypeError("Collection not of expected type.")
         self.collection = collection  # type: Collection
         self.sane_name_config = sane_name_config or {}
+        self.sane_name_config.setdefault("min_len", 1)
 
     @classmethod
     def get_args_kwargs(cls, *args, **kwargs):
