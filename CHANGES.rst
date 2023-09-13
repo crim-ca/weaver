@@ -27,6 +27,9 @@ Fixes:
 - Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
   to schema validation incorrectly preventing it.
 - Fix human-readable `JSON`-like content cleanup to preserve sequences of quotes corresponding to valid empty strings.
+- Fix ``get_sane_name`` checks performed on `Process` ID and `Service` name to use ``min_len=1`` in order to allow
+  valid `WPS` process definition on existing servers to resolve references that are shorter than the previous default
+  of 3 characters.
 
 .. _changes_4.30.1:
 
