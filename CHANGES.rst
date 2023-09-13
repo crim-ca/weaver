@@ -27,6 +27,17 @@ Fixes:
 - Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
   to schema validation incorrectly preventing it.
 - Fix human-readable `JSON`-like content cleanup to preserve sequences of quotes corresponding to valid empty strings.
+- Fix `WPS` I/O ``integer`` literal data conversion to `OpenAPI` I/O ``schema`` definition injecting an
+  invalid ``format: double`` property due to type checking with ``float`` succeeding against ``int`` values.
+- Fix `CWL` I/O value validation for ``enum``-like definitions from corresponding `OpenAPI` and `WPS` I/O.
+  Since `CWL` I/O do not allow ``Enum`` type for values other than basic ``string`` type, ``valueFrom`` attribute is
+  used to handle ``int``, ``float`` and ``bool`` types, using an embedded JavaScript validation against allowed values.
+  Because of this validation strategy, `CWL` packages must now include ``InlineJavascriptRequirement`` when allowed
+  values for these basic types must be performed in order for the `CWL` engine to parse I/O contents of ``valueFrom``
+  (relates to `cwl-v1.2#267 <https://github.com/common-workflow-language/cwl-v1.2/issues/267>`_,
+  `common-workflow-language#764 <https://github.com/common-workflow-language/common-workflow-language/issues/764>`_ and
+  `common-workflow-language#907 <https://github.com/common-workflow-language/common-workflow-language/issues/907>`_).
+- Fix typing definitions for certain ``Literal`` references for proper resolution involving values stored in constants.
 - Fix ``get_sane_name`` checks performed on `Process` ID and `Service` name to use ``min_len=1`` in order to allow
   valid `WPS` process definition on existing servers to resolve references that are shorter than the previous default
   of 3 characters.

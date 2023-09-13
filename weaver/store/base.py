@@ -1,5 +1,6 @@
 import abc
 from typing import TYPE_CHECKING
+from typing_extensions import Literal, get_args
 
 from weaver.utils import VersionFormat
 
@@ -33,8 +34,24 @@ if TYPE_CHECKING:
     JobSearchResult = Tuple[Union[List[Job], JobGroupCategory], int]
 
 
+StoreServicesType = Literal["services"]
+StoreProcessesType = Literal["processes"]
+StoreJobsType = Literal["jobs"]
+StoreBillsType = Literal["bills"]
+StoreQuotesType = Literal["quotes"]
+StoreVaultType = Literal["vault"]
+StoreTypeName = Literal[
+    StoreBillsType,
+    StoreJobsType,
+    StoreProcessesType,
+    StoreQuotesType,
+    StoreServicesType,
+    StoreVaultType
+]
+
+
 class StoreInterface(object, metaclass=abc.ABCMeta):
-    type = None      # type: str
+    type = None      # type: StoreTypeName
     settings = None  # type: SettingsType
 
     def __init__(self, settings=None):
@@ -45,7 +62,7 @@ class StoreInterface(object, metaclass=abc.ABCMeta):
 
 
 class StoreServices(StoreInterface):
-    type = "services"
+    type = get_args(StoreServicesType)[0]
 
     @abc.abstractmethod
     def save_service(self, service, overwrite=True):
@@ -79,7 +96,7 @@ class StoreServices(StoreInterface):
 
 
 class StoreProcesses(StoreInterface):
-    type = "processes"
+    type = get_args(StoreProcessesType)[0]
 
     @abc.abstractmethod
     def save_process(self, process, overwrite=True):
@@ -145,7 +162,7 @@ class StoreProcesses(StoreInterface):
 
 
 class StoreJobs(StoreInterface):
-    type = "jobs"
+    type = get_args(StoreJobsType)[0]
 
     @abc.abstractmethod
     def save_job(self,
@@ -220,7 +237,7 @@ class StoreJobs(StoreInterface):
 
 
 class StoreQuotes(StoreInterface):
-    type = "quotes"
+    type = get_args(StoreQuotesType)[0]
 
     @abc.abstractmethod
     def save_quote(self, quote):
@@ -249,7 +266,7 @@ class StoreQuotes(StoreInterface):
 
 
 class StoreBills(StoreInterface):
-    type = "bills"
+    type = get_args(StoreBillsType)[0]
 
     @abc.abstractmethod
     def save_bill(self, bill):
@@ -273,7 +290,7 @@ class StoreBills(StoreInterface):
 
 
 class StoreVault(StoreInterface):
-    type = "vault"
+    type = get_args(StoreVaultType)[0]
 
     @abc.abstractmethod
     def get_file(self, file_id, nothrow=False):

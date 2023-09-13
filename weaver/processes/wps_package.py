@@ -73,12 +73,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
     CWL_TOOL_NAMESPACE_URL,
+    IO_INPUT,
+    IO_OUTPUT,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE,
-    WPS_INPUT,
-    WPS_OUTPUT
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
@@ -142,6 +142,7 @@ if TYPE_CHECKING:
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
+    from weaver.processes.constants import IO_Select_Type
     from weaver.processes.convert import (
         ANY_IO_Type,
         CWL_Input_Type,
@@ -599,13 +600,13 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     """
     wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
     wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
-    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
-    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
+    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, IO_INPUT)
+    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, IO_OUTPUT)
     return wps_inputs_merged, wps_outputs_merged
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, str, bool) -> List[PKG_IO_Type]
+    # type: (CWLFactoryCallable, IO_Select_Type, bool) -> List[PKG_IO_Type]
     """
     Retrieves I/O definitions from a validated :class:`CWLFactoryCallable`.
 
@@ -613,15 +614,15 @@ def _get_package_io(package_factory, io_select, as_json):
         Factory can be obtained with validation using :func:`_load_package_content`.
 
     :param package_factory: :term:`CWL` factory that contains I/O references to the package definition.
-    :param io_select: either :data:`WPS_INPUT` or :data:`WPS_OUTPUT` according to what needs to be processed.
+    :param io_select: either :data:`IO_INPUT` or :data:`IO_OUTPUT` according to what needs to be processed.
     :param as_json: toggle to the desired output type.
         If ``True``, converts the I/O definitions into :term:`JSON` representation.
         If ``False``, converts the I/O definitions into :term:`WPS` objects.
     :returns: I/O format depending on value :paramref:`as_json`.
     """
-    if io_select == WPS_OUTPUT:
+    if io_select == IO_OUTPUT:
         io_attrib = "outputs_record_schema"
-    elif io_select == WPS_INPUT:
+    elif io_select == IO_INPUT:
         io_attrib = "inputs_record_schema"
     else:
         raise PackageTypeError(f"Unknown I/O selection: '{io_select}'.")
@@ -638,8 +639,8 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
     """
     Generates :term:`WPS`-like ``(inputs, outputs)`` tuple using parsed CWL package definitions.
     """
-    return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
-            _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
+    return (_get_package_io(package_factory, io_select=IO_INPUT, as_json=as_json),
+            _get_package_io(package_factory, io_select=IO_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
@@ -1248,8 +1249,8 @@ class WpsPackage(Process):
         # handle EOImage inputs
         inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
-        inputs = [json2wps_io(i, WPS_INPUT) for i in inputs]
-        outputs = [json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", [])]
+        inputs = [json2wps_io(i, IO_INPUT) for i in inputs]
+        outputs = [json2wps_io(o, IO_OUTPUT) for o in kw.pop("outputs", [])]
         metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", [])]
 
         super(WpsPackage, self).__init__(
