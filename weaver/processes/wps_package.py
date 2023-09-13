@@ -243,7 +243,7 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_id = get_sane_name(process_id_or_url)
+    process_id = get_sane_name(process_id_or_url, min_len=1)
     process_url = sd.process_service.path.format(process_id=process_id)
     return f"{data_source_url}{process_url}"
 
@@ -974,7 +974,7 @@ def get_process_identifier(process_info, package):
     process_id = get_any_id(process_info)
     if not process_id:
         process_id = package.get("id")
-    process_id = get_sane_name(process_id, assert_invalid=True)
+    process_id = get_sane_name(process_id, assert_invalid=True, min_len=1)
     return process_id
 
 
