@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.31.0:
+
+`4.31.0 <https://github.com/crim-ca/weaver/tree/4.31.0>`_ (2023-09-14)
+========================================================================
+
+Changes:
+--------
 - Add the official `CWL` `JSON` schema reference
   (`common-workflow-language/cwl-v1.2#256 <https://github.com/common-workflow-language/cwl-v1.2/pull/256>`_)
   as ``$schema`` parameter returned in under the `OpenAPI` schema for the `CWL` component employed by `Weaver`
