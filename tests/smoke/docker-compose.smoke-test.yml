@@ -16,6 +16,7 @@ services:
       - "4001:4001"
     volumes:
       - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ./tests:/tests
     networks:
       - default
     restart: "no"

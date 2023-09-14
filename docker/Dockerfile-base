@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         netbase \
         gcc \
         git \
+        nodejs \
     && pip install --no-cache-dir --upgrade -r requirements-sys.txt \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e ${APP_DIR} \
