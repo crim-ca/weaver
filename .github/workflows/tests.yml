@@ -33,6 +33,7 @@ jobs:
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
+      DOCKER_TEST_EXEC_ARGS: "-T"
     services:
       # Label used to access the service container
       mongodb:
