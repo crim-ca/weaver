@@ -811,6 +811,7 @@ docker-test: docker-build stop	## execute smoke test of the built images (valida
 	@curl localhost:4001 | grep "Weaver Information" || \
 		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	docker-compose $(DOCKER_TEST_COMPOSES) exec weaver bash /tests/run_tests.sh
 	docker-compose $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat
