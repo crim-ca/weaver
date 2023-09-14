@@ -41,17 +41,17 @@ for each process.
     * - releases
       - | |version| |commits-since| |license|
 
-.. |py_ver| image:: https://img.shields.io/badge/python-3.6%2B-blue.svg
-    :alt: Requires Python 3.6+
+.. |py_ver| image:: https://img.shields.io/badge/python-3.7%2B-blue.svg
+    :alt: Requires Python 3.7+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/4.30.1.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/4.31.0.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/4.30.1...master
+    :target: https://github.com/crim-ca/weaver/compare/4.31.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-4.30.1-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-4.31.0-blue
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/4.30.1
+    :target: https://github.com/crim-ca/weaver/tree/4.31.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
     :alt: Libraries.io Dependencies Status
@@ -65,9 +65,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=4.30.1&branch=4.30.1
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=4.31.0&branch=4.31.0
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A4.30.1
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A4.31.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: ReadTheDocs Build Status (master branch)
@@ -79,7 +79,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/4.30.1?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/4.31.0?label=tag%20status
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -202,12 +202,12 @@ Docker image repositories:
 
 ::
 
-    $ docker pull pavics/weaver:4.30.1
+    $ docker pull pavics/weaver:4.31.0
 
 For convenience, following tags are also available:
 
-- ``weaver:4.30.1-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:4.30.1-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:4.31.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:4.31.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
@@ -331,7 +331,7 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |ogc-api-proc-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
 .. _`OGC API - Processes - Part 2: Deploy, Replace, Undeploy`: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-apppkg| replace:: `OGC Application Package`
-.. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+.. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy

@@ -146,7 +146,7 @@ if TYPE_CHECKING:
         "type": CWL_IO_ArrayBaseType,
         "items": Union[str, CWL_IO_EnumType],  # "items" => type of every item
     })
-    CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
+    CWL_IO_TypeItem = Union[CWL_IO_BaseType, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
     CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
     CWL_Input_Type = TypedDict("CWL_Input_Type", {
         "id": NotRequired[str],     # representation used by plain CWL definition

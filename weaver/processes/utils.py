@@ -195,7 +195,7 @@ def _check_deploy(payload):
     """
     message = "Process deployment definition is invalid."
     try:
-        results = sd.Deploy().deserialize(payload)
+        results = sd.Deploy(schema_meta_include=False, schema_include=False).deserialize(payload)
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
@@ -239,7 +239,10 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitList(
+                schema_meta_include=False,
+                schema_include=False,
+            ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
@@ -352,6 +355,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)
+    payload.pop("$id", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -459,6 +463,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # remove schema to avoid later deserialization error if different, but remaining content is valid
     # also, avoid storing this field in the process object, regenerate it as needed during responses
     process_info.pop("$schema", None)
+    process_info.pop("$id", None)
 
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
@@ -865,8 +870,8 @@ def parse_wps_process_config(config_entry):
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
     # if explicit name was provided, validate it (assert fail if not),
-    # otherwise replace silently bad character since since is requested to be inferred
-    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
+    # otherwise replace silently bad character since it is requested to be inferred
+    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name), min_len=1)
     svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
@@ -914,7 +919,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
     for wps_process in wps_processes:
-        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier)}"
+        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier, min_len=1)}"
         wps_pid = wps_process.identifier
         proc_url = f"{service_url}?service=WPS&request=DescribeProcess&identifier={wps_pid}&version={wps.version}"
         svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE

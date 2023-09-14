@@ -544,7 +544,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for pkg in package_mock:
                 stack.enter_context(pkg)
             path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
@@ -568,6 +568,30 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+    def test_deploy_process_short_name(self):
+        process_name = "x"
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        process_data["processDescription"]["visibility"] = Visibility.PUBLIC
+        process_data["processDescription"]["outputs"] = {"output": {"schema": {"type": "string"}}}
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
+            assert resp.status_code == 201
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["processSummary"]["id"] == process_name
+            assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+            # perform get to make sure all name checks in the chain, going through db save/load, are validated
+            path = f"{path}/{process_name}"
+            query = {"schema": ProcessSchema.OLD}
+            resp = self.app.get(path, headers=self.json_headers, params=query, expect_errors=False)
+            assert resp.status_code == 200
+            assert resp.json["process"]["id"] == process_name
 
     def test_deploy_process_bad_name(self):
         process_name = f"{self.fully_qualified_test_process_name()}..."
@@ -977,6 +1001,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             cwl_out = cwl["outputs"]["output"]
             cwl_out["id"] = "output"
             cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
             assert pkg == cwl
 
             # process description should have been generated with relevant I/O
@@ -1946,6 +1974,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.post_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
         assert resp.content_type == ContentType.APP_JSON
+
+    def test_execute_process_valid_empty_string(self):
+        """
+        Ensure that a process expecting an input string parameter can be provided as empty (not resolved as "missing").
+        """
+        path = f"/processes/{self.process_public.identifier}/jobs"
+        data = self.get_process_execute_template(test_input="")
+
+        with contextlib.ExitStack() as stack:
+            for exe in mocked_process_job_runner():
+                stack.enter_context(exe)
+            resp = self.app.post_json(path, params=data, headers=self.json_headers)
+            assert resp.status_code == 201, "Expected job submission without inputs created without error."
+            job = self.job_store.fetch_by_id(resp.json["jobID"])
+            assert job.inputs[0]["data"] == "", "Input value should be an empty string."
 
     def test_execute_process_missing_required_params(self):
         """

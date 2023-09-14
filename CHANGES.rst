@@ -18,6 +18,44 @@ Fixes:
 ------
 - No change.
 
+.. _changes_4.31.0:
+
+`4.31.0 <https://github.com/crim-ca/weaver/tree/4.31.0>`_ (2023-09-14)
+========================================================================
+
+Changes:
+--------
+- Add the official `CWL` `JSON` schema reference
+  (`common-workflow-language/cwl-v1.2#256 <https://github.com/common-workflow-language/cwl-v1.2/pull/256>`_)
+  as ``$schema`` parameter returned in under the `OpenAPI` schema for the `CWL` component employed by `Weaver`
+  (fixes `#547 <https://github.com/crim-ca/weaver/issues/547>`_).
+- Add ``$schema`` field auto-insertion into the generated `OpenAPI` schema definition by ``CorniceSwagger`` when
+  corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute
+  (fixes `#157 <https://github.com/crim-ca/weaver/issues/157>`_).
+- Drop Python 3.6 support.
+
+Fixes:
+------
+- Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
+- Fix ``GET /providers/{provider_id}`` response using ``$schema`` instead of ``$id`` to provide its content schema.
+- Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
+  to schema validation incorrectly preventing it.
+- Fix human-readable `JSON`-like content cleanup to preserve sequences of quotes corresponding to valid empty strings.
+- Fix `WPS` I/O ``integer`` literal data conversion to `OpenAPI` I/O ``schema`` definition injecting an
+  invalid ``format: double`` property due to type checking with ``float`` succeeding against ``int`` values.
+- Fix `CWL` I/O value validation for ``enum``-like definitions from corresponding `OpenAPI` and `WPS` I/O.
+  Since `CWL` I/O do not allow ``Enum`` type for values other than basic ``string`` type, ``valueFrom`` attribute is
+  used to handle ``int``, ``float`` and ``bool`` types, using an embedded JavaScript validation against allowed values.
+  Because of this validation strategy, `CWL` packages must now include ``InlineJavascriptRequirement`` when allowed
+  values for these basic types must be performed in order for the `CWL` engine to parse I/O contents of ``valueFrom``
+  (relates to `cwl-v1.2#267 <https://github.com/common-workflow-language/cwl-v1.2/issues/267>`_,
+  `common-workflow-language#764 <https://github.com/common-workflow-language/common-workflow-language/issues/764>`_ and
+  `common-workflow-language#907 <https://github.com/common-workflow-language/common-workflow-language/issues/907>`_).
+- Fix typing definitions for certain ``Literal`` references for proper resolution involving values stored in constants.
+- Fix ``get_sane_name`` checks performed on `Process` ID and `Service` name to use ``min_len=1`` in order to allow
+  valid `WPS` process definition on existing servers to resolve references that are shorter than the previous default
+  of 3 characters.
+
 .. _changes_4.30.1:
 
 `4.30.1 <https://github.com/crim-ca/weaver/tree/4.30.1>`_ (2023-07-07)
@@ -725,7 +763,7 @@ Changes:
   The previous schema for deployment with nested ``process`` field remains supported for backward compatibility.
 
 .. |ogc-app-pkg| replace:: OGC Application Package
-.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 
 Fixes:
 ------

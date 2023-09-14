@@ -625,6 +625,35 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
 
 
+class WpsShortNameProviderTest(WpsProviderBase):
+    remote_provider_name = "x"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.configuration": WeaverConfiguration.HYBRID
+    }
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        {"y": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML},
+    ])
+    def test_get_provider_process_description_short_names(self):
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == self.remote_provider_name
+
+        path = f"/providers/{self.remote_provider_name}/processes/y"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == "y"
+
+
 class WpsProviderLocalOnlyTest(WpsProviderBase):
     """
     Validate that operations are preemptively forbidden for a local-only instance.

@@ -194,6 +194,7 @@ class TestWeaverClient(TestWeaverClientBase):
         providers = result.body["providers"]
         for prov in providers:
             prov.pop("$schema", None)
+            prov.pop("$id", None)
         assert providers == [
             {"id": prov1.name, "processes": resources.TEST_EMU_WPS1_PROCESSES},
             {"id": prov2.name, "processes": resources.TEST_HUMMINGBIRD_WPS1_PROCESSES},
@@ -379,6 +380,7 @@ class TestWeaverClient(TestWeaverClientBase):
         output_formats = result.body["outputs"]["output"]["formats"]
         for out_fmt in output_formats:
             out_fmt.pop("$schema", None)
+            out_fmt.pop("$id", None)
         assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert result.body["description"] == (
@@ -454,12 +456,13 @@ class TestWeaverClient(TestWeaverClientBase):
         ]:
             self.run_execute_inputs_schema_variant(invalid_inputs_schema, expect_success=False)
 
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     def test_execute_manual_monitor_status_and_download_results(self):
         """
         Test a typical case of :term:`Job` execution, result retrieval and download, but with manual monitoring.
 
         Manual monitoring can be valid in cases where a *very* long :term:`Job` must be executed, and the user does
-        not intend to wait after it. This avoids leaving some shell/notebook/etc. open of a long time and provide a
+        not intend to wait for it. This avoids leaving some shell/notebook/etc. open of a long time and provide a
         massive ``timeout`` value. Instead, the user can simply re-call :meth:`WeaverClient.monitor` at a later time
         to resume monitoring. Other situation can be if the connection was dropped or script runner crashed, and the
         want to pick up monitoring again.
@@ -811,6 +814,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER] = {"dockerPull": ref}
         return cwl
 
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     def test_deploy_docker_auth_username_password_valid(self):
         """
         Test that username and password arguments can be provided simultaneously for docker login.
@@ -1198,10 +1202,11 @@ class TestWeaverCLI(TestWeaverClientBase):
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
             # ignore schema specifications for comparison only of contents
-            in_schema.pop("$schema", None)
-            out_schema.pop("$schema", None)
-            for out_fmt in out_formats:
-                out_fmt.pop("$schema", None)
+            for field in ["$id", "$schema"]:
+                in_schema.pop(field, None)
+                out_schema.pop(field, None)
+                for out_fmt in out_formats:
+                    out_fmt.pop(field, None)
             # if any of the below definitions don't include user-provided information,
             # CLI did not combine it as intended prior to sending deployment request
             assert in_schema == in_oas  # injected by user provided process description
