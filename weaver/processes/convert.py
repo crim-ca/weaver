@@ -1337,6 +1337,7 @@ def get_cwl_io_type(io_info, strict=True):
         LOGGER.debug("I/O parsed for multiple base types")
 
     # parse single-definition
+    io_info = io_info.copy()
     io_info["type"] = io_type  # override resolved multi-type base for more parsing
     io_name = io_info["name"]
     io_min_occurs = 0 if is_null else 1

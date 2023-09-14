@@ -18,6 +18,12 @@ Fixes:
 ------
 - Fix missing Node.js requirement in built Docker image in order to evaluate definitions that employ
   `CWL` ``InlineJavascriptRequirement``, such as ``valueFrom`` employed for numeric ``Enum`` input type validation.
+- Fix ``processes.wps_package.WpsPackage.make_inputs`` unable to parse multi-type `CWL` definitions due parsing
+  as single-type element with ``parse_cwl_array_type``. Function ``get_cwl_io_type`` is used instead to resolve any
+  `CWL` type combination properly.
+- Fix ``get_cwl_io_type`` function that would modify the I/O definition passed as argument, which could lead to failing
+  `CWL` ``class`` reference resolutions later on due to different ``type`` with ``org.w3id.cwl.cwl`` prefix simplified
+  before ``cwltool`` had the chance to resolve them.
 
 .. _changes_4.31.0:
 
