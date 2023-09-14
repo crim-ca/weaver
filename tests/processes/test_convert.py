@@ -1,6 +1,8 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
+import copy
+
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
 import json
@@ -708,7 +710,7 @@ def test_cwl2wps_io_record_format():
 
 
 @pytest.mark.parametrize(
-    "io_type, io_info",
+    ["io_type", "io_info"],
     [
         (WPS_LITERAL, {"type": WPS_LITERAL}),
         (WPS_COMPLEX, {"type": WPS_COMPLEX}),
@@ -727,26 +729,62 @@ def test_get_io_type_category(io_type, io_info):
     assert get_io_type_category(io_info) == io_type, f"Testing: {io_info}"
 
 
-@pytest.mark.parametrize("io_info, io_def", [
-    ({"type": "string"},
-     CWLIODefinition(type="string")),
-    ({"type": "int"},
-     CWLIODefinition(type="int")),
-    ({"type": "float"},
-     CWLIODefinition(type="float")),
-    ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
-     CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
-    ({"type": {"type": "array", "items": "string"}},
-     CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
-    ({"type": ["null", "string"]},
-     CWLIODefinition(type="string", null=True, min_occurs=0)),
-    ({"type": "string?"},
-     CWLIODefinition(type="string", null=True, min_occurs=0)),
-])
+@pytest.mark.parametrize(
+    ["io_info", "io_def"],
+    [
+        ({"type": "string"},
+         CWLIODefinition(type="string")),
+        ({"type": "int"},
+         CWLIODefinition(type="int")),
+        ({"type": "float"},
+         CWLIODefinition(type="float")),
+        ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
+         CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
+        ({"type": {"type": "array", "items": "string"}},
+         CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
+        ({"type": ["null", "string"]},
+         CWLIODefinition(type="string", null=True, min_occurs=0)),
+        ({"type": "string?"},
+         CWLIODefinition(type="string", null=True, min_occurs=0)),
+    ]
+)
 def test_get_cwl_io_type(io_info, io_def):
     io_def.name = io_info["name"] = "test"
     io_res = get_cwl_io_type(io_info)
     assert io_res == io_def
+
+
+@pytest.mark.parametrize(
+    ["io_info", "io_def"],
+    [
+        (
+            {
+                "name": "test",
+                "type": "org.w3id.cwl.cwl.File",
+                "format": "https://www.iana.org/assignments/media-types/application/json",
+                "location": "/tmp/random.json",
+            },
+            CWLIODefinition(name="test", type="File")
+        )
+    ]
+)
+def test_get_cwl_io_type_unmodified(io_info, io_def):
+    """
+    Ensure that the input I/O details do not cause a side effect modification of the data when parsing the definition.
+
+    When :func:`get_cwl_io_type` was called with a definition containing ``type: org.w3id.cwl.cwl.File``, the resulting
+    parsing caused the input information to be overriden by ``type: File``. Although they are essentially equivalent
+    once resolved, this modification performed before :mod:`cwltool` had the time to parse the definition made it
+    incorrectly resolve ``class: File``, which in turn, caused :class:`cwltool.pathmapper.PathMapper` to be missing
+    the mapped ``location`` of provided inputs, leading to full :term:`CWL` execution failure.
+
+    .. seealso::
+        - https://github.com/crim-ca/weaver/pull/546
+    """
+    io_copy = copy.deepcopy(io_info)
+    io_res = get_cwl_io_type(io_info)
+    assert io_res == io_def
+    assert io_info == io_copy, "Argument I/O information should not be modified from parsing."
 
 
 def test_parse_cwl_array_type_explicit_invalid_item():
