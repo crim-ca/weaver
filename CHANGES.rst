@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix missing Node.js requirement in built Docker image in order to evaluate definitions that employ
+  `CWL` ``InlineJavascriptRequirement``, such as ``valueFrom`` employed for numeric ``Enum`` input type validation.
 
 .. _changes_4.31.0:
 
