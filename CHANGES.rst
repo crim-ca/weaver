@@ -19,6 +19,7 @@ Changes:
 - Add ``$schema`` field auto-insertion into the generated `OpenAPI` schema definition by ``CorniceSwagger`` when
   corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute
   (fixes `#157 <https://github.com/crim-ca/weaver/issues/157>`_).
+- Drop Python 3.6 support.
 
 Fixes:
 ------

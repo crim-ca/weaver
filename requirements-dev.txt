@@ -24,7 +24,6 @@ pluggy>=0.7
 pytest<7
 pytest-rerunfailures
 pydocstyle
-pylint>=2.11,!=2.12,<2.14; python_version <= "3.6"
 pylint>=2.15.4; python_version >= "3.7"
 pylint-per-file-ignores; python_version >= "3.7"
 pylint_quotes

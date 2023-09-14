@@ -46,15 +46,6 @@ jobs:
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
-          # end-of-life python
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-unit-only
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
             python-version: "3.11"

@@ -41,8 +41,8 @@ for each process.
     * - releases
       - | |version| |commits-since| |license|
 
-.. |py_ver| image:: https://img.shields.io/badge/python-3.6%2B-blue.svg
-    :alt: Requires Python 3.6+
+.. |py_ver| image:: https://img.shields.io/badge/python-3.7%2B-blue.svg
+    :alt: Requires Python 3.7+
     :target: https://www.python.org/getit
 
 .. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/4.30.1.svg
