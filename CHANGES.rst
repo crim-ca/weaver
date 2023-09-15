@@ -15,6 +15,7 @@ Changes:
 - Add ``GET /providers/{provider_id}/processes/{process_id}/package`` endpoint that allows retrieval of the `CWL`
   `Application Package` definition generated for the specific `Provider`'s `Process` definition.
 - Add `CLI` ``package`` operation to request the remote `Provider` or local `Process` `CWL` `Application Package`.
+- Add `CLI` output reporting of performed HTTP requests details when using the ``--debug/-d`` option.
 
 Fixes:
 ------
