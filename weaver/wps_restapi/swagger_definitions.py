@@ -311,6 +311,7 @@ providers_service = Service(name="providers", path="/providers")
 provider_service = Service(name="provider", path=f"{providers_service.path}/{{provider_id}}")
 provider_processes_service = Service(name="provider_processes", path=provider_service.path + processes_service.path)
 provider_process_service = Service(name="provider_process", path=provider_service.path + process_service.path)
+provider_process_package_service = Service(name="provider_process_pkg", path=f"{provider_process_service.path}/package")
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
@@ -2794,6 +2795,10 @@ class ProcessEndpoint(LocalProcessPath):
 class ProcessPackageEndpoint(LocalProcessPath):
     header = RequestHeaders()
     querystring = LocalProcessQuery()
+
+
+class ProviderProcessPackageEndpoint(ProviderProcessPath, ProcessPackageEndpoint):
+    pass
 
 
 class ProcessPayloadEndpoint(LocalProcessPath):
@@ -6633,6 +6638,10 @@ get_provider_process_responses = {
     "405": MethodNotAllowedErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+get_provider_process_package_responses = copy(get_process_package_responses)
+get_provider_process_package_responses.update({
+    "403": ForbiddenProviderAccessResponseSchema(),
+})
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),

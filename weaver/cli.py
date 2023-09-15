@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+import textwrap
 import time
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ from urllib.parse import urlparse
 import yaml
 from pyramid.httpexceptions import HTTPNotImplemented
 from requests.auth import AuthBase, HTTPBasicAuth
+from requests.sessions import Session
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
@@ -22,7 +24,7 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, OutputFormat, get_content_type, get_format
+from weaver.formats import ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -348,7 +350,6 @@ class WeaverClient(object):
     def _request(self,
                  method,                # type: AnyRequestMethod
                  url,                   # type: str
-                 *args,                 # type: Any
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  x_headers=None,        # type: Optional[AnyHeadersContainer]
                  request_timeout=None,  # type: Optional[int]
@@ -370,7 +371,20 @@ class WeaverClient(object):
         if isinstance(request_retries, int) and request_retries > 0:
             kwargs.setdefault("retries", request_retries)
 
-        return request_extra(method, url, *args, headers=headers, **kwargs)
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            fields = set(inspect.signature(Session.request).parameters) - {"params", "url", "method", "json", "body"}
+            options = {opt: val for opt, val in kwargs.items() if opt in fields}
+            tab = "  "
+            LOGGER.debug(
+                f"Request:\n{tab}%s %s\n{tab}Queries:\n%s\n{tab}Headers:\n%s\n{tab}Content:\n%s\n{tab}Options:\n%s",
+                method,
+                url,
+                textwrap.indent(repr_json(kwargs.get("params") or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(headers or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(kwargs.get("json") or kwargs.get("body") or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(options, indent=len(tab)), tab * 2),
+            )
+        return request_extra(method, url, headers=headers, **kwargs)
 
     def _get_url(self, url):
         # type: (Optional[str]) -> str
@@ -538,6 +552,9 @@ class WeaverClient(object):
         """
         Registers a remote :term:`Provider` using specified references.
 
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
+
         :param provider_id: Identifier to employ for registering the new :term:`Provider`.
         :param provider_url: Endpoint location to register the new remote :term:`Provider`.
         :param url: Instance URL if not already provided during client creation.
@@ -575,6 +592,9 @@ class WeaverClient(object):
                    ):                       # type: (...) -> OperationResult
         """
         Unregisters a remote :term:`Provider` using the specified identifier.
+
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
         :param provider_id: Identifier to employ for unregistering the :term:`Provider`.
         :param url: Instance URL if not already provided during client creation.
@@ -629,8 +649,13 @@ class WeaverClient(object):
         If the reference is resolved to be a :term:`Workflow`, all its underlying :term:`Process` steps must be
         available under the same URL that this client was initialized with.
 
+        .. note::
+            This is only supported by :term:`OGC API - Processes` instances that support
+            the `Deploy, Replace, Undeploy` (DRU) extension.
+
         .. seealso::
-            :ref:`proc_op_deploy`
+            - :ref:`proc_op_deploy`
+            - |ogc-api-proc-part2|_
 
         :param process_id:
             Desired process identifier.
@@ -855,6 +880,48 @@ class WeaverClient(object):
         else:
             path = f"{base}/processes/{process_id}"
         return path
+
+    def package(self,
+                process_id,                 # type: str
+                provider_id=None,           # type: Optional[str]
+                url=None,                   # type: Optional[str]
+                auth=None,                  # type: Optional[AuthHandler]
+                headers=None,               # type: Optional[AnyHeadersContainer]
+                with_links=True,            # type: bool
+                with_headers=False,         # type: bool
+                request_timeout=None,       # type: Optional[int]
+                request_retries=None,       # type: Optional[int]
+                output_format=None,         # type: Optional[AnyOutputFormat]
+                ):                          # type: (...) -> OperationResult
+        """
+        Retrieve the :term:`Application Package` definition of the specified :term:`Process`.
+
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
+
+        :param process_id: Identifier of the local or remote process to describe.
+        :param provider_id: Identifier of the provider from which to locate a remote process to describe.
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        path = self._get_process_url(url, process_id, provider_id)
+        path = f"{path}/package"
+        resp = self._request("GET", path,
+                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             request_timeout=request_timeout, request_retries=request_retries)
+        return self._parse_result(resp, message="Retrieving process Application Package.",
+                                  output_format=output_format, with_links=with_links, with_headers=with_headers)
 
     @staticmethod
     def _parse_inputs(inputs):
@@ -2365,6 +2432,17 @@ def make_parser():
         help="Representation schema of the returned process description (default: %(default)s, case-insensitive)."
     )
 
+    op_package = WeaverArgumentParser(
+        "package",
+        description="Obtain the Application Package definition of an existing process.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_package)
+    add_url_param(op_package)
+    add_shared_options(op_package)
+    add_process_param(op_package)
+    add_provider_param(op_package, required=False)
+
     op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
@@ -2606,6 +2684,7 @@ def make_parser():
         op_unregister,
         op_capabilities,
         op_describe,
+        op_package,
         op_execute,
         op_jobs,
         op_monitor,
