@@ -53,7 +53,6 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:

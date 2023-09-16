@@ -1353,8 +1353,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl.pop("$id", None)
         cwl.pop("$schema", None)
         pkg = package.copy()
-        pkg["inputs"] = [dict(id=key, **val) for key, val in package["inputs"].items()]
-        pkg["outputs"] = [dict(id=key, **val) for key, val in package["outputs"].items()]
+        pkg["inputs"] = [dict(id=key, **val) for key, val in package["inputs"].items()]  # noqa
+        pkg["outputs"] = [dict(id=key, **val) for key, val in package["outputs"].items()]  # noqa
         assert cwl == pkg
 
     def test_execute_inputs_capture(self):
