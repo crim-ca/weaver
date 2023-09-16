@@ -435,6 +435,8 @@ class WeaverClient(object):
                             for item in nested:
                                 if isinstance(item, dict):
                                     item.pop("links", None)
+                        elif isinstance(nested, dict):
+                            nested.pop("links", None)
                     body.pop("links", None)
                 msg = body.get("description", body.get("message", "undefined"))
             if code >= 400:
@@ -484,7 +486,6 @@ class WeaverClient(object):
                 desc = data.get("processDescription", {}).get("process", {}) or data.get("processDescription", {})
                 desc["id"] = process_id
             data.setdefault("processDescription", desc)  # already applied if description was found/updated at any level
-            desc["visibility"] = Visibility.PUBLIC
         except (ValueError, TypeError, ScannerError) as exc:  # pragma: no cover
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)
@@ -711,7 +712,8 @@ class WeaverClient(object):
         resp = self._request("POST", path, json=data,
                              headers=req_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
-        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+        return self._parse_result(resp, with_links=with_links, nested_links="processSummary",
+                                  with_headers=with_headers, output_format=output_format)
 
     def undeploy(self,
                  process_id,            # type: str

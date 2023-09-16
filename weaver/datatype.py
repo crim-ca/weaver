@@ -2247,7 +2247,7 @@ class Process(Base):
     @property
     def visibility(self):
         # type: () -> Visibility
-        return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
+        return Visibility.get(self.get("visibility"), Visibility.PUBLIC)
 
     @visibility.setter
     def visibility(self, visibility):

@@ -450,6 +450,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     process_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
     process_info["outputTransmission"] = process_desc.get("outputTransmission", [])
     process_info["processDescriptionURL"] = description_url
+
     # insert the "resolved" context using details retrieved from "executionUnit"/"href" or directly with "owsContext"
     if "owsContext" not in process_info and reference:
         process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
@@ -476,11 +477,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         raise HTTPBadRequest(detail=str(exc))
     except HTTPException:
         raise
+    links = process.links(container)
+    process_summary["links"] = links
     data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,
         "deploymentDone": True,
-        "links": process.links(container),
     }
     if deployment_profile_name:
         data["deploymentProfileName"] = deployment_profile_name

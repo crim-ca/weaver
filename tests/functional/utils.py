@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, Optional, Tuple, Union
     from typing_extensions import Literal
 
+    from pyramid.config import Configurator
+    from webtest import TestApp
+
     from weaver.typedefs import (
         AnyRequestMethod,
         AnyResponseType,
@@ -305,7 +308,10 @@ class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
     monitor_timeout = 30
     monitor_interval = 1
-    settings = {}  # type: SettingsType
+    settings = {}   # type: SettingsType
+    config = None   # type: Configurator
+    app = None      # type: TestApp
+    url = None      # type: str
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes

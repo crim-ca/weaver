@@ -4844,14 +4844,6 @@ class Unit(ExtendedMappingSchema):
     unit = CWL(description=f"Execution unit definition as CWL package specification. {CWL_DOC_MESSAGE}")
 
 
-class UndeploymentResult(ExtendedMappingSchema):
-    id = AnyIdentifier()
-
-
-class DeploymentResult(ExtendedMappingSchema):
-    processSummary = ProcessSummary()
-
-
 class ProviderSummaryList(ExtendedSequenceSchema):
     provider_service = ProviderSummarySchema()
 
