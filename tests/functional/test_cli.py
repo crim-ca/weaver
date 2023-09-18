@@ -102,6 +102,8 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
 
 
 class TestWeaverClient(TestWeaverClientBase):
+    test_tmp_dir = None  # type: str
+
     @classmethod
     def setUpClass(cls):
         super(TestWeaverClient, cls).setUpClass()
@@ -341,6 +343,40 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, deploy, undeploy=True)
         assert result.success
         assert "undefined" not in result.message
+
+    def test_deploy_private_process_description(self):
+        test_id = f"{self.test_process_prefix}private-process-description"
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
+        payload.pop("executionUnit", None)
+        process = payload["processDescription"].pop("process")
+        payload["processDescription"].update(process)
+        payload["processDescription"]["visibility"] = Visibility.PRIVATE
+
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert not result.success
+        assert result.code == 403
+
+    def test_deploy_private_process_nested(self):
+        test_id = f"{self.test_process_prefix}private-process-nested"
+        payload = self.retrieve_payload("Echo", "deploy", local=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
+        payload.pop("executionUnit", None)
+        payload["processDescription"]["process"]["visibility"] = Visibility.PRIVATE
+
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload, package)
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert not result.success
+        assert result.code == 403
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
@@ -771,6 +807,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "--body", payload,  # no --process/--id, but available through --body
                 "--cwl", package,
+                "-D",  # avoid conflict just in case
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -778,6 +815,28 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert any("\"id\": \"Echo\"" in line for line in lines)
         assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_no_links(self):
+        payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                "deploy",
+                "-u", self.url,
+                "--body", payload,
+                "--cwl", package,
+                "-nL",
+                "-D",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        # ignore indents of fields from formatted JSON content
+        assert any("\"id\": \"Echo\"" in line for line in lines)
+        assert all("\"links\":" not in line for line in lines)
 
     def test_deploy_docker_auth_help(self):
         """
@@ -1254,6 +1313,49 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"inputs\": {" in line for line in lines)
         assert any("\"outputs\": {" in line for line in lines)
         assert all("\"links\":" not in line for line in lines)
+
+    def test_package_process(self):
+        payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
+        package = self.retrieve_payload("Echo", "package", local=True)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "--body", payload,
+                "--cwl", package,
+                "--id", "test-echo-get-package"
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"id\": \"test-echo-get-package\"" in line for line in lines)
+
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "package",
+                "-u", self.url,
+                "-p", "test-echo-get-package"
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("\"cwlVersion\"" in line for line in lines)
+        cwl = json.loads("".join(lines))
+
+        # package not 100% the same, but equivalent definitions
+        # check that what is returned is at least relatively equal
+        cwl.pop("$id", None)
+        cwl.pop("$schema", None)
+        pkg = package.copy()
+        pkg["inputs"] = [{"id": key, **val} for key, val in package["inputs"].items()]  # pylint: disable=E1136
+        pkg["outputs"] = [{"id": key, **val} for key, val in package["outputs"].items()]  # pylint: disable=E1136
+        assert cwl == pkg
 
     def test_execute_inputs_capture(self):
         """

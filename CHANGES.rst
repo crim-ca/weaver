@@ -12,7 +12,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``GET /providers/{provider_id}/processes/{process_id}/package`` endpoint that allows retrieval of the `CWL`
+  `Application Package` definition generated for the specific `Provider`'s `Process` definition.
+- Add `CLI` ``package`` operation to request the remote `Provider` or local `Process` `CWL` `Application Package`.
+- Add `CLI` output reporting of performed HTTP requests details when using the ``--debug/-d`` option.
+- Modify default behavior of ``visibility`` field (under ``processDescription`` or ``processDescription.process``)
+  to employ the expected functionality by native `OGC API - Processes` clients that do not support this option
+  (i.e.: ``public`` by default), and to align resolution strategy with deployments by direct `CWL` payload which do not
+  include this feature either. A `Process` deployment that desires to employ this feature (``visibility: private``) will
+  have to provide the value explicitly, or update the deployed `Process` definition afterwards with the relevant
+  ``PUT`` request. Since ``public`` will now be used by default, the `CLI` will not automatically inject the value
+  in the payload anymore when omitted.
 
 Fixes:
 ------
@@ -24,6 +34,10 @@ Fixes:
 - Fix ``get_cwl_io_type`` function that would modify the I/O definition passed as argument, which could lead to failing
   `CWL` ``class`` reference resolutions later on due to different ``type`` with ``org.w3id.cwl.cwl`` prefix simplified
   before ``cwltool`` had the chance to resolve them.
+- Fix ``links`` listing duplicated in response from `Process` deployment.
+  Links will only be listed within the returned ``processSummary`` to respect the `OGC API - Processes` schema.
+- Fix `CLI` not removing embedded ``links`` in ``processSummary`` from ``deploy`` operation response
+  when ``-nL``/``--no-links`` option is specified.
 
 .. _changes_4.31.0:
 
