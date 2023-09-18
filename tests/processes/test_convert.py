@@ -1,8 +1,6 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
-import copy
-
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
 import json
@@ -549,6 +547,78 @@ def test_any2cwl_io_enum_validate(test_io, test_input, expect_valid):
             tool(**inputs)
 
 
+def test_any2cwl_io_enum_schema_name():
+    """
+    Ensure that :term:`CWL` ``Enum`` contains a ``name`` to avoid false-positive conflicting schemas.
+
+    When an ``Enum`` is reused multiple times to define an I/O, omitting the ``name`` makes the duplicate definition
+    to be considered a conflict, since :mod:`cwltool` will automatically apply an auto-generated ``name`` for that
+    schema.
+
+    .. seealso::
+        - https://github.com/common-workflow-language/cwltool/issues/1908
+    """
+    test_symbols = [str(i) for i in range(100)]
+    test_input = {
+        "id": "test",
+        "data_type": "string",
+        "allowed_values": test_symbols,
+        "any_value": False,
+        "min_occurs": 0,
+        "max_occurs": 3,
+    }
+    cwl_expect = {
+        "id": "test",
+        "type": [
+            "null",
+            {
+                "type": "enum",
+                "symbols": test_symbols,
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "enum",
+                    "symbols": test_symbols,
+                },
+            },
+        ]
+    }
+    cwl_input, _ = any2cwl_io(test_input, IO_INPUT)
+    assert cwl_input == cwl_expect
+
+    # test it against an actual definition
+    cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": "echo",
+        "inputs": {
+            "test": cwl_input,
+        },
+        "outputs": {
+            "output": "stdout",
+        }
+    }
+    cwl_without_name = deepcopy(cwl)
+    cwl_without_name["inputs"]["test"].pop("name", None)  # FIXME: no None since 'name' required
+
+    factory = CWLFactory()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(cwl_without_name, tmp_file)
+        tmp_file.flush()
+        with pytest.raises(WorkflowException):
+            tool = factory.make(f"file://{tmp_file.name}")
+            tool(test=test_symbols[0])
+
+        tmp_file.seek(0)
+        json.dump(cwl, tmp_file)
+        tmp_file.flush()
+        tool = factory.make(f"file://{tmp_file.name}")
+        tool(test=None)
+        tool(test=test_symbols[0])
+        tool(test=[test_symbols[0]])
+
+
 @pytest.mark.parametrize(
     ["test_io", "expect"],
     [
@@ -781,7 +851,7 @@ def test_get_cwl_io_type_unmodified(io_info, io_def):
     .. seealso::
         - https://github.com/crim-ca/weaver/pull/546
     """
-    io_copy = copy.deepcopy(io_info)
+    io_copy = deepcopy(io_info)
     io_res = get_cwl_io_type(io_info)
     assert io_res == io_def
     assert io_info == io_copy, "Argument I/O information should not be modified from parsing."

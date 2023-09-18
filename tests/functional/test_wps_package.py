@@ -62,7 +62,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, load_file
+from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
@@ -3120,6 +3120,32 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
+
+    def test_execute_various_cwl_enum_schema(self):
+        proc = "Finch_EnsembleGridPointWetdays"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        data = self.retrieve_payload(proc, "execute", local=True)
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": data,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+
+        assert results
 
 
 @pytest.mark.functional

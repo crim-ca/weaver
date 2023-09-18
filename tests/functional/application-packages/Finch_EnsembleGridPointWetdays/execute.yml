@@ -1,0 +1,13 @@
+lat: "45.35629610945964"
+lon: "-73.98748912005094"
+start_date: "1950"
+end_date: "1960"
+ensemble_percentiles: ""
+dataset: "candcs-u6"
+scenario: "ssp126"
+models: "26models"
+freq: "YS"
+data_validation: "warn"
+output_format: "csv"
+csv_precision: 0
+thresh: "15 mm\/day"

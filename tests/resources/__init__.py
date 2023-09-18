@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
+FUNCTIONAL_APP_PKG = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/application-packages"))
 
 GET_CAPABILITIES_TEMPLATE_URL = "{}?service=WPS&request=GetCapabilities&version=1.0.0"
 DESCRIBE_PROCESS_TEMPLATE_URL = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0"

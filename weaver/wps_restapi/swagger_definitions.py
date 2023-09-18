@@ -4619,14 +4619,26 @@ class CWLTypeSymbols(ExtendedSequenceSchema):
     symbol = CWLTypeSymbolValues()
 
 
-class CWLTypeArray(ExtendedMappingSchema):
-    type = ExtendedSchemaNode(String(), example=PACKAGE_ARRAY_BASE, validator=OneOf([PACKAGE_ARRAY_BASE]))
-    items = CWLTypeString(title="CWLTypeArrayItems", validator=OneOf(PACKAGE_ARRAY_ITEMS))
-
-
 class CWLTypeEnum(ExtendedMappingSchema):
     type = ExtendedSchemaNode(String(), example=PACKAGE_ENUM_BASE, validator=OneOf(PACKAGE_CUSTOM_TYPES))
     symbols = CWLTypeSymbols(summary="Allowed values composing the enum.")
+
+
+class CWLTypeArrayItemObject(ExtendedMappingSchema):
+    type = CWLTypeString(validator=OneOf(PACKAGE_ARRAY_ITEMS - PACKAGE_CUSTOM_TYPES))
+
+
+class CWLTypeArrayItems(OneOfKeywordSchema):
+    _one_of = [
+        CWLTypeString(title="CWLTypeArrayItemsString", validator=OneOf(PACKAGE_ARRAY_ITEMS)),
+        CWLTypeEnum(summary="CWL type as enum of values."),
+        CWLTypeArrayItemObject(summary="CWL type in nested object definition."),
+    ]
+
+
+class CWLTypeArray(ExtendedMappingSchema):
+    type = ExtendedSchemaNode(String(), example=PACKAGE_ARRAY_BASE, validator=OneOf([PACKAGE_ARRAY_BASE]))
+    items = CWLTypeArrayItems()
 
 
 class CWLTypeBase(OneOfKeywordSchema):
