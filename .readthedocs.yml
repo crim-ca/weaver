@@ -1,5 +1,7 @@
 # configuration to setup readthedocs
 version: 2
+build:
+  os: ubuntu-22.04
 sphinx:
   configuration: docs/source/conf.py
 #formats: all
