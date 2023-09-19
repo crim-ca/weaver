@@ -38,6 +38,10 @@ Fixes:
   Links will only be listed within the returned ``processSummary`` to respect the `OGC API - Processes` schema.
 - Fix `CLI` not removing embedded ``links`` in ``processSummary`` from ``deploy`` operation response
   when ``-nL``/``--no-links`` option is specified.
+- Fix `CWL` definitions combining nested ``enum`` types as ``["null", <enum>, {type: array, items: <enum>]`` without an
+  explicit ``name`` or ``SchemaDefRequirement`` causing failing ``schema_salad`` resolution under ``cwltool``. A patch
+  is applied for the moment to inject a temporary ``name`` to let the `CWL` engine succeed schema validation (relates
+  to `common-workflow-language/cwltool#1908 <https://github.com/common-workflow-language/cwltool/issues/1908>`_).
 
 .. _changes_4.31.0:
 

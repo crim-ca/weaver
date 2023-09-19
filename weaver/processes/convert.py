@@ -122,14 +122,14 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
-        CWL_Input_Type,
         CWL_IO_ComplexType,
         CWL_IO_DataType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
+        CWL_IO_Type,
         CWL_IO_Value,
-        CWL_Output_Type,
+        CWL_SchemaNames,
         ExecutionInputs,
         ExecutionInputsList,
         ExecutionInputsMap,
@@ -176,7 +176,6 @@ if TYPE_CHECKING:
         "supported_formats": NotRequired[List[JSON_Format]],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
-    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
@@ -1175,6 +1174,28 @@ def get_cwl_io_type_name(io_type):
     return io_type
 
 
+def resolve_cwl_io_type_schema(io_info, cwl_schema_names=None):
+    # type: (CWL_IO_Type, Optional[CWLSchemaNames]) -> CWL_IO_Type
+    """
+    Reverse :term:`CWL` schema references by name back to their full :term:`CWL` I/O definition.
+
+    .. seealso::
+        - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
+        - :meth:`weaver.processes.wps_package.WpsPackage.update_cwl_schema_names`
+    """
+    if not isinstance(io_info, dict) or not cwl_schema_names:
+        return io_info
+    io_type = io_info.get("type")
+    io_item = io_info.get("items")
+    if io_type == "array" and isinstance(io_item, str) and io_item in cwl_schema_names:
+        io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
+        io_info["items"] = cwl_schema_names[io_item]._props
+    elif isinstance(io_type, str) and io_type in cwl_schema_names:
+        io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
+        io_info["type"] = cwl_schema_names[io_type]._props
+    return io_info
+
+
 @dataclass
 class CWLIODefinition(object):
     """
@@ -1272,8 +1293,8 @@ class CWLIODefinition(object):
     """
 
 
-def get_cwl_io_type(io_info, strict=True):
-    # type: (CWL_IO_Type, bool) -> CWLIODefinition
+def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
+    # type: (CWL_IO_Type, bool, Optional[CWL_SchemaNames]) -> CWLIODefinition
     """
     Obtains the basic type of the CWL input and identity if it is optional.
 
@@ -1290,6 +1311,7 @@ def get_cwl_io_type(io_info, strict=True):
 
     :param io_info: :term:`CWL` definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
+    :param cwl_schema_names: Mapping of CWL type schema references to resolve in long form if used in a definition.
     :return: tuple of guessed base type and flag indicating if it can be null (optional input).
     """
     io_type = get_cwl_io_type_name(io_info["type"])
@@ -1316,6 +1338,7 @@ def get_cwl_io_type(io_info, strict=True):
             io_base_type = None
             for i, typ in enumerate(io_type, start=int(is_null)):
                 typ = get_cwl_io_type_name(typ)
+                typ = resolve_cwl_io_type_schema(typ, cwl_schema_names)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
                 array_io_def = parse_cwl_array_type(sub_type, strict=strict)
