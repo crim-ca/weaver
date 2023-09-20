@@ -331,7 +331,7 @@ class WpsProcessInterface(abc.ABC):
         .. seealso::
             Function :func:`weaver.processes.convert.any2cwl_io` defines a generic glob pattern using the output ID
             and expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
-            doesn't necessarily produces file names with the output ID as expected to find them (could be anything),
+            doesn't necessarily produce file names with the output ID as expected to find them (could be anything),
             staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
 
         .. warning::

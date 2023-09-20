@@ -1582,7 +1582,7 @@ class WpsPackage(Process):
                         if io_item["items"].get("type") == "enum":
                             array_enum = io_item["items"]
                     # only apply the name reference if not already provided (eg: explicit name defined in original CWL)
-                    if item_enum and array_enum and item_enum == array_enum and "name" not in io_item:
+                    if item_enum and array_enum and item_enum == array_enum and "name" not in item_enum:
                         item_enum["name"] = array_enum["name"] = f"{io_name}{uuid.uuid4()}"
 
     def update_effective_user(self):

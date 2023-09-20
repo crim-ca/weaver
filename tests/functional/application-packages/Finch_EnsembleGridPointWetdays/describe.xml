@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Original contents from:
+    https://finch.crim.ca/wps?service=WPS&request=DescribeProcess&version=1.0.0&identifier=ensemble_grid_point_wetdays
+Exception:
+    All duplicate 'AllowedValues' are commented out.
+    Assumes that https://github.com/bird-house/finch/pull/302 is integrated.
+-->
+<!-- PyWPS 4.5.2 -->
+<wps:ProcessDescriptions xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsDescribeProcess_response.xsd" service="WPS" version="1.0.0" xml:lang="en-US">
+    <ProcessDescription wps:processVersion="0.1" storeSupported="true" statusSupported="true">
+        <ows:Identifier>ensemble_grid_point_wetdays</ows:Identifier>
+        <ows:Title>Number of wet days</ows:Title>
+        <ows:Abstract>The number of days with daily precipitation at or above a given threshold.</ows:Abstract>
+        <DataInputs>
+            <Input minOccurs="1" maxOccurs="100">
+                <ows:Identifier>lat</ows:Identifier>
+                <ows:Title>Latitude</ows:Title>
+                <ows:Abstract>Latitude coordinate. Accepts a comma separated list of floats for multiple grid cells.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="100">
+                <ows:Identifier>lon</ows:Identifier>
+                <ows:Title>Longitude</ows:Title>
+                <ows:Abstract>Longitude coordinate. Accepts a comma separated list of floats for multiple grid cells.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>start_date</ows:Identifier>
+                <ows:Title>Initial date</ows:Title>
+                <ows:Abstract>Initial date for temporal subsetting. Can be expressed as year (%Y), year-month (%Y-%m) or year-month-day(%Y-%m-%d). Defaults to first day in file.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>end_date</ows:Identifier>
+                <ows:Title>Final date</ows:Title>
+                <ows:Abstract>Final date for temporal subsetting. Can be expressed as year (%Y), year-month (%Y-%m) or year-month-day(%Y-%m-%d). Defaults to last day in file.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>ensemble_percentiles</ows:Identifier>
+                <ows:Title>Ensemble percentiles</ows:Title>
+                <ows:Abstract>Ensemble percentiles to calculate for input climate simulations. Accepts a comma separated list of integers. An empty string will disable the ensemble reduction and the output will have all members along the &#39;realization&#39; dimension, using the input filenames as coordinates.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <DefaultValue>10,50,90</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>average</ows:Identifier>
+                <ows:Title>Perform spatial average.</ows:Title>
+                <ows:Abstract>Whether to average over spatial dimensions or not. Averaging is done before the ensemble percentiles.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#boolean">boolean</ows:DataType>
+                <DefaultValue>False</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>dataset</ows:Identifier>
+                <ows:Title>Dataset name</ows:Title>
+                <ows:Abstract>Name of the dataset from which to get netcdf files for inputs.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>candcs-u5</ows:Value>
+                    <ows:Value>bccaqv2</ows:Value>
+                    <ows:Value>candcs-u6</ows:Value>
+                    <ows:Value>humidex-daily</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>candcs-u5</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="3">
+                <ows:Identifier>scenario</ows:Identifier>
+                <ows:Title>Emission Scenario</ows:Title>
+                <ows:Abstract>Emission scenario (RCPs or SSPs, depending on the dataset)</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>ssp245</ows:Value>
+                    <ows:Value>ssp585</ows:Value>
+                    <ows:Value>rcp85</ows:Value>
+                    <ows:Value>rcp26</ows:Value>
+                    <ows:Value>rcp45</ows:Value>
+                    <ows:Value>ssp126</ows:Value>
+                </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1000">
+                <ows:Identifier>models</ows:Identifier>
+                <ows:Title>Models to include in ensemble</ows:Title>
+                <ows:Abstract>When calculating the ensemble, include only these models. Allowed values depend on the dataset chosen. By default, all models are used (&#39;all&#39;), taking the first realization of each. Special sub-lists are also available :candcs-u5: [&#39;24models&#39;, &#39;pcic12&#39;], bccaqv2: [&#39;24models&#39;, &#39;pcic12&#39;], candcs-u6: [&#39;26models&#39;], humidex-daily: [&#39;humidex_models&#39;]</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>all</ows:Value>
+                    <ows:Value>BNU-ESM</ows:Value>
+                    <ows:Value>CCSM4</ows:Value>
+                    <ows:Value>CESM1-CAM5</ows:Value>
+                    <ows:Value>CNRM-CM5</ows:Value>
+                    <ows:Value>CSIRO-Mk3-6-0</ows:Value>
+                    <ows:Value>CanESM2</ows:Value>
+                    <ows:Value>FGOALS-g2</ows:Value>
+                    <ows:Value>GFDL-CM3</ows:Value>
+                    <ows:Value>GFDL-ESM2G</ows:Value>
+                    <ows:Value>GFDL-ESM2M</ows:Value>
+                    <ows:Value>HadGEM2-AO</ows:Value>
+                    <ows:Value>HadGEM2-ES</ows:Value>
+                    <ows:Value>IPSL-CM5A-LR</ows:Value>
+                    <ows:Value>IPSL-CM5A-MR</ows:Value>
+                    <ows:Value>MIROC-ESM-CHEM</ows:Value>
+                    <ows:Value>MIROC-ESM</ows:Value>
+                    <ows:Value>MIROC5</ows:Value>
+                    <ows:Value>MPI-ESM-LR</ows:Value>
+                    <ows:Value>MPI-ESM-MR</ows:Value>
+                    <ows:Value>MRI-CGCM3</ows:Value>
+                    <ows:Value>NorESM1-M</ows:Value>
+                    <ows:Value>NorESM1-ME</ows:Value>
+                    <ows:Value>bcc-csm1-1-m</ows:Value>
+                    <ows:Value>bcc-csm1-1</ows:Value>
+                    <!-- duplicates
+                    <ows:Value>BNU-ESM</ows:Value>
+                    <ows:Value>CCSM4</ows:Value>
+                    <ows:Value>CESM1-CAM5</ows:Value>
+                    <ows:Value>CNRM-CM5</ows:Value>
+                    <ows:Value>CSIRO-Mk3-6-0</ows:Value>
+                    <ows:Value>CanESM2</ows:Value>
+                    <ows:Value>FGOALS-g2</ows:Value>
+                    <ows:Value>GFDL-CM3</ows:Value>
+                    <ows:Value>GFDL-ESM2G</ows:Value>
+                    <ows:Value>GFDL-ESM2M</ows:Value>
+                    <ows:Value>HadGEM2-AO</ows:Value>
+                    <ows:Value>HadGEM2-ES</ows:Value>
+                    <ows:Value>IPSL-CM5A-LR</ows:Value>
+                    <ows:Value>IPSL-CM5A-MR</ows:Value>
+                    <ows:Value>MIROC-ESM-CHEM</ows:Value>
+                    <ows:Value>MIROC-ESM</ows:Value>
+                    <ows:Value>MIROC5</ows:Value>
+                    <ows:Value>MPI-ESM-LR</ows:Value>
+                    <ows:Value>MPI-ESM-MR</ows:Value>
+                    <ows:Value>MRI-CGCM3</ows:Value>
+                    <ows:Value>NorESM1-M</ows:Value>
+                    <ows:Value>NorESM1-ME</ows:Value>
+                    <ows:Value>bcc-csm1-1-m</ows:Value>
+                    <ows:Value>bcc-csm1-1</ows:Value>
+                    -->
+                    <ows:Value>ACCESS-CM2</ows:Value>
+                    <ows:Value>ACCESS-ESM1-5</ows:Value>
+                    <ows:Value>BCC-CSM2-MR</ows:Value>
+                    <ows:Value>CMCC-ESM2</ows:Value>
+                    <ows:Value>CNRM-CM6-1</ows:Value>
+                    <ows:Value>CNRM-ESM2-1</ows:Value>
+                    <ows:Value>CanESM5</ows:Value>
+                    <ows:Value>EC-Earth3</ows:Value>
+                    <ows:Value>EC-Earth3-Veg</ows:Value>
+                    <ows:Value>FGOALS-g3</ows:Value>
+                    <ows:Value>GFDL-ESM4</ows:Value>
+                    <ows:Value>HadGEM3-GC31-LL</ows:Value>
+                    <ows:Value>INM-CM4-8</ows:Value>
+                    <ows:Value>INM-CM5-0</ows:Value>
+                    <ows:Value>IPSL-CM6A-LR</ows:Value>
+                    <ows:Value>KACE-1-0-G</ows:Value>
+                    <ows:Value>KIOST-ESM</ows:Value>
+                    <ows:Value>MIROC-ES2L</ows:Value>
+                    <ows:Value>MIROC6</ows:Value>
+                    <ows:Value>MPI-ESM1-2-HR</ows:Value>
+                    <ows:Value>MPI-ESM1-2-LR</ows:Value>
+                    <ows:Value>MRI-ESM2-0</ows:Value>
+                    <ows:Value>NorESM2-LM</ows:Value>
+                    <ows:Value>NorESM2-MM</ows:Value>
+                    <ows:Value>TaiESM1</ows:Value>
+                    <ows:Value>UKESM1-0-LL</ows:Value>
+                    <!-- duplicates
+                    <ows:Value>MPI-ESM1-2-HR</ows:Value>
+                    <ows:Value>EC-Earth3</ows:Value>
+                    <ows:Value>ACCESS-CM2</ows:Value>
+                    <ows:Value>MIROC-ES2L</ows:Value>
+                    <ows:Value>EC-Earth3-Veg</ows:Value>
+                    <ows:Value>IPSL-CM6A-LR</ows:Value>
+                    <ows:Value>INM-CM5-0</ows:Value>
+                    <ows:Value>FGOALS-g3</ows:Value>
+                    <ows:Value>CanESM5</ows:Value>
+                    <ows:Value>MIROC6</ows:Value>
+                    -->
+                    <ows:Value>GISS-E2-1-G</ows:Value>
+                    <ows:Value>EC-Earth3-Veg-LR</ows:Value>
+                    <!-- duplicates
+                    <ows:Value>CNRM-ESM2-1</ows:Value>
+                    <ows:Value>MPI-ESM1-2-LR</ows:Value>
+                    <ows:Value>INM-CM4-8</ows:Value>
+                    <ows:Value>MRI-ESM2-0</ows:Value>
+                    <ows:Value>CMCC-ESM2</ows:Value>
+                    <ows:Value>ACCESS-ESM1-5</ows:Value>
+                    <ows:Value>CNRM-CM6-1</ows:Value>
+                    <ows:Value>24models</ows:Value>
+                    <ows:Value>pcic12</ows:Value>
+                    -->
+                    <ows:Value>24models</ows:Value>
+                    <ows:Value>pcic12</ows:Value>
+                    <ows:Value>26models</ows:Value>
+                    <ows:Value>humidex_models</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>all</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>thresh</ows:Identifier>
+                <ows:Title>Thresh</ows:Title>
+                <ows:Abstract>Precipitation value over which a day is considered wet.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <DefaultValue>1.0 mm/day</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>freq</ows:Identifier>
+                <ows:Title>Frequency</ows:Title>
+                <ows:Abstract>Resampling frequency.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>YS</ows:Value>
+                    <ows:Value>MS</ows:Value>
+                    <ows:Value>QS-DEC</ows:Value>
+                    <ows:Value>AS-JUL</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>YS</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>op</ows:Identifier>
+                <ows:Title>Op</ows:Title>
+                <ows:Abstract>Comparison operation. Default: &#34;&gt;=&#34;.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>gt</ows:Value>
+                    <ows:Value>&gt;=</ows:Value>
+                    <ows:Value>&gt;</ows:Value>
+                    <ows:Value>ge</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>&gt;=</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="12">
+                <ows:Identifier>month</ows:Identifier>
+                <ows:Title>Select by month</ows:Title>
+                <ows:Abstract>Months of the year over which to compute indicator.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#integer">integer</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>1</ows:Value>
+                    <ows:Value>2</ows:Value>
+                    <ows:Value>3</ows:Value>
+                    <ows:Value>4</ows:Value>
+                    <ows:Value>5</ows:Value>
+                    <ows:Value>6</ows:Value>
+                    <ows:Value>7</ows:Value>
+                    <ows:Value>8</ows:Value>
+                    <ows:Value>9</ows:Value>
+                    <ows:Value>10</ows:Value>
+                    <ows:Value>11</ows:Value>
+                    <ows:Value>12</ows:Value>
+                </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>season</ows:Identifier>
+                <ows:Title>Select by season</ows:Title>
+                <ows:Abstract>Climatological season over which to compute indicator.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>DJF</ows:Value>
+                    <ows:Value>MAM</ows:Value>
+                    <ows:Value>JJA</ows:Value>
+                    <ows:Value>SON</ows:Value>
+                </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>check_missing</ows:Identifier>
+                <ows:Title>Missing value handling method</ows:Title>
+                <ows:Abstract>Method used to determine which aggregations should be considered missing.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>any</ows:Value>
+                    <ows:Value>wmo</ows:Value>
+                    <ows:Value>pct</ows:Value>
+                    <ows:Value>at_least_n</ows:Value>
+                    <ows:Value>skip</ows:Value>
+                    <ows:Value>from_context</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>any</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>missing_options</ows:Identifier>
+                <ows:Title>Missing method parameters</ows:Title>
+                <ows:Abstract>JSON representation of dictionary of missing method parameters.</ows:Abstract>
+                <ComplexData maximumMegabytes="200">
+                    <Default>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>cf_compliance</ows:Identifier>
+                <ows:Title>Strictness level for CF-compliance input checks.</ows:Title>
+                <ows:Abstract>Whether to log, warn or raise when inputs have non-CF-compliant attributes.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>log</ows:Value>
+                    <ows:Value>warn</ows:Value>
+                    <ows:Value>raise</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>warn</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>data_validation</ows:Identifier>
+                <ows:Title>Strictness level for data validation input checks.</ows:Title>
+                <ows:Abstract>Whether to log, warn or raise when inputs fail data validation checks.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>log</ows:Value>
+                    <ows:Value>warn</ows:Value>
+                    <ows:Value>raise</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>raise</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>output_name</ows:Identifier>
+                <ows:Title>Name of the output</ows:Title>
+                <ows:Abstract>Prefix of the output filename, defaults to the dataset name and the identifier of the process.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>output_format</ows:Identifier>
+                <ows:Title>Output format choice</ows:Title>
+                <ows:Abstract>Choose in which format you want to receive the result. CSV actually means a zip file of two csv files.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>netcdf</ows:Value>
+                    <ows:Value>csv</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>netcdf</DefaultValue>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>csv_precision</ows:Identifier>
+                <ows:Title>Number of decimal places to round to in the CSV output.</ows:Title>
+                <ows:Abstract>Only valid if output_format is CSV. If not set, all decimal places of a 64 bit floating precision number are printed. If negative, rounds before the decimal point.</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#integer">integer</ows:DataType>
+                </LiteralData>
+            </Input>
+        </DataInputs>
+        <ProcessOutputs>
+            <Output>
+                <ows:Identifier>output</ows:Identifier>
+                <ows:Title>Result</ows:Title>
+                <ows:Abstract>The format depends on the &#39;output_format&#39; input parameter.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                        <Format>
+                            <MimeType>application/zip</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+            <Output>
+                <ows:Identifier>output_log</ows:Identifier>
+                <ows:Title>Logging information</ows:Title>
+                <ows:Abstract>Collected logs during process run.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+        </ProcessOutputs>
+    </ProcessDescription>
+</wps:ProcessDescriptions>

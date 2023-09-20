@@ -187,11 +187,11 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             ignoring any nested dirs where the modified *outputBindings* definition will be able to match as if each
             step :term:`Process` outputs were generated locally.
         """
-        if "outputBinding" in schema and "glob" in schema["outputBinding"]:
-            # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
-            glob = schema["outputBinding"]["glob"]
-            glob = os.path.split(glob)[-1] or "."
-            schema["outputBinding"]["glob"] = glob
+        # if "outputBinding" in schema and "glob" in schema["outputBinding"]:
+        #     # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
+        #     glob = schema["outputBinding"]["glob"]
+        #     glob = os.path.split(glob)[-1] or "."
+        #     schema["outputBinding"]["glob"] = glob
         output = super(WpsWorkflow, self).collect_output(
             schema,
             builder,

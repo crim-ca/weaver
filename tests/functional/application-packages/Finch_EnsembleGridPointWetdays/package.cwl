@@ -305,7 +305,8 @@ outputs:
   - id: output
     type: File
     outputBinding:
-      glob: "*/stdout.log"  # auto-added by Weaver with corresponding 'stdout: stdout.log' definition
+      glob: "stdout.log"
+stdout: stdout.log
 $namespaces:
   iana: https://www.iana.org/assignments/media-types/
   edam: http://edamontology.org/
