@@ -23,7 +23,15 @@ from pywps.validator.mode import MODE
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
 from weaver.exceptions import PackageTypeError
-from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
+from weaver.formats import (
+    EDAM_MAPPING,
+    EDAM_NAMESPACE,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_DEFINITION,
+    OGC_MAPPING,
+    OGC_NAMESPACE_DEFINITION,
+    ContentType
+)
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
@@ -38,6 +46,7 @@ from weaver.processes.constants import (
     ProcessSchema
 )
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
+from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
@@ -128,6 +137,99 @@ def test_are_different_and_set_single_null():
     item = ObjectWithEqProperty()
     assert _are_different_and_set(item, null) is False
     assert _are_different_and_set(null, item) is False
+
+
+@pytest.mark.parametrize(
+    ["wps_io", "cwl_io_expect"],
+    [
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_JSON, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{IANA_NAMESPACE}:{ContentType.APP_JSON}",
+                "outputBinding": {
+                    "glob": "output/*.json"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.TEXT_PLAIN, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}",
+                "outputBinding": {
+                    "glob": "output/*.*"  # *.txt replaced by *.* since anything can be text/plain
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.TEXT_PLAIN, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_JSON, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "outputBinding": {
+                    "glob": "output/*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_XML, "encoding": "base64", "default": True},
+                    {"mimeType": ContentType.APP_XML, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{IANA_NAMESPACE}:{ContentType.APP_XML}",
+                "outputBinding": {
+                    "glob": "output/*.xml"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_NETCDF, "encoding": "base64", "default": True},
+                    {"mimeType": ContentType.APP_ZIP, "encoding": "base64", "default": False}
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                # no "format" since more than one, CWL does not support many
+                "outputBinding": {
+                    "glob": ["output/*.nc", "output/*.zip"]
+                }
+            }
+        )
+    ]
+)
+def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
+    cwl_io = {"id": wps_io["id"]}
+    _convert_any2cwl_io_complex(cwl_io, {}, wps_io, IO_OUTPUT)
+    assert cwl_io == cwl_io_expect
 
 
 def test_any2cwl_io_from_wps():
