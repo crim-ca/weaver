@@ -4,8 +4,6 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 .. seealso::
     - :mod:`tests.functional.wps_package`.
 """
-import warnings
-
 import contextlib
 import copy
 import io
@@ -16,6 +14,7 @@ import re
 import shutil
 import sys
 import tempfile
+import warnings
 from typing import TYPE_CHECKING
 
 import cwltool.process

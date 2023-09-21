@@ -68,7 +68,6 @@ class Wps1Process(WpsProcessInterface):
                 _message, _progress, _status, self.provider, *args, **kwargs
             )
         )
-        self.stage_output_id_nested = True  # set after __init__ to avoid reset by base class
 
     def format_inputs(self, workflow_inputs):
         # type: (CWL_RuntimeInputList) -> OWS_InputDataValues

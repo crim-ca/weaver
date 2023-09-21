@@ -32,6 +32,7 @@ inputs:
       position: 1
 outputs:
   output_files:
+    # NOTE: always one, but using array to allow chaining itself any amount of times
     type:
       type: array
       items: File

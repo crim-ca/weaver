@@ -1,5 +1,6 @@
 import collections.abc
 import logging
+import os
 import tempfile
 from functools import partial
 from typing import TYPE_CHECKING, cast  # these are actually used in the code
@@ -186,11 +187,18 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             ignoring any nested dirs where the modified *outputBindings* definition will be able to match as if each
             step :term:`Process` outputs were generated locally.
         """
-        # if "outputBinding" in schema and "glob" in schema["outputBinding"]:
-        #     # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
-        #     glob = schema["outputBinding"]["glob"]
-        #     glob = os.path.split(glob)[-1] or "."
-        #     schema["outputBinding"]["glob"] = glob
+        if "outputBinding" in schema and "glob" in schema["outputBinding"]:
+            glob = schema["outputBinding"]["glob"]
+            glob_list = isinstance(glob, list)
+            glob = glob if isinstance(glob, list) else [glob]
+            out_id = schema["id"].rsplit("#", 1)[-1]
+            glob_spec = []
+            for glob_item in glob:
+                if glob_item.startswith(outdir):
+                    # if equal -> '.', which is identical to what CWL '<dir>/.' expects for a dir entry
+                    glob_item = os.path.relpath(glob_item, outdir)
+                glob_spec.append(os.path.join(out_id, glob_item))
+            schema["outputBinding"]["glob"] = glob_spec if glob_list else glob_spec[0]
         output = super(WpsWorkflow, self).collect_output(
             schema,
             builder,
@@ -198,7 +206,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             fs_access,
             compute_checksum=compute_checksum,
         )
-        return output or {}
+        return output
 
 
 class WpsWorkflowJob(CommandLineJob):

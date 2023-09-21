@@ -96,7 +96,7 @@ class WpsProcessInterface(abc.ABC):
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
         self.temp_staging = set()
-        self.stage_output_id_nested = False
+        self.stage_output_id_nested = True  # FIXME: deprecate everywhere (force: True) to unify procedure
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
@@ -329,8 +329,8 @@ class WpsProcessInterface(abc.ABC):
             We cannot rely on specific file names to be mapped, since glob can match many (eg: ``"*.txt"``).
 
         .. seealso::
-            Function :func:`weaver.processes.convert.any2cwl_io` defines a generic glob pattern using the output ID
-            and expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
+            Function :func:`weaver.processes.convert._convert_any2cwl_io_complex` defines a generic glob pattern from
+            the expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
             doesn't necessarily produce file names with the output ID as expected to find them (could be anything),
             staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
 
