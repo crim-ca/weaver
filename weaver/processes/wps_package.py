@@ -145,7 +145,6 @@ if TYPE_CHECKING:
     from weaver.processes.constants import IO_Select_Type
     from weaver.processes.convert import (
         ANY_IO_Type,
-        CWL_Input_Type,
         JSON_IO_Type,
         PKG_IO_Type,
         WPS_Input_Type,
@@ -157,6 +156,7 @@ if TYPE_CHECKING:
         AnyValueType,
         CWL,
         CWL_AnyRequirements,
+        CWL_Input_Type,
         CWL_IO_ComplexType,
         CWL_IO_Type,
         CWL_Requirement,
@@ -1545,6 +1545,7 @@ class WpsPackage(Process):
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
     def update_cwl_schema_names(self):
+        # type: () -> None
         """
         Detect duplicate :term:`CWL` schema types not referred by name to provide one and avoid resolution failure.
 
@@ -1883,7 +1884,7 @@ class WpsPackage(Process):
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
-                    cwl_schema_names,   # type: Dict[str, CWL_SchemaNames]
+                    cwl_schema_names,   # type: CWL_SchemaNames
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
         Converts :term:`WPS` input values to corresponding :term:`CWL` input values for processing by the package.

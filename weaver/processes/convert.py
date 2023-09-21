@@ -528,9 +528,11 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     # outputs are allowed to define only one 'applied' format
     for field in WPS_FIELD_FORMAT:
         fmt = get_field(wps_io, field, search_variations=True)
+        if not fmt:
+            continue
         if isinstance(fmt, (list, tuple)) and len(fmt) == 1:
             fmt = fmt[0]
-        if isinstance(fmt, dict):
+        if not isinstance(fmt, (list, tuple)):  # could be 'dict', 'Format' or any other 'object' holder
             cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt)
             if cwl_io_ref and cwl_io_fmt:
                 cwl_ns.update(cwl_io_ref)
@@ -1193,15 +1195,21 @@ def resolve_cwl_io_type_schema(io_info, cwl_schema_names=None):
         - :meth:`weaver.processes.wps_package.WpsPackage.update_cwl_schema_names`
     """
     if not isinstance(io_info, dict) or not cwl_schema_names:
-        return io_info
+        return get_cwl_io_type_name(io_info)
     io_type = io_info.get("type")
     io_item = io_info.get("items")
-    if io_type == "array" and isinstance(io_item, str) and io_item in cwl_schema_names:
+    if io_type == PACKAGE_ARRAY_BASE and isinstance(io_item, str):
         io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
-        io_info["items"] = cwl_schema_names[io_item]._props
-    elif isinstance(io_type, str) and io_type in cwl_schema_names:
+        io_name = get_cwl_io_type_name(io_item)  # avoid mapping back to File/Directory records in CWL schema names
+        if io_name in cwl_schema_names:
+            io_name = cwl_schema_names[io_item]._props
+        io_info["items"] = io_name
+    elif isinstance(io_type, str):
         io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
-        io_info["type"] = cwl_schema_names[io_type]._props
+        io_name = get_cwl_io_type_name(io_type)  # avoid mapping back to File/Directory records in CWL schema names
+        if io_name in cwl_schema_names:
+            io_name = cwl_schema_names[io_type]._props
+        io_info["type"] = io_name
     return io_info
 
 
@@ -1346,7 +1354,6 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
             io_type_many = set()
             io_base_type = None
             for i, typ in enumerate(io_type, start=int(is_null)):
-                typ = get_cwl_io_type_name(typ)
                 typ = resolve_cwl_io_type_schema(typ, cwl_schema_names)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type

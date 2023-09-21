@@ -1,6 +1,5 @@
 import collections.abc
 import logging
-import os
 import tempfile
 from functools import partial
 from typing import TYPE_CHECKING, cast  # these are actually used in the code

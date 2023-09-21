@@ -2318,7 +2318,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=1)
+    @pytest.mark.flaky(reruns=2, reruns_delay=3)
     def test_execute_with_json_listing_directory(self):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
@@ -3151,6 +3151,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
+        body["processDescription"]["process"]["id"] = self._testMethodName
         self.deploy_process(body, describe_schema=ProcessSchema.OGC)
 
         data = self.retrieve_payload(proc, "execute", local=True)
@@ -3162,7 +3163,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = f"/processes/{proc}/jobs"
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -3203,6 +3204,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             version="1.0.0"
         )
         body["executionUnit"] = [{"href": wps}]
+        body["processDescription"]["process"]["id"] = self._testMethodName
         self.deploy_process(body, describe_schema=ProcessSchema.OGC)
 
         data = self.retrieve_payload(proc, "execute", local=True)
@@ -3234,7 +3236,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             mock_responses.add("GET", output_log_url, body="log", headers={"Content-Type": ContentType.TEXT_PLAIN})
             mock_responses.add("GET", output_zip_url, body="zip", headers={"Content-Type": ContentType.APP_ZIP})
 
-            proc_url = f"/processes/{proc}/jobs"
+            proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
