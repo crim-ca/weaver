@@ -2318,7 +2318,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=3)
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     def test_execute_with_json_listing_directory(self):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
@@ -2958,12 +2958,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "default" not in pkg["outputs"][0]
         assert pkg["outputs"][0]["format"] == OGC_NETCDF
         assert pkg["outputs"][0]["type"] == "File"
-        assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf/*.nc"
+        # NOTE:
+        #   not using "glob: <output-id>/*.<ext>" anymore in **generated** CWL for remote WPS
+        #   the package definition will consider the outputs as if generated relatively
+        #   to the URL endpoint where the process runs
+        #   it is only during *Workflow Steps* (when each result is staged locally) that output ID dir nesting
+        #   is applied to resolve potential conflict/over-matching of files by globs is applied for local file-system.
+        assert pkg["outputs"][0]["outputBinding"]["glob"] == "*.nc"  # output_netcdf/*.nc
         assert pkg["outputs"][1]["id"] == "output_log"
         assert "default" not in pkg["outputs"][1]
         assert pkg["outputs"][1]["format"] == EDAM_PLAIN
         assert pkg["outputs"][1]["type"] == "File"
-        assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log/*.*"
+        assert pkg["outputs"][1]["outputBinding"]["glob"] == "*.*"  # "output_log/*.*"
 
         # process description I/O validation
         assert len(proc["inputs"]) == 2

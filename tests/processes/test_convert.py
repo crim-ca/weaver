@@ -154,7 +154,7 @@ def test_are_different_and_set_single_null():
                 "type": "File",
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_JSON}",
                 "outputBinding": {
-                    "glob": "output/*.json"
+                    "glob": "*.json"
                 }
             }
         ),
@@ -170,7 +170,7 @@ def test_are_different_and_set_single_null():
                 "type": "File",
                 "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}",
                 "outputBinding": {
-                    "glob": "output/*.*"  # *.txt replaced by *.* since anything can be text/plain
+                    "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain
                 }
             }
         ),
@@ -186,7 +186,7 @@ def test_are_different_and_set_single_null():
                 "id": "output",
                 "type": "File",
                 "outputBinding": {
-                    "glob": "output/*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
+                    "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
                 }
             }
         ),
@@ -203,7 +203,7 @@ def test_are_different_and_set_single_null():
                 "type": "File",
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_XML}",
                 "outputBinding": {
-                    "glob": "output/*.xml"
+                    "glob": "*.xml"
                 }
             }
         ),
@@ -220,7 +220,7 @@ def test_are_different_and_set_single_null():
                 "type": "File",
                 # no "format" since more than one, CWL does not support many
                 "outputBinding": {
-                    "glob": ["output/*.nc", "output/*.zip"]
+                    "glob": ["*.nc", "*.zip"]
                 }
             }
         )
@@ -1929,8 +1929,12 @@ def test_ogcapi2cwl_process_without_extra():
             "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
         },
         "outputs": {
-            "output": {"type": "File", "format": "ogc:geotiff",
-                       "outputBinding": {"glob": "output/*.tiff"}},
+            "output": {
+                "type": "File", "format": "ogc:geotiff",
+                "outputBinding": {
+                    "glob": "*.tiff"  # "output/*.tiff" only during Workflow step execution
+                }
+            },
         },
         "$namespaces": cwl_ns
     }

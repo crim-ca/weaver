@@ -492,7 +492,7 @@ class TestWeaverClient(TestWeaverClientBase):
         ]:
             self.run_execute_inputs_schema_variant(invalid_inputs_schema, expect_success=False)
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=3)
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     def test_execute_manual_monitor_status_and_download_results(self):
         """
         Test a typical case of :term:`Job` execution, result retrieval and download, but with manual monitoring.
@@ -873,7 +873,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER] = {"dockerPull": ref}
         return cwl
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=3)
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     def test_deploy_docker_auth_username_password_valid(self):
         """
         Test that username and password arguments can be provided simultaneously for docker login.

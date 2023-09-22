@@ -23,6 +23,10 @@ Changes:
   have to provide the value explicitly, or update the deployed `Process` definition afterwards with the relevant
   ``PUT`` request. Since ``public`` will now be used by default, the `CLI` will not automatically inject the value
   in the payload anymore when omitted.
+- Remove attribute ``WpsProcessInterface.stage_output_id_nested`` and enforce the behavior of nesting output by ID
+  under corresponding directories for all remote `Process` execution when resolving `CWL` `Workflow` steps. This
+  ensures a more consistent file and directory resolution between steps of different nature (`CWL`, `WPS`, `OGC` based)
+  using multiple combinations of ``glob`` patterns and expected media-types.
 
 Fixes:
 ------
