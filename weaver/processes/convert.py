@@ -514,7 +514,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     Converts the :term:`WPS`-like I/O definition and defines them inplace into the :term:`CWL` containers.
 
     .. seealso::
-        See :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results` which thightly interacts
+        See :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results` which closely interacts
         with the produced ``outputBinding.glob`` patterns generated here. Methodology should align between them.
 
     :param cwl_io: Basic :term:`CWL` I/O container (only ID needed) where to write conversion results.

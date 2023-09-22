@@ -434,6 +434,19 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNotFound.code])):
         for process_info in cls.test_processes_info.values():
             cls.clean_test_processes_iter_before(process_info)
+
+            # if any job is still pending in the database, it can cause process delete to fail (forbidden, in use)
+            path = f"/processes/{process_info.id}/jobs"
+            resp = cls.request("GET", path,
+                               headers=cls.headers, cookies=cls.cookies,
+                               ignore_errors=True, log_enabled=False)
+            cls.assert_response(resp, allowed_codes, message="Failed cleanup of test processes jobs!")
+            for job in resp.json.get("jobs", []):
+                cls.request("DELETE", f"{path}/{job}",
+                            headers=cls.headers, cookies=cls.cookies,
+                            ignore_errors=True, log_enabled=False)
+
+            # then clean the actual process
             path = f"/processes/{process_info.id}"
             resp = cls.request("DELETE", path,
                                headers=cls.headers, cookies=cls.cookies,
