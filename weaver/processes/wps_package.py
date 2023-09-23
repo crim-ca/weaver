@@ -143,13 +143,7 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Authentication, Job
     from weaver.processes.constants import IO_Select_Type
-    from weaver.processes.convert import (
-        ANY_IO_Type,
-        JSON_IO_Type,
-        PKG_IO_Type,
-        WPS_Input_Type,
-        WPS_Output_Type
-    )
+    from weaver.processes.convert import ANY_IO_Type, JSON_IO_Type, PKG_IO_Type, WPS_Input_Type, WPS_Output_Type
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
