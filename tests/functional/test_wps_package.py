@@ -37,6 +37,7 @@ from tests.utils import (
     mocked_file_server,
     mocked_http_file,
     mocked_reference_test_file,
+    mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     mocked_wps_output,
     setup_aws_s3_bucket
@@ -62,11 +63,13 @@ from weaver.processes.constants import (
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, load_file
+from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
     from typing import List
+
+    from responses import RequestsMock
 
     from weaver.typedefs import CWL_AnyRequirements, CWL_RequirementsDict, JSON, Number
 
@@ -2955,12 +2958,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "default" not in pkg["outputs"][0]
         assert pkg["outputs"][0]["format"] == OGC_NETCDF
         assert pkg["outputs"][0]["type"] == "File"
-        assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf/*.nc"
+        # NOTE:
+        #   not using "glob: <output-id>/*.<ext>" anymore in **generated** CWL for remote WPS
+        #   the package definition will consider the outputs as if generated relatively
+        #   to the URL endpoint where the process runs
+        #   it is only during *Workflow Steps* (when each result is staged locally) that output ID dir nesting
+        #   is applied to resolve potential conflict/over-matching of files by globs is applied for local file-system.
+        assert pkg["outputs"][0]["outputBinding"]["glob"] == "*.nc"  # output_netcdf/*.nc
         assert pkg["outputs"][1]["id"] == "output_log"
         assert "default" not in pkg["outputs"][1]
         assert pkg["outputs"][1]["format"] == EDAM_PLAIN
         assert pkg["outputs"][1]["type"] == "File"
-        assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log/*.*"
+        assert pkg["outputs"][1]["outputBinding"]["glob"] == "*.*"  # "output_log/*.*"
 
         # process description I/O validation
         assert len(proc["inputs"]) == 2
@@ -3120,6 +3129,128 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
+
+    def test_execute_cwl_enum_schema_combined_type_single_array_from_cwl(self):
+        """
+        Test that validates successful reuse of :term:`CWL` ``Enum`` within a list of types.
+
+        .. code-block:: yaml
+
+            input:
+                type:
+                    - "null"
+                    - type: enum
+                      symbols: [A, B, C]
+                    - type: array
+                      items:
+                          type: enum
+                          symbols: [A, B, C]
+
+        When the above definition is applied, :mod:`cwltool` and its underlying :mod:`schema_salad` utilities often
+        resulted in failed schema validation due to the reused :term:`CWL` ``Enum`` being detected as "*conflicting*"
+        by ``name`` auto-generated when parsing the tool definition.
+
+        .. seealso::
+            :func:`test_execute_cwl_enum_schema_combined_type_single_array_from_wps`
+        """
+        proc = "Finch_EnsembleGridPointWetdays"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        body["executionUnit"] = [{"unit": pkg}]
+        body["processDescription"]["process"]["id"] = self._testMethodName
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        data = self.retrieve_payload(proc, "execute", local=True)
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": data,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{self._testMethodName}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+
+        assert results
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        {
+            "Finch_EnsembleGridPointWetdays": os.path.join(
+                resources.FUNCTIONAL_APP_PKG,
+                "Finch_EnsembleGridPointWetdays/describe.xml"
+            )
+        },
+    ])
+    def test_execute_cwl_enum_schema_combined_type_single_array_from_wps(self, mock_responses):
+        # type: (RequestsMock) -> None
+        """
+        Test that validates successful reuse of :term:`CWL` ``Enum`` within a list of types.
+
+        In this case, the :term:`CWL` ``Enum`` combining single-value reference and array of ``Enum`` should be
+        automatically generated from the corresponding :term:`WPS` I/O descriptions.
+
+        .. seealso::
+            :func:`test_execute_cwl_enum_schema_combined_type_single_array_from_cwl`
+        """
+        proc = "Finch_EnsembleGridPointWetdays"
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        wps = get_path_kvp(
+            resources.TEST_REMOTE_SERVER_URL,
+            service="WPS",
+            request="DescribeProcess",
+            identifier=proc,
+            version="1.0.0"
+        )
+        body["executionUnit"] = [{"href": wps}]
+        body["processDescription"]["process"]["id"] = self._testMethodName
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+
+        data = self.retrieve_payload(proc, "execute", local=True)
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": data,
+        }
+        status_path = os.path.join(resources.FUNCTIONAL_APP_PKG, "Finch_EnsembleGridPointWetdays/status.xml")
+        status_url = f"{resources.TEST_REMOTE_SERVER_URL}/status.xml"
+        output_log_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.txt"
+        output_zip_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.zip"
+        with open(status_path, mode="r", encoding="utf-8") as status_file:
+            status_body = status_file.read().format(
+                TEST_SERVER_URL=resources.TEST_REMOTE_SERVER_URL,
+                PROCESS_ID=proc,
+                LOCATION_XML=status_url,
+                OUTPUT_FILE_URL=output_zip_url,
+                OUTPUT_LOG_FILE_URL=output_log_url,
+            )
+
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+
+            # mock responses expected by "remote" WPS-1 Execute request and relevant documents
+            mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status_body, headers=self.xml_headers)
+            mock_responses.add("GET", status_url, body=status_body, headers=self.xml_headers)
+            mock_responses.add("GET", output_log_url, body="log", headers={"Content-Type": ContentType.TEXT_PLAIN})
+            mock_responses.add("GET", output_zip_url, body="zip", headers={"Content-Type": ContentType.APP_ZIP})
+
+            proc_url = f"/processes/{self._testMethodName}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+
+        assert results
 
 
 @pytest.mark.functional

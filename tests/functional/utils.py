@@ -306,6 +306,7 @@ class JobUtils(object):
 @pytest.mark.functional
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+    xml_headers = {"Content-Type": ContentType.TEXT_XML}
     monitor_timeout = 30
     monitor_interval = 1
     settings = {}   # type: SettingsType

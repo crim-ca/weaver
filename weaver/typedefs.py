@@ -167,6 +167,13 @@ if TYPE_CHECKING:
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
+    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
+
+    class CWL_SchemaName(Protocol):
+        name: str
+        _props: CWL_IO_Type
+
+    CWL_SchemaNames = Dict[str, CWL_SchemaName]
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {

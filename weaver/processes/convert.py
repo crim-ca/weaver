@@ -122,14 +122,14 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
-        CWL_Input_Type,
         CWL_IO_ComplexType,
         CWL_IO_DataType,
         CWL_IO_EnumSymbols,
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
+        CWL_IO_Type,
         CWL_IO_Value,
-        CWL_Output_Type,
+        CWL_SchemaNames,
         ExecutionInputs,
         ExecutionInputsList,
         ExecutionInputsMap,
@@ -176,7 +176,6 @@ if TYPE_CHECKING:
         "supported_formats": NotRequired[List[JSON_Format]],
     }, total=False)
     JSON_IO_ListOrMap = Union[List[JSON], Dict[str, Union[JSON, str]]]
-    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
@@ -514,6 +513,10 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     """
     Converts the :term:`WPS`-like I/O definition and defines them inplace into the :term:`CWL` containers.
 
+    .. seealso::
+        See :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results` which closely interacts
+        with the produced ``outputBinding.glob`` patterns generated here. Methodology should align between them.
+
     :param cwl_io: Basic :term:`CWL` I/O container (only ID needed) where to write conversion results.
     :param cwl_ns: Namespaces to gradually update when encountering new format Media-Type definitions.
     :param wps_io: Original :term:`WPS`-like I/O to be converted.
@@ -521,7 +524,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     :return: Nothing. Changed inplace.
     """
     cwl_io_fmt = None
-    cwl_io_ext = ContentType.ANY
+    cwl_io_ext = get_extension(ContentType.ANY)
     cwl_io["type"] = PACKAGE_FILE_TYPE
     cwl_id = cwl_io["id"]
 
@@ -529,58 +532,78 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     # outputs are allowed to define only one 'applied' format
     for field in WPS_FIELD_FORMAT:
         fmt = get_field(wps_io, field, search_variations=True)
-        if isinstance(fmt, dict):
+        if not fmt:
+            continue
+        if isinstance(fmt, (list, tuple)) and len(fmt) == 1:
+            fmt = fmt[0]
+        if not isinstance(fmt, (list, tuple)):  # could be 'dict', 'Format' or any other 'object' holder
             cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt)
             if cwl_io_ref and cwl_io_fmt:
                 cwl_ns.update(cwl_io_ref)
             break
         if isinstance(fmt, (list, tuple)):
-            if len(fmt) == 1:
-                cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt[0])
-                if cwl_io_ref and cwl_io_fmt:
-                    cwl_ns.update(cwl_io_ref)
-                break
-            if io_select == IO_OUTPUT and len(fmt) > 1:
-                break  # don't use any format because we cannot enforce one
             cwl_ns_multi = {}
-            cwl_fmt_multi = []
+            cwl_fmt_multi = {}  # use dict as ordered set
+            cwl_ext_multi = {}  # use dict as ordered set
             for fmt_i in fmt:
                 # FIXME: (?)
                 #   when multiple formats are specified, but at least one schema/namespace reference can't be found,
                 #   we must drop all since that unknown format is still allowed but cannot be validated
                 #   avoid potential validation error if that format was the one provided during execute...
                 #   (see: https://github.com/crim-ca/weaver/issues/50)
-                cwl_io_ref_i, cwl_io_fmt_i, _ = _get_cwl_fmt_details(fmt_i)
-                if cwl_io_ref_i and cwl_io_fmt_i:
+                cwl_io_ref_i, cwl_io_fmt_i, cwl_io_ext = _get_cwl_fmt_details(fmt_i)
+                if cwl_io_ref_i and cwl_io_fmt_i:  # if any known format was resolved
                     cwl_ns_multi.update(cwl_io_ref_i)
-                    cwl_fmt_multi.append(cwl_io_fmt_i)
+                    cwl_fmt_multi.update({cwl_io_fmt_i: None})
+                    cwl_ext_multi.update({cwl_io_ext: None})
                 else:
                     # reset all since at least one format could not be mapped to an official schema
                     cwl_ns_multi = {}
                     cwl_fmt_multi = None
                     break
             cwl_io_fmt = cwl_fmt_multi  # all formats or none of them
+            cwl_io_ext = cwl_ext_multi
             cwl_ns.update(cwl_ns_multi)
             break
+
+    cwl_io_ext = [cwl_io_ext] if isinstance(cwl_io_ext, str) else list(cwl_io_ext)
     if cwl_io_fmt:
-        cwl_io["format"] = cwl_io_fmt
-    # for backward compatibility with deployed processes, consider text/plan as 'any' for glob pattern
-    cwl_io_txt = get_extension(ContentType.TEXT_PLAIN)
-    if cwl_io_ext == cwl_io_txt:
-        cwl_io_any = get_extension(ContentType.ANY)
-        LOGGER.warning("Replacing '%s' [%s] to generic '%s' [%s] glob pattern. "
-                       "More explicit format could be considered for %s '%s'.",
-                       ContentType.TEXT_PLAIN, cwl_io_txt, ContentType.ANY, cwl_io_any, io_select, cwl_id)
-        cwl_io_ext = cwl_io_any
+        # don't use any format if more than one because we cannot enforce multiple formats
+        # ('format' must be string: https://www.commonwl.org/v1.2/CommandLineTool.html#File)
+        if not isinstance(cwl_io_fmt, str) and len(cwl_io_fmt) == 1:
+            cwl_io["format"] = list(cwl_io_fmt)[0]
+        if isinstance(cwl_io_fmt, str):
+            cwl_io["format"] = cwl_io_fmt
+
     if io_select == IO_OUTPUT:
+        # for backward compatibility with deployed processes, consider text/plan as 'any' for glob pattern
+        cwl_io_txt = get_extension(ContentType.TEXT_PLAIN)
+        if cwl_io_txt in cwl_io_ext:
+            cwl_io_any = get_extension(ContentType.ANY)
+            LOGGER.warning("Replacing '%s' [%s] to generic '%s' [%s] glob pattern from resolved formats %s. "
+                           "More explicit format media-type should be considered for %s '%s'.",
+                           ContentType.TEXT_PLAIN, cwl_io_txt, cwl_io_ext,
+                           ContentType.ANY, cwl_io_any, io_select, cwl_id)
+            cwl_io_ext = [cwl_io_any]
+
         # Method 'weaver.processes.wps_process_base.WpsProcessInterface.stage_results' uses the produced glob
-        # pattern below of generated output definitions from WPS items that don't offer any hint about the expected
-        # file naming format or specification.
-        # Require that the file is nested in a directory named as the output ID (to isolate against conflict by
-        # other outputs) and has the expected extension based on the file format/schema/media-type.
-        # Any character can be employed for the file name within the sub-dir as generated by the remote process.
+        # pattern(s) below of generated output definitions from WPS items that don't offer any hint about the
+        # expected file naming format or specification (because we cannot guess what will be produced as output
+        # from the remote process definitions alone). We can only provide expected extension based on the file
+        # format/schema/media-type of the output definition.
+        # To avoid potential naming clashes or conflicting matching from generic patterns when CWL tries to resolve
+        # paths, that staging operation stage outputs and adjust each glob pattern under a directory named by the
+        # respective output ID.
+        # However, it is very important **NOT** to add the output ID directory nesting approach here, otherwise it
+        # will confuse the staging process between Workflow steps, since it won't be able to distinguish whether the
+        # nesting was already applied by Weaver (here), or provided by an user-provided CWL Application Package, since
+        # WPS-based. OGC-based, CWL-based, (or any future implementation) can be combined within a same Workflow.
+        cwl_glob = [
+            f"*{ext}" if ext != "/" else "./"  # handle special case of "extension" for 'Directory' type
+            for ext in cwl_io_ext
+        ]
         cwl_io["outputBinding"] = {
-            "glob": f"{cwl_id}/*{cwl_io_ext}"
+            "glob": cwl_glob[0] if len(cwl_glob) == 1 else cwl_glob
         }
 
 
@@ -1175,6 +1198,34 @@ def get_cwl_io_type_name(io_type):
     return io_type
 
 
+def resolve_cwl_io_type_schema(io_info, cwl_schema_names=None):
+    # type: (CWL_IO_Type, Optional[CWL_SchemaNames]) -> CWL_IO_Type
+    """
+    Reverse :term:`CWL` schema references by name back to their full :term:`CWL` I/O definition.
+
+    .. seealso::
+        - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
+        - :meth:`weaver.processes.wps_package.WpsPackage.update_cwl_schema_names`
+    """
+    if not isinstance(io_info, dict) or not cwl_schema_names:
+        return get_cwl_io_type_name(io_info)
+    io_type = io_info.get("type")
+    io_item = io_info.get("items")
+    if io_type == PACKAGE_ARRAY_BASE and isinstance(io_item, str):
+        io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
+        io_name = get_cwl_io_type_name(io_item)  # avoid mapping back to File/Directory records in CWL schema names
+        if io_name in cwl_schema_names:
+            io_name = cwl_schema_names[io_item]._props
+        io_info["items"] = io_name
+    elif isinstance(io_type, str):
+        io_info = io_info.copy()  # avoid undoing CWL tool parsing/resolution
+        io_name = get_cwl_io_type_name(io_type)  # avoid mapping back to File/Directory records in CWL schema names
+        if io_name in cwl_schema_names:
+            io_name = cwl_schema_names[io_type]._props
+        io_info["type"] = io_name
+    return io_info
+
+
 @dataclass
 class CWLIODefinition(object):
     """
@@ -1272,8 +1323,8 @@ class CWLIODefinition(object):
     """
 
 
-def get_cwl_io_type(io_info, strict=True):
-    # type: (CWL_IO_Type, bool) -> CWLIODefinition
+def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
+    # type: (CWL_IO_Type, bool, Optional[CWL_SchemaNames]) -> CWLIODefinition
     """
     Obtains the basic type of the CWL input and identity if it is optional.
 
@@ -1290,6 +1341,7 @@ def get_cwl_io_type(io_info, strict=True):
 
     :param io_info: :term:`CWL` definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
+    :param cwl_schema_names: Mapping of CWL type schema references to resolve in long form if used in a definition.
     :return: tuple of guessed base type and flag indicating if it can be null (optional input).
     """
     io_type = get_cwl_io_type_name(io_info["type"])
@@ -1315,7 +1367,7 @@ def get_cwl_io_type(io_info, strict=True):
             io_type_many = set()
             io_base_type = None
             for i, typ in enumerate(io_type, start=int(is_null)):
-                typ = get_cwl_io_type_name(typ)
+                typ = resolve_cwl_io_type_schema(typ, cwl_schema_names)
                 io_name = io_info["name"]
                 sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
                 array_io_def = parse_cwl_array_type(sub_type, strict=strict)

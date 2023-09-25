@@ -23,6 +23,10 @@ Changes:
   have to provide the value explicitly, or update the deployed `Process` definition afterwards with the relevant
   ``PUT`` request. Since ``public`` will now be used by default, the `CLI` will not automatically inject the value
   in the payload anymore when omitted.
+- Remove attribute ``WpsProcessInterface.stage_output_id_nested`` and enforce the behavior of nesting output by ID
+  under corresponding directories for all remote `Process` execution when resolving `CWL` `Workflow` steps. This
+  ensures a more consistent file and directory resolution between steps of different nature (`CWL`, `WPS`, `OGC` based)
+  using multiple combinations of ``glob`` patterns and expected media-types.
 
 Fixes:
 ------
@@ -38,6 +42,10 @@ Fixes:
   Links will only be listed within the returned ``processSummary`` to respect the `OGC API - Processes` schema.
 - Fix `CLI` not removing embedded ``links`` in ``processSummary`` from ``deploy`` operation response
   when ``-nL``/``--no-links`` option is specified.
+- Fix `CWL` definitions combining nested ``enum`` types as ``["null", <enum>, {type: array, items: <enum>]`` without an
+  explicit ``name`` or ``SchemaDefRequirement`` causing failing ``schema_salad`` resolution under ``cwltool``. A patch
+  is applied for the moment to inject a temporary ``name`` to let the `CWL` engine succeed schema validation (relates
+  to `common-workflow-language/cwltool#1908 <https://github.com/common-workflow-language/cwltool/issues/1908>`_).
 
 .. _changes_4.31.0:
 
