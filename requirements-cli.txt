@@ -1,0 +1,6 @@
+-r requirements.txt
+# following for building utilities in the CLI
+ipython2cwl
+jupyter-repo2docker
+# add missing dependencies that are incorrectly resolved
+ipython_genutils
