@@ -2531,7 +2531,7 @@ def make_parser():
     )
     op_execute_output_context = op_execute.add_mutually_exclusive_group()
     op_execute_output_context.add_argument(
-        "-oP", "--output-public", dest="output_context", const="public",
+        "-oP", "--output-public", dest="output_context", const="public", action="store_const",
         help=(
             "Set header 'X-WPS-Output-Context: public' to indicate preference of job output context to be "
             "located under the public WPS output location of the server. The server is not mandated to fulfill this "

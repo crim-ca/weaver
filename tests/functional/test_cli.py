@@ -16,6 +16,7 @@ import mock
 import pytest
 from owslib.ows import DEFAULT_OWS_NAMESPACE
 from owslib.wps import WPSException
+from parameterized import parameterized
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
@@ -1559,7 +1560,14 @@ class TestWeaverCLI(TestWeaverClientBase):
                 data = file.read()
             assert msg in data  # technically, output is log of echoed input message, so not exactly equal
 
-    def test_execute_output_context(self):
+    @parameterized.expand(
+        [
+            (["-oP"], "public"),
+            (["-oC", "data"], "data"),
+            (["-oC", "test/nested"], "test/nested"),
+        ]
+    )
+    def test_execute_output_context(self, cli_options, expect_output_context):
         proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
             for mock_exec_proc in mocked_execute_celery():
@@ -1576,13 +1584,14 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "-M",
                     "-T", 10,
                     "-W", 1,
-                    "-oP",  # request public WPS output context
+                    "-F", OutputFormat.YAML,
+                    *cli_options,
                 ],
                 trim=False,
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
+            assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
             job_id = None
             for line in lines:
                 if line.startswith("jobID: "):
@@ -1605,19 +1614,17 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             sep = lines.index("---")
-            headers = lines[:sep]
             content = lines[sep + 1:]
             assert content
             link = None
-            for header in headers:
-                if "Link:" in header:
-                    link = header.split(":", 1)[-1].strip()
+            for line in content:
+                if "href:" in line:
+                    link = line.split(":", 1)[-1].strip()
                     break
             assert link
-            link = link.split(";")[0].strip("<>")
             wps_url = get_wps_output_url(self.settings)
             wps_path = link.split(wps_url)[-1]
-            assert wps_path == f"/public/{job_id}/output/output.txt"
+            assert wps_path == f"/{expect_output_context}/{job_id}/output/stdout.log"
 
     def test_execute_help_details(self):
         """
