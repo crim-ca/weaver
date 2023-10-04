@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CLI` ``execute`` options ``--output-public/-oP`` and ``--output-context/-oC OUTPUT_CONTEXT`` that add the
+  specified ``X-WPS-Output-Context`` header to request the relevant output storage location of `Job` results.
 
 Fixes:
 ------
