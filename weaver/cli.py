@@ -1059,6 +1059,7 @@ class WeaverClient(object):
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
                 output_refs=None,       # type: Optional[Iterable[str]]
+                output_context=None,    # type: Optional[str]
                 ):                      # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
@@ -1072,7 +1073,8 @@ class WeaverClient(object):
         include details as the ``class: File`` and ``path`` with location.
 
         .. seealso::
-            :ref:`proc_op_execute`
+            - :ref:`proc_op_execute`
+            - :ref:`exec_output_location`
 
         .. note::
             Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
@@ -1110,6 +1112,10 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_context:
+            Specify an output context for which the `Weaver` instance should attempt storing the :term:`Job` results
+            under the nested location of its configured :term:`WPS` outputs. Note that the instance is not required
+            to fulfill that preference, and can ignore this value if it deems that the provided context is inadequate.
         :returns: Results of the operation.
         """
         base = self._get_url(url)  # raise before inputs parsing if not available
@@ -1156,6 +1162,8 @@ class WeaverClient(object):
         exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         exec_headers.update(self._headers)
         exec_headers.update(auth_headers)
+        if output_context:
+            exec_headers["X-WPS-Output-Context"] = str(output_context)
         resp = self._request("POST", exec_url, json=data,
                              headers=exec_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -2520,6 +2528,23 @@ def make_parser():
 
             Example: ``-R output-one -R output-two``
         """)
+    )
+    op_execute_output_context = op_execute.add_mutually_exclusive_group()
+    op_execute_output_context.add_argument(
+        "-oP", "--output-public", dest="output_context", const="public", action="store_const",
+        help=(
+            "Set header 'X-WPS-Output-Context: public' to indicate preference of job output context to be "
+            "located under the public WPS output location of the server. The server is not mandated to fulfill this "
+            "preference, but will apply it if supported and considered a valid value."
+        )
+    )
+    op_execute_output_context.add_argument(
+        "-oC", "--output-context", dest="output_context", type=str,
+        help=(
+            "Set header 'X-WPS-Output-Context' with the specified value to indicate preference of job output context "
+            "located under the requested WPS output location of the server. The server is not mandated to fulfill this "
+            "preference, but will apply it if supported and considered a valid value."
+        )
     )
     op_execute.add_argument(
         "-M", "--monitor", dest="monitor", action="store_true",
