@@ -24,7 +24,8 @@ pluggy>=0.7
 pytest<7
 pytest-rerunfailures
 pydocstyle
-pylint>=2.15.4; python_version >= "3.7"
+# FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
+pylint>=2.15.4,<3; python_version >= "3.7"
 pylint-per-file-ignores; python_version >= "3.7"
 pylint_quotes
 responses
