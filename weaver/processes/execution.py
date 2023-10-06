@@ -17,7 +17,7 @@ from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
-from weaver.notify import encrypt_email, notify_job_complete
+from weaver.notify import decrypt_email, encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA, JobInputsOutputsSchema
@@ -459,7 +459,8 @@ def send_job_complete_notification_email(job, task_logger, settings):
     """
     if job.notification_email is not None:
         try:
-            notify_job_complete(job, job.notification_email, settings)
+            email = decrypt_email(job.notification_email, settings)
+            notify_job_complete(job, email, settings)
             message = "Notification email sent successfully."
             job.save_log(logger=task_logger, message=message)
         except Exception as exc:

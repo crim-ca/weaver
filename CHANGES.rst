@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add utility methods for `Job` to easily retrieve its various URLs.
 
 Fixes:
 ------
