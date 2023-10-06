@@ -16,6 +16,7 @@ import mock
 import pytest
 from owslib.ows import DEFAULT_OWS_NAMESPACE
 from owslib.wps import WPSException
+from parameterized import parameterized
 from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
@@ -42,7 +43,7 @@ from weaver.processes.types import ProcessType
 from weaver.status import Status, StatusCategory
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
-from weaver.wps.utils import map_wps_output_location
+from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
     from typing import Dict, Optional
@@ -1558,6 +1559,72 @@ class TestWeaverCLI(TestWeaverClientBase):
             with open(path, mode="r", encoding="utf-8") as file:
                 data = file.read()
             assert msg in data  # technically, output is log of echoed input message, so not exactly equal
+
+    @parameterized.expand(
+        [
+            (["-oP"], "public"),
+            (["-oC", "data"], "data"),
+            (["-oC", "test/nested"], "test/nested"),
+        ]
+    )
+    def test_execute_output_context(self, cli_options, expect_output_context):
+        proc = self.test_process["Echo"]
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec_proc)
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    "-u", self.url,
+                    "-p", proc,
+                    "-I", "message='TEST MESSAGE!'",
+                    "-M",
+                    "-T", 10,
+                    "-W", 1,
+                    "-F", OutputFormat.YAML,
+                    *cli_options,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+            job_id = None
+            for line in lines:
+                if line.startswith("jobID: "):
+                    job_id = line.split(":")[-1].strip()
+                    break
+            assert job_id
+
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "results",
+                    "-u", self.url,
+                    "-j", job_id,
+                    "-wH",  # must display header to get 'Link'
+                    "-F", OutputFormat.YAML,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            sep = lines.index("---")
+            content = lines[sep + 1:]
+            assert content
+            link = None
+            for line in content:
+                if "href:" in line:
+                    link = line.split(":", 1)[-1].strip()
+                    break
+            assert link
+            wps_url = get_wps_output_url(self.settings)
+            wps_path = link.split(wps_url)[-1]
+            assert wps_path == f"/{expect_output_context}/{job_id}/output/stdout.log"
 
     def test_execute_help_details(self):
         """

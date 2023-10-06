@@ -15,6 +15,8 @@ Changes:
 - Add utility methods for `Job` to easily retrieve its various URLs.
 - Add ``weaver.wps_email_notify_timeout`` setting (default 10s) to avoid SMTP server deadlock on failing connection.
 - Modify the ``encrypt_email`` function to use an alternate strategy allowing ``decrypt_email`` on `Job` completed.
+- Add `CLI` ``execute`` options ``--output-public/-oP`` and ``--output-context/-oC OUTPUT_CONTEXT`` that add the
+  specified ``X-WPS-Output-Context`` header to request the relevant output storage location of `Job` results.
 
 Fixes:
 ------
