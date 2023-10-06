@@ -1236,8 +1236,7 @@ class Job(Base):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> str
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
-        job_path = f"{extra_path}" if extra_path else ""
-        return self._job_url(base_url) + job_path
+        return self._job_url(base_url) + (extra_path or "")
 
     def status_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
@@ -1245,23 +1244,23 @@ class Job(Base):
 
     def logs_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
-        return self.job_url(container=container, extra_path="logs")
+        return self.job_url(container=container, extra_path="/logs")
 
     def exceptions_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
-        return self.job_url(container=container, extra_path="exceptions")
+        return self.job_url(container=container, extra_path="/exceptions")
 
     def inputs_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
-        return self.job_url(container=container, extra_path="inputs")
+        return self.job_url(container=container, extra_path="/inputs")
 
     def outputs_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
-        return self.job_url(container=container, extra_path="outputs")
+        return self.job_url(container=container, extra_path="/outputs")
 
     def results_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
-        return self.job_url(container=container, extra_path="results")
+        return self.job_url(container=container, extra_path="/results")
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]

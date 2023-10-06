@@ -13,10 +13,15 @@ Changes
 Changes:
 --------
 - Add utility methods for `Job` to easily retrieve its various URLs.
+- Add ``weaver.wps_email_notify_timeout`` setting (default 10s) to avoid SMTP server deadlock on failing connection.
+- Modify the ``encrypt_email`` function to use an alternate strategy allowing ``decrypt_email`` on `Job` completed.
 
 Fixes:
 ------
-- No change.
+- Fix `Job` submitted email encryption not reversible to retrieve the original notification email on completion
+  (fixes `#568 <https://github.com/crim-ca/weaver/issues/568>`_).
+- Fix example Mako Template for email notification using an unavailable property ``${logs}``.
+  Instead, the new utility methods ``job.[...]_url`` should be used to retrieve relevant locations.
 
 .. _changes_4.32.0:
 

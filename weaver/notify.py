@@ -31,14 +31,17 @@ __DEFAULT_TEMPLATE__ = """
     job: weaver.datatype.Job object
     settings: application settings
 
-    And every variable returned by the `weaver.datatype.Job.json` method:
-    status:           succeeded, failed
-    logs:             url to the logs
-    jobID:            example "617f23d3-f474-47f9-a8ec-55da9dd6ac71"
-    result:           url to the outputs
-    duration:         example "0:01:02"
-    message:          example "Job succeeded."
-    percentCompleted: example 100
+    And every variable returned by the `weaver.datatype.Job.json` method.
+    Below is a non-exhaustive list of example parameters from this method.
+    Refer to the method for complete listing.
+
+        status:           succeeded, failed
+        logs:             url to the logs
+        jobID:            example "617f23d3-f474-47f9-a8ec-55da9dd6ac71"
+        result:           url to the outputs
+        duration:         example "0:01:02"
+        message:          example "Job succeeded."
+        percentCompleted: example 100
 </%doc>
 From: Weaver
 To: ${to}
@@ -76,11 +79,12 @@ def notify_job_complete(job, to_email_recipient, container):
     smtp_host = settings.get("weaver.wps_email_notify_smtp_host")
     from_addr = settings.get("weaver.wps_email_notify_from_addr")
     password = settings.get("weaver.wps_email_notify_password")
+    timeout = int(settings.get("weaver.wps_email_notify_timeout") or 10)
     port = settings.get("weaver.wps_email_notify_port")
     ssl = asbool(settings.get("weaver.wps_email_notify_ssl", True))
     # an example template is located in
     # weaver/wps_restapi/templates/notification_email_example.mako
-    template_dir = settings.get("weaver.wps_email_notify_template_dir")
+    template_dir = settings.get("weaver.wps_email_notify_template_dir") or ""
 
     if not smtp_host or not port:
         raise ValueError("The email server configuration is missing.")
@@ -107,9 +111,9 @@ def notify_job_complete(job, to_email_recipient, container):
     message = f"{contents}".strip("\n")
 
     if ssl:
-        server = smtplib.SMTP_SSL(smtp_host, port)
+        server = smtplib.SMTP_SSL(smtp_host, port, timeout=timeout)
     else:
-        server = smtplib.SMTP(smtp_host, port)
+        server = smtplib.SMTP(smtp_host, port, timeout=timeout)
         server.ehlo()
         try:
             server.starttls()
@@ -129,6 +133,7 @@ def notify_job_complete(job, to_email_recipient, container):
         raise IOError(f"Code: {code}, Message: {error_message}")
 
 
+# https://stackoverflow.com/a/55147077
 def get_crypto_key(settings, salt, rounds):
     # type: (SettingsType, bytes, int) -> bytes
     """

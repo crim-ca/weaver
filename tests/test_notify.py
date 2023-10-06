@@ -45,12 +45,14 @@ def test_encrypt_decrypt_email_raise(email_func):
 
 
 def test_notify_job_complete():
+    test_url = "https://test-weaver.example.com"
     settings = {
-        "weaver.url": "test-weaver.example.com",
+        "weaver.url": test_url,
         "weaver.wps_email_notify_smtp_host": "xyz.test.com",
         "weaver.wps_email_notify_from_addr": "test-weaver@email.com",
         "weaver.wps_email_notify_password": "super-secret",
         "weaver.wps_email_notify_port": 12345,
+        "weaver.wps_email_notify_timeout": 1,  # quick fail if invalid
     }
     notify_email = "test-user@email.com"
     test_job = Job(
@@ -58,33 +60,85 @@ def test_notify_job_complete():
         process="test-process",
         settings=settings,
     )
+    test_job_err_url = f"{test_url}/processes/{test_job.process}/jobs/{test_job.id}/exceptions"
+    test_job_out_url = f"{test_url}/processes/{test_job.process}/jobs/{test_job.id}/results"
+    test_job_log_url = f"{test_url}/processes/{test_job.process}/jobs/{test_job.id}/logs"
 
     with mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL) as mock_smtp:
-        mock_smtp.sendmail = mock.MagicMock(return_value=None)  # sending worked
+        mock_smtp.return_value.sendmail.return_value = None  # sending worked
 
         test_job.status = Status.SUCCEEDED
-        test_job.progress = 100
         notify_job_complete(test_job, notify_email, settings)
         mock_smtp.assert_called_with("xyz.test.com", 12345)
+        assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
+        assert mock_smtp.return_value.sendmail.call_args[0][1] == notify_email
+        message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
+        assert message_encoded
+        message = message_encoded.decode("utf8")
+        assert "From: Weaver" in message
+        assert f"To: {notify_email}" in message
+        assert f"Subject: Job {test_job.process} Succeeded"
+        assert test_job_out_url in message
+        assert test_job_log_url in message
+        assert test_job_err_url not in message
 
-        # test_job.status = Status.FAILED
-        # test_job.progress = 42
-        # notify_job_complete(test_job, notify_email, settings)
+        test_job.status = Status.FAILED
+        notify_job_complete(test_job, notify_email, settings)
+        assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
+        assert mock_smtp.return_value.sendmail.call_args[0][1] == notify_email
+        message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
+        assert message_encoded
+        message = message_encoded.decode("utf8")
+        assert "From: Weaver" in message
+        assert f"To: {notify_email}" in message
+        assert f"Subject: Job {test_job.process} Failed"
+        assert test_job_out_url not in message
+        assert test_job_log_url in message
+        assert test_job_err_url in message
 
 
 def test_notify_job_complete_custom_template():
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".mako") as email_template_file:
+        email_template_file.writelines([
+            "From: Weaver\n",
+            "To: ${to}\n",
+            "Subject: Job ${job.process} ${job.status}\n",
+            "\n",  # end of email header, content below
+            "Job: ${job.status_url(settings)}\n",
+        ])
+        email_template_file.flush()
+        email_template_file.seek(0)
+
         mako_dir, mako_name = os.path.split(email_template_file.name)
+        test_url = "https://test-weaver.example.com"
         settings = {
-            "weaver.url": "test-weaver.example.com",
+            "weaver.url": test_url,
             "weaver.wps_email_notify_smtp_host": "xyz.test.com",
             "weaver.wps_email_notify_from_addr": "test-weaver@email.com",
             "weaver.wps_email_notify_password": "super-secret",
             "weaver.wps_email_notify_port": 12345,
+            "weaver.wps_email_notify_timeout": 1,  # quick fail if invalid
             "weaver.wps_email_notify_template_dir": mako_dir,
             "weaver.wps_email_notify_template_default": mako_name,
         }
-        with mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL) as mock_smtp:
-            mock_smtp.sendmail = mock.MagicMock(return_value=None)  # sending worked
+        notify_email = "test-user@email.com"
+        test_job = Job(
+            task_id=uuid.uuid4(),
+            process="test-process",
+            status=Status.SUCCEEDED,
+            settings=settings,
+        )
 
-        mock_smtp.ass
+        with mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL) as mock_smtp:
+            mock_smtp.return_value.sendmail.return_value = None  # sending worked
+            notify_job_complete(test_job, notify_email, settings)
+
+        message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
+        message = message_encoded.decode("utf8")
+        assert message == "\n".join([
+            "From: Weaver",
+            f"To: {notify_email}",
+            f"Subject: Job {test_job.process} {Status.SUCCEEDED}",
+            "",
+            f"Job: {test_url}/processes/{test_job.process}/jobs/{test_job.id}",
+        ])
