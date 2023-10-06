@@ -17,11 +17,13 @@ Changes:
 - Modify the ``encrypt_email`` function to use an alternate strategy allowing ``decrypt_email`` on `Job` completed.
 - Add `CLI` ``execute`` options ``--output-public/-oP`` and ``--output-context/-oC OUTPUT_CONTEXT`` that add the
   specified ``X-WPS-Output-Context`` header to request the relevant output storage location of `Job` results.
+- Remove ``notification_email`` from ``GET /jobs`` query parameters.
+  Due to the nature of the encryption strategy, this cannot be supported anymore.
 
 Fixes:
 ------
-- Fix `Job` submitted email encryption not reversible to retrieve the original notification email on completion
-  (fixes `#568 <https://github.com/crim-ca/weaver/issues/568>`_).
+- Fix `Job` submitted with a ``notification_email`` not reversible from its encrypted value to retrieve the original
+  email on `Job` completion to send the notification (fixes `#568 <https://github.com/crim-ca/weaver/issues/568>`_).
 - Fix example Mako Template for email notification using an unavailable property ``${logs}``.
   Instead, the new utility methods ``job.[...]_url`` should be used to retrieve relevant locations.
 

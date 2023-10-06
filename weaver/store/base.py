@@ -217,7 +217,6 @@ class StoreJobs(StoreInterface):
                   job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
-                  notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
                   page=0,                   # type: Optional[int]

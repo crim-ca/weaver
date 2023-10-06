@@ -74,10 +74,6 @@ def get_queried_jobs(request):
     detail = filters.pop("detail", False)
     groups = filters.pop("groups", None)
     filters["status"] = filters["status"].split(",") if "status" in filters else None
-    filters["notification_email"] = (
-        encrypt_email(filters["notification_email"], settings)
-        if filters.get("notification_email", False) else None
-    )
     filters["min_duration"] = filters.pop("minDuration", None)
     filters["max_duration"] = filters.pop("maxDuration", None)
     filters["job_type"] = filters.pop("type", None)
