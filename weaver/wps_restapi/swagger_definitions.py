@@ -1856,6 +1856,25 @@ class JobGroupsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     validator = StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
 
 
+class JobExecuteSubscribers(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/subscriber.yaml"
+    description = "Optional URIs for callbacks for this job."
+    success_uri = URL(
+        name="successUri",
+        description="Location where to POST the job results on successful completion.",
+    )
+    process_uri = URL(
+        name="inProgressUri",
+        description="Location where to POST the job status once it starts running.",
+        missing=drop,
+    )
+    failure_uri = URL(
+        name="failedUri",
+        description="Location where to POST the job status if it fails execution.",
+        missing=drop,
+    )
+
+
 class LaunchJobQuerystring(ExtendedMappingSchema):
     tags = JobTagsCommaSeparated()
 
@@ -3662,6 +3681,7 @@ class Execute(ExecuteInputOutputs):
         validator=Email(),
         description="Optionally send a notification email when the job is done."
     )
+    subscribers = JobExecuteSubscribers(missing=drop)
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):
