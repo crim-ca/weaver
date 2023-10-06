@@ -3,12 +3,12 @@ import logging
 import os
 import secrets
 import smtplib
+from typing import TYPE_CHECKING
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from typing import TYPE_CHECKING
-
 from mako.template import Template
 from pyramid.settings import asbool
 
