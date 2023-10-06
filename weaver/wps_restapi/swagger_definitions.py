@@ -5562,7 +5562,6 @@ class GetJobsQueries(PagingQueries):
                        description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
     sort = JobSortEnum(missing=drop)
     access = JobAccess(missing=drop, default=None)
-    notification_email = ExtendedSchemaNode(String(), missing=drop, validator=Email())
     tags = JobTagsCommaSeparated()
 
 

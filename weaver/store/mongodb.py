@@ -78,12 +78,19 @@ if TYPE_CHECKING:
         AnyVersion,
         ExecutionInputs,
         ExecutionOutputs,
-        JSON
+        JSON,
+        SettingsType
     )
     from weaver.visibility import AnyVisibility
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
-    MongodbAggregateValue = Union[MongodbValue, List[MongodbValue], Dict[str, AnyValueType], List[AnyValueType]]
+    MongodbAggregateValue = Union[
+        MongodbValue,
+        List[MongodbValue],
+        List[AnyValueType],
+        Dict[str, AnyValueType],
+        Dict[str, List[AnyValueType]],
+    ]
     MongodbAggregateSortOrder = Dict[str, int]
     MongodbAggregateSortExpression = TypedDict("MongodbAggregateSortExpression", {
         "$sort": MongodbAggregateSortOrder,
@@ -553,7 +560,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         if visibility is None:
             visibility = Visibility.values()
         if not isinstance(visibility, list):
-            visibility = [visibility]
+            visibility = [visibility]  # type: List[str]
         for v in visibility:
             vis = Visibility.get(v)
             if vis not in Visibility:
@@ -922,7 +929,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
-                  notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
                   page=0,                   # type: Optional[int]
@@ -973,7 +979,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         :param job_type: filter matching jobs for given type.
         :param tags: list of tags to filter matching jobs.
         :param access: access visibility to filter matching jobs (default: :py:data:`Visibility.PUBLIC`).
-        :param notification_email: notification email to filter matching jobs.
         :param status: status to filter matching jobs.
         :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
@@ -985,9 +990,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job.
         """
         search_filters = {}
-        if notification_email is not None:
-            search_filters["notification_email"] = notification_email
-
         search_filters.update(self._apply_status_filter(status))
         search_filters.update(self._apply_ref_or_type_filter(job_type, process, service))
         search_filters.update(self._apply_tags_filter(tags))
