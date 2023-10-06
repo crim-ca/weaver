@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.33.0:
+
+`4.33.0 <https://github.com/crim-ca/weaver/tree/4.33.0>`_ (2023-10-06)
+========================================================================
+
+Changes:
+--------
 - Add utility methods for `Job` to easily retrieve its various URLs.
 - Add ``weaver.wps_email_notify_timeout`` setting (default 10s) to avoid SMTP server deadlock on failing connection.
 - Modify the ``encrypt_email`` function to use an alternate strategy allowing ``decrypt_email`` on `Job` completed.
