@@ -30,6 +30,12 @@ def test_encrypt_email_random():
     token3 = encrypt_email(email, settings)
     assert token1 != token2 != token3
 
+    # although encrypted are all different, they should all decrypt back to the original!
+    email1 = decrypt_email(token1, settings)
+    email2 = decrypt_email(token2, settings)
+    email3 = decrypt_email(token3, settings)
+    assert email1 == email2 == email3 == email
+
 
 @pytest.mark.parametrize("email_func", [encrypt_email, decrypt_email])
 def test_encrypt_decrypt_email_raise(email_func):
@@ -69,7 +75,7 @@ def test_notify_job_complete():
 
         test_job.status = Status.SUCCEEDED
         notify_job_complete(test_job, notify_email, settings)
-        mock_smtp.assert_called_with("xyz.test.com", 12345)
+        mock_smtp.assert_called_with("xyz.test.com", 12345, timeout=1)
         assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
         assert mock_smtp.return_value.sendmail.call_args[0][1] == notify_email
         message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
