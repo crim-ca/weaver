@@ -148,6 +148,7 @@ weaver.wps_email_encrypt_rounds = 100000
 weaver.wps_email_notify_smtp_host =
 weaver.wps_email_notify_from_addr = example@email.com
 weaver.wps_email_notify_password = 123456
+weaver.wps_email_notify_timeout = 10
 weaver.wps_email_notify_port = 25
 weaver.wps_email_notify_ssl = true
 weaver.wps_email_notify_template_dir =

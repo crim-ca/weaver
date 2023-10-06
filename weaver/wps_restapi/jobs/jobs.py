@@ -8,7 +8,6 @@ from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
-from weaver.notify import encrypt_email
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
@@ -74,10 +73,6 @@ def get_queried_jobs(request):
     detail = filters.pop("detail", False)
     groups = filters.pop("groups", None)
     filters["status"] = filters["status"].split(",") if "status" in filters else None
-    filters["notification_email"] = (
-        encrypt_email(filters["notification_email"], settings)
-        if filters.get("notification_email", False) else None
-    )
     filters["min_duration"] = filters.pop("minDuration", None)
     filters["max_duration"] = filters.pop("maxDuration", None)
     filters["job_type"] = filters.pop("type", None)

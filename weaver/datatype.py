@@ -925,17 +925,6 @@ class Job(Base):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
-    def status_url(self, container=None):
-        # type: (Optional[AnySettingsContainer]) -> str
-        """
-        Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
-        """
-        settings = get_settings(container)
-        location_base = f"/providers/{self.service}" if self.service else ""
-        api_base_url = get_wps_restapi_base_url(settings)
-        location_url = f"{api_base_url}{location_base}/processes/{self.process}/jobs/{self.id}"
-        return location_url
-
     @property
     def notification_email(self):
         # type: () -> Optional[str]
@@ -1236,12 +1225,42 @@ class Job(Base):
             response = xml_util.tostring(response)
         self["response"] = response
 
-    def _job_url(self, base_url=None):
-        # type: (Optional[str]) -> str
+    def _job_url(self, base_url):
+        # type: (str) -> str
         if self.service is not None:
             base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
         return base_url + job_path
+
+    def job_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        return self._job_url(base_url) + (extra_path or "")
+
+    def status_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container)
+
+    def logs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/logs")
+
+    def exceptions_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/exceptions")
+
+    def inputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/inputs")
+
+    def outputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/outputs")
+
+    def results_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/results")
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
