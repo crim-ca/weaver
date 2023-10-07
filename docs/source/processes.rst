@@ -1394,13 +1394,29 @@ the configured :term:`WPS` output directory.
 .. versionadded:: 4.3
     Addition of the ``X-WPS-Output-Context`` header.
 
-Email Notification
+.. _proc_op_execute_subscribers:
+
+Notification Subscribers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When submitting a :term:`Job` for execution, it is possible to provide the ``notification_email`` field.
 Doing so will tell `Weaver` to send an email to the specified address with successful or failure details
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
 email-specific settings (see: :ref:`Configuration`).
+
+Alternatively to ``notification_email``, the ``subscribers`` field of the :term:`API` can be employed during :term:`Job`
+submission. Using this field will take precedence over ``notification_email`` for corresponding email and status
+combinations. The :term:`Job` ``subscribers`` allow more fined-grained control over which emails will be sent for
+the various combinations of :term:`Job` status milestones.
+
+Furthermore, ``subscribers`` allow specifying URLs where HTTP(S) requests will be sent with
+the :ref:`Job Status <proc_op_status>` or :ref:`Job Results <proc_op_result>` contents directly in :term:`JSON` format.
+This allows users and/or servers to directly receive the necessary details using a push-notification mechanism instead
+of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint otherwise required to obtain updated
+:term:`Job` details.
+
+.. seealso::
+    Refer to the |oas-rtd|_ of the |exec-req|_ request for all available ``subscribers`` properties.
 
 .. _proc_op_status:
 .. _proc_op_monitor:

@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.status import AnyStatusType
+    from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
     Path = Union[os.PathLike, str, bytes]
@@ -443,6 +443,10 @@ if TYPE_CHECKING:
     ExecutionResultArray = List[ExecutionResultObject]
     ExecutionResultValue = Union[ExecutionResultObject, ExecutionResultArray]
     ExecutionResults = Dict[str, ExecutionResultValue]
+    ExecutionSubscribers = TypedDict("ExecutionSubscribers", {
+        "emails": NotRequired[Dict[StatusType, str]],
+        "callbacks": NotRequired[Dict[StatusType, str]],
+    }, total=True)
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})

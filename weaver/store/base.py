@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         DatetimeIntervalType,
         ExecutionInputs,
         ExecutionOutputs,
+        ExecutionSubscribers,
         JSON,
         SettingsType,
         TypedDict
@@ -179,7 +180,7 @@ class StoreJobs(StoreInterface):
                  user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
-                 notification_email=None,   # type: Optional[str]
+                 subscribers=None,          # type: Optional[ExecutionSubscribers]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job

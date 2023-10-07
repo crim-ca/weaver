@@ -50,7 +50,7 @@ def test_encrypt_decrypt_email_raise(email_func):
         pytest.fail("Should have raised for invalid/missing settings")
 
 
-def test_notify_job_complete():
+def test_notify_email_job_complete():
     test_url = "https://test-weaver.example.com"
     settings = {
         "weaver.url": test_url,

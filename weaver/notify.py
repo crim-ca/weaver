@@ -12,57 +12,19 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from mako.template import Template
 from pyramid.settings import asbool
 
+from weaver import WEAVER_MODULE_DIR
 from weaver.datatype import Job
-from weaver.utils import bytes2str, get_settings, str2bytes
+from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.status import Status
+from weaver.utils import bytes2str, fully_qualified_name, get_settings, str2bytes, request_extra
+from weaver.wps_restapi.jobs.utils import get_results
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, SettingsType
+    from typing import Optional
+
+    from weaver.typedefs import AnySettingsContainer, ExecutionSubscribers, SettingsType, JSON
 
 LOGGER = logging.getLogger(__name__)
-
-__DEFAULT_TEMPLATE__ = """
-<%doc>
-    This is an example notification message to be sent by email when a job is done.
-    It is formatted using the Mako template library (https://www.makotemplates.org/).
-    The content must also include the message header.
-
-    The provided variables are:
-    to: Recipient's address
-    job: weaver.datatype.Job object
-    settings: application settings
-
-    And every variable returned by the `weaver.datatype.Job.json` method.
-    Below is a non-exhaustive list of example parameters from this method.
-    Refer to the method for complete listing.
-
-        status:           succeeded, failed
-        logs:             url to the logs
-        jobID:            example "617f23d3-f474-47f9-a8ec-55da9dd6ac71"
-        result:           url to the outputs
-        duration:         example "0:01:02"
-        message:          example "Job succeeded."
-        percentCompleted: example 100
-</%doc>
-From: Weaver
-To: ${to}
-Subject: Job ${job.process} ${job.status.title()}
-Content-Type: text/plain; charset=UTF-8
-
-Dear user,
-
-Your job submitted on ${job.created.strftime("%Y/%m/%d %H:%M %Z")} to ${settings.get("weaver.url")} ${job.status}.
-
-% if job.status == "succeeded":
-You can retrieve the output(s) at the following link: ${job.results_url(settings)}
-% elif job.status == "failed":
-You can retrieve potential error details from the following link: ${job.exceptions_url(settings)}
-% endif
-
-The job logs are available at the following link: ${job.logs_url(settings)}
-
-Regards,
-Weaver
-"""
 
 __SALT_LENGTH__ = 16
 __TOKEN_LENGTH__ = 32
@@ -70,10 +32,49 @@ __ROUNDS_LENGTH__ = 4
 __DEFAULT_ROUNDS__ = 100_000
 
 
-def notify_job_complete(job, to_email_recipient, container):
+def resolve_email_template(job, settings):
+    # type: (Job, SettingsType) -> Template
+    """
+    Finds the most appropriate Mako Template email notification file based on configuration and :term:`Job` context.
+
+    .. note::
+        The example template is used by default if the template directory is not overridden
+        (weaver/wps_restapi/templates/notification_email_example.mako).
+    """
+    template_dir = settings.get("weaver.wps_email_notify_template_dir") or ""
+
+    # find appropriate template according to settings
+    if not os.path.isdir(template_dir):
+        LOGGER.warning("No default email template directory configured. Using default template.")
+        template_file = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/templates/notification_email_example.mako")
+        template = Template(filename=template_file)
+    else:
+        default_setting = "weaver.wps_email_notify_template_default"
+        default_default = "default.mako"
+        default_name = settings.get(default_setting, default_default)
+        process_name = f"{job.process!s}.mako"
+        process_status_name = f"{job.process!s}/{job.status!s}.mako"
+        default_template = os.path.join(template_dir, default_name)
+        process_template = os.path.join(template_dir, process_name)
+        process_status_template = os.path.join(template_dir, process_status_name)
+        if os.path.isfile(process_status_template):
+            template = Template(filename=process_status_template)  # nosec: B702
+        elif os.path.isfile(process_template):
+            template = Template(filename=process_template)  # nosec: B702
+        elif os.path.isfile(default_template):
+            template = Template(filename=default_template)  # nosec: B702
+        else:
+            raise IOError(
+                f"No Mako Template file could be resolved under the template directory: [{template_dir}]. Expected "
+                f"OneOf[{process_status_name!s}, {process_name!s}, {{{default_setting!s}}}, {default_default!s}]"
+            )
+    return template
+
+
+def notify_job_email(job, to_email_recipient, container):
     # type: (Job, str, AnySettingsContainer) -> None
     """
-    Send email notification of a job completion.
+    Send email notification of a :term:`Job` status.
     """
     settings = get_settings(container)
     smtp_host = settings.get("weaver.wps_email_notify_smtp_host")
@@ -82,30 +83,12 @@ def notify_job_complete(job, to_email_recipient, container):
     timeout = int(settings.get("weaver.wps_email_notify_timeout") or 10)
     port = settings.get("weaver.wps_email_notify_port")
     ssl = asbool(settings.get("weaver.wps_email_notify_ssl", True))
-    # an example template is located in
-    # weaver/wps_restapi/templates/notification_email_example.mako
-    template_dir = settings.get("weaver.wps_email_notify_template_dir") or ""
 
     if not smtp_host or not port:
         raise ValueError("The email server configuration is missing.")
     port = int(port)
 
-    # find appropriate template according to settings
-    if not os.path.isdir(template_dir):
-        LOGGER.warning("No default email template directory configured. Using default format.")
-        template = Template(text=__DEFAULT_TEMPLATE__)  # nosec: B702
-    else:
-        default_name = settings.get("weaver.wps_email_notify_template_default", "default.mako")
-        process_name = f"{job.process!s}.mako"
-        default_template = os.path.join(template_dir, default_name)
-        process_template = os.path.join(template_dir, process_name)
-        if os.path.isfile(process_template):
-            template = Template(filename=process_template)  # nosec: B702
-        elif os.path.isfile(default_template):
-            template = Template(filename=default_template)  # nosec: B702
-        else:
-            raise IOError(f"Template file doesn't exist: OneOf[{process_name!s}, {default_name!s}]")
-
+    template = resolve_email_template(job, settings)
     job_json = job.json(settings)
     contents = template.render(to=to_email_recipient, job=job, settings=settings, **job_json)
     message = f"{contents}".strip("\n")
@@ -178,3 +161,94 @@ def decrypt_email(email, settings):
     except Exception as ex:
         LOGGER.debug("Job email decrypt failed [%r].", ex)
         raise ValueError("Cannot complete job, server not properly configured for notification email.")
+
+
+def map_job_subscribers(job_body, settings):
+    # type: (JSON, SettingsType) -> Optional[ExecutionSubscribers]
+    """
+    Converts the :term:`Job` subscribers definition submitted at execution into a mapping for later reference.
+
+    The returned contents must be sorted in the relevant :term:`Job` object.
+    For backward compatibility, ``notification_email`` directly provided at the root will be used if corresponding
+    definitions were not provided for the corresponding subscriber email fields.
+    """
+    notification_email = job_body.get("notification_email")
+    submit_subscribers = job_body.get("subscribers")
+    mapped_subscribers = {}
+    for status, name, sub_type, alt in [
+        (Status.STARTED, "inProgressUri", "emails", None),
+        (Status.FAILED, "failedUri", "emails", notification_email),
+        (Status.SUCCEEDED, "successUri", "emails", notification_email),
+        (Status.STARTED, "inProgressEmail", "callbacks", None),
+        (Status.FAILED, "failedEmail", "callbacks", None),
+        (Status.SUCCEEDED, "successEmail", "callbacks", None),
+    ]:
+        value = submit_subscribers.get(name) or alt
+        if not value:
+            continue
+        if sub_type == "emails":
+            value = encrypt_email(value, settings)
+        mapped_subscribers.setdefault(sub_type, {})
+        mapped_subscribers[sub_type][status] = value
+    return mapped_subscribers or None
+
+
+def send_job_notification_email(job, task_logger, settings):
+    # type: (Job, logging.Logger, SettingsType) -> None
+    """
+    Sends the notification email about the execution if it was requested during :term:`Job` submission.
+    """
+    notification_email = job.subscribers.get("emails", {}).get(job.status)
+    if notification_email:
+        try:
+            email = decrypt_email(notification_email, settings)
+            notify_job_email(job, email, settings)
+            message = "Notification email sent successfully."
+            job.save_log(logger=task_logger, message=message)
+        except Exception as exc:
+            exception = f"{fully_qualified_name(exc)}: {exc!s}"
+            message = f"Couldn't send notification email ({exception})"
+            job.save_log(errors=message, logger=task_logger, message=message)
+
+
+def send_job_callback_request(job, task_logger, settings):
+    # type: (Job, logging.Logger, SettingsType) -> None
+    request_uri = job.subscribers.get("callbacks", {}).get(job.status)
+    if request_uri:
+        try:
+            if job.status != Status.SUCCEEDED:
+                body = job.json(settings)
+            else:
+                # OGC-compliant request body needed to respect 'subscribers' callback definition
+                # (https://github.com/opengeospatial/ogcapi-processes/blob/master/core/examples/yaml/callbacks.yaml)
+                body = get_results(
+                    job,
+                    settings,
+                    value_key="value",
+                    schema=JobInputsOutputsSchema.OGC,
+                    link_references=False,
+                )
+            request_extra(
+                "POST",
+                request_uri,
+                allowed_codes=[200, 201, 202],
+                cache_enabled=False,
+                settings=settings,
+            )
+            message = "Notification callback request sent successfully."
+            job.save_log(logger=task_logger, message=message)
+        except Exception as exc:
+            exception = f"{fully_qualified_name(exc)}: {exc!s}"
+            message = f"Couldn't send notification callback request ({exception})"
+            job.save_log(errors=message, logger=task_logger, message=message)
+
+
+def notify_job_subscribers(job, task_logger, settings):
+    # type: (Job, logging.Logger, SettingsType) -> None
+    """
+    Send notifications to all requested :term:`Job` subscribers according to its current status.
+
+    All notification operations are non-raising. In case of error, the :term:`Job` logs is updated with error details.
+    """
+    send_job_notification_email(job, task_logger, settings)
+    send_job_callback_request(job, task_logger, settings)
