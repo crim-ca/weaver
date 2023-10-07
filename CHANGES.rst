@@ -24,6 +24,7 @@ Changes:
 - Refactor ``weaver/notify.py`` and ``weaver/processes/execution.py`` to avoid mixed references to the
   encryption/decryption logic employed for notification emails. All notifications including emails and
   callback requests are now completely handled and contained in the ``weaver/notify.py`` module.
+- Remove partially duplicate Mako Template definition as hardcoded string and separate file for email notification.
 
 Fixes:
 ------
