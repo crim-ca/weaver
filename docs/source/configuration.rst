@@ -230,9 +230,9 @@ they are optional and which default value or operation is applied in each situat
   |
   | Defines configuration of email notification functionality on :term:`Job` status milestones.
   |
-  | Encryption settings as well as custom email templates are available.
-    Default email template defined in `email-template`_ is employed if none is provided or when specified template
-    file or directory cannot be resolved.
+  | Encryption settings as well as custom email template locations are available.
+    The |default-notify-email-template|_ is employed if none is provided or when specified template
+    files or directory cannot be resolved.
   |
   | When looking up for templates within ``weaver.wps_email_notify_template_dir``, the following resolution order is
     followed to attempt matching files. The first one that is found will be employed for the notification email.
@@ -241,10 +241,11 @@ they are optional and which default value or operation is applied in each situat
   | 2. file ``{TEMPLATE_DIR}/{PROCESS_ID}.mako`` used for a specific :term:`Process` but any :term:`Job` status
   | 3. file ``{TEMPLATE_DIR}/{weaver.wps_email_notify_template_default}`` used for any combination if specified
   | 4. file ``{TEMPLATE_DIR}/default.mako`` used for any combination if an alternate default name was not specified
-  | 5. file `email-template`_ by default as last resort
+  | 5. file |default-notify-email-template|_ as last resort
   |
   | Email notifications are sent only when corresponding :term:`Job` status milestones are reached and when
-    email(s) were provided in the :ref:`Execute <proc_op_execute>` request body.
+    email(s) were provided in the :ref:`Execute <proc_op_execute>` request body. Emails will not be sent if
+    the request body did not include a subscription to those notifications, even if the templates were configured.
 
 .. seealso::
     See :ref:`Notification Subscribers <proc_op_execute_subscribers>` for more details.
