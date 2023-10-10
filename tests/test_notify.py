@@ -7,7 +7,7 @@ import mock
 import pytest
 
 from weaver.datatype import Job
-from weaver.notify import decrypt_email, encrypt_email, notify_job_complete
+from weaver.notify import decrypt_email, encrypt_email, notify_job_email
 from weaver.status import Status
 
 
@@ -74,7 +74,7 @@ def test_notify_email_job_complete():
         mock_smtp.return_value.sendmail.return_value = None  # sending worked
 
         test_job.status = Status.SUCCEEDED
-        notify_job_complete(test_job, notify_email, settings)
+        notify_job_email(test_job, notify_email, settings)
         mock_smtp.assert_called_with("xyz.test.com", 12345, timeout=1)
         assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
         assert mock_smtp.return_value.sendmail.call_args[0][1] == notify_email
@@ -89,7 +89,7 @@ def test_notify_email_job_complete():
         assert test_job_err_url not in message
 
         test_job.status = Status.FAILED
-        notify_job_complete(test_job, notify_email, settings)
+        notify_job_email(test_job, notify_email, settings)
         assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
         assert mock_smtp.return_value.sendmail.call_args[0][1] == notify_email
         message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
@@ -103,7 +103,7 @@ def test_notify_email_job_complete():
         assert test_job_err_url in message
 
 
-def test_notify_job_complete_custom_template():
+def test_notify_job_email_custom_template():
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".mako") as email_template_file:
         email_template_file.writelines([
             "From: Weaver\n",
@@ -137,7 +137,7 @@ def test_notify_job_complete_custom_template():
 
         with mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL) as mock_smtp:
             mock_smtp.return_value.sendmail.return_value = None  # sending worked
-            notify_job_complete(test_job, notify_email, settings)
+            notify_job_email(test_job, notify_email, settings)
 
         message_encoded = mock_smtp.return_value.sendmail.call_args[0][2]
         message = message_encoded.decode("utf8")
