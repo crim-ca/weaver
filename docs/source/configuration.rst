@@ -221,7 +221,7 @@ they are optional and which default value or operation is applied in each situat
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
 
-- | ``weaver.wps_metadata_[...]`` (multiple settings)
+- | ``weaver.wps_metadata_[...]`` (multiple settings) [:class:`str`]
   |
   | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints
     (:ref:`GetCapabilities <proc_op_getcap>`).

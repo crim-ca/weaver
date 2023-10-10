@@ -19,6 +19,7 @@ Changes:
   parsing of its value if provided in the `JSON` body during `Job` submission for backward compatibility support of
   existing servers. The ``Job.notification_email`` attribute is removed to avoid duplicate references.
 - Add notification email for `Job` ``started`` status, only available through the ``subscribers`` property.
+- Add `CLI` and ``WeaverClient`` options to support ``subscribers`` specification for submitted `Job` execution.
 - Add ``{PROCESS_ID}/{STATUS}.mako`` template detection under the ``weaver.wps_email_notify_template_dir`` location
   to allow per-`Process` and per-`Job` status email customization.
 - Refactor ``weaver/notify.py`` and ``weaver/processes/execution.py`` to avoid mixed references to the
@@ -28,7 +29,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.cli`` logger not properly configured when executed from `CLI` causing log messages to not be reported.
 
 .. _changes_4.33.0:
 

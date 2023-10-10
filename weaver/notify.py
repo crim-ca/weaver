@@ -85,7 +85,11 @@ def notify_job_email(job, to_email_recipient, container):
     ssl = asbool(settings.get("weaver.wps_email_notify_ssl", True))
 
     if not smtp_host or not port:
-        raise ValueError("The email server configuration is missing.")
+        # note: don't expose the values to avoid leaking them in logs
+        raise ValueError(
+            "The email server configuration is missing or incomplete. "
+            "Validate that SMTP host and port are properly configured."
+        )
     port = int(port)
 
     template = resolve_email_template(job, settings)
@@ -176,12 +180,12 @@ def map_job_subscribers(job_body, settings):
     submit_subscribers = job_body.get("subscribers")
     mapped_subscribers = {}
     for status, name, sub_type, alt in [
-        (Status.STARTED, "inProgressUri", "emails", None),
-        (Status.FAILED, "failedUri", "emails", notification_email),
-        (Status.SUCCEEDED, "successUri", "emails", notification_email),
-        (Status.STARTED, "inProgressEmail", "callbacks", None),
-        (Status.FAILED, "failedEmail", "callbacks", None),
-        (Status.SUCCEEDED, "successEmail", "callbacks", None),
+        (Status.STARTED, "inProgressEmail", "emails", None),
+        (Status.FAILED, "failedEmail", "emails", notification_email),
+        (Status.SUCCEEDED, "successEmail", "emails", notification_email),
+        (Status.STARTED, "inProgressUri", "callbacks", None),
+        (Status.FAILED, "failedUri", "callbacks", None),
+        (Status.SUCCEEDED, "successUri", "callbacks", None),
     ]:
         value = submit_subscribers.get(name) or alt
         if not value:
@@ -221,7 +225,7 @@ def send_job_callback_request(job, task_logger, settings):
             else:
                 # OGC-compliant request body needed to respect 'subscribers' callback definition
                 # (https://github.com/opengeospatial/ogcapi-processes/blob/master/core/examples/yaml/callbacks.yaml)
-                body = get_results(
+                body, _ = get_results(
                     job,
                     settings,
                     value_key="value",
@@ -231,6 +235,7 @@ def send_job_callback_request(job, task_logger, settings):
             request_extra(
                 "POST",
                 request_uri,
+                json=body,
                 allowed_codes=[200, 201, 202],
                 cache_enabled=False,
                 settings=settings,

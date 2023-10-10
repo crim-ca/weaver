@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import shutil
+import smtplib
 import tempfile
 import uuid
 from typing import TYPE_CHECKING
@@ -38,9 +39,10 @@ from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
 from weaver.datatype import DockerAuthentication, Service
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
+from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
-from weaver.status import Status, StatusCategory
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import fully_qualified_name
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
@@ -67,7 +69,10 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
         settings.update({
             "weaver.vault_dir": tempfile.mkdtemp(prefix="weaver-test-"),
             "weaver.wps_output_dir": tempfile.mkdtemp(prefix="weaver-test-"),
-            "weaver.wps_output_url": "http://random-file-server.com/wps-outputs"
+            "weaver.wps_output_url": "http://random-file-server.com/wps-outputs",
+            "weaver.wps_email_notify_smtp_host": "http://fake-email-server",
+            "weaver.wps_email_notify_port": 1234,
+            "weaver.wps_email_encrypt_salt": "123456",
         })
         cls.settings = settings
         super(TestWeaverClientBase, cls).setUpClass()
@@ -425,7 +430,8 @@ class TestWeaverClient(TestWeaverClientBase):
         ), "CLI should not have overridden the process description field."
 
     def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
-                                          preload=False, location=False, expect_success=True, mock_exec=True):
+                                          preload=False, location=False, expect_success=True,
+                                          mock_exec=True, **exec_kwargs):
         if isinstance(inputs_param, str):
             ref = {"location": inputs_param} if location else {"ref_name": inputs_param}
             if preload:
@@ -440,7 +446,8 @@ class TestWeaverClient(TestWeaverClientBase):
                 mock_exec_func = None
             for mock_exec_proc in mocked_execute_celery(func_execute_task=mock_exec_func):
                 stack_exec.enter_context(mock_exec_proc)
-            result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process], inputs=inputs_param)
+            result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process],
+                                         inputs=inputs_param, **exec_kwargs)
         if expect_success:
             assert result.success, result.message + (result.text if result.text else "")
             assert "jobID" in result.body
@@ -565,6 +572,63 @@ class TestWeaverClient(TestWeaverClientBase):
         #   Test should wrap 'get_job' in 'get_job_status' view (or similar wrapping approach) to validate that
         #   status was periodically pooled and returned 'running' until the final 'succeeded' resumes to download.
         raise NotImplementedError
+
+    def test_execute_subscribers(self):
+        """
+        Test that specified subscribers are called for relevant :term:`Job` status milestones.
+
+        .. versionadded:: 4.34
+        """
+        subscribers = {
+            "inProgressUri": "https://server.com/started",
+            "failedUri": "https://server.com/failure",
+            "successUri": "https://server.com/success",
+            "inProgressEmail": "working@email.com",
+            "failedEmail": "failed@email.com",
+            "successEmail": "success@email.com",
+        }
+        with contextlib.ExitStack() as subs_stack:
+            # mock as close as possible to the 'send' operations of respective subscriber types
+            mocked_requests = subs_stack.enter_context(mock.patch("weaver.notify.request_extra"))
+            mocked_smtp = subs_stack.enter_context(mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL))
+            mocked_smtp.return_value.sendmail.return_value = None  # sending worked
+            mocked_emails = mocked_smtp.return_value.sendmail  # shortcut
+
+            result = self.run_execute_inputs_schema_variant(
+                {"message": "test-subscribers"},
+                subscribers=subscribers,
+                mock_exec=False,  # need to run it to get subscriber calls
+            )
+
+            # NOTE:
+            #   Because JSON of job status are pushed using the OGC schema definitions,
+            #   actual status in the body will be mapped to their standard equivalents.
+            #   For example, "started" will be represented as "running" in the callback request body,
+            #   even though both of these statuses are used internally at distinct execution steps.
+            running_statuses = JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]
+            job_id = result.body["jobID"]
+            expect_outputs = {
+                "output": {
+                    "href": f"{get_wps_output_url(self.settings)}/{job_id}/output/stdout.log",
+                    "type": ContentType.TEXT_PLAIN,
+                    "format": {"mediaType": ContentType.TEXT_PLAIN},
+                }
+            }
+
+            # order important, expect status 'started' (in-progress) to occur before 'succeeded'
+            # call for 'failed' should never happen since 'succeeded' expected, as validated by above method
+            assert mocked_requests.call_count == 2, "Should not have called both failed/success callback requests"
+            assert mocked_requests.call_args_list[0].args == ("POST", subscribers["inProgressUri"])
+            assert mocked_requests.call_args_list[0].kwargs["json"]["status"] in running_statuses  # status JSON
+            assert mocked_requests.call_args_list[1].args == ("POST", subscribers["successUri"])
+            assert mocked_requests.call_args_list[1].kwargs["json"] == expect_outputs  # results JSON
+
+            # first argument None is 'from_addr' not configured, this is allowed if provided by 'From' email header
+            assert mocked_emails.call_count == 2, "Should not have sent both failed/success email notifications"
+            assert mocked_emails.call_args_list[0].args[:2] == (None, subscribers["inProgressEmail"])
+            assert b"Job test-client-Echo Started" in mocked_emails.call_args_list[0].args[-1]
+            assert mocked_emails.call_args_list[1].args[:2] == (None, subscribers["successEmail"])
+            assert b"Job test-client-Echo Succeeded" in mocked_emails.call_args_list[1].args[-1]
 
     # NOTE:
     #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body
@@ -1625,6 +1689,61 @@ class TestWeaverCLI(TestWeaverClientBase):
             wps_url = get_wps_output_url(self.settings)
             wps_path = link.split(wps_url)[-1]
             assert wps_path == f"/{expect_output_context}/{job_id}/output/stdout.log"
+
+    def test_execute_subscriber_options(self):
+        """
+        Validate that subscriber options are properly combined on the CLI.
+
+        Since options are provided by multiple separate arguments on the command line, but are a single JSON definition
+        in :class:`weaver.cli.WeaverClient`, ensure that mapping is accomplished as expected. Also, validate that those
+        definitions correspond to the final data structure obtained in the database for later use by the job execution.
+
+        .. versionadded:: 4.34
+        """
+        proc = self.test_process["Echo"]
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec_proc)
+
+            test_email_started = "started-job@email.com"
+            test_email_failed = "failed-job@email.com"
+            test_callback_started = "https://server.com/started"
+            test_callback_success = "https://server.com/success"
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    # "weaver",
+                    "execute",
+                    "-u", self.url,
+                    "-p", proc,
+                    "-I", "message='TEST MESSAGE!'",
+                    "-M",
+                    "-T", 2,
+                    "-W", 1,
+                    "-nL",
+                    "-d",
+                    "-F", OutputFormat.JSON_RAW,
+                    "-sEP", test_email_started,
+                    "-sEF", test_email_failed,
+                    "-sCP", test_callback_started,
+                    "-sCS", test_callback_success,
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+            data = json.loads(lines[0])
+            assert data["status"] == Status.SUCCEEDED
+
+            job = self.job_store.fetch_by_id(data["jobID"])
+            # to properly compare, we must decrypt emails (encrypt is not deterministic on multiple calls)
+            subs = copy.deepcopy(job.subscribers)
+            for sub, email in subs["emails"].items():
+                subs["emails"][sub] = decrypt_email(email, self.settings)
+            assert subs == {
+                "callbacks": {Status.STARTED: test_callback_started, Status.SUCCEEDED: test_callback_success},
+                "emails": {Status.STARTED: test_email_started, Status.FAILED: test_email_failed},
+            }, "Job subscribers should be as submitted, after combining CLI options, without extra or missing ones."
 
     def test_execute_help_details(self):
         """

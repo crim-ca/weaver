@@ -337,7 +337,7 @@ above :term:`CLI` variations, but it is usually more intuitive to use a Python :
             {"href": "http://another.com/data.json"},
         ],
         "single": {
-            "href": "/workspace/data.xml@mediaType",  # note: uploaded to vault automatically before execution
+            "href": "/workspace/data.xml",  # note: uploaded to vault automatically before execution
             "type": "text/xml",
         }
     })
