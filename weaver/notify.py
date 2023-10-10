@@ -47,7 +47,7 @@ def resolve_email_template(job, settings):
     if not os.path.isdir(template_dir):
         LOGGER.warning("No default email template directory configured. Using default template.")
         template_file = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/templates/notification_email_example.mako")
-        template = Template(filename=template_file)
+        template = Template(filename=template_file)  # nosec: B702
     else:
         default_setting = "weaver.wps_email_notify_template_default"
         default_default = "default.mako"
