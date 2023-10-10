@@ -177,7 +177,7 @@ def map_job_subscribers(job_body, settings):
     definitions were not provided for the corresponding subscriber email fields.
     """
     notification_email = job_body.get("notification_email")
-    submit_subscribers = job_body.get("subscribers")
+    submit_subscribers = job_body.get("subscribers") or {}
     mapped_subscribers = {}
     for status, name, sub_type, alt in [
         (Status.STARTED, "inProgressEmail", "emails", None),
