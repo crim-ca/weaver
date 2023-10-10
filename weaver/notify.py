@@ -16,13 +16,13 @@ from weaver import WEAVER_MODULE_DIR
 from weaver.datatype import Job
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.status import Status
-from weaver.utils import bytes2str, fully_qualified_name, get_settings, str2bytes, request_extra
+from weaver.utils import bytes2str, fully_qualified_name, get_settings, request_extra, str2bytes
 from weaver.wps_restapi.jobs.utils import get_results
 
 if TYPE_CHECKING:
     from typing import Optional
 
-    from weaver.typedefs import AnySettingsContainer, ExecutionSubscribers, SettingsType, JSON
+    from weaver.typedefs import AnySettingsContainer, ExecutionSubscribers, JSON, SettingsType
 
 LOGGER = logging.getLogger(__name__)
 
