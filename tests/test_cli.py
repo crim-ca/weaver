@@ -1,6 +1,8 @@
 """
 Unit test for :mod:`weaver.cli` utilities.
 """
+import argparse
+
 import base64
 import inspect
 import json
@@ -20,6 +22,7 @@ from weaver.cli import (
     BearerAuthHandler,
     CookieAuthHandler,
     OperationResult,
+    SubscriberAction,
     WeaverClient,
     main as weaver_cli
 )
@@ -280,3 +283,91 @@ def test_file_inputs_not_uploaded_to_vault():
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
+
+
+@pytest.mark.parametrize(
+    ["expect_error", "subscriber_option", "subscriber_dest", "subscriber_value", "subscriber_result"],
+    [
+        (
+            None,
+            "--subscriber-email",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "https://some-server.com/path",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "test@email.com",
+            None,
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "random",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "random",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "test@email.com",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "https://some-server.com/path",
+            None
+        ),
+    ]
+)
+def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, subscriber_value, subscriber_result):
+    ns = argparse.Namespace()
+    try:
+        action = SubscriberAction(["-sXX", subscriber_option], dest=subscriber_dest)
+        action(argparse.ArgumentParser(), ns, subscriber_value)
+    except Exception as exc:
+        assert expect_error is not None, f"Test was not expected to fail, but raised {exc!s}."
+        assert isinstance(exc, expect_error), f"Test expected to raise {expect_error}, but raised {exc!s} instead."
+    else:
+        assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
+        assert dict(**vars(ns)) == subscriber_result

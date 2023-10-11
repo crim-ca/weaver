@@ -82,7 +82,8 @@ if TYPE_CHECKING:
         # avoid linter issue
         AnyRequestMethod = str
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
-        CWL = JSON = ExecutionInputsMap = ExecutionResults = HeadersType = Any
+        CWL = JSON = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = HeadersType = Any
+        JobSubscribers = Any
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
@@ -1553,7 +1554,7 @@ class WeaverClient(object):
             out_path = os.path.join(out_dir, out_id)
             is_list = True
             if not isinstance(value, list):
-                value = [value]
+                value = [value]  # type: ignore
                 is_list = False
             for i, item in enumerate(value):
                 if "href" in item:
@@ -1964,12 +1965,12 @@ class SubscriberAction(argparse.Action):
     map the ``subscriber`` value under a dictionary ``holder`` that will be passed to the :class:`argparse.Namespace`.
     """
 
-    def __init__(self, *option_strings, dest=None, **kwargs):
-        # type: (str, str, Any) -> None
-        if not isinstance(dest, str) or "." not in dest:
+    def __init__(self, option_strings, dest=None, **kwargs):
+        # type: (List[str], str, Any) -> None
+        if not isinstance(dest, str) or "." not in dest:  # pragma: no cover  # only for self-validation
             raise ValueError("Using 'SubscriberAction' requires 'dest=<holder>.<subscriber>' parameter.")
         dest, self.field = dest.split(".", 1)
-        super(SubscriberAction, self).__init__(*option_strings, dest=dest, **kwargs)
+        super(SubscriberAction, self).__init__(option_strings, dest=dest, **kwargs)
 
     def __call__(self, parser, namespace, subscriber_param, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, str, Optional[str]) -> None
@@ -1983,9 +1984,9 @@ class SubscriberAction(argparse.Action):
 
     def validate(self, option, value):
         # type: (str, Any) -> None
-        if "email" in option:
+        if "email" in self.field:
             pattern = re.compile(EMAIL_RE, flags=re.IGNORECASE)
-        elif "callback" in option:
+        elif "callback" in self.field:
             pattern = re.compile(URL_REGEX, flags=re.IGNORECASE)
         else:
             raise NotImplementedError(f"Cannot parse option: '{option}'")
