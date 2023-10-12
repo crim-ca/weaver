@@ -37,14 +37,21 @@ def resolve_email_template(job, settings):
     """
     Finds the most appropriate Mako Template email notification file based on configuration and :term:`Job` context.
 
-    .. note::
-        The example template is used by default if the template directory is not overridden
-        (weaver/wps_restapi/templates/notification_email_example.mako).
+    The example template is used by default *ONLY* if the template directory was not overridden. If overridden, failing
+    to match any of the template file locations will raise to report the issue instead of silently using the default.
+
+    .. seealso::
+        https://github.com/crim-ca/weaver/blob/master/weaver/wps_restapi/templates/notification_email_example.mako
+
+    :raises IOError:
+        If the template directory was configured explicitly, but cannot be resolved, or if any of the possible
+        combinations of template file names cannot be resolved under that directory.
+    :returns: Matched template instance based on resolution order as described in the documentation.
     """
     template_dir = settings.get("weaver.wps_email_notify_template_dir") or ""
 
     # find appropriate template according to settings
-    if not os.path.isdir(template_dir):
+    if not template_dir and not os.path.isdir(template_dir):
         LOGGER.warning("No default email template directory configured. Using default template.")
         template_file = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/templates/notification_email_example.mako")
         template = Template(filename=template_file)  # nosec: B702
