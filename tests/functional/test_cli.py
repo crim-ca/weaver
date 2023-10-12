@@ -624,11 +624,12 @@ class TestWeaverClient(TestWeaverClientBase):
             assert mocked_requests.call_args_list[1].kwargs["json"] == expect_outputs  # results JSON
 
             # first argument None is 'from_addr' not configured, this is allowed if provided by 'From' email header
+            test_proc_byte = self.test_process["Echo"]
             assert mocked_emails.call_count == 2, "Should not have sent both failed/success email notifications"
             assert mocked_emails.call_args_list[0].args[:2] == (None, subscribers["inProgressEmail"])
-            assert b"Job test-client-Echo Started" in mocked_emails.call_args_list[0].args[-1]
+            assert f"Job {test_proc_byte} Started".encode() in mocked_emails.call_args_list[0].args[-1]
             assert mocked_emails.call_args_list[1].args[:2] == (None, subscribers["successEmail"])
-            assert b"Job test-client-Echo Succeeded" in mocked_emails.call_args_list[1].args[-1]
+            assert f"Job {test_proc_byte} Succeeded".encode() in mocked_emails.call_args_list[1].args[-1]
 
     # NOTE:
     #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body

@@ -1960,7 +1960,7 @@ class SubscriberAction(argparse.Action):
     """
     Action that will validate that the input argument references a valid subscriber argument.
 
-    If valid, the returned value with be an updated subscriber definition.
+    If valid, the returned value will be an updated subscriber definition.
     All arguments using ``action=SubscriberType`` should include a ``dest="<holder>.<subscriber>"`` parameter that will
     map the ``subscriber`` value under a dictionary ``holder`` that will be passed to the :class:`argparse.Namespace`.
     """
@@ -1991,7 +1991,7 @@ class SubscriberAction(argparse.Action):
         else:
             raise NotImplementedError(f"Cannot parse option: '{option}'")
         if not re.match(pattern, value):
-            raise argparse.ArgumentError(self, f"Value '{value} is a valid subscriber argument for '{option}'.")
+            raise argparse.ArgumentError(self, f"Value '{value}' is not a valid subscriber argument for '{option}'.")
 
 
 def add_subscribers_params(parser):
@@ -2051,6 +2051,7 @@ def add_subscribers_params(parser):
         metavar="URL",
         dest="subscribers.successUri",
         help=(
+            "Send an HTTP callback request to this URL if the job execution completed successfully.\n\n"
             "The request body will contain the JSON representation of the job results."
         )
     )

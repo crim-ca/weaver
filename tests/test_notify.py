@@ -1,4 +1,6 @@
+import contextlib
 import os
+import pathlib
 import smtplib
 import tempfile
 import uuid
@@ -6,8 +8,9 @@ import uuid
 import mock
 import pytest
 
+from weaver import WEAVER_MODULE_DIR
 from weaver.datatype import Job
-from weaver.notify import decrypt_email, encrypt_email, notify_job_email
+from weaver.notify import decrypt_email, encrypt_email, notify_job_email, resolve_email_template
 from weaver.status import Status
 
 
@@ -148,3 +151,111 @@ def test_notify_job_email_custom_template():
             "",
             f"Job: {test_url}/processes/{test_job.process}/jobs/{test_job.id}",
         ])
+
+
+@pytest.mark.parametrize(
+    ["settings", "test_process", "test_status", "tmp_default", "expect_result"],
+    [
+        ({}, None, None, None, 4),
+        # directory exists, but none of the supported mako variants found under it
+        ({"weaver.wps_email_notify_template_dir": tempfile.gettempdir()}, None, None, None, IOError),
+        ({"weaver.wps_email_notify_template_dir": "/DOES_NOT_EXIST"}, None, None, None, 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>"}, None, None, None, 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+          "weaver.wps_email_notify_template_default": "RANDOM"}, None, None, None, 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>"}, None, None, None, 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+          "weaver.wps_email_notify_template_default": "test-default.mako"}, None, None, "random.mako", 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>"}, None, None, "test-default.mako", 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>"}, None, None, "test-default.mako", 4),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+          "weaver.wps_email_notify_template_default": "test-default.mako"}, None, None, "default.mako", 3),
+        ({"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+          "weaver.wps_email_notify_template_default": "test-default.mako"}, None, None, "test-default.mako", 2),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "random-process",
+            None,
+            "test-default.mako",
+            2
+        ),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "random-process",
+            Status.SUCCEEDED,
+            "test-default.mako",
+            2
+        ),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "tmp-process",
+            Status.STARTED,
+            "test-default.mako",
+            2
+        ),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "tmp-process",
+            None,
+            "test-default.mako",
+            2
+        ),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "tmp-process",
+            Status.SUCCEEDED,
+            "test-default.mako",
+            2
+        ),
+        (
+            {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
+             "weaver.wps_email_notify_template_default": "test-default.mako"},
+            "tmp-process",
+            Status.STARTED,
+            "test-default.mako",
+            1
+        ),
+    ]
+)
+def test_resolve_email_template(settings, test_process, test_status, tmp_default, expect_result):
+    # process name and job status important to evaluate expected mako file resolution
+    tmp_process = "tmp-process"
+    tmp_status = Status.STARTED
+
+    with contextlib.ExitStack() as tmp_stack:
+        tmp_dir = pathlib.Path(tmp_stack.enter_context(tempfile.TemporaryDirectory()))
+        if settings.get("weaver.wps_email_notify_template_dir") == "<TMP_DIR>":
+            settings["weaver.wps_email_notify_template_dir"] = tmp_dir
+
+        tmp_proc_dir = tmp_dir / tmp_process
+        os.makedirs(tmp_proc_dir, exist_ok=True)
+        tmp_file0 = tmp_proc_dir / f"{tmp_process}.mako"
+        tmp_file0.touch()
+        tmp_file1 = tmp_dir / f"{tmp_status}.mako"
+        tmp_file1.touch()
+        tmp_file2 = tmp_dir / f"{tmp_default}.mako"
+        tmp_file3 = tmp_dir / "default.mako"
+        default_file = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/templates/notification_email_example.mako")
+
+        ordered_possible_matches = [
+            tmp_file0,  # {tmp_dir}/{process}/{status}.mako
+            tmp_file1,  # {tmp_dir}/{process}.mako
+            tmp_file2,  # {tmp_dir}/{default}.mako
+            tmp_file3,  # {tmp_dir}/default.mako
+            default_file,  # weaver default mako
+        ]
+
+        test_job = Job(task_id=uuid.uuid4(), process=test_process, status=test_status)
+        try:
+            found_template = resolve_email_template(test_job, settings)
+            found_template_index = ordered_possible_matches.index(found_template.filename)
+            assert isinstance(expect_result, int), f"Test expected to raise {expect_result} but did not raise."
+            assert found_template_index == expect_result
+        except Exception as exc:
+            assert issubclass(expect_result, Exception), f"Test did not expect an error, but raised {exc!s}."
+            assert isinstance(exc, expect_result), f"Test expected {expect_result}, but raised {exc!s} instead."

@@ -51,7 +51,7 @@ def resolve_email_template(job, settings):
     else:
         default_setting = "weaver.wps_email_notify_template_default"
         default_default = "default.mako"
-        default_name = settings.get(default_setting, default_default)
+        default_name = settings.get(default_setting) or default_default
         process_name = f"{job.process!s}.mako"
         process_status_name = f"{job.process!s}/{job.status!s}.mako"
         default_template = os.path.join(template_dir, default_name)
@@ -84,7 +84,7 @@ def notify_job_email(job, to_email_recipient, container):
     port = settings.get("weaver.wps_email_notify_port")
     ssl = asbool(settings.get("weaver.wps_email_notify_ssl", True))
 
-    if not smtp_host or not port:
+    if not smtp_host or not port:  # pragma: no cover  # only raise to warn service manager
         # note: don't expose the values to avoid leaking them in logs
         raise ValueError(
             "The email server configuration is missing or incomplete. "
