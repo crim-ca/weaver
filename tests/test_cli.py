@@ -2,7 +2,6 @@
 Unit test for :mod:`weaver.cli` utilities.
 """
 import argparse
-
 import base64
 import inspect
 import json
@@ -370,4 +369,4 @@ def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, su
         assert isinstance(exc, expect_error), f"Test expected to raise {expect_error}, but raised {exc!s} instead."
     else:
         assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
-        assert dict(**vars(ns)) == subscriber_result
+        assert dict(**vars(ns)) == subscriber_result  # pylint: disable=R1735
