@@ -137,7 +137,8 @@
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
-.. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. |default-notify-email-template| replace:: Default Notification Email Mako Template
 .. |opensearch-deploy| replace:: OpenSearch Deploy
 .. _opensearch-deploy: ../../../tests/opensearch/json/opensearch_deploy.json
 .. |opensearch-examples| replace:: OpenSearch Examples
