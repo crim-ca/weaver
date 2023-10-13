@@ -17,7 +17,7 @@ from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
-from weaver.notify import decrypt_email, encrypt_email, notify_job_complete
+from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA, JobInputsOutputsSchema
@@ -127,8 +127,9 @@ def execute_process(task, job_id, wps_url, headers=None):
     job.status = Status.STARTED  # will be mapped to 'RUNNING'
     job.status_message = f"Job {Status.STARTED}."  # will preserve detail of STARTED vs RUNNING
     job.save_log(message=job.status_message)
-
     task_logger = get_task_logger(__name__)
+    notify_job_subscribers(job, task_logger, settings)
+
     job.save_log(logger=task_logger, message="Job task setup initiated.")
     load_pywps_config(settings)
     job.progress = JobProgress.SETUP
@@ -269,8 +270,11 @@ def execute_process(task, job_id, wps_url, headers=None):
         job.save_log(errors=errors, logger=task_logger)
         job = store.update_job(job)
     finally:
-        # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
+        # note:
+        #   don't update the progress and status here except for 'success' to preserve last error that was set
+        #   it is more relevant to return the latest step that worked properly to understand where it failed
         job = store.fetch_by_id(job.id)
+        # if task worker terminated, local 'job' is out of date compared to remote/background runner last update
         if task_terminated and map_status(job.status) == Status.FAILED:
             job.status = Status.DISMISSED
         task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
@@ -282,7 +286,7 @@ def execute_process(task, job_id, wps_url, headers=None):
 
         if task_success:
             job.progress = JobProgress.NOTIFY
-        send_job_complete_notification_email(job, task_logger, settings)
+        notify_job_subscribers(job, task_logger, settings)
 
         if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job.status = Status.SUCCEEDED
@@ -450,23 +454,6 @@ def parse_wps_inputs(wps_process, job):
     except KeyError:
         wps_inputs = []
     return wps_inputs
-
-
-def send_job_complete_notification_email(job, task_logger, settings):
-    # type: (Job, logging.Logger, SettingsType) -> None
-    """
-    Sends the notification email of completed execution if it was requested during job submission.
-    """
-    if job.notification_email is not None:
-        try:
-            email = decrypt_email(job.notification_email, settings)
-            notify_job_complete(job, email, settings)
-            message = "Notification email sent successfully."
-            job.save_log(logger=task_logger, message=message)
-        except Exception as exc:
-            exception = f"{fully_qualified_name(exc)}: {exc!s}"
-            message = f"Couldn't send notification email ({exception})"
-            job.save_log(errors=message, logger=task_logger, message=message)
 
 
 def make_results_relative(results, settings):
@@ -656,16 +643,14 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
     exec_resp = json_body.get("response")
-
-    notification_email = json_body.get("notification_email")
-    encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
+    subscribers = map_job_subscribers(json_body, settings)
 
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
                          inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
                          is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
                          execute_async=is_execute_async, execute_response=exec_resp,
-                         custom_tags=tags, notification_email=encrypted_email, accept_language=language)
+                         custom_tags=tags, accept_language=language, subscribers=subscribers)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
     location_url = job.status_url(settings)
@@ -688,7 +673,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
             if job.status == Status.SUCCEEDED:
                 return get_job_results_response(job, settings, headers=resp_headers)
             # otherwise return the error status
-            body = job.json(container=settings, self_link="status")
+            body = job.json(container=settings)
             body["location"] = location_url
             resp = get_job_submission_response(body, resp_headers, error=True)
             return resp

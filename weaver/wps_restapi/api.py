@@ -210,8 +210,7 @@ def get_conformance(category):
         f"{ogcapi_proc_core}/rec/job-list/next-1",
         f"{ogcapi_proc_core}/rec/job-list/next-2",
         f"{ogcapi_proc_core}/rec/job-list/next-3",
-        # FIXME: https://github.com/crim-ca/weaver/issues/230
-        # ogcapi_proc_core + "/req/callback/job-callback",
+        f"{ogcapi_proc_core}/req/callback/job-callback",
         f"{ogcapi_proc_core}/req/core",
         f"{ogcapi_proc_core}/req/core/api-definition-op",
         f"{ogcapi_proc_core}/req/core/api-definition-success",

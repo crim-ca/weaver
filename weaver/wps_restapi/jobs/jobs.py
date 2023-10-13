@@ -133,7 +133,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    job_status = job.json(request, self_link="status")
+    job_status = job.json(request)
     return HTTPOk(json=job_status)
 
 

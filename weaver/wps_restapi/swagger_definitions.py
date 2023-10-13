@@ -26,7 +26,7 @@ import duration
 import jsonschema
 import yaml
 from babel.numbers import list_currencies
-from colander import All, DateTime, Email, Length, Money, OneOf, Range, Regex, drop, null, required
+from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
@@ -357,6 +357,13 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class Email(ExtendedSchemaNode):
+    schema_type = String
+    description = "Email recipient."
+    format = "email"
+    validator = EmailRegex()
 
 
 class MediaType(ExtendedSchemaNode):
@@ -1856,6 +1863,42 @@ class JobGroupsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     validator = StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
 
 
+class JobExecuteSubscribers(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/subscriber.yaml"
+    description = "Optional URIs for callbacks for this job."
+    # basic OGC subscribers
+    success_uri = URL(
+        name="successUri",
+        description="Location where to POST the job results on successful completion.",
+    )
+    failure_uri = URL(
+        name="failedUri",
+        description="Location where to POST the job status if it fails execution.",
+        missing=drop,
+    )
+    started_uri = URL(
+        name="inProgressUri",
+        description="Location where to POST the job status once it starts execution.",
+        missing=drop,
+    )
+    # additional subscribers
+    success_email = Email(
+        name="successEmail",
+        description="Email recipient to send a notification on successful job completion.",
+        missing=drop,
+    )
+    failure_email = Email(
+        name="failedEmail",
+        description="Email recipient to send a notification on failed job completion.",
+        missing=drop,
+    )
+    started_email = Email(
+        name="inProgressEmail",
+        description="Email recipient to send a notification of job status once it starts execution.",
+        missing=drop,
+    )
+
+
 class LaunchJobQuerystring(ExtendedMappingSchema):
     tags = JobTagsCommaSeparated()
 
@@ -2292,7 +2335,7 @@ class OWSAddress(ExtendedMappingSchema, OWSNamespace):
     admin_area = OWSString(name="AdministrativeArea", title="AdministrativeArea", missing=drop)
     postal_code = OWSString(name="PostalCode", title="OWSPostalCode", example="A1B 2C3", missing=drop)
     email = OWSString(name="ElectronicMailAddress", title="OWSElectronicMailAddress",
-                      example="mail@me.com", validator=Email, missing=drop)
+                      example="mail@me.com", validator=EmailRegex, missing=drop)
 
 
 class OWSContactInfo(ExtendedMappingSchema, OWSNamespace):
@@ -3656,12 +3699,15 @@ class Execute(ExecuteInputOutputs):
         ),
         validator=OneOf(ExecuteResponse.values())
     )
-    notification_email = ExtendedSchemaNode(
-        String(),
+    notification_email = Email(
         missing=drop,
-        validator=Email(),
-        description="Optionally send a notification email when the job is done."
+        deprecated=True,
+        description=(
+            "Optionally send a notification email when the job is completed. "
+            "This is equivalent to using subscribers for both failed and successful job status emails simultaneously."
+        )
     )
+    subscribers = JobExecuteSubscribers(missing=drop)
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):
