@@ -12,11 +12,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add schema validation and reference to the `API` landing page, with additional parameters to respect `OGC` schema.
+- Add multiple `JSON` schema references for schema classes that are represented by corresponding `OGC` definitions.
 
 Fixes:
 ------
-- No change.
+- Fix auto-insertion of ``$schema`` and ``$id`` URI references into `JSON` schema and their data content representation.
+  When in `OpenAPI` context, schemas now correctly report their ``$id`` as the reference schema they represent (usually
+  from external `OGC` schema references), and ``$schema`` as the `JSON` meta-schema. When representing `JSON` data
+  contents validated against a `JSON` schema, the ``$schema`` property is used instead to refer to that schema.
+  All auto-insertions of these references can be enabled or disabled with options depending on what is more sensible
+  for presenting results from various `API` responses.
 
 .. _changes_4.33.0:
 
