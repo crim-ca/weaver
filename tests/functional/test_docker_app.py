@@ -120,8 +120,8 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         # process already deployed by setUpClass
         body = self.get_deploy_body()
         process = self.process_store.fetch_by_id(self.process_id)
-        assert "$id" in process.package
-        assert process.package["$id"] == CWL_SCHEMA_URL
+        assert "$schema" in process.package
+        assert process.package["$schema"] == CWL_SCHEMA_URL
 
         payload = process.payload
         payload.pop("$schema", None)

@@ -518,17 +518,21 @@ def api_frontpage_body(settings):
              "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
              "title": "WPS 2.0 XML validation schemas entrypoint."},
         ])
-    return {
-        "message": "Weaver Information",
-        "configuration": weaver_config,
-        "description": __meta__.__description__,
-        "parameters": [
-            {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
-            {"name": "vault", "enabled": weaver_vault},
-            {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
-        ],
-        "links": weaver_links,
-    }
+    body = sd.FrontpageSchema().deserialize(
+        {
+            "message": "Weaver Information",
+            "configuration": weaver_config,
+            "description": __meta__.__description__,
+            "attribution": __meta__.__author__,
+            "parameters": [
+                {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+                {"name": "vault", "enabled": weaver_vault},
+                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
+            ],
+            "links": weaver_links,
+        }
+    )
+    return body
 
 
 @sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,

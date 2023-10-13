@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Add schema validation and reference to the `API` landing page, with additional parameters to respect `OGC` schema.
+- Add multiple `JSON` schema references for schema classes that are represented by corresponding `OGC` definitions.
 - Add `Job` ``subscribers`` support to define `OGC`-compliant callback URLs where HTTP(S) requests will be sent upon
   reaching certain `Job` status milestones (resolves `#230 <https://github.com/crim-ca/weaver/issues/230>`_).
 - Add email notification support to the new ``subscribers`` definition (extension over `OGC` minimal requirements).
@@ -29,6 +31,12 @@ Changes:
 
 Fixes:
 ------
+- Fix auto-insertion of ``$schema`` and ``$id`` URI references into `JSON` schema and their data content representation.
+  When in `OpenAPI` context, schemas now correctly report their ``$id`` as the reference schema they represent (usually
+  from external `OGC` schema references), and ``$schema`` as the `JSON` meta-schema. When representing `JSON` data
+  contents validated against a `JSON` schema, the ``$schema`` property is used instead to refer to that schema.
+  All auto-insertions of these references can be enabled or disabled with options depending on what is more sensible
+  for presenting results from various `API` responses.
 - Fix ``weaver.cli`` logger not properly configured when executed from `CLI` causing log messages to not be reported.
 
 .. _changes_4.33.0:
