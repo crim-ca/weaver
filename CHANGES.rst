@@ -1562,7 +1562,8 @@ Fixes:
   file path explicitly instead of returning an invalid directory.
 - Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
 - Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
-  patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
+  patch on ``null`` since fix `geopython/pywps#507 <https://github.com/geopython/pywps/pull/507>`_ not released at
+  this point).
 - Fix potential invalid database state that could have saved an invalid process although the following
   ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
   after complete and successful schema validation.
