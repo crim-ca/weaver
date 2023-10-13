@@ -826,12 +826,17 @@ if TYPE_CHECKING:
     ProcessDescriptionListing = Union[ProcessOfferingListing, ProcessDescriptionNestedListing]
     ProcessDescription = Union[ProcessDescriptionMapping, ProcessDescriptionListing]
 
-    ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
+    ExecutionUnitNested = TypedDict("ExecutionUnitNested", {
         "unit": CWL
     }, total=True)
+    ExecutionUnitItem = Union[CWL, ExecutionUnitNested, Link]
+    ExecutionUnit = Union[
+        ExecutionUnitItem,
+        List[ExecutionUnitItem],
+    ]
     ProcessDeployment = TypedDict("ProcessDeployment", {
         "processDescription": ProcessDescription,
-        "executionUnit": List[Union[ExecutionUnitItem, Link]],
+        "executionUnit": ExecutionUnit,
         "immediateDeployment": NotRequired[bool],
         "deploymentProfileName": str,
     }, total=True)

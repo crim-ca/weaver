@@ -4852,8 +4852,18 @@ class CWL(CWLBase, CWLApp):
     _sort_first = ["$schema", "cwlVersion", "id", "class"]
 
 
-class Unit(ExtendedMappingSchema):
-    unit = CWL(description=f"Execution unit definition as CWL package specification. {CWL_DOC_MESSAGE}")
+class ExecutionUnitCWL(CWL):
+    description = f"Execution unit definition as CWL package specification. {CWL_DOC_MESSAGE}"
+
+
+# use 'strict' base schema such that it can contain only 'unit', nothing else permitted to reduce oneOf conflicts
+class ExecutionUnitNested(StrictMappingSchema):
+    unit = ExecutionUnitCWL()
+    type = MediaType(
+        description="IANA identifier of content-type represented by the unit definition.",
+        missing=drop,
+        validator=OneOf(ContentType.ANY_CWL),
+    )
 
 
 class ProviderSummaryList(ExtendedSequenceSchema):
@@ -5132,18 +5142,21 @@ class PackageBody(ExtendedMappingSchema):
 
 
 class ExecutionUnit(OneOfKeywordSchema):
+    title = "ExecutionUnit"
+    description = "Definition of the Application Package to execute."
     _one_of = [
         Reference(name="Reference", title="Reference", description="Execution Unit reference."),
-        Unit(name="Unit", title="Unit", description="Execution Unit definition."),
+        ExecutionUnitCWL(name="Unit", title="Unit", description="Execution Unit definition directly provided."),
+        ExecutionUnitNested(
+            name="UnitNested",
+            title="UnitNested",
+            description="Execution Unit definition nested under a 'unit' property.",
+        ),
     ]
 
 
 class ExecutionUnitList(ExtendedSequenceSchema):
-    unit = ExecutionUnit(
-        name="ExecutionUnit",
-        title="ExecutionUnit",
-        description="Definition of the Application Package to execute."
-    )
+    item = ExecutionUnit(name="ExecutionUnit")
     validator = Length(min=1, max=1)
 
 
@@ -5209,8 +5222,22 @@ class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     ]
 
 
+# combination of following 2 references:
+#   https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/openapi/schemas/processes-dru/ogcapppkg.yaml
+#   https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/openapi/schemas/processes-dru/ogcapppkg-array.yaml
+# but omitting the unsupported generic properties (which can be mapped to equivalent CWL requirements):
+#   https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/openapi/schemas/processes-dru/executionUnit.yaml
+class ExecutionUnitVariations(OneOfKeywordSchema):
+    _one_of = [
+        # each 'ExecutionUnit', either individually or within an array,
+        # already combines the JSON unit (nested under 'unit' or directly) vs href link representations
+        ExecutionUnit(),
+        ExecutionUnitList(),
+    ]
+
+
 class ExecutionUnitDefinition(ExtendedMappingSchema):
-    executionUnit = ExecutionUnitList()
+    executionUnit = ExecutionUnitVariations()
 
 
 class DeployParameters(ExtendedMappingSchema):

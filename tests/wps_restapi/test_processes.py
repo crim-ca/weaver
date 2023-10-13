@@ -1018,6 +1018,82 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "formats": [{"default": True, "mediaType": "text/plain"}]
             }]
 
+    def test_deploy_process_CWL_DockerRequirement_executionUnit_DirectUnit(self):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": cwl,
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
+
+    def test_deploy_process_CWL_DockerRequirement_executionUnit_UnitWithMediaType(self):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": {"unit": cwl, "type": ContentType.APP_JSON},
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
+
     def test_deploy_process_CWL_CudaRequirement_executionUnit(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
