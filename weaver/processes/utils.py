@@ -239,7 +239,7 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList(
+            d_exec_unit = sd.ExecutionUnitVariations(
                 schema_meta_include=False,
                 schema_include=False,
             ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
@@ -400,7 +400,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             if not any(deployment_profile_name.lower().endswith(typ) for typ in allowed_profile_suffix):
                 raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
-        if not isinstance(execution_units, list):
+        if isinstance(execution_units, dict):
+            if "unit" not in execution_units:
+                execution_units = {"unit": execution_units}
+            execution_units = [execution_units]
+        if not isinstance(execution_units, list) or not len(execution_units) == 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         for execution_unit in execution_units:
             if not isinstance(execution_unit, dict):

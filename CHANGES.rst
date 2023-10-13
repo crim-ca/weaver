@@ -12,6 +12,14 @@ Changes
 
 Changes:
 --------
+- Support alternative representations from `OGC API - Processes` schemas for ``executionUnit`` definition
+  during `Process` deployment. The *unit* does not need to be nested under ``unit`` or a list anymore, and can instead
+  be directly provided as `JSON` mapping. For backward compatibility, the previous list representation is still allowed
+  (fixes `#507 <https://github.com/crim-ca/weaver/issues/507>`_).
+- Support an additional ``type`` property along a ``unit`` item describing an ``executionUnit`` to specify an IANA
+  Media-Type that categories the ``unit`` contents, similarly to how it could be provided for its ``href`` counterpart.
+  For the moment, only `CWL`-based ``unit`` are supported, but this could allow future extensions to provide alternate
+  representations of an `Application Package`.
 - Add schema validation and reference to the `API` landing page, with additional parameters to respect `OGC` schema.
 - Add multiple `JSON` schema references for schema classes that are represented by corresponding `OGC` definitions.
 - Add `Job` ``subscribers`` support to define `OGC`-compliant callback URLs where HTTP(S) requests will be sent upon
@@ -1312,7 +1320,7 @@ Changes:
   operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
   corresponding new names aligned with `OGC-API`.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
-  (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+  (relates to `#211 <https://github.com/crim-ca/weaver/issues/211>`_).
 - Add explicit pattern validation (``type/subtype``) of format string definitions with ``MediaType`` schema.
 - Add sorting capability to generate mapping schemas for API responses using overrides of
   properties ``_sort_first`` and ``_sort_after`` using lists of desired ordered field names.
@@ -1338,7 +1346,7 @@ Changes:
   URL formatted strings are allowed, or alternatively an explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
 - Block unknown and ``builtin`` process types during deployment from the API
-  (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
+  (fixes `#276 <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
   no indication for mapping to an appropriate ``Process`` implementation are preemptively validated.
 - Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
@@ -1358,7 +1366,7 @@ Fixes:
 - Fix `#203 <https://github.com/crim-ca/weaver/issues/203>`_ with explicit validation test of ``ProcessSummary``
   schema for providers response.
 - Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
-  (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+  (relates to `#263 <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fix schemas references and apply deserialization to providers listing request.
 - Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
   to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of `OGC-API`
@@ -1437,7 +1445,7 @@ Changes:
 Fixes:
 ------
 - Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
-  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+  (fixes `#263 <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fixed the format of the output file URL. When the prefix ``/`` was not present,
   URL was incorrectly handled by not prepending the required base URL location.
 
@@ -1473,12 +1481,12 @@ Changes:
 Fixes:
 ------
 - Pin ``pywps==4.4.3`` and fix incompatibility introduced by its refactor of I/O base classes in
-  `#602 <https://github.com/geopython/pywps/pull/602>`_
+  `geopython/pywps#602 <https://github.com/geopython/pywps/pull/602>`_
   (specifically `commit 343d825 <https://github.com/geopython/pywps/commit/343d82539576b1e73eee3102654749c3d3137cff>`_),
   which broke the ``ComplexInput`` work-around to avoid useless of file URLs
-  (see issue `#526 <https://github.com/geopython/pywps/issues/526>`_).
+  (see issue `geopython/pywps#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Fix default execution mode specification in process job control options
-  (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
+  (fixes `opengeospatial/ogcapi-processes#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
 - Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
   limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
@@ -1562,7 +1570,8 @@ Fixes:
   file path explicitly instead of returning an invalid directory.
 - Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
 - Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
-  patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
+  patch on ``null`` since fix `geopython/pywps#507 <https://github.com/geopython/pywps/pull/507>`_ not released at
+  this point).
 - Fix potential invalid database state that could have saved an invalid process although the following
   ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
   after complete and successful schema validation.
