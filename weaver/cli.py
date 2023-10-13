@@ -1984,9 +1984,9 @@ class SubscriberAction(argparse.Action):
 
     def validate(self, option, value):
         # type: (str, Any) -> None
-        if "email" in self.field:
+        if "email" in option:
             pattern = re.compile(EMAIL_RE, flags=re.IGNORECASE)
-        elif "callback" in self.field:
+        elif "callback" in option:
             pattern = re.compile(URL_REGEX, flags=re.IGNORECASE)
         else:
             raise NotImplementedError(f"Cannot parse option: '{option}'")
