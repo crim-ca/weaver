@@ -1091,13 +1091,3 @@ def test_schema_ref_resolution(
             },
             "additionalProperties": {}
         }, err_msg
-
-
-def test_schema_ref_resolution_include():
-    schema_node = sd.ProviderSummarySchema()
-    assert schema_node._schema_meta_include is True, "Cannot run test without pre-condition"
-    assert schema_node._schema, "Cannot run test without pre-condition"
-
-    def_handler = ce.OAS3DefinitionHandler
-    schema_json = ce.OAS3BodyParameterConverter().convert(schema_node, def_handler)
-    print(schema_json)
