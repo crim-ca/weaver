@@ -69,6 +69,7 @@ from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
+    URI,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -92,7 +93,6 @@ from weaver.wps_restapi.colander_extras import (
     StrictMappingSchema,
     StringOneOf,
     StringRange,
-    URI,
     XMLObject
 )
 from weaver.wps_restapi.constants import ConformanceCategory
