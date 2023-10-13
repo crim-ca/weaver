@@ -1064,7 +1064,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             p_id = "test-docker-python-version"
             body = {
                 "processDescription": {"process": {"id": p_id}},
-                "executionUnit": {"unit": cwl, "type": ContentType.APP_JSON},
+                "executionUnit": {"unit": cwl, "type": ContentType.APP_CWL_JSON},
                 "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)

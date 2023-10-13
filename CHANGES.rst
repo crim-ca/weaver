@@ -12,7 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support alternative representations from `OGC API - Processes` schemas for ``executionUnit`` definition
+  during `Process` deployment. The *unit* does not need to be nested under ``unit`` or a list anymore, and can instead
+  be directly provided as `JSON` mapping. For backward compatibility, the previous list representation is still allowed
+  (fixes `#507 <https://github.com/crim-ca/weaver/issues/507>`_).
+- Support an additional ``type`` property along a ``unit`` item describing an ``executionUnit`` to specify an IANA
+  Media-Type that categories the ``unit`` contents, similarly to how it could be provided for its ``href`` counterpart.
+  For the moment, only `CWL`-based ``unit`` are supported, but this could allow future extensions to provide alternate
+  representations of an `Application Package`.
 
 Fixes:
 ------
