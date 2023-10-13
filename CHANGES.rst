@@ -14,6 +14,20 @@ Changes:
 --------
 - Add schema validation and reference to the `API` landing page, with additional parameters to respect `OGC` schema.
 - Add multiple `JSON` schema references for schema classes that are represented by corresponding `OGC` definitions.
+- Add `Job` ``subscribers`` support to define `OGC`-compliant callback URLs where HTTP(S) requests will be sent upon
+  reaching certain `Job` status milestones (resolves `#230 <https://github.com/crim-ca/weaver/issues/230>`_).
+- Add email notification support to the new ``subscribers`` definition (extension over `OGC` minimal requirements).
+- Deprecate `Job` ``notification_email`` in the `OpenAPI` specification in favor of ``subscribers``, but preserve
+  parsing of its value if provided in the `JSON` body during `Job` submission for backward compatibility support of
+  existing servers. The ``Job.notification_email`` attribute is removed to avoid duplicate references.
+- Add notification email for `Job` ``started`` status, only available through the ``subscribers`` property.
+- Add `CLI` and ``WeaverClient`` options to support ``subscribers`` specification for submitted `Job` execution.
+- Add ``{PROCESS_ID}/{STATUS}.mako`` template detection under the ``weaver.wps_email_notify_template_dir`` location
+  to allow per-`Process` and per-`Job` status email customization.
+- Refactor ``weaver/notify.py`` and ``weaver/processes/execution.py`` to avoid mixed references to the
+  encryption/decryption logic employed for notification emails. All notifications including emails and
+  callback requests are now completely handled and contained in the ``weaver/notify.py`` module.
+- Remove partially duplicate Mako Template definition as hardcoded string and separate file for email notification.
 
 Fixes:
 ------
@@ -23,6 +37,7 @@ Fixes:
   contents validated against a `JSON` schema, the ``$schema`` property is used instead to refer to that schema.
   All auto-insertions of these references can be enabled or disabled with options depending on what is more sensible
   for presenting results from various `API` responses.
+- Fix ``weaver.cli`` logger not properly configured when executed from `CLI` causing log messages to not be reported.
 
 .. _changes_4.33.0:
 

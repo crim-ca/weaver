@@ -85,6 +85,7 @@ if TYPE_CHECKING:
         CWL,
         ExecutionInputs,
         ExecutionOutputs,
+        ExecutionSubscribers,
         JSON,
         Link,
         Metadata,
@@ -926,16 +927,28 @@ class Job(Base):
         self["status_location"] = location_url
 
     @property
-    def notification_email(self):
-        # type: () -> Optional[str]
-        return self.get("notification_email")
+    def subscribers(self):
+        # type: () -> Optional[ExecutionSubscribers]
+        return self.get("subscribers")
 
-    @notification_email.setter
-    def notification_email(self, email):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(email, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.notification_email'")
-        self["notification_email"] = email
+    @subscribers.setter
+    def subscribers(self, subscribers):
+        # type: (Optional[ExecutionSubscribers]) -> None
+        if subscribers and not (
+            isinstance(subscribers, dict) and
+            all(
+                sub_type and isinstance(sub_type, str) and
+                sub and isinstance(sub, str) and
+                val and isinstance(val, str)
+                for sub_type, subs in subscribers.items()
+                for sub, val in (subs if isinstance(subs, dict) else {None: None}).items()
+            )
+        ):
+            raise TypeError(
+                "Mapping of subscriber types, status and notification references "
+                f"is required for '{self.__name__}.subscribers'."
+            )
+        self["subscribers"] = subscribers or None
 
     @property
     def accept_language(self):
@@ -1327,10 +1340,10 @@ class Job(Base):
             link.update(link_meta)
         return job_links
 
-    def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer]) -> JSON
         """
-        Obtains the JSON data representation for response body.
+        Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -1359,7 +1372,7 @@ class Job(Base):
             # new name as per OGC-API, enforced integer
             # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
             "progress": int(self.progress),
-            "links": self.links(settings, self_link=self_link)
+            "links": self.links(settings, self_link="status")
         }
         return sd.JobStatusInfo().deserialize(job_json)
 
@@ -1394,7 +1407,7 @@ class Job(Base):
             "context": self.context,
             "request": self.request,
             "response": self.response,
-            "notification_email": self.notification_email,
+            "subscribers": self.subscribers,
             "accept_language": self.accept_language,
         }
 
