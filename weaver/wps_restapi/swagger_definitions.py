@@ -69,6 +69,7 @@ from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
+    URI,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -158,11 +159,16 @@ OGC_API_SCHEMA_EXT_QUOTE = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-quo
 OGC_API_SCHEMA_EXT_WORKFLOW = f"{OGC_API_SCHEMA_BASE}/openapi/schemas/processes-workflows"
 
 # official/published references
-OGC_API_PROC_PART1 = "https://schemas.opengis.net/ogcapi/processes/part1/1.0"
-OGC_API_PROC_PART1_SCHEMAS = f"{OGC_API_PROC_PART1}/openapi/schemas"
-OGC_API_PROC_PART1_RESPONSES = f"{OGC_API_PROC_PART1}/openapi/responses"
-OGC_API_PROC_PART1_PARAMETERS = f"{OGC_API_PROC_PART1}/openapi/parameters"
-OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1}/examples"
+OGC_API_SCHEMAS_URL = "https://schemas.opengis.net"
+OGC_API_COMMON_PART1_BASE = f"{OGC_API_SCHEMAS_URL}/ogcapi/common/part1/1.0"
+OGC_API_COMMON_PART1_SCHEMAS = f"{OGC_API_COMMON_PART1_BASE}/openapi/schemas"
+OGC_API_PROC_PART1_BASE = f"{OGC_API_SCHEMAS_URL}/ogcapi/processes/part1/1.0"
+OGC_API_PROC_PART1_SCHEMAS = f"{OGC_API_PROC_PART1_BASE}/openapi/schemas"
+OGC_API_PROC_PART1_RESPONSES = f"{OGC_API_PROC_PART1_BASE}/openapi/responses"
+OGC_API_PROC_PART1_PARAMETERS = f"{OGC_API_PROC_PART1_BASE}/openapi/parameters"
+OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1_BASE}/examples"
+OGC_WPS_1_BASE = f"{OGC_API_SCHEMAS_URL}/wps/1.0.0"
+OGC_WPS_2_BASE = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
@@ -756,7 +762,8 @@ class LinkBase(LinkLanguage, MetadataBase):
 
 
 class Link(LinkRelationship, LinkBase):
-    pass
+    _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/link.json"
+    _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 
 
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
@@ -832,7 +839,7 @@ class Format(ExtendedMappingSchema):
     """
     Used to respect ``mediaType`` field as suggested per `OGC-API`.
     """
-    _schema_include = False  # exclude "$id" added on each sub-deserialize (too verbose, only for reference)
+    _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
 
     mediaType = MediaType(default=ContentType.TEXT_PLAIN, example=ContentType.APP_JSON)
@@ -5141,8 +5148,14 @@ class FrontpageParameters(ExtendedSequenceSchema):
 
 
 class FrontpageSchema(LandingPage, DescriptionSchema):
+    _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/landingPage.json"
+    _sort_first = ["title", "configuration", "message", "description", "attribution"]
+    _sort_after = ["parameters", "links"]
+
+    title = ExtendedSchemaNode(String(), default="Weaver", example="Weaver")
     message = ExtendedSchemaNode(String(), default="Weaver Information", example="Weaver Information")
     configuration = ExtendedSchemaNode(String(), default="default", example="default")
+    attribution = ExtendedSchemaNode(String(), description="Short representation of the API maintainers.")
     parameters = FrontpageParameters()
 
 
@@ -5175,6 +5188,7 @@ class ConformanceList(ExtendedSequenceSchema):
 
 
 class ConformanceSchema(ExtendedMappingSchema):
+    _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/confClasses.json"
     conformsTo = ConformanceList()
 
 
@@ -5823,7 +5837,7 @@ class ErrorDetail(ExtendedMappingSchema):
 class OWSErrorCode(ExtendedSchemaNode):
     schema_type = String
     example = "InvalidParameterValue"
-    description = "OWS error code."
+    description = "OWS error code or URI reference that identifies the problem type."
 
 
 class OWSExceptionResponse(ExtendedMappingSchema):
@@ -5846,16 +5860,16 @@ class ErrorCause(OneOfKeywordSchema):
 
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/exception.yaml"
+    _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/exception.json"
     description = "JSON schema for exceptions based on RFC 7807"
-    type = OWSErrorCode()
+    type = OWSErrorCode()  # only this is required
     title = ExtendedSchemaNode(String(), description="Short description of the error.", missing=drop)
     detail = ExtendedSchemaNode(String(), description="Detail about the error cause.", missing=drop)
-    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=500)
+    status = ExtendedSchemaNode(Integer(), description="Error status code.", example=500, missing=drop)
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
-    instance = ExtendedSchemaNode(String(), missing=drop)
+    instance = ExtendedSchemaNode(String(), validator=URI, missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
 
@@ -7084,11 +7098,9 @@ def validate_node_schema(schema_node, cstruct):
     schema_node.deserialize(cstruct)
     schema_file = schema_node._schema.replace(WEAVER_SCHEMA_URL, WEAVER_SCHEMA_DIR)
     schema_path = []
-    schema_ref = ""
     if "#" in schema_file:
         schema_file, schema_ref = schema_file.split("#", 1)
         schema_path = [ref for ref in schema_ref.split("/") if ref]
-        schema_ref = f"#{schema_ref}"
     schema_base = schema = load_file(schema_file)
     if schema_path:
         for part in schema_path:
