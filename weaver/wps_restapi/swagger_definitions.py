@@ -167,8 +167,8 @@ OGC_API_PROC_PART1_SCHEMAS = f"{OGC_API_PROC_PART1_BASE}/openapi/schemas"
 OGC_API_PROC_PART1_RESPONSES = f"{OGC_API_PROC_PART1_BASE}/openapi/responses"
 OGC_API_PROC_PART1_PARAMETERS = f"{OGC_API_PROC_PART1_BASE}/openapi/parameters"
 OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1_BASE}/examples"
-OGC_WPS_1_BASE = f"{OGC_API_SCHEMAS_URL}/wps/1.0.0"
-OGC_WPS_2_BASE = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
+OGC_WPS_1_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/1.0.0"
+OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
@@ -2194,14 +2194,14 @@ class WPSOperationGetNoContent(ExtendedMappingSchema):
 
 
 class WPSOperationPost(ExtendedMappingSchema):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/common/RequestBaseType.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/common/RequestBaseType.xsd"
     accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
     language = OWSLanguageAttribute(missing=drop)
     service = OWSService()
 
 
 class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsGetCapabilities_request.xsd"
     name = "GetCapabilities"
     title = "GetCapabilities"
 
@@ -2243,7 +2243,7 @@ class OWSMetadata(ExtendedSequenceSchema, OWSNamespace):
 
 
 class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
     identifier = OWSIdentifierList(
@@ -2260,7 +2260,7 @@ class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
 
 
 class WPSExecutePost(WPSOperationPost, WPSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_request.xsd"
     name = "Execute"
     title = "Execute"
     identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
@@ -2368,7 +2368,7 @@ class OWSServiceProvider(ExtendedMappingSchema, OWSNamespace):
 
 
 class WPSDescriptionType(ExtendedMappingSchema, OWSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/common/DescriptionType.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/common/DescriptionType.xsd"
     name = "DescriptionType"
     _title = OWSTitle(description="Title of the service.", example="Weaver")
     abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.", missing=drop)
@@ -2462,14 +2462,14 @@ class WPSLanguageSpecification(ExtendedMappingSchema, WPSNamespace):
 
 
 class WPSResponseBaseType(PermissiveMappingSchema, WPSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/common/ResponseBaseType.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/common/ResponseBaseType.xsd"
     service = WPSServiceAttribute()
     version = WPSVersionAttribute()
     lang = WPSLanguageAttribute()
 
 
 class WPSProcessVersion(ExtendedSchemaNode, WPSNamespace):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/common/ProcessVersion.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/common/ProcessVersion.xsd"
     schema_type = String
     description = "Release version of this Process."
     name = "processVersion"
@@ -2591,7 +2591,7 @@ class ProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSGetCapabilities(WPSResponseBaseType):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsGetCapabilities_response.xsd"
     name = "Capabilities"
     title = "Capabilities"  # not to be confused by 'GetCapabilities' used for request
     svc = OWSServiceIdentification()
@@ -2618,7 +2618,7 @@ class WPSProcessDescriptionList(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSDescribeProcess(WPSResponseBaseType):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsDescribeProcess_response.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
     process = WPSProcessDescriptionList()
@@ -2733,7 +2733,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3163,7 +3163,7 @@ class ProcessSummary(
     """
     Summary process definition.
     """
-    _schema = f"{OGC_API_SCHEMA_CORE}/processSummary.yaml"
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/processSummary.yaml"
     _sort_first = PROCESS_DESCRIPTION_FIELD_FIRST
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
@@ -5184,7 +5184,7 @@ class VersionsSchema(ExtendedMappingSchema):
 
 class ConformanceList(ExtendedSequenceSchema):
     conformance = URL(description="Conformance specification link.",
-                      example="http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core")
+                      example="http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core")
 
 
 class ConformanceSchema(ExtendedMappingSchema):

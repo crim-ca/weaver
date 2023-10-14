@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Add ``alternate`` references, as ``Link`` header and within the `JSON` content ``links`` property when applicable, in
+  the returned `Process` description response to refer between the `XML` and the corresponding `JSON` representations.
 - Support alternative representations from `OGC API - Processes` schemas for ``executionUnit`` definition
   during `Process` deployment. The *unit* does not need to be nested under ``unit`` or a list anymore, and can instead
   be directly provided as `JSON` mapping. For backward compatibility, the previous list representation is still allowed
@@ -39,6 +41,8 @@ Changes:
 
 Fixes:
 ------
+- Fix inconsistent or missing schema references to updated `OGC` schema locations, and align their based URL locations
+  for corresponding ``/conformance`` endpoint reporting.
 - Fix auto-insertion of ``$schema`` and ``$id`` URI references into `JSON` schema and their data content representation.
   When in `OpenAPI` context, schemas now correctly report their ``$id`` as the reference schema they represent (usually
   from external `OGC` schema references), and ``$schema`` as the `JSON` meta-schema. When representing `JSON` data
