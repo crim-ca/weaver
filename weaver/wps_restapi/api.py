@@ -322,8 +322,7 @@ def get_conformance(category):
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/response",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/ogcapppkg",
         # FIXME: below partially, for full Part 3, would need $graph support
-        # (see https://github.com/crim-ca/weaver/issues/56) 
-        # and below 'f"{ogcapi_proc_apppkg}/conf/app-pck/cwl"'
+        # (see https://github.com/crim-ca/weaver/issues/56 and below '/conf/app-pck/cwl')
         f"{ogcapi_proc_part3}/req/cwl-workflows",
         f"{ogcapi_proc_part3}/conf/cwl-workflows",
         # FIXME: support part 3: workflows (https://github.com/crim-ca/weaver/issues/412)
