@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 4.30.1
+APP_VERSION ?= 4.34.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -802,6 +802,7 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
@@ -811,6 +812,7 @@ docker-test: docker-build stop	## execute smoke test of the built images (valida
 	@curl localhost:4001 | grep "Weaver Information" || \
 		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	docker-compose $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
 	docker-compose $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat

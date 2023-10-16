@@ -7,17 +7,22 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 import contextlib
 import copy
 import io
+import json
 import logging
 import os
 import re
 import shutil
 import sys
 import tempfile
+import warnings
 from typing import TYPE_CHECKING
 
 import cwltool.process
 import mock
 import pytest
+from _pytest.outcomes import Failed
+from cwltool.errors import WorkflowException
+from cwltool.factory import Factory as CWLFactory
 
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Process
@@ -486,3 +491,71 @@ def test_cwl_extension_requirements_no_error():
         f"Error message must contain all following items: {valid_msg}. "
         f"Some items were missing in: \n{message}"
     )
+
+
+def test_cwl_enum_schema_name_patched():
+    """
+    Ensure that :term:`CWL` ``Enum`` contains a ``name`` to avoid false-positive conflicting schemas.
+
+    When an ``Enum`` is reused multiple times to define an I/O, omitting the ``name`` makes the duplicate definition
+    to be considered a conflict, since :mod:`cwltool` will automatically apply an auto-generated ``name`` for that
+    schema.
+
+    .. seealso::
+        - https://github.com/common-workflow-language/cwltool/issues/1908
+        - :meth:`weaver.processes.wps_package.WpsPackage.update_cwl_schema_names`
+    """
+    test_symbols = [str(i) for i in range(100)]
+    cwl_input_without_name = {
+        "type": [
+            "null",
+            {
+                "type": "enum",
+                "symbols": test_symbols,
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "enum",
+                    "symbols": test_symbols,
+                },
+            },
+        ]
+    }
+    cwl_without_name = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": "echo",
+        "inputs": {
+            "test": cwl_input_without_name,
+        },
+        "outputs": {
+            "output": {"type": "stdout"},
+        }
+    }  # type: CWL
+
+    factory = CWLFactory()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(cwl_without_name, tmp_file)
+        tmp_file.flush()
+        try:
+            with pytest.raises(WorkflowException):
+                tool = factory.make(f"file://{tmp_file.name}")
+                tool(test=test_symbols[0])
+        except Failed:
+            # WARNING:
+            #   CWL tool schema-salad validator seems to inconsistently raise in some situations and not others (?)
+            #   (see https://github.com/common-workflow-language/cwltool/issues/1908)
+            #   Ignore if it raises since it is not breaking for our test and implementation.
+            warnings.warn("CWL nested enums without 'name' did not raise, but not breaking...")
+
+    # our implementation that eventually gets called goes through 'update_cwl_schema_names', that one MUST NOT raise
+    pkg = WpsPackage(package=cwl_without_name, identifier="test", title="test")
+    pkg.update_cwl_schema_names()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(pkg.package, tmp_file)
+        tmp_file.flush()
+        tool = factory.make(f"file://{tmp_file.name}")
+        tool(test=None)
+        tool(test=test_symbols[0])
+        tool(test=[test_symbols[0]])

@@ -209,7 +209,6 @@ class WpsProviderTest(WpsConfigBase):
                 OUTPUT_FILE=output_url,
             )
 
-        xml_headers = {"Content-Type": ContentType.TEXT_XML}
         ncdump_data = "Fake NetCDF Data"
         with contextlib.ExitStack() as stack_exec:
             # mock direct execution bypassing celery
@@ -217,8 +216,8 @@ class WpsProviderTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
             # mock responses expected by "remote" WPS-1 Execute request and relevant documents
             mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": ContentType.APP_NETCDF})
-            mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status, headers=xml_headers)
-            mock_responses.add("GET", status_url, body=status, headers=xml_headers)
+            mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status, headers=self.xml_headers)
+            mock_responses.add("GET", status_url, body=status, headers=self.xml_headers)
             mock_responses.add("GET", output_url, body=ncdump_data, headers={"Content-Type": ContentType.TEXT_PLAIN})
 
             # add reference to specific provider execute class to validate it was called

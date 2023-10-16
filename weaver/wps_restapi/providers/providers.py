@@ -143,10 +143,13 @@ def get_provider(request):
     Get a provider definition (GetCapabilities).
     """
     service, _ = get_service(request)
-    return HTTPOk(json=service.summary(request))
+    data = get_schema_ref(sd.ProviderSummarySchema, request, ref_name=False)
+    info = service.summary(request)
+    data.update(info)
+    return HTTPOk(json=data)
 
 
-@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
+@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                                    renderer=OutputFormat.JSON, schema=sd.ProviderProcessesEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
@@ -187,7 +190,7 @@ def describe_provider_process(request):
     return Process.convert(process, service, get_settings(request))
 
 
-@sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
+@sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OutputFormat.JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
@@ -196,7 +199,7 @@ def describe_provider_process(request):
 def get_provider_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
-    Retrieve a process description (DescribeProcess).
+    Retrieve a remote provider's process description (DescribeProcess).
     """
     process = describe_provider_process(request)
     schema = request.params.get("schema")
@@ -204,10 +207,24 @@ def get_provider_process(request):
     return HTTPOk(json=offering)
 
 
-@sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+@sd.provider_process_package_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+                                         renderer=OutputFormat.JSON, schema=sd.ProviderProcessPackageEndpoint(),
+                                         response_schemas=sd.get_provider_process_package_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+@check_provider_requirements
+def get_provider_process_package(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Retrieve a remote provider's process Application Package definition.
+    """
+    process = describe_provider_process(request)
+    return HTTPOk(json=process.package or {})
+
+
+@sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
                                     renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
                                     response_schemas=sd.post_provider_process_job_responses)
-@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
                                renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
                                response_schemas=sd.post_provider_process_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
