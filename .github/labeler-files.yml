@@ -32,6 +32,7 @@ ci/doc:
 ci/tests:
   - tests/**/*
   - weaver/processes/wps_default.py
+  - weaver/processes/wps_testing.py
 
 ## Triage
 
