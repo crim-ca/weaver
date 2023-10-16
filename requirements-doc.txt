@@ -3,7 +3,6 @@
 # we actually need to install all requirements during docs build because of OpenAPI generation
 # (see 'docs/source/conf.py')
 -r requirements.txt
-cloud_sptheme
 jinja2<3.1; python_version <= "3.7"  # fix sphinx failing, see: https://github.com/sphinx-doc/sphinx/issues/10291
 jinja2; python_version >= "3.8"
 sphinx>=3.5,<6; python_version <= "3.7"
