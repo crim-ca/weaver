@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.34.0:
+
+`4.34.0 <https://github.com/crim-ca/weaver/tree/4.34.0>`_ (2023-10-16)
+========================================================================
+
+Changes:
+--------
 - Add ``alternate`` references, as ``Link`` header and within the `JSON` content ``links`` property when applicable, in
   the returned `Process` description response to refer between the `XML` and the corresponding `JSON` representations.
 - Support alternative representations from `OGC API - Processes` schemas for ``executionUnit`` definition
