@@ -19,9 +19,13 @@ from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
     from weaver.typedefs import AnyRequestType, JSON
+
+    FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
+    FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,9 +51,9 @@ class AcceptLanguage(Constants):
 
 class ContentType(Constants):
     """
-    Supported Content-Types.
+    Supported ``Content-Type`` values.
 
-    Media-type nomenclature::
+    Media-Type nomenclature::
 
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
@@ -94,6 +98,40 @@ class ContentType(Constants):
     ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
+
+
+class ContentEncoding(Constants):
+    """
+    Supported ``Content-Encoding`` values.
+    """
+    UTF_8 = "UTF-8"
+    BINARY = "binary"
+    BASE64 = "base64"
+
+    @staticmethod
+    def is_text(encoding):
+        # type: (Any) -> bool
+        """
+        Indicates if the ``Content-Encoding`` value can be categorized as textual data.
+        """
+        return ContentEncoding.get(encoding) in [ContentEncoding.UTF_8, None]
+
+    @staticmethod
+    def is_binary(encoding):
+        # type: (Any) -> bool
+        """
+        Indicates if the ``Content-Encoding`` value can be categorized as binary data.
+        """
+        return not ContentEncoding.is_text(encoding)
+
+    @staticmethod
+    def open_parameters(encoding, mode="r"):
+        # type: (Any, FileModeSteamType) -> Tuple[FileModeEncoding, Literal["UTF-8", None]]
+        """
+        Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
+        """
+        is_text = ContentEncoding.is_text(encoding)
+        return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
 
 
 class OutputFormat(Constants):

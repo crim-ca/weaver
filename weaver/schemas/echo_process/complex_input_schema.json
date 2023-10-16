@@ -1,27 +1,27 @@
 {
-    "properties": {
-      "property1": {
-        "type": "string"
-      },
-      "property2": {
-        "type": "string",
-        "format": "uri"
-      },
-      "property3": {
-        "type": "number"
-      },
-      "property4": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "property5": {
-        "type": "boolean"
-      }
+  "type": "object",
+  "properties": {
+    "property1": {
+      "type": "string"
     },
-    "required": [
-      "property1",
-      "property5"
-    ],
-    "type": "object",
-    "additionalProperties": false
-  }
+    "property2": {
+      "type": "string",
+      "format": "uri"
+    },
+    "property3": {
+      "type": "number"
+    },
+    "property4": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "property5": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "property1",
+    "property5"
+  ],
+  "additionalProperties": false
+}

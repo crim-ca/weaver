@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyRegistryContainer, CWL, CWL_RequirementsList, JSON, TypedDict
 
     BuiltinResourceMap = TypedDict("BuiltinResourceMap", {
-        "package": str,
+        "package": os.PathLike[str],
         "payload": JSON
     }, total=True)
 
@@ -48,7 +48,7 @@ __all__ = [
 
 
 def _get_builtin_reference_mapping(root):
-    # type: (str) -> Dict[str, BuiltinResourceMap]
+    # type: (os.PathLike[str]) -> Dict[str, BuiltinResourceMap]
     """
     Generates a mapping of `reference` to actual ``builtin`` package file path.
     """
@@ -68,7 +68,7 @@ def _get_builtin_reference_mapping(root):
 
 
 def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
-    # type: (str, str, str, bool) -> Union[str, None]
+    # type: (str, os.PathLike[str], str, bool) -> Union[str, None]
     """
     Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
     """
@@ -140,10 +140,11 @@ def register_builtin_processes(container):
         process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)
         process_version = _get_builtin_metadata(process_id, process_path, "__version__")
         process_title = _get_builtin_metadata(process_id, process_path, "__title__")
+        process_id_resolved = process_info["identifier"]
         process_payload = {
             "processDescription": {
                 "process": {
-                    "id": process_id,
+                    "id": process_id_resolved,
                     "type": ProcessType.BUILTIN,
                     "title": process_title,
                     "version": process_version,
@@ -155,7 +156,7 @@ def register_builtin_processes(container):
         }
         process_payload["processDescription"]["process"].update(ows_context_href(process_url))
         builtin_processes.append(Process(
-            id=process_id,
+            id=process_id_resolved,
             type=ProcessType.BUILTIN,
             title=process_title,
             version=process_version,

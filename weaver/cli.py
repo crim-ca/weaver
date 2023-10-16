@@ -25,7 +25,7 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, OutputFormat, get_content_type, get_format, repr_json
+from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -59,7 +59,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
-    from typing_extensions import Literal
 
     from requests import Response
 
@@ -1000,9 +999,11 @@ class WeaverClient(object):
         auth_tokens = {}  # type: Dict[str, str]
         update_inputs = dict(inputs)
         for input_id, input_data in dict(inputs).items():
+            input_array = True
             if not isinstance(input_data, list):  # support array of files
                 input_data = [input_data]
-            for data in input_data:
+                input_array = False
+            for input_index, data in enumerate(input_data):
                 if not isinstance(data, dict):
                     continue
                 file = href = get_any_value(data, default=null, data=False)
@@ -1026,15 +1027,12 @@ class WeaverClient(object):
 
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
-                encoding = get_field(fmt, "encoding", search_variations=True)
+                c_enc = get_field(fmt, "encoding", search_variations=True) or None
                 if not ctype:
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
-                if encoding is not None or encoding != "":
-                    res = self.upload(href, content_type=fmt.mime_type, content_encoding=encoding, url=url)
-                else:
-                    res = self.upload(href, content_type=fmt.mime_type, url=url)
+                res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
                 vault_href = res.body["file_href"]
@@ -1042,14 +1040,11 @@ class WeaverClient(object):
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
-                if isinstance(inputs[input_id], list):
-                    if update_inputs[input_id] == input_data:
-                        update_inputs[input_id] = []
-                    update_inputs[input_id].append({"href": vault_href,
-                                                    "format": {"mediaType": ctype}})
+                input_vault_href = {"href": vault_href, "format": {"mediaType": ctype, "encoding": c_enc}}
+                if input_array:
+                    update_inputs[input_id][input_index] = input_vault_href
                 else:
-                    update_inputs[input_id] = {"href": vault_href,
-                                               "format": {"mediaType": ctype}}
+                    update_inputs[input_id] = input_vault_href
 
         auth_headers = {}
         if auth_tokens:
@@ -1203,18 +1198,18 @@ class WeaverClient(object):
                             with_links=with_links, with_headers=with_headers, output_format=output_format)
 
     def upload(self,
-               file_path,                 # type: str
-               content_type=None,         # type: Optional[str]
-               content_encoding="utf-8",  # type: Literal["utf-8", "base64"]
-               url=None,                  # type: Optional[str]
-               auth=None,                 # type: Optional[AuthHandler]
-               headers=None,              # type: Optional[AnyHeadersContainer]
-               with_links=True,           # type: bool
-               with_headers=False,        # type: bool
-               request_timeout=None,      # type: Optional[int]
-               request_retries=None,      # type: Optional[int]
-               output_format=None,        # type: Optional[AnyOutputFormat]
-               ):                         # type: (...) -> OperationResult
+               file_path,               # type: str
+               content_type=None,       # type: Optional[str]
+               content_encoding=None,   # type: Optional[ContentEncoding]
+               url=None,                # type: Optional[str]
+               auth=None,               # type: Optional[AuthHandler]
+               headers=None,            # type: Optional[AnyHeadersContainer]
+               with_links=True,         # type: bool
+               with_headers=False,      # type: bool
+               request_timeout=None,    # type: Optional[int]
+               request_retries=None,    # type: Optional[int]
+               output_format=None,      # type: Optional[AnyOutputFormat]
+               ):                       # type: (...) -> OperationResult
         """
         Upload a local file to the :term:`Vault`.
 
@@ -1231,7 +1226,9 @@ class WeaverClient(object):
             This should be an IANA Media-Type, optionally with additional parameters such as charset.
             If not provided, attempts to guess it based on the file extension.
         :param content_encoding:
-            Specify the encoding for the file. For text use ``utf-8`` and for binary use ``base64``.
+            Specify the Content-Encoding of the file.
+            For text use ``utf-8`` or leave ``None``.
+            For binary use ``base64`` or ``binary``.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1264,25 +1261,24 @@ class WeaverClient(object):
         if not os.path.isfile(file_path):
             return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
         LOGGER.debug("Processing file for vault upload: [%s]", file_path)
+        c_enc = ContentEncoding.get(content_encoding)
         file_headers = get_href_headers(
             file_path,
             download_headers=False,
             content_headers=True,
             content_type=content_type,
-            content_encoding=content_encoding
+            content_encoding=c_enc,
         )
         base = self._get_url(url)
         path = f"{base}/vault"
 
-        open_function = open(file_path, "r", encoding="utf-8")  # pylint: disable=R1732
-        if content_encoding == "base64":
-            open_function = open(file_path, "rb")  # pylint: disable=R1732
-
+        f_mode, f_enc = ContentEncoding.open_parameters(c_enc, mode="r")
         files = {
             "file": (
                 os.path.basename(file_path),
-                open_function,
-                file_headers["Content-Type"]
+                open(file_path, mode=f_mode, encoding=f_enc),  # pylint: disable=R1732
+                file_headers["Content-Type"],
+                {"Content-Encoding": c_enc} if c_enc else {},
             )
         }
         req_headers = {

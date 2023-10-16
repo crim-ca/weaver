@@ -1,5 +1,6 @@
 import datetime
 import inspect
+import itertools
 import os
 
 import mock
@@ -12,72 +13,101 @@ from requests.exceptions import ConnectionError
 from weaver import formats as f
 
 
-def test_get_extension():
-    assert f.get_extension(f.ContentType.APP_JSON) == ".json"  # basic
-    assert f.get_extension(f"{f.ContentType.APP_JSON}; charset=UTF-8") == ".json"  # ignore extra parameters
-    assert f.get_extension(f.ContentType.APP_GEOJSON) == ".geojson"      # pywps <4.4 definition
-    assert f.get_extension(f.ContentType.APP_VDN_GEOJSON) == ".geojson"  # pywps>=4.4 definition
-    assert f.get_extension(f.ContentType.IMAGE_GEOTIFF) == ".tiff"  # pywps definition
-    assert f.get_extension("application/x-custom") == ".custom"
-    assert f.get_extension("application/unknown") == ".unknown"
+@pytest.mark.parametrize(
+    ["test_extension", "extra_params", "expected_content_type"],
+    [
+        (f.ContentType.APP_JSON, {}, ".json"),  # basic
+        (f"{f.ContentType.APP_JSON}; charset=UTF-8", {}, ".json"),  # ignore extra parameters
+        (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
+        (f.ContentType.APP_VDN_GEOJSON, {}, ".geojson"),  # pywps>=4.4 definition
+        (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),  # pywps definition
+        ("application/x-custom", {}, ".custom"),
+        ("application/unknown", {}, ".unknown"),
+        (f.ContentType.APP_DIR, {"dot": True}, "/"),
+        (f.ContentType.APP_DIR, {"dot": False}, "/"),
+        (f.ContentType.ANY, {}, ".*"),
+    ]
+)
+def test_get_extension(test_extension, extra_params, expected_content_type):
+    assert f.get_extension(test_extension, **extra_params) == expected_content_type
 
 
-def test_get_extension_directory():
-    assert f.get_extension(f.ContentType.APP_DIR, dot=True) == "/"
-    assert f.get_extension(f.ContentType.APP_DIR, dot=False) == "/"
+@pytest.mark.parametrize(
+    ["test_extension", "extra_params", "expected_content_type"],
+    [
+        (".json", {}, f.ContentType.APP_JSON),
+        (".tif", {}, f.ContentType.IMAGE_TIFF),
+        (".tiff", {}, f.ContentType.IMAGE_TIFF),
+        (".yml", {}, f.ContentType.APP_YAML),
+        (".yaml", {}, f.ContentType.APP_YAML),
+        ("/", {}, f.ContentType.APP_DIR),
+        (".unknown", {"default": f.ContentType.TEXT_PLAIN}, f.ContentType.TEXT_PLAIN),
+        (".txt", {"charset": "UTF-8"}, f"{f.ContentType.TEXT_PLAIN}; charset=UTF-8"),
+        (".tif", {"charset": "UTF-8"}, f.ContentType.IMAGE_TIFF),  # not added by error
+        (".unknown", {}, None),
+    ]
+)
+def test_get_content_type(test_extension, extra_params, expected_content_type):
+    assert f.get_content_type(test_extension, **extra_params) == expected_content_type
 
 
-def test_get_extension_glob_any():
-    assert f.get_extension(f.ContentType.ANY) == ".*"
+@pytest.mark.parametrize(
+    ["test_encoding", "expected_encoding"],
+    [
+        (f.ContentEncoding.UTF_8.upper(), f.ContentEncoding.UTF_8),
+        (f.ContentEncoding.UTF_8.lower(), f.ContentEncoding.UTF_8),
+        (f.ContentEncoding.BINARY, f.ContentEncoding.BINARY),
+        (f.ContentEncoding.BASE64, f.ContentEncoding.BASE64),
+        ("", None),
+        (None, None),
+    ]
+)
+def test_get_content_encoding(test_encoding, expected_encoding):
+    assert f.ContentEncoding.get(test_encoding) == expected_encoding
 
 
-def test_get_content_type():
-    assert f.get_content_type(".json") == f.ContentType.APP_JSON
-    assert f.get_content_type(".tif") == f.ContentType.IMAGE_TIFF
-    assert f.get_content_type(".tiff") == f.ContentType.IMAGE_TIFF
-    assert f.get_content_type(".yml") == f.ContentType.APP_YAML
-    assert f.get_content_type(".yaml") == f.ContentType.APP_YAML
+@pytest.mark.parametrize(
+    ["test_content_type", "expected_content_type", "expected_content_encoding"],
+    [
+        (f.ContentType.APP_JSON, f.ContentType.APP_JSON, ""),  # basic
+        (f"{f.ContentType.APP_JSON}; charset=UTF-8", f.ContentType.APP_JSON, ""),  # detailed
+        (f.ContentType.APP_GEOJSON, f.ContentType.APP_GEOJSON, ""),  # pywps vendor MIME-type
+        (f.ContentType.APP_NETCDF, f.ContentType.APP_NETCDF, "base64"),  # extra encoding data available
+    ]
+)
+def test_get_format(test_content_type, expected_content_type, expected_content_encoding):
+    assert f.get_format(test_content_type) == Format(expected_content_type, encoding=expected_content_encoding)
 
 
-def test_get_content_type_directory():
-    assert f.get_content_type("/") == f.ContentType.APP_DIR
-
-
-def test_get_content_type_extra_parameters():
-    assert f.get_content_type(".unknown") is None
-    assert f.get_content_type(".unknown", default=f.ContentType.TEXT_PLAIN) == f.ContentType.TEXT_PLAIN
-    assert f.get_content_type(".txt", charset="UTF-8") == f"{f.ContentType.TEXT_PLAIN}; charset=UTF-8"
-    assert f.get_content_type(".tif", charset="UTF-8") == f.ContentType.IMAGE_TIFF  # not added by error
-
-
-def test_get_format():
-    assert f.get_format(f.ContentType.APP_JSON) == Format(f.ContentType.APP_JSON)  # basic
-    assert f.get_format(f"{f.ContentType.APP_JSON}; charset=UTF-8") == Format(f.ContentType.APP_JSON)
-    assert f.get_format(f.ContentType.APP_GEOJSON) == Format(f.ContentType.APP_GEOJSON)  # pywps vendor MIME-type
-    assert f.get_format(f.ContentType.APP_NETCDF).encoding == "base64"  # extra encoding data available
-
-
-def test_get_format_media_type_no_extension():
-    for ctype in [
+@pytest.mark.parametrize(
+    "test_extension",
+    [
         f.ContentType.APP_OCTET_STREAM,
         f.ContentType.APP_FORM,
         f.ContentType.MULTI_PART_FORM,
-    ]:
-        fmt = f.get_format(ctype)
-        assert fmt == Format(ctype, extension=None)
-        assert fmt.extension == ""
+    ]
+)
+def test_get_format_media_type_no_extension(test_extension):
+    fmt = f.get_format(test_extension)
+    assert fmt == Format(test_extension, extension=None)
+    assert fmt.extension == ""
 
 
-def test_get_format_default_no_extension():
-    for val in ["", None]:
-        for ctype in [
+@pytest.mark.parametrize(
+    ["test_extension", "default_content_type"],
+    itertools.product(
+        ["", None],
+        [
             f.ContentType.APP_OCTET_STREAM,
             f.ContentType.APP_FORM,
             f.ContentType.MULTI_PART_FORM,
-        ]:
-            fmt = f.get_format(val, default=ctype)
-            assert fmt == Format(ctype, extension=None)
-            assert fmt.extension == ""
+        ]
+    )
+)
+def test_get_format_default_no_extension(test_extension, default_content_type):
+    fmt = f.get_format(test_extension, default=default_content_type)
+    assert fmt == Format(default_content_type, extension=None)
+    assert fmt.extension == ""
 
 
 def test_get_cwl_file_format_tuple():
@@ -244,21 +274,24 @@ def test_clean_mime_type_format_ogc():
     assert res_type == mime_type  # application/x-type
 
 
-def test_clean_mime_type_format_io_remove_extra_parameters():
-    test_input_formats = [
+@pytest.mark.parametrize(
+    ["expected_content_type", "test_content_type"],
+    [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
         (f.ContentType.APP_JSON, f"{f.ContentType.APP_JSON}; charset=UTF-8"),
         (f.ContentType.APP_XML, f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0"),
         ("application/vnd.api+json", "application/vnd.api+json; charset=UTF-8"),
         ("application/vnd.api+json", "application/vnd.api+json"),
     ]
-    for expect_fmt, test_fmt in test_input_formats:
-        res_type = f.clean_mime_type_format(test_fmt, strip_parameters=True)
-        assert res_type == expect_fmt
+)
+def test_clean_mime_type_format_io_remove_extra_parameters(expected_content_type, test_content_type):
+    res_type = f.clean_mime_type_format(test_content_type, strip_parameters=True)
+    assert res_type == expected_content_type
 
 
-def test_clean_mime_type_format_io_strip_base_type():
-    test_input_formats = [
+@pytest.mark.parametrize(
+    ["expected_content_type", "test_content_type"],
+    [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", f"{f.ContentType.APP_JSON}; charset=UTF-8"),
         (f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0",
@@ -266,29 +299,33 @@ def test_clean_mime_type_format_io_strip_base_type():
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", "application/vnd.api+json; charset=UTF-8"),
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]
-    for expect_fmt, test_fmt in test_input_formats:
-        res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True)
-        assert res_type == expect_fmt
+)
+def test_clean_mime_type_format_io_strip_base_type(expected_content_type, test_content_type):
+    res_type = f.clean_mime_type_format(test_content_type, suffix_subtype=True)
+    assert res_type == expected_content_type
 
 
-def test_clean_mime_type_format_io_strip_base_and_remove_parameters():
-    test_input_formats = [
+@pytest.mark.parametrize(
+    ["expected_content_type", "test_content_type"],
+    [
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON),
         (f.ContentType.APP_JSON, f"{f.ContentType.APP_JSON}; charset=UTF-8"),
         (f.ContentType.APP_XML, f"{f.ContentType.APP_XML}; charset=UTF-8; version=1.0"),
         (f.ContentType.APP_JSON, "application/vnd.api+json; charset=UTF-8"),
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]
-    for expect_fmt, test_fmt in test_input_formats:
-        res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True, strip_parameters=True)
-        assert res_type == expect_fmt
+)
+def test_clean_mime_type_format_io_strip_base_and_remove_parameters(expected_content_type, test_content_type):
+    res_type = f.clean_mime_type_format(test_content_type, suffix_subtype=True, strip_parameters=True)
+    assert res_type == expected_content_type
 
 
-def test_clean_mime_type_format_default():
-    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=False) is None
-    assert f.clean_mime_type_format("", suffix_subtype=False, strip_parameters=True) is None
-    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=False) is None
-    assert f.clean_mime_type_format("", suffix_subtype=True, strip_parameters=True) is None
+@pytest.mark.parametrize(
+    ["suffix_subtype", "strip_parameters"],
+    itertools.product([True, False], repeat=2)
+)
+def test_clean_mime_type_format_default(suffix_subtype, strip_parameters):
+    assert f.clean_mime_type_format("", suffix_subtype=suffix_subtype, strip_parameters=strip_parameters) is None
 
 
 def test_repr_json_default_string():
