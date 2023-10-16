@@ -3,9 +3,8 @@
 # we actually need to install all requirements during docs build because of OpenAPI generation
 # (see 'docs/source/conf.py')
 -r requirements.txt
-jinja2<3.1; python_version <= "3.7"  # fix sphinx failing, see: https://github.com/sphinx-doc/sphinx/issues/10291
-jinja2; python_version >= "3.8"
-sphinx>=3.5,<6; python_version <= "3.7"
+jinja2
+sphinx>=4.0.2,<6; python_version <= "3.7"
 sphinx>=6,<8; python_version >= "3.8"
 sphinx-argparse
 sphinx-autoapi>=1.7.0
