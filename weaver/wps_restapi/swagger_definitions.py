@@ -106,6 +106,7 @@ if TYPE_CHECKING:
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
+
 WEAVER_CONFIG_REMOTE_LIST = f"[{', '.join(WeaverFeature.REMOTE)}]"
 
 API_TITLE = "Weaver REST API"
@@ -171,11 +172,6 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
-
-# TODO We can delete the next 2 constants after changing link in echo_process, used for developpement.
-WEAVER_SCHEMA_ECHO_PROCESS_VERSION = "implement-example-process"
-WEAVER_SCHEMA_ECHO_PROCESS_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/" \
-                                 f"{WEAVER_SCHEMA_ECHO_PROCESS_VERSION}/weaver/schemas"
 
 DATETIME_INTERVAL_CLOSED_SYMBOL = "/"
 DATETIME_INTERVAL_OPEN_START_SYMBOL = "../"
@@ -246,6 +242,7 @@ for name in os.listdir(SCHEMA_EXAMPLE_DIR):
             EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
         else:
             EXAMPLES[name] = f.read()
+
 
 #########################################################
 # API tags
@@ -339,7 +336,6 @@ provider_result_service = Service(name="provider_result", path=provider_service.
 
 vault_service = Service(name="vault", path="/vault")
 vault_file_service = Service(name="vault_file", path=f"{vault_service.path}/{{file_id}}")
-
 
 #########################################################
 # Generic schemas
@@ -1000,8 +996,8 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 class Content(ExtendedMappingSchema):
     href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
-                        default=drop,  # if invalid, drop it completely,
-                        missing=required,  # but still mark as 'required' for parent objects
+                        default=drop,       # if invalid, drop it completely,
+                        missing=required,   # but still mark as 'required' for parent objects
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
@@ -1454,8 +1450,8 @@ class AllowedRangesList(ExtendedSequenceSchema):
 class AllowedValues(OneOfKeywordSchema):
     _one_of = [
         AllowedRangesList(description="List of value ranges and constraints."),  # array of {range}
-        AllowedValuesList(description="List of enumerated allowed values."),  # array of "value"
-        ExtendedSchemaNode(String(), description="Single allowed value."),  # single "value"
+        AllowedValuesList(description="List of enumerated allowed values."),     # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),       # single "value"
     ]
 
 
@@ -2744,7 +2740,7 @@ class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
     svc_loc = WPSServiceInstanceAttribute()
     process = WPSProcessSummary()
     status = WPSStatus()
-    inputs = WPSDataInputs(missing=drop)  # when lineage is requested only
+    inputs = WPSDataInputs(missing=drop)          # when lineage is requested only
     out_def = WPSOutputDefinitions(missing=drop)  # when lineage is requested only
     outputs = WPSProcessOutputs()
 
@@ -3084,7 +3080,7 @@ class ExecuteOutputMapAdditionalProperties(ExtendedMappingSchema):
 class ExecuteOutputSpecMap(AnyOfKeywordSchema):
     _any_of = [
         ExecuteOutputMapAdditionalProperties(),  # normal {"<output-id>": {...}}
-        EmptyMappingSchema(),  # allows explicitly provided {}
+        EmptyMappingSchema(),                    # allows explicitly provided {}
     ]
 
 
@@ -3550,8 +3546,8 @@ class ExecuteInputReference(Reference):
 
 
 class ExecuteInputFile(AnyOfKeywordSchema):
-    _any_of = [  # 'href' required for both to provide file link/reference
-        ExecuteInputFileLink(),  # 'OGC' schema with 'type: <MediaType>'
+    _any_of = [                   # 'href' required for both to provide file link/reference
+        ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
         ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
     ]
 
@@ -3589,7 +3585,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
-    value = ExecuteInputObjectData()  # can be anything, including literal value, array of them, nested object
+    value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
@@ -3602,9 +3598,9 @@ class ExecuteInputQualifiedValue(Format):
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
-        ExecuteInputInlineValue(),  # <inline-literal>
+        ExecuteInputInlineValue(),     # <inline-literal>
         ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
-        ExecuteInputFile(),  # 'href' with either 'type' (OGC) or 'format' (OLD)
+        ExecuteInputFile(),            # 'href' with either 'type' (OGC) or 'format' (OLD)
         # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
     ]
 
@@ -3640,7 +3636,7 @@ class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
 class ExecuteInputMapValues(AnyOfKeywordSchema):
     _any_of = [
         ExecuteInputMapAdditionalProperties(),  # normal {"<input-id>": {...}}
-        EmptyMappingSchema(),  # allows explicitly provided {}
+        EmptyMappingSchema(),                   # allows explicitly provided {}
     ]
 
 
@@ -4750,10 +4746,9 @@ class CWLInputType(OneOfKeywordSchema):
 
 
 class CWLInputMap(PermissiveMappingSchema):
-    io_info = IO_INFO_IDS.format(first="CWL", second="WPS", what="input")
-    description = f"{io_info} (Note: '{{input-id}}' is a variable corresponding for each identifier)"
     input_id = CWLInputType(variable="{input-id}", title="CWLInputDefinition",
-                            description=description)
+                            description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
+                            " (Note: '{input-id}' is a variable corresponding for each identifier)")
 
 
 class CWLInputItem(CWLInputObject):
@@ -4800,10 +4795,9 @@ class CWLOutputType(OneOfKeywordSchema):
 
 
 class CWLOutputMap(ExtendedMappingSchema):
-    io_info = IO_INFO_IDS.format(first="CWL", second="WPS", what="output")
-    description = f"{io_info} (Note: '{{output-id}}' is a variable corresponding for each identifier)"
     output_id = CWLOutputType(variable="{output-id}", title="CWLOutputDefinition",
-                              description=description)
+                              description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
+                              " (Note: '{output-id}' is a variable corresponding for each identifier)")
 
 
 class CWLOutputItem(CWLOutputObject):
