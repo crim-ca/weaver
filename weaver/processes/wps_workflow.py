@@ -186,12 +186,32 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             To let :term:`CWL` :term:`Workflow` inter-steps mapping work as intended, we must remap the locations
             ignoring any nested dirs where the modified *outputBindings* definition will be able to match as if each
             step :term:`Process` outputs were generated locally.
+
+        .. note::
+            Because the staging operation following remote :term:`Process` execution nests each output under a directory
+            name matching respective output IDs, globs must be update with that modified nested directory as well.
+
+        .. seealso::
+            :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results`
         """
         if "outputBinding" in schema and "glob" in schema["outputBinding"]:
-            # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
             glob = schema["outputBinding"]["glob"]
-            glob = os.path.split(glob)[-1] or "."
-            schema["outputBinding"]["glob"] = glob
+            glob_list = isinstance(glob, list)
+            glob = glob if isinstance(glob, list) else [glob]
+            out_id = schema["id"].rsplit("#", 1)[-1]
+            glob_spec = []
+            for glob_item in glob:
+                if glob_item.startswith(outdir):
+                    # CWL allows outputBinding to have relative or absolute starting with outdir.
+                    # Anything else should be forbidden by the validator.
+                    # (see ``glob`` under https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputBinding)
+                    # glob = outdir -> '.', which is identical to what CWL '<outdir>/<out_id>/.' expects for a dir entry
+                    glob_item = os.path.relpath(glob_item, outdir)
+                # if the glob had additional directory nesting, we must remove them, because the staging result
+                # operation would have brought output file/dir back under the respective dir named by output ID
+                glob_item = os.path.split(glob_item)[-1] or "."
+                glob_spec.append(os.path.join(out_id, glob_item))
+            schema["outputBinding"]["glob"] = glob_spec if glob_list else glob_spec[0]
         output = super(WpsWorkflow, self).collect_output(
             schema,
             builder,
@@ -199,7 +219,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             fs_access,
             compute_checksum=compute_checksum,
         )
-        return output or {}
+        return output
 
 
 class WpsWorkflowJob(CommandLineJob):
@@ -234,7 +254,7 @@ class WpsWorkflowJob(CommandLineJob):
                 for glob in glob_spec if glob_list else [glob_spec]:
                     # in case of Directory collection with '<dir>/', use '.' because cwltool replaces it by the outdir
                     out_glob = glob.split("/")[-1] or "."
-                    out_glob = f"{output_id}/{out_glob}" if self.wps_process.stage_output_id_nested else out_glob
+                    out_glob = f"{output_id}/{out_glob}"
                     out_globs.add(out_glob)
                 self.expected_outputs[output_id] = out_globs if glob_list else list(out_globs)[0]
 

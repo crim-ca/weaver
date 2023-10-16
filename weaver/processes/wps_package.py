@@ -73,22 +73,22 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENTS_SUPPORTED,
     CWL_TOOL_NAMESPACE_URL,
+    IO_INPUT,
+    IO_OUTPUT,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE,
-    WPS_INPUT,
-    WPS_OUTPUT
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     cwl2wps_io,
+    get_cwl_io_type,
     json2wps_field,
     json2wps_io,
     merge_package_io,
     normalize_ordered_io,
     ogcapi2cwl_process,
-    parse_cwl_array_type,
     wps2json_io,
     xml_wps2cwl
 )
@@ -142,25 +142,22 @@ if TYPE_CHECKING:
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
-    from weaver.processes.convert import (
-        ANY_IO_Type,
-        CWL_Input_Type,
-        JSON_IO_Type,
-        PKG_IO_Type,
-        WPS_Input_Type,
-        WPS_Output_Type
-    )
+    from weaver.processes.constants import IO_Select_Type
+    from weaver.processes.convert import ANY_IO_Type, JSON_IO_Type, PKG_IO_Type, WPS_Input_Type, WPS_Output_Type
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
         AnyValueType,
         CWL,
         CWL_AnyRequirements,
+        CWL_Input_Type,
         CWL_IO_ComplexType,
+        CWL_IO_Type,
         CWL_Requirement,
         CWL_RequirementNames,
         CWL_RequirementsDict,
         CWL_Results,
+        CWL_SchemaNames,
         CWL_ToolPathObject,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
@@ -243,7 +240,7 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_id = get_sane_name(process_id_or_url)
+    process_id = get_sane_name(process_id_or_url, min_len=1)
     process_url = sd.process_service.path.format(process_id=process_id)
     return f"{data_source_url}{process_url}"
 
@@ -599,13 +596,13 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     """
     wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
     wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
-    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
-    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
+    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, IO_INPUT)
+    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, IO_OUTPUT)
     return wps_inputs_merged, wps_outputs_merged
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, str, bool) -> List[PKG_IO_Type]
+    # type: (CWLFactoryCallable, IO_Select_Type, bool) -> List[PKG_IO_Type]
     """
     Retrieves I/O definitions from a validated :class:`CWLFactoryCallable`.
 
@@ -613,15 +610,15 @@ def _get_package_io(package_factory, io_select, as_json):
         Factory can be obtained with validation using :func:`_load_package_content`.
 
     :param package_factory: :term:`CWL` factory that contains I/O references to the package definition.
-    :param io_select: either :data:`WPS_INPUT` or :data:`WPS_OUTPUT` according to what needs to be processed.
+    :param io_select: either :data:`IO_INPUT` or :data:`IO_OUTPUT` according to what needs to be processed.
     :param as_json: toggle to the desired output type.
         If ``True``, converts the I/O definitions into :term:`JSON` representation.
         If ``False``, converts the I/O definitions into :term:`WPS` objects.
     :returns: I/O format depending on value :paramref:`as_json`.
     """
-    if io_select == WPS_OUTPUT:
+    if io_select == IO_OUTPUT:
         io_attrib = "outputs_record_schema"
-    elif io_select == WPS_INPUT:
+    elif io_select == IO_INPUT:
         io_attrib = "inputs_record_schema"
     else:
         raise PackageTypeError(f"Unknown I/O selection: '{io_select}'.")
@@ -638,8 +635,8 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
     """
     Generates :term:`WPS`-like ``(inputs, outputs)`` tuple using parsed CWL package definitions.
     """
-    return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
-            _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
+    return (_get_package_io(package_factory, io_select=IO_INPUT, as_json=as_json),
+            _get_package_io(package_factory, io_select=IO_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
@@ -974,7 +971,7 @@ def get_process_identifier(process_info, package):
     process_id = get_any_id(process_info)
     if not process_id:
         process_id = package.get("id")
-    process_id = get_sane_name(process_id, assert_invalid=True)
+    process_id = get_sane_name(process_id, assert_invalid=True, min_len=1)
     return process_id
 
 
@@ -1248,8 +1245,8 @@ class WpsPackage(Process):
         # handle EOImage inputs
         inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
-        inputs = [json2wps_io(i, WPS_INPUT) for i in inputs]
-        outputs = [json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", [])]
+        inputs = [json2wps_io(i, IO_INPUT) for i in inputs]
+        outputs = [json2wps_io(o, IO_OUTPUT) for o in kw.pop("outputs", [])]
         metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", [])]
 
         super(WpsPackage, self).__init__(
@@ -1541,6 +1538,48 @@ class WpsPackage(Process):
             if self.package.get("baseCommand") == "python":
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
+    def update_cwl_schema_names(self):
+        # type: () -> None
+        """
+        Detect duplicate :term:`CWL` schema types not referred by name to provide one and avoid resolution failure.
+
+        Doing this resolution avoids reused definitions being considered as "conflicts" because of missing ``name``.
+        To avoid introducing a real conflict, names are injected only under corresponding :term:`CWL` I/O by ID.
+        The most common type of definition resolve this way is when :term:`CWL` ``Enum`` is reused for single and
+        array-based definitions simultaneously.
+
+        .. seealso::
+            - :func:`weaver.processes.convert.resolve_cwl_io_type_schema`
+            - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
+
+        .. fixme::
+            Workaround for https://github.com/common-workflow-language/cwltool/issues/1908.
+        """
+        for io_select in ["inputs", "outputs"]:
+            if isinstance(self.package[io_select], dict):
+                io_items = self.package[io_select]  # type: Dict[str, CWL_IO_Type]
+            else:
+                io_items = {item["id"]: item for item in self.package[io_select]}  # type: Dict[str, CWL_IO_Type]
+            for io_name, io_def in io_items.items():
+                if isinstance(io_def["type"], list):
+                    item_enum = None
+                    array_enum = None
+                    for io_item in io_def["type"]:
+                        if not isinstance(io_item, dict):
+                            continue
+                        if io_item.get("type") == "enum":
+                            item_enum = io_item
+                            continue
+                        if io_item.get("type") != "array":
+                            continue
+                        if not isinstance(io_item.get("items", {}), dict):
+                            continue
+                        if io_item["items"].get("type") == "enum":
+                            array_enum = io_item["items"]
+                    # only apply the name reference if not already provided (eg: explicit name defined in original CWL)
+                    if item_enum and array_enum and item_enum == array_enum and "name" not in item_enum:
+                        item_enum["name"] = array_enum["name"] = f"{io_name}{uuid.uuid4()}"
+
     def update_effective_user(self):
         # type: () -> None
         """
@@ -1731,6 +1770,7 @@ class WpsPackage(Process):
 
             self.update_effective_user()
             self.update_requirements()
+            self.update_cwl_schema_names()
 
             runtime_params = self.setup_runtime()
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
@@ -1766,7 +1806,8 @@ class WpsPackage(Process):
                                                                                 eoimage_data_sources,
                                                                                 accept_mime_types,
                                                                                 settings=self.settings)
-                cwl_inputs = self.make_inputs(request.inputs, cwl_inputs_info)
+                cwl_schema_refs = package_inst.t.names.names
+                cwl_inputs = self.make_inputs(request.inputs, cwl_inputs_info, cwl_schema_refs)
                 self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, Status.RUNNING)
             except PackageException as exc:
                 raise self.exception_message(type(exc), None, str(exc))  # re-raise as is, but with extra log entry
@@ -1837,6 +1878,7 @@ class WpsPackage(Process):
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
+                    cwl_schema_names,   # type: CWL_SchemaNames
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
         Converts :term:`WPS` input values to corresponding :term:`CWL` input values for processing by the package.
@@ -1847,6 +1889,7 @@ class WpsPackage(Process):
 
         :param wps_inputs: Actual :term:`WPS` inputs parsed from execution request.
         :param cwl_inputs_info: Expected CWL input definitions for mapping.
+        :param cwl_schema_names: Mapping of CWL type schema references to resolve 'type: <ref>' if used in a definition.
         :return: :term:`CWL` input values.
         """
         cwl_inputs = {}
@@ -1858,7 +1901,7 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            io_def = parse_cwl_array_type(cwl_inputs_info[input_id])
+            io_def = get_cwl_io_type(cwl_inputs_info[input_id], cwl_schema_names=cwl_schema_names)
             if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None

@@ -64,9 +64,10 @@ def get_conformance(category):
 
     ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
     ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
-    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
+    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
     ogcapi_proc_core = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
     ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
+    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -210,8 +211,7 @@ def get_conformance(category):
         f"{ogcapi_proc_core}/rec/job-list/next-1",
         f"{ogcapi_proc_core}/rec/job-list/next-2",
         f"{ogcapi_proc_core}/rec/job-list/next-3",
-        # FIXME: https://github.com/crim-ca/weaver/issues/230
-        # ogcapi_proc_core + "/req/callback/job-callback",
+        f"{ogcapi_proc_core}/req/callback/job-callback",
         f"{ogcapi_proc_core}/req/core",
         f"{ogcapi_proc_core}/req/core/api-definition-op",
         f"{ogcapi_proc_core}/req/core/api-definition-success",
@@ -321,14 +321,36 @@ def get_conformance(category):
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/delete-op",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/response",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/ogcapppkg",
-        # FIXME: support part 3: workflows (?)
-        #   https://github.com/crim-ca/weaver/issues/412
-        # ogcapi_proc_part3 + "/req/workflows",
-        # ogcapi_proc_part3 + "/req/workflows/collection/body",
-        # ogcapi_proc_part3 + "/req/workflows/collection/content-type",
-        # ogcapi_proc_part3 + "/req/workflows/collection/post-op",
-        # ogcapi_proc_part3 + "/req/workflows/collection/response-body",
-        # ogcapi_proc_part3 + "/req/workflows/collection/response",
+        # FIXME: below partially, for full Part 3, would need $graph support
+        # (see https://github.com/crim-ca/weaver/issues/56 and below '/conf/app-pck/cwl')
+        f"{ogcapi_proc_part3}/req/cwl-workflows",
+        f"{ogcapi_proc_part3}/conf/cwl-workflows",
+        # FIXME: support part 3: workflows (https://github.com/crim-ca/weaver/issues/412)
+        # f"{ogcapi_proc_part3}/conf/nested-processes",
+        # f"{ogcapi_proc_part3}/conf/remote-core-processes",
+        # f"{ogcapi_proc_part3}/conf/collection-input",
+        # f"{ogcapi_proc_part3}/conf/remote-collections",
+        # f"{ogcapi_proc_part3}/conf/input-fields-modifiers",
+        # f"{ogcapi_proc_part3}/conf/output-fields-modifiers",
+        # f"{ogcapi_proc_part3}/conf/deployable-workflows",
+        # f"{ogcapi_proc_part3}/conf/collection-output",
+        # f"{ogcapi_proc_part3}/req/collection-input",
+        # f"{ogcapi_proc_part3}/req/collection-output",
+        # f"{ogcapi_proc_part3}/req/deployable-workflows",
+        # f"{ogcapi_proc_part3}/req/input-fields-modifiers",
+        # f"{ogcapi_proc_part3}/req/output-fields-modifiers",
+        # f"{ogcapi_proc_part3}/req/nested-processes",
+        # f"{ogcapi_proc_part3}/req/remote-collections",
+        # f"{ogcapi_proc_part3}/req/remote-core-processes",
+        # f"{ogcapi_proc_part3}/req/workflows",
+        # f"{ogcapi_proc_part3}/req/workflows/collection/body",
+        # f"{ogcapi_proc_part3}/req/workflows/collection/content-type",
+        # f"{ogcapi_proc_part3}/req/workflows/collection/post-op",
+        # f"{ogcapi_proc_part3}/req/workflows/collection/response-body",
+        # f"{ogcapi_proc_part3}/req/workflows/collection/response",
+        # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
+        # f"{ogcapi_proc_part3}/conf/openeo-workflows",
+        # f"{ogcapi_proc_part3}/req/openeo-workflows",
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
@@ -344,21 +366,21 @@ def get_conformance(category):
         f"{ogcapi_proc_apppkg}/conf/app-stage-in",
         f"{ogcapi_proc_apppkg}/req/app-stage-in",
         # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
-        # ogcapi_proc_apppkg + "/conf/app/stac-input",
-        # ogcapi_proc_apppkg + "/req/app/stac-input",
+        # f"{ogcapi_proc_apppkg}/conf/app/stac-input",
+        # f"{ogcapi_proc_apppkg}/req/app/stac-input",
         f"{ogcapi_proc_apppkg}/conf/app-stage-out",
         f"{ogcapi_proc_apppkg}/req/app-stage-out",
-        # ogcapi_proc_apppkg + "/req/app/stac-out",
-        # ogcapi_proc_apppkg + "/conf/app/stac-out",
-        # ogcapi_proc_apppkg + "/rec/app/stac-out-metadata",
-        # ogcapi_proc_apppkg + "/rec/conf/stac-out-metadata",
+        # f"{ogcapi_proc_apppkg}/req/app/stac-out",
+        # f"{ogcapi_proc_apppkg}/conf/app/stac-out",
+        # f"{ogcapi_proc_apppkg}/rec/app/stac-out-metadata",
+        # f"{ogcapi_proc_apppkg}/rec/conf/stac-out-metadata",
         f"{ogcapi_proc_apppkg}/conf/app-pck",
         f"{ogcapi_proc_apppkg}/req/app-pck",
         # FIXME: Support embedded step definition in CWL (https://github.com/crim-ca/weaver/issues/56)
         #   Allow definition of a '$graph' with list of Workflow + >=1 CommandLineTool all together
         #   see: https://docs.ogc.org/bp/20-089r1.html#toc28
-        # ogcapi_proc_apppkg + "/conf/app-pck/cwl",
-        # ogcapi_proc_apppkg + "/req/app-pck/cwl",
+        # f"{ogcapi_proc_apppkg}/conf/app-pck/cwl",
+        # f"{ogcapi_proc_apppkg}/req/app-pck/cwl",
         f"{ogcapi_proc_apppkg}/req/app-pck/clt",
         f"{ogcapi_proc_apppkg}/req/app-pck/wf",
         f"{ogcapi_proc_apppkg}/req/app-pck/wf-inputs",
@@ -368,11 +390,11 @@ def get_conformance(category):
         f"{ogcapi_proc_apppkg}/req/app-pck-stage-in",
         # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
         #   not sure about requirement: "staging of EO products SHALL be of type 'Directory'."
-        # ogcapi_proc_apppkg + "/req/app-pck-stage-in/clt-stac",
-        # ogcapi_proc_apppkg + "/req/app-pck-stage-in/wf-stac",
+        # f"{ogcapi_proc_apppkg}/req/app-pck-stage-in/clt-stac",
+        # f"{ogcapi_proc_apppkg}/req/app-pck-stage-in/wf-stac",
         f"{ogcapi_proc_apppkg}/conf/app-pck-stage-out",
         f"{ogcapi_proc_apppkg}/req/app-pck-stage-out",
-        # ogcapi_proc_apppkg + "/req/app-pck-stage-out/output-stac"
+        # f"{ogcapi_proc_apppkg}/req/app-pck-stage-out/output-stac"
         f"{ogcapi_proc_apppkg}/conf/plt",
         f"{ogcapi_proc_apppkg}/req/plt",
         f"{ogcapi_proc_apppkg}/req/plt/api",
@@ -381,11 +403,11 @@ def get_conformance(category):
         f"{ogcapi_proc_apppkg}/conf/plt-stage-in",
         f"{ogcapi_proc_apppkg}/req/plt-stage-in",
         # FIXME: Support for STAC metadata (https://github.com/crim-ca/weaver/issues/103)
-        # ogcapi_proc_apppkg + "/req/plt-stage-in/input-stac",
-        # ogcapi_proc_apppkg + "/req/plt-stage-in/stac-stage",
+        # f"{ogcapi_proc_apppkg}/req/plt-stage-in/input-stac",
+        # f"{ogcapi_proc_apppkg}/req/plt-stage-in/stac-stage",
         f"{ogcapi_proc_apppkg}/conf/plt-stage-out",
         f"{ogcapi_proc_apppkg}/req/plt-stage-out",
-        # ogcapi_proc_apppkg + "/req/plt-stage-out/stac-stage",
+        # f"{ogcapi_proc_apppkg}/req/plt-stage-out/stac-stage",
     ]
     if category not in [None, ConformanceCategory.ALL]:
         cat = f"/{category}/"
@@ -519,17 +541,21 @@ def api_frontpage_body(settings):
              "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
              "title": "WPS 2.0 XML validation schemas entrypoint."},
         ])
-    return {
-        "message": "Weaver Information",
-        "configuration": weaver_config,
-        "description": __meta__.__description__,
-        "parameters": [
-            {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
-            {"name": "vault", "enabled": weaver_vault},
-            {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
-        ],
-        "links": weaver_links,
-    }
+    body = sd.FrontpageSchema().deserialize(
+        {
+            "message": "Weaver Information",
+            "configuration": weaver_config,
+            "description": __meta__.__description__,
+            "attribution": __meta__.__author__,
+            "parameters": [
+                {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+                {"name": "vault", "enabled": weaver_vault},
+                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
+            ],
+            "links": weaver_links,
+        }
+    )
+    return body
 
 
 @sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,

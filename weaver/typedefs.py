@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING  # pragma: no cover
 if TYPE_CHECKING:
     import os
     import sys
-    import typing
     import uuid
     from datetime import datetime
     from decimal import Decimal
@@ -69,7 +68,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.status import AnyStatusType
+    from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
     Path = Union[os.PathLike, str, bytes]
@@ -146,7 +145,7 @@ if TYPE_CHECKING:
         "type": CWL_IO_ArrayBaseType,
         "items": Union[str, CWL_IO_EnumType],  # "items" => type of every item
     })
-    CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
+    CWL_IO_TypeItem = Union[CWL_IO_BaseType, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
     CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
     CWL_Input_Type = TypedDict("CWL_Input_Type", {
         "id": NotRequired[str],     # representation used by plain CWL definition
@@ -167,6 +166,13 @@ if TYPE_CHECKING:
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
+    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
+
+    class CWL_SchemaName(Protocol):
+        name: str
+        _props: CWL_IO_Type
+
+    CWL_SchemaNames = Dict[str, CWL_SchemaName]
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {
@@ -406,6 +412,14 @@ if TYPE_CHECKING:
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobSubscribers = TypedDict("JobSubscribers", {
+        "failedUri": NotRequired[str],
+        "successUri": NotRequired[str],
+        "inProgressUri": NotRequired[str],
+        "failedEmail": NotRequired[str],
+        "successEmail": NotRequired[str],
+        "inProgressEmail": NotRequired[str],
+    }, total=True)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
     ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
@@ -425,8 +439,10 @@ if TYPE_CHECKING:
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
     ExecutionOutputs = Union[ExecutionOutputsList, ExecutionOutputsMap]
     ExecutionResultObjectRef = TypedDict("ExecutionResultObjectRef", {
-        "href": Optional[str],
+        "href": str,
         "type": NotRequired[str],
+        "title": NotRequired[str],
+        "rel": NotRequired[str],
     }, total=False)
     ExecutionResultObjectValue = TypedDict("ExecutionResultObjectValue", {
         "value": Optional[AnyValueType],
@@ -436,6 +452,10 @@ if TYPE_CHECKING:
     ExecutionResultArray = List[ExecutionResultObject]
     ExecutionResultValue = Union[ExecutionResultObject, ExecutionResultArray]
     ExecutionResults = Dict[str, ExecutionResultValue]
+    ExecutionSubscribers = TypedDict("ExecutionSubscribers", {
+        "emails": NotRequired[Dict[StatusType, str]],
+        "callbacks": NotRequired[Dict[StatusType, str]],
+    }, total=True)
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
@@ -819,12 +839,17 @@ if TYPE_CHECKING:
     ProcessDescriptionListing = Union[ProcessOfferingListing, ProcessDescriptionNestedListing]
     ProcessDescription = Union[ProcessDescriptionMapping, ProcessDescriptionListing]
 
-    ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
+    ExecutionUnitNested = TypedDict("ExecutionUnitNested", {
         "unit": CWL
     }, total=True)
+    ExecutionUnitItem = Union[CWL, ExecutionUnitNested, Link]
+    ExecutionUnit = Union[
+        ExecutionUnitItem,
+        List[ExecutionUnitItem],
+    ]
     ProcessDeployment = TypedDict("ProcessDeployment", {
         "processDescription": ProcessDescription,
-        "executionUnit": List[Union[ExecutionUnitItem, Link]],
+        "executionUnit": ExecutionUnit,
         "immediateDeployment": NotRequired[bool],
         "deploymentProfileName": str,
     }, total=True)
@@ -834,5 +859,6 @@ if TYPE_CHECKING:
         "response": NotRequired[AnyExecuteResponse],
         "inputs": NotRequired[ExecutionInputs],
         "outputs": NotRequired[ExecutionOutputs],
-        "notification_email": NotRequired[str],
+        "subscribers": NotRequired[JobSubscribers],
+        "notification_email": NotRequired[str],  # deprecated, backward-compatibility
     }, total=False)

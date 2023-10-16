@@ -62,7 +62,6 @@ class Wps1Process(WpsProcessInterface):
         # following are defined after 'prepare' step
         self.wps_provider = None    # type: Optional[WebProcessingService]
         self.wps_process = None     # type: Optional[ProcessOWS]
-        self.stage_output_id_nested = True
         super(Wps1Process, self).__init__(
             request,
             lambda _message, _progress, _status, *args, **kwargs: update_status(

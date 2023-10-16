@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import datetime
 import logging
 import os
@@ -34,6 +35,7 @@ from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
+from weaver.notify import decrypt_email
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import get_path_kvp, now
@@ -543,6 +545,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert "limit" in str(resp.json["cause"]) and "less than minimum" in str(resp.json["cause"])
         assert "limit" in resp.json["value"] and resp.json["value"]["limit"] == str(0)
 
+    @pytest.mark.skip(reason="Obsolete feature. It is not possible to filter by encrypted notification email anymore.")
     def test_get_jobs_by_encrypted_email(self):
         """
         Verifies that literal email can be used as search criterion although not saved in plain text within db.
@@ -562,13 +565,20 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
-        job_id = resp.json["jobID"]
+            job_id = resp.json["jobID"]
+
+            # submit a second job just to make sure email doesn't match it as well
+            other_body = copy.deepcopy(body)
+            other_body["notification_email"] = "random@email.com"
+            resp = self.app.post_json(path, params=other_body, headers=self.json_headers)
+            assert resp.status_code == 201
 
         # verify the email is not in plain text
         job = self.job_store.fetch_by_id(job_id)
         assert job.notification_email != email and job.notification_email is not None
-        assert int(job.notification_email, 16) != 0  # email should be encrypted with hex string
+        assert decrypt_email(job.notification_email, self.settings) == email, "Email should be recoverable."
 
+        # make sure that jobs searched using email are found with encryption transparently for the user
         path = get_path_kvp(sd.jobs_service.path, detail="true", notification_email=email)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1494,6 +1504,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_none = sd.Execute().deserialize({})
         job_none.pop("$schema", None)
+        job_none.pop("$id", None)
         assert job_none == {
             "inputs": {},
             "outputs": {},
@@ -1503,6 +1514,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_none = sd.Execute().deserialize({"outputs": {"random": default_trans_mode}})
         job_in_none.pop("$schema", None)
+        job_in_none.pop("$id", None)
         assert job_in_none == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1512,6 +1524,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_dict = sd.Execute().deserialize({"inputs": {}, "outputs": {"random": default_trans_mode}})
         job_in_empty_dict.pop("$schema", None)
+        job_in_empty_dict.pop("$id", None)
         assert job_in_empty_dict == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1521,6 +1534,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_list = sd.Execute().deserialize({"inputs": [], "outputs": {"random": default_trans_mode}})
         job_in_empty_list.pop("$schema", None)
+        job_in_empty_list.pop("$id", None)
         assert job_in_empty_list == {
             "inputs": [],
             "outputs": {"random": default_trans_mode},
@@ -1530,6 +1544,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_none = sd.Execute().deserialize({"inputs": {"random": "ok"}})
         job_out_none.pop("$schema", None)
+        job_out_none.pop("$id", None)
         assert job_out_none == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1539,6 +1554,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_dict = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": {}})
         job_out_empty_dict.pop("$schema", None)
+        job_out_empty_dict.pop("$id", None)
         assert job_out_empty_dict == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1548,6 +1564,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_list = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": []})
         job_out_empty_list.pop("$schema", None)
+        job_out_empty_list.pop("$id", None)
         assert job_out_empty_list == {
             "inputs": {"random": "ok"},
             "outputs": [],
@@ -1560,6 +1577,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
         })
         job_out_defined.pop("$schema", None)
+        job_out_defined.pop("$id", None)
         assert job_out_defined == {
             "inputs": {"random": "ok"},
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},

@@ -80,6 +80,7 @@ from cornice_swagger.converters.schema import (
     convert_regex_validator
 )
 from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, ParameterHandler, ResponseHandler
+from jsonschema.validators import Draft7Validator
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
@@ -122,10 +123,12 @@ LITERAL_SCHEMA_TYPES = frozenset([
 NO_DOUBLE_SLASH_PATTERN = r"(?!.*//.*$)"
 URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTERN}")
 URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
-URI_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
-FILE_URI = colander.Regex(URI_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
+FILE_URL_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
+FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
+URI_REGEX = rf"{colander.URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
+URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
-    "uri": {"converter": BaseStringTypeConverter, "validator": URL},
+    "uri": {"converter": BaseStringTypeConverter, "validator": URI},
     "url": {"converter": BaseStringTypeConverter, "validator": URL},
     "file": {"converter": BaseStringTypeConverter, "validator": FILE_URI},
 })
@@ -1179,31 +1182,57 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     """
     Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
 
-    When the :class:`colander.MappingSchema` defines ``_schema = "<URL>"`` or ``_id = "<URL>"`` with a valid URL,
-    all validations will automatically insert the corresponding ``$schema`` or ``$id`` field with this URL to the
-    deserialized JSON result.
+    Schema references are resolved under two distinct contexts:
 
-    Alternatively, the parameters ``schema`` and ``id`` can be passed as keyword arguments when instantiating the
-    schema node.
+    1. When generating the :term:`JSON` schema representation of the current schema node, for :term:`OpenAPI`
+       representation, the ``_schema`` attribute will indicate the ``$id`` value that identifies this schema,
+       while the ``_schema_meta`` will provide the ``$schema`` property that refers to the :term:`JSON` meta-schema
+       used by default to define it.
+
+    2. When deserializing :term:`JSON` data that should be validated against the current schema node, the generated
+       :term:`JSON` data will include the ``$schema`` property using the ``_schema`` attribute. In this case,
+       the ``$id`` is omitted as that :term:`JSON` represents an instance of the schema, but not its identity.
+
+    Alternatively, the parameters ``schema`` and ``schema_meta`` can be passed as keyword arguments when instantiating
+    the schema node. The references injection in the :term:`JSON` schema and data can be disabled with parameters
+    ``schema_include`` and ``schema_meta_include``, or the corresponding class attributes. Furthermore, options
+    ``schema_include_deserialize``, ``schema_include_convert_type`` and ``schema_meta_include_convert_type`` can be
+    used to control individually each schema inclusion during either the type conversion context (:term:`JSON` schema)
+    or the deserialization context (:term:`JSON` data validation).
     """
     _extension = "_ext_schema_ref"
-    _ext_schema_fields = ["_schema", "_id"]
+    _ext_schema_options = [
+        "_schema_meta",
+        "_schema_meta_include",
+        "_schema_meta_include_convert_type",
+        "_schema",
+        "_schema_include",
+        "_schema_include_deserialize",
+        "_schema_include_convert_type",
+    ]
+    _ext_schema_fields = ["_id", "_schema"]
 
     # typings and attributes to help IDEs flag that the field is available/overridable
-    _schema = None          # type: str
-    _id = None              # type: str
+
+    _schema_meta = Draft7Validator.META_SCHEMA["$schema"]  # type: str
+    _schema_meta_include = True                 # type: bool
+    _schema_meta_include_convert_type = True    # type: bool
+
+    _schema = None                              # type: str
+    _schema_include = True                      # type: bool
+    _schema_include_deserialize = True          # type: bool
+    _schema_include_convert_type = True         # type: bool
 
     def __init__(self, *args, **kwargs):
-        schema_fields = self._schema_fields
-        for schema_key in schema_fields:
+        for schema_key in self._schema_options:
             schema_field = schema_key[1:]
-            schema_ref = kwargs.pop(schema_field, None)
-            if self._is_schema_ref(schema_ref):
-                setattr(self, schema_key, schema_ref)
+            schema_value = kwargs.pop(schema_field, object)
+            if schema_value is not object:
+                setattr(self, schema_key, schema_value)
         super(SchemaRefMappingSchema, self).__init__(*args, **kwargs)
         setattr(self, SchemaRefMappingSchema._extension, True)
 
-        for schema_key in schema_fields:
+        for schema_key in self._schema_fields:
             schema_field = f"${schema_key[1:]}"
             sort_first = getattr(self, "_sort_first", [])
             sort_after = getattr(self, "_sort_after", [])
@@ -1213,24 +1242,31 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     @staticmethod
     def _is_schema_ref(schema_ref):
         # type: (Any) -> bool
-        return isinstance(schema_ref, str) and URL.match_object.match(schema_ref)
+        return isinstance(schema_ref, str) and URI.match_object.match(schema_ref)
+
+    @property
+    def _schema_options(self):
+        return getattr(self, "_ext_schema_options", SchemaRefMappingSchema._ext_schema_options)
 
     @property
     def _schema_fields(self):
         return getattr(self, "_ext_schema_fields", SchemaRefMappingSchema._ext_schema_fields)
 
-    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+    def _schema_deserialize(self, cstruct, schema_meta, schema_id):
+        # type: (OpenAPISchema, Optional[str], Optional[str]) -> OpenAPISchema
+        """
+        Applies the relevant schema references and properties depending on :term:`JSON` schema/data conversion context.
+        """
         if not isinstance(cstruct, dict):
             return cstruct
         if not getattr(self, SchemaRefMappingSchema._extension, False):
             return cstruct
 
         schema_result = {}
-        schema_fields = self._schema_fields
-        for schema_key in schema_fields:
-            schema_ref = getattr(self, schema_key, None)
+        schema_fields = [("schema", schema_meta), ("id", schema_id)]
+        for schema_key, schema_ref in schema_fields:
             if self._is_schema_ref(schema_ref):
-                schema_field = f"${schema_key[1:]}"
+                schema_field = f"${schema_key}"
                 schema = ExtendedSchemaNode(
                     colander.String(),
                     name=schema_field,
@@ -1243,6 +1279,39 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
 
         schema_result.update(cstruct)
         return schema_result
+
+    def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+        """
+        Converts the data using validation against the :term:`JSON` schema definition.
+        """
+        # meta-schema always disabled in this context since irrelevant
+        # refer to the "id" of the parent schema representing this data using "$schema"
+        # this is not "official" JSON requirement, but very common in practice
+        schema_id = None
+        schema_id_include = getattr(self, "_schema_include", False)
+        schema_id_include_deserialize = getattr(self, "_schema_include_deserialize", False)
+        if schema_id_include and schema_id_include_deserialize:
+            schema_id = getattr(self, "_schema", None)
+        if schema_id:
+            return self._schema_deserialize(cstruct, schema_id, None)
+        return cstruct
+
+    def convert_type(self, cstruct):  # pylint: disable=W0222,signature-differs
+        """
+        Converts the node to obtain the :term:`JSON` schema definition.
+        """
+        schema_id = schema_meta = None
+        schema_id_include = getattr(self, "_schema_include", False)
+        schema_id_include_convert_type = getattr(self, "_schema_include_convert_type", False)
+        schema_meta_include = getattr(self, "_schema_meta_include", False)
+        schema_meta_include_convert_type = getattr(self, "_schema_meta_include_convert_type", False)
+        if schema_id_include and schema_id_include_convert_type:
+            schema_id = getattr(self, "_schema", None)
+        if schema_meta_include and schema_meta_include_convert_type:
+            schema_meta = getattr(self, "_schema_meta", None)
+        if schema_id or schema_meta:
+            return self._schema_deserialize(cstruct, schema_meta, schema_id)
+        return cstruct
 
     @staticmethod
     @abstractmethod
@@ -2233,7 +2302,25 @@ class NotKeywordSchema(KeywordMapper):
         return ExtendedMappingSchema.deserialize(self, cstruct)
 
 
-class ExtendedTypeConverter(TypeConverter):
+class SchemaRefConverter(TypeConverter):
+    """
+    Converter that will add :term:`OpenAPI` ``$schema`` and ``$id`` references if they are provided in the schema node.
+    """
+    def convert_type(self, schema_node):
+        # type: (colander.SchemaNode) -> OpenAPISchema
+        result = super(SchemaRefConverter, self).convert_type(schema_node)
+        if isinstance(schema_node, SchemaRefMappingSchema):
+            # apply any resolved schema references at the top of the definition
+            result_ref = SchemaRefMappingSchema.convert_type(schema_node, {})
+            result_ref.update(result)
+            result = result_ref
+        return result
+
+
+class ExtendedTypeConverter(SchemaRefConverter):
+    """
+    Base converter with support of `Extended` schema type definitions.
+    """
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema
         # base type converters expect raw pattern string
@@ -2250,7 +2337,7 @@ class ExtendedTypeConverter(TypeConverter):
         return result
 
 
-class KeywordTypeConverter(TypeConverter):
+class KeywordTypeConverter(SchemaRefConverter):
     """
     Generic keyword converter that builds schema with a list of sub-schemas under the keyword.
     """
