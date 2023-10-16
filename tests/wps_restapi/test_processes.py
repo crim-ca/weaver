@@ -58,9 +58,9 @@ if TYPE_CHECKING:
 
 # pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
-    remote_server = None  # type: str
-    settings = {}  # type: SettingsType
-    config = None  # type: Configurator
+    remote_server = None    # type: str
+    settings = {}           # type: SettingsType
+    config = None           # type: Configurator
 
     @classmethod
     def setUpClass(cls):
@@ -655,7 +655,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert proc["inputs"][0]["id"] == "input-1"
             assert proc["inputs"][0]["minOccurs"] == 1
             assert proc["inputs"][0]["maxOccurs"] == 1
-            assert "formats" not in proc["inputs"][0]  # literal data doesn't have "formats"
+            assert "formats" not in proc["inputs"][0]   # literal data doesn't have "formats"
             assert len(proc["outputs"]) == 1
             assert proc["outputs"][0]["id"] == "output"
             assert "minOccurs" not in proc["outputs"][0]
@@ -668,11 +668,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
     def deploy_process_make_visible_and_fetch_deployed(self,
-                                                       deploy_payload,  # type: JSON
-                                                       expected_process_id,  # type: str
-                                                       headers=None,  # type: Optional[AnyHeadersContainer]
-                                                       assert_io=True,  # type: bool
-                                                       ):  # type: (...) -> JSON
+                                                       deploy_payload,          # type: JSON
+                                                       expected_process_id,     # type: str
+                                                       headers=None,            # type: Optional[AnyHeadersContainer]
+                                                       assert_io=True,          # type: bool
+                                                       ):                       # type: (...) -> JSON
         """
         Deploy, make visible and obtain process description.
 
@@ -781,11 +781,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
 
     def deploy_process_CWL_direct(self,
-                                  content_type,  # type: ContentType
-                                  graph_count=0,  # type: int
-                                  process_id="test-direct-cwl-json",  # type: str
-                                  version=None,  # type: Optional[AnyVersion]
-                                  ):  # type: (...) -> Tuple[CWL, JSON]
+                                  content_type,                         # type: ContentType
+                                  graph_count=0,                        # type: int
+                                  process_id="test-direct-cwl-json",    # type: str
+                                  version=None,                         # type: Optional[AnyVersion]
+                                  ):                                    # type: (...) -> Tuple[CWL, JSON]
         cwl = {}
         cwl_core = self.get_cwl_docker_python_version(cwl_version=None, process_id=process_id)
         cwl_base = {"cwlVersion": "v1.0"}
@@ -1305,7 +1305,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """
         body = {
             "processDescription": {
-                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,  # must tell which process from GetCapabilities
+                "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,    # must tell which process from GetCapabilities
                 "href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL,  # this one should be used
             },
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -1759,8 +1759,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "should also be applied at the same time since the operation replaces the new process definition (PUT)."
         )
         assert (
-                "description" not in body["processSummary"] or  # if undefined, dropped from body
-                body["processSummary"]["description"] != desc_v1["description"]  # just in case, check otherwise
+            "description" not in body["processSummary"] or  # if undefined, dropped from body
+            body["processSummary"]["description"] != desc_v1["description"]  # just in case, check otherwise
         ), (
             "Description should not have remained from previous version since this is a replacement (PUT),"
             "not a revision update (PATCH)."
