@@ -55,6 +55,7 @@ from weaver.processes.convert import (
     any2cwl_io,
     complex2json,
     convert_input_values_schema,
+    convert_value_units,
     cwl2json_input_values,
     cwl2wps_io,
     get_cwl_io_type,
@@ -65,7 +66,9 @@ from weaver.processes.convert import (
     json2wps_datatype,
     merge_io_formats,
     normalize_ordered_io,
+    oas2json_io,
     ogcapi2cwl_process,
+    ows2json_io,
     parse_cwl_array_type,
     parse_cwl_enum_type,
     repr2json_input_values,
@@ -2073,3 +2076,129 @@ def test_xml_wps2cwl_enum_updated():
     assert "[1.2, 3.4, 5.6]" in cwl_value_from
     assert "values.includes(self)" in cwl_value_from
     assert "self.every(item => values.includes(item))" in cwl_value_from
+
+
+@pytest.mark.parametrize(
+    ["io_schema", "io_expected"],
+    [
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {"type": "string"},  # generic representation, will not convert units
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+            }
+        ),
+        (
+            {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                    "type": "object",
+                    "required": ["measurement", "uom"],
+                    "properties": {
+                        "measurement": {"type": "number"},
+                        "uom": {"type": "string"},  # generic representation, will not convert units
+                        "reference": {"type": "string", "format": "uri"},
+                    }
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "minOccurs": 2,
+            }
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {"type": "string", "const": "m"},  # specific unit, auto-convert unit/values
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uoms": [{"uom": "m", "reference": ""}],
+            }
+        ),
+        (
+            {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                    "type": "object",
+                    "required": ["measurement", "uom"],
+                    "properties": {
+                        "measurement": {"type": "number"},
+                        "uom": {"type": "string", "enum": ["s", "h"]},  # specific unit, auto-convert unit/values
+                        "reference": {"type": "string", "format": "uri"},
+                    }
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uoms": [{"uom": "s", "reference": ""}, {"uom": "h", "reference": ""}],
+                "minOccurs": 2,
+            }
+        ),
+    ]
+)
+def test_oas2json_io_convert_literal_uom_definition(io_schema, io_expected):
+    assert oas2json_io(io_schema) == io_expected
+
+
+@pytest.mark.parametrize(
+    ["ows_io", "json_io"],
+    [
+        (
+            {
+                "identifier": "test",
+                "type": "float",
+                "data_type": "float",
+                "uoms": [{"uom": "m", "reference": ""}, {"uom": "ft", "reference": ""}],
+                "uom": {"uom": "m", "reference": "urn:ogc:def:uom:OGC:1.0:metre"},
+            },
+            {
+                "id": "test",
+                "literalDataDomains": [
+                    {
+                        "default": True,
+                        "valueDefinition": {"anyValue": False},
+                        "dataType": {"name": "float"},
+                        "UOMs": {
+                            "default": {"uom": "m", "reference": "urn:ogc:def:uom:OGC:1.0:metre"},
+                            "supported": [{"uom": "m", "reference": ""}, {"uom": "ft", "reference": ""}],
+                        },
+                    }
+                ],
+            },
+        )
+    ]
+)
+def test_ows2json_io_convert_literal_uom(ows_io, json_io):
+    result = ows2json_io(ows_io)  # type: ignore
+    for key in ows_io:  # avoid copying everything to make test definitions easier
+        result.pop(key, None)
+    assert result == json_io
+
+
+@pytest.mark.parametrize(
+    ["value", "uom", "to", "expected"],
+    [
+        (9.81, "m/s²", "km/min²", 35.316)
+    ]
+)
+def test_convert_value_units_literal_uom(value, uom, to, expected):
+    assert convert_value_units(value, uom, to) == expected

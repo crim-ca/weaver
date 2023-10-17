@@ -20,7 +20,7 @@ Glossary
 
     API
         | Application Programming Interface
-        | Most typically, referring to the use of HTTP requests following an :term:`OpenAPI` specification.
+        | Most typically, referring to the use of HTTP(S) requests following an :term:`OpenAPI` specification.
 
     Application Package
         General term that refers to *"what and how to execute"* the :term:`Process`. Application Packages provide the
@@ -103,7 +103,8 @@ Glossary
           Alternative operation modes are described in :ref:`Configuration Settings`.
 
     I/O
-        Inputs and/or Outputs of CWL and/or WPS depending on context.
+        Inputs and/or Outputs of :term:`CWL`, :term:`OAP`, :term:`WPS` or :term:`OAS` representation
+        depending on context.
 
     IANA
         Ontology that regroups multiple definitions, amongst which `Weaver` looks up most of its known and supported
@@ -142,6 +143,7 @@ Glossary
     OGC
         |ogc|_
 
+    OAP
     OGC API - Processes
         The new :term:`API` that defines :term:`JSON` REST-binding representation
         of :term:`WPS` :term:`Process` collection.
@@ -204,6 +206,25 @@ Glossary
           of known conversion methods with other compatible units to obtain the equivalent value. These values are
           transferred to the :term:`Process` as specified, and it is up to the underlying :term:`Application Package`
           definition to interpret it as deemed fit.
+
+    URI
+        | Uniform Resource Identifier
+        | Superset of :term:`URL` and :term:`URN` that uses a specific string format to identify a resource.
+
+    URL
+        | Uniform Resource Locator
+        | Subset of :term:`URI` that follows the ``<scheme>://<scheme-specific-part>`` format, as per :rfc:`1738`.
+          Specifies where an identified resource is available and the protocol mechanism employed for retrieving it.
+          This is employed in `Weaver` for ``http(s)://``, ``s3://`` and ``file://`` locations by :term:`I/O`, or in
+          general to refer to :term:`API` locations.
+
+    URN
+        | Uniform Resource Name
+        | Subset of :term:`URI` that follows the ``urn:<namespace>:<specific-part>`` format, as per :rfc:`8141`.
+          It is used to register a unique reference to a named entity such as a :term:`UoM` or other common definitions.
+
+        .. seealso::
+            - `IANA URN Namespaces <https://www.iana.org/assignments/urn-namespaces/urn-namespaces.xhtml>`_
 
     Vault
         Secured storage employed to upload files that should be temporarily stored on the `Weaver` server for
