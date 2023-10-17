@@ -50,35 +50,35 @@ outputs:
         - Value2
         - Value3
     outputBinding:
-      outputEval: $(inputs.string_input)
+      outputEval: $(inputs.stringInput)
   measureOutput:
     type: float
     outputBinding:
-      outputEval: $(inputs.measure_input)
+      outputEval: $(inputs.measureInput)
   dateOutput:
     type: string
     outputBinding:
-      outputEval: $(inputs.date_input)
+      outputEval: $(inputs.dateInput)
   doubleOutput:
     type: double
     outputBinding:
-      outputEval: $(inputs.double_input)
+      outputEval: $(inputs.doubleInput)
   arrayOutput:
     type:
       type: array
       items: int
     outputBinding:
-      outputEval: $(inputs.array_input)
+      outputEval: $(inputs.arrayInput)
   complexObjectOutput:
     type: File
     outputBinding:
-      outputEval: $(inputs.complex_object_input)
+      outputEval: $(inputs.complexObjectInput)
   geometryOutput:
     type:
       type: array
       items: File
     outputBinding:
-      outputEval: $(inputs.geometry_input)
+      outputEval: $(inputs.geometryInput)
   boundingBoxOutput:
     type: File
   imagesOutput:
@@ -86,10 +86,10 @@ outputs:
       type: array
       items: File
     outputBinding:
-      outputEval: $(inputs.images_input)
+      outputEval: $(inputs.imagesInput)
   featureCollectionOutput:
     type: File
     outputBinding:
-      outputEval: $(inputs.feature_collection_input)
+      outputEval: $(inputs.featureCollectionInput)
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
