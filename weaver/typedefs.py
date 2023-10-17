@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil

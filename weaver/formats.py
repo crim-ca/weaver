@@ -1,10 +1,11 @@
+import base64
 import datetime
 import json
 import logging
 import os
 import re
 import socket
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -18,7 +19,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -103,9 +104,22 @@ class ContentType(Constants):
 class ContentEncoding(Constants):
     """
     Supported ``Content-Encoding`` values.
+
+    .. note::
+        Value ``binary`` is kept for convenience and backward compatibility with older definitions.
+        It will default to the same encoding strategy as if ``base64`` was specified explicitly.
+        Value ``binary`` is not part of :rfc:`4648`, but remains a common occurrence that dates from
+        when ``format: binary`` was the approach employed to represent binary (JSON-schema Draft-04 and prior)
+        instead of what is now recommended using ``contentEncoding: base64`` (JSON-schema Draft-07).
+
+    .. seealso::
+        - https://github.com/json-schema-org/json-schema-spec/issues/803
+        - https://github.com/json-schema-org/json-schema-spec/pull/862
     """
     UTF_8 = "UTF-8"
     BINARY = "binary"
+    BASE16 = "base16"
+    BASE32 = "base32"
     BASE64 = "base64"
 
     @staticmethod
@@ -132,6 +146,48 @@ class ContentEncoding(Constants):
         """
         is_text = ContentEncoding.is_text(encoding)
         return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
+
+    @staticmethod
+    @overload
+    def encode(data, encoding, binary):
+        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        ...
+
+    @staticmethod
+    @overload
+    def encode(data, encoding, binary=False):
+        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        ...
+
+    @staticmethod
+    def encode(data, encoding=BASE64, binary=False):
+        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+        data_type = type(data)
+        out_type = bytes if binary else str
+        enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
+        enc_func = {
+            (str, str, ContentEncoding.UTF_8): lambda _: _,
+            (str, bytes, ContentEncoding.UTF_8): lambda s: s.encode(),
+            (bytes, bytes, ContentEncoding.UTF_8): lambda _: _,
+            (bytes, str, ContentEncoding.UTF_8): lambda s: s.decode(),
+            (str, str, ContentEncoding.BASE16): lambda s: base64.b16encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE16): lambda s: base64.b16encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE16): lambda s: base64.b16encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE16): lambda s: base64.b16encode(s),
+            (str, str, ContentEncoding.BASE32): lambda s: base64.b32encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE32): lambda s: base64.b32encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE32): lambda s: base64.b32encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE32): lambda s: base64.b32encode(s),
+            (str, str, ContentEncoding.BASE64): lambda s: base64.b64encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE64): lambda s: base64.b64encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE64): lambda s: base64.b64encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE64): lambda s: base64.b64encode(s),
+            (str, str, ContentEncoding.BINARY): lambda s: base64.b64encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BINARY): lambda s: base64.b64encode(s.encode()),
+            (bytes, str, ContentEncoding.BINARY): lambda s: base64.b64encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BINARY): lambda s: base64.b64encode(s),
+        }
+        return enc_func[(data_type, out_type, enc_type)](data)
 
 
 class OutputFormat(Constants):

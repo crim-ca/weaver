@@ -143,27 +143,21 @@ class TestWeaverClient(TestWeaverClientBase):
     def test_capabilities(self):
         result = self.process_listing_op(self.client.capabilities)
         assert set(result.body["processes"]) == {
-            # builtin
-            "file2string_array",
-            "file_index_selector",
-            "jsonarray2netcdf",
-            "metalink2netcdf",
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            # builtin
+            *self.get_builtin_process_names(),
         }
 
     def test_processes(self):
         result = self.process_listing_op(self.client.processes)
         assert set(result.body["processes"]) == {
-            # builtin
-            "file2string_array",
-            "file_index_selector",
-            "jsonarray2netcdf",
-            "metalink2netcdf",
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            # builtin
+            *self.get_builtin_process_names(),
         }
 
     def test_processes_with_details(self):
@@ -171,14 +165,11 @@ class TestWeaverClient(TestWeaverClientBase):
         assert all(isinstance(proc, dict) for proc in result.body["processes"])
         expect_ids = [proc["id"] for proc in result.body["processes"]]
         assert set(expect_ids) == {
-            # builtin
-            "file2string_array",
-            "file_index_selector",
-            "jsonarray2netcdf",
-            "metalink2netcdf",
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            # builtin
+            *self.get_builtin_process_names(),
         }
 
     @mocked_remote_server_requests_wps1([

@@ -62,8 +62,37 @@ def test_get_content_type(test_extension, extra_params, expected_content_type):
         (None, None),
     ]
 )
-def test_get_content_encoding(test_encoding, expected_encoding):
+def test_content_encoding_get(test_encoding, expected_encoding):
     assert f.ContentEncoding.get(test_encoding) == expected_encoding
+
+
+@pytest.mark.parametrize(
+    ["data", "encoding", "binary", "result"],
+    [
+        ("123", f.ContentEncoding.UTF_8, False, "123"),
+        ("123", f.ContentEncoding.UTF_8, True, b"123"),
+        (b"123", f.ContentEncoding.UTF_8, False, "123"),
+        (b"123", f.ContentEncoding.UTF_8, True, b"123"),
+        ("123", f.ContentEncoding.BASE16, False, "313233"),
+        ("123", f.ContentEncoding.BASE16, True, b"313233"),
+        (b"123", f.ContentEncoding.BASE16, False, "313233"),
+        (b"123", f.ContentEncoding.BASE16, True, b"313233"),
+        ("123", f.ContentEncoding.BASE32, False, "GEZDG==="),
+        ("123", f.ContentEncoding.BASE32, True, b"GEZDG==="),
+        (b"123", f.ContentEncoding.BASE32, False, "GEZDG==="),
+        (b"123", f.ContentEncoding.BASE32, True, b"GEZDG==="),
+        ("123", f.ContentEncoding.BASE64, False, "MTIz"),
+        ("123", f.ContentEncoding.BASE64, True, b"MTIz"),
+        (b"123", f.ContentEncoding.BASE64, False, "MTIz"),
+        (b"123", f.ContentEncoding.BASE64, True, b"MTIz"),
+        ("123", f.ContentEncoding.BINARY, False, "MTIz"),
+        ("123", f.ContentEncoding.BINARY, True, b"MTIz"),
+        (b"123", f.ContentEncoding.BINARY, False, "MTIz"),
+        (b"123", f.ContentEncoding.BINARY, True, b"MTIz"),
+    ]
+)
+def test_content_encoding_encode(data, encoding, binary, result):
+    assert f.ContentEncoding.encode(data, encoding, binary) == result
 
 
 @pytest.mark.parametrize(

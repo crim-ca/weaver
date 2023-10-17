@@ -12,7 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``weaver.formats.ContentEncoding`` with handlers for common encoding manipulation from input values.
+- Add the |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
+  complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
+  at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings.
+
+.. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
+.. |oap_echo| replace:: ``EchoProcess``
 
 Fixes:
 ------

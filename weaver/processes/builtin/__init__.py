@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 import sys
@@ -40,14 +41,18 @@ if TYPE_CHECKING:
     }, total=True)
 
 LOGGER = logging.getLogger(__name__)
+WEAVER_BUILTIN_DIR = os.path.abspath(os.path.dirname(__file__))
 
 __all__ = [
+    "WEAVER_BUILTIN_DIR",
     "BuiltinProcess",
+    "get_builtin_reference_mapping",
     "register_builtin_processes"
 ]
 
 
-def _get_builtin_reference_mapping(root):
+@functools.cache
+def get_builtin_reference_mapping(root=WEAVER_BUILTIN_DIR):
     # type: (os.PathLike[str]) -> Dict[str, BuiltinResourceMap]
     """
     Generates a mapping of `reference` to actual ``builtin`` package file path.
@@ -129,7 +134,7 @@ def register_builtin_processes(container):
     CWL definitions must be located within the :mod:`weaver.processes.builtin` module.
     """
     restapi_url = get_wps_restapi_base_url(container)
-    builtin_apps_mapping = _get_builtin_reference_mapping(os.path.abspath(os.path.dirname(__file__)))
+    builtin_apps_mapping = get_builtin_reference_mapping(WEAVER_BUILTIN_DIR)
     builtin_processes = []
     for process_id, process_data in builtin_apps_mapping.items():
         process_path = process_data["package"]

@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import json
 import os
 import tempfile
@@ -9,12 +10,13 @@ import pytest
 from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType
+from weaver.formats import ContentEncoding, ContentType, repr_json
 from weaver.processes.builtin import register_builtin_processes
 from weaver.status import Status
+from weaver.wps.utils import map_wps_output_location
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, ExecutionInputs, ExecutionResults
 
 
 @pytest.mark.functional
@@ -35,7 +37,7 @@ class BuiltinAppTest(WpsConfigBase):
     def setUp(self):
         # register builtin processes from scratch to have clean state
         self.process_store.clear_processes()
-        register_builtin_processes(self.settings)
+        register_builtin_processes(self.settings)  # type: ignore  # not using registry since pre-configured by test
 
     def test_jsonarray2netcdf_describe_old_schema(self):
         resp = self.app.get("/processes/jsonarray2netcdf?schema=OLD", headers=self.json_headers)
@@ -86,21 +88,21 @@ class BuiltinAppTest(WpsConfigBase):
         assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
-    def setup_inputs(self, stack):
-        dirname = tempfile.gettempdir()
+    def setup_jsonarray2netcdf_inputs(self, stack):
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
         nc_data = "Hello NetCDF!"
-        tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")     # pylint: disable=R1732
-        tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")   # pylint: disable=R1732
+        tmp_ncdf = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".nc")     # pylint: disable=R1732
+        tmp_json = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json")   # pylint: disable=R1732
         tmp_ncdf = stack.enter_context(tmp_ncdf)  # noqa
         tmp_json = stack.enter_context(tmp_json)  # noqa
         tmp_ncdf.write(nc_data)
         tmp_ncdf.seek(0)
-        tmp_json.write(json.dumps([f"file://{os.path.join(dirname, tmp_ncdf.name)}"]))
+        tmp_json.write(json.dumps([f"file://{os.path.join(tmp_dir, tmp_ncdf.name)}"]))
         tmp_json.seek(0)
-        body = {"inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}]}
+        body = {"inputs": [{"id": "input", "href": os.path.join(tmp_dir, tmp_json.name)}]}
         return body, nc_data
 
-    def validate_results(self, results, outputs, data, links):
+    def validate_jsonarray2netcdf_results(self, results, outputs, data, links):
         # first validate format of OGC-API results
         if results is not None:
             assert isinstance(results, dict)
@@ -149,7 +151,7 @@ class BuiltinAppTest(WpsConfigBase):
 
     def test_jsonarray2netcdf_execute_async(self):
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec)
+            body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
@@ -161,23 +163,24 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, f"Error: {resp.json}"
+        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
         assert resp.content_type in ContentType.APP_JSON
         # following details not available yet in async, but are in sync
         assert "created" not in resp.json
         assert "finished" not in resp.json
         assert "duration" not in resp.json
         assert "progress" not in resp.json
+        assert "outputs" not in resp.json
 
         job_url = resp.json["location"]
         results = self.monitor_job(job_url)
 
         output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
+        assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_results(results, outputs, nc_data, None)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None)
 
     def test_jsonarray2netcdf_execute_async_output_by_reference_dontcare_response_document(self):
         """
@@ -189,9 +192,9 @@ class BuiltinAppTest(WpsConfigBase):
             https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
         """
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec)
+            body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
-                "response": ExecuteResponse.DOCUMENT,  # by value/reference don't care because of this
+                "response": ExecuteResponse.DOCUMENT,  # by value/reference doesn't matter because of this
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
             })
             for mock_exec in mocked_execute_celery():
@@ -201,7 +204,7 @@ class BuiltinAppTest(WpsConfigBase):
                                        data=body, headers=self.json_headers, only_local=True)
 
         assert resp.content_type in ContentType.APP_JSON
-        assert resp.status_code == 201, f"Error: {resp.json}"
+        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
@@ -219,7 +222,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
-        self.validate_results(results, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, result_links)
 
     def test_jsonarray2netcdf_execute_async_output_by_value_response_raw(self):
         """
@@ -229,7 +232,7 @@ class BuiltinAppTest(WpsConfigBase):
             https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
         """
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec)
+            body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 # NOTE: quantity of outputs important as well
@@ -243,7 +246,7 @@ class BuiltinAppTest(WpsConfigBase):
                                        data=body, headers=self.json_headers, only_local=True)
 
         assert resp.content_type in ContentType.APP_JSON
-        assert resp.status_code == 201, f"Error: {resp.json}"
+        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
@@ -263,7 +266,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
-        self.validate_results(None, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links)
 
     def test_jsonarray2netcdf_execute_async_output_by_reference_response_raw(self):
         """
@@ -275,7 +278,7 @@ class BuiltinAppTest(WpsConfigBase):
             https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
         """
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec)
+            body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],  # Link header
@@ -287,7 +290,7 @@ class BuiltinAppTest(WpsConfigBase):
                                        data=body, headers=self.json_headers, only_local=True)
 
         assert resp.content_type in ContentType.APP_JSON
-        assert resp.status_code == 201, f"Error: {resp.json}"
+        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
         job_url = resp.json["location"]
         self.monitor_job(job_url, return_status=True)  # don't fetch results automatically
 
@@ -301,10 +304,10 @@ class BuiltinAppTest(WpsConfigBase):
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint
         resp = self.app.get(f"{job_url}/outputs", headers=self.json_headers)
-        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
+        assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_results(None, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links)
 
     def test_jsonarray2netcdf_execute_sync(self):
         """
@@ -314,7 +317,7 @@ class BuiltinAppTest(WpsConfigBase):
             https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
         """
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec)
+            body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
                 "response": ExecuteResponse.DOCUMENT,
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
@@ -358,7 +361,214 @@ class BuiltinAppTest(WpsConfigBase):
 
         output_url = f"{job_url}/outputs"
         resp = self.app.get(output_url, headers=self.json_headers)
-        assert resp.status_code == 200, f"Error job outputs:\n{resp.json}"
+        assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_results(results, outputs, nc_data, None)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None)
+
+    def test_echo_process_describe(self):
+        resp = self.app.get("/processes/EchoProcess", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.APP_JSON
+        body = resp.json
+        assert list(body["inputs"]) == [
+            "stringInput",
+            "measureInput",
+            "dateInput",
+            "doubleInput",
+            "arrayInput",
+            "complexObjectInput",
+            "geometryInput",
+            "boundingBoxInput",
+            "imagesInput",
+            "featureCollectionInput",
+        ]
+        assert list(body["outputs"]) == [
+            "stringOutput",
+            "measureOutput",
+            "dateOutput",
+            "doubleOutput",
+            "arrayOutput",
+            "complexObjectOutput",
+            "geometryOutput",
+            "boundingBoxOutput",
+            "imagesOutput",
+            "featureCollectionOutput",
+        ]
+
+    def setup_echo_process_inputs(self, stack):
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_feature_collection_geojson = stack.enter_context(
+            tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)
+        )
+        json.dump(
+            {
+                "$schema": "https://geojson.org/schema/FeatureCollection.json",
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "test"},
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [1.2, 3.4, 5.6],  # 3D point
+                        }
+                    }
+                ],
+            },
+            tmp_feature_collection_geojson,
+        )
+        tmp_feature_collection_geojson.flush()
+        tmp_feature_collection_geojson.seek(0)
+        inputs = {
+            "stringInput": "test-string",
+            "measureInput": {"measurement": 9.81, "uom": "m/s²"},
+            "dateInput": datetime.datetime.utcnow().isoformat(),
+            "doubleInput": 3.1416,
+            "arrayInput": [1, 2, 3],
+            "complexObjectInput": {
+                "property1": "abc",
+                "property2": "https://example.com",
+                "property3": 1.234,
+                # "property4": "<date-time>",  # omitted on purpose, not required by schema
+                "property5": True,
+            },
+            "geometryInput": [
+                {"type": "Point", "coordinates": [1, 2]},
+                {"type": "Polygon", "coordinates": [
+                    [[1, 2], [3, 4], [5, 6], [7, 8], [9, 1], [1, 2]]
+                ]},
+            ],
+            "boundingBoxInput": {
+                "bbox": [1, 2, 3, 4, 5, 6],
+                "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            },
+            "imagesInput": [
+                {
+                    "value": ContentEncoding.encode("random-tiff", ContentEncoding.BASE64),
+                    "format": {"mediaType": ContentType.IMAGE_GEOTIFF, "encoding": ContentEncoding.BASE64},
+                },
+            ],
+            "featureCollectionInput": {
+                "href": tmp_feature_collection_geojson.name,
+                "format": {
+                    "mediaType": ContentType.APP_GEOJSON,
+                    "schema": "https://geojson.org/schema/FeatureCollection.json",
+                }
+            }
+        }
+        body = {"inputs": inputs}
+        return body
+
+    def validate_echo_process_results(self, results, inputs):
+        # type: (ExecutionResults, ExecutionInputs) -> None
+        """
+        Validate that the outputs from the example ``EchoProcess``.
+
+        Expect that the results are directly provided, as per OGC-formatted results schema.
+        Since this process simply echos the inputs to corresponding outputs, inputs are used to test expected results.
+        """
+        assert list(results) == [
+            "stringOutput",
+            "measureOutput",
+            "dateOutput",
+            "doubleOutput",
+            "arrayOutput",
+            "complexObjectOutput",
+            "geometryOutput",
+            "boundingBoxOutput",
+            "imagesOutput",
+            "featureCollectionOutput",
+        ]
+
+        # all literals should be directly equal
+        for out_id in [
+            "stringOutput",
+            "measureOutput",
+            "dateOutput",
+            "doubleOutput",
+            "arrayOutput",
+        ]:
+            assert results[out_id] == inputs[out_id]
+
+        # for complex outputs, contents should be the same, but stage-out URL is expected
+        for out_id in [
+            "complexObjectOutput",
+            "geometryOutput",
+            "boundingBoxOutput",
+            "imagesOutput",
+            "featureCollectionOutput",
+        ]:
+            in_path = inputs[out_id].pop("href")  # inputs use local paths (mocked by test for "remote" locations)
+            out_url = results[out_id].pop("href")  # compare the rest after
+            out_path = map_wps_output_location(out_url, self.settings, url=False)
+            # use binary comparison since some contents are binary and others not
+            with open(out_path, mode="rb") as out_file:
+                out_data = out_file.read()
+            with open(in_path, mode="rb") as in_file:
+                in_data = in_file.read()
+            assert out_data == in_data
+            assert results[out_id] == inputs[out_id], "Remaining complex metadata should match input definition"
+
+    def test_echo_process_execute_sync(self):
+        """
+        Job submitted in ``sync`` mode with multiple input/output types.
+
+        .. seealso::
+            https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+        """
+        with contextlib.ExitStack() as stack_exec:
+            body = self.setup_echo_process_inputs(stack_exec)
+            body.update({
+                "response": ExecuteResponse.DOCUMENT,
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+            })
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            headers = {"Prefer": "wait=10"}
+            headers.update(self.json_headers)
+            path = "/processes/EchoProcess/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=body, headers=headers, only_local=True)
+
+        assert resp.status_code == 200, f"Error: {resp.text}"
+        assert resp.content_type in ContentType.APP_JSON
+
+        # since sync, results are directly available instead of job status
+        # even if results are returned directly (instead of status),
+        # status location link is available for reference as needed
+        assert "Location" in resp.headers
+        # validate sync was indeed applied (in normal situation, not considering mock test that runs in sync)
+        assert resp.headers["Preference-Applied"] == headers["Prefer"]
+        # following details should not be available since results are returned in sync instead of async job status
+        for field in ["status", "created", "finished", "duration", "progress"]:
+            assert field not in resp.json
+        results = resp.json
+        self.validate_echo_process_results(results, body["inputs"])
+
+    def test_echo_process_execute_async(self):
+        with contextlib.ExitStack() as stack_exec:
+            body = self.setup_echo_process_inputs(stack_exec)
+            body.update({
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
+            })
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            path = "/processes/EchoProcess/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=body, headers=self.json_headers, only_local=True)
+
+        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
+        assert resp.content_type in ContentType.APP_JSON
+        # following details not available yet in async, but are in sync
+        assert "created" not in resp.json
+        assert "finished" not in resp.json
+        assert "duration" not in resp.json
+        assert "progress" not in resp.json
+        assert "outputs" not in resp.json
+
+        job_url = resp.json["location"]
+        results = self.monitor_job(job_url)
+        self.validate_echo_process_results(results, body["inputs"])

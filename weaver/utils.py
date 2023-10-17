@@ -1326,7 +1326,7 @@ def raise_on_xml_exception(xml_node):
 
 
 def str2bytes(string):
-    # type: (Union[str, bytes]) -> bytes
+    # type: (AnyStr) -> bytes
     """
     Obtains the bytes representation of the string.
     """
@@ -1338,7 +1338,7 @@ def str2bytes(string):
 
 
 def bytes2str(string):
-    # type: (Union[str, bytes]) -> str
+    # type: (AnyStr) -> str
     """
     Obtains the unicode representation of the string.
     """

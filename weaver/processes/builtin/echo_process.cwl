@@ -6,7 +6,7 @@ label: Echo Process
 doc: This process accepts and number of input and simple echoes each input as an output.
 baseCommand: echo
 inputs:
-  string_input:
+  stringInput:
     label: String Literal Input Example
     doc: This is an example of a STRING literal input.
     type:
@@ -15,30 +15,34 @@ inputs:
         - Value1
         - Value2
         - Value3
-  date_input:
+  measureInput:
+    type: double
+  dateInput:
     type: string
-  measure_input:
+  doubleInput:
     type: double
-  double_input:
-    type: double
-  array_input:
+  arrayInput:
     type:
       type: array
       items: int
-  complex_object_input:
+  complexObjectInput:
     type: File
-  geometry_input:
+  geometryInput:
     type:
       type: array
       items: File
-  images_input:
+    format: "iana:application/geo+json"
+  boundingBoxInput:
+    type: File
+  imagesInput:
     type:
-      type: array
-      items: File
-  feature_collection_input:
+      - File
+      - type: array
+        items: File
+  featureCollectionInput:
     type: File
 outputs:
-  string_output:
+  stringOutput:
     type:
       type: enum
       symbols:
@@ -47,41 +51,45 @@ outputs:
         - Value3
     outputBinding:
       outputEval: $(inputs.string_input)
-  date_output:
-    type: string
-    outputBinding:
-      outputEval: $(inputs.date_input)
-  measure_output:
+  measureOutput:
     type: float
     outputBinding:
       outputEval: $(inputs.measure_input)
-  double_output:
+  dateOutput:
+    type: string
+    outputBinding:
+      outputEval: $(inputs.date_input)
+  doubleOutput:
     type: double
     outputBinding:
       outputEval: $(inputs.double_input)
-  array_output:
+  arrayOutput:
     type:
       type: array
       items: int
     outputBinding:
       outputEval: $(inputs.array_input)
-  complex_object_output:
+  complexObjectOutput:
     type: File
     outputBinding:
       outputEval: $(inputs.complex_object_input)
-  geometry_output:
+  geometryOutput:
     type:
       type: array
       items: File
     outputBinding:
       outputEval: $(inputs.geometry_input)
-  images_output:
+  boundingBoxOutput:
+    type: File
+  imagesOutput:
     type:
       type: array
       items: File
     outputBinding:
       outputEval: $(inputs.images_input)
-  feature_collection_output:
+  featureCollectionOutput:
     type: File
     outputBinding:
       outputEval: $(inputs.feature_collection_input)
+$namespaces:
+  iana: "https://www.iana.org/assignments/media-types/"

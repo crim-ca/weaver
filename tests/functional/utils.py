@@ -28,6 +28,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
+from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
@@ -35,7 +36,7 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Tuple, Union
+    from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
     from typing_extensions import Literal
 
     from pyramid.config import Configurator
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
         AnyResponseType,
         AnyUUID,
         CWL,
+        ExecutionResults,
         JSON,
         ProcessDeployment,
         ProcessDescription,
@@ -257,6 +259,16 @@ class ResourcesUtil(object):
         except (IOError, ValueError):
             pass
 
+    @staticmethod
+    def get_builtin_process_names():
+        # type: () -> List[str]
+        info = get_builtin_reference_mapping()
+        proc_names = [
+            data["payload"].get("id") or proc
+            for proc, data in info.items()
+        ]
+        return proc_names
+
 
 class JobUtils(object):
     job_store = None
@@ -436,7 +448,7 @@ class WpsConfigBase(unittest.TestCase):
                     return_status=False,                # type: bool
                     wait_for_status=None,               # type: Optional[str]
                     expect_failed=False,                # type: bool
-                    ):                                  # type: (...) -> Dict[str, JSON]
+                    ):                                  # type: (...) -> ExecutionResults
         """
         Job polling of status URL until completion or timeout.
 
