@@ -2323,6 +2323,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
 
+        .. fixme::
+            In some circonstances when running the complete test suite, this test fails sporadically when asserting
+            the expected output listing size and paths. Re-running this test by itself validates if this case happened.
+
         .. versionadded:: 4.27
         """
         proc = "DirectoryListingProcess"

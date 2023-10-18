@@ -27,7 +27,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Type, Union
+    from typing import Any, Callable, Dict, Optional, Type, Union
 
     from cwltool.builder import Builder
     from cwltool.context import RuntimeContext
@@ -72,12 +72,13 @@ def get_builtin_reference_mapping(root=WEAVER_BUILTIN_DIR):
     return refs
 
 
-def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
-    # type: (str, os.PathLike[str], str, bool) -> Union[str, None]
+def _get_builtin_metadata(process_id, process_path, meta_field, extra_info=None, extra_param=None, *, clean=False):
+    # type: (str, os.PathLike[str], str, Optional[Dict[str, Any]], Optional[str], Any, bool) -> Union[str, None]
     """
     Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
     """
     py_file = f"{os.path.splitext(process_path)[0]}.py"
+    meta = None
     if os.path.isfile(py_file):
         try:
             mod = import_module(f"{__name__}.{process_id}")
@@ -86,6 +87,10 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
                 return clean_json_text_body(meta) if clean else meta
         except ImportError:
             pass
+    if isinstance(extra_info, dict) and isinstance(extra_param, str):
+        meta = extra_info.get(extra_param)
+    if meta and isinstance(meta, str):
+        return clean_json_text_body(meta) if clean else meta
     return None
 
 
@@ -142,9 +147,11 @@ def register_builtin_processes(container):
         process_info = get_process_definition(process_desc, package=None, reference=process_path, builtin=True)
         process_url = "/".join([restapi_url, "processes", process_id])
         process_package = _get_builtin_package(process_id, process_info["package"])
-        process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)
-        process_version = _get_builtin_metadata(process_id, process_path, "__version__")
-        process_title = _get_builtin_metadata(process_id, process_path, "__title__")
+        process_abstract = _get_builtin_metadata(
+            process_id, process_path, "__doc__", process_info, "description", clean=True
+        )
+        process_version = _get_builtin_metadata(process_id, process_path, "__version__", process_info, "version")
+        process_title = _get_builtin_metadata(process_id, process_path, "__title__", process_info, "title")
         process_id_resolved = process_info["identifier"]
         process_payload = {
             "processDescription": {

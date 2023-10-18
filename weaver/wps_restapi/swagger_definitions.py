@@ -3610,7 +3610,7 @@ class ExecuteInputArrayValues(ExtendedSequenceSchema):
 
 
 # combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
-class ExecuteInputData(OneOfKeywordSchema):
+class ExecuteInputData(OneOfKeywordSchema, StrictMappingSchema):
     description = "Execute data definition of the input."
     _one_of = [
         ExecuteInputInlineOrRefData,
@@ -3628,7 +3628,9 @@ class ExecuteInputData(OneOfKeywordSchema):
 #         items:
 #           $ref: "inlineOrRefData.yaml"
 #
-class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
+# depend on 'StrictMappingSchema' such that any unmapped "additionalProperties"
+# caused by the nested schema to fail validation is refused in the final mapping
+class ExecuteInputMapAdditionalProperties(StrictMappingSchema):
     input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
                                 description="Received mapping input value definition during job submission.")
 

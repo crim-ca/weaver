@@ -917,6 +917,27 @@ def test_dropable_variable_mapping():
     evaluate_test_cases(test_schemas)
 
 
+def test_invalid_multi_child_variable():
+    class VarMap(ce.ExtendedMappingSchema):
+        var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
+        var_2 = ce.ExtendedSchemaNode(colander.String(), variable="<var-2>")
+
+    with pytest.raises(colander.Invalid, match=".*ambiguous.*"):
+        VarMap().deserialize({"random": "abc"})
+
+
+def test_variable_not_additional_properties():
+    class VarMap(ce.StrictMappingSchema):
+        var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
+
+    err = (
+        ".*Unknown properties or missing variable child-schema in mapping"
+        ".*Could not find any matching variable schema in mapping for property \\'other\\'.*"
+    ).replace(" ", r"[\s\"']+")  # must add some extra handling because of colander formatting by max-width
+    with pytest.raises(colander.Invalid, match=err):
+        VarMap().deserialize({"random": "abc", "other": 1})
+
+
 def test_media_type_pattern():
     test_schema = sd.MediaType
     test_cases = [

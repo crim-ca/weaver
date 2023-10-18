@@ -13,16 +13,24 @@ Changes
 Changes:
 --------
 - Add ``weaver.formats.ContentEncoding`` with handlers for common encoding manipulation from input values.
-- Add the |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
+- Add |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
   complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
-  at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings.
+  at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings
+  (fixes `#379 <https://github.com/crim-ca/weaver/issues/379>`_).
 
 .. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
 .. |oap_echo| replace:: ``EchoProcess``
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.wps_restapi.swagger_definitions.ExecuteInputValues`` deserialization that sometimes silently dropped
+  invalid `JSON`-formatted inputs that did not fulfill schema validation. This was caused by a side effect regarding
+  how ``weaver.wps_restapi.colander_extras.VariableSchemaNode`` handled "unknown" `JSON` ``properties`` from submitted
+  content. In cases where *required* `Process` inputs were causing the invalid schema, `Job` execution would be aborted
+  and the error would be reported due to "missing" inputs. However, if the `JSON` failing schema validation happened to
+  be nested under an *optional* input definition, the `Job` execution could have resumed silently by omitting this
+  input's value propagation to the downstream `CWL`, `WPS` or `OGC API - Processes` implementation, which could make
+  it use an alternative default value than the real input that was submitted for the `Job`.
 
 .. _changes_4.34.0:
 

@@ -14,9 +14,10 @@ from weaver.formats import ContentEncoding, ContentType, repr_json
 from weaver.processes.builtin import register_builtin_processes
 from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, ExecutionInputs, ExecutionResults
+    from weaver.typedefs import ExecutionInputs, ExecutionResults, JSON
 
 
 @pytest.mark.functional
@@ -89,7 +90,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
     def setup_jsonarray2netcdf_inputs(self, stack):
-        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
         nc_data = "Hello NetCDF!"
         tmp_ncdf = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".nc")     # pylint: disable=R1732
         tmp_json = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json")   # pylint: disable=R1732
@@ -397,9 +398,9 @@ class BuiltinAppTest(WpsConfigBase):
         ]
 
     def setup_echo_process_inputs(self, stack):
-        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
         tmp_feature_collection_geojson = stack.enter_context(
-            tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)
+            tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732
         )
         json.dump(
             {
@@ -460,6 +461,32 @@ class BuiltinAppTest(WpsConfigBase):
         body = {"inputs": inputs}
         return body
 
+    def test_echo_process_execute_inputs_valid_schema(self):
+        """
+        Validate that submitted inputs are properly defined and that schema interprets them correctly for validation.
+
+        .. note::
+            This validation serves 2 purposes.
+
+            1. It ensures that expected :term:`OGC` example ``EchoProcess`` formats are supported.
+            2. It ensures that :class:`weaver.wps_restapi.swagger_definitions.ExecuteInputValues` deserialization
+               behaves correctly. In older versions, some invalid :term:`JSON`-formatted inputs not fulfilling any
+               schema validation were silently dropped. Execution could still be aborted due to missing inputs, but
+               if the inputs failing schema validation happened to be optional, those could not be propagated correctly.
+
+        .. versionadded:: 4.35
+        """
+        with contextlib.ExitStack() as stack:
+            body = self.setup_echo_process_inputs(stack)
+            payload = sd.Execute().deserialize(body)
+        expect_defaults = {
+            "mode": ExecuteMode.AUTO,
+            "response": ExecuteResponse.DOCUMENT,
+            "outputs": {},
+        }
+        body.update(expect_defaults)
+        assert payload == body
+
     def validate_echo_process_results(self, results, inputs):
         # type: (ExecutionResults, ExecutionInputs) -> None
         """
@@ -516,6 +543,8 @@ class BuiltinAppTest(WpsConfigBase):
 
         .. seealso::
             https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+
+        .. versionadded:: 4.35
         """
         with contextlib.ExitStack() as stack_exec:
             body = self.setup_echo_process_inputs(stack_exec)
@@ -547,6 +576,11 @@ class BuiltinAppTest(WpsConfigBase):
         self.validate_echo_process_results(results, body["inputs"])
 
     def test_echo_process_execute_async(self):
+        """
+        Validate the example and builtin ``EchoProcess`` in ``async`` execution mode.
+
+        .. versionadded:: 4.35
+        """
         with contextlib.ExitStack() as stack_exec:
             body = self.setup_echo_process_inputs(stack_exec)
             body.update({
