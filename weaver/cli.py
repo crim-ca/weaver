@@ -1027,11 +1027,11 @@ class WeaverClient(object):
 
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
-                c_enc = get_field(fmt, "encoding", search_variations=True) or None
                 if not ctype:
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
+                c_enc = get_field(fmt, "encoding", search_variations=True) or None
                 res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
@@ -1040,7 +1040,10 @@ class WeaverClient(object):
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
-                input_vault_href = {"href": vault_href, "format": {"mediaType": ctype, "encoding": c_enc}}
+                input_vault_href = {
+                    "href": vault_href,
+                    "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
+                }
                 if input_array:
                     update_inputs[input_id][input_index] = input_vault_href
                 else:

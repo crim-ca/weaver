@@ -22,7 +22,8 @@ inputs:
         uom:
           type: string
         reference:
-          type: anyUri
+          type: string
+          format: uri
   dateInput:
     title: Date Literal Input Example
     description: This is an example of a DATE literal input.
@@ -57,6 +58,9 @@ inputs:
     description: This is an example of a complex object input.
     schema:
       type: object
+      required:
+      - property1
+      - property5
       properties:
         property1:
           type: string
@@ -68,9 +72,6 @@ inputs:
           type: dateTime
         property5:
           type: boolean
-      required:
-      - property1
-      - property5
   geometryInput:
     title: Geometry input
     description: |
@@ -159,7 +160,8 @@ outputs:
         uom:
           type: string
         reference:
-          type: anyURI
+          type: string
+          format: uri
   dateOutput:
     schema:
       type: dateTime
