@@ -164,6 +164,73 @@ def test_any_of_one_of_variable_error_nested_chain():
     ]), json.dumps(invalid_keys, indent=2)
 
 
+def test_variable_error_nested_messages():
+    """
+    Validate that appropriate error messages for each combination of variable property schemas are reported.
+    """
+    class VarItem(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+        val = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    class VarMap(ce.VariableMappingSchema):
+        var = VarItem(variable="{var}")
+
+    class NestedMap(ce.ExtendedMappingSchema):
+        obj = VarMap()
+
+    error_key_var = "VarItem<{var}>"
+    error_key_num = "VarItem<{var}>.num"
+    error_key_val = "VarItem<{var}>.val"
+    error_obj_key_var = "obj"
+    error_obj_key_num = "obj.VarItem<{var}>.num"
+    error_obj_key_val = "obj.VarItem<{var}>.val"
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": 123})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_var]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_var]
+    assert "\"123\" is not a mapping type" in error_info[error_key_var]
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": {"val": 123}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_num, error_key_val]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_num]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_val]
+    assert "Missing value for required field without any default" in error_info[error_key_num]
+    assert "123 is not a string" in error_info[error_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": {"num": 123}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_val], "Numeric field is valid, should not be in dict"
+    assert "Requirement not met under variable: {var}" in error_info[error_key_val]
+    assert "Missing value for required field without any default" in error_info[error_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_var]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_var]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {"random": {}}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_num, error_obj_key_val]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_num]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_val]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_num]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {"random": {"num": 123}}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_val], "Numeric field is valid, should not be in dict"
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_val]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_val]
+
+
 def test_oneof_variable_dict_or_list():
     """
     Test the common representation of item listing (with ID) and corresponding ID to content mapping representations.
