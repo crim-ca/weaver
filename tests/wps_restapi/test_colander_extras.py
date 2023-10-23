@@ -4,6 +4,7 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
+import json
 import inspect
 from typing import TYPE_CHECKING
 
@@ -108,6 +109,59 @@ def test_any_of_under_variable():
     assert isinstance(result, dict)
     assert key in result
     assert result[key] == {"type": "float"}
+
+
+def test_any_of_one_of_variable_error_nested_chain():
+    """
+    Validate that a nested chain of oneOf, anyOf and variable schema nodes produce the expected reference details
+    when the schema validation fails for the input data.
+    """
+    # pre-validate that schema is still valid for this test (expected structure)
+    test_schema = sd.ExecuteInputValues(name="test_input")
+    one_of_item = "ExecuteInputMapValues"
+    any_of_item = "ExecuteInputMapAdditionalProperties"
+    var_item_key = "{input-id}"
+    var_item_obj = "ExecuteInputData"
+    nested_item = "ExecuteInputInlineOrRefData"
+    nested_sub_item = "ExecuteInputInlineValue"
+    assert test_schema._one_of
+    assert ce._get_node_name(test_schema._one_of[-1]) == one_of_item
+    assert test_schema._one_of[-1]._any_of
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0]) == any_of_item
+    assert test_schema._one_of[-1]._any_of[0].children
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0].children[0]) == f"{var_item_obj}<{var_item_key}>"
+    assert test_schema._one_of[-1]._any_of[0].children[0].variable
+    assert test_schema._one_of[-1]._any_of[0].children[0].title == var_item_obj
+    assert test_schema._one_of[-1]._any_of[0].children[0]._one_of
+    assert test_schema._one_of[-1]._any_of[0].children[0]._one_of[0]._one_of
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0].children[0]._one_of[0]._one_of[0]) == nested_sub_item
+
+    # generate error from invalid schema
+    with pytest.raises(colander.Invalid) as error:
+        test_schema.deserialize({"some-key": [{"type": "invalid"}]})
+
+    # validate that provided information does not duplicate key references
+    invalid_info = error.value.asdict()
+    invalid_keys = list(invalid_info)
+    invalid_test = [
+        f"{one_of_item}.{one_of_item}",
+        f"{any_of_item}.{any_of_item}",
+        f"{var_item_obj}.{var_item_obj}",
+    ]
+    valid_expect_keys = [
+        f"{test_schema.name}.{one_of_item}.{any_of_item}.{var_item_obj}<{var_item_key}>.{nested_item}.{nested_sub_item}"
+    ]
+    test_cases = [
+        (test not in err_key, err_key, test)  # status: expected keys?
+        for test in invalid_test
+        for err_key in invalid_keys
+    ]
+    test_bad_keys = list(filter(lambda _: not _[0], test_cases))
+    assert all(test[0] for test in test_cases), json.dumps(test_bad_keys, indent=2)
+    assert all([
+        any(valid_key in partial_key for partial_key in invalid_keys)
+        for valid_key in valid_expect_keys
+    ]), json.dumps(invalid_keys, indent=2)
 
 
 def test_oneof_variable_dict_or_list():

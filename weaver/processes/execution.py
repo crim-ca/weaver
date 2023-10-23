@@ -610,7 +610,16 @@ def submit_job_handler(payload,             # type: ProcessExecution
     try:
         json_body = sd.Execute().deserialize(payload)
     except colander.Invalid as ex:
-        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
+        raise HTTPBadRequest(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidSchema",
+                "title": "Execute",
+                "detail": "Execution body failed schema validation.",
+                "status": HTTPBadRequest.status_code,
+                "error": ex.msg,
+                "value": ex.asdict(),
+            })
+        )
 
     db = get_db(settings)
 

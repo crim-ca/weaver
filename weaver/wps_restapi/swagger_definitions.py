@@ -3546,6 +3546,7 @@ class ExecuteInputReference(Reference):
 
 
 class ExecuteInputFile(AnyOfKeywordSchema):
+    title = "ExecuteInputFile"
     _any_of = [                   # 'href' required for both to provide file link/reference
         ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
         ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
@@ -3585,6 +3586,7 @@ class ExecuteInputObjectData(OneOfKeywordSchema):
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
 class ExecuteInputQualifiedValue(Format):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    title = "ExecuteInputQualifiedValue"
     value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
 
 
@@ -3613,8 +3615,8 @@ class ExecuteInputArrayValues(ExtendedSequenceSchema):
 class ExecuteInputData(OneOfKeywordSchema, StrictMappingSchema):
     description = "Execute data definition of the input."
     _one_of = [
-        ExecuteInputInlineOrRefData,
-        ExecuteInputArrayValues,
+        ExecuteInputInlineOrRefData(),
+        ExecuteInputArrayValues(),
     ]
 
 
@@ -3631,7 +3633,7 @@ class ExecuteInputData(OneOfKeywordSchema, StrictMappingSchema):
 # depend on 'StrictMappingSchema' such that any unmapped "additionalProperties"
 # caused by the nested schema to fail validation is refused in the final mapping
 class ExecuteInputMapAdditionalProperties(StrictMappingSchema):
-    input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
+    input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputData",
                                 description="Received mapping input value definition during job submission.")
 
 

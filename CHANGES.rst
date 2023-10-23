@@ -31,6 +31,15 @@ Fixes:
   be nested under an *optional* input definition, the `Job` execution could have resumed silently by omitting this
   input's value propagation to the downstream `CWL`, `WPS` or `OGC API - Processes` implementation, which could make
   it use an alternative default value than the real input that was submitted for the `Job`.
+- Fix schema name representation employed in generated ``colander.Invalid`` error when a schema validation failed, in
+  order to better represent deeply nested schema using multiple ``oneOf``, ``anyOf``, ``allOf`` schema nodes.
+  Using ``colander.Invalid.asdict``, each dictionary key now properly indicates the specific path of sub-nodes with
+  their relevant schema validation error.
+- Fix ``variable`` schema node names to provide a ``{SchemaName}<{VariableName}>`` representation, such that it can be
+  more easily identified. Schema nodes with a ``variable`` (i.e.: schema under ``additionalProperties``) previously only
+  indicated ``{VariableName}``, which made it complicated to follow reference schema classes that formed the error path.
+  Each of the evaluated fields against each possible ``variable`` schema will now report their corresponding nested
+  schema validation error as ``{SchemaName}<{VariableName}>({field})`` such that results can be understood.
 
 .. _changes_4.34.0:
 
