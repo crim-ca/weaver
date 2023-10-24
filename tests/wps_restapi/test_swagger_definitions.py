@@ -3,6 +3,7 @@ import uuid
 import colander
 import pytest
 
+from weaver.formats import ContentType
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -53,3 +54,118 @@ def test_process_id_with_version_tag_get_valid():
             sd.ProcessIdentifierTag().deserialize(test_id)
     for test_id in test_id_version_valid:
         assert sd.ProcessIdentifierTag().deserialize(test_id) == test_id
+
+
+@pytest.mark.parametrize(
+    ["test_data", "expect_result"],
+    [
+        (
+            {"input": "abc"},
+            {"input": "abc"},
+        ),
+        (
+            {"input": 123},
+            {"input": 123},
+        ),
+        (
+            {"input": {"custom": 123}},
+            colander.Invalid,  # not nested under 'value'
+        ),
+        (
+            {"input": ["abc"]},
+            {"input": ["abc"]},
+        ),
+        (
+            {"input": [123]},
+            {"input": [123]},
+        ),
+        (
+            {"input": [{"custom": 123}]},
+            colander.Invalid,  # not nested under 'value'
+        ),
+        (
+            {"input": {"value": "abc"}},
+            {"input": {"value": "abc", "mediaType": ContentType.TEXT_PLAIN}},
+        ),
+        (
+            {"input": {"value": 123}},
+            {"input": {"value": 123, "mediaType": ContentType.TEXT_PLAIN}},
+        ),
+        (
+            {"input": {"value": "abc"}},
+            {"input": {"value": "abc", "mediaType": ContentType.TEXT_PLAIN}},
+        ),
+        (
+            {"input": {"value": {"custom": 123}}},
+            {"input": {"value": {"custom": 123}, "mediaType": ContentType.APP_JSON}},
+        ),
+        (
+            # array of custom schema
+            {"input": [{"custom": 123}]},
+            colander.Invalid,  # each item must be nested by 'qualifiedValue'
+        ),
+        (
+            # array of custom schema
+            {"input": [{"value": {"custom": 123}}]},
+            {"input": [{"value": {"custom": 123}, "mediaType": ContentType.APP_JSON}]},
+        ),
+        (
+            # custom schema, which happens to be an array of objects
+            {"input": {"value": [{"custom": 123}]}},
+            colander.Invalid,
+        ),
+        # special object allowed directly
+        (
+            {"input": {"bbox": [1, 2, 3, 4]}},
+            {"input": {
+                "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                "bbox": [1, 2, 3, 4],
+                "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            }},
+        ),
+        (
+            {"input": [{"bbox": [1, 2, 3, 4]}, {"bbox": [5, 6, 7, 8, 9, 0]}]},
+            {
+                "input": [
+                    {
+                        "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                        "bbox": [1, 2, 3, 4],
+                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    },
+                    {
+                        "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                        "bbox": [5, 6, 7, 8, 9, 0],
+                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                    }
+                ]
+            },
+        ),
+        # special known object, but still not allowed directly
+        (
+            {"input": {"measurement": 1, "uom": "m"}},
+            colander.Invalid,
+        ),
+        (
+            {"input": {"value": {"measurement": 1, "uom": "m"}}},
+            {"input": {"value": {"measurement": 1, "uom": "m"}, "mediaType": ContentType.APP_JSON}},
+        ),
+        (
+            {"input": [{"value": {"measurement": 1, "uom": "m"}}]},
+            {"input": [{"value": {"measurement": 1, "uom": "m"}, "mediaType": ContentType.APP_JSON}]},
+        ),
+    ]
+)
+def test_execute_input_inline_object_invalid(test_data, expect_result):
+    """
+    Ensure that generic data objects provided inline are disallowed, but known objects are permitted.
+
+    This validates that schema definitions are not ambiguous. In such case, overly generic objects that can be
+    validated against multiple schemas (e.g.: ``oneOf``) will raise :class:`colander.Invalid` with relevant details.
+    """
+    schema = sd.ExecuteInputValues()
+    if expect_result is colander.Invalid:
+        with pytest.raises(colander.Invalid):
+            schema.deserialize(test_data)
+    else:
+        result = schema.deserialize(test_data)
+        assert result == expect_result

@@ -3560,34 +3560,110 @@ class ExecuteInputFile(AnyOfKeywordSchema):
 #
 # Excludes objects to avoid conflict with later object mapping and {"value": <data>} definitions.
 # Excludes array literals that will be defined separately with allowed array of any item within this schema.
-# FIXME: does not support byte/binary type (string + format:byte) - see also: 'AnyLiteralType'
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
-# FIXME: does not support bbox
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/bbox.yaml
-class ExecuteInputInlineValue(AnyLiteralType):
-    title = "ExecuteInputInlineValue"
-    description = "Execute input value provided inline."
+# Note: Also supports 'binaryInputValue', since 'type: string' regardless of 'format' is valid.
+class ExecuteInputInlineLiteral(AnyLiteralType):
+    title = "ExecuteInputInlineLiteral"
+    description = "Execute input literal value provided inline."
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml
-#
-#   oneOf:
-#     - $ref: "inputValueNoObject.yaml"
-#     - type: object
-class ExecuteInputObjectData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValue.yaml"
-    description = "Data value of any schema "
+class BoundingBox2D(ExtendedSequenceSchema):
+    description = "Bounding Box using 2D points."
+    item = Number()
+    validator = Length(min=4, max=4)
+
+
+class BoundingBox3D(ExtendedSequenceSchema):
+    description = "Bounding Box using 3D points."
+    item = Number()
+    validator = Length(min=6, max=6)
+
+
+class BoundingBoxValue(OneOfKeywordSchema):
     _one_of = [
-        ExecuteInputInlineValue(),
-        PermissiveMappingSchema(description="Data provided as any object schema."),
+        BoundingBox2D,
+        BoundingBox3D,
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
-class ExecuteInputQualifiedValue(Format):
+class ExecuteInputInlineBoundingBox(StrictMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+    description = "Execute bounding box value provided inline."
+    bbox = BoundingBoxValue(
+        description="Point values of the bounding box."
+    )
+    crs = URL(
+        default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        description="Coordinate Reference System of the Bounding Box points.",
+    )
+
+
+class ExecuteInputInlineValue(OneOfKeywordSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValueNoObject.yaml"
+    _one_of = [
+        ExecuteInputInlineLiteral(),
+        ExecuteInputInlineBoundingBox(),
+    ]
+
+
+class ExecuteInputMeasurement(StrictMappingSchema):
+    description = "Execute measurement value with a unit of measure."
+    measurement = Number()
+    uom = ExtendedSchemaNode(
+        String(allow_empty=True),
+        title="UoM",
+        description="Unit of Measure for the specified value.",
+    )
+    reference = ExecuteReferenceURL(
+        missing=drop,
+        description="Reference URL to schema definition of the named entity.",
+    )
+
+
+class ExecuteInputObjectData(NotKeywordSchema, PermissiveMappingSchema):
+    summary = "Data provided as any object schema."
+    description = (
+        "Data provided as any object schema. "
+        "This content can represent any JSON definition. "
+        "It is recommended to provide either a 'mediaType' or a JSON 'schema' along with this value, "
+        "although this is not strictly required."
+    )
+    _not = [
+        ExecuteInputInlineBoundingBox(),
+        ExecuteInputMeasurement(),
+    ]
+
+
+# extended 'object' part form:
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml
+class ExecuteInputAnyObjectValue(OneOfKeywordSchema):
+    summary = "Data provided as any object schema."
+    _one_of = [
+        # NOTE: any explicit object variation added here must be applied to 'not' of the generic object schema
+        ExecuteInputMeasurement(),
+        ExecuteInputObjectData(),
+    ]
+
+
+class ExecuteInputQualifiedLiteralValue(Format):  # default 'mediaType: text/plain'
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    value = ExecuteInputInlineValue()
+
+
+class ExecuteInputQualifiedAnyObjectValue(Format):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    value = ExecuteInputAnyObjectValue()    # can be anything, including literal value, array of them, nested object
+    mediaType = MediaType(default=ContentType.APP_JSON, example=ContentType.APP_JSON)  # override default for object
+
+
+class ExecuteInputQualifiedValue(OneOfKeywordSchema):
     title = "ExecuteInputQualifiedValue"
-    value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
+    # not exactly the same schema, but equivalent, with alternate 'mediaType' defaults for literal vs object
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValue.yaml"
+    _schema_include_deserialize = False
+    _one_of = [
+        ExecuteInputQualifiedLiteralValue(),
+        ExecuteInputQualifiedAnyObjectValue(),
+    ]
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
@@ -3600,9 +3676,9 @@ class ExecuteInputQualifiedValue(Format):
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
-        ExecuteInputInlineValue(),     # <inline-literal>
-        ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
-        ExecuteInputFile(),            # 'href' with either 'type' (OGC) or 'format' (OLD)
+        ExecuteInputInlineValue(),          # <inline-value> (literal, bbox, measurement)
+        ExecuteInputQualifiedValue(),       # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
+        ExecuteInputFile(),                 # 'href' with either 'type' (OGC) or 'format' (OLD)
         # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
     ]
 

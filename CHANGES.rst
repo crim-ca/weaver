@@ -17,6 +17,10 @@ Changes:
   complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
   at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings
   (fixes `#379 <https://github.com/crim-ca/weaver/issues/379>`_).
+- Add support of `OGC` `BoundingBox` definition (``bbox`` and ``crs`` fields) as `Process` execution input value
+  with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
+- Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
+  input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
 
 .. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
 .. |oap_echo| replace:: ``EchoProcess``

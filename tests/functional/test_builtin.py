@@ -423,23 +423,39 @@ class BuiltinAppTest(WpsConfigBase):
         tmp_feature_collection_geojson.seek(0)
         inputs = {
             "stringInput": "test-string",
-            "measureInput": {"measurement": 9.81, "uom": "m/s²"},
             "dateInput": datetime.datetime.utcnow().isoformat(),
             "doubleInput": 3.1416,
             "arrayInput": [1, 2, 3],
+            # all following objects MUST be under 'value' to form a 'qualifiedInputValue' (or nested objects for list)
+            # generic 'object' directly provided inline is forbidden (ie: 'inputValueNoObject')
+            # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/inlineOrRefData.yaml
             "complexObjectInput": {
-                "property1": "abc",
-                "property2": "https://example.com",
-                "property3": 1.234,
-                # "property4": "<date-time>",  # omitted on purpose, not required by schema
-                "property5": True,
+                "value": {
+                    "property1": "abc",
+                    "property2": "https://example.com",
+                    "property3": 1.234,
+                    # "property4": "<date-time>",  # omitted on purpose, not required by schema
+                    "property5": True,
+                }
             },
             "geometryInput": [
-                {"type": "Point", "coordinates": [1, 2]},
-                {"type": "Polygon", "coordinates": [
-                    [[1, 2], [3, 4], [5, 6], [7, 8], [9, 1], [1, 2]]
-                ]},
+                {
+                    "value": {"type": "Point", "coordinates": [1, 2]}
+                },
+                {
+                    "value": {
+                        "type": "Polygon",
+                        "coordinates": [[[1, 2], [3, 4], [5, 6], [7, 8], [9, 1], [1, 2]]]
+                    },
+                    "mediaType": ContentType.APP_GEOJSON,
+                }
             ],
+            # this is also considered a generic 'object' by OGC API that must be provided as 'qualifiedInputValue'
+            # however, we have special handling logic in Weaver since those measurements can be mapped to WPS I/O
+            # which define similar properties for literal values
+            "measureInput": {"value": {"measurement": 9.81, "uom": "m/s²"}},
+            # this is a special type known to OGC
+            # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
             "boundingBoxInput": {
                 "bbox": [1, 2, 3, 4, 5, 6],
                 "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
