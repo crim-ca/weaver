@@ -145,7 +145,6 @@ def register_builtin_processes(container):
         process_path = process_data["package"]
         process_desc = process_data["payload"]
         process_info = get_process_definition(process_desc, package=None, reference=process_path, builtin=True)
-        process_package = _get_builtin_package(process_id, process_info["package"])
         process_abstract = _get_builtin_metadata(
             process_id, process_path, "__doc__", process_info, "description", clean=True
         )
@@ -153,6 +152,7 @@ def register_builtin_processes(container):
         process_title = _get_builtin_metadata(process_id, process_path, "__title__", process_info, "title")
         process_id_resolved = process_info["identifier"]
         process_url = "/".join([restapi_url, "processes", process_id_resolved])
+        process_package = _get_builtin_package(process_id_resolved, process_info["package"])
         process_payload = {
             "processDescription": {
                 "process": {
