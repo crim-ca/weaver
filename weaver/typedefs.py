@@ -382,19 +382,26 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
         "href": str,
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueData = TypedDict("JobValueData", {
-        "data": AnyValueType,
+        "data": Required[AnyValueType],
     }, total=False)
     JobValueValue = TypedDict("JobValueValue", {
-        "value": AnyValueType,
+        # qualified value allow any object (not list directly though)
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
     JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": Required[str],
@@ -402,7 +409,7 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueValueItem = TypedDict("JobValueValueItem", {
         "id": Required[str],
-        "value": Required[AnyValueType],
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
     JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
