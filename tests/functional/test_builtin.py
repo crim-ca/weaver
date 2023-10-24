@@ -463,15 +463,14 @@ class BuiltinAppTest(WpsConfigBase):
             "imagesInput": [
                 {
                     "value": ContentEncoding.encode("random-tiff", ContentEncoding.BASE64),
-                    "format": {"mediaType": ContentType.IMAGE_GEOTIFF, "encoding": ContentEncoding.BASE64},
+                    "mediaType": ContentType.IMAGE_OGC_GEOTIFF,
+                    "encoding": ContentEncoding.BASE64,
                 },
             ],
             "featureCollectionInput": {
                 "href": tmp_feature_collection_geojson.name,
-                "format": {
-                    "mediaType": ContentType.APP_GEOJSON,
-                    "schema": "https://geojson.org/schema/FeatureCollection.json",
-                }
+                "type": ContentType.APP_GEOJSON,
+                "schema": "https://geojson.org/schema/FeatureCollection.json",
             }
         }
         body = {"inputs": inputs}
@@ -496,11 +495,25 @@ class BuiltinAppTest(WpsConfigBase):
             body = self.setup_echo_process_inputs(stack)
             payload = sd.Execute().deserialize(body)
         expect_defaults = {
+            "$schema": sd.Execute._schema,
             "mode": ExecuteMode.AUTO,
             "response": ExecuteResponse.DOCUMENT,
             "outputs": {},
         }
+        expect_input_defaults = {
+            "measureInput": {"mediaType": ContentType.APP_JSON},
+            "boundingBoxInput": {"$schema": sd.ExecuteInputInlineBoundingBox._schema},
+            "geometryInput": [{"mediaType": ContentType.APP_JSON}, {}],
+            "complexObjectInput": {"mediaType": ContentType.APP_JSON},
+        }
         body.update(expect_defaults)
+        for input_key, input_val in body["inputs"].items():
+            if input_key in expect_input_defaults:
+                if isinstance(input_val, list):
+                    for i in range(len(input_val)):
+                        input_val[0].update(expect_input_defaults[input_key][0])
+                else:
+                    input_val.update(expect_input_defaults[input_key])
         assert payload == body
 
     def validate_echo_process_results(self, results, inputs):

@@ -82,7 +82,7 @@ class ContentType(Constants):
     APP_YAML = "application/x-yaml"
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
-    IMAGE_OGC_GEOTIFF = "mage/tiff; application=geotiff"
+    IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"

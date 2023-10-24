@@ -120,10 +120,10 @@ inputs:
       oneOf:
       - type: string
         contentEncoding: base64
-        contentMediaType: application/tiff; application=geotiff
+        contentMediaType: image/tiff; application=geotiff
       - type: string
         contentEncoding: base64
-        contentMediaType: application/jp2
+        contentMediaType: image/jp2
   featureCollectionInput:
     title: Feature Collection Input Example
     description: |
@@ -210,10 +210,10 @@ outputs:
       oneOf:
       - type: string
         contentEncoding: base64
-        contentMediaType: application/tiff; application=geotiff
+        contentMediaType: image/tiff; application=geotiff
       - type: string
         contentEncoding: base64
-        contentMediaType: application/jp2
+        contentMediaType: image/jp2
   featureCollectionOutput:
     schema:
       oneOf:

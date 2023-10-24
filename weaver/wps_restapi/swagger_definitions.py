@@ -3538,6 +3538,9 @@ class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
         description="IANA identifier of content-type located at the link."
     )
     rel = LinkRelationshipType(missing=drop)  # optional opposite to normal 'Link'
+    # schema is not official, but logical (same name as under 'format' of process description for a complex file)
+    # this extra field is not prohibited from OGC Link definition (just make it explicit here)
+    schema = FormatSchema(missing=drop)
 
 
 # same as 'ExecuteInputLink', but using 'OLD' schema with 'format' field
@@ -3588,6 +3591,7 @@ class BoundingBoxValue(OneOfKeywordSchema):
 class ExecuteInputInlineBoundingBox(StrictMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
     description = "Execute bounding box value provided inline."
+    format = "ogc-bbox"
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )

@@ -44,6 +44,10 @@ Fixes:
   indicated ``{VariableName}``, which made it complicated to follow reference schema classes that formed the error path.
   Each of the evaluated fields against each possible ``variable`` schema will now report their corresponding nested
   schema validation error as ``{SchemaName}<{VariableName}>({field})`` such that results can be understood.
+- Fix execution input reference (i.e.: using ``href``) dropping a ``schema`` URL reference if provided explicitly.
+  This parameter now remains within the produced content passed to the `Job`, and forwarded to a remote `Process` if
+  applicable, but no further schema validation is accomplished with the value in ``schema`` for the moment.
+- Fix ``ContentType.IMAGE_OGC_GEOTIFF`` using invalid media-type name (missing ``i`` in ``image``).
 
 .. _changes_4.34.0:
 

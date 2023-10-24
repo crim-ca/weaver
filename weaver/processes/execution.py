@@ -788,7 +788,7 @@ def validate_process_io(process, payload):
                         "code": "InvalidParameterValue",
                         "name": io_name,
                         "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect"
+                            f"Submitted '{io_name}' requested Content-Types that do not respect "
                             "supported formats specified by the process description."
                         ),
                         "value": {

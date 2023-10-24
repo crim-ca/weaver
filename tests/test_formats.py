@@ -12,6 +12,37 @@ from requests.exceptions import ConnectionError
 
 from weaver import formats as f
 
+_ALLOWED_MEDIA_TYPE_CATEGORIES = [
+    "application",
+    "archives",
+    "audio",
+    "data",
+    "documents",
+    "image",
+    "multipart",
+    "text",
+    "video",
+]
+
+
+@pytest.mark.parametrize(
+    "media_type",
+    (
+        {
+            f.get_content_type(_ext)
+            for _ext in f.get_allowed_extensions()
+            if f.get_content_type(_ext) is not None
+        }
+        | {_ctype for _ctype in f.ContentType.values() if isinstance(_ctype, str)}
+        | set(f.IANA_MAPPING)
+        | set(f.EDAM_MAPPING)
+        | set(f.OGC_MAPPING)
+        | set(f.OPENGIS_MAPPING)
+    ) - {f.ContentType.ANY}
+)
+def test_valid_media_type_categories(media_type):
+    assert media_type.split("/")[0] in _ALLOWED_MEDIA_TYPE_CATEGORIES
+
 
 @pytest.mark.parametrize(
     ["test_extension", "extra_params", "expected_content_type"],
