@@ -62,6 +62,7 @@ numpy>=1.22.2; python_version >= "3.8"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.28.1
+pint
 psutil
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
