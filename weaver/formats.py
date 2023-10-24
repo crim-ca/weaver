@@ -160,6 +160,12 @@ class ContentEncoding(Constants):
         ...
 
     @staticmethod
+    @overload
+    def encode(data, encoding, binary):
+        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+        ...
+
+    @staticmethod
     def encode(data, encoding=BASE64, binary=False):
         # type: (AnyStr, ContentEncoding, bool) -> AnyStr
         data_type = type(data)
@@ -188,6 +194,54 @@ class ContentEncoding(Constants):
             (bytes, bytes, ContentEncoding.BINARY): lambda s: base64.b64encode(s),
         }
         return enc_func[(data_type, out_type, enc_type)](data)
+
+    @staticmethod
+    @overload
+    def decode(data, encoding, binary):
+        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        ...
+
+    @staticmethod
+    @overload
+    def decode(data, encoding, binary=False):
+        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        ...
+
+    @staticmethod
+    @overload
+    def decode(data, encoding, binary):
+        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+        ...
+
+    @staticmethod
+    def decode(data, encoding=BASE64, binary=False):
+        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+        data_type = type(data)
+        out_type = bytes if binary else str
+        enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
+        dec_func = {
+            (str, str, ContentEncoding.UTF_8): lambda _: _,
+            (str, bytes, ContentEncoding.UTF_8): lambda s: s.encode(),
+            (bytes, bytes, ContentEncoding.UTF_8): lambda _: _,
+            (bytes, str, ContentEncoding.UTF_8): lambda s: s.decode(),
+            (str, str, ContentEncoding.BASE16): lambda s: base64.b16decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE16): lambda s: base64.b16decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE16): lambda s: base64.b16decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE16): lambda s: base64.b16decode(s),
+            (str, str, ContentEncoding.BASE32): lambda s: base64.b32decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE32): lambda s: base64.b32decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE32): lambda s: base64.b32decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE32): lambda s: base64.b32decode(s),
+            (str, str, ContentEncoding.BASE64): lambda s: base64.b64decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE64): lambda s: base64.b64decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE64): lambda s: base64.b64decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE64): lambda s: base64.b64decode(s),
+            (str, str, ContentEncoding.BINARY): lambda s: base64.b64decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BINARY): lambda s: base64.b64decode(s.encode()),
+            (bytes, str, ContentEncoding.BINARY): lambda s: base64.b64decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BINARY): lambda s: base64.b64decode(s),
+        }
+        return dec_func[(data_type, out_type, enc_type)](data)
 
 
 class OutputFormat(Constants):

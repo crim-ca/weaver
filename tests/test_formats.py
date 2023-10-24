@@ -122,8 +122,10 @@ def test_content_encoding_get(test_encoding, expected_encoding):
         (b"123", f.ContentEncoding.BINARY, True, b"MTIz"),
     ]
 )
-def test_content_encoding_encode(data, encoding, binary, result):
+def test_content_encoding_encode_decode(data, encoding, binary, result):
     assert f.ContentEncoding.encode(data, encoding, binary) == result
+    b_data = isinstance(data, bytes)
+    assert f.ContentEncoding.decode(result, encoding, b_data) == data
 
 
 @pytest.mark.parametrize(

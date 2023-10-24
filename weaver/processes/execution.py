@@ -764,7 +764,7 @@ def validate_process_io(process, payload):
                     get_field(io_fmt, "mime_type", search_variations=True, default="")
                     for io_fmt in io_format
                 }
-                io_accept = [clean_mime_type_format(ctype, strip_parameters=True) for ctype in io_accept if ctype]
+                io_accept = [clean_mime_type_format(ctype) for ctype in io_accept if ctype]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
                     io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)

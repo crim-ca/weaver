@@ -577,10 +577,7 @@ class BuiltinAppTest(WpsConfigBase):
         """
         with contextlib.ExitStack() as stack_exec:
             body = self.setup_echo_process_inputs(stack_exec)
-            body.update({
-                "response": ExecuteResponse.DOCUMENT,
-                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
-            })
+            body.update({"response": ExecuteResponse.DOCUMENT})
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
             headers = {"Prefer": "wait=10"}

@@ -48,6 +48,9 @@ Fixes:
   This parameter now remains within the produced content passed to the `Job`, and forwarded to a remote `Process` if
   applicable, but no further schema validation is accomplished with the value in ``schema`` for the moment.
 - Fix ``ContentType.IMAGE_OGC_GEOTIFF`` using invalid media-type name (missing ``i`` in ``image``).
+- Fix `Job` input validation stripping additional parameters from provided Media-Type, potentially causing mismatching
+  Content-Type validation against the corresponding `Process` description inputs. Types should now match exactly the
+  original `Process` definition, including any additional parameters and sub-types.
 
 .. _changes_4.34.0:
 
