@@ -2151,7 +2151,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
     Convert a single-dimension bounding box :term:`JSON` I/O definition into corresponding :term:`OpenAPI` schema.
 
     .. seealso::
-        https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d5257/core/openapi/schemas/bbox.yaml
+        :data:`sd.OGC_API_BBOX_SCHEMA`
     """
     # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
     # and could mismatch the intended CRS by the user, unless available explicitly
@@ -2159,9 +2159,9 @@ def json2oas_io_bbox(io_info, io_hint=null):
     supported_crs = get_field(io_info, "supported_crs", search_variations=True)
     if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
         crs_schema["enum"] = supported_crs
-    item_schema = {
+    bbox_object_schema = {
         "type": "object",
-        "format": "ogc-bbox",
+        "format": sd.OGC_API_BBOX_FORMAT,
         "required": ["bbox"],
         "properties": {
             "crs": crs_schema,
@@ -2175,15 +2175,29 @@ def json2oas_io_bbox(io_info, io_hint=null):
             },
         }
     }  # type: OpenAPISchemaObject
+
     if isinstance(io_hint, dict):
         if "$ref" in io_hint:
-            item_schema["$id"] = io_hint["$ref"]
+            bbox_object_schema["$id"] = io_hint["$ref"]
         elif "allOf" in io_hint:
             for item in io_hint["allOf"]:
                 if "$ref" in item:
-                    item_schema["$id"] = item["$ref"]
+                    bbox_object_schema["$id"] = item["$ref"]
                     break
-    return item_schema
+
+    # add the alternate representation method
+    bbox_string_schema = {
+        "type": "string",
+        "format": sd.OGC_API_BBOX_FORMAT,
+        "contentSchema": sd.OGC_API_BBOX_SCHEMA,
+    }
+    bbox_schema = {
+        "oneOf": [
+            bbox_object_schema,
+            bbox_string_schema,
+        ]
+    }
+    return bbox_schema
 
 
 def json2oas_io_literal_data_type(io_type):
@@ -2480,7 +2494,7 @@ def oas2json_io_object(io_info, io_href=null):
     """
     io_fmt = get_field(io_info, "format", search_variations=False)
     io_props = get_field(io_info, "properties", search_variations=False) or {}
-    if ("bbox" in io_props and "crs" in io_props) or io_fmt == "ogc-bbox":
+    if ("bbox" in io_props and "crs" in io_props) or io_fmt == sd.OGC_API_BBOX_FORMAT:
         io_json = {"type": WPS_BOUNDINGBOX}
         io_crs = get_field(io_props, "crs", search_variations=False)
         if isinstance(io_crs, dict):
@@ -2671,13 +2685,17 @@ def oas2json_io(io_info):
     # NOTE:
     #   Don't include "{type: string, format: uri}" as complex type.
     #   Leave this as the method to indicate that a process uses a plain URL reference that must not be fetched.
+    #   The appropriate way to define "fetchable" resources is with 'content' prefixed properties below.
     if io_type == "string":
         io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
         io_encode = get_field(io_info, "contentEncoding", search_variations=False)
-        # io_schema = get_field(io_info, "contentSchema", search_variations=False)  # ignore since possible in literal
-        if any(io_field is not null for io_field in [io_ctype, io_encode]):
+        io_schema = get_field(io_info, "contentSchema", search_variations=False)
+        io_format = get_field(io_info, "format", search_variations=False)
+        if any(io_field is not null for io_field in [io_ctype, io_encode]):  # ignore schema since possible in literal
             io_type = WPS_COMPLEX  # set value to avoid null return below, but no parsing after since not OAS type
             io_json = oas2json_io_file(io_info, io_href)
+        if io_schema == sd.OGC_API_BBOX_SCHEMA or io_format == sd.OGC_API_BBOX_FORMAT:
+            return oas2json_io_object(io_info, io_href)
 
     else:
         # known special case of extended OAS object representing a literal (unit of measure)
@@ -2846,11 +2864,36 @@ def json2wps_field(field_info, field_category):
     elif field_category == "keywords" and isinstance(field_info, list):
         return field_info
     elif field_category == "uom" and isinstance(field_info, str):
-        return
+        return field_info
     elif field_category in ["identifier", "title", "abstract"] and isinstance(field_info, str):
         return field_info
     LOGGER.warning("Field of type '%s' not handled as known WPS field.", field_category)
     return None
+
+
+def json2wps_supported_uoms(io_info):
+    # type: (JSON_IO_Type) -> Union[Type[null], List[UOM]]
+    """
+    Obtains instances of supported Unit of Measure (:term:`UoM`) from a :term:`JSON` :term:`I/O` definition.
+    """
+    uoms = get_field(io_info, "uoms", search_variations=True)
+    if not uoms or not isinstance(uoms, list):
+        return null
+    supported_uoms = []
+    for uom in uoms:
+        if isinstance(uom, UOM):
+            supported_uoms.append(uom)
+            continue
+        if not isinstance(uom, dict):
+            return null
+        unit = get_field(uom, "uom", search_variations=True)
+        href = get_any_value(uom, file=True, data=False, default="")
+        # don't check for 'if not unit', but for string type
+        # an explicit empty string is valid, as "unit" of no-unit value
+        if not isinstance(unit, str):
+            return null
+        supported_uoms.append(UOM(unit, href))
+    return supported_uoms
 
 
 def json2wps_allowed_values(io_info):
@@ -2993,6 +3036,12 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         if data_type in WPS_LITERAL_DATA_TYPES and data_type not in LITERAL_DATA_TYPES:
             data_type = any2wps_literal_datatype(data_type, is_value=False, pywps=True)
         io_info["data_type"] = data_type
+        supported_uoms = json2wps_supported_uoms(io_info)
+        if supported_uoms:
+            io_info["uoms"] = supported_uoms
+        else:
+            io_info.pop("uoms", None)
+        io_info.pop("uom", None)  # remove 'default', auto-selected from first 'uoms'
     if io_select == IO_INPUT:
         if ("max_occurs", "unbounded") in io_info.items():
             io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
@@ -3126,7 +3175,8 @@ def wps2json_io(io_wps, forced_fields=False):
                 io_wps_json["formats"][0]["default"] = io_missing
 
     elif io_wps_json["type"] == WPS_BOUNDINGBOX:
-        pass  # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
+        # nothing to be done for 'bbox' as 'crss', both are already plain lists of numbers/strings
+        io_wps_json["dimensions"] = None  # reset in case default (2) was applied, both 2/3 simultaneously for OGC API
 
     else:  # literal
         # retrieve the default definition with original value type (default 'data' is string encoded with it)

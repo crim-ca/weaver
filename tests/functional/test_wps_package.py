@@ -65,6 +65,7 @@ from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import List
@@ -224,9 +225,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "required": ["bbox"],
             # merged:
-            "format": "ogc-bbox",
+            "format": OGC_API_BBOX_FORMAT,
             # added:
-            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+            "$id": sd.OGC_API_BBOX_SCHEMA,
         }
         assert desc["inputs"]["complexObjectInput"]["schema"] == {
             "oneOf": [
@@ -355,9 +356,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "required": ["bbox"],
             # merged:
-            "format": "ogc-bbox",
+            "format": sd.OGC_API_BBOX_FORMAT,
             # added:
-            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+            "$id": sd.OGC_API_BBOX_SCHEMA,
         }
         assert desc["outputs"]["complexObjectOutput"]["schema"] == {
             "oneOf": [

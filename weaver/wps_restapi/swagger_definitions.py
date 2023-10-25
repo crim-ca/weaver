@@ -170,6 +170,12 @@ OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1_BASE}/examples"
 OGC_WPS_1_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/1.0.0"
 OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 
+# Because this type has special handling functionalities to distinguish it from any other usual 'complex' I/O
+# or any generic JSON-object data, define common constants that can be reused across the code.
+# If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
+OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_BBOX_FORMAT = "ogc-bbox"
+
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
 
@@ -3589,9 +3595,9 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class ExecuteInputInlineBoundingBox(StrictMappingSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+    _schema = OGC_API_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
-    format = "ogc-bbox"
+    format = OGC_API_BBOX_FORMAT
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )

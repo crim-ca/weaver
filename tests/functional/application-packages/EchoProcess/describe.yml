@@ -26,7 +26,7 @@ inputs:
       allOf:
         - format: ogc-bbox
         # - $ref: ../../openapi/schemas/bbox.yaml
-        - $ref: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml
+        - $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
     title: Bounding Box Input Example
   complexObjectInput:
     description: This is an example of a complex object input.
@@ -156,7 +156,7 @@ outputs:
       allOf:
         - format: ogc-bbox
           # - $ref: ../../openapi/schemas/bbox.yaml
-        - $ref: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/bbox.yaml
+        - $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
   complexObjectOutput:
     schema:
       properties:

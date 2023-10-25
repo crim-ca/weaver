@@ -1,6 +1,12 @@
 # additional process description details
 # based on: https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/core/examples/json/ProcessDescription.json
-$schema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/process.yaml"
+# NOTE:
+#   Official schema is broken. See:
+#   - https://github.com/opengeospatial/ogcapi-processes/issues/370
+#   - https://github.com/opengeospatial/ogcapi-processes/pull/371
+# $schema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/process.yaml"
+# Alternate schema that works:
+$schema: "https://raw.githubusercontent.com/crim-ca/ogcapi-processes/fix-schema-recursive/openapi/schemas/processes-core/process.yaml"
 $id: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json"
 id: EchoProcess  # name to use for deployment
 version: "1.0.0"
@@ -21,6 +27,14 @@ inputs:
           type: number
         uom:
           type: string
+          # Following 'enum' requirement is not part of the original OGC EchoProcess definition.
+          # However, without this, the resolved input would only be considered as any plain Literal Value.
+          # To validate that Weaver understands and interprets this structure with additional context using UoMs,
+          # we add the applicable units for validation. These references should propagate all the way to the
+          # corresponding 'supported UoM' that can be defined in WPS I/O literalDataDomains.
+          enum:
+            - "m/s²"
+            - "km/min²"
         reference:
           type: string
           format: uri
@@ -50,7 +64,9 @@ inputs:
       In this case, the input array would be interpreted as a single value
       and not as individual inputs.
     schema:
-      type: integer
+      type: array
+      items:
+        type: integer
     minOccurs: 2
     maxOccurs: 10
   complexObjectInput:
@@ -100,7 +116,7 @@ inputs:
       the specification and does not need to be specified in the definition 
       of the input.
     schema:
-      type: object
+      type: string
       format: ogc-bbox
       contentSchema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
   imagesInput:
@@ -159,20 +175,28 @@ outputs:
           type: number
         uom:
           type: string
+          # see corresponding "measureInput" for details
+          enum:
+            - "m/s²"
+            - "km/min²"
         reference:
           type: string
           format: uri
   dateOutput:
     schema:
-      type: dateTime
+      type: string
+      format: date-time
   doubleOutput:
     schema:
-      type: double
+      type: number
+      format: double
   arrayOutput:
     schema:
+      type: array
+      items:
+        type: integer
       minItems: 2
       maxItems: 10
-      type: integer
   complexObjectOutput:
     schema:
       type: object

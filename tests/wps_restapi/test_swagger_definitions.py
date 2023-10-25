@@ -118,7 +118,7 @@ def test_process_id_with_version_tag_get_valid():
         (
             {"input": {"bbox": [1, 2, 3, 4]}},
             {"input": {
-                "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                "$schema": sd.OGC_API_BBOX_SCHEMA,
                 "bbox": [1, 2, 3, 4],
                 "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
             }},
@@ -128,12 +128,12 @@ def test_process_id_with_version_tag_get_valid():
             {
                 "input": [
                     {
-                        "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                        "$schema": sd.OGC_API_BBOX_SCHEMA,
                         "bbox": [1, 2, 3, 4],
                         "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                     },
                     {
-                        "$schema": f"{sd.OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml",
+                        "$schema": sd.OGC_API_BBOX_SCHEMA,
                         "bbox": [5, 6, 7, 8, 9, 0],
                         "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
                     }
