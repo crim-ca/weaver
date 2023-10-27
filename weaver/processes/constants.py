@@ -16,10 +16,17 @@ WPS_BOUNDINGBOX = "bbox"
 WPS_Literal_Type = Literal["literal"]  # pylint: disable=C0103
 WPS_Reference_Type = Literal["reference"]  # pylint: disable=C0103
 WPS_Complex_Type = Literal["ComplexData"]  # pylint: disable=C0103
-WPS_Category_Type = Union[WPS_Literal_Type, WPS_Reference_Type, WPS_Complex_Type]  # pylint: disable=C0103
+WPS_BoundingBox_Type = Literal["BoundingBoxData"]  # pylint: disable=C0103
+WPS_Category_Type = Union[  # pylint: disable=C0103
+    WPS_Literal_Type,
+    WPS_Reference_Type,
+    WPS_Complex_Type,
+    WPS_BoundingBox_Type,
+]
 WPS_LITERAL = get_args(WPS_Literal_Type)[0]
 WPS_REFERENCE = get_args(WPS_Reference_Type)[0]
 WPS_COMPLEX_DATA = get_args(WPS_Complex_Type)[0]
+WPS_BOUNDINGBOX_DATA = get_args(WPS_BoundingBox_Type)[0]
 WPS_LITERAL_DATA_BOOLEAN = frozenset(["bool", "boolean"])
 WPS_LITERAL_DATA_DATETIME = frozenset(["date", "time", "dateTime"])
 WPS_LITERAL_DATA_FLOAT = frozenset(["scale", "angle", "float", "double"])
