@@ -1226,7 +1226,7 @@ class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
 class DefinitionOAS(AnyOfKeywordSchema):
     _any_of = [
         ObjectOAS(),
-        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
     ]
 
 
@@ -1416,8 +1416,8 @@ class LiteralReference(ExtendedMappingSchema):
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/nameReferenceType.yaml"
-    name = ExtendedSchemaNode(String())
-    reference = ExecuteReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
+    name = ExtendedSchemaNode(String(), description="Name of the entity definition.")
+    reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
 
 class DataTypeSchema(NameReferenceType):
@@ -1429,6 +1429,26 @@ class DataTypeSchema(NameReferenceType):
 
 class UomSchema(NameReferenceType):
     title = "UnitOfMeasure"
+    name = ExtendedSchemaNode(
+        String(),
+        description="Name of the entity definition.",
+        missing=drop,  # override to make optional in contrat to 'NameReferenceType'
+    )
+    uom = ExtendedSchemaNode(
+        String(allow_empty=True),  # unit/dimension-less value
+        description="Unit applicable for the corresponding measurement representation.",
+    )
+
+
+class SupportedUoM(ExtendedSequenceSchema):
+    description = "List of supported units for the represented measurement."
+    uom_item = UomSchema()
+    validator = Length(min=1)
+
+
+class MeasurementDataDomain(ExtendedMappingSchema):
+    supported = SupportedUoM()
+    default = UomSchema(missing=drop)
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1423
@@ -1519,8 +1539,8 @@ class LiteralDataDomain(ExtendedMappingSchema):
                                  description="Indicates if this literal data domain definition is the default one.")
     defaultValue = AnyLiteralType(missing=drop, description="Default value to employ if none was provided.")
     dataType = DataTypeSchema(missing=drop, description="Type name and reference of the literal data representation.")
-    uom = UomSchema(missing=drop, description="Unit of measure applicable for the data.")
     valueDefinition = LiteralDataValueDefinition(description="Literal data domain constraints.")
+    uoms = MeasurementDataDomain(name="UOMs", missing=drop, description="Unit of measure applicable for the data.")
 
 
 class LiteralDataDomainList(ExtendedSequenceSchema):

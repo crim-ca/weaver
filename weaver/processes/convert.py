@@ -2318,6 +2318,12 @@ def json2oas_io_literal(io_info, io_hint=null):
             data_type = data_hint or data_type
             data_fmt = get_field(io_hint, "format", search_variations=False)
             data_fmt = {"format": data_fmt} if data_fmt is not null else {}
+            # if the provided literal data can still be represented by a 'type: object'
+            # then the I/O can contain additional metadata along the value, such as for a measurement
+            # make sure to preserve that data representation variant in the schema to describe it
+            io_type = get_field(io_hint, "type")
+            if io_type == "object":
+                item_variation.append(io_hint)
         if not data_type:
             continue
         data_var = json2oas_io_literal_data_type(data_type)
