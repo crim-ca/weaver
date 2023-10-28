@@ -103,6 +103,44 @@ def test_oneof_io_formats_deserialize_as_listing():
     assert result[2]["type"]["items"] == "string"
 
 
+@pytest.mark.parametrize(
+    ["missing", "value", "result"],
+    [
+        (colander.required, 1.2, 1.2),
+        (colander.required, "ok", "ok"),
+        (colander.required, "", colander.Invalid),
+        (colander.required, None, colander.Invalid),
+        (colander.required, True, colander.Invalid),
+        (colander.required, {}, colander.Invalid),
+        (colander.drop, 1.2, 1.2),
+        (colander.drop, "ok", "ok"),
+        (colander.drop, "", colander.drop),
+        (colander.drop, None, colander.drop),
+        (colander.drop, True, colander.drop),
+        (colander.drop, {}, colander.drop),
+    ]
+)
+def test_any_of_missing(missing, value, result):
+    class AnyOf(ce.AnyOfKeywordSchema):
+        _any_of = [
+            ce.ExtendedSchemaNode(ce.ExtendedString(allow_empty=False), name="string"),
+            ce.ExtendedSchemaNode(ce.ExtendedFloat(), name="number"),
+        ]
+
+    class Nested(ce.ExtendedMappingSchema):
+        data = AnyOf(missing=missing)
+
+    for data, schema, expect in [
+        (value, AnyOf(missing=missing), result),
+        ({"data": value}, Nested(), {} if result is colander.drop else {"data": result}),
+    ]:
+        if result is colander.Invalid:
+            with pytest.raises(colander.Invalid):
+                schema.deserialize(data)
+        else:
+            assert schema.deserialize(data) == expect
+
+
 def test_any_of_under_variable():
     key = "this-variable-key-does-not-matter"
     result = sd.CWLInputMap(name=__name__).deserialize({key: {"type": "float"}})

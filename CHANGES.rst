@@ -51,6 +51,8 @@ Fixes:
 - Fix `Job` input validation stripping additional parameters from provided Media-Type, potentially causing mismatching
   Content-Type validation against the corresponding `Process` description inputs. Types should now match exactly the
   original `Process` definition, including any additional parameters and sub-types.
+- Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
+  using ``missing=colander.drop``.
 
 .. _changes_4.34.0:
 

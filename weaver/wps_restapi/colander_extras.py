@@ -2299,12 +2299,14 @@ class AnyOfKeywordSchema(KeywordMapper):
             merged_any_of = self.default
 
         # nothing succeeded, the whole definition is invalid in this case
-        if merged_any_of is colander.null:
+        if merged_any_of is colander.null and self.missing is colander.required:
             invalid_any_of.msg = (
                 f"Incorrect type must represent any of: {list(option_any_of)}. "
                 f"All missing from input data."
             )
             raise invalid_any_of
+        if merged_any_of is colander.null:
+            return self.missing
         return merged_any_of
 
 
