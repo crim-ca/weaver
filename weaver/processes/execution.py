@@ -16,7 +16,7 @@ from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
+from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -40,6 +40,7 @@ from weaver.utils import (
     get_registry,
     get_settings,
     now,
+    parse_kvp,
     parse_number_with_unit,
     parse_prefer_header_execute_mode,
     raise_on_xml_exception,
@@ -395,6 +396,17 @@ def fetch_wps_process(job, wps_url, headers, settings):
     return wps_process
 
 
+def parse_wps_input_format(input_info, type_field="mime_type", search_variations=True):
+    # type: (JSON, str, bool) -> Tuple[Optional[str], Optional[str]]
+    ctype = get_field(input_info, type_field, search_variations=search_variations, default=None)
+    c_enc = get_field(input_info, "encoding", search_variations=True, default=None)
+    if not c_enc:
+        ctype_params = parse_kvp(ctype)
+        c_enc = ctype_params.get("charset")
+        c_enc = c_enc[0] if c_enc and isinstance(c_enc, list) else None
+    return ctype, c_enc
+
+
 def parse_wps_input_complex(input_value, input_info):
     # type: (Union[str, JSON], JSON) -> ComplexDataInput
     """
@@ -404,20 +416,17 @@ def parse_wps_input_complex(input_value, input_info):
     c_enc = ctype = schema = None
     schema_vars = ["reference", "$schema"]
     if isinstance(input_value, dict):
-        ctype = (
-            get_field(input_value, "type", default=None) or
-            get_field(input_value, "mime_type", search_variations=True, default=None)
-        )
-        c_enc = get_field(input_value, "encoding", search_variations=True, default=None)
+        ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
+        if not ctype:
+            ctype, c_enc = parse_wps_input_format(input_value)
         schema = get_field(input_value, "schema", search_variations=True, default=None, extra_variations=schema_vars)
         input_value = get_any_value(input_value)
+        input_value = repr_json(input_value, indent=None, ensure_ascii=(c_enc in ["ASCII", "ascii"]))
     if not ctype:
-        ctype = get_field(input_info, "mime_type", search_variations=True, default=None)
-        c_enc = get_field(input_info, "encoding", search_variations=True, default=None)
+        ctype, c_enc = parse_wps_input_format(input_info)
         media_format = get_field(input_info, "format", default=None)
-        if isinstance(media_format, dict):
-            ctype = ctype or get_field(input_info, "mime_type", search_variations=True, default=None)
-            c_enc = c_enc or get_field(input_info, "encoding", search_variations=True, default=None)
+        if not ctype and isinstance(media_format, dict):
+            ctype, c_enc = parse_wps_input_format(media_format)
     if isinstance(schema, dict):
         schema = get_field(schema, "$ref", default=None, extra_variations=schema_vars)
     # need to support 'file://' scheme, but PyWPS doesn't like them, so remove the 'file://' part

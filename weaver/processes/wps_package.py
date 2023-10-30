@@ -33,7 +33,7 @@ from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLExceptio
 from cwltool.process import use_custom_schema
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout.basic import SOURCE_TYPE
+from pywps.inout.basic import SOURCE_TYPE, DataHandler, NoneIOHandler
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.outputs import ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
@@ -1902,7 +1902,7 @@ class WpsPackage(Process):
             input_i = input_occurs[0]
             # handle as reference/data
             io_def = get_cwl_io_type(cwl_inputs_info[input_id], cwl_schema_names=cwl_schema_names)
-            if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
+            if isinstance(input_i, (ComplexInput, BoundingBoxInput)) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
                 if io_def.array:
@@ -1912,7 +1912,7 @@ class WpsPackage(Process):
                     input_href = self.make_location_input(io_def.type, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
-            elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
+            elif isinstance(input_i, LiteralInput):
                 # extend array data that allow max_occur > 1
                 if io_def.array:
                     input_data = [i.url if i.as_reference else i.data for i in input_occurs]
@@ -1976,7 +1976,7 @@ class WpsPackage(Process):
         return input_location
 
     def make_location_input(self, input_type, input_definition):
-        # type: (CWL_IO_ComplexType, ComplexInput) -> Optional[JSON]
+        # type: (CWL_IO_ComplexType, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
         """
         Generates the JSON content required to specify a `CWL` ``File`` or ``Directory`` input from a location.
 
@@ -2006,6 +2006,10 @@ class WpsPackage(Process):
         # cannot rely only on 'as_reference' as often it is not provided by the request, although it's an href
         if input_definition.as_reference:
             input_location = input_definition.url
+        # convert the BBOX representation to a compatible File for CWL
+        if isinstance(input_definition._iohandler, NoneIOHandler) and isinstance(input_definition, BoundingBoxInput):
+            input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}
+            input_definition._iohandler = DataHandler(input_value, input_definition._iohandler)
         # FIXME: PyWPS bug
         #   Calling 'file' method fetches it, and it is always called by the package itself
         #   during type validation if the MODE is anything else than disabled (MODE.NONE).
@@ -2026,7 +2030,11 @@ class WpsPackage(Process):
         # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
-            input_location = input_definition.data
+            if input_definition.data is not None:
+                # use 'file' instead of '_iohandler._file' in this case to make sure
+                # the reference containing 'data' is generated if not already done
+                # this file will be needed to pass down to CWL by reference
+                input_location = input_definition.file
         input_scheme = None
         if not input_location:
             url = getattr(input_definition, "url")

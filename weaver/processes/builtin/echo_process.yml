@@ -81,11 +81,13 @@ inputs:
         property1:
           type: string
         property2:
-          type: anyURI
+          type: string
+          format: uri
         property3:
           type: number
         property4:
-          type: dateTime
+          type: string
+          format: date-time
         property5:
           type: boolean
   geometryInput:
@@ -156,6 +158,11 @@ inputs:
       - allOf:
         - format: geojson-feature-collection
         - $ref: https://geojson.org/schema/FeatureCollection.json
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the expected media-type to represent GeoJSON
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/FeatureCollection.json
 outputs:
   stringOutput:
     schema:
@@ -207,11 +214,13 @@ outputs:
         property1:
           type: string
         property2:
-          type: anyURI
+          type: string
+          format: uri
         property3:
           type: number
         property4:
-          type: dateTime
+          type: string
+          format: date-time
         property5:
           type: boolean
   geometryOutput:
@@ -249,3 +258,8 @@ outputs:
       - allOf:
         - format: geojson-feature-collection
         - $ref: https://geojson.org/schema/FeatureCollection.json
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the expected media-type to represent GeoJSON
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/FeatureCollection.json
