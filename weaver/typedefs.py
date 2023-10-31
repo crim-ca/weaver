@@ -278,10 +278,16 @@ if TYPE_CHECKING:
         "size": NotRequired[Literal[0]],
         "listing": List[CWL_RuntimeOutputFile],
     }, total=False)
-    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]
+    CWL_RuntimeInputFileItem = Union[CWL_RuntimeInputFile, List[CWL_RuntimeInputFile]]
+    CWL_RuntimeInputDirectoryItem = Union[CWL_RuntimeInputDirectory, List[CWL_RuntimeInputDirectory]]
+    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
-    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
-    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
+    CWL_RuntimeInputList = List[
+        Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
+    ]
+    CWL_RuntimeOutputFileItem = Union[CWL_RuntimeOutputFile, List[CWL_RuntimeOutputFile]]
+    CWL_RuntimeOutputDirectoryItem = Union[CWL_RuntimeOutputDirectory, List[CWL_RuntimeOutputDirectory]]
+    CWL_RuntimeOutput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeOutputFileItem, CWL_RuntimeOutputDirectoryItem]
     CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # CWL loading

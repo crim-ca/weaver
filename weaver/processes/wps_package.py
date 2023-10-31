@@ -36,7 +36,7 @@ from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
-from pywps.inout.outputs import ComplexOutput
+from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput, LiteralOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
 from pywps.inout.storage.file import FileStorage, FileStorageBuilder
 from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
@@ -1609,7 +1609,7 @@ class WpsPackage(Process):
     def update_status(self, message, progress, status, error=None):
         # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
         """
-        Updates the `PyWPS` real job status from a specified parameters.
+        Updates the :mod:`pywps` real job status from a specified parameters.
         """
         self.percent = progress or self.percent or 0
 
@@ -1916,16 +1916,16 @@ class WpsPackage(Process):
             elif isinstance(input_i, LiteralInput):
                 # extend array data that allow max_occur > 1
                 if io_def.array:
-                    input_data = [self.make_literal_data(input_def) for input_def in input_occurs]
+                    input_data = [self.make_literal_input(input_def) for input_def in input_occurs]
                 else:
-                    input_data = self.make_literal_data(input_i)
+                    input_data = self.make_literal_input(input_i)
                 cwl_inputs[input_id] = input_data
             else:
                 raise PackageTypeError(f"Undefined package input for execution: {type(input_i)}.")
         return cwl_inputs
 
     @staticmethod
-    def make_literal_data(input_definition):
+    def make_literal_input(input_definition):
         # type: (LiteralInput) -> JSON
         """
         Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
@@ -1934,7 +1934,7 @@ class WpsPackage(Process):
             return input_definition.url
         if input_definition.data_type in WPS_LITERAL_DATA_DATETIME:
             return input_definition.json["data"]  # avoid the python datetime object
-        return input_definition.data  # otherwise, we want the conversion posted XML string
+        return input_definition.data  # otherwise, enforce conversion from XML string
 
     @staticmethod
     def make_location_bbox(input_definition):
@@ -1942,7 +1942,7 @@ class WpsPackage(Process):
         """
         Convert a Bounding Box to a compatible :term:`CWL` ``File`` using corresponding IOHandler of a Complex input.
         """
-        input_definition.data_format = Format(ContentType.APP_JSON, schema="ogc-bbox")
+        input_definition.data_format = Format(ContentType.APP_JSON, schema=sd.OGC_API_BBOX_FORMAT)
         input_location = IOHandler._build_file_name(input_definition)
         input_definition._iohandler = FileHandler(input_location, input_definition)
         input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}
@@ -2145,6 +2145,7 @@ class WpsPackage(Process):
         """
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
+                # FIXME: support multiple outputs cardinality (https://github.com/crim-ca/weaver/issues/25)
                 if len(cwl_result[output_id]) > 1:
                     self.logger.warning(
                         "Dropping additional output values (%s total), only 1 supported per identifier.",
@@ -2158,26 +2159,58 @@ class WpsPackage(Process):
                     )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
 
-            if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
-                raise PackageTypeError(
-                    f"Process output '{output_id}' defines CWL type other than 'File'. "
-                    "Application output results must use 'File' type to return file references."
-                )
-            if "location" in cwl_result[output_id]:
-                self.make_location_output(cwl_result, output_id)
-                continue
+            if isinstance(cwl_result[output_id], dict):
+                if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
+                    raise PackageTypeError(
+                        f"Process output '{output_id}' defines CWL type other than 'File'. "
+                        "Application output results must use 'File' type to return file references."
+                    )
+                if "location" in cwl_result[output_id]:
+                    self.make_location_output(cwl_result, output_id)
+                if isinstance(self.response.outputs[output_id], ComplexOutput):
+                    continue
 
-            # data output
-            self.response.outputs[output_id].data = cwl_result[output_id]
+                # unpack CWL File into Bounding Box
+                if isinstance(self.response.outputs[output_id], BoundingBoxOutput):
+                    self.make_bbox_output(cwl_result, output_id)
+                    continue
+
+            data_output = self.make_literal_output(cwl_result[output_id])
+            self.response.outputs[output_id].data = data_output
             self.response.outputs[output_id].as_reference = False
             self.logger.info("Resolved WPS output [%s] as literal data", output_id)
+
+    @staticmethod
+    def make_literal_output(data):
+        # type: (AnyValueType) -> AnyValueType
+        """
+        Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
+        """
+        return repr_json(data, force_string=False)
+
+    def make_bbox_output(self, cwl_result, output_id):
+        # type: (CWL_Results, str) -> None
+        """
+        Generates the :term:`WPS` Bounding Box output from the :term:`CWL` ``File``.
+
+        Assumes that location outputs were resolved beforehand, such that the file is available locally.
+        """
+        bbox_loc = cwl_result[output_id]["location"]
+        if bbox_loc.startswith("file://"):
+            bbox_loc = bbox_loc[7:]
+        with open(bbox_loc, mode="r", encoding="utf-8") as bbox_file:
+            bbox_data = json.load(bbox_file)
+        self.response.outputs[output_id].data = bbox_data["bbox"]
+        self.response.outputs[output_id].crs = bbox_data["crs"]
+        self.response.outputs[output_id].dimensions = len(bbox_data["bbox"]) // 2
+        self.response.outputs[output_id].as_reference = False
 
     def make_location_output(self, cwl_result, output_id):
         # type: (CWL_Results, str) -> None
         """
-        Rewrite the `WPS` output with required location using result path from `CWL` execution.
+        Rewrite the :term:`WPS` output with required location using result path from :term:`CWL` execution.
 
-        Configures the parameters such that `PyWPS` will either auto-resolve the local paths to match with URL
+        Configures the parameters such that :mod:`pywps` will either auto-resolve the local paths to match with URL
         defined by ``weaver.wps_output_url`` or upload it to `S3` bucket from ``weaver.wps_output_s3_bucket`` and
         provide reference directly.
 

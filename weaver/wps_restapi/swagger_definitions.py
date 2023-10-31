@@ -174,7 +174,8 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 # or any generic JSON-object data, define common constants that can be reused across the code.
 # If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
 OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
-OGC_API_BBOX_FORMAT = "ogc-bbox"
+OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
+OGC_API_BBOX_EPSG = "EPSG:4326"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"

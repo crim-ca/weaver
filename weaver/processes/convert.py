@@ -69,6 +69,7 @@ from weaver.processes.constants import (
     PACKAGE_LITERAL_TYPES,
     PACKAGE_NUMERIC_TYPES,
     WPS_BOUNDINGBOX,
+    WPS_BOUNDINGBOX_DATA,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
     WPS_COMPLEX_TYPES,
@@ -449,7 +450,7 @@ def ows2json_io(ows_io):
 def ows2json_output_data(output, process_description, container=None):
     # type: (OWS_Output_Type, ProcessOWS, Optional[AnySettingsContainer]) -> JSON
     """
-    Utility method to convert an :mod:`owslib.wps` process execution output data (result) to `JSON`.
+    Utility method to convert an :mod:`owslib.wps` process execution output data (result) to :term:`JSON`.
 
     In the case that a ``reference`` output of `JSON` content-type is specified and that it refers to a file that
     contains an array list of URL references to simulate a multiple-output, this specific output gets expanded to
@@ -492,26 +493,52 @@ def ows2json_output_data(output, process_description, container=None):
 
     else:
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
-        json_output["data"] = output.data[0] if output.data else None
+        json_output["data"] = output.data[0] if output.data else None  # type: Union[BoundingBox, AnyValueType]
 
     if (json_output["dataType"] == WPS_COMPLEX_DATA or "reference" in json_output) and output.mimeType:
         json_output["mimeType"] = output.mimeType
 
+    if json_output["dataType"] == WPS_BOUNDINGBOX_DATA:
+        bbox_data = json_output["data"]  # type: BoundingBox
+        json_data = ows2json_output_bbox(bbox_data)
+        json_output["data"] = json_data
+
     return json_output
+
+
+def ows2json_output_bbox(bbox):
+    # type: (BoundingBox) -> JSON
+    """
+    Converts an :mod:`owslib` :term:`WPS` Bounding Box data into a :term:`JSON` representation.
+    """
+    # FIXME: owslib does not actually handle 3D+ coordinates...
+    bbox_crs = str(bbox.crs)
+    if bbox.crs.axisorder == "yx":
+        bbox_val = [bbox.miny, bbox.minx, bbox.maxy, bbox.maxx]
+    else:
+        bbox_val = [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
+    bbox_val = [float(val) for val in bbox_val]
+    bbox_data = {"bbox": bbox_val, "crs": bbox_crs}
+    if bbox.crs.id.upper() == sd.OGC_API_BBOX_EPSG:
+        bbox_data.update({
+            "format": sd.OGC_API_BBOX_FORMAT,
+            "schema": sd.OGC_API_BBOX_SCHEMA,
+        })
+    return bbox_data
 
 
 # FIXME: support metalink unwrapping / multi-output array (weaver https://github.com/crim-ca/weaver/issues/25)
 def _get_multi_json_references(output, container):
     # type: (OWS_Output_Type, Optional[AnySettingsContainer]) -> Optional[List[JSON]]
     """
-    Obtains the JSON contents of a single output corresponding to multi-file references.
+    Obtains the :term:`JSON` contents of a single output corresponding to multi-file references.
 
     Since WPS standard does not allow to return multiple values for a single output,
     a lot of process actually return a JSON array containing references to these outputs.
 
-    Because the multi-output references are contained within this JSON file, it is not very convenient to retrieve
-    the list of URLs as one always needs to open and read the file to get them. This function goal is to detect this
-    particular format and expand the references to make them quickly available in the job output response.
+    Because the multi-output references are contained within this :term:`JSON` file, it is not very convenient to
+    retrieve the list of URLs as one always needs to open and read the file to get them. This function goal is to
+    detect this particular format and expand the references to make them quickly available in the job output response.
 
     :return:
         Array of HTTP(S) references if the specified output is effectively a JSON containing that, ``None`` otherwise.
