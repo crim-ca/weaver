@@ -14,6 +14,10 @@ inputs:
   stringInput:
     schema:
       type: string
+      enum:
+        - Value1
+        - Value2
+        - Value3
   measureInput:
     title: Numerical Value with UOM Example
     description: This is an example of a NUMERIC literal with an associated unit of measure.
@@ -105,6 +109,11 @@ inputs:
       - allOf:
         - format: geojson-geometry
         - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the media-type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      - type: string
+        contentMediaType: application/json
+        contentSchema: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
   boundingBoxInput:
     title: Bounding Box Input Example
     description: |
@@ -232,12 +241,21 @@ outputs:
       - allOf:
         - format: geojson-geometry
         - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the media-type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      - type: string
+        contentMediaType: application/json
+        contentSchema: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
   boundingBoxOutput:
     schema:
-      allOf:
-        - format: "ogc-bbox"
-          # use a static reference here instead of the repository reference that can change on commit
-        - $ref: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
+      oneOf:
+        - allOf:
+            - format: "ogc-bbox"
+              # use a static reference here instead of the repository reference that can change on commit
+            - $ref: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
+        - type: string
+          format: ogc-bbox
+          contentSchema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
   imagesOutput:
     schema:
       oneOf:

@@ -81,6 +81,8 @@ outputs:
       outputEval: $(inputs.geometryInput)
   boundingBoxOutput:
     type: File
+    outputBinding:
+      outputEval: $(inputs.boundingBoxInput)
   imagesOutput:
     type:
       type: array

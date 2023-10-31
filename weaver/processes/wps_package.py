@@ -33,7 +33,8 @@ from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLExceptio
 from cwltool.process import use_custom_schema
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout.basic import SOURCE_TYPE, DataHandler, NoneIOHandler
+from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
+from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.outputs import ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
@@ -78,7 +79,8 @@ from weaver.processes.constants import (
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE
+    PACKAGE_FILE_TYPE,
+    WPS_LITERAL_DATA_DATETIME
 )
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
@@ -138,7 +140,6 @@ if TYPE_CHECKING:
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
-    from pywps.inout.formats import Format
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
@@ -1915,13 +1916,41 @@ class WpsPackage(Process):
             elif isinstance(input_i, LiteralInput):
                 # extend array data that allow max_occur > 1
                 if io_def.array:
-                    input_data = [i.url if i.as_reference else i.data for i in input_occurs]
+                    input_data = [self.make_literal_data(input_def) for input_def in input_occurs]
                 else:
-                    input_data = input_i.url if input_i.as_reference else input_i.data
+                    input_data = self.make_literal_data(input_i)
                 cwl_inputs[input_id] = input_data
             else:
                 raise PackageTypeError(f"Undefined package input for execution: {type(input_i)}.")
         return cwl_inputs
+
+    @staticmethod
+    def make_literal_data(input_definition):
+        # type: (LiteralInput) -> JSON
+        """
+        Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
+        """
+        if input_definition.as_reference:
+            return input_definition.url
+        if input_definition.data_type in WPS_LITERAL_DATA_DATETIME:
+            return input_definition.json["data"]  # avoid the python datetime object
+        return input_definition.data  # otherwise, we want the conversion posted XML string
+
+    @staticmethod
+    def make_location_bbox(input_definition):
+        # type: (BoundingBoxInput) -> None
+        """
+        Convert a Bounding Box to a compatible :term:`CWL` ``File`` using corresponding IOHandler of a Complex input.
+        """
+        input_definition.data_format = Format(ContentType.APP_JSON, schema="ogc-bbox")
+        input_location = IOHandler._build_file_name(input_definition)
+        input_definition._iohandler = FileHandler(input_location, input_definition)
+        input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}
+        input_definition.data = input_value
+
+        # make sure the file is generated with its contents
+        with open(input_definition.file, "w") as bbox_file:
+            json.dump(input_value, bbox_file, ensure_ascii=False)
 
     def make_location_input_security_check(self, input_scheme, input_type, input_id, input_location, input_definition):
         # type: (str, CWL_IO_ComplexType, str, str, ComplexInput) -> str
@@ -2006,10 +2035,9 @@ class WpsPackage(Process):
         # cannot rely only on 'as_reference' as often it is not provided by the request, although it's an href
         if input_definition.as_reference:
             input_location = input_definition.url
-        # convert the BBOX representation to a compatible File for CWL
+        # convert the BBOX to a compatible CWL File using corresponding IOHandler setup as ComplexInput
         if isinstance(input_definition._iohandler, NoneIOHandler) and isinstance(input_definition, BoundingBoxInput):
-            input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}
-            input_definition._iohandler = DataHandler(input_value, input_definition._iohandler)
+            self.make_location_bbox(input_definition)
         # FIXME: PyWPS bug
         #   Calling 'file' method fetches it, and it is always called by the package itself
         #   during type validation if the MODE is anything else than disabled (MODE.NONE).

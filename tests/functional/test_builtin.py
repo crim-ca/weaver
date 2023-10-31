@@ -422,7 +422,7 @@ class BuiltinAppTest(WpsConfigBase):
         tmp_feature_collection_geojson.flush()
         tmp_feature_collection_geojson.seek(0)
         inputs = {
-            "stringInput": "test-string",
+            "stringInput": "Value2",
             "dateInput": datetime.datetime.utcnow().isoformat(),
             "doubleInput": 3.1416,
             "arrayInput": [1, 2, 3],
@@ -440,7 +440,8 @@ class BuiltinAppTest(WpsConfigBase):
             },
             "geometryInput": [
                 {
-                    "value": {"type": "Point", "coordinates": [1, 2]}
+                    "value": {"type": "Point", "coordinates": [1, 2]},
+                    "mediaType": ContentType.APP_GEOJSON,
                 },
                 {
                     "value": {
