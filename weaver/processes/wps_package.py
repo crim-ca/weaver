@@ -36,7 +36,7 @@ from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
-from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput, LiteralOutput
+from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
 from pywps.inout.storage.file import FileStorage, FileStorageBuilder
 from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
@@ -55,7 +55,15 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
+from weaver.formats import (
+    ContentType,
+    clean_media_type_format,
+    get_content_type,
+    get_cwl_file_format,
+    get_format,
+    map_cwl_media_type,
+    repr_json
+)
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -79,11 +87,11 @@ from weaver.processes.constants import (
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE,
-    WPS_LITERAL_DATA_DATETIME
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
+    any2json_literal_data,
     cwl2wps_io,
     get_cwl_io_type,
     json2wps_field,
@@ -1932,9 +1940,7 @@ class WpsPackage(Process):
         """
         if input_definition.as_reference:
             return input_definition.url
-        if input_definition.data_type in WPS_LITERAL_DATA_DATETIME:
-            return input_definition.json["data"]  # avoid the python datetime object
-        return input_definition.data  # otherwise, enforce conversion from XML string
+        return any2json_literal_data(input_definition.data, input_definition.data_type)
 
     @staticmethod
     def make_location_bbox(input_definition):
@@ -2221,10 +2227,12 @@ class WpsPackage(Process):
         result_loc = cwl_result[output_id]["location"].replace("file://", "").rstrip("/")
         result_path = os.path.split(result_loc)[-1]
         result_type = cwl_result[output_id].get("class", PACKAGE_FILE_TYPE)
+        result_cwl_fmt = cwl_result[output_id].get("format")
         result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
         if result_is_dir and not result_path.endswith("/"):
             result_path += "/"
             result_loc += "/"
+            result_cwl_fmt = ContentType.APP_DIR
 
         # PyWPS internally sets a new FileStorage (default) inplace when generating the JSON definition of the output.
         # This is done such that the generated XML status document in WPS response can obtain the output URL location.
@@ -2260,14 +2268,67 @@ class WpsPackage(Process):
                 adjust_directory_local(result_loc, self.workdir, OutputMethod.MOVE)
             else:
                 adjust_file_local(result_loc, self.workdir, OutputMethod.MOVE)
+
         # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
-        self.response.outputs[output_id].as_reference = True
-        self.response.outputs[output_id].file = result_wps
+        resp_output = self.response.outputs[output_id]  # type: ComplexOutput
+        resp_output.as_reference = True
+        resp_output.file = result_wps
         # Since each output has its own storage already prefixed by '[Context/]JobID/', avoid JobID nesting another dir.
         # Instead, let it create a dir matching the output ID to get '[Context/]JobID/OutputID/[file(s).ext]'
-        self.response.outputs[output_id].uuid = output_id
+        resp_output.uuid = output_id
+        # guess the produced file media-type to override the default one selected
+        if isinstance(resp_output, ComplexOutput):  # don't process bbox that are 'File' in CWL
+            self.resolve_output_format(resp_output, result_path, result_cwl_fmt)
 
         self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
+
+    @staticmethod
+    def resolve_output_format(output, result_path, result_cwl_format):
+        # type: (ComplexOutput, str, Optional[str]) -> None
+        """
+        Resolves the obtained media-type for an output :term:`CWL` ``File``.
+
+        Considers :term:`CWL` results ``format``, the file path, and the :term:`Process` description to resolve the
+        best possible match, retaining a much as possible the metadata that can be resolved from their corresponding
+        details.
+        """
+        result_ctype = map_cwl_media_type(result_cwl_format)
+        if not result_ctype:
+            # fallback attempt using extension if available
+            result_ext = os.path.splitext(result_path)[-1]
+            if result_ext:
+                result_ctype = get_content_type(result_ext)
+        if not result_ctype:
+            return
+
+        # - When resolving media-types, use the corresponding supported format defined in the process definition
+        #   instead of the generated one from CWL format, because process supported formats can provide more details
+        #   than the CWL format does, such as the encoding and any reference schema.
+        # - If no match is found, leave default format without applying the result CWL format since
+        #   we cannot generate an invalid output with unsupported formats (will raise later anyway).
+        # - Clean the media-types to consider partial match from extra parameters such as charset.
+        #   Gradually attempt mathing from exact type to looser definitions.
+        result_format_base = get_format(result_ctype)
+        result_ctype_clean = clean_media_type_format(
+            result_format_base.mime_type,
+            strip_parameters=True,
+            suffix_subtype=True,
+        )
+        result_formats = [result_format_base]
+        if result_format_base.mime_type != result_ctype_clean:
+            result_formats.append(get_format(result_ctype_clean))
+        for result_format in result_formats:
+            for strip, simplify in [
+                (False, False),
+                (True, False),
+                (False, True),
+                (True, True),
+            ]:
+                for fmt in output.supported_formats:
+                    fmt_type = clean_media_type_format(fmt.mime_type, strip_parameters=strip, suffix_subtype=simplify)
+                    if fmt_type == result_format.mime_type:
+                        output.data_format = fmt
+                        return
 
     def make_location_storage(self, storage_type, location_type):
         # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]

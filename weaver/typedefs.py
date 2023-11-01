@@ -305,8 +305,8 @@ if TYPE_CHECKING:
     # PyWPS Execution
     WPS_InputData = Tuple[str, AnyInputData]
     WPS_OutputAsRef = Tuple[str, Optional[bool]]                            # (output_id, as_ref)
-    WPS_OutputAsRefMimeType = Tuple[str, Optional[bool], Optional[str]]     # (output_id, as_ref, mime_type)
-    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
+    WPS_OutputAsRefMediaType = Tuple[str, Optional[bool], Optional[str]]    # (output_id, as_ref, mime_type)
+    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMediaType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]

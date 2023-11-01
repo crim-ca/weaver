@@ -11,41 +11,54 @@ IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]  # pylint: disable=C
 IO_INPUT = get_args(IO_Select_Input)[0]  # pylint: disable=C0103
 IO_OUTPUT = get_args(IO_Select_Output)[0]  # pylint: disable=C0103
 
-WPS_COMPLEX = "complex"
-WPS_BOUNDINGBOX = "bbox"
 WPS_Literal_Type = Literal["literal"]  # pylint: disable=C0103
 WPS_Reference_Type = Literal["reference"]  # pylint: disable=C0103
-WPS_Complex_Type = Literal["ComplexData"]  # pylint: disable=C0103
-WPS_BoundingBox_Type = Literal["BoundingBoxData"]  # pylint: disable=C0103
+WPS_Complex_Type = Literal["complex"]  # pylint: disable=C0103
+WPS_COMPLEX = get_args(WPS_Complex_Type)[0]
+WPS_ComplexData_Type = Literal["ComplexData"]  # pylint: disable=C0103
+WPS_BoundingBoxData_Type = Literal["BoundingBoxData"]  # pylint: disable=C0103
+WPS_BoundingBox_Type = Literal["bbox"]  # pylint: disable=C0103
+WPS_BOUNDINGBOX = get_args(WPS_BoundingBox_Type)[0]
 WPS_Category_Type = Union[  # pylint: disable=C0103
     WPS_Literal_Type,
     WPS_Reference_Type,
-    WPS_Complex_Type,
-    WPS_BoundingBox_Type,
+    WPS_ComplexData_Type,
+    WPS_BoundingBoxData_Type,
 ]
 WPS_LITERAL = get_args(WPS_Literal_Type)[0]
 WPS_REFERENCE = get_args(WPS_Reference_Type)[0]
-WPS_COMPLEX_DATA = get_args(WPS_Complex_Type)[0]
-WPS_BOUNDINGBOX_DATA = get_args(WPS_BoundingBox_Type)[0]
-WPS_LITERAL_DATA_BOOLEAN = frozenset(["bool", "boolean"])
-WPS_LITERAL_DATA_DATETIME = frozenset(["date", "time", "dateTime"])
-WPS_LITERAL_DATA_FLOAT = frozenset(["scale", "angle", "float", "double"])
-WPS_LITERAL_DATA_INTEGER = frozenset(["int", "integer", "long", "positiveInteger", "nonNegativeInteger"])
-WPS_LITERAL_DATA_STRING = frozenset({"anyURI", "string"} | WPS_LITERAL_DATA_DATETIME)
-WPS_LITERAL_DATA_TYPES = frozenset(
-    WPS_LITERAL_DATA_BOOLEAN |
-    WPS_LITERAL_DATA_DATETIME |
-    WPS_LITERAL_DATA_FLOAT |
-    WPS_LITERAL_DATA_INTEGER |
-    WPS_LITERAL_DATA_STRING
-)
+WPS_COMPLEX_DATA = get_args(WPS_ComplexData_Type)[0]
+WPS_BOUNDINGBOX_DATA = get_args(WPS_BoundingBoxData_Type)[0]
+
+WPS_LiteralDataBoolean_Type = Literal["bool", "boolean"]  # pylint: disable=C0103
+WPS_LITERAL_DATA_BOOLEAN = frozenset(get_args(WPS_LiteralDataBoolean_Type))
+WPS_LiteralDataDateTime_Type = Literal["date", "time", "dateTime"]  # pylint: disable=C0103
+WPS_LITERAL_DATA_DATETIME = frozenset(get_args(WPS_LiteralDataDateTime_Type))
+WPS_LiteralDataFloat_Type = Literal["scale", "angle", "float", "double"]  # pylint: disable=C0103
+WPS_LITERAL_DATA_FLOAT = frozenset(get_args(WPS_LiteralDataFloat_Type))
+WPS_LiteralDataInteger_Type = Literal[  # pylint: disable=C0103
+    "int", "integer", "long", "positiveInteger", "nonNegativeInteger"
+]
+WPS_LITERAL_DATA_INTEGER = frozenset(get_args(WPS_LiteralDataInteger_Type))
+WPS_LiteralDataString_Type = Literal["anyURI", "string"]  # pylint: disable=C0103
+WPS_LITERAL_DATA_STRING = frozenset(get_args(WPS_LiteralDataString_Type))
+WPS_LiteralData_Type = Literal[
+    WPS_LiteralDataBoolean_Type,
+    WPS_LiteralDataDateTime_Type,
+    WPS_LiteralDataFloat_Type,
+    WPS_LiteralDataInteger_Type,
+    WPS_LiteralDataString_Type,
+]
+WPS_LITERAL_DATA_TYPES = frozenset(get_args(WPS_LiteralData_Type))
 
 # WPS 'type' string variations employed to indicate a Complex (file) I/O by different libraries
 # for literal types, see 'any2cwl_literal_datatype' and 'any2wps_literal_datatype' functions
-WPS_COMPLEX_TYPES = frozenset([WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE])
+WPS_ComplexType = Literal[WPS_Complex_Type, WPS_ComplexData_Type, WPS_Reference_Type]  # pylint: disable=C0103
+WPS_COMPLEX_TYPES = frozenset(get_args(WPS_ComplexType))
 
 # WPS 'type' string of all combinations (type of data / library implementation)
-WPS_DATA_TYPES = frozenset({WPS_LITERAL, WPS_BOUNDINGBOX} | WPS_COMPLEX_TYPES)
+WPS_DataType = Literal[WPS_Literal_Type, WPS_BoundingBox_Type, WPS_ComplexType]
+WPS_DATA_TYPES = frozenset(get_args(WPS_DataType))
 
 
 class OpenSearchField(Constants):
@@ -65,23 +78,46 @@ CWL_TOOL_NAMESPACE_ID = "cwltool"
 CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
 CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})
 
+CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
+CWL_RequirementDockerType = Literal["DockerRequirement"]
+CWL_RequirementDockerGpuType = Literal["DockerGpuRequirement"]
+CWL_RequirementESGFCWTType = Literal["ESGF-CWTRequirement"]
+CWL_RequirementOGCAPIType = Literal["OGCAPIRequirement"]
+CWL_RequirementWPS1Type = Literal["WPS1Requirement"]
+CWL_RequirementCUDAType = Literal["cwltool:CUDARequirement"]
+CWL_RequirementEnvVarType = Literal["EnvVarRequirement"]
+CWL_RequirementInitialWorkDirType = Literal["InitialWorkDirRequirement"]
+CWL_RequirementInlineJavascriptType = Literal["InlineJavascriptRequirement"]
+CWL_RequirementInplaceUpdateType = Literal["InplaceUpdateRequirement"]
+CWL_RequirementLoadListingType = Literal["LoadListingRequirement"]
+CWL_RequirementMPIType = Literal["MPIRequirement"]
+CWL_RequirementNetworkAccessType = Literal["NetworkAccess"]
+CWL_RequirementProcessGeneratorType = Literal["ProcessGenerator"]
+CWL_RequirementResourceType = Literal["ResourceRequirement"]
+CWL_RequirementScatterFeatureType = Literal["ScatterFeatureRequirement"]
+CWL_RequirementSecretsType = Literal["Secrets"]
+CWL_RequirementToolTimeLimitType = Literal["ToolTimeLimit"]
+CWL_RequirementWorkReuseType = Literal["WorkReuse"]
+
 # FIXME: convert to 'Constants' class
 # CWL package (requirements/hints) corresponding to `ProcessType.APPLICATION`
-CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
-CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
-CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"  # backward compatibility
-CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
-CWL_REQUIREMENT_APP_OGC_API = "OGCAPIRequirement"
-CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
+CWL_REQUIREMENT_APP_BUILTIN = get_args(CWL_RequirementBuiltinType)[0]
+CWL_REQUIREMENT_APP_DOCKER = get_args(CWL_RequirementDockerType)[0]
+# backward compatibility, instead use ('DockerRequirement' + 'cwltool:CUDARequirement')
+CWL_REQUIREMENT_APP_DOCKER_GPU = get_args(CWL_RequirementDockerGpuType)[0]
+CWL_REQUIREMENT_APP_ESGF_CWT = get_args(CWL_RequirementESGFCWTType)[0]
+CWL_REQUIREMENT_APP_OGC_API = get_args(CWL_RequirementOGCAPIType)[0]
+CWL_REQUIREMENT_APP_WPS1 = get_args(CWL_RequirementWPS1Type)[0]
 
-CWL_REQUIREMENT_APP_TYPES = frozenset([
-    CWL_REQUIREMENT_APP_BUILTIN,
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_APP_DOCKER_GPU,  # backward compatibility, use 'DockerRequirement+cwltool:CUDARequirement' instead
-    CWL_REQUIREMENT_APP_ESGF_CWT,
-    CWL_REQUIREMENT_APP_OGC_API,
-    CWL_REQUIREMENT_APP_WPS1,
-])
+CWL_RequirementAppTypes = Literal[
+    CWL_RequirementBuiltinType,
+    CWL_RequirementDockerType,
+    CWL_RequirementDockerGpuType,
+    CWL_RequirementESGFCWTType,
+    CWL_RequirementOGCAPIType,
+    CWL_RequirementWPS1Type,
+]
+CWL_REQUIREMENT_APP_TYPES = frozenset(get_args(CWL_RequirementAppTypes))
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
 """
@@ -95,7 +131,6 @@ CWL_REQUIREMENT_APP_LOCAL = frozenset([
 Set of :term:`CWL` requirements that correspond to local execution of an :term:`Application Package`.
 """
 
-# FIXME: convert to 'Constants' class
 CWL_REQUIREMENT_APP_REMOTE = frozenset([
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
@@ -120,21 +155,22 @@ Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GP
 
 # FIXME: convert to 'Constants' class
 # NOTE: depending on the 'cwlVersion' of the document, some items are extensions or native to the standard specification
-CWL_REQUIREMENT_CUDA = f"{CWL_TOOL_NAMESPACE_ID}:CUDARequirement"
+CWL_REQUIREMENT_CUDA = get_args(CWL_RequirementCUDAType)[0]
 CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_TOOL_NAMESPACE
-CWL_REQUIREMENT_ENV_VAR = "EnvVarRequirement"
-CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
-CWL_REQUIREMENT_INLINE_JAVASCRIPT = "InlineJavascriptRequirement"
-CWL_REQUIREMENT_INPLACE_UPDATE = "InplaceUpdateRequirement"
-CWL_REQUIREMENT_LOAD_LISTING = "LoadListingRequirement"
-CWL_REQUIREMENT_MPI = "MPIRequirement"  # no implication yet
-CWL_REQUIREMENT_NETWORK_ACCESS = "NetworkAccess"
-CWL_REQUIREMENT_PROCESS_GENERATOR = "ProcessGenerator"
-CWL_REQUIREMENT_RESOURCE = "ResourceRequirement"
-CWL_REQUIREMENT_SCATTER = "ScatterFeatureRequirement"
-CWL_REQUIREMENT_SECRETS = "Secrets"
-CWL_REQUIREMENT_TIME_LIMIT = "ToolTimeLimit"
-CWL_REQUIREMENT_WORK_REUSE = "WorkReuse"  # default is to reuse, employed to explicitly disable
+CWL_REQUIREMENT_ENV_VAR = get_args(CWL_RequirementEnvVarType)[0]
+CWL_REQUIREMENT_INIT_WORKDIR = get_args(CWL_RequirementInitialWorkDirType)[0]
+CWL_REQUIREMENT_INLINE_JAVASCRIPT = get_args(CWL_RequirementInlineJavascriptType)[0]
+CWL_REQUIREMENT_INPLACE_UPDATE = get_args(CWL_RequirementInplaceUpdateType)[0]
+CWL_REQUIREMENT_LOAD_LISTING = get_args(CWL_RequirementLoadListingType)[0]
+CWL_REQUIREMENT_MPI = get_args(CWL_RequirementMPIType)[0]  # no implication yet
+CWL_REQUIREMENT_NETWORK_ACCESS = get_args(CWL_RequirementNetworkAccessType)[0]
+CWL_REQUIREMENT_PROCESS_GENERATOR = get_args(CWL_RequirementProcessGeneratorType)[0]
+CWL_REQUIREMENT_RESOURCE = get_args(CWL_RequirementResourceType)[0]
+CWL_REQUIREMENT_SCATTER = get_args(CWL_RequirementScatterFeatureType)[0]
+CWL_REQUIREMENT_SECRETS = get_args(CWL_RequirementSecretsType)[0]
+CWL_REQUIREMENT_TIME_LIMIT = get_args(CWL_RequirementToolTimeLimitType)[0]
+# default is to reuse, employed to explicitly disable
+CWL_REQUIREMENT_WORK_REUSE = get_args(CWL_RequirementWorkReuseType)[0]
 
 CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_CUDA,
@@ -239,34 +275,34 @@ class JobInputsOutputsSchema(Constants):
 if TYPE_CHECKING:
     # pylint: disable=invalid-name
     CWL_RequirementNames = Literal[
-        CWL_REQUIREMENT_APP_BUILTIN,
-        CWL_REQUIREMENT_APP_DOCKER,
-        CWL_REQUIREMENT_APP_DOCKER_GPU,
-        CWL_REQUIREMENT_APP_ESGF_CWT,
-        CWL_REQUIREMENT_APP_OGC_API,
-        CWL_REQUIREMENT_APP_WPS1,
-        CWL_REQUIREMENT_CUDA,
-        CWL_REQUIREMENT_ENV_VAR,
-        CWL_REQUIREMENT_INIT_WORKDIR,
-        CWL_REQUIREMENT_INLINE_JAVASCRIPT,
-        CWL_REQUIREMENT_INPLACE_UPDATE,
-        CWL_REQUIREMENT_LOAD_LISTING,
-        CWL_REQUIREMENT_MPI,
-        CWL_REQUIREMENT_NETWORK_ACCESS,
-        CWL_REQUIREMENT_RESOURCE,
-        CWL_REQUIREMENT_SCATTER,
-        CWL_REQUIREMENT_SECRETS,
-        CWL_REQUIREMENT_TIME_LIMIT,
-        CWL_REQUIREMENT_WORK_REUSE,
+        CWL_RequirementBuiltinType,
+        CWL_RequirementDockerType,
+        CWL_RequirementDockerGpuType,
+        CWL_RequirementESGFCWTType,
+        CWL_RequirementOGCAPIType,
+        CWL_RequirementWPS1Type,
+        CWL_RequirementCUDAType,
+        CWL_RequirementEnvVarType,
+        CWL_RequirementInitialWorkDirType,
+        CWL_RequirementInlineJavascriptType,
+        CWL_RequirementInplaceUpdateType,
+        CWL_RequirementLoadListingType,
+        CWL_RequirementMPIType,
+        CWL_RequirementNetworkAccessType,
+        CWL_RequirementResourceType,
+        CWL_RequirementScatterFeatureType,
+        CWL_RequirementSecretsType,
+        CWL_RequirementToolTimeLimitType,
+        CWL_RequirementWorkReuseType,
     ]
-    ProcessSchemaType = Literal[ProcessSchema.OGC, ProcessSchema.OLD, ProcessSchema.WPS]
-
-    WPS_ComplexType = Literal[WPS_COMPLEX, WPS_COMPLEX_DATA, WPS_REFERENCE]
-    WPS_DataType = Union[Literal[WPS_LITERAL, WPS_BOUNDINGBOX], WPS_ComplexType]
-
+    ProcessSchemaType = Literal["OGC", "ogc", "OLD", "old", "WPS", "wps"]
     JobInputsOutputsSchemaType = Literal[
-        JobInputsOutputsSchema.OGC_STRICT,
-        JobInputsOutputsSchema.OLD_STRICT,
-        JobInputsOutputsSchema.OGC,
-        JobInputsOutputsSchema.OLD
+        "ogc+strict",
+        "OGC+STRICT",
+        "old+strict",
+        "OLD+STRICT",
+        "ogc",
+        "OGC",
+        "old",
+        "OLD",
     ]

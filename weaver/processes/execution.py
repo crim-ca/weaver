@@ -16,7 +16,7 @@ from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format, repr_json
+from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -232,8 +232,10 @@ def execute_process(task, job_id, wps_url, headers=None):
                         job.status_message = f"Job succeeded{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
-                        job_results = [ows2json_output_data(output, process, settings)
-                                       for output in execution.processOutputs]
+                        job_results = [
+                            ows2json_output_data(output, process, settings)
+                            for output in execution.processOutputs
+                        ]
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
@@ -839,7 +841,7 @@ def validate_process_io(process, payload):
                     get_field(io_fmt, "mime_type", search_variations=True, default="")
                     for io_fmt in io_format
                 }
-                io_accept = [clean_mime_type_format(ctype) for ctype in io_accept if ctype]
+                io_accept = [clean_media_type_format(ctype) for ctype in io_accept if ctype]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
                     io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)

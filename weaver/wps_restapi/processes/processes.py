@@ -21,7 +21,7 @@ from weaver.formats import (
     ContentType,
     OutputFormat,
     add_content_type_charset,
-    clean_mime_type_format,
+    clean_media_type_format,
     guess_target_format,
     repr_json
 )
@@ -373,7 +373,7 @@ def submit_local_job(request):
     Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
-    ctype = clean_mime_type_format(get_header("content-type", request.headers, default=None), strip_parameters=True)
+    ctype = clean_media_type_format(get_header("content-type", request.headers, default=None), strip_parameters=True)
     if ctype in ContentType.ANY_XML:
         # Send the XML request to the WPS endpoint which knows how to parse it properly.
         # Execution will end up in the same 'submit_job_handler' function as other branch for JSON.

@@ -105,15 +105,18 @@ inputs:
       oneOf:
       - type: string
         contentMediaType: application/gml+xml; version=3.2
-        contentSchema: http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
+        contentSchema: https://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
       - allOf:
         - format: geojson-geometry
         - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
-      # following is extended from the original OGC EchoProcess
-      # it corresponds to the media-type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      # following are extended from the original OGC EchoProcess, with two compatible variants of 'GeoJSON'
+      # only distinction is the media-type and type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/GeoJSON.json
       - type: string
         contentMediaType: application/json
-        contentSchema: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+        contentSchema: https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
   boundingBoxInput:
     title: Bounding Box Input Example
     description: |
@@ -244,8 +247,11 @@ outputs:
       # following is extended from the original OGC EchoProcess
       # it corresponds to the media-type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
       - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/GeoJSON.json
+      - type: string
         contentMediaType: application/json
-        contentSchema: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+        contentSchema: https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
   boundingBoxOutput:
     schema:
       oneOf:

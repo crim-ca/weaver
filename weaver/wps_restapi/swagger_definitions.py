@@ -936,7 +936,7 @@ class ResultFormat(FormatDescription):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
     _ext_schema_fields = []  # exclude "$schema" added on each sub-deserialize (too verbose, only for reference)
 
-    mediaType = MediaType(String())
+    mediaType = MediaType(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
 
@@ -3615,7 +3615,7 @@ class BoundingBoxValue(OneOfKeywordSchema):
     ]
 
 
-class ExecuteInputInlineBoundingBox(StrictMappingSchema):
+class BoundingBoxObject(StrictMappingSchema):
     _schema = OGC_API_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
     format = OGC_API_BBOX_FORMAT
@@ -3626,6 +3626,10 @@ class ExecuteInputInlineBoundingBox(StrictMappingSchema):
         default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
         description="Coordinate Reference System of the Bounding Box points.",
     )
+
+
+class ExecuteInputInlineBoundingBox(BoundingBoxObject):
+    _schema_include_deserialize = False
 
 
 class ExecuteInputInlineValue(OneOfKeywordSchema):
@@ -5105,38 +5109,44 @@ class JobOutputs(OneOfKeywordSchema):
 
 
 # implement only literal parts from following schemas:
-# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
-# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/qualifiedInputValue.yaml
-#
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValueNoObject.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
 # Other parts are implemented separately with:
 #   - 'ValueFormatted' (qualifiedInputValue)
+#   - 'ResultBoundingBox' (bbox)
 #   - 'ResultReference' (link)
-class ResultLiteral(AnyLiteralValueType):
-    # value = <AnyLiteralValueType>
-    pass
+class ResultLiteral(AnyLiteralType):
+    ...
 
 
 class ResultLiteralList(ExtendedSequenceSchema):
     result = ResultLiteral()
 
 
-class ValueFormatted(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(
-        String(),
+class ValueFormatted(ResultFormat):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    _schema_include_deserialize = False
+    value = AnyValueOAS(
         example="<xml><data>test</data></xml>",
         description="Formatted content value of the result."
     )
-    format = ResultFormat()
+    format = ResultFormat(missing=drop, schema_include_deserialize=False)  # backward compatibility
 
 
 class ValueFormattedList(ExtendedSequenceSchema):
     result = ValueFormatted()
 
 
+class ResultBoundingBox(BoundingBoxObject):
+    _schema_include_deserialize = False
+
+
 class ResultReference(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/link.yaml"
+    _schema_include_deserialize = False
     href = ReferenceURL(description="Result file reference.")
     type = MediaType(description="IANA Content-Type of the file reference.")
-    format = ResultFormat()
+    format = ResultFormat(missing=drop, schema_include_deserialize=False)  # backward compatibility
 
 
 class ResultReferenceList(ExtendedSequenceSchema):
@@ -5150,6 +5160,7 @@ class ResultData(OneOfKeywordSchema):
         # other classes require only one of the two, and therefore are more permissive during schema validation
         ValueFormatted(description="Result formatted content value."),
         ValueFormattedList(description="Result formatted content of multiple values."),
+        ResultBoundingBox(description="Result bounding box value."),
         ResultReference(description="Result reference location."),
         ResultReferenceList(description="Result locations for multiple references."),
         ResultLiteral(description="Result literal value."),

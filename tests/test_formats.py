@@ -172,6 +172,31 @@ def test_get_format_default_no_extension(test_extension, default_content_type):
     assert fmt.extension == ""
 
 
+@pytest.mark.parametrize(
+    ["cwl_format", "expect_media_type"],
+    [
+        (f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}", f.ContentType.APP_JSON),
+        (f"{f.IANA_NAMESPACE_URL}{f.ContentType.APP_JSON}", f.ContentType.APP_JSON),
+        (f"{f.IANA_NAMESPACE}:{f.ContentType.IMAGE_JPEG}", f.ContentType.IMAGE_JPEG),
+        (f"{f.IANA_NAMESPACE_URL}{f.ContentType.IMAGE_JPEG}", f.ContentType.IMAGE_JPEG),
+        (f"{f.EDAM_NAMESPACE}:{f.ContentType.APP_HDF5}", f.ContentType.APP_HDF5),
+        (f"{f.EDAM_NAMESPACE_URL}{f.ContentType.APP_HDF5}", f.ContentType.APP_HDF5),
+        (f"{f.EDAM_NAMESPACE}:{f.EDAM_MAPPING[f.ContentType.APP_HDF5]}", f.ContentType.APP_HDF5),
+        (f"{f.EDAM_NAMESPACE_URL}{f.EDAM_MAPPING[f.ContentType.APP_HDF5]}", f.ContentType.APP_HDF5),
+        (f"{f.EDAM_NAMESPACE}:does-not-exist", None),
+        (f"{f.EDAM_NAMESPACE_URL}does-not-exist", None),
+        (f"{f.EDAM_NAMESPACE}:format_123456", None),
+        (f"{f.EDAM_NAMESPACE_URL}format_123456", None),
+        ("application/unknown", "application/unknown"),
+        ("custom:application/unknown", "application/unknown"),
+        ("invalid-unknown", None),
+    ]
+)
+def test_map_cwl_media_type(cwl_format, expect_media_type):
+    result_media_type = f.map_cwl_media_type(cwl_format)
+    assert result_media_type == expect_media_type
+
+
 def test_get_cwl_file_format_tuple():
     untested = set(f.FORMAT_NAMESPACES)
     tests = [
@@ -295,44 +320,44 @@ def test_get_cwl_file_format_synonym():
         "Literal MIME-type expected instead of its existing synonym since non-official is allowed (must_exist=False)"
 
 
-def test_clean_mime_type_format_iana():
+def test_clean_media_type_format_iana():
     iana_fmt = f"{f.IANA_NAMESPACE}:{f.ContentType.APP_JSON}"  # "iana:mime_type"
-    res_type = f.clean_mime_type_format(iana_fmt)
+    res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON
     iana_url = list(f.IANA_NAMESPACE_DEFINITION.values())[0]
     iana_fmt = os.path.join(iana_url, f.ContentType.APP_JSON)
-    res_type = f.clean_mime_type_format(iana_fmt)
+    res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON  # application/json
 
 
-def test_clean_mime_type_format_edam():
+def test_clean_media_type_format_edam():
     mime_type, fmt = list(f.EDAM_MAPPING.items())[0]
     edam_fmt = f"{f.EDAM_NAMESPACE}:{fmt}"  # "edam:format_####"
-    res_type = f.clean_mime_type_format(edam_fmt)
+    res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type
     edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
-    res_type = f.clean_mime_type_format(edam_fmt)
+    res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type  # application/x-type
 
 
 @pytest.mark.skipif(condition=not f.OPENGIS_MAPPING, reason="No OpenGIS format mappings defined to test")
-def test_clean_mime_type_format_opengis():
+def test_clean_media_type_format_opengis():
     mime_type, fmt = list(f.OPENGIS_MAPPING.items())[0]
     gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "opengis:####"
-    res_type = f.clean_mime_type_format(gis_fmt)
+    res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type
     gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)
-    res_type = f.clean_mime_type_format(gis_fmt)
+    res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type  # application/x-type
 
 
-def test_clean_mime_type_format_ogc():
+def test_clean_media_type_format_ogc():
     mime_type, fmt = list(f.OGC_MAPPING.items())[0]
     ogc_fmt = f"{f.OGC_NAMESPACE}:{fmt}"  # "ogc:####"
-    res_type = f.clean_mime_type_format(ogc_fmt)
+    res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type
     ogc_fmt = os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt)
-    res_type = f.clean_mime_type_format(ogc_fmt)
+    res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type  # application/x-type
 
 
@@ -346,8 +371,8 @@ def test_clean_mime_type_format_ogc():
         ("application/vnd.api+json", "application/vnd.api+json"),
     ]
 )
-def test_clean_mime_type_format_io_remove_extra_parameters(expected_content_type, test_content_type):
-    res_type = f.clean_mime_type_format(test_content_type, strip_parameters=True)
+def test_clean_media_type_format_io_remove_extra_parameters(expected_content_type, test_content_type):
+    res_type = f.clean_media_type_format(test_content_type, strip_parameters=True)
     assert res_type == expected_content_type
 
 
@@ -362,8 +387,8 @@ def test_clean_mime_type_format_io_remove_extra_parameters(expected_content_type
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]
 )
-def test_clean_mime_type_format_io_strip_base_type(expected_content_type, test_content_type):
-    res_type = f.clean_mime_type_format(test_content_type, suffix_subtype=True)
+def test_clean_media_type_format_io_strip_base_type(expected_content_type, test_content_type):
+    res_type = f.clean_media_type_format(test_content_type, suffix_subtype=True)
     assert res_type == expected_content_type
 
 
@@ -377,8 +402,8 @@ def test_clean_mime_type_format_io_strip_base_type(expected_content_type, test_c
         (f.ContentType.APP_JSON, "application/vnd.api+json"),
     ]
 )
-def test_clean_mime_type_format_io_strip_base_and_remove_parameters(expected_content_type, test_content_type):
-    res_type = f.clean_mime_type_format(test_content_type, suffix_subtype=True, strip_parameters=True)
+def test_clean_media_type_format_io_strip_base_and_remove_parameters(expected_content_type, test_content_type):
+    res_type = f.clean_media_type_format(test_content_type, suffix_subtype=True, strip_parameters=True)
     assert res_type == expected_content_type
 
 
@@ -386,8 +411,8 @@ def test_clean_mime_type_format_io_strip_base_and_remove_parameters(expected_con
     ["suffix_subtype", "strip_parameters"],
     itertools.product([True, False], repeat=2)
 )
-def test_clean_mime_type_format_default(suffix_subtype, strip_parameters):
-    assert f.clean_mime_type_format("", suffix_subtype=suffix_subtype, strip_parameters=strip_parameters) is None
+def test_clean_media_type_format_default(suffix_subtype, strip_parameters):
+    assert f.clean_media_type_format("", suffix_subtype=suffix_subtype, strip_parameters=strip_parameters) is None
 
 
 def test_repr_json_default_string():

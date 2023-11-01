@@ -1,3 +1,5 @@
+import copy
+
 import contextlib
 import datetime
 import json
@@ -397,7 +399,7 @@ class BuiltinAppTest(WpsConfigBase):
             "featureCollectionOutput",
         ]
 
-    def setup_echo_process_inputs(self, stack):
+    def setup_echo_process_execution_body(self, stack):
         tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
         tmp_feature_collection_geojson = stack.enter_context(
             tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732
@@ -448,7 +450,9 @@ class BuiltinAppTest(WpsConfigBase):
                         "type": "Polygon",
                         "coordinates": [[[1, 2], [3, 4], [5, 6], [7, 8], [9, 1], [1, 2]]]
                     },
-                    "mediaType": ContentType.APP_GEOJSON,
+                    # purposely not using 'geo+json' here to test format selection, use the 'OGC' GeoJSON
+                    # (see the process definition, distinct schema references)
+                    "mediaType": ContentType.APP_JSON,
                 }
             ],
             # this is also considered a generic 'object' by OGC API that must be provided as 'qualifiedInputValue'
@@ -458,7 +462,7 @@ class BuiltinAppTest(WpsConfigBase):
             # this is a special type known to OGC
             # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
             "boundingBoxInput": {
-                "bbox": [1, 2, 3, 4, 5, 6],
+                "bbox": [51.9, 7., 52., 7.1],
                 "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
             },
             "imagesInput": [
@@ -474,7 +478,24 @@ class BuiltinAppTest(WpsConfigBase):
                 "schema": "https://geojson.org/schema/FeatureCollection.json",
             }
         }
-        body = {"inputs": inputs}
+        outputs = {
+            "geometryOutput": {
+                "mediaType": ContentType.APP_JSON,
+                "schema": " http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+            },
+            "imagesOutput": {
+                "mediaType": ContentType.IMAGE_OGC_GEOTIFF,
+                "encoding": ContentEncoding.BASE64,
+            },
+            "featureCollectionOutput": {
+                "mediaType": ContentType.APP_GEOJSON,
+                "schema": "https://geojson.org/schema/FeatureCollection.json",
+            }
+        }
+        body = {
+            "inputs": inputs,
+            "outputs": outputs,
+        }
         return body
 
     def test_echo_process_execute_inputs_valid_schema(self):
@@ -493,7 +514,7 @@ class BuiltinAppTest(WpsConfigBase):
         .. versionadded:: 4.35
         """
         with contextlib.ExitStack() as stack:
-            body = self.setup_echo_process_inputs(stack)
+            body = self.setup_echo_process_execution_body(stack)
             payload = sd.Execute().deserialize(body)
         expect_defaults = {
             "$schema": sd.Execute._schema,
@@ -538,34 +559,92 @@ class BuiltinAppTest(WpsConfigBase):
             "featureCollectionOutput",
         ]
 
-        # all literals should be directly equal
+        # generic literals should be directly equal
         for out_id in [
             "stringOutput",
-            "measureOutput",
             "dateOutput",
             "doubleOutput",
-            "arrayOutput",
+            # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
+            # "arrayOutput",
         ]:
-            assert results[out_id] == inputs[out_id]
+            in_id = out_id.replace("Output", "Input")
+            out_val = results[out_id].get("value", results[out_id])
+            assert out_val == inputs[in_id]
+        # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
+        assert results["arrayOutput"]["value"] == inputs["arrayInput"][0]
 
-        # for complex outputs, contents should be the same, but stage-out URL is expected
+        # special literal/bbox object handling
+        for out_id, out_fields_map in [
+            (
+                "measureOutput",
+                [
+                    (["value", "measurement"], ["value"]),
+                ]
+            ),
+            (
+                "boundingBoxOutput",
+                [
+                    (["bbox"], ["value", "bbox"]),
+                    (["crs"], ["value", "crs"]),
+                ]
+            ),
+        ]:
+            in_id = out_id.replace("Output", "Input")
+            for field_map in out_fields_map:
+                in_val_nested = inputs[in_id]
+                out_val_nested = results[out_id]
+                for nested_field in field_map[0]:
+                    in_val_nested = in_val_nested[nested_field]
+                for nested_field in field_map[1]:
+                    out_val_nested = out_val_nested[nested_field]
+                assert out_val_nested == in_val_nested
+
+        # complex outputs, contents should be the same, but stage-out URL is expected
         for out_id in [
             "complexObjectOutput",
             "geometryOutput",
-            "boundingBoxOutput",
             "imagesOutput",
             "featureCollectionOutput",
         ]:
-            in_path = inputs[out_id].pop("href")  # inputs use local paths (mocked by test for "remote" locations)
-            out_url = results[out_id].pop("href")  # compare the rest after
-            out_path = map_wps_output_location(out_url, self.settings, url=False)
-            # use binary comparison since some contents are binary and others not
-            with open(out_path, mode="rb") as out_file:
-                out_data = out_file.read()
-            with open(in_path, mode="rb") as in_file:
-                in_data = in_file.read()
-            assert out_data == in_data
-            assert results[out_id] == inputs[out_id], "Remaining complex metadata should match input definition"
+            in_id = out_id.replace("Output", "Input")
+            in_items = copy.deepcopy(inputs[in_id])
+            out_items = copy.deepcopy(results[out_id])
+            in_items = [in_items] if isinstance(in_items, dict) else in_items
+            out_items = [out_items] if isinstance(out_items, dict) else out_items
+            # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
+            if len(in_items) > 1:
+                assert len(out_items) == 1
+                in_items = in_items[:1]
+            else:
+                assert len(in_items) == len(out_items)
+            for in_def, out_def in zip(in_items, out_items):
+                assert "href" in out_def
+                # inputs use local paths (mocked by test for "remote" locations) or literal JSON
+                in_path = in_def.pop("href", None)
+                out_url = out_def.pop("href")  # compare the rest of the metadata after
+                out_path = map_wps_output_location(out_url, self.settings, url=False)
+                # use binary comparison since some contents are binary and others not
+                with open(out_path, mode="rb") as out_file:
+                    out_data = out_file.read()
+                in_as_data = not in_path
+                if in_as_data:
+                    in_data = json.dumps(in_def.pop("value")).encode()
+                else:
+                    with open(in_path, mode="rb") as in_file:
+                        in_data = in_file.read()
+                assert out_data == in_data
+                # if input was provided directly as JSON, the output can still be provided as reference (return=minimal)
+                if in_as_data:
+                    if in_def != {}:
+                        assert out_def["type"] == in_def["mediaType"], (
+                            "Since explicit format was specified, the same is expected as output"
+                        )
+                    else:
+                        assert out_def["type"] == ContentType.APP_JSON, (
+                            "Since no explicit format was specified, at least needs to be JSON"
+                        )
+                else:
+                    assert out_def == in_def, f"Remaining complex metadata should match '{in_id}' definition"
 
     def test_echo_process_execute_sync(self):
         """
@@ -577,7 +656,7 @@ class BuiltinAppTest(WpsConfigBase):
         .. versionadded:: 4.35
         """
         with contextlib.ExitStack() as stack_exec:
-            body = self.setup_echo_process_inputs(stack_exec)
+            body = self.setup_echo_process_execution_body(stack_exec)
             body.update({"response": ExecuteResponse.DOCUMENT})
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
@@ -609,7 +688,7 @@ class BuiltinAppTest(WpsConfigBase):
         .. versionadded:: 4.35
         """
         with contextlib.ExitStack() as stack_exec:
-            body = self.setup_echo_process_inputs(stack_exec)
+            body = self.setup_echo_process_execution_body(stack_exec)
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,

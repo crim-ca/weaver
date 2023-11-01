@@ -10,6 +10,7 @@ from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
+from dateutil import parser as date_parser
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, overload
 from urllib.parse import unquote, urlparse
@@ -120,7 +121,12 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
     from requests.models import Response
 
-    from weaver.processes.constants import JobInputsOutputsSchemaType, ProcessSchemaType, WPS_DataType
+    from weaver.processes.constants import (
+        JobInputsOutputsSchemaType,
+        ProcessSchemaType,
+        WPS_DataType,
+        WPS_LiteralData_Type
+    )
     from weaver.typedefs import (
         AnySettingsContainer,
         AnyValueType,
@@ -154,8 +160,8 @@ if TYPE_CHECKING:
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
-    OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexDataInput]
-    OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, BoundingBoxDataInput, ComplexData]
+    OWS_Input_Type = Union[OWS_Input_Base, BoundingBox, BoundingBoxDataInput, ComplexData, ComplexDataInput]
+    OWS_Output_Type = Union[OWS_Output_Base, BoundingBox, ComplexData]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_Format = TypedDict("JSON_Format", {
         "mime_type": Required[str],
@@ -445,8 +451,6 @@ def ows2json_io(ows_io):
     return json_io
 
 
-# FIXME: add option to control auto-fetch, disable during workflow by default to avoid double downloads?
-#       (https://github.com/crim-ca/weaver/issues/183)
 def ows2json_output_data(output, process_description, container=None):
     # type: (OWS_Output_Type, ProcessOWS, Optional[AnySettingsContainer]) -> JSON
     """
@@ -478,10 +482,12 @@ def ows2json_output_data(output, process_description, container=None):
     json_output = {
         "identifier": output.identifier,
         "title": output.title,
-        "dataType": output.dataType
+        "dataType": output.dataType,
+        "data": None,  # type: JSON
     }
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
+    output_data = None
     if output.reference:
         json_output["reference"] = output.reference
 
@@ -493,23 +499,48 @@ def ows2json_output_data(output, process_description, container=None):
 
     else:
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
-        json_output["data"] = output.data[0] if output.data else None  # type: Union[BoundingBox, AnyValueType]
+        output_data = output.data[0] if output.data else None  # type: Union[BoundingBox, AnyValueType]
 
-    if (json_output["dataType"] == WPS_COMPLEX_DATA or "reference" in json_output) and output.mimeType:
-        json_output["mimeType"] = output.mimeType
-
-    if json_output["dataType"] == WPS_BOUNDINGBOX_DATA:
-        bbox_data = json_output["data"]  # type: BoundingBox
-        json_data = ows2json_output_bbox(bbox_data)
+    # convert data value as required since WPS XML uses raw strings or container objects
+    if json_output["dataType"] in WPS_LITERAL_DATA_TYPES:
+        json_output["data"] = any2json_literal_data(output_data, json_output["dataType"])
+    elif json_output["dataType"] == WPS_BOUNDINGBOX_DATA:
+        json_data = ows2json_bbox_data(output_data)
         json_output["data"] = json_data
+    elif json_output["dataType"] == WPS_COMPLEX_DATA or "reference" in json_output:
+        json_output["dataType"] = WPS_COMPLEX_DATA  # force in case not set
+        if output.mimeType:
+            json_output["mimeType"] = output.mimeType
+            if output.mimeType in ContentType.ANY_JSON and isinstance(output.data, (list, dict)) and output.data:
+                json_output["data"] = output.data
 
     return json_output
 
 
-def ows2json_output_bbox(bbox):
+def any2json_literal_data(data, data_type):
+    # type: (AnyValueType, WPS_LiteralData_Type) -> AnyValueType
+    """
+    Converts :mod:`owslib` :term:`WPS` literal data using strings into the specific :term:`JSON` compatible type.
+    """
+    if data is None:
+        return None
+    dtype = any2wps_literal_datatype(data_type)
+    if dtype == "float":
+        return float(data)
+    if dtype == "boolean":
+        return bool(data)
+    if dtype == "integer":
+        return int(data)
+    if dtype in WPS_LITERAL_DATA_DATETIME:
+        data = date_parser.parse(data) if isinstance(data, str) else data
+        return data.isoformat()
+    return str(data)
+
+
+def ows2json_bbox_data(bbox):
     # type: (BoundingBox) -> JSON
     """
-    Converts an :mod:`owslib` :term:`WPS` Bounding Box data into a :term:`JSON` representation.
+    Converts :mod:`owslib` :term:`WPS` Bounding Box data into a :term:`JSON` representation.
     """
     # FIXME: owslib does not actually handle 3D+ coordinates...
     bbox_crs = str(bbox.crs)
@@ -1956,7 +1987,7 @@ def any2cwl_literal_datatype(io_type):
     """
     Solves common literal data-type names to supported ones for `CWL`.
     """
-    if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
+    if io_type in WPS_LITERAL_DATA_STRING | WPS_LITERAL_DATA_DATETIME | OAS_LITERAL_STRING_FORMATS:
         return "string"
     if io_type in WPS_LITERAL_DATA_INTEGER | OAS_LITERAL_INTEGER_FORMATS:
         return "int"
@@ -1968,7 +1999,7 @@ def any2cwl_literal_datatype(io_type):
 
 
 def any2wps_literal_datatype(io_type, is_value=False, pywps=False):
-    # type: (AnyValueType, bool, bool) -> Union[str, Type[null]]
+    # type: (Union[AnyValueType, WPS_LiteralData_Type], bool, bool) -> Union[str, Type[null]]
     """
     Solves common literal data-type names to supported ones for `WPS`.
 
@@ -1980,7 +2011,7 @@ def any2wps_literal_datatype(io_type, is_value=False, pywps=False):
     """
     if isinstance(io_type, str):
         if not is_value:
-            if io_type in WPS_LITERAL_DATA_STRING | OAS_LITERAL_STRING_FORMATS:
+            if io_type in WPS_LITERAL_DATA_STRING | WPS_LITERAL_DATA_DATETIME | OAS_LITERAL_STRING_FORMATS:
                 if io_type in WPS_LITERAL_DATA_DATETIME | OAS_LITERAL_DATETIME_FORMATS:
                     return io_type if io_type in WPS_LITERAL_DATA_DATETIME else "dateTime"
                 return "string"
@@ -2246,7 +2277,7 @@ def json2oas_io_literal_data_type(io_type):
             data_info["format"] = io_type
     if io_type in WPS_LITERAL_DATA_BOOLEAN:
         data_info["type"] = "boolean"
-    if io_type in OAS_LITERAL_STRING_FORMATS | WPS_LITERAL_DATA_STRING:
+    if io_type in OAS_LITERAL_STRING_FORMATS | WPS_LITERAL_DATA_STRING | WPS_LITERAL_DATA_DATETIME:
         data_info["type"] = "string"
         if "time" in io_type.lower():
             data_info["format"] = "date-time"

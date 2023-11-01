@@ -31,7 +31,6 @@ inputs:
     type:
       type: array
       items: File
-    format: "iana:application/geo+json"
   boundingBoxInput:
     type: File
   imagesInput:
