@@ -6,7 +6,7 @@
 #   - https://github.com/opengeospatial/ogcapi-processes/pull/371
 # $schema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/process.yaml"
 # Alternate schema that works:
-$schema: "https://raw.githubusercontent.com/crim-ca/ogcapi-processes/fix-schema-recursive/openapi/schemas/processes-core/process.yaml"
+$schema: "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/schemas/processes-core/process.yaml"
 $id: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json"
 id: EchoProcess  # name to use for deployment
 version: "1.0.0"

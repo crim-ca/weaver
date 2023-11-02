@@ -19,7 +19,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
+    DataStrType = TypeVar("DataStrType")
 
 LOGGER = logging.getLogger(__name__)
 
@@ -156,27 +157,37 @@ class ContentEncoding(Constants):
 
     @staticmethod
     @overload
-    def encode(data, encoding, binary):
+    def encode(data, encoding=BASE64, binary=True):
         # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
         ...
 
     @staticmethod
     @overload
-    def encode(data, encoding, binary=False):
+    def encode(data, encoding=BASE64, binary=False):
         # type: (AnyStr, ContentEncoding, Literal[False]) -> str
         ...
 
     @staticmethod
     @overload
-    def encode(data, encoding, binary):
-        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+    def encode(data, encoding=BASE64, binary=None):
+        # type: (DataStrType, ContentEncoding, Literal[None]) -> DataStrType
         ...
 
     @staticmethod
-    def encode(data, encoding=BASE64, binary=False):
-        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+    def encode(data, encoding=BASE64, binary=None):
+        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        """
+        Encodes the data to the requested encoding and convert it to the string-like data type representation.
+
+        :param data: Data to encode.
+        :param encoding: Target encoding method.
+        :param binary:
+            If unspecified, the string-like type will be the same as the input data.
+            Otherwise, convert the encoded data to :class:`str` or :class:`bytes` accordingly.
+        :return: Encoded and converted data.
+        """
         data_type = type(data)
-        out_type = bytes if binary else str
+        out_type = data_type if binary is None else (bytes if binary else str)
         enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
         enc_func = {
             (str, str, ContentEncoding.UTF_8): lambda _: _,
@@ -204,27 +215,37 @@ class ContentEncoding(Constants):
 
     @staticmethod
     @overload
-    def decode(data, encoding, binary):
+    def decode(data, encoding=BASE64, binary=True):
         # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
         ...
 
     @staticmethod
     @overload
-    def decode(data, encoding, binary=False):
+    def decode(data, encoding=BASE64, binary=False):
         # type: (AnyStr, ContentEncoding, Literal[False]) -> str
         ...
 
     @staticmethod
     @overload
-    def decode(data, encoding, binary):
-        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+    def decode(data, encoding=BASE64, binary=None):
+        # type: (DataStrType, ContentEncoding, Literal[None]) -> DataStrType
         ...
 
     @staticmethod
-    def decode(data, encoding=BASE64, binary=False):
-        # type: (AnyStr, ContentEncoding, bool) -> AnyStr
+    def decode(data, encoding=BASE64, binary=None):
+        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        """
+        Decodes the data from the specified encoding and convert it to the string-like data type representation.
+
+        :param data: Data to decode.
+        :param encoding: Expected source encoding.
+        :param binary:
+            If unspecified, the string-like type will be the same as the input data.
+            Otherwise, convert the decoded data to :class:`str` or :class:`bytes` accordingly.
+        :return: Decoded and converted data.
+        """
         data_type = type(data)
-        out_type = bytes if binary else str
+        out_type = data_type if binary is None else (bytes if binary else str)
         enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
         dec_func = {
             (str, str, ContentEncoding.UTF_8): lambda _: _,
@@ -953,6 +974,8 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     if default is None:
         default = json_default_handler
     try:
+        if isinstance(data, str):
+            return data  # avoid adding additional quotes
         data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110

@@ -416,13 +416,15 @@ def parse_wps_input_complex(input_value, input_info):
     """
     # if provided, pass down specified input format to allow validation against supported formats
     c_enc = ctype = schema = None
+    input_field = "value"
     schema_vars = ["reference", "$schema"]
     if isinstance(input_value, dict):
         ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
         if not ctype:
             ctype, c_enc = parse_wps_input_format(input_value)
         schema = get_field(input_value, "schema", search_variations=True, default=None, extra_variations=schema_vars)
-        input_value = get_any_value(input_value)
+        input_field = get_any_value(input_value, key=True)
+        input_value = input_value[input_field]
         input_value = repr_json(input_value, indent=None, ensure_ascii=(c_enc in ["ASCII", "ascii"]))
     if not ctype:
         ctype, c_enc = parse_wps_input_format(input_info)
@@ -431,9 +433,10 @@ def parse_wps_input_complex(input_value, input_info):
             ctype, c_enc = parse_wps_input_format(media_format)
     if isinstance(schema, dict):
         schema = get_field(schema, "$ref", default=None, extra_variations=schema_vars)
-    # need to support 'file://' scheme, but PyWPS doesn't like them, so remove the 'file://' part
-    if str(input_value).startswith("file://"):
-        input_value = input_value[7:]
+    # need to support 'file://' scheme which could be omitted
+    # to ensure owslib parses it has a link (asReference), add it if missing
+    if input_field in ["href", "reference"] and "://" not in str(input_value):
+        input_value = f"file://{input_value}"
     return ComplexDataInput(input_value, mimeType=ctype, encoding=c_enc, schema=schema)
 
 

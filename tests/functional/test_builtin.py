@@ -8,6 +8,7 @@ import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
+from owslib.crs import Crs
 
 from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
@@ -473,7 +474,7 @@ class BuiltinAppTest(WpsConfigBase):
                 },
             ],
             "featureCollectionInput": {
-                "href": tmp_feature_collection_geojson.name,
+                "href": f"file://{tmp_feature_collection_geojson.name}",
                 "type": ContentType.APP_GEOJSON,
                 "schema": "https://geojson.org/schema/FeatureCollection.json",
             }
@@ -585,7 +586,7 @@ class BuiltinAppTest(WpsConfigBase):
                 "boundingBoxOutput",
                 [
                     (["bbox"], ["value", "bbox"]),
-                    (["crs"], ["value", "crs"]),
+                    (Crs(inputs["boundingBoxInput"]["crs"]).getcodeurn(), ["value", "crs"]),
                 ]
             ),
         ]:
@@ -593,8 +594,11 @@ class BuiltinAppTest(WpsConfigBase):
             for field_map in out_fields_map:
                 in_val_nested = inputs[in_id]
                 out_val_nested = results[out_id]
-                for nested_field in field_map[0]:
-                    in_val_nested = in_val_nested[nested_field]
+                if isinstance(field_map[0], list):
+                    for nested_field in field_map[0]:
+                        in_val_nested = in_val_nested[nested_field]
+                else:
+                    in_val_nested = field_map[0]
                 for nested_field in field_map[1]:
                     out_val_nested = out_val_nested[nested_field]
                 assert out_val_nested == in_val_nested
@@ -621,6 +625,7 @@ class BuiltinAppTest(WpsConfigBase):
                 assert "href" in out_def
                 # inputs use local paths (mocked by test for "remote" locations) or literal JSON
                 in_path = in_def.pop("href", None)
+                in_path = in_path[7:] if str(in_path).startswith("file://") else in_path
                 out_url = out_def.pop("href")  # compare the rest of the metadata after
                 out_path = map_wps_output_location(out_url, self.settings, url=False)
                 # use binary comparison since some contents are binary and others not
@@ -628,23 +633,24 @@ class BuiltinAppTest(WpsConfigBase):
                     out_data = out_file.read()
                 in_as_data = not in_path
                 if in_as_data:
-                    in_data = json.dumps(in_def.pop("value")).encode()
+                    in_data = in_def.pop("value")
+                    in_data = (json.dumps(in_data) if isinstance(in_data, dict) else in_data).encode()
+                    in_data = ContentEncoding.decode(in_data) if in_def.get("encoding") == "base64" else in_data
                 else:
                     with open(in_path, mode="rb") as in_file:
                         in_data = in_file.read()
                 assert out_data == in_data
-                # if input was provided directly as JSON, the output can still be provided as reference (return=minimal)
-                if in_as_data:
-                    if in_def != {}:
-                        assert out_def["type"] == in_def["mediaType"], (
-                            "Since explicit format was specified, the same is expected as output"
-                        )
-                    else:
-                        assert out_def["type"] == ContentType.APP_JSON, (
-                            "Since no explicit format was specified, at least needs to be JSON"
-                        )
+                # even if the input was provided directly as JSON,
+                # the output will be provided as reference (return=minimal)
+                if in_def != {}:
+                    in_type = in_def["mediaType"] if in_as_data else in_def["type"]
+                    assert out_def["type"] == in_type, (
+                        "Since explicit format was specified, the same is expected as output"
+                    )
                 else:
-                    assert out_def == in_def, f"Remaining complex metadata should match '{in_id}' definition"
+                    assert out_def["type"] == ContentType.APP_JSON, (
+                        "Since no explicit format was specified, at least needs to be JSON"
+                    )
 
     def test_echo_process_execute_sync(self):
         """
@@ -666,20 +672,20 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=headers, only_local=True)
 
-        assert resp.status_code == 200, f"Error: {resp.text}"
-        assert resp.content_type in ContentType.APP_JSON
+            assert resp.status_code == 200, f"Error: {resp.text}"
+            assert resp.content_type in ContentType.APP_JSON
 
-        # since sync, results are directly available instead of job status
-        # even if results are returned directly (instead of status),
-        # status location link is available for reference as needed
-        assert "Location" in resp.headers
-        # validate sync was indeed applied (in normal situation, not considering mock test that runs in sync)
-        assert resp.headers["Preference-Applied"] == headers["Prefer"]
-        # following details should not be available since results are returned in sync instead of async job status
-        for field in ["status", "created", "finished", "duration", "progress"]:
-            assert field not in resp.json
-        results = resp.json
-        self.validate_echo_process_results(results, body["inputs"])
+            # since sync, results are directly available instead of job status
+            # even if results are returned directly (instead of status),
+            # status location link is available for reference as needed
+            assert "Location" in resp.headers
+            # validate sync was indeed applied (in normal situation, not considering mock test that runs in sync)
+            assert resp.headers["Preference-Applied"] == headers["Prefer"]
+            # following details should not be available since results are returned in sync instead of async job status
+            for field in ["status", "created", "finished", "duration", "progress"]:
+                assert field not in resp.json
+            results = resp.json
+            self.validate_echo_process_results(results, body["inputs"])
 
     def test_echo_process_execute_async(self):
         """
@@ -692,7 +698,13 @@ class BuiltinAppTest(WpsConfigBase):
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
-                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
+                "outputs": [
+                    {
+                        "id": input_id.replace("Input", "Output"),
+                        "transmissionMode": ExecuteTransmissionMode.VALUE,
+                    }
+                    for input_id in body["inputs"]
+                ],
             })
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
@@ -700,15 +712,15 @@ class BuiltinAppTest(WpsConfigBase):
             resp = mocked_sub_requests(self.app, "post_json", path,
                                        data=body, headers=self.json_headers, only_local=True)
 
-        assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
-        assert resp.content_type in ContentType.APP_JSON
-        # following details not available yet in async, but are in sync
-        assert "created" not in resp.json
-        assert "finished" not in resp.json
-        assert "duration" not in resp.json
-        assert "progress" not in resp.json
-        assert "outputs" not in resp.json
+            assert resp.status_code == 201, f"Error:\n{repr_json(resp.text, indent=2)}"
+            assert resp.content_type in ContentType.APP_JSON
+            # following details not available yet in async, but are in sync
+            assert "created" not in resp.json
+            assert "finished" not in resp.json
+            assert "duration" not in resp.json
+            assert "progress" not in resp.json
+            assert "outputs" not in resp.json
 
-        job_url = resp.json["location"]
-        results = self.monitor_job(job_url)
-        self.validate_echo_process_results(results, body["inputs"])
+            job_url = resp.json["location"]
+            results = self.monitor_job(job_url)
+            self.validate_echo_process_results(results, body["inputs"])
