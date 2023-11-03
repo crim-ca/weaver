@@ -42,8 +42,8 @@ def validate_reference(url, is_file):
         f"{tmp_dir}/",
         "file:///tmp/cwltool_out_",
         "file:///tmp/cwltool_tmp_",
-        "/tmp/cwltool_out_",
-        "/tmp/cwltool_tmp_",
+        "/tmp/cwltool_out_",  # nosec: B108
+        "/tmp/cwltool_tmp_",  # nosec: B108
     ]
     if any(url.startswith(path) for path in tmp_paths):
         return
