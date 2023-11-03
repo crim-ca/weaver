@@ -13,7 +13,7 @@ from weaver.database import get_db
 from weaver.datatype import VaultFile
 from weaver.formats import repr_json
 from weaver.store.base import StoreVault
-from weaver.utils import get_header, get_settings, get_weaver_url, is_uuid
+from weaver.utils import get_header, get_secure_path, get_settings, get_weaver_url, is_uuid
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -54,7 +54,9 @@ def get_vault_path(file, container=None):
     Get the full path of the vault file.
     """
     vault_dir = get_vault_dir(container)
-    return os.path.join(vault_dir, file.name)
+    vault_path = os.path.join(vault_dir, file.name)
+    vault_path = get_secure_path(vault_path)
+    return vault_path
 
 
 def get_vault_url(file, container=None):
@@ -269,4 +271,5 @@ def decrypt_from_vault(vault_file, path, out_dir=None, delete_encrypted=False):
         out_file.seek(0)
         if delete_encrypted:
             os.remove(path)
-    return out_file.name
+    vault_path = get_secure_path(out_file.name)
+    return vault_path

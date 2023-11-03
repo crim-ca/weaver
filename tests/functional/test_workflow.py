@@ -24,6 +24,7 @@ from webtest import TestApp as WebTestApp
 
 from tests.functional.utils import ResourcesUtil
 from tests.utils import (
+    FileServer,
     get_settings_from_config_ini,
     get_settings_from_testapp,
     get_test_weaver_app,
@@ -126,7 +127,7 @@ class ProcessInfo(object):
 @pytest.mark.workflow
 class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     """
-    Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
+    Runs an end-2-end test procedure on weaver configured as EMS located on specified ``WEAVER_TEST_SERVER_HOSTNAME``.
     """
     __settings__ = None
     test_processes_info = {}        # type: Dict[WorkflowProcesses, ProcessInfo]
@@ -164,6 +165,11 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     logger_json_indent = None       # type: Optional[int]
     logger_field_indent = 2         # type: int
     log_full_trace = True           # type: bool
+
+    file_server = None              # type: FileServer
+    """
+    File server made available to tests for emulating a remote HTTP location.
+    """
 
     WEAVER_URL = None               # type: Optional[str]
     WEAVER_RESTAPI_URL = None       # type: Optional[str]
@@ -214,15 +220,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         cls.WEAVER_TEST_JOB_GET_STATUS_INTERVAL = int(cls.get_option("WEAVER_TEST_JOB_GET_STATUS_INTERVAL", 5))
 
         # server settings
-        cls.WEAVER_TEST_CONFIGURATION = cls.get_option("WEAVER_TEST_CONFIGURATION", WeaverConfiguration.EMS)
-        cls.WEAVER_TEST_SERVER_HOSTNAME = cls.get_option("WEAVER_TEST_SERVER_HOSTNAME", "")
+        cls.WEAVER_TEST_CONFIGURATION = conf = cls.get_option("WEAVER_TEST_CONFIGURATION", WeaverConfiguration.EMS)
+        cls.WEAVER_TEST_SERVER_HOSTNAME = host = cls.get_option("WEAVER_TEST_SERVER_HOSTNAME", "")
         cls.WEAVER_TEST_SERVER_BASE_PATH = cls.get_option("WEAVER_TEST_SERVER_BASE_PATH", "/weaver")
         cls.WEAVER_TEST_SERVER_API_PATH = cls.get_option("WEAVER_TEST_SERVER_API_PATH", "/")
         cls.WEAVER_TEST_CONFIG_INI_PATH = cls.get_option("WEAVER_TEST_CONFIG_INI_PATH")    # none uses default path
-        if cls.WEAVER_TEST_SERVER_HOSTNAME in [None, ""]:
+        if host in [None, ""]:
             # running with a local-only Web Test application
             config = setup_config_with_mongodb(settings={
-                "weaver.configuration": cls.WEAVER_TEST_CONFIGURATION,
+                "weaver.configuration": conf,
                 # NOTE:
                 #   Because everything is running locally in this case, all processes should automatically map between
                 #   the two following dir/URL as equivalents locations, accordingly to what they require for execution.
@@ -238,10 +244,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             os.makedirs(cls.__settings__["weaver.wps_output_dir"], exist_ok=True)
         else:
             # running on a remote service (remote server or can be "localhost", but in parallel application)
-            if cls.WEAVER_TEST_SERVER_HOSTNAME.startswith("http"):
-                url = cls.WEAVER_TEST_SERVER_HOSTNAME
+            if host.startswith("http"):
+                url = host
             else:
-                url = f"http://{cls.WEAVER_TEST_SERVER_HOSTNAME}"
+                url = f"http://{host}"
             cls.app = WebTestApp(url)
             cls.WEAVER_URL = get_weaver_url(cls.settings.fget(cls))
         cls.WEAVER_RESTAPI_URL = get_wps_restapi_base_url(cls.settings.fget(cls))
@@ -250,6 +256,9 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         cls.setup_test_processes_before()
         cls.setup_test_processes()
         cls.setup_test_processes_after()
+
+        cls.file_server = FileServer()
+        cls.file_server.start()
 
     @property
     def settings(self):
@@ -275,6 +284,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.clean_test_processes()
+        cls.file_server.teardown()
         testing.tearDown()
         cls.log("%sEnd of '%s': %s\n%s",
                 cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases)
@@ -951,7 +961,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         .. note::
             Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
-            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+            location cannot be mocked by the test suite. Employ local test paths as if they were already fetched.
         """
 
         with contextlib.ExitStack() as stack:
@@ -1005,14 +1015,19 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            # jsonarray2netcdf cannot use local paths anymore for nested NetCDF, provide them through tmp file server
+            nc_dir = self.file_server.document_root
+            nc_url = self.file_server.uri
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_path = os.path.join(tmp_dir, nc_name)
-                nc_refs.append(f"file://{nc_path}")
-                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
+                nc_path = os.path.join(nc_dir, nc_name)
+                nc_href = f"{nc_url}/{nc_name}"
+                nc_refs.append(nc_href)
+                with open(nc_path, mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
+
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
                 json.dump(nc_refs, tmp_file)  # must match execution body
 
@@ -1051,7 +1066,9 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         .. note::
             Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
-            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+            location cannot be mocked by the test suite. With security checks, they cannot be locally defined either,
+            since the :term:`CWL` temporary directory is not known in advance for respective ``CommandLineTool`` steps.
+            Employ a *real* file-server for test paths to emulate a remote location to be fetched.
 
         .. seealso::
             Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
@@ -1064,9 +1081,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_path = os.path.join(tmp_dir, nc_name)
-                nc_refs.append(f"file://{nc_path}")
-                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
+                nc_path = os.path.join(self.file_server.document_root, nc_name)
+                nc_href = os.path.join(self.file_server.uri, nc_name)
+                nc_refs.append(nc_href)
+                with open(nc_path, mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
                 json.dump(nc_refs, tmp_file)  # must match execution body
@@ -1091,7 +1109,9 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         .. note::
             Because ``jsonarray2netcdf`` is running in subprocess instantiated by :mod:`cwltool`, file-server
-            location cannot be mocked by the test suite. Employ local test paths as if they where already fetched.
+            location cannot be mocked by the test suite. With security checks, they cannot be locally defined either,
+            since the :term:`CWL` temporary directory is not known in advance for respective ``CommandLineTool`` steps.
+            Employ a *real* file-server for test paths to emulate a remote location to be fetched.
 
         .. seealso::
             Inverse :term:`WPS` / :term:`OGC API - Processes` process references from
@@ -1104,9 +1124,10 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_path = os.path.join(tmp_dir, nc_name)
-                nc_refs.append(f"file://{nc_path}")
-                with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
+                nc_path = os.path.join(self.file_server.document_root, nc_name)
+                nc_href = os.path.join(self.file_server.uri, nc_name)
+                nc_refs.append(nc_href)
+                with open(nc_path, mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
                 json.dump(nc_refs, tmp_file)  # must match execution body
