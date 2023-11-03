@@ -11,6 +11,7 @@ from pywps.inout.formats import Format
 from requests.exceptions import ConnectionError
 
 from weaver import formats as f
+from weaver.utils import null
 
 _ALLOWED_MEDIA_TYPE_CATEGORIES = [
     "application",
@@ -420,6 +421,27 @@ def test_repr_json_default_string():
     values = {"test": obj_ref}
     expect = f"{{'test': {str(obj_ref)}}}"
     result = f.repr_json(values)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["test", "expect", "force_string"],
+    [
+        ("abc", "abc", True),
+        (123, 123, False),
+        (123, "123", True),
+        ([1, 2], [1, 2], False),
+        ([1, 2], "[1, 2]", True),
+        ("[1, 2]", "[1, 2]", True),
+        ({"a": 1}, {"a": 1}, False),
+        ({"a": 1}, "{\"a\": 1}", True),
+        ("{\"a\": 1}", "{\"a\": 1}", True),
+        (null, str(null), False),
+        (null, str(null), True),
+    ]
+)
+def test_repr_json_force_string_handling(test, expect, force_string):
+    result = f.repr_json(test, force_string=force_string, indent=None)
     assert result == expect
 
 

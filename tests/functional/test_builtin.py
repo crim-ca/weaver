@@ -1,6 +1,5 @@
-import copy
-
 import contextlib
+import copy
 import datetime
 import json
 import os
@@ -14,7 +13,7 @@ from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, repr_json
-from weaver.processes.builtin import register_builtin_processes
+from weaver.processes.builtin import register_builtin_processes, jsonarray2netcdf
 from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
@@ -481,16 +480,21 @@ class BuiltinAppTest(WpsConfigBase):
         }
         outputs = {
             "geometryOutput": {
-                "mediaType": ContentType.APP_JSON,
-                "schema": " http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+                "format": {
+                    "mediaType": ContentType.APP_JSON,
+                }
             },
             "imagesOutput": {
-                "mediaType": ContentType.IMAGE_OGC_GEOTIFF,
-                "encoding": ContentEncoding.BASE64,
+                "format": {
+                    "mediaType": ContentType.IMAGE_OGC_GEOTIFF,
+                    "encoding": ContentEncoding.BASE64,
+                }
             },
             "featureCollectionOutput": {
-                "mediaType": ContentType.APP_GEOJSON,
-                "schema": "https://geojson.org/schema/FeatureCollection.json",
+                "format": {
+                    "mediaType": ContentType.APP_GEOJSON,
+                    "schema": "https://geojson.org/schema/FeatureCollection.json",
+                }
             }
         }
         body = {
@@ -521,22 +525,26 @@ class BuiltinAppTest(WpsConfigBase):
             "$schema": sd.Execute._schema,
             "mode": ExecuteMode.AUTO,
             "response": ExecuteResponse.DOCUMENT,
-            "outputs": {},
         }
         expect_input_defaults = {
             "measureInput": {"mediaType": ContentType.APP_JSON},
             "boundingBoxInput": {"$schema": sd.ExecuteInputInlineBoundingBox._schema},
-            "geometryInput": [{"mediaType": ContentType.APP_JSON}, {}],
             "complexObjectInput": {"mediaType": ContentType.APP_JSON},
         }
+        expect_output_defaults = {
+            "imagesOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            "geometryOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            "featureCollectionOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+        }
         body.update(expect_defaults)
-        for input_key, input_val in body["inputs"].items():
-            if input_key in expect_input_defaults:
-                if isinstance(input_val, list):
-                    for i in range(len(input_val)):
-                        input_val[0].update(expect_input_defaults[input_key][0])
-                else:
-                    input_val.update(expect_input_defaults[input_key])
+        for io_holder, io_defaults in [("inputs", expect_input_defaults), ("outputs", expect_output_defaults)]:
+            for io_key, io_val in body[io_holder].items():
+                if io_key in io_defaults:
+                    if isinstance(io_val, list):
+                        for _ in range(len(io_val)):
+                            io_val[0].update(io_defaults[io_key][0])
+                    else:
+                        io_val.update(io_defaults[io_key])
         assert payload == body
 
     def validate_echo_process_results(self, results, inputs):
@@ -724,3 +732,32 @@ class BuiltinAppTest(WpsConfigBase):
             job_url = resp.json["location"]
             results = self.monitor_job(job_url)
             self.validate_echo_process_results(results, body["inputs"])
+
+
+def test_jsonarray2netcdf_process():
+    with contextlib.ExitStack() as stack:
+        data = {}
+        for idx in range(3):
+            tmp_nc = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".nc"))
+            tmp_nc_data = f"data NetCDF {idx}"
+            tmp_nc.write(tmp_nc_data)
+            tmp_nc.flush()
+            tmp_nc.seek(0)
+            tmp_nc_href = f"file://{tmp_nc.name}"
+            data[tmp_nc_href] = tmp_nc_data
+        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+        json.dump(list(data), tmp_json, indent=2)
+        tmp_json.flush()
+        tmp_json.seek(0)
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(SystemExit) as err:
+            jsonarray2netcdf.main("-i", tmp_json.name, "-o", tmp_out_dir)
+        assert err.value.code in [None, 0]
+
+        for nc_file, nc_data in data.items():
+            nc_name = os.path.split(nc_file)[-1]
+            nc_path = os.path.join(tmp_out_dir, nc_name)
+            assert os.path.isfile(nc_path)
+            with open(nc_path, "r") as nc_ref:
+                assert nc_ref.read() == nc_data

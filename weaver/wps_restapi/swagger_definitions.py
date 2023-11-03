@@ -3629,7 +3629,7 @@ class BoundingBoxObject(StrictMappingSchema):
 
 
 class ExecuteInputInlineBoundingBox(BoundingBoxObject):
-    _schema_include_deserialize = False
+    _schema_include_deserialize = True
 
 
 class ExecuteInputInlineValue(OneOfKeywordSchema):

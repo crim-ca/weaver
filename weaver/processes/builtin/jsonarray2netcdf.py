@@ -56,7 +56,7 @@ def j2n(json_reference, output_dir):
                 LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
                 fetched_nc = fetch_file(file_url, output_dir, timeout=10, retry=3)
                 LOGGER.debug("Fetched NetCDF output location: [%s]", fetched_nc)
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         LOGGER.error("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
@@ -66,13 +66,13 @@ def main(*args):
     # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", metavar="json", type=str,
+    parser.add_argument("-i", metavar="json", type=str, required=True,
                         help="JSON file to be parsed for NetCDF file names.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.")
-    ns = parser.parse_args(*args)
+    ns = parser.parse_args(args)
     sys.exit(j2n(ns.i, ns.o))
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])

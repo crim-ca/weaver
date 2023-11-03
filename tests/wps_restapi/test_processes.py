@@ -802,7 +802,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         headers = {"Content-Type": ContentType.APP_CWL_JSON, "Accept": ContentType.APP_JSON}
         resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
         assert resp.status_code == 400
-        assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
+        assert "DeployCWL.id" in resp.json["cause"]
+        assert "Missing required field." in resp.json["cause"]["DeployCWL.id"]
 
     def deploy_process_CWL_direct(self,
                                   content_type,                         # type: ContentType

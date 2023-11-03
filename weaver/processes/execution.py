@@ -416,14 +416,13 @@ def parse_wps_input_complex(input_value, input_info):
     """
     # if provided, pass down specified input format to allow validation against supported formats
     c_enc = ctype = schema = None
-    input_field = "value"
     schema_vars = ["reference", "$schema"]
+    input_field = get_any_value(input_info, key=True)
     if isinstance(input_value, dict):
         ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
         if not ctype:
             ctype, c_enc = parse_wps_input_format(input_value)
         schema = get_field(input_value, "schema", search_variations=True, default=None, extra_variations=schema_vars)
-        input_field = get_any_value(input_value, key=True)
         input_value = input_value[input_field]
         input_value = repr_json(input_value, indent=None, ensure_ascii=(c_enc in ["ASCII", "ascii"]))
     if not ctype:
@@ -695,9 +694,10 @@ def submit_job_handler(payload,             # type: ProcessExecution
                 "type": "InvalidSchema",
                 "title": "Execute",
                 "detail": "Execution body failed schema validation.",
-                "status": HTTPBadRequest.status_code,
+                "status": HTTPBadRequest.code,
                 "error": ex.msg,
-                "value": ex.asdict(),
+                "cause": ex.asdict(),
+                "value": repr_json(ex.value),
             })
         )
 
