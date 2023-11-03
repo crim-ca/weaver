@@ -127,7 +127,7 @@ def describe_file(request):
         )
         headers["Content-Location"] = get_vault_url(vault_file, request)
     finally:
-        if os.path.isfile(tmp_file):
+        if tmp_file and os.path.isfile(tmp_file):
             os.remove(tmp_file)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
