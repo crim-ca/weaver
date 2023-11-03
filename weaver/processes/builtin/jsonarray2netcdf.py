@@ -23,7 +23,7 @@ from weaver.processes.builtin.utils import is_netcdf_url, validate_file_referenc
 from weaver.utils import fetch_file, get_secure_path  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
-PACKAGE_BASE = __file__.split(WEAVER_ROOT_DIR.rstrip("/") + "/")[-1].rsplit(PACKAGE_NAME)[0]
+PACKAGE_BASE = __file__.rsplit(WEAVER_ROOT_DIR.rstrip("/") + "/", 1)[-1].rsplit(PACKAGE_NAME)[0]
 PACKAGE_MODULE = f"{PACKAGE_BASE}{PACKAGE_NAME}".replace("/", ".")
 
 # setup logger since it is not run from the main 'weaver' app

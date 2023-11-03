@@ -24,7 +24,7 @@ from weaver.processes.builtin.utils import validate_file_reference  # isort:skip
 from weaver.utils import OutputMethod, fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
-PACKAGE_BASE = __file__.split(WEAVER_ROOT_DIR.rstrip("/") + "/")[-1].rsplit(PACKAGE_NAME)[0]
+PACKAGE_BASE = __file__.rsplit(WEAVER_ROOT_DIR.rstrip("/") + "/", 1)[-1].rsplit(PACKAGE_NAME)[0]
 PACKAGE_MODULE = f"{PACKAGE_BASE}{PACKAGE_NAME}".replace("/", ".")
 
 # setup logger since it is not run from the main 'weaver' app
@@ -33,7 +33,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.2"
+__version__ = "1.3"
 __title__ = "File Index Selector"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 

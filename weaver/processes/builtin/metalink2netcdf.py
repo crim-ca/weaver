@@ -22,7 +22,7 @@ from weaver.utils import fetch_file  # isort:skip # noqa: E402
 from weaver.processes.builtin.utils import is_netcdf_url  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
-PACKAGE_BASE = __file__.split(WEAVER_ROOT_DIR.rstrip("/") + "/")[-1].rsplit(PACKAGE_NAME)[0]
+PACKAGE_BASE = __file__.rsplit(WEAVER_ROOT_DIR.rstrip("/") + "/", 1)[-1].rsplit(PACKAGE_NAME)[0]
 PACKAGE_MODULE = f"{PACKAGE_BASE}{PACKAGE_NAME}".replace("/", ".")
 
 # setup logger since it is not run from the main 'weaver' app
@@ -31,7 +31,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.3"
+__version__ = "1.4"
 __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 

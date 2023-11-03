@@ -165,7 +165,7 @@ class BuiltinAppTest(WpsConfigBase):
         Validate that local file path as input is not permitted anymore.
         """
         with contextlib.ExitStack() as stack_exec:
-            body, nc_data = self.setup_inputs(stack_exec, use_temp_file=True)
+            body, _ = self.setup_inputs(stack_exec, use_temp_file=True)
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
