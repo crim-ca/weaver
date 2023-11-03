@@ -5,12 +5,13 @@ import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
+from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
 
 from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType
-from weaver.processes.builtin import register_builtin_processes
+from weaver.formats import ContentType, get_format, repr_json
+from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
 from weaver.status import Status
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ class BuiltinAppTest(WpsConfigBase):
     def setUp(self):
         # register builtin processes from scratch to have clean state
         self.process_store.clear_processes()
-        register_builtin_processes(self.settings)
+        register_builtin_processes(self.settings)  # type: ignore
 
     def test_jsonarray2netcdf_describe_old_schema(self):
         resp = self.app.get("/processes/jsonarray2netcdf?schema=OLD", headers=self.json_headers)
@@ -362,3 +363,234 @@ class BuiltinAppTest(WpsConfigBase):
         outputs = resp.json
 
         self.validate_results(results, outputs, nc_data, None)
+
+
+def test_jsonarray2netcdf_process():
+    with contextlib.ExitStack() as stack:
+        data = {}
+        for idx in range(3):
+            tmp_nc = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".nc"))
+            tmp_nc_data = f"data NetCDF {idx}"
+            tmp_nc.write(tmp_nc_data)
+            tmp_nc.flush()
+            tmp_nc.seek(0)
+            tmp_nc_href = f"file://{tmp_nc.name}"
+            data[tmp_nc_href] = tmp_nc_data
+        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+        json.dump(list(data), tmp_json, indent=2)
+        tmp_json.flush()
+        tmp_json.seek(0)
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(SystemExit) as err:
+            jsonarray2netcdf.main("-i", tmp_json.name, "-o", tmp_out_dir)
+        assert err.value.code in [None, 0]
+
+        for nc_file, nc_data in data.items():
+            nc_name = os.path.split(nc_file)[-1]
+            nc_path = os.path.join(tmp_out_dir, nc_name)
+            assert os.path.isfile(nc_path)
+            with open(nc_path, mode="r", encoding="utf-8") as nc_ref:
+                assert nc_ref.read() == nc_data
+
+
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        1,
+        "",
+        "abc",
+        {},
+        [
+            1,
+            2,
+        ],
+        [
+            "abc",
+            "xyz",
+        ],
+        [
+            "/tmp/does-not-exist/fake-file.txt",  # noqa
+            "/tmp/does-not-exist/fake-file.nc",  # noqa
+        ]
+    ]
+)
+def test_jsonarray2netcdf_invalid_json(test_data):
+    with contextlib.ExitStack() as stack:
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+        tmp_file.write(repr_json(test_data, force_string=True))
+        tmp_file.flush()
+        tmp_file.seek(0)
+
+        with pytest.raises(ValueError) as err:
+            jsonarray2netcdf.main("-i", tmp_file.name, "-o", tmp_out_dir)
+        assert str(err.value) == "Invalid JSON file format, expected a plain array of NetCDF file URL strings."
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [],
+        ["-i"],
+    ]
+)
+def test_jsonarray2netcdf_missing_params(args):
+    with pytest.raises(SystemExit) as err:
+        jsonarray2netcdf.main(*args)
+    assert err.value.code == 2
+
+
+def test_jsonarray2netcdf_invalid_out_dir():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_out_dir = os.path.join(tmp_dir, "random")
+
+        with pytest.raises(ValueError) as err:
+            jsonarray2netcdf.main("-i", "", "-o", tmp_out_dir)
+        assert "does not exist" in str(err.value)
+
+
+@pytest.mark.parametrize(
+    ["metalink_cls", "metalink_ext", "test_index"],
+    [
+        (MetaLink, ".metalink", 2),
+        (MetaLink4, ".meta4", 2)
+    ]
+)
+def test_metalink2netcdf_process(metalink_cls, metalink_ext, test_index):
+    with contextlib.ExitStack() as stack:
+        data = {}
+        meta_files = []
+        nc_fmt = get_format(ContentType.APP_NETCDF)
+        for idx in range(3):
+            tmp_nc = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".nc"))
+            tmp_nc_data = f"data NetCDF {idx}"
+            tmp_nc.write(tmp_nc_data)
+            tmp_nc.flush()
+            tmp_nc.seek(0)
+            data[idx] = {"name": tmp_nc.name, "data": tmp_nc_data}
+            tmp_meta_file = MetaFile(identity=str(idx), fmt=nc_fmt)
+            tmp_meta_file.file = tmp_nc.name
+            meta_files.append(tmp_meta_file)
+        metalink = metalink_cls(identity="test", workdir=tempfile.gettempdir(), files=tuple(meta_files))
+        tmp_meta = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=metalink_ext))
+        tmp_meta.write(metalink.xml)
+        tmp_meta.flush()
+        tmp_meta.seek(0)
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(SystemExit) as err:
+            metalink2netcdf.main("-i", tmp_meta.name, "-n", str(test_index), "-o", tmp_out_dir)
+        assert err.value.code in [None, 0]
+
+        for idx in range(3):
+            nc_out_name = os.path.split(data[idx]["name"])[-1]
+            nc_out_path = os.path.join(tmp_out_dir, nc_out_name)
+            if idx + 1 == test_index:  # index is 1-based in XPath
+                assert os.path.isfile(nc_out_path)
+                with open(nc_out_path, mode="r", encoding="utf-8") as nc_out_file:
+                    nc_out_data = nc_out_file.read()
+                os.remove(nc_out_path)
+                assert nc_out_data == data[idx]["data"]
+            else:
+                assert not os.path.isfile(nc_out_path)
+
+
+def test_metalink2netcdf_reference_not_netcdf():
+    with contextlib.ExitStack() as stack:
+        metafile = MetaFile(fmt=get_format(ContentType.APP_NETCDF))
+        tmp_text = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".text"))
+        tmp_text.write("dont care")
+        tmp_text.flush()
+        tmp_text.seek(0)
+        metafile.file = tmp_text.name
+        metalink = MetaLink4(identity="test", workdir=tempfile.gettempdir(), files=tuple([metafile]))
+        tmp_meta = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".meta4"))
+        tmp_meta.write(metalink.xml)
+        tmp_meta.flush()
+        tmp_meta.seek(0)
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        with pytest.raises(ValueError) as err:
+            metalink2netcdf.main("-i", tmp_meta.name, "-n", "1", "-o", tmp_out_dir)
+        assert "not a valid NetCDF" in str(err.value)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["-i"],
+        ["-i", ""],
+        ["-n"],
+        ["-n", "1"],
+    ]
+)
+def test_metalink2netcdf_missing_params(args):
+    with pytest.raises(SystemExit) as err:
+        metalink2netcdf.main(*args)
+    assert err.value.code == 2
+
+
+def test_metalink2netcdf_invalid_out_dir():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_out_dir = os.path.join(tmp_dir, "random")
+
+        with pytest.raises(ValueError) as err:
+            metalink2netcdf.main("-i", "", "-n", "1", "-o", tmp_out_dir)
+        assert "does not exist" in str(err.value)
+
+
+def test_file_index_selector_process():
+    with contextlib.ExitStack() as stack:
+        data = {}
+        test_files = []
+        for idx, ext in enumerate([".txt", ".nc", ".tiff"]):
+            tmp_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=ext))
+            tmp_data = f"data {idx}"
+            tmp_file.write(tmp_data)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            tmp_href = f"file://{tmp_file.name}"
+            data[idx] = {"name": tmp_file.name, "data": tmp_data, "href": tmp_href}
+            test_files.append(tmp_href)
+        tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+
+        test_index = 1
+        with pytest.raises(SystemExit) as err:
+            file_index_selector.main("-f", *test_files, "-i", str(test_index), "-o", tmp_out_dir)
+        assert err.value.code in [None, 0]
+        for idx, tmp_info in data.items():
+            out_name = os.path.split(tmp_info["name"])[-1]
+            out_path = os.path.join(tmp_out_dir, out_name)
+            if idx == test_index:
+                assert os.path.isfile(out_path)
+                with open(out_path, mode="r", encoding="utf-8") as out_file:
+                    out_data = out_file.read()
+                os.remove(out_path)
+                assert out_data == tmp_info["data"]
+            else:
+                assert not os.path.isfile(out_path)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["-f"],
+        ["-f", ""],
+        ["-i"],
+        ["-i", "1"],
+    ]
+)
+def test_file_index_selector_missing_params(args):
+    with pytest.raises(SystemExit) as err:
+        file_index_selector.main(*args)
+    assert err.value.code == 2
+
+
+def test_file_index_selector_invalid_out_dir():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_out_dir = os.path.join(tmp_dir, "random")
+
+        with pytest.raises(ValueError) as err:
+            file_index_selector.main("-f", "", "-i", "1", "-o", tmp_out_dir)
+        assert "does not exist" in str(err.value)

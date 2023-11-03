@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # pylint: disable=C0413,wrong-import-order
 from weaver import xml_util  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import is_netcdf_url  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 
@@ -27,7 +28,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.2"
+__version__ = "1.3"
 __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
@@ -48,29 +49,41 @@ def m2n(metalink_reference, index, output_dir):
             LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
             xml_data = xml_util.parse(metalink_path)
             LOGGER.debug("Parsing Metalink file references.")
-            nc_file_url = xml_data.xpath(f"string(//metalink/file[{index}]/metaurl)")
+            meta_ns = xml_data.getroot().nsmap[None]  # metalink URN namespace, pass explicitly otherwise xpath fails
+            meta_version = xml_data.xpath("/m:metalink[1]", namespaces={"m": meta_ns})
+            if (
+                (meta_version and meta_version[0].get("version") == "4.0") or
+                os.path.splitext(metalink_path)[-1] == ".meta4"
+            ):
+                ns_xpath = f"/m:metalink/m:file[{index}]/m:metaurl"
+            else:
+                ns_xpath = f"/m:metalink/m:files/m:file[{index}]/m:resources[1]/m:url"
+            nc_file_url = str(xml_data.xpath(f"string({ns_xpath})", namespaces={"m": meta_ns}))
+            if not is_netcdf_url(nc_file_url):
+                raise ValueError(f"Resolved file URL [{nc_file_url}] is not a valid NetCDF reference.")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
             LOGGER.debug("NetCDF file URL : %s", nc_file_url)
             fetch_file(nc_file_url, output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
-        LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
+        LOGGER.error("Process '%s' raised an unhandled exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 
 
-def main():
+def main(*args):
+    # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", metavar="metalink", type=str,
+    parser.add_argument("-i", metavar="metalink", type=str, required=True,
                         help="Metalink file to be parsed for NetCDF file names.")
-    parser.add_argument("-n", metavar="index", type=int,
+    parser.add_argument("-n", metavar="index", type=int, required=True,
                         help="Index of the specific NetCDF file to extract. First element's index is 1.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the Metalink file.")
-    args = parser.parse_args()
+    args = parser.parse_args(args)
     sys.exit(m2n(args.i, args.n, args.o))
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])

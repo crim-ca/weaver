@@ -45,7 +45,7 @@ Element = lxml_etree.Element
 ParseError = lxml_etree.ParseError
 
 # define this type here so that code can use it for actual logic without repeating 'noqa'
-XML = lxml_etree._Element  # noqa
+XML = lxml_etree._ElementTree  # noqa
 
 # save a local reference to method employed by OWSLib directly called
 _lxml_fromstring = lxml_etree.fromstring
