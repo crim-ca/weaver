@@ -1,0 +1,41 @@
+<!--
+    Response body of execute status from process.
+    Test using it must substitute following variables:
+
+        - TEST_SERVER_URL: location where the service resides
+        - PROCESS_ID: identifier of the process being executed
+        - LOCATION_XML: location of 'this' simulated status XML file
+        - OUTPUT_FILE_URL/OUTPUT_LOG_FILE_URL: location of result files
+-->
+<wps:ExecuteResponse
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+        service="WPS" version="1.0.0" xml:lang="en-US"
+        serviceInstance="{TEST_SERVER_URL}?service=WPS&amp;request=GetCapabilities"
+        statusLocation="{LOCATION_XML}">
+    <wps:Process wps:processVersion="4.4.1.1">
+        <ows:Identifier>{PROCESS_ID}</ows:Identifier>
+        <ows:Title>{PROCESS_ID}</ows:Title>
+        <ows:Abstract>{PROCESS_ID}</ows:Abstract>
+    </wps:Process>
+    <wps:Status creationTime="2021-09-28T15:08:05Z">
+        <wps:ProcessSucceeded>PyWPS Process {PROCESS_ID} finished</wps:ProcessSucceeded>
+    </wps:Status>
+    <wps:ProcessOutputs>
+        <!-- execute with 'output_format=csv' is required to "generate" a ZIP in 'output' -->
+        <wps:Output>
+            <ows:Identifier>output</ows:Identifier>
+            <ows:Title>output</ows:Title>
+            <wps:Reference xlink:href="{OUTPUT_FILE_URL}" mimeType="application/zip"/>
+        </wps:Output>
+        <wps:Output>
+            <ows:Identifier>output_log</ows:Identifier>
+            <ows:Title>output_log</ows:Title>
+            <wps:Reference xlink:href="{OUTPUT_LOG_FILE_URL}" mimeType="text/plain"/>
+        </wps:Output>
+    </wps:ProcessOutputs>
+</wps:ExecuteResponse>

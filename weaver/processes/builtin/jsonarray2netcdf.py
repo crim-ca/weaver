@@ -45,7 +45,7 @@ def j2n(json_reference, output_dir):
     LOGGER.info("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
-            raise ValueError(f"Output dir [{output_dir}] does not exist.")
+            raise ValueError(f"Output directory [{output_dir}] does not exist.")
         with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.info("Verify URL reference: [%s]", json_reference)
             validate_file_reference(json_reference)
@@ -67,7 +67,7 @@ def j2n(json_reference, output_dir):
                 LOGGER.info("Fetching NetCDF reference from JSON file: [%s]", file_url)
                 fetched_nc = fetch_file(file_url, output_dir, timeout=10, retry=3)
                 LOGGER.info("Fetched NetCDF output location: [%s]", fetched_nc)
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         LOGGER.error("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
@@ -77,13 +77,13 @@ def main(*args):
     # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", metavar="json", type=str,
+    parser.add_argument("-i", metavar="json", type=str, required=True,
                         help="JSON file to be parsed for NetCDF file names.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.")
-    ns = parser.parse_args(*args)
+    ns = parser.parse_args(args)
     sys.exit(j2n(ns.i, ns.o))
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])

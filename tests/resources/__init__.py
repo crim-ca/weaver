@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
+FUNCTIONAL_APP_PKG = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/application-packages"))
 
 GET_CAPABILITIES_TEMPLATE_URL = "{}?service=WPS&request=GetCapabilities&version=1.0.0"
 DESCRIBE_PROCESS_TEMPLATE_URL = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0"
@@ -52,6 +53,8 @@ WPS_LITERAL_COMPLEX_IO_ID = "ice_days"
 WPS_LITERAL_COMPLEX_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_complex_io.xml")
 WPS_LITERAL_VALUES_IO_ID = "ensemble_grid_point_cold_spell_duration_index"
 WPS_LITERAL_VALUES_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_values_io.xml")
+WPS_LITERAL_ENUM_IO_ID = "wps_literal_enum_io"
+WPS_LITERAL_ENUM_IO_XML = os.path.join(RESOURCES_PATH, "wps_literal_enum_io.xml")
 WPS_NO_INPUTS_ID = "pavicstestdocs"
 WPS_NO_INPUTS_XML = os.path.join(RESOURCES_PATH, "wps_no_inputs.xml")
 WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(

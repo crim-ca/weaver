@@ -24,14 +24,17 @@ services:
       - mongodb
     volumes:
       # Weaver configuration
-      - ./components/weaver/config/weaver/weaver.ini:/opt/local/src/weaver/config/weaver.ini
-      - ./components/weaver/config/weaver/data_sources.yml:/opt/local/src/weaver/config/data_sources.yml
-      - ./components/weaver/config/weaver/request_options.yml:/opt/local/src/weaver/config/request_options.yml
-      - ./components/weaver/config/weaver/wps_processes.yml:/opt/local/src/weaver/config/wps_processes.yml
+      - ./config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ./config/data_sources.yml.example:/opt/local/src/weaver/config/data_sources.yml
+      - ./config/request_options.yml.example:/opt/local/src/weaver/config/request_options.yml
+      - ./config/wps_processes.yml.example:/opt/local/src/weaver/config/wps_processes.yml
       # WARNING: see detail in 'worker' definition
       - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
     networks:
+      # network 'default' is created by default by docker-compose
+      # adjust to whichever service that offers HTTP access if using more advanced networking definitions
       - default
+      - mongodb
     restart: always
     logging: *default-logging
 
@@ -49,13 +52,15 @@ services:
       #   This avoids Weaver-API to be able to run Docker commands directly.
       #   Furthermore, only the Worker has the 'docker-cli' preinstalled.
       - docker-proxy
+      - mongodb
     links:
       - mongodb
     volumes:
       # Weaver configuration
-      - ./config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
-      - ./config/data_sources.yml:/opt/local/src/weaver/config/data_sources.yml
-      - ./config/request_options.yml:/opt/local/src/weaver/config/request_options.yml
+      - ./config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ./config/data_sources.yml.example:/opt/local/src/weaver/config/data_sources.yml
+      - ./config/request_options.yml.example:/opt/local/src/weaver/config/request_options.yml
+      - ./config/wps_processes.yml.example:/opt/local/src/weaver/config/wps_processes.yml
       # WARNING:
       #   If you need to provide some credentials to provide access to protected docker repositories
       - ~/.docker/config.json:/root/.docker/config.json
@@ -103,6 +108,7 @@ services:
     # WARNING:
     #   Never expose this container's port to a public network.
     #   Other containers that require docker (weaver-worker) should communicate only through 'docker-proxy' network.
+    #   Other networks such as database connection should also be avoided to get components separated.
     networks:
       - docker-proxy
     logging: *default-logging
@@ -116,11 +122,12 @@ services:
     container_name: mongodb
     volumes:
       - /data/mongodb_persist:/data/db
-    # MongoDB crash with permission denied errors if the command is not overridden like this
-    command: bash -c 'chown -R mongodb:mongodb /data && chmod -R 755 /data && mongod'
+    networks:
+      - mongodb
     restart: always
     logging: *default-logging
 
 networks:
+  mongodb: {}
   docker-proxy:
     driver: bridge

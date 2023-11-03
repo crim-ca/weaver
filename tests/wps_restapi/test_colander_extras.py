@@ -13,7 +13,7 @@ import pytest
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import List, Tuple, Type, Union
+    from typing import List, Optional, Tuple, Type, Union
 
     from weaver.typedefs import JSON
 
@@ -946,3 +946,148 @@ def test_media_type_pattern():
             pass
         else:
             pytest.fail(f"Expected valid format from [{test_schema.__name__}] with: '{test_value}'")
+
+
+@pytest.mark.parametrize(
+    [
+        "schema",
+        "schema_include",
+        "schema_include_deserialize",
+        "schema_include_convert_type",
+        "schema_expected_deserialize",
+        "schema_expected_convert_type",
+        "schema_meta",
+        "schema_meta_include",
+        "schema_meta_include_convert_type",
+        "schema_meta_expected_convert_type",
+    ],
+    [
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", False, True, True, None, None,
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            "https://json-schema.com#", False, True, None,
+        ),
+        (
+            "https://schema.com/item", False, True, True, None, None,
+            "https://json-schema.com#", False, True, None,
+        ),
+        (
+            None, True, True, True, None, None,
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            None, True, True, None,
+        ),
+        (
+            "https://schema.com/item", True, False, True, None, "https://schema.com/item",
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, False, "https://schema.com/item", None,
+            "https://json-schema.com#", True, False, None,
+        ),
+        (
+            None, True, True, True, None, None,
+            None, True, True, None,
+        ),
+        (
+            # even when provided by attribute/argument, invalid URIs are ignored
+            # this is to avoid injecting them and generate invalid JSON schema/data instances
+            "--not-an-uri!", True, True, True, None, None,
+            "://not_an_uri", True, True, None,
+        ),
+    ]
+)
+def test_schema_ref_resolution(
+    schema,                             # type: Optional[str]
+    schema_include,                     # type: bool
+    schema_include_deserialize,         # type: bool
+    schema_include_convert_type,        # type: bool
+    schema_expected_deserialize,        # type: Optional[str]
+    schema_expected_convert_type,       # type: Optional[str]
+    schema_meta,                        # type: Optional[str]
+    schema_meta_include,                # type: bool
+    schema_meta_include_convert_type,   # type: bool
+    schema_meta_expected_convert_type,  # type: Optional[str]
+):                                      # type: (...) -> None
+    class MapByAttribute(ce.ExtendedMappingSchema):
+        title = "Item"
+        child = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    # do the same as if _schema, _schema_meta, etc. were set at the same place as 'title'
+    # but use 'setattr' here to allow combinations with/without them being set as needed
+    for schema_field, schema_value in [
+        ("_schema", schema),
+        ("_schema_include", schema_include),
+        ("_schema_include_deserialize", schema_include_deserialize),
+        ("_schema_include_convert_type", schema_include_convert_type),
+        ("_schema_meta", schema_meta),
+        ("_schema_meta_include", schema_meta_include),
+        ("_schema_meta_include_convert_type", schema_meta_include_convert_type),
+    ]:
+        setattr(MapByAttribute, schema_field, schema_value)
+
+    class MapByArgument(ce.ExtendedMappingSchema):
+        title = "Item"
+        child = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    # must be valid for both mappings above
+    test_data = {"child": "test"}
+
+    for schema_node in [
+        MapByAttribute(),
+        MapByArgument(
+            schema=schema,
+            schema_include=schema_include,
+            schema_include_deserialize=schema_include_deserialize,
+            schema_include_convert_type=schema_include_convert_type,
+            schema_meta=schema_meta,
+            schema_meta_include=schema_meta_include,
+            schema_meta_include_convert_type=schema_meta_include_convert_type,
+        ),
+    ]:
+        dispatcher = ce.OAS3TypeConversionDispatcher()
+        schema_json = dispatcher(schema_node)
+        schema_data = schema_node.deserialize(test_data)
+
+        err_msg = f"Failed using {schema_node}"
+        assert "$id" not in schema_data, err_msg
+        if schema_expected_convert_type:
+            assert "$id" in schema_json, err_msg
+            assert schema_json["$id"] == schema_expected_convert_type, err_msg
+        else:
+            assert "$id" not in schema_json, err_msg
+        if schema_expected_deserialize:
+            assert "$schema" in schema_data, err_msg
+            assert schema_data["$schema"] == schema_expected_deserialize, err_msg
+        else:
+            assert "$schema" not in schema_data, err_msg
+        if schema_meta_expected_convert_type:
+            assert "$schema" in schema_json, err_msg
+            assert schema_json["$schema"] == schema_meta_expected_convert_type, err_msg
+        else:
+            assert "$schema" not in schema_json, err_msg
+
+        # check that the remaining of the resolution is as expected
+        schema_json.pop("$id", None)
+        schema_data.pop("$id", None)
+        schema_json.pop("$schema", None)
+        schema_data.pop("$schema", None)
+        assert schema_data == test_data, err_msg
+        assert schema_json == {
+            "type": "object",
+            "title": "Item",
+            "required": ["child"],
+            "properties": {
+                "child": {"type": "string", "title": "child"}
+            },
+            "additionalProperties": {}
+        }, err_msg

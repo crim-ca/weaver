@@ -14,6 +14,7 @@ inputs:
      - iana:application/metalink+xml
      - iana:application/metalink4+xml
  index:
+   doc: Index of the MetaLink file to extract. This index is 1-based.
    type: int
    inputBinding:
      position: 2

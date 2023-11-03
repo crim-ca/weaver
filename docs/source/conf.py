@@ -57,7 +57,6 @@ extensions = [
     "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
-    "cloud_sptheme.ext.autodoc_sections",   # allow sections in docstrings code
     "sphinx.ext.githubpages",   # for publishing the doc to GitHub pages
     "sphinx.ext.todo",          # support directives
     "sphinx.ext.viewcode",      # add links to highlighted source code

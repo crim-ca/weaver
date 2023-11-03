@@ -217,12 +217,20 @@ def get_local_process(request):
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
         ctype = guess_target_format(request)
+        ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+        ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
+        proc_url = process.href(request)
         if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
             offering = process.offering(ProcessSchema.WPS, request=request)
-            return Response(offering, content_type=add_content_type_charset(ContentType.APP_XML, "UTF-8"))
+            headers = [
+                ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
+                ("Content-Type", ctype_xml),
+            ]
+            return Response(offering, headerlist=headers)
         else:
             offering = process.offering(schema)
-            return HTTPOk(json=offering)
+            headers = [("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}")]
+            return HTTPOk(json=offering, headers=headers)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")

@@ -84,8 +84,8 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
 
-    # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
+    MockConfigWPS1 = Sequence[str, str, Union[Sequence[str], Dict[str, str]]]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -673,6 +673,16 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         def test_function():
             pass
 
+    Process description ID override Mock example:
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1(
+            [ "<server-url>", "<getcaps-xml-path>", {"proc-1": "<describe-xml>", "proc-2": "<describe-xml>", ...} ]
+        )
+        def test_function():
+            pass
+
     The generated responses mock can be obtained as follows to add further request definitions to simulate:
 
     .. code-block:: python
@@ -696,12 +706,13 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         Single level or nested 2D list/tuples of 3 elements, where each one defines:
             1. WPS server URL to be mocked to simulate response contents from requests for following items.
             2. Single XML file path to the expected response body of a server ``GetCapabilities`` request.
-            3. List of XML file paths to one or multiple expected response body of ``DescribeProcess`` requests.
+            3. List of XML file paths or data to one or multiple expected response body of ``DescribeProcess`` requests,
+               or mapping of desired process ID to their corresponding ``DescribeProcess`` XML file path or string data.
     :param mock_responses:
         Handle to the generated mock instance by this decorator on the first wrapped call to add more configurations.
         In this case, wrapper function is not returned.
     :param data:
-        Flag indicating that provided strings are the literal data instead of file references.
+        Flag indicating that provided strings are directly the XML data instead of file references.
         All server configurations must be file OR data references, no mixing between them supported.
     :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
@@ -718,20 +729,33 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
 
     for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
         assert isinstance(resource_xml_getcap, str)
-        assert isinstance(resource_xml_describe, (set, list, tuple))
+        assert isinstance(resource_xml_describe, (set, list, tuple, dict))
         if not data:
             assert os.path.isfile(resource_xml_getcap)
-            assert all(os.path.isfile(file) for file in resource_xml_describe)
+            if isinstance(resource_xml_describe, dict):
+                assert all(os.path.isfile(file) for file in resource_xml_describe.values())
+            else:
+                assert all(os.path.isfile(file) for file in resource_xml_describe)
+        if isinstance(resource_xml_describe, dict):
+            map_describe = list(resource_xml_describe.items())
+        else:
+            map_describe = [(None, desc) for desc in resource_xml_describe]
 
         get_cap_xml = get_xml(resource_xml_getcap)
         version_query = "&version=1.0.0"
         get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
-        for proc_desc_xml in resource_xml_describe:
+        for map_desc_id, proc_desc_xml in map_describe:
             describe_xml = get_xml(proc_desc_xml)
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
+            if map_desc_id is not None and map_desc_id != proc_desc_id:
+                describe_xml = describe_xml.replace(
+                    f"<ows:Identifier>{proc_desc_id}</ows:Identifier>",
+                    f"<ows:Identifier>{map_desc_id}</ows:Identifier>",
+                )
+                proc_desc_id = map_desc_id
             proc_desc_url = f"{test_server_wps}?service=WPS&request=DescribeProcess&identifier={proc_desc_id}"
             all_request.add((responses.GET, proc_desc_url, describe_xml))
             all_request.add((responses.GET, proc_desc_url + version_query, describe_xml))

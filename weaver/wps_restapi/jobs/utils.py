@@ -328,7 +328,7 @@ def get_results(job,                                # type: Job
     :param schema:
         Selects which schema to employ for representing the output results (listing or mapping).
     :param link_references:
-        If enabled, an output that was requested by reference instead of value will be returned as ``Link`` reference.
+        If enabled, an output that was requested by reference instead of by value will be returned as ``Link`` header.
     :returns:
         Tuple with:
             - List or mapping of all outputs each with minimally an ID and value under the requested key.

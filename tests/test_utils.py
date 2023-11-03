@@ -648,7 +648,7 @@ def test_request_extra_zero_values():
 
     # since backoff factor multiplies all incrementally increasing delays between requests,
     # proper detection of input backoff=0 makes all sleep calls equal to zero
-    assert all(backoff == 0 for backoff in sleep_counter["called_with"])
+    assert all([backoff == 0 for backoff in sleep_counter["called_with"]])
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
 
 

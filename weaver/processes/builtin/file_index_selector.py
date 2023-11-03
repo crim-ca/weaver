@@ -59,12 +59,12 @@ def main(*args):
     # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-f", "--files", type=str, nargs="+", help="Files from which to select.")
-    parser.add_argument("-i", "--index", type=int, help="Index of the file to select.")
+    parser.add_argument("-f", "--files", type=str, required=True, nargs="+", help="Files from which to select.")
+    parser.add_argument("-i", "--index", type=int, required=True, help="Index of the file to select.")
     parser.add_argument("-o", "--outdir", default=CUR_DIR, help="Output directory of the selected file.")
-    ns = parser.parse_args(*args)
+    ns = parser.parse_args(args)
     sys.exit(select(ns.files, ns.index, ns.outdir))
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])
