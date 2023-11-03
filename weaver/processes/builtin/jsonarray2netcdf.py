@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # pylint: disable=C0413,wrong-import-order
 from weaver import WEAVER_ROOT_DIR  # isort:skip # noqa: E402
 from weaver.formats import repr_json  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import is_netcdf_url, validate_file_reference  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import is_netcdf_url, validate_reference  # isort:skip # noqa: E402
 from weaver.utils import fetch_file, get_secure_path  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -48,7 +48,7 @@ def j2n(json_reference, output_dir):
             raise ValueError(f"Output directory [{output_dir}] does not exist.")
         with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.info("Verify URL reference: [%s]", json_reference)
-            validate_file_reference(json_reference)
+            validate_reference(json_reference, is_file=True)
             LOGGER.info("Fetching JSON file: [%s]", json_reference)
             json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)
             json_path = get_secure_path(json_path)
@@ -61,7 +61,7 @@ def j2n(json_reference, output_dir):
             LOGGER.info("Parsing JSON file references from file contents:\n%s", repr_json(json_content))
             for file_url in json_content:
                 LOGGER.info("Validate NetCDF reference from JSON file: [%s]", file_url)
-                validate_file_reference(file_url)
+                validate_reference(file_url, is_file=True)
                 if not is_netcdf_url(file_url):
                     raise ValueError(f"Invalid file format for [{file_url}], expected a NetCDF file URL.")
                 LOGGER.info("Fetching NetCDF reference from JSON file: [%s]", file_url)

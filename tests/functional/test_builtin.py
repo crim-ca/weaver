@@ -448,7 +448,7 @@ def test_jsonarray2netcdf_process():
         [
             "/tmp/does-not-exist/fake-file.txt",  # noqa
             "/tmp/does-not-exist/fake-file.nc",  # noqa
-        ]
+        ],
     ]
 )
 def test_jsonarray2netcdf_invalid_json(test_data):
@@ -461,7 +461,12 @@ def test_jsonarray2netcdf_invalid_json(test_data):
 
         with pytest.raises(ValueError) as err:
             jsonarray2netcdf.main("-i", tmp_file.name, "-o", tmp_out_dir)
-        assert str(err.value) == "Invalid JSON file format, expected a plain array of NetCDF file URL strings."
+        valid_errors = [
+            "Invalid JSON file format, expected a plain array of NetCDF file URL strings.",
+            "Invalid file format",
+            "Not a valid file URL reference",
+        ]
+        assert any(error in str(err.value) for error in valid_errors), f"Raised error [{err.value}] was not expected"
 
 
 @pytest.mark.parametrize(

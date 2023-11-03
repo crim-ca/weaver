@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
 from weaver import WEAVER_ROOT_DIR  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import validate_file_reference  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import validate_reference  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 PACKAGE_BASE = __file__.rsplit(WEAVER_ROOT_DIR.rstrip("/") + "/", 1)[-1].rsplit(PACKAGE_NAME)[0]
@@ -38,7 +38,7 @@ OUTPUT_CWL_JSON = "cwl.output.json"
 def process(input_file, output_dir):
     # type: (str, str) -> None
     LOGGER.info("Got arguments: input_file=%s output_dir=%s", input_file, output_dir)
-    validate_file_reference(input_file)
+    validate_reference(input_file, is_file=True)
     output_data = {"output": [input_file]}
     with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
         return json.dump(output_data, file)

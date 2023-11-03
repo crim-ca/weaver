@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
 from weaver import WEAVER_ROOT_DIR  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import validate_file_reference  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import validate_reference  # isort:skip # noqa: E402
 from weaver.utils import OutputMethod, fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -46,7 +46,7 @@ def select(files, index, output_dir):
         if not os.path.isdir(output_dir):
             raise ValueError(f"Output dir [{output_dir}] does not exist.")
         file_path = files[index]
-        validate_file_reference(file_path)
+        validate_reference(file_path, is_file=True)
         fetch_file(file_path, output_dir, out_method=OutputMethod.COPY)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor

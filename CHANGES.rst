@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Add more secure path validations steps before fetching contents.
 - Disallow ``builtin`` processes expecting a user-provided input path to run with local file references such that
   they must respect any configured server-side remote file access rules instead of bypassing security validations
   through resolved local paths.

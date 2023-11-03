@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
 from weaver import WEAVER_ROOT_DIR, xml_util  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import validate_file_reference  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import validate_reference  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 from weaver.processes.builtin.utils import is_netcdf_url  # isort:skip # noqa: E402
 
@@ -47,7 +47,7 @@ def m2n(metalink_reference, index, output_dir):
         if not os.path.isdir(output_dir):
             raise ValueError(f"Output dir [{output_dir}] does not exist.")
         LOGGER.info("Validating Metalink file: [%s]", metalink_reference)
-        validate_file_reference(metalink_reference)
+        validate_reference(metalink_reference, is_file=True)
         with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.info("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
@@ -67,7 +67,7 @@ def m2n(metalink_reference, index, output_dir):
             if not is_netcdf_url(nc_file_url):
                 raise ValueError(f"Resolved file URL [{nc_file_url}] is not a valid NetCDF reference.")
             LOGGER.info("Validating NetCDF reference: [%s]", nc_file_url)
-            validate_file_reference(nc_file_url)
+            validate_reference(nc_file_url, is_file=True)
             LOGGER.info("Fetching NetCDF reference [%s] from Metalink file [%s]", nc_file_url, metalink_reference)
             fetch_file(nc_file_url, output_dir)
     except Exception as exc:

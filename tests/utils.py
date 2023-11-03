@@ -877,18 +877,18 @@ class FileServer(SimpleHTTPTestServer):
     Contrary to :func:`mocked_file_server` where requests are captured and redirected to the corresponding files,
     this server receives *real* requests (via a socket) and returns matched files. This is particularly important
     during tests that call subprocesses independently of the main Python test process
-    (e.g.: :term:`CWL` ``CommandLineTool` for a ``Builtin`` :term:`Process`), because mocks applied in the main
-    process are not reflected in the other ones.
+    (e.g.: :term:`CWL` ``CommandLineTool` for a ``Builtin`` :term:`Process`), because mocks applied in the main test
+    process are not reflected in the other subprocesses.
 
     .. warning::
         This server takes more time to start than usual mocks. Use it sparingly, and consider maintaining a single
-         instance over multiple tests of a complete test suite rather than recreating a server for each test.
+        instance over multiple tests of a complete test suite rather than recreating a server for each test.
     """
     def __init__(self):  # pylint: disable=W0231
         self._port = self.get_port()
         self._uri = f"http://0.0.0.0:{self._port}"
 
-        # purposely call 'HTTPTestServer' instead of 'SimpleHTTPTestServer' to enforce the URI
+        # purposely call 'HTTPTestServer' instead of 'SimpleHTTPTestServer' to enforce the URI hostname
         # otherwise, 'socket.gethostname()' is used (machine name), and the obtained URI fails our schema validation
         HTTPTestServer.__init__(self, hostname="0.0.0.0", port=self._port, uri=self._uri)  # pylint: disable=W0233
         self.cwd = self.document_root
