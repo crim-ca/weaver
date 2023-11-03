@@ -1,15 +1,12 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
-# FIXME:
-#  replace invalid 'Optional' (type or None) used instead of 'NotRequired' (optional key) when better supported
-#  https://youtrack.jetbrains.com/issue/PY-53611/Support-PEP-655-typingRequiredtypingNotRequired-for-TypedDicts
 if TYPE_CHECKING:
     import os
     import sys
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil

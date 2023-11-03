@@ -1,3 +1,4 @@
+import functools
 from typing import Tuple, Union
 
 try:
@@ -38,3 +39,8 @@ except ImportError:  # pragma: no cover  # for backward compatibility
         @property
         def micro(self) -> int:
             return self.patch
+
+try:
+    from functools import cache
+except ImportError:  # python<3.9
+    cache = functools.lru_cache(maxsize=None)

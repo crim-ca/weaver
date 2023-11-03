@@ -1,4 +1,3 @@
-import functools
 import logging
 import os
 import sys
@@ -13,6 +12,7 @@ from cwltool.job import CommandLineJob, JobBase
 from cwltool.singularity import SingularityCommandLineJob
 
 from weaver import WEAVER_ROOT_DIR
+from weaver.compat import cache
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
@@ -51,7 +51,7 @@ __all__ = [
 ]
 
 
-@functools.cache
+@cache
 def get_builtin_reference_mapping(root=WEAVER_BUILTIN_DIR):
     # type: (os.PathLike[str]) -> Dict[str, BuiltinResourceMap]
     """
