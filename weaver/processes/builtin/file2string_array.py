@@ -15,12 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver import WEAVER_ROOT_DIR  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import validate_reference  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import get_package_details, validate_reference  # isort:skip # noqa: E402
 
-PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
-PACKAGE_BASE = __file__.rsplit(WEAVER_ROOT_DIR.rstrip("/") + "/", 1)[-1].rsplit(PACKAGE_NAME)[0]
-PACKAGE_MODULE = f"{PACKAGE_BASE}{PACKAGE_NAME}".replace("/", ".")
+PACKAGE_NAME, PACKAGE_BASE, PACKAGE_MODULE = get_package_details(__file__)
 
 # setup logger since it is not run from the main 'weaver' app
 LOGGER = logging.getLogger(PACKAGE_MODULE)

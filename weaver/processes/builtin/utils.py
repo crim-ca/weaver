@@ -1,9 +1,13 @@
 import os
 import tempfile
-from typing import Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from weaver import WEAVER_ROOT_DIR
 from weaver.formats import ContentType, get_extension
+
+if TYPE_CHECKING:
+    from typing import Any, Tuple
 
 
 def is_netcdf_url(url):
@@ -49,3 +53,15 @@ def validate_reference(url, is_file):
         return
     if urlparse(url).scheme not in ["http", "https", "s3"]:
         raise ValueError(f"Not a valid file URL reference [{url}]. Scheme not supported.")
+
+
+def get_package_details(file):
+    # type: (os.PathLike[str]) -> Tuple[str, str, str]
+    """
+    Obtains the ``builtin`` process details from its file reference.
+    """
+    name = os.path.split(os.path.splitext(file)[0])[-1]
+    root = WEAVER_ROOT_DIR.rstrip("/")  # avoid double //
+    path = str(file).rsplit(f"{root}/", 1)[-1].rsplit(name)[0]
+    mod = f"{path}{name}".replace("/", ".")
+    return name, path, mod
