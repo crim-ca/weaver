@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.35.0:
+
+`4.35.0 <https://github.com/crim-ca/weaver/tree/4.35.0>`_ (2023-11-03)
+========================================================================
+
+Changes:
+--------
 - Add more secure path validations steps before fetching contents.
 - Disallow ``builtin`` processes expecting a user-provided input path to run with local file references such that
   they must respect any configured server-side remote file access rules instead of bypassing security validations
