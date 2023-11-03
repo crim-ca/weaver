@@ -12,11 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
+  ``file_index_selector`` with validation of happy path and error handling conditions.
 
 Fixes:
 ------
-- No change.
+- Fix invalid parsing of `XML` Metalink files in ``metalink2netcdf``. Metalink V3 and V4 will now properly consider the
+  namespace and specific content structure to extract the NetCDF URL reference, and the `Process` will validate that the
+  extracted reference respects the NetCDF extension.
 
 .. _changes_4.34.0:
 
