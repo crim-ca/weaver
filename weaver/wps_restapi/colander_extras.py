@@ -1158,8 +1158,13 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                     var_cross_invalid.add(colander.Invalid(self, msg=match_msg))
                 raise var_cross_invalid
 
-    def _validate_unmatched_variable_mapping(self, variable_mapping, invalid_mapping, constant_children_schema_names, cstruct):
-        # type: (VariableSchemaNodeMapping, Dict[str, colander.Invalid], List[str], JSON) -> None
+    def _validate_unmatched_variable_mapping(
+        self,
+        variable_mapping,                   # type: VariableSchemaNodeMapping
+        invalid_mapping,                    # type: Dict[str, colander.Invalid]
+        constant_children_schema_names,     # type: List[str]
+        cstruct,                            # type: JSON
+    ):                                      # type: (...) -> None
         """
         Validate if any additional properties that could not be mapped by variables are permitted in the mapping schema.
         """
@@ -1173,7 +1178,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                     value=cstruct,
                 )
                 for child_name in missing_child_names:
-                    for var_name, var_unmapped_invalid in invalid_mapping.items():
+                    for var_unmapped_invalid in invalid_mapping.values():
                         for var_child_instance_invalid in var_unmapped_invalid.children:
                             if var_child_instance_invalid.pos == child_name:
                                 var_child_instance_invalid.pos = f"{var_child_instance_invalid.node.name}({child_name})"

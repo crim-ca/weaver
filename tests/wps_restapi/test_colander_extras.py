@@ -4,8 +4,8 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
-import json
 import inspect
+import json
 from typing import TYPE_CHECKING
 
 import colander

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
-    DataStrType = TypeVar("DataStrType")
+    DataStrT = TypeVar("DataStrT")
 
 LOGGER = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class ContentEncoding(Constants):
     @staticmethod
     @overload
     def encode(data, encoding=BASE64, binary=None):
-        # type: (DataStrType, ContentEncoding, Literal[None]) -> DataStrType
+        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
         ...
 
     @staticmethod
@@ -228,7 +228,7 @@ class ContentEncoding(Constants):
     @staticmethod
     @overload
     def decode(data, encoding=BASE64, binary=None):
-        # type: (DataStrType, ContentEncoding, Literal[None]) -> DataStrType
+        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
         ...
 
     @staticmethod
@@ -785,11 +785,11 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         try:
             for _ in range(retries):
                 try:
-                    resp = urlopen(_media_type_url, timeout=2)  # nosec: B310 # hardcoded HTTP(S) # pylint: disable=R1732
+                    with urlopen(_media_type_url, timeout=2) as resp:  # nosec: B310  # IANA scheme guaranteed HTTP
+                        if resp.code == HTTPOk.code:
+                            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
                 except socket.timeout:
                     continue
-                if resp.code == HTTPOk.code:
-                    return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
                 break
         except HTTPError:
             pass

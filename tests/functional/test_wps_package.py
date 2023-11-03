@@ -188,7 +188,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        ogc_api_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579"
 
         desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
@@ -202,32 +201,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # check obtained/extended schemas case by case based on expected merging of definitions
         assert desc["inputs"]["arrayInput"]["schema"] == ref["inputs"]["arrayInput"]["schema"]  # no change
         assert desc["inputs"]["boundingBoxInput"]["schema"] == {
-            # what is referenced by $ref, converted to $id after retrieval
-            "type": "object",
-            "properties": {
-                "crs": {
-                    "type": "string",
-                    "format": "uri",
-                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    "enum": [
-                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-                    ]
+            "oneOf": [
+                {
+                    # what is referenced by $ref, converted to $id after retrieval
+                    "type": "object",
+                    "properties": {
+                        "crs": {
+                            "type": "string",
+                            "format": "uri",
+                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "enum": [
+                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                            ]
+                        },
+                        "bbox": {
+                            "type": "array",
+                            "items": "number",
+                            "oneOf": [
+                                {"minItems": 4, "maxItems": 4},
+                                {"minItems": 6, "maxItems": 6},
+                            ]
+                        }
+                    },
+                    "required": ["bbox"],
+                    # merged:
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    # added:
+                    "$id": sd.OGC_API_BBOX_SCHEMA,
                 },
-                "bbox": {
-                    "type": "array",
-                    "items": "number",
-                    "oneOf": [
-                        {"minItems": 4, "maxItems": 4},
-                        {"minItems": 6, "maxItems": 6},
-                    ]
+                {
+                    "type": "string",
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
                 }
-            },
-            "required": ["bbox"],
-            # merged:
-            "format": OGC_API_BBOX_FORMAT,
-            # added:
-            "$id": sd.OGC_API_BBOX_SCHEMA,
+            ]
         }
         assert desc["inputs"]["complexObjectInput"]["schema"] == {
             "oneOf": [
@@ -333,32 +341,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         #   *everything else* should be identical to inputs
         assert desc["outputs"]["arrayOutput"]["schema"] == ref["outputs"]["arrayOutput"]["schema"]  # no change
         assert desc["outputs"]["boundingBoxOutput"]["schema"] == {
-            # what is referenced by $ref, converted to $id after retrieval
-            "type": "object",
-            "properties": {
-                "crs": {
-                    "type": "string",
-                    "format": "uri",
-                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    "enum": [
-                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-                    ]
+            "oneOf": [
+                {
+                    # what is referenced by $ref, converted to $id after retrieval
+                    "type": "object",
+                    "properties": {
+                        "crs": {
+                            "type": "string",
+                            "format": "uri",
+                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "enum": [
+                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                            ]
+                        },
+                        "bbox": {
+                            "type": "array",
+                            "items": "number",
+                            "oneOf": [
+                                {"minItems": 4, "maxItems": 4},
+                                {"minItems": 6, "maxItems": 6},
+                            ]
+                        }
+                    },
+                    "required": ["bbox"],
+                    # merged:
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    # added:
+                    "$id": sd.OGC_API_BBOX_SCHEMA,
                 },
-                "bbox": {
-                    "type": "array",
-                    "items": "number",
-                    "oneOf": [
-                        {"minItems": 4, "maxItems": 4},
-                        {"minItems": 6, "maxItems": 6},
-                    ]
+                {
+                    "type": "string",
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
                 }
-            },
-            "required": ["bbox"],
-            # merged:
-            "format": sd.OGC_API_BBOX_FORMAT,
-            # added:
-            "$id": sd.OGC_API_BBOX_SCHEMA,
+            ]
         }
         assert desc["outputs"]["complexObjectOutput"]["schema"] == {
             "oneOf": [

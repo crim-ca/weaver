@@ -13,7 +13,7 @@ from tests.functional.utils import WpsConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, repr_json
-from weaver.processes.builtin import register_builtin_processes, jsonarray2netcdf
+from weaver.processes.builtin import jsonarray2netcdf, register_builtin_processes
 from weaver.status import Status
 from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
@@ -759,5 +759,5 @@ def test_jsonarray2netcdf_process():
             nc_name = os.path.split(nc_file)[-1]
             nc_path = os.path.join(tmp_out_dir, nc_name)
             assert os.path.isfile(nc_path)
-            with open(nc_path, "r") as nc_ref:
+            with open(nc_path, mode="r", encoding="utf-8") as nc_ref:
                 assert nc_ref.read() == nc_data

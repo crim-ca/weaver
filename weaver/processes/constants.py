@@ -5,21 +5,21 @@ from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
-IO_Select_Input = Literal["input"]  # pylint: disable=C0103
-IO_Select_Output = Literal["output"]  # pylint: disable=C0103
-IO_Select_Type = Literal[IO_Select_Input, IO_Select_Output]  # pylint: disable=C0103
-IO_INPUT = get_args(IO_Select_Input)[0]  # pylint: disable=C0103
-IO_OUTPUT = get_args(IO_Select_Output)[0]  # pylint: disable=C0103
+IO_SelectInput_Type = Literal["input"]
+IO_SelectOutput_Type = Literal["output"]
+IO_Select_Type = Literal[IO_SelectInput_Type, IO_SelectOutput_Type]
+IO_INPUT = get_args(IO_SelectInput_Type)[0]
+IO_OUTPUT = get_args(IO_SelectOutput_Type)[0]
 
-WPS_Literal_Type = Literal["literal"]  # pylint: disable=C0103
-WPS_Reference_Type = Literal["reference"]  # pylint: disable=C0103
-WPS_Complex_Type = Literal["complex"]  # pylint: disable=C0103
+WPS_Literal_Type = Literal["literal"]
+WPS_Reference_Type = Literal["reference"]
+WPS_Complex_Type = Literal["complex"]
 WPS_COMPLEX = get_args(WPS_Complex_Type)[0]
-WPS_ComplexData_Type = Literal["ComplexData"]  # pylint: disable=C0103
-WPS_BoundingBoxData_Type = Literal["BoundingBoxData"]  # pylint: disable=C0103
-WPS_BoundingBox_Type = Literal["bbox"]  # pylint: disable=C0103
+WPS_ComplexData_Type = Literal["ComplexData"]
+WPS_BoundingBoxData_Type = Literal["BoundingBoxData"]
+WPS_BoundingBox_Type = Literal["bbox"]
 WPS_BOUNDINGBOX = get_args(WPS_BoundingBox_Type)[0]
-WPS_Category_Type = Union[  # pylint: disable=C0103
+WPS_CategoryType = Union[
     WPS_Literal_Type,
     WPS_Reference_Type,
     WPS_ComplexData_Type,
@@ -30,17 +30,17 @@ WPS_REFERENCE = get_args(WPS_Reference_Type)[0]
 WPS_COMPLEX_DATA = get_args(WPS_ComplexData_Type)[0]
 WPS_BOUNDINGBOX_DATA = get_args(WPS_BoundingBoxData_Type)[0]
 
-WPS_LiteralDataBoolean_Type = Literal["bool", "boolean"]  # pylint: disable=C0103
+WPS_LiteralDataBoolean_Type = Literal["bool", "boolean"]
 WPS_LITERAL_DATA_BOOLEAN = frozenset(get_args(WPS_LiteralDataBoolean_Type))
-WPS_LiteralDataDateTime_Type = Literal["date", "time", "dateTime"]  # pylint: disable=C0103
+WPS_LiteralDataDateTime_Type = Literal["date", "time", "dateTime"]
 WPS_LITERAL_DATA_DATETIME = frozenset(get_args(WPS_LiteralDataDateTime_Type))
-WPS_LiteralDataFloat_Type = Literal["scale", "angle", "float", "double"]  # pylint: disable=C0103
+WPS_LiteralDataFloat_Type = Literal["scale", "angle", "float", "double"]
 WPS_LITERAL_DATA_FLOAT = frozenset(get_args(WPS_LiteralDataFloat_Type))
-WPS_LiteralDataInteger_Type = Literal[  # pylint: disable=C0103
+WPS_LiteralDataInteger_Type = Literal[
     "int", "integer", "long", "positiveInteger", "nonNegativeInteger"
 ]
 WPS_LITERAL_DATA_INTEGER = frozenset(get_args(WPS_LiteralDataInteger_Type))
-WPS_LiteralDataString_Type = Literal["anyURI", "string"]  # pylint: disable=C0103
+WPS_LiteralDataString_Type = Literal["anyURI", "string"]
 WPS_LITERAL_DATA_STRING = frozenset(get_args(WPS_LiteralDataString_Type))
 WPS_LiteralData_Type = Literal[
     WPS_LiteralDataBoolean_Type,
@@ -53,7 +53,7 @@ WPS_LITERAL_DATA_TYPES = frozenset(get_args(WPS_LiteralData_Type))
 
 # WPS 'type' string variations employed to indicate a Complex (file) I/O by different libraries
 # for literal types, see 'any2cwl_literal_datatype' and 'any2wps_literal_datatype' functions
-WPS_ComplexType = Literal[WPS_Complex_Type, WPS_ComplexData_Type, WPS_Reference_Type]  # pylint: disable=C0103
+WPS_ComplexType = Literal[WPS_Complex_Type, WPS_ComplexData_Type, WPS_Reference_Type]
 WPS_COMPLEX_TYPES = frozenset(get_args(WPS_ComplexType))
 
 # WPS 'type' string of all combinations (type of data / library implementation)

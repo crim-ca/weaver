@@ -1955,7 +1955,7 @@ class WpsPackage(Process):
         input_definition.data = input_value
 
         # make sure the file is generated with its contents
-        with open(input_definition.file, "w") as bbox_file:
+        with open(input_definition.file, mode="w", encoding="utf-8") as bbox_file:
             json.dump(input_value, bbox_file, ensure_ascii=False)
 
     def make_location_input_security_check(self, input_scheme, input_type, input_id, input_location, input_definition):

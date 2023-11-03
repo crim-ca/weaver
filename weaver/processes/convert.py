@@ -10,18 +10,18 @@ from collections import OrderedDict
 from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
-from dateutil import parser as date_parser
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, overload
 from urllib.parse import unquote, urlparse
 
 import colander
 import pint
+from dateutil import parser as date_parser
 from owslib.wps import ComplexData, Metadata as OWS_Metadata, is_reference
 from pywps import OGCUNIT, Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicBoundingBox, BasicComplex, BasicIO, UOM
+from pywps.inout.basic import UOM, BasicBoundingBox, BasicComplex, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, LITERAL_DATA_TYPES, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -86,7 +86,7 @@ from weaver.processes.constants import (
     IO_Select_Type,
     JobInputsOutputsSchema,
     ProcessSchema,
-    WPS_Category_Type
+    WPS_CategoryType
 )
 from weaver.utils import (
     SchemaRefResolver,
@@ -304,7 +304,7 @@ def convert_value_units(value, uom, to):
 def complex2json(data):
     # type: (Union[ComplexData, Any]) -> Union[JSON, Any]
     """
-    Obtains the JSON representation of a :class:`ComplexData` or simply return the unmatched type.
+    Obtains the :term:`JSON` representation of a :class:`ComplexData` or simply return the unmatched type.
     """
     if not isinstance(data, ComplexData):
         return data
@@ -324,9 +324,9 @@ def complex2json(data):
 def metadata2json(meta, force=False):
     # type: (Union[ANY_Metadata_Type, Any], bool) -> Union[JSON, Any]
     """
-    Retrieve metadata information and generate its JSON representation.
+    Retrieve metadata information and generate its :term:`JSON` representation.
 
-    Obtains the JSON representation of a :class:`OWS_Metadata` or :class:`pywps.app.Common.Metadata`.
+    Obtains the :term:`JSON` representation of a :class:`OWS_Metadata` or :class:`pywps.app.Common.Metadata`.
     Otherwise, simply return the unmatched type.
     If requested, can enforce parsing a dictionary for the corresponding keys.
     """
@@ -467,10 +467,11 @@ def ows2json_output_data(output, process_description, container=None):
     If the ``dataType`` details is missing from the data output (depending on servers that might omit it), the
     :paramref:`process_description` is employed to retrieve the original description with expected result details.
 
-    :param output: output with data value or reference according to expected result for the corresponding process.
-    :param process_description: definition of the process producing the specified output following execution.
-    :param container: container to retrieve application settings (for request options during file retrieval as needed).
-    :return: converted JSON result data and additional metadata as applicable based on data-type and content-type.
+    :param output: Output with data value or reference according to expected result for the corresponding process.
+    :param process_description: Definition of the process producing the specified output following execution.
+    :param container: Container to retrieve application settings (for request options during file retrieval as needed).
+    :return:
+        Converted :term:`JSON` result data and additional metadata as applicable based on data-type and content-type.
     """
 
     if not output.dataType:
@@ -483,7 +484,7 @@ def ows2json_output_data(output, process_description, container=None):
         "identifier": output.identifier,
         "title": output.title,
         "dataType": output.dataType,
-        "data": None,  # type: JSON
+        "data": None,
     }
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
@@ -565,14 +566,14 @@ def _get_multi_json_references(output, container):
     Obtains the :term:`JSON` contents of a single output corresponding to multi-file references.
 
     Since WPS standard does not allow to return multiple values for a single output,
-    a lot of process actually return a JSON array containing references to these outputs.
+    a lot of process actually return a :term:`JSON` array containing references to these outputs.
 
     Because the multi-output references are contained within this :term:`JSON` file, it is not very convenient to
     retrieve the list of URLs as one always needs to open and read the file to get them. This function goal is to
     detect this particular format and expand the references to make them quickly available in the job output response.
 
     :return:
-        Array of HTTP(S) references if the specified output is effectively a JSON containing that, ``None`` otherwise.
+        Array of HTTP(S) references if the specified output a :term:`JSON` with URL references, ``None`` otherwise.
     """
     # Check for the json datatype and mime-type
     if output.dataType == WPS_COMPLEX_DATA and output.mimeType == ContentType.APP_JSON:
@@ -602,7 +603,7 @@ def _get_multi_json_references(output, container):
 
 
 def get_io_type_category(io_info):
-    # type: (ANY_IO_Type) -> WPS_Category_Type
+    # type: (ANY_IO_Type) -> WPS_CategoryType
     """
     Guesses the applicable :term:`I/O` type with provided information from any known :term:`I/O` structure.
     """
@@ -2808,7 +2809,9 @@ def oas_resolve_remote(io_info):
     :term:`I/O` type.
 
     :param io_info: :term:`I/O` :term:`OpenAPI` schema to attempt resolution as applicable.
-    :return: Resolved :term:`I/O` schema or directly the provided schema returned unmodified if no references need resolution.
+    :return:
+        Resolved :term:`I/O` schema or directly the provided schema returned unmodified if no references need
+        resolution.
     """
     # retrieve external schema reference (possibly nested)
     io_href = get_field(io_info, "$ref", search_variations=False, pop_found=True)
