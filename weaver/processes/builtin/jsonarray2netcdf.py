@@ -41,7 +41,7 @@ def j2n(json_reference, output_dir):
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
         if not os.path.isdir(output_dir):
-            raise ValueError(f"Output dir [{output_dir}] does not exist.")
+            raise ValueError(f"Output directory [{output_dir}] does not exist.")
         with TemporaryDirectory(prefix=f"wps_process_{PACKAGE_NAME}_") as tmp_dir:
             LOGGER.debug("Fetching JSON file: [%s]", json_reference)
             json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)

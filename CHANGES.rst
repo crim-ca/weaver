@@ -21,6 +21,8 @@ Changes:
   with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 - Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
   input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
+  ``file_index_selector`` with validation of happy path and error handling conditions.
 
 .. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
 .. |oap_echo| replace:: ``EchoProcess``
@@ -53,6 +55,9 @@ Fixes:
   original `Process` definition, including any additional parameters and sub-types.
 - Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
   using ``missing=colander.drop``.
+- Fix invalid parsing of `XML` Metalink files in ``metalink2netcdf``. Metalink V3 and V4 will now properly consider the
+  namespace and specific content structure to extract the NetCDF URL reference, and the `Process` will validate that the
+  extracted reference respects the NetCDF extension.
 
 .. _changes_4.34.0:
 
