@@ -25,8 +25,8 @@ pytest<7
 pytest-rerunfailures
 pydocstyle
 # FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
-pylint>=2.15.4,<3; python_version >= "3.7"
-pylint-per-file-ignores; python_version >= "3.7"
+pylint>=2.15.4,<3
+pylint-per-file-ignores
 pylint_quotes
 responses
 safety
