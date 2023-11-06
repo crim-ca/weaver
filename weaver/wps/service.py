@@ -2,7 +2,7 @@ import logging
 import os
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import urlparse
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
