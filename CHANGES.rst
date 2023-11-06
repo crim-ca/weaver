@@ -14,6 +14,7 @@ Changes:
 --------
 - Drop Python 3.7 support.
 - Add Python 3.12 to GitHub CI experimental builds.
+- Bump ``werkzeug>=3.0.1`` to resolve security vulnerability from the package.
 
 Fixes:
 ------
