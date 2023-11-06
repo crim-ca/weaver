@@ -63,8 +63,8 @@ if TYPE_CHECKING:
     from webob.multidict import MultiDict as PyramidMultiDict
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
-    from werkzeug.wrappers import Request as WerkzeugRequest
     from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
+    from werkzeug.wrappers import Request as WerkzeugRequest
 
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
