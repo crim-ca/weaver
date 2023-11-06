@@ -24,7 +24,7 @@ from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import extend_instance, get_header, get_registry, get_settings, get_weaver_url
+from weaver.utils import extend_instance, get_header, get_registry, get_request_args, get_settings, get_weaver_url
 from weaver.visibility import Visibility
 from weaver.wps.storage import ReferenceStatusLocationStorage
 from weaver.wps.utils import (
@@ -202,7 +202,8 @@ class WorkerService(ServiceWPS):
 
         # create the JSON payload from the XML content and submit job
         is_workflow = proc.type == ProcessType.WORKFLOW
-        tags = req.params.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
+        args = get_request_args(req)
+        tags = args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,

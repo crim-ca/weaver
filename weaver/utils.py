@@ -21,7 +21,7 @@ from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
 from typing import TYPE_CHECKING, overload
-from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
+from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
 import colander
@@ -106,6 +106,8 @@ if TYPE_CHECKING:
         AnyKey,
         AnyRegistryContainer,
         AnyRequestMethod,
+        AnyRequestQueryMultiDict,
+        AnyRequestType,
         AnyResponseType,
         AnySettingsContainer,
         AnyUUID,
@@ -550,6 +552,32 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
     except KeyError:  # No cookie
         return {}
+
+
+def get_request_args(request):
+    # type: (AnyRequestType) -> AnyRequestQueryMultiDict
+    """
+    Extracts the parsed query string arguments from the appropriate request object strategy.
+
+    Depending on the request implementation, attribute ``query_string`` are expected as :class:`bytes` (:mod:`werkzeug`)
+    or :class:`str` (:mod:`pyramid`, :mod:`webob`). The ``query_string`` attribute is then used by ``args`` and
+    ``params`` for respective implementations, but assuming their string-like formats are respected.
+
+    .. seealso::
+        https://github.com/pallets/werkzeug/issues/2710
+    """
+    try:
+        # cannot assume/check only by object type, since they are sometimes extended with both (see 'extend_instance')
+        # instead, rely on the expected 'query_string' type by each implementation
+        if isinstance(request.query_string, bytes) and hasattr(request, "args"):
+            return request.args
+        if isinstance(request.query_string, str) and hasattr(request, "params"):
+            return request.params
+    except (AttributeError, TypeError):
+        pass  # ignore
+    # perform essentially what both implementations do
+    params = parse_qsl(bytes2str(request.query_string), keep_blank_values=True)
+    return dict(params)
 
 
 def parse_kvp(query,                    # type: str
