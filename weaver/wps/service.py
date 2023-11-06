@@ -2,7 +2,7 @@ import logging
 import os
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
@@ -194,7 +194,7 @@ class WorkerService(ServiceWPS):
 
         Returns the status response as is if XML, or convert it to JSON, according to request ``Accept`` header.
         """
-        req = wps_request.http_request
+        req = wps_request.http_request  # type: Union[PyramidRequest, WerkzeugRequest]
         pid = wps_request.identifier
         ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
         proc = get_process(process_id=pid, settings=self.settings)  # raises if invalid or missing
@@ -202,7 +202,7 @@ class WorkerService(ServiceWPS):
 
         # create the JSON payload from the XML content and submit job
         is_workflow = proc.type == ProcessType.WORKFLOW
-        tags = req.args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
+        tags = req.params.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
