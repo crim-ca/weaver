@@ -486,9 +486,10 @@ def test_bytes2str():
 
 
 class PseudoRequest(object):
-    def __init__(self, *_): ...
-
     query_string = ""
+
+    def __init__(self, *_):
+        ...
 
 
 class BadQueryStringTypeRequest(PseudoRequest):
