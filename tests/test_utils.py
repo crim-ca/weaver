@@ -503,6 +503,7 @@ class BadQueryStringTypeRequest(PseudoRequest):
         [PyramidRequest, WerkzeugRequest, PseudoRequest, BadQueryStringTypeRequest],
         [
             ("", {}),
+            ("param=", {"param": ""}),
             ("param=value", {"param": "value"}),
             ("param=val1,val2", {"param": "val1,val2"}),
             ("param1=val1,val2&param2=val3", {"param1": "val1,val2", "param2": "val3"}),
