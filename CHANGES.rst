@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Drop Python 3.7 support.
+- Add Python 3.12 to GitHub CI experimental builds.
 
 Fixes:
 ------
