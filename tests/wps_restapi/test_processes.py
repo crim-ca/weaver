@@ -1556,7 +1556,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         data["id"] = "invalid-process:1.2.3"
         resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
         assert resp.status_code in [400, 422]
-        assert "invalid" in resp.json["description"]
+        assert "Invalid" in resp.json["error"]
 
         data = {
             "processDescription": {"process": {"id": "invalid-process:1.2.3"}},
@@ -1565,7 +1565,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         resp = self.app.post_json("/processes", params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422]
-        assert "invalid" in resp.json["description"]
+        assert "Invalid" in resp.json["error"]
 
     def test_update_process_not_found(self):
         resp = self.app.patch_json("/processes/not-found", params={}, headers=self.json_headers, expect_errors=True)

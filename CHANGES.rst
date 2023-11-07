@@ -21,6 +21,8 @@ Changes:
   with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 - Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
   input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add ``create_metalink`` utility function to facilitate generation of a ``.meta4`` or ``.metalink`` file definition
+  from a list of file link references (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 
 Fixes:
 ------

@@ -2715,7 +2715,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "inputs": [{}],   # updated after
+            # "inputs": {},   # updated after
             "outputs": {"values": {"type": "string"}}
         }
         body = {
@@ -2724,7 +2724,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
-                    "inputs": [{}]  # updated after
+                    # "inputs": {}  # updated after
                 },
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
@@ -2732,18 +2732,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
 
         # replace by invalid min/max and check that it raises
-        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
+        cwl["inputs"] = [{"id": "test", "type": {"type": "array", "items": "string"}}]
+        body["processDescription"]["process"]["inputs"] = [{"id": "test", "minOccurs": [1], "maxOccurs": 1}]
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input minOccurs schema definition should have been raised"
-        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "DeployMinMaxOccurs" in str(resp.json["cause"])
         assert "Invalid" in resp.json["error"]
 
-        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
+        cwl["inputs"] = [{"id": "test", "type": {"type": "array", "items": "string"}}]
         body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input maxOccurs schema definition should have been raised"
-        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "DeployMinMaxOccurs" in str(resp.json["cause"])
         assert "Invalid" in resp.json["error"]
 
     def test_deploy_merge_complex_io_from_package(self):

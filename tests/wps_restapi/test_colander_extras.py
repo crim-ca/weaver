@@ -1090,8 +1090,9 @@ def test_variable_not_additional_properties():
         var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
 
     err = (
-        ".*Unknown properties or missing variable child-schema in mapping"
-        ".*Could not find any matching variable schema in mapping for property \\'other\\'.*"
+        r".*ExtendedSchemaNode<<var-1>>\(other\)"
+        r".*Unknown properties or invalid additional property schema in mapping"
+        r".*1 is not a string.*"
     ).replace(" ", r"[\s\"']+")  # must add some extra handling because of colander formatting by max-width
     with pytest.raises(colander.Invalid, match=err):
         VarMap().deserialize({"random": "abc", "other": 1})

@@ -49,6 +49,8 @@ from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
+from pywps.inout.basic import UrlHandler
+from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
@@ -62,7 +64,7 @@ from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType, get_content_type, get_extension, repr_json
+from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
@@ -171,6 +173,16 @@ if TYPE_CHECKING:
     ]
     AnyOutputMethod = Union[AnyMetadataOutputMethod, AnyDownloadOutputMethod]
     AnyOutputResult = Union[MetadataResult, DownloadResult]
+
+    AnyMetalink = Union[MetaLink, MetaLink4]
+    FileLink = TypedDict("FileLink", {
+        "href": str,
+        "file": NotRequired[Optional[str]],
+        "name": NotRequired[Optional[str]],
+        "type": NotRequired[Optional[str]],         # mediaType equivalent
+        "mediaType": NotRequired[Optional[str]],    # for convenience
+        "encoding": NotRequired[Optional[str]],
+    }, total=True)
 
     FilterType = TypeVar("FilterType")  # pylint: disable=C0103,invalid-name
 
@@ -3432,6 +3444,86 @@ def fetch_reference(reference,                          # type: str
     else:
         path = fetch_file(reference, out_dir, out_method=out_method, settings=settings, **option_kwargs)
     return [path] if out_listing and isinstance(path, str) else path
+
+
+class SizedUrlHandler(UrlHandler):
+    """
+    Avoids an unnecessary request to obtain the content size if the expected file is already available locally.
+    """
+    @property
+    def size(self):
+        if self._file and os.path.isfile(self._file):
+            return str(os.stat(self._file).st_size)
+        return super().size
+
+
+def create_metalink(
+    files,          # type: List[FileLink]
+    version=4,      # type: Literal[3, 4]
+    name=None,      # type: Optional[str]
+    workdir=None,   # type: Optional[Path]
+):                  # type: (...) -> AnyMetalink
+    """
+    Generates a MetaLink definition with provided link references.
+
+    If the link includes a local ``file`` path, or when the ``href`` itself is a local path, the IO handler will employ
+    those references to avoid the usual behavior performed by :mod:`pywps` that auto-fetches the remote file. To retain
+    that behavior, simply make sure that ``href`` is a remote file and that ``path`` is unset or does not exist.
+
+    :param files: File link, and optionally, with additional name, local path, media-type and encoding.
+    :param version: Desired metalink content as defined by the corresponding version.
+    :param name: Global name identifier for the metalink file.
+    :param workdir: Location where to store files when auto-fetching them.
+    :returns: Metalink object with appropriate template generation utilities.
+
+    .. seealso::
+        - https://en.wikipedia.org/wiki/Metalink#Example_Metalink_3.0_.metalink_file
+        - https://en.wikipedia.org/wiki/Metalink#Example_Metalink_4.0_.meta4_file
+        - :rfc:`5854`
+        - :rfc:`6249`
+    """
+    meta_files = []
+    for link in files:
+        # find generic details
+        meta_name = link.get("name")
+        meta_name = str(meta_name) if meta_name is not None else None
+        meta_type = link.get("type") or link.get("mediaType")
+        meta_enc = link.get("encoding")
+        meta_fmt = get_format(meta_type)
+        if meta_fmt and not meta_fmt.encoding and meta_enc:
+            meta_fmt.encoding = meta_enc
+        meta_href = link["href"]
+        meta_path = link.get("file")
+        if meta_href.startswith("/"):
+            meta_href = f"file://{meta_href}"
+            meta_path = meta_path or meta_href
+        elif meta_href.startswith("file://"):
+            meta_path = meta_path or meta_href[7:]
+        meta_file = MetaFile(identity=meta_name, fmt=meta_fmt)
+
+        # define source IO handler
+        # following steps order are important to avoid duplicate copy/fetch by pywps
+        # generate a 'SizedUrlHandler' with '._output._iohandler.prop="url"' and sets '._output._iohandler._url'
+        # normally, a 'UrlHandler' would be assigned automatically by using 'meta_file.file = meta_href'
+        meta_file._output._iohandler = SizedUrlHandler(meta_href, meta_file._output)
+        href_scheme = meta_href.split("://", 1)[0]
+        # then, need to set '._output._iohandler._file' to avoid 'UrlHandler' trying to automatically fetch it
+        if href_scheme == "file":
+            meta_file._output._iohandler._file = meta_href
+        elif meta_path and os.path.isfile(meta_path):
+            meta_file._output._iohandler._file = os.path.abspath(meta_path)
+        else:
+            LOGGER.warning(
+                "No local file path provided for [%s]."
+                "Metalink reference will attempt to automatically fetch it.",
+                meta_href
+            )
+        meta_files.append(meta_file)
+
+    workdir = str(workdir) if workdir else None
+    meta_cls = MetaLink4 if version == 4 else MetaLink
+    meta_link = meta_cls(identity=name, workdir=workdir, files=tuple(meta_files))
+    return meta_link
 
 
 def load_file(file_path, text=False):

@@ -8,14 +8,21 @@ from typing import TYPE_CHECKING
 
 import pytest
 from owslib.crs import Crs
-from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
+from pywps.inout.outputs import MetaFile, MetaLink4
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import FileServer, get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
+from tests.utils import (
+    FileServer,
+    get_settings_from_testapp,
+    mocked_execute_celery,
+    mocked_file_server,
+    mocked_sub_requests
+)
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
 from weaver.status import Status
+from weaver.utils import create_metalink, fully_qualified_name
 from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -841,7 +848,9 @@ def test_jsonarray2netcdf_invalid_json(test_data):
             "Invalid file format",
             "Not a valid file URL reference",
         ]
-        assert any(error in str(err.value) for error in valid_errors), f"Raised error [{err.value}] was not expected"
+        assert any(error in str(err.value) for error in valid_errors), (
+            f"Raised error ({fully_qualified_name(err.value)})[{err.value}] was not expected."
+        )
 
 
 @pytest.mark.parametrize(
@@ -867,40 +876,52 @@ def test_jsonarray2netcdf_invalid_out_dir():
 
 
 @pytest.mark.parametrize(
-    ["metalink_cls", "metalink_ext", "test_index"],
+    ["metalink_version", "metalink_ext", "test_index"],
     [
-        (MetaLink, ".metalink", 2),
-        (MetaLink4, ".meta4", 2)
+        (3, ".metalink", 2),
+        (4, ".meta4", 2)
     ]
 )
-def test_metalink2netcdf_process(metalink_cls, metalink_ext, test_index):
+def test_metalink2netcdf_process(metalink_version, metalink_ext, test_index):
     with contextlib.ExitStack() as stack:
         data = {}
-        meta_files = []
-        nc_fmt = get_format(ContentType.APP_NETCDF)
+        tmp_src_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_src_host = "http://fake-server.com/data"
         for idx in range(3):
-            tmp_nc = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".nc"))
+            tmp_nc = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_src_dir, mode="w", suffix=".nc"))
             tmp_nc_data = f"data NetCDF {idx}"
             tmp_nc.write(tmp_nc_data)
             tmp_nc.flush()
             tmp_nc.seek(0)
-            data[idx] = {"name": tmp_nc.name, "data": tmp_nc_data}
-            tmp_meta_file = MetaFile(identity=str(idx), fmt=nc_fmt)
-            tmp_meta_file.file = tmp_nc.name
-            meta_files.append(tmp_meta_file)
-        metalink = metalink_cls(identity="test", workdir=tempfile.gettempdir(), files=tuple(meta_files))
-        tmp_meta = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=metalink_ext))
-        tmp_meta.write(metalink.xml)
+            tmp_meta_href = os.path.join(tmp_src_host, os.path.split(tmp_nc.name)[-1])
+            data[idx] = {
+                "name": str(idx),
+                "file": tmp_nc.name,
+                "data": tmp_nc_data,
+                "href": tmp_meta_href,
+                "type": ContentType.APP_NETCDF,
+            }
+
+        metalink = create_metalink(
+            files=list(data.values()),  # type: ignore
+            version=metalink_version,   # type: ignore
+            workdir=tmp_src_dir,
+        )
+        tmp_meta_xml = metalink.xml
+        assert "file://" not in tmp_meta_xml, "Metalink IO handler incorrectly configured to test HTTP remote file."
+        tmp_meta = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_src_dir, mode="w", suffix=metalink_ext))
+        tmp_meta.write(tmp_meta_xml)
         tmp_meta.flush()
         tmp_meta.seek(0)
         tmp_out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mocked_file_server(tmp_src_dir, tmp_src_host, settings={}))
 
         with pytest.raises(SystemExit) as err:
             metalink2netcdf.main("-i", tmp_meta.name, "-n", str(test_index), "-o", tmp_out_dir)
         assert err.value.code in [None, 0]
 
         for idx in range(3):
-            nc_out_name = os.path.split(data[idx]["name"])[-1]
+            nc_out_name = os.path.split(data[idx]["file"])[-1]
             nc_out_path = os.path.join(tmp_out_dir, nc_out_name)
             if idx + 1 == test_index:  # index is 1-based in XPath
                 assert os.path.isfile(nc_out_path)

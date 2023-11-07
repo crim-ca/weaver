@@ -1,3 +1,5 @@
+import contextlib
+
 import datetime
 import inspect
 import itertools
@@ -289,8 +291,9 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_connect_error(*_, **__):
         raise ConnectionError()
 
+    @contextlib.contextmanager
     def mock_urlopen(*_, **__):
-        return HTTPOk()
+        yield HTTPOk()
 
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:

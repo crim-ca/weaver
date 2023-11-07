@@ -2137,6 +2137,13 @@ class WpsPackage(Process):
         else:
             self.logger.info("%s input (%s) SKIPPED fetch: [%s]", input_type, input_id, input_location)
 
+        # when the process is passed around between OWSLib and PyWPS, it is very important to provide the scheme
+        # otherwise, they will interpret complex data directly instead of by reference
+        # (see for example 'owslib.wps.ComplexDataInput.get_xml' that relies only on the
+        #  presence of the scheme to infer whether the complex data is a reference or not)
+        if "://" not in input_location:
+            input_location = f"file://{input_location}"
+
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
