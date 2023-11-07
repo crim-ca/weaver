@@ -30,9 +30,11 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPOk
 )
+from pyramid.request import Request as PyramidRequest
 from pywps.response.status import WPS_STATUS
 from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
+from werkzeug import Request as WerkzeugRequest
 
 from tests.utils import (
     MOCK_AWS_REGION,
@@ -63,6 +65,7 @@ from weaver.utils import (
     get_any_value,
     get_base_url,
     get_path_kvp,
+    get_request_args,
     get_request_options,
     get_sane_name,
     get_secure_directory_name,
@@ -480,6 +483,45 @@ def test_bytes2str():
     # pylint: disable=W1406,redundant-u-string-prefix  # left for readability
     assert bytes2str(b"test-bytes") == u"test-bytes"
     assert bytes2str(u"test-unicode") == u"test-unicode"
+
+
+class PseudoRequest(object):
+    query_string = ""
+
+    def __init__(self, *_):
+        ...
+
+
+class BadQueryStringTypeRequest(PseudoRequest):
+    @property
+    def args(self):
+        raise AttributeError
+
+    @property
+    def params(self):
+        raise AttributeError
+
+
+@pytest.mark.parametrize(
+    ["request_cls", "converter", "query_string_expect_params"],
+    itertools.product(
+        [PyramidRequest, WerkzeugRequest, PseudoRequest, BadQueryStringTypeRequest],
+        [str, str2bytes],
+        [
+            ("", {}),
+            ("param=", {"param": ""}),
+            ("param=value", {"param": "value"}),
+            ("param=val1,val2", {"param": "val1,val2"}),
+            ("param1=val1,val2&param2=val3", {"param1": "val1,val2", "param2": "val3"}),
+        ]
+    )
+)
+def test_get_request_args(request_cls, converter, query_string_expect_params):
+    query_string, expect_params = query_string_expect_params
+    request = request_cls({})
+    request.query_string = converter(query_string)
+    result = get_request_args(request)
+    assert dict(result) == expect_params
 
 
 def test_get_ssl_verify_option():

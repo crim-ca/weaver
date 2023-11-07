@@ -22,6 +22,7 @@ parameterized
 pluggy>=0.7
 # FIXME: bad interpolation of 'setup.cfg' for pytest 'log_format' (https://github.com/pytest-dev/pytest/issues/10019)
 pytest<7
+pytest-httpserver>=1.0.7  # support werkzeug>=3
 pytest-server-fixtures
 pytest-rerunfailures
 pydocstyle
