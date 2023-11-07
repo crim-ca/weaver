@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.36.0:
+
+`4.36.0 <https://github.com/crim-ca/weaver/tree/4.36.0>`_ (2023-11-06)
+========================================================================
+
+Changes:
+--------
 - Drop Python 3.7 support.
 - Add Python 3.12 to GitHub CI experimental builds.
 - Bump ``werkzeug>=3.0.1`` to resolve security vulnerability from the package.
