@@ -9,7 +9,7 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
 from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
-from pywps.response import WPSResponse
+from pywps.response.basic import WPSResponse
 from pywps.response.execute import ExecuteResponse
 from requests.structures import CaseInsensitiveDict
 from werkzeug.wrappers.request import Request as WerkzeugRequest
