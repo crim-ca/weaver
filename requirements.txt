@@ -61,7 +61,7 @@ numpy>=1.21.6; python_version == "3.7"  # pyup: ignore
 numpy>=1.22.2; python_version >= "3.8"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.28.1
+owslib==0.29.3
 pint
 psutil
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
@@ -77,7 +77,7 @@ python-dateutil
 pyramid_rewrite
 pyramid_storage
 pytz
-pywps==4.5.2; python_version >= "3.7"
+pywps==4.6.0; python_version >= "3.7"
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
 requests
