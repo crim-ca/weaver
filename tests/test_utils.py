@@ -497,11 +497,16 @@ class BadQueryStringTypeRequest(PseudoRequest):
     def args(self):
         raise AttributeError
 
+    @property
+    def params(self):
+        raise AttributeError
+
 
 @pytest.mark.parametrize(
-    ["request_cls", "query_string_expect_params"],
+    ["request_cls", "converter", "query_string_expect_params"],
     itertools.product(
         [PyramidRequest, WerkzeugRequest, PseudoRequest, BadQueryStringTypeRequest],
+        [str, str2bytes],
         [
             ("", {}),
             ("param=", {"param": ""}),
@@ -511,10 +516,10 @@ class BadQueryStringTypeRequest(PseudoRequest):
         ]
     )
 )
-def test_get_request_args(request_cls, query_string_expect_params):
+def test_get_request_args(request_cls, converter, query_string_expect_params):
     query_string, expect_params = query_string_expect_params
     request = request_cls({})
-    request.query_string = query_string
+    request.query_string = converter(query_string)
     result = get_request_args(request)
     assert dict(result) == expect_params
 

@@ -69,7 +69,7 @@ from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 try:  # refactor in jsonschema==4.18.0
     from jsonschema.validators import _RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
-except ImportError:
+except ImportError:  # pragma: no cover
     from jsonschema.validators import RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
 
 if TYPE_CHECKING:
@@ -573,8 +573,11 @@ def get_request_args(request):
             return request.args
         if isinstance(request.query_string, str) and hasattr(request, "params"):
             return request.params
-    except (AttributeError, TypeError):
-        pass  # ignore
+    except (AttributeError, TypeError):  # pragma: no cover
+        LOGGER.warning(
+            "Could not resolve expected query string parameter parser in request of type: [%s]. Using default parsing.",
+            type(request)
+        )
     # perform essentially what both implementations do
     params = parse_qsl(bytes2str(request.query_string), keep_blank_values=True)
     return dict(params)
