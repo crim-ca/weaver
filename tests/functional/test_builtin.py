@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 
 @pytest.mark.functional
 class BuiltinAppTest(WpsConfigBase):
+    file_server = None  # type: FileServer
+    """
+    File server made available to tests for emulating a remote HTTP location.
+    """
+
     @classmethod
     def setUpClass(cls):
         cls.settings = {
