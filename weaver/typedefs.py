@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
@@ -57,8 +57,10 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from webob.acceptparse import AcceptLanguageInvalidHeader, AcceptLanguageNoHeader, AcceptLanguageValidHeader
     from webob.headers import EnvironHeaders, ResponseHeaders
+    from webob.multidict import MultiDict as PyramidMultiDict
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
+    from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
     from weaver.datatype import Process, Service
@@ -334,6 +336,7 @@ if TYPE_CHECKING:
         "head", "get", "post", "put", "patch", "delete",
     ]
     AnyRequestMethod = Union[RequestMethod, str]
+    AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]

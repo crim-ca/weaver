@@ -11,7 +11,7 @@ from owslib.crs import Crs
 from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
 
 from tests.functional.utils import WpsConfigBase
-from tests.utils import get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
+from tests.utils import FileServer, get_settings_from_testapp, mocked_execute_celery, mocked_sub_requests
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
@@ -37,6 +37,13 @@ class BuiltinAppTest(WpsConfigBase):
         }
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         super(BuiltinAppTest, cls).setUpClass()
+
+        cls.file_server = FileServer()
+        cls.file_server.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.file_server.teardown()
 
     def setUp(self):
         # register builtin processes from scratch to have clean state
@@ -92,18 +99,23 @@ class BuiltinAppTest(WpsConfigBase):
         assert body["jobControlOptions"] == [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
-    def setup_jsonarray2netcdf_inputs(self, stack):
-        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
+    def setup_jsonarray2netcdf_inputs(self, stack, use_temp_file=False):
+        if use_temp_file:
+            dir_path = tempfile.gettempdir()
+            url_path = f"file://{dir_path}"
+        else:
+            dir_path = self.file_server.document_root
+            url_path = self.file_server.uri
         nc_data = "Hello NetCDF!"
-        tmp_ncdf = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".nc")     # pylint: disable=R1732
-        tmp_json = tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json")   # pylint: disable=R1732
+        tmp_ncdf = tempfile.NamedTemporaryFile(dir=dir_path, mode="w", suffix=".nc")     # pylint: disable=R1732
+        tmp_json = tempfile.NamedTemporaryFile(dir=dir_path, mode="w", suffix=".json")   # pylint: disable=R1732
         tmp_ncdf = stack.enter_context(tmp_ncdf)  # noqa
         tmp_json = stack.enter_context(tmp_json)  # noqa
         tmp_ncdf.write(nc_data)
         tmp_ncdf.seek(0)
-        tmp_json.write(json.dumps([f"file://{os.path.join(tmp_dir, tmp_ncdf.name)}"]))
+        tmp_json.write(json.dumps([f"{url_path}/{os.path.basename(tmp_ncdf.name)}"]))
         tmp_json.seek(0)
-        body = {"inputs": [{"id": "input", "href": os.path.join(tmp_dir, tmp_json.name)}]}
+        body = {"inputs": [{"id": "input", "href": f"{url_path}/{os.path.basename(tmp_json.name)}"}]}
         return body, nc_data
 
     def validate_jsonarray2netcdf_results(self, results, outputs, data, links):
@@ -152,6 +164,30 @@ class BuiltinAppTest(WpsConfigBase):
         assert nc_href.startswith(wps_out)
         nc_real_path = nc_href.replace(wps_out, wps_dir)
         assert os.path.split(nc_real_path)[-1] == os.path.split(nc_href)[-1]
+
+    def test_jsonarray2netcdf_execute_invalid_file_local(self):
+        """
+        Validate that local file path as input is not permitted anymore.
+        """
+        with contextlib.ExitStack() as stack_exec:
+            body, _ = self.setup_jsonarray2netcdf_inputs(stack_exec, use_temp_file=True)
+            body.update({
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
+            })
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            path = "/processes/jsonarray2netcdf/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=body, headers=self.json_headers, only_local=True)
+        assert resp.status_code == 201
+
+        job_url = resp.json["location"]
+        job_res = self.monitor_job(job_url, expect_failed=True)
+        assert job_res["status"] == Status.FAILED
+        job_logs = self.app.get(f"{job_url}/logs").json
+        assert any("ValueError: Not a valid file URL reference" in log for log in job_logs)
 
     def test_jsonarray2netcdf_execute_async(self):
         with contextlib.ExitStack() as stack_exec:
@@ -782,7 +818,7 @@ def test_jsonarray2netcdf_process():
         [
             "/tmp/does-not-exist/fake-file.txt",  # noqa
             "/tmp/does-not-exist/fake-file.nc",  # noqa
-        ]
+        ],
     ]
 )
 def test_jsonarray2netcdf_invalid_json(test_data):
@@ -795,7 +831,12 @@ def test_jsonarray2netcdf_invalid_json(test_data):
 
         with pytest.raises(ValueError) as err:
             jsonarray2netcdf.main("-i", tmp_file.name, "-o", tmp_out_dir)
-        assert str(err.value) == "Invalid JSON file format, expected a plain array of NetCDF file URL strings."
+        valid_errors = [
+            "Invalid JSON file format, expected a plain array of NetCDF file URL strings.",
+            "Invalid file format",
+            "Not a valid file URL reference",
+        ]
+        assert any(error in str(err.value) for error in valid_errors), f"Raised error [{err.value}] was not expected"
 
 
 @pytest.mark.parametrize(

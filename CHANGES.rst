@@ -21,11 +21,6 @@ Changes:
   with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
 - Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
   input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
-- Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
-  ``file_index_selector`` with validation of happy path and error handling conditions.
-
-.. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
-.. |oap_echo| replace:: ``EchoProcess``
 
 Fixes:
 ------
@@ -55,6 +50,42 @@ Fixes:
   original `Process` definition, including any additional parameters and sub-types.
 - Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
   using ``missing=colander.drop``.
+
+.. _changes_4.36.0:
+
+`4.36.0 <https://github.com/crim-ca/weaver/tree/4.36.0>`_ (2023-11-06)
+========================================================================
+
+Changes:
+--------
+- Drop Python 3.7 support.
+- Add Python 3.12 to GitHub CI experimental builds.
+- Bump ``werkzeug>=3.0.1`` to resolve security vulnerability from the package.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.35.0:
+
+`4.35.0 <https://github.com/crim-ca/weaver/tree/4.35.0>`_ (2023-11-03)
+========================================================================
+
+Changes:
+--------
+- Add more secure path validations steps before fetching contents.
+- Disallow ``builtin`` processes expecting a user-provided input path to run with local file references such that
+  they must respect any configured server-side remote file access rules instead of bypassing security validations
+  through resolved local paths.
+- Add multiple validation checks for more secure file paths handling when retrieving contents from remote locations.
+- Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
+  ``file_index_selector`` with validation of happy path and error handling conditions.
+
+.. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
+.. |oap_echo| replace:: ``EchoProcess``
+
+Fixes:
+------
 - Fix invalid parsing of `XML` Metalink files in ``metalink2netcdf``. Metalink V3 and V4 will now properly consider the
   namespace and specific content structure to extract the NetCDF URL reference, and the `Process` will validate that the
   extracted reference respects the NetCDF extension.
