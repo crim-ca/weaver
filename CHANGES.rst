@@ -52,6 +52,8 @@ Fixes:
   original `Process` definition, including any additional parameters and sub-types.
 - Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
   using ``missing=colander.drop``.
+- Fix ``$schema`` of `OGC` ``nameReferenceType`` being reported under every ``dataType`` of ``literalDataDomains`` for
+  literal `I/O` of `Process` descriptions. The reference is not only included in the `OpenAPI` definition as intended.
 
 .. _changes_4.36.0:
 

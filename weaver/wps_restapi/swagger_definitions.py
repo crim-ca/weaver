@@ -1417,6 +1417,7 @@ class LiteralReference(ExtendedMappingSchema):
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/nameReferenceType.yaml"
+    _schema_include_deserialize = False
     name = ExtendedSchemaNode(String(), description="Name of the entity definition.")
     reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
