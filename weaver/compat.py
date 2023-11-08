@@ -1,4 +1,3 @@
-import functools
 from typing import Tuple, Union
 
 try:
@@ -41,6 +40,7 @@ except ImportError:  # pragma: no cover  # for backward compatibility
             return self.patch
 
 try:
-    from functools import cache
+    from functools import cache  # pylint: disable=unused-import  # definition for other modules to import
 except ImportError:  # python<3.9
-    cache = functools.lru_cache(maxsize=None)
+    from functools import lru_cache
+    cache = lru_cache(maxsize=None)
