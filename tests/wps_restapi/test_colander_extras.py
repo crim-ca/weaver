@@ -151,8 +151,9 @@ def test_any_of_under_variable():
 
 def test_any_of_one_of_variable_error_nested_chain():
     """
-    Validate that a nested chain of oneOf, anyOf and variable schema nodes produce the expected reference details
-    when the schema validation fails for the input data.
+    Validate a nested chain of oneOf, anyOf and variable schema nodes.
+
+    Ensures that the produced error has the expected reference details when schema validation fails for the input data.
     """
     # pre-validate that schema is still valid for this test (expected structure)
     test_schema = sd.ExecuteInputValues(name="test_input")
