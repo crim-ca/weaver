@@ -35,6 +35,7 @@ from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
 from celery.app import Celery
 from mypy_boto3_s3.literals import RegionName
+from pyramid_celery import celery_app as app
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import (
@@ -47,7 +48,7 @@ from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
 from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
-from pyramid.threadlocal import get_current_registry
+from pyramid.threadlocal import get_current_registry, get_current_request
 from pyramid_beaker import set_cache_regions_from_settings
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
@@ -469,7 +470,10 @@ def get_registry(container=None, nothrow=False):
     if isinstance(container, Registry):
         return container
     if isinstance(container, WerkzeugRequest) or container is None:
-        return get_current_registry()
+        if get_current_request() is None:
+            return get_registry(app)
+        else:
+            return get_current_registry()
     if nothrow:
         return None
     raise TypeError(f"Could not retrieve registry from container object of type [{fully_qualified_name(container)}].")
