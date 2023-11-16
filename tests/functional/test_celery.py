@@ -1,25 +1,16 @@
 """
 Tests to validate that :mod:`celery` execution behaves as intended.
 """
-import time
-
-import json
-
-import inspect
-
-import tempfile
-
 import contextlib
-
+import inspect
+import json
 import os
 import subprocess
 import sys
+import tempfile
+import time
 
-from tests.utils import (
-    get_settings_from_testapp,
-    get_test_weaver_app,
-    setup_config_with_mongodb
-)
+from tests.utils import get_settings_from_testapp, get_test_weaver_app, setup_config_with_mongodb
 from weaver.config import WeaverConfiguration
 from weaver.database import get_db
 from weaver.database.mongodb import get_mongodb_connection
