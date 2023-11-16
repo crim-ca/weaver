@@ -123,9 +123,9 @@ def test_celery_registry_resolution():
         ))  # type: subprocess.Popen
 
         task1, _ = celery_task_cmd1.communicate()
-        time.sleep(.25)
+        time.sleep(1)
         task2, _ = celery_task_cmd2.communicate()
-        time.sleep(.25)
+        time.sleep(1)
 
         celery_mongo_db = get_mongodb_connection({
             "mongodb.host": settings["mongodb.host"],
