@@ -47,7 +47,7 @@ from pyramid.registry import Registry
 from pyramid.request import Request as PyramidRequest
 from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
-from pyramid.threadlocal import get_current_registry, get_current_request
+from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
 from pyramid_celery import celery_app as app
 from requests import HTTPError as RequestsHTTPError, Response
@@ -469,11 +469,10 @@ def get_registry(container=None, nothrow=False):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if container is None and sys.argv[0].rsplit("/", 1)[-1] == "celery":
+        return app.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, WerkzeugRequest) or container is None:
-        if get_current_request() is None:
-            return get_registry(app)
-        else:
-            return get_current_registry()
+        return get_current_registry()
     if nothrow:
         return None
     raise TypeError(f"Could not retrieve registry from container object of type [{fully_qualified_name(container)}].")
