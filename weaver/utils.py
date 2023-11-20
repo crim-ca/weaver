@@ -65,7 +65,7 @@ from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, get_extension, repr_json
 from weaver.status import map_status
-from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.warning import UndefinedContainerWarning, TimeZoneInfoAlreadySetWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 try:  # refactor in jsonschema==4.18.0
@@ -477,7 +477,16 @@ def get_registry(container=None, nothrow=False):
         return container.registry
     if isinstance(container, Registry):
         return container
-    if container is None and sys.argv[0].rsplit("/", 1)[-1] == "celery":
+    if container is None:
+        # find 2 parents since 'get_settings' calls 'get_registry' to provide better context
+        warnings.warn(
+            f"Function [{get_caller_name()}] called from [{get_caller_name(skip=2)}] "
+            "did not provide a settings container. Consider providing it explicitly.",
+            UndefinedContainerWarning,
+        )
+    # preemptively check registry in celery if applicable
+    # avoids error related to forked processes when restarting workers
+    if container is None and is_celery():
         return app.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, WerkzeugRequest) or container is None:
         return get_current_registry()
@@ -1519,14 +1528,25 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def get_caller_name(skip=2, base_class=False):
+def get_caller_name(skip=0, base_class=False):
     # type: (int, bool) -> str
     """
     Find the name of a parent caller function or method.
 
     The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
-    :param skip: specifies how many levels of stack to skip while getting the caller.
+    Example:
+
+    Supposing the following call stack ``main -> func1 -> func2 -> func3 -> get_caller_name``.
+
+    Calling ``get_caller_name()`` or ``get_caller_name(skip=1)`` would return the full package location of ``func2``
+    because it is 1-level higher than were ``get_caller_name`` is called from (inside ``func3``).
+    Calling ``get_caller_name(skip=0)`` would return ``func3`` directly, and ``func1`` for ``get_caller_name(skip=2)``.
+
+    :param skip:
+        Specifies how many levels of stack to skip for getting the caller.
+        By default, uses ``skip=1`` to obtain the immediate parent function that called :func:`get_caller_name`,
+        were ``skip=0`` would be the function itself that called :func:`get_caller_name`.
     :param base_class:
         Specified if the base class should be returned or the top-most class in case of inheritance
         If the caller is not a class, this doesn't do anything.
