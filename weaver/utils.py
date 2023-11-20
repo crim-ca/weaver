@@ -457,6 +457,14 @@ def get_any_message(info, default=""):
     return (info.get("message") or info.get("description") or info.get("detail") or default).strip()
 
 
+def is_celery():
+    # type: () -> bool
+    """
+    Detect if the current application was executed as a :mod:`celery` command.
+    """
+    return sys.argv[0].rsplit("/", 1)[-1] == "celery"
+
+
 def get_registry(container=None, nothrow=False):
     # type: (Optional[AnyRegistryContainer], bool) -> Optional[Registry]
     """
