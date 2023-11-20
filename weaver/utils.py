@@ -1535,8 +1535,6 @@ def get_caller_name(skip=0, base_class=False):
 
     The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
-    Example:
-
     Supposing the following call stack ``main -> func1 -> func2 -> func3 -> get_caller_name``.
 
     Calling ``get_caller_name()`` or ``get_caller_name(skip=1)`` would return the full package location of ``func2``
