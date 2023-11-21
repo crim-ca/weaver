@@ -1,6 +1,7 @@
 CONDA_HOME ?= /opt/conda
 CONDA_ENV ?= weaver
 CONDA_ENVS_DIR ?= /opt/conda/envs
+CONDA_BIN ?= $(CONDA_HOME)/bin/conda
 
 HOSTNAME ?= localhost
 HTTP_PORT ?= 8094

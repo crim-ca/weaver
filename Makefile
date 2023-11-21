@@ -37,7 +37,7 @@ else
   else
     CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
   endif
-  CONDA_BIN := $(CONDA_BIN_DIR)/conda
+  CONDA_BIN ?= $(CONDA_BIN_DIR)/conda
   CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
   CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 
