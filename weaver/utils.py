@@ -65,7 +65,7 @@ from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, get_extension, repr_json
 from weaver.status import map_status
-from weaver.warning import UndefinedContainerWarning, TimeZoneInfoAlreadySetWarning
+from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 try:  # refactor in jsonschema==4.18.0
