@@ -71,7 +71,9 @@ psutil
 pymongo>=4  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 pyramid>=1.7.3
 pyramid_beaker>=0.8
-pyramid_celery>=4.0.0   # required for celery>=5
+# see https://github.com/sontek/pyramid_celery/pull/102 to fix Python 3.12 support and other improvements
+#pyramid_celery>=4.0.0   # required for celery>=5
+git+https://github.com/crim-ca/pyramid_celery/tree/5.0.0a#egg=pyramid_celery
 pyramid_mako
 python-dateutil
 pyramid_rewrite
