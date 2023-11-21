@@ -700,17 +700,21 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     Guess the best applicable response ``Content-Type`` header from the request.
 
     Considers the request ``Accept`` header, ``format`` query and alternatively ``f`` query to parse possible formats.
-    Full Media-Type are expected in the header. Query parameters can use both the full type, or only the sub-type
+    Full Media-Type are expected in the header. Query parameters can use both the full Media-Type, or only the sub-type
     (i.e.: :term:`JSON`, :term:`XML`, etc.), with case-insensitive names.
-    Defaults to :py:data:`ContentType.APP_JSON` if none was specified.
+
+    Defaults to :py:data:`ContentType.APP_JSON` if none was specified as :paramref:`default` explicitly and that no
+    ``Accept` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
+    format specifiers were not provided in the request.
 
     Applies some specific logic to handle automatically added ``Accept`` headers by many browsers such that sending
-    requests to the API using them will not automatically default back to :term:`XML` or similar `HTML` representations.
-    If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the URL, those will
-    be applied since this is a very intuitive (and easier) approach to request different formats when using browsers.
+    requests to the :term:`API` using them will not automatically default back to :term:`XML` or similar `HTML`
+    representations. If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the
+    URL, those will be applied since this is a very intuitive (and easier) approach to request different formats when
+    using browsers.
 
-    When user-agent clients are identified as another source, such as sending requests from a server or from code, both
-    headers and query parameters are applied directly without question.
+    When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
+    both headers and query parameters are applied directly without question.
 
     :returns: Matched MIME-type or default.
     """
@@ -726,14 +730,14 @@ def guess_target_format(request, default=ContentType.APP_JSON):
         content_type = get_header("accept", request.headers, default=default or "")
         for ctype in content_type.split(","):
             ctype = clean_mime_type_format(ctype, suffix_subtype=True, strip_parameters=True)
-            if ctype != default:
+            if ctype != default or not default:
                 # because most browsers enforce some 'visual' list of accept header, revert to JSON if detected
                 # explicit request set by client (e.g.: using 'requests') will have full control over desired content
                 user_agent = get_header("user-agent", request.headers)
                 if user_agent and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"]):
-                    content_type = ContentType.APP_JSON
+                    content_type = default or ContentType.APP_JSON
     if not content_type or content_type == ContentType.ANY:
-        content_type = default
+        content_type = default or ContentType.APP_JSON
     return content_type
 
 
