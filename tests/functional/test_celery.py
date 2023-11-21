@@ -8,13 +8,28 @@ import os
 import subprocess
 import sys
 import tempfile
-import time
+from typing import TYPE_CHECKING
 
 from tests.utils import get_settings_from_testapp, get_test_weaver_app, setup_config_with_mongodb
 from weaver.config import WeaverConfiguration
 from weaver.database import get_db
 from weaver.database.mongodb import get_mongodb_connection
+from weaver.utils import retry_on_condition
 from weaver.wps.utils import get_wps_url
+
+if TYPE_CHECKING:
+    from pymongo.collection import Collection
+
+
+def is_attribute_none(exception):
+    # type: (Exception) -> bool
+    return isinstance(exception, AttributeError) and "None" in str(exception)
+
+
+def get_taskmeta_output(taskmeta_collection, output):
+    # type: (Collection, str) -> str
+    taskmeta = taskmeta_collection.find_one({"_id": output.strip()})
+    return taskmeta.get("traceback", "") + taskmeta.get("result", "")
 
 
 def test_celery_registry_resolution():
@@ -84,6 +99,7 @@ def test_celery_registry_resolution():
         ))  # type: subprocess.Popen
         celery_stdout, celery_stderr = celery_process.communicate()
         celery_output = celery_stdout + celery_stderr
+        assert "Traceback" not in celery_output, "Unhandled error at Weaver/Celery startup. Cannot resume test."
         assert all([
             msg in celery_output
             for msg in
@@ -122,10 +138,14 @@ def test_celery_registry_resolution():
             env={"PATH": f"{python_dir}:{debug_path}"},
         ))  # type: subprocess.Popen
 
-        task1, _ = celery_task_cmd1.communicate()
-        time.sleep(1)
-        task2, _ = celery_task_cmd2.communicate()
-        time.sleep(1)
+        task1_output, _ = retry_on_condition(
+            lambda: celery_task_cmd1.communicate(),
+            condition=is_attribute_none, retries=5, interval=1,
+        )
+        task2_output, _ = retry_on_condition(
+            lambda: celery_task_cmd2.communicate(),
+            condition=is_attribute_none, retries=5, interval=1,
+        )
 
         celery_mongo_db = get_mongodb_connection({
             "mongodb.host": settings["mongodb.host"],
@@ -133,10 +153,14 @@ def test_celery_registry_resolution():
             "mongodb.db_name": "celery-test",
         })
         celery_taskmeta = celery_mongo_db.celery_taskmeta
-        task1_meta = celery_taskmeta.find_one({"_id": task1.strip()})
-        task2_meta = celery_taskmeta.find_one({"_id": task2.strip()})
-        task1_result = task1_meta.get("traceback", "") + task1_meta.get("result", "")
-        task2_result = task2_meta.get("traceback", "") + task2_meta.get("result", "")
+        task1_result = retry_on_condition(
+            get_taskmeta_output, celery_taskmeta, task1_output,
+            condition=is_attribute_none, retries=5, interval=1,
+        )
+        task2_result = retry_on_condition(
+            get_taskmeta_output, celery_taskmeta, task2_output,
+            condition=is_attribute_none, retries=5, interval=1,
+        )
 
         # following errors are not necessarily linked directly to celery failing
         # however, if all other tests pass except this one, there's a big chance

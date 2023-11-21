@@ -1761,6 +1761,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
                        *args,                   # type: Params.args
                        condition=Exception,     # type: RetryCondition
                        retries=1,               # type: int
+                       interval=0,              # type: Number
                        **kwargs,                # type: Params.kwargs
                        ):                       # type: (...) -> Return
     """
@@ -1772,6 +1773,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
         In case of a callable, success/failure result should be returned to indicate if retry is needed.
         If retry is not requested by the handler for the specified exception, it is raised directly.
     :param retries: Amount of retries to perform. If retries are exhausted, the final exception is re-raised.
+    :param interval: wait time interval (seconds) between retries.
     :return: Expected normal operation return value if it was handled within the specified amount of retries.
     """
     if (
@@ -1810,6 +1812,8 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
             last_exc = exc
             LOGGER.warning("Operation '%s' failed but matched handler condition for retry. Retrying (%s/%s)...",
                            name, attempt, retries)
+            if interval and remain:
+                time.sleep(interval)
     LOGGER.error("Operation '%s' still failing. Maximum retry attempts reached (%s).", name, retries)
     raise last_exc
 
