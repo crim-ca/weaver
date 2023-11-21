@@ -162,7 +162,7 @@ class WorkerService(ServiceWPS):
         """
         req = wps_request.http_request
         req = extend_instance(req, PyramidRequest)  # apply query 'params' method
-        accept_type = guess_target_format(req, default=None)
+        accept_type = guess_target_format(req, default=ContentType.APP_XML)
         if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
             proc = wps_request.identifiers

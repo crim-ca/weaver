@@ -134,6 +134,22 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
+    def test_describeprocess_no_format_default_api_client(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Robot"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
+    def test_describeprocess_no_format_default_web_browser(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Mozilla/Test"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
     def test_execute_allowed_demo(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
