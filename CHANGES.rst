@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_4.37.0:
+
+`4.37.0 <https://github.com/crim-ca/weaver/tree/4.37.0>`_ (2023-11-22)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix default `XML` format resolution for `WPS` endpoint when no ``Accept`` header or ``format``/``f`` query parameter
   is provided and that the request is submitted from a Web Browser, which involves additional control logic to select
   the applicable ``Content-Type`` for the response.
