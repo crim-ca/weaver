@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+import celery
 import mock
 import moto
 import pkg_resources
@@ -32,7 +33,6 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from pyramid.testing import DummyRequest
-from pyramid_celery import celery_app
 from pytest_server_fixtures.http import HTTPTestServer, SimpleHTTPTestServer
 from requests import Response
 from webtest import TestApp, TestResponse
@@ -59,7 +59,7 @@ from weaver.utils import (
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal
 
     from mypy_boto3_s3.client import S3Client
@@ -1052,6 +1052,7 @@ def mocked_execute_celery(
     celery_task="weaver.processes.execution.execute_process",   # type: str
     func_execute_task=None,                                     # type: Optional[Callable[[...], Any]]
     web_test_app=None,                                          # type: Optional[TestApp]
+    celery_app_name="app",                                      # type: str
 ):                                                              # type: (...) -> Iterable[MockPatch]
     """
     Contextual mock of a task execution to run locally instead of dispatched :mod:`celery` worker.
@@ -1077,9 +1078,11 @@ def mocked_execute_celery(
         The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
         If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
     :param web_test_app:
-        Test web application employed to execute tasks without dispatch to :mod:`celery`.
+        Test web application employed to execute tasks that would normally be dispatched to a :mod:`celery` worker.
         If provided, ensures that references to :mod:`celery` that would normally look for the :mod:`pyramid` registry
         will find the one provided by this test application, and all relevant settings set for it.
+    :param celery_app_name:
+        Name of the :mod:`celery` application or imported alias within the module referenced by :paramref:`celery_task`.
     """
 
     class MockTaskContext(object):
@@ -1102,9 +1105,11 @@ def mocked_execute_celery(
         # all following methods return what would be returned normally in sync mode
 
         def wait(self, *_, **__):
+            # type: (*Any, **Any) -> Type[CeleryTaskTimeoutError]
             raise CeleryTaskTimeoutError
 
         def ready(self, *_, **__):
+            # type: (*Any, **Any) -> bool
             return True
 
     mocked_task_context = MockTaskContext()
@@ -1120,13 +1125,30 @@ def mocked_execute_celery(
             func_execute_task(*args, **kwargs)  # noqa
         return mocked_task_context
 
-    if isinstance(web_test_app, TestApp):
-        celery_app.conf.setdefault("PYRAMID_REGISTRY", web_test_app.app.registry)
-
-    return (
+    celery_mocks = [
         mock.patch(f"{celery_task}.delay", side_effect=mock_execute_task),
         mock.patch("celery.app.task.Context", return_value=mocked_task_context),
-    )
+    ]
+
+    class MockCeleryApp(celery.Celery):
+        @property
+        def conf(self):
+            return {"PYRAMID_REGISTRY": web_test_app.app.registry}
+
+    if isinstance(web_test_app, TestApp):
+        # WARNING:
+        #   It is very critical that the mock referencing to the above test app registry is applied as context manager.
+        #   Since the Celery app is created globally by 'pyramid_celery', omitting to reset the mock could cause the
+        #   Pyramid registry and the underlying settings to be make its way across tests references. This can cause
+        #   unexpected side-effects if configurations vary between tests to evaluate distinct use cases. Using the
+        #   context manager, we make sure that the mock should live only during the corresponding 'with' block lifetime,
+        #   which should be limited to more controlled duration than globally.
+        celery_task_module = celery_task.rsplit(".", 1)[0]
+        celery_mocks.append(
+            mock.patch(f"{celery_task_module}.{celery_app_name}", new_callable=MockCeleryApp, spec=celery.Celery)
+        )
+
+    return celery_mocks
 
 
 @contextlib.contextmanager
