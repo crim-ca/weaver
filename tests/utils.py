@@ -32,6 +32,7 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from pyramid.testing import DummyRequest
+from pyramid_celery import celery_app
 from pytest_server_fixtures.http import HTTPTestServer, SimpleHTTPTestServer
 from requests import Response
 from webtest import TestApp, TestResponse
@@ -1047,8 +1048,11 @@ def mocked_wps_output(settings,                 # type: SettingsType
     )
 
 
-def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):
-    # type: (str, Optional[Callable[[...], Any]]) -> Iterable[MockPatch]
+def mocked_execute_celery(
+    celery_task="weaver.processes.execution.execute_process",   # type: str
+    func_execute_task=None,                                     # type: Optional[Callable[[...], Any]]
+    web_test_app=None,                                          # type: Optional[TestApp]
+):                                                              # type: (...) -> Iterable[MockPatch]
     """
     Contextual mock of a task execution to run locally instead of dispatched :mod:`celery` worker.
 
@@ -1072,11 +1076,15 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         should omit the input argument for the :class:`celery.task.Task` that will not be automatically inserted.
         The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
         If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
+    :param web_test_app:
+        Test web application employed to execute tasks without dispatch to :mod:`celery`.
+        If provided, ensures that references to :mod:`celery` that would normally look for the :mod:`pyramid` registry
+        will find the one provided by this test application, and all relevant settings set for it.
     """
 
-    class MockTask(object):
+    class MockTaskContext(object):
         """
-        Mocks the Celery Task for testing.
+        Mocks the :class:`celery.app.task.Context` for testing.
 
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
         call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
@@ -1099,10 +1107,10 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         def ready(self, *_, **__):
             return True
 
-    task = MockTask()
+    mocked_task_context = MockTaskContext()
 
     def mock_execute_task(*args, **kwargs):
-        # type: (*Any, **Any) -> MockTask
+        # type: (*Any, **Any) -> MockTaskContext
         if func_execute_task is None:
             mod, func = celery_task.rsplit(".", 1)
             module = importlib.import_module(mod)
@@ -1110,17 +1118,20 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
             task_func(*args, **kwargs)
         else:
             func_execute_task(*args, **kwargs)  # noqa
-        return task
+        return mocked_task_context
+
+    if isinstance(web_test_app, TestApp):
+        celery_app.conf.setdefault("PYRAMID_REGISTRY", web_test_app.app.registry)
 
     return (
         mock.patch(f"{celery_task}.delay", side_effect=mock_execute_task),
-        mock.patch("celery.app.task.Context", return_value=task)
+        mock.patch("celery.app.task.Context", return_value=mocked_task_context),
     )
 
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> mock.MagicMock
+    # type: () -> contextlib.AbstractContextManager[mock.MagicMock]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 

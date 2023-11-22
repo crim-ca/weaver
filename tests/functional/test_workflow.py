@@ -28,6 +28,7 @@ from tests.utils import (
     get_settings_from_config_ini,
     get_settings_from_testapp,
     get_test_weaver_app,
+    mocked_dismiss_process,
     mocked_execute_celery,
     mocked_file_server,
     mocked_sub_requests,
@@ -451,10 +452,13 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                                headers=cls.headers, cookies=cls.cookies,
                                ignore_errors=True, log_enabled=False)
             cls.assert_response(resp, allowed_codes, message="Failed cleanup of test processes jobs!")
-            for job in resp.json.get("jobs", []):
-                cls.request("DELETE", f"{path}/{job}",
-                            headers=cls.headers, cookies=cls.cookies,
-                            ignore_errors=True, log_enabled=False)
+            with contextlib.ExitStack() as stack:
+                if cls.is_webtest():
+                    stack.enter_context(mocked_dismiss_process())
+                for job in resp.json.get("jobs", []):
+                    cls.request("DELETE", f"{path}/{job}",
+                                headers=cls.headers, cookies=cls.cookies,
+                                ignore_errors=True, log_enabled=False)
 
             # then clean the actual process
             path = f"/processes/{process_info.id}"
@@ -818,7 +822,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 stack_exec.enter_context(mock.patch(data_source_use, side_effect=self.mock_get_data_source_from_url))
             if self.is_webtest():
                 # mock execution when running on local Web Test app since no Celery runner is available
-                for mock_exec in mocked_execute_celery():
+                for mock_exec in mocked_execute_celery(web_test_app=self.app):
                     stack_exec.enter_context(mock_exec)
                 # mock HTTP HEAD request to validate WPS output access (see 'setUpClass' details)
                 mock_req = stack_exec.enter_context(mocked_wps_output(self.settings, mock_head=True, mock_get=False))
