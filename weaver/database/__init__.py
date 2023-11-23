@@ -37,7 +37,7 @@ def get_db(container=None, reset_connection=False):
     if not reset_connection and registry and isinstance(getattr(registry, "db", None), MongoDatabase):
         return registry.db
     database = MongoDatabase(container)
-    if reset_connection:
+    if reset_connection and registry:
         registry.db = database
     return database
 
