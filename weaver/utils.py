@@ -49,6 +49,7 @@ from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
+from pyramid_celery import celery_app as app
 from pywps.inout.basic import UrlHandler
 from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
 from requests import HTTPError as RequestsHTTPError, Response
@@ -66,7 +67,7 @@ from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
 from weaver.status import map_status
-from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
 
 try:  # refactor in jsonschema==4.18.0
@@ -469,6 +470,14 @@ def get_any_message(info, default=""):
     return (info.get("message") or info.get("description") or info.get("detail") or default).strip()
 
 
+def is_celery():
+    # type: () -> bool
+    """
+    Detect if the current application was executed as a :mod:`celery` command.
+    """
+    return sys.argv[0].rsplit("/", 1)[-1] == "celery"
+
+
 def get_registry(container=None, nothrow=False):
     # type: (Optional[AnyRegistryContainer], bool) -> Optional[Registry]
     """
@@ -480,6 +489,17 @@ def get_registry(container=None, nothrow=False):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if container is None:
+        # find 2 parents since 'get_settings' calls 'get_registry' to provide better context
+        warnings.warn(
+            f"Function [{get_caller_name()}] called from [{get_caller_name(skip=2)}] "
+            "did not provide a settings container. Consider providing it explicitly.",
+            UndefinedContainerWarning,
+        )
+    # preemptively check registry in celery if applicable
+    # avoids error related to forked processes when restarting workers
+    if container is None and is_celery():
+        return app.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, WerkzeugRequest) or container is None:
         return get_current_registry()
     if nothrow:
@@ -1520,14 +1540,23 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def get_caller_name(skip=2, base_class=False):
+def get_caller_name(skip=0, base_class=False):
     # type: (int, bool) -> str
     """
     Find the name of a parent caller function or method.
 
     The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
-    :param skip: specifies how many levels of stack to skip while getting the caller.
+    Supposing the following call stack ``main -> func1 -> func2 -> func3 -> get_caller_name``.
+
+    Calling ``get_caller_name()`` or ``get_caller_name(skip=1)`` would return the full package location of ``func2``
+    because it is 1-level higher than were ``get_caller_name`` is called from (inside ``func3``).
+    Calling ``get_caller_name(skip=0)`` would return ``func3`` directly, and ``func1`` for ``get_caller_name(skip=2)``.
+
+    :param skip:
+        Specifies how many levels of stack to skip for getting the caller.
+        By default, uses ``skip=1`` to obtain the immediate parent function that called :func:`get_caller_name`,
+        were ``skip=0`` would be the function itself that called :func:`get_caller_name`.
     :param base_class:
         Specified if the base class should be returned or the top-most class in case of inheritance
         If the caller is not a class, this doesn't do anything.
@@ -1744,6 +1773,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
                        *args,                   # type: Params.args
                        condition=Exception,     # type: RetryCondition
                        retries=1,               # type: int
+                       interval=0,              # type: Number
                        **kwargs,                # type: Params.kwargs
                        ):                       # type: (...) -> Return
     """
@@ -1755,6 +1785,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
         In case of a callable, success/failure result should be returned to indicate if retry is needed.
         If retry is not requested by the handler for the specified exception, it is raised directly.
     :param retries: Amount of retries to perform. If retries are exhausted, the final exception is re-raised.
+    :param interval: wait time interval (seconds) between retries.
     :return: Expected normal operation return value if it was handled within the specified amount of retries.
     """
     if (
@@ -1793,6 +1824,8 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
             last_exc = exc
             LOGGER.warning("Operation '%s' failed but matched handler condition for retry. Retrying (%s/%s)...",
                            name, attempt, retries)
+            if interval and remain:
+                time.sleep(interval)
     LOGGER.error("Operation '%s' still failing. Maximum retry attempts reached (%s).", name, retries)
     raise last_exc
 

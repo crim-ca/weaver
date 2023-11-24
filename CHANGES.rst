@@ -55,6 +55,41 @@ Fixes:
 - Fix ``$schema`` of `OGC` ``nameReferenceType`` being reported under every ``dataType`` of ``literalDataDomains`` for
   literal `I/O` of `Process` descriptions. The reference is not only included in the `OpenAPI` definition as intended.
 
+.. _changes_4.38.0:
+
+`4.38.0 <https://github.com/crim-ca/weaver/tree/4.38.0>`_ (2023-11-24)
+========================================================================
+
+Changes:
+--------
+- Add Python 3.12 support (fixes `#587 <https://github.com/crim-ca/weaver/issues/587>`_).
+
+  * Depends on ``PasteDeploy==3.1.0``
+    (relates to `Pylons/pastedeploy#43 <https://github.com/Pylons/pastedeploy/pull/43>`_).
+  * Depends on ``pyramid_celery==5.0.0a`` [`crim-ca/pyramid_celery <https://github.com/crim-ca/pyramid_celery>`_ fork]
+    (relates to `sontek/pyramid_celery#102 <https://github.com/sontek/pyramid_celery/pull/102>`_).
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.37.0:
+
+`4.37.0 <https://github.com/crim-ca/weaver/tree/4.37.0>`_ (2023-11-22)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix default `XML` format resolution for `WPS` endpoint when no ``Accept`` header or ``format``/``f`` query parameter
+  is provided and that the request is submitted from a Web Browser, which involves additional control logic to select
+  the applicable ``Content-Type`` for the response.
+- Fix pre-forked ``celery`` worker process inconsistently resolving the ``pyramid`` registry applied
+  by ``pyramid_celery`` after worker restart.
+
 .. _changes_4.36.0:
 
 `4.36.0 <https://github.com/crim-ca/weaver/tree/4.36.0>`_ (2023-11-06)

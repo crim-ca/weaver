@@ -120,7 +120,7 @@ def execute_process(task, job_id, wps_url, headers=None):
 
     task_process = get_celery_process()
     rss_start = task_process.memory_info().rss
-    registry = get_registry(None)  # local thread, whether locally or dispatched celery
+    registry = get_registry(app)  # local thread, whether locally or dispatched celery
     settings = get_settings(registry)
     db = get_db(registry, reset_connection=True)  # reset the connection because we are in a forked celery process
     store = db.get_store(StoreJobs)
