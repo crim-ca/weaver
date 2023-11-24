@@ -12,7 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add Python 3.12 support (fixes `#587 <https://github.com/crim-ca/weaver/issues/587>`_).
+
+  * Depends on ``PasteDeploy==3.1.0``
+    (relates to `Pylons/pastedeploy#43 <https://github.com/Pylons/pastedeploy/pull/43>`_).
+  * Depends on ``pyramid_celery==5.0.0a`` [`crim-ca/pyramid_celery <https://github.com/crim-ca/pyramid_celery>`_ fork]
+    (relates to `sontek/pyramid_celery#102 <https://github.com/sontek/pyramid_celery/pull/102>`_).
 
 Fixes:
 ------
