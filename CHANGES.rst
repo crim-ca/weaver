@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.38.0:
+
+`4.38.0 <https://github.com/crim-ca/weaver/tree/4.38.0>`_ (2023-11-24)
+========================================================================
+
+Changes:
+--------
 - Add Python 3.12 support (fixes `#587 <https://github.com/crim-ca/weaver/issues/587>`_).
 
   * Depends on ``PasteDeploy==3.1.0``
