@@ -850,3 +850,7 @@ stop: 		## kill application instance(s) started with gunicorn (pserve)
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
+
+# Reapply config if overrides were defined.
+# Ensure overrides take precedence over targets and auto-resolution logic of variables.
+-include Makefile.config

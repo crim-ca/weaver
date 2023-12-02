@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 def is_attribute_none(exception):
     # type: (Exception) -> bool
-    return isinstance(exception, AttributeError) and "None" in str(exception)
+    return isinstance(exception, AttributeError) and any(err in str(exception) for err in ["None", "NoneType"])
 
 
 def get_taskmeta_output(taskmeta_collection, output):
