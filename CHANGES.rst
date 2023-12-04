@@ -1929,8 +1929,8 @@ Changes:
   where potentially inaccessible (according to settings). Definition of `CWL` package will need to add
   `InitialWorkDirRequirement <https://www.commonwl.org/v1.0/CommandLineTool.html#InitialWorkDirRequirement>`_ as per
   defined by reference specification to stage those files if they need to be accessed with write permissions
-  (see: `example <https://www.commonwl.org/user_guide/15-staging/>`_). Addresses some issues listed in
-  `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
+  (see: `example <https://www.commonwl.org/user_guide/topics/staging-input-files.html>`_).
+  Addresses some issues listed in `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
 - Enforce removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and

@@ -1174,7 +1174,7 @@ Below is a list of compatible elements.
 | Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
 +=========================================+==========================================================+
 | ``keywords``                            | ``s:keywords`` (expecting ``s`` in ``$namespace``        |
-|                                         | referring to http://schema.org [#schemaorg]_)            |
+|                                         | referring to http://schema.org [#cwl_schemaorg]_)        |
 +-----------------------------------------+----------------------------------------------------------+
 | ``metadata``                            | ``$schemas``/``$namespace``                              |
 | (using ``title`` and ``href`` fields)   | (using namespace name and HTTP references)               |
@@ -1186,8 +1186,8 @@ Below is a list of compatible elements.
 
 .. rubric:: Footnotes
 
-.. [#schemaorg]
-    See example: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. [#cwl_schemaorg]
+    See example: `cwl-metadata`_
 
 .. |br| raw:: html
 

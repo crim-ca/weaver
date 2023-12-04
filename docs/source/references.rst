@@ -34,7 +34,7 @@
 .. _cwl-workflow: https://www.commonwl.org/v1.1/Workflow.html
 .. |cwl-workdir-req| replace:: InitialWorkDirRequirement
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
-.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
+.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/topics/staging-input-files.html
 .. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
 .. FIXME apply official CWL specification location
@@ -49,7 +49,7 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
-.. _cwl-metadata: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
