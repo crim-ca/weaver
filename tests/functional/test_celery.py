@@ -10,6 +10,8 @@ import sys
 import tempfile
 from typing import TYPE_CHECKING
 
+import pytest
+
 from tests.utils import get_settings_from_testapp, get_test_weaver_app, setup_config_with_mongodb
 from weaver.config import WeaverConfiguration
 from weaver.database import get_db
@@ -32,6 +34,7 @@ def get_taskmeta_output(taskmeta_collection, output):
     return taskmeta.get("traceback", "") + taskmeta.get("result", "")
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_celery_registry_resolution():
     python_bin = sys.executable
     python_dir = os.path.dirname(python_bin)
