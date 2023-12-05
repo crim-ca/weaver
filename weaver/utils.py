@@ -2174,8 +2174,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     LOGGER.debug("Fetch file resolved as remote URL reference.")
     request_kwargs.pop("stream", None)
     resp = request_extra("GET", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
-    if resp.status_code >= 400:
-        # pragma: no cover
+    if resp.status_code >= 400:  # pragma: no cover
         # use method since response object does not derive from Exception, therefore cannot be raised directly
         if hasattr(resp, "raise_for_status"):
             resp.raise_for_status()
