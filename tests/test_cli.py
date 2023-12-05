@@ -1,6 +1,8 @@
 """
 Unit test for :mod:`weaver.cli` utilities.
 """
+import contextlib
+
 import argparse
 import base64
 import inspect
@@ -224,6 +226,14 @@ def test_auth_handler_cookie():
     assert resp.headers["Cookie"] == token
 
 
+def test_upload_file_not_found():
+    with tempfile.NamedTemporaryFile() as tmp_file_deleted:
+        pass   # delete on close
+    result = WeaverClient().upload(tmp_file_deleted.name)
+    assert not result.success
+    assert "does not exist" in result.message
+
+
 @pytest.mark.cli
 def test_href_inputs_not_uploaded_to_vault():
     mock_result = OperationResult(False, code=500)
@@ -272,6 +282,54 @@ def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(test_file_name)[-1]) as input_file:
         inputs = {"file": {"href": input_file.name}}
+        with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+            result = WeaverClient()._upload_files(inputs=inputs)
+    assert result == expected_output
+
+
+@pytest.mark.cli
+def test_file_inputs_array_uploaded_to_vault():
+    fake_href1 = f"https://some-host.com/file1.json"
+    fake_href2 = f"https://some-host.com/file2.zip"
+    fake_id = "fake_id"
+    fake_token = "fake_token"
+
+    expected_output = (
+        {
+            "file": [
+                {
+                    "href": fake_href1,
+                    "format": {"mediaType": ContentType.APP_JSON},
+                },
+                {
+                    "href": fake_href2,
+                    "format": {
+                        "mediaType": ContentType.APP_ZIP,
+                        "encoding": ContentEncoding.BASE64,
+                    },
+                }
+            ]
+        },
+        {
+            "X-Auth-Vault": f"token {fake_token}; id={fake_id}"
+        }
+    )
+
+    def mock_upload(_href, *_, **__):
+        fake_href = fake_href1 if _href.endswith(".json") else fake_href2
+        output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
+        mock_result = OperationResult(True, code=200, body=output_body)
+        return mock_result
+
+    with contextlib.ExitStack() as stack:
+        input_file1 = tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href1)[-1])
+        input_file2 = tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href2)[-1])
+        inputs = {
+            "file": [
+                {"href": input_file1.name},
+                {"href": input_file2.name}
+            ]
+        }
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result == expected_output

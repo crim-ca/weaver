@@ -9,7 +9,7 @@ import re
 import sys
 import textwrap
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 import yaml
@@ -2328,9 +2328,9 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
 
     def add_subparsers(self, *args, **kwargs):  # type: ignore
         self.register("action", "parsers", WeaverSubParserAction)
-        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)  # type: WeaverSubParserAction
+        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)
         setattr(group, "parser", self)
-        return group
+        return cast(WeaverSubParserAction, group)
 
     @property
     def help_mode(self):
