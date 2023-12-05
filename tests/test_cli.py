@@ -289,8 +289,8 @@ def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
 
 @pytest.mark.cli
 def test_file_inputs_array_uploaded_to_vault():
-    fake_href1 = f"https://some-host.com/file1.json"
-    fake_href2 = f"https://some-host.com/file2.zip"
+    fake_href1 = "https://some-host.com/file1.json"
+    fake_href2 = "https://some-host.com/file2.zip"
     fake_id = "fake_id"
     fake_token = "fake_token"
 
@@ -322,12 +322,12 @@ def test_file_inputs_array_uploaded_to_vault():
         return mock_result
 
     with contextlib.ExitStack() as stack:
-        input_file1 = tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href1)[-1])
-        input_file2 = tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href2)[-1])
+        input1 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href1)[-1]))
+        input2 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href2)[-1]))
         inputs = {
             "file": [
-                {"href": input_file1.name},
-                {"href": input_file2.name}
+                {"href": input1.name},
+                {"href": input2.name}
             ]
         }
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
