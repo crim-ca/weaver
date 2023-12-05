@@ -9,11 +9,14 @@ from collections import OrderedDict
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+import pint
 import pytest
 import yaml
 from cwltool.errors import WorkflowException
 from cwltool.factory import Factory as CWLFactory
-from owslib.wps import ComplexData, Input as OWSInput
+from owslib.crs import Crs
+from owslib.wps import ComplexData, Input as OWSInput, Output as OWSOutput
+from pywps.inout.basic import UOM
 from pywps.inout.formats import Format
 from pywps.inout.inputs import ComplexInput, LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
@@ -39,7 +42,9 @@ from weaver.processes.constants import (
     IO_INPUT,
     IO_OUTPUT,
     WPS_BOUNDINGBOX,
+    WPS_BOUNDINGBOX_DATA,
     WPS_COMPLEX,
+    WPS_COMPLEX_DATA,
     WPS_COMPLEX_TYPES,
     WPS_LITERAL,
     WPS_LITERAL_DATA_TYPES,
@@ -64,11 +69,13 @@ from weaver.processes.convert import (
     json2oas_io,
     json2wps_allowed_values,
     json2wps_datatype,
+    json2wps_supported_uoms,
     merge_io_formats,
     normalize_ordered_io,
     oas2json_io,
     ogcapi2cwl_process,
     ows2json_io,
+    ows2json_output_data,
     parse_cwl_array_type,
     parse_cwl_enum_type,
     repr2json_input_values,
@@ -76,6 +83,7 @@ from weaver.processes.convert import (
     wps2json_io,
     xml_wps2cwl
 )
+from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
 from weaver.utils import null
 
 if TYPE_CHECKING:
@@ -287,10 +295,21 @@ class MockElementXML(dict):
     def __getattr__(self, _):
         return MockElementXML({})
 
+    @property
+    def tag(self):
+        return [""]
+
     def find(self, key):
         if isinstance(self.value, dict):
             return self.value.get(key)
         return None
+
+
+class MockBboxElementXML(MockElementXML):
+    def __init__(self, bbox, crs):
+        super().__init__(None)
+        self.minx, self.miny, self.maxx, self.maxy = bbox
+        self.crs = crs
 
 
 def test_any2cwl_io_from_ows():
@@ -2098,6 +2117,25 @@ def test_xml_wps2cwl_enum_updated():
         ),
         (
             {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "default": "m",
+                    },
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uom": {"uom": "m", "reference": ""}
+            }
+        ),
+        (
+            {
                 "type": "array",
                 "minItems": 2,
                 "items": {
@@ -2153,10 +2191,101 @@ def test_xml_wps2cwl_enum_updated():
                 "minOccurs": 2,
             }
         ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": ["random"],  # unknown unit
+                    },
+                }
+            },
+            pint.PintError,
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": [],  # bad
+                    },
+                }
+            },
+            ValueError,
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": ["m"],
+                    },
+                    "reference": {
+                        "type": "string",
+                        "enum": ["", "", ""],  # bad, must match UoM amount
+                    },
+                }
+            },
+            ValueError,
+        )
     ]
 )
 def test_oas2json_io_convert_literal_uom_definition(io_schema, io_expected):
-    assert oas2json_io(io_schema) == io_expected
+    try:
+        io_result = oas2json_io(io_schema)
+    except Exception as exc:
+        if isinstance(io_expected, type) and issubclass(io_expected, Exception):
+            assert isinstance(exc, io_expected)
+        else:
+            pytest.fail(f"Exception not expected: [{exc}]")
+    else:
+        if isinstance(io_expected, type) and issubclass(io_expected, Exception):
+            pytest.fail(f"Expected [{io_expected}] did not raise.")
+        assert io_result == io_expected
+
+
+@pytest.mark.parametrize(
+    ["uoms", "expect"],
+    [
+        (
+            [UOM("m"), {"uom": "km"}, {"uom": "ft"}],
+            [UOM("m"), UOM("km"), UOM("ft")],
+        ),
+        (
+            [UOM("m"), None],
+            null,
+        ),
+        (
+            [UOM("m"), {}],
+            null,
+        ),
+        (
+            [UOM("m"), "random"],
+            null,
+        ),
+        (
+            [],
+            null,
+        ),
+        (
+            {},
+            null,
+        ),
+    ]
+)
+def test_json2wps_supported_uoms(uoms, expect):
+    data = {"uoms": uoms}
+    result = json2wps_supported_uoms(data)
+    assert result == expect
 
 
 @pytest.mark.parametrize(
@@ -2192,6 +2321,75 @@ def test_ows2json_io_convert_literal_uom(ows_io, json_io):
     for key in ows_io:  # avoid copying everything to make test definitions easier
         result.pop(key, None)
     assert result == json_io
+
+
+@pytest.mark.parametrize(
+    ["value", "dtype", "ctype", "expect"],
+    [
+        # note: OWSLib encodes literal data as array of string since parsed from XML
+        (
+            [123456],
+            "integer",
+            None,
+            {"data": 123456, "dataType": "integer"},
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("EPSG:4326"))],  # auto-resolve axis order YX
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": "urn:ogc:def:crs:EPSG::4326",
+                    "bbox": [2., 1., 4., 3.],
+                    "format": OGC_API_BBOX_FORMAT,
+                    "schema": OGC_API_BBOX_SCHEMA,
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("CRS:84"))],  # auto-resolve axis order XY
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": "urn:ogc:def:crs:CRS::84",
+                    "bbox": [1., 2., 3., 4.],
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("custom", axisorder="xy"))],
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {"dataType": WPS_BOUNDINGBOX_DATA, "data": {"crs": "urn:ogc:def:crs:::-1", "bbox": [1., 2., 3., 4.]}},
+        ),
+        (
+            ["random"],
+            WPS_COMPLEX_DATA,
+            "text/plain",
+            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": "text/plain"},
+        ),
+        (
+            [1, 2, 3],
+            WPS_COMPLEX_DATA,
+            "application/json",
+            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": "application/json"},
+        ),
+    ]
+)
+def test_ows2json_output_data(value, dtype, ctype, expect):
+    output = OWSOutput(MockElementXML({}))  # skip parsing from XML, inject corresponding results directly
+    output.identifier = "test"
+    output.title = "TEST"
+    output.dataType = dtype
+    output.data = value
+    if ctype:
+        output.mimeType = ctype
+    result = ows2json_output_data(output, None, {})  # type: ignore
+    expect.update({"identifier": "test", "title": "TEST"})
+    assert result == expect
 
 
 @pytest.mark.parametrize(

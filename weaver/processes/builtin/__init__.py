@@ -85,7 +85,7 @@ def _get_builtin_metadata(process_id, process_path, meta_field, extra_info=None,
             meta = getattr(mod, meta_field, None)
             if meta and isinstance(meta, str):
                 return clean_json_text_body(meta) if clean else meta
-        except ImportError:
+        except ImportError:  # pragma: no cover
             pass
     if isinstance(extra_info, dict) and isinstance(extra_param, str):
         meta = extra_info.get(extra_param)
