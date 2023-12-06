@@ -1,10 +1,9 @@
 """
 Unit test for :mod:`weaver.cli` utilities.
 """
-import contextlib
-
 import argparse
 import base64
+import contextlib
 import inspect
 import json
 import os

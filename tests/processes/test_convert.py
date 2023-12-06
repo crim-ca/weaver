@@ -83,8 +83,8 @@ from weaver.processes.convert import (
     wps2json_io,
     xml_wps2cwl
 )
-from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
 from weaver.utils import null
+from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
 
 if TYPE_CHECKING:
     from typing import List
