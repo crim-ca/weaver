@@ -2165,7 +2165,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_execute_job_with_bbox(self):
         body = self.retrieve_payload("EchoBoundingBox", "deploy", local=True)
         proc = self.fully_qualified_test_process_name(self._testMethodName)
-        _, cwl = self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         data = self.retrieve_payload("EchoBoundingBox", "execute", local=True)
         bbox = data["bboxInput"]

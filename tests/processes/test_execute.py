@@ -22,12 +22,14 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass
 class MockInputDefinition:
+    # pylint: disable=C0103  # must use the names employed by OWSLib, even if not standard snake case
     # override Input to skip XML parsing
     identifier: str = "test"
     dataType: WPS_CategoryType = None
 
 
 class MockProcess:
+    # pylint: disable=C0103  # must use the names employed by OWSLib, even if not standard snake case
     # override Process to skip XML parsing
     def __init__(self, inputs: List[Input]) -> None:
         self.identifier = "test"
@@ -91,7 +93,7 @@ def test_parse_wps_inputs(input_data, input_definition, expect_input):
     job.inputs = [input_data]
     result_inputs = parse_wps_inputs(proc, job)
     if expect_input is None:
-        assert result_inputs == []
+        assert result_inputs == []  # pylint: disable=C1803  # not check only if empty, we want to check the type also!
     else:
         result_input = result_inputs[0][1]
         if not isinstance(expect_input, str):
