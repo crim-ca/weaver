@@ -82,6 +82,7 @@ if TYPE_CHECKING:
         CeleryResult,
         HeaderCookiesType,
         HeadersType,
+        JobValueBbox,
         JSON,
         ProcessExecution,
         SettingsType,
@@ -440,7 +441,7 @@ def parse_wps_input_complex(input_value, input_info):
 
 
 def parse_wps_input_bbox(input_value, input_info):
-    # type: (Union[str, JSON], JSON) -> BoundingBoxDataInput
+    # type: (Union[str, JobValueBbox], JSON) -> BoundingBoxDataInput
     """
     Parse the input data details into a bounding box input.
     """
@@ -450,7 +451,9 @@ def parse_wps_input_bbox(input_value, input_info):
         bbox_crs = input_value.get("crs")
         bbox_val = input_value.get("bbox")
     if not bbox_crs:
-        bbox_crs = input_info.get("bbox", {}).get("default") or None
+        bbox_crs_def = input_info.get("bbox", {})
+        if isinstance(bbox_crs_def, dict) and "default" in bbox_crs_def:
+            bbox_crs = bbox_crs_def["default"] or None
     bbox_val = bbox_val.split(",") if isinstance(bbox_val, str) else bbox_val
     bbox_dim = len(bbox_val) // 2
     return BoundingBoxDataInput(bbox_val, crs=bbox_crs, dimensions=bbox_dim)
@@ -504,6 +507,8 @@ def parse_wps_inputs(wps_process, job):
             else:
                 input_id = get_any_id(job_input)
                 input_val = get_any_value(job_input)
+            if input_id in bbox_inputs and input_val is None:  # inline bbox
+                input_val = job_input
 
             # FIXME: handle minOccurs>=2 vs single-value inputs
             #   - https://github.com/opengeospatial/ogcapi-processes/issues/373

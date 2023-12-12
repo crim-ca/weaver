@@ -438,8 +438,9 @@ class WpsConfigBase(unittest.TestCase):
             return f"Error logs:\n{_text}"
         return ""
 
-    def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace(".", "-")
+    def fully_qualified_test_process_name(self, name=""):
+        name = fully_qualified_name(self) + (f"-{name}" if name else "")
+        return name.replace(".", "-")
 
     def monitor_job(self,
                     status_url,                         # type: str

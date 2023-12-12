@@ -2162,6 +2162,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert processed_values["measureFloatInput"] == 10.2
         assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
 
+    def test_execute_job_with_bbox(self):
+        body = self.retrieve_payload("EchoBoundingBox", "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        _, cwl = self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        data = self.retrieve_payload("EchoBoundingBox", "execute", local=True)
+        bbox = data["bboxInput"]
+        assert bbox["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84", (
+            "Input BBOX expects an explicit CRS reference URI. "
+            "This is used to validate interpretation of CRS by WPS data type handlers."
+        )
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": data,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+
+        # note: following CRS format is not valid unless nested under 'value' (ie: schema allows it as "object" value)
+        expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
+        assert results
+        assert "bboxOutput" in results
+        assert results["bboxOutput"]["value"] == expect_bbox, (
+            "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
+        )
+
     def test_execute_job_with_context_output_dir(self):
         cwl = {
             "cwlVersion": "v1.0",

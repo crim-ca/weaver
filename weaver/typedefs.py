@@ -377,6 +377,10 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
+    JobValueBbox = TypedDict("JobValueBbox", {
+        "bbox": Required[List[Number]],
+        "crs": NotRequired[str],
+    })
     JobValueFormat = TypedDict("JobValueFormat", {
         "mime_type": NotRequired[str],
         "media_type": NotRequired[str],
@@ -400,7 +404,7 @@ if TYPE_CHECKING:
         # qualified value allow any object (not list directly though)
         "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
+    JobValueObject = Union[JobValueData, JobValueValue, JobValueBbox, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
@@ -417,7 +421,11 @@ if TYPE_CHECKING:
         "id": Required[str],
         "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
+    JobValueBboxItem = TypedDict("JobValueBboxItem", {
+        "id": Required[str],
+        "value": Required[JobValueBbox],
+    }, total=False)
+    JobValueItem = Union[JobValueDataItem, JobValueValueItem, JobValueBboxItem, JobValueFileItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
     JobInputs = List[JobInputItem]
