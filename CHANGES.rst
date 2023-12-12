@@ -54,6 +54,11 @@ Fixes:
   using ``missing=colander.drop``.
 - Fix ``$schema`` of `OGC` ``nameReferenceType`` being reported under every ``dataType`` of ``literalDataDomains`` for
   literal `I/O` of `Process` descriptions. The reference is not only included in the `OpenAPI` definition as intended.
+- Fix override of `CWL` ``stderr`` and ``stdout`` definitions if specified by the original *Application Package* for
+  its own implementation. These stream handles are added to the `CWL` by Weaver to provide more contextual debugging
+  and traceability details of the internal application executed by the `Process`. However, a package making use of this
+  functionality of `CWL` to capture an output file would be broken unless naming the file exactly as ``stderr.log`` and
+  ``stdout.log``. Weaver will now employ the parameters provided by the *Application Package* if specified.
 
 .. _changes_4.38.0:
 
