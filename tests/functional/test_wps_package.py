@@ -329,10 +329,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 }
             ]
         }
-        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
-        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
-        #        since no real indication/distinction between a literal data and one with uom
-        # assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
+        assert desc["inputs"]["measureInput"]["schema"] == {
+            "oneOf": [
+                # same as original definition with UoM requirements
+                ref["inputs"]["measureInput"]["schema"],
+                # extended additional "simple" representation of literal data directly provided
+                {"type": "number", "format": "float"},
+            ]
+        }
         assert desc["inputs"]["stringInput"]["schema"] == ref["inputs"]["stringInput"]["schema"]  # no change
 
         # NOTE:
@@ -451,10 +455,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 }
             ]
         }
-        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
-        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
-        #        since no real indication/distinction between a literal data and one with uom
-        # assert desc["outputs"]["measureOutput"]["schema"] == ref["outputs"]["measureOutput"]["schema"]  # no change
+        assert desc["outputs"]["measureOutput"]["schema"] == {
+            "oneOf": [
+                # same as original definition with UoM requirements
+                ref["outputs"]["measureOutput"]["schema"],
+                # extended additional "simple" representation of literal data directly provided
+                {"type": "number", "format": "float"},
+            ]
+        }
         assert desc["outputs"]["stringOutput"]["schema"] == ref["outputs"]["stringOutput"]["schema"]  # no change
 
         # check detection of array min/max items => min/max occurs
