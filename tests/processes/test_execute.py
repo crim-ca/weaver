@@ -12,12 +12,7 @@ from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
 
 from weaver.datatype import Job
 from weaver.formats import ContentEncoding, ContentType
-from weaver.processes.constants import (
-    WPS_BOUNDINGBOX_DATA,
-    WPS_COMPLEX_DATA,
-    WPS_LITERAL,
-    WPS_CategoryType,
-)
+from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, WPS_LITERAL, WPS_CategoryType
 from weaver.processes.execution import parse_wps_inputs
 
 if TYPE_CHECKING:
