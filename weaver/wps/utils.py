@@ -493,12 +493,18 @@ def load_pywps_config(container, config=None):
         pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible
         pywps_config.CONFIG.set("s3", "encrypt", "true")  # encrypts data server-side, transparent from this side
 
+    allowed_input_file_paths = [
+        tempfile.gettempdir(),
+        output_dir,
+    ]
+
     # enforce back resolved values onto PyWPS config
     pywps_config.CONFIG.set("server", "setworkdir", "true")
     pywps_config.CONFIG.set("server", "sethomedir", "true")
     pywps_config.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
     pywps_config.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
     pywps_config.CONFIG.set("server", "url", get_wps_url(settings, load=False))
+    pywps_config.CONFIG.set("server", "allowedinputpaths", os.pathsep.join(allowed_input_file_paths))
     settings["weaver.wps_configured"] = True
     return pywps_config.CONFIG
 

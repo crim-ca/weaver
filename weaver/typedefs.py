@@ -1,8 +1,5 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
-# FIXME:
-#  replace invalid 'Optional' (type or None) used instead of 'NotRequired' (optional key) when better supported
-#  https://youtrack.jetbrains.com/issue/PY-53611/Support-PEP-655-typingRequiredtypingNotRequired-for-TypedDicts
 if TYPE_CHECKING:
     import os
     import sys
@@ -280,10 +277,16 @@ if TYPE_CHECKING:
         "size": NotRequired[Literal[0]],
         "listing": List[CWL_RuntimeOutputFile],
     }, total=False)
-    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]
+    CWL_RuntimeInputFileItem = Union[CWL_RuntimeInputFile, List[CWL_RuntimeInputFile]]
+    CWL_RuntimeInputDirectoryItem = Union[CWL_RuntimeInputDirectory, List[CWL_RuntimeInputDirectory]]
+    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
-    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
-    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
+    CWL_RuntimeInputList = List[
+        Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
+    ]
+    CWL_RuntimeOutputFileItem = Union[CWL_RuntimeOutputFile, List[CWL_RuntimeOutputFile]]
+    CWL_RuntimeOutputDirectoryItem = Union[CWL_RuntimeOutputDirectory, List[CWL_RuntimeOutputDirectory]]
+    CWL_RuntimeOutput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeOutputFileItem, CWL_RuntimeOutputDirectoryItem]
     CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # CWL loading
@@ -301,8 +304,8 @@ if TYPE_CHECKING:
     # PyWPS Execution
     WPS_InputData = Tuple[str, AnyInputData]
     WPS_OutputAsRef = Tuple[str, Optional[bool]]                            # (output_id, as_ref)
-    WPS_OutputAsRefMimeType = Tuple[str, Optional[bool], Optional[str]]     # (output_id, as_ref, mime_type)
-    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
+    WPS_OutputAsRefMediaType = Tuple[str, Optional[bool], Optional[str]]    # (output_id, as_ref, mime_type)
+    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMediaType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
@@ -374,6 +377,10 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
+    JobValueBbox = TypedDict("JobValueBbox", {
+        "bbox": Required[List[Number]],
+        "crs": NotRequired[str],
+    })
     JobValueFormat = TypedDict("JobValueFormat", {
         "mime_type": NotRequired[str],
         "media_type": NotRequired[str],
@@ -385,19 +392,26 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
         "href": str,
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueData = TypedDict("JobValueData", {
-        "data": AnyValueType,
+        "data": Required[AnyValueType],
     }, total=False)
     JobValueValue = TypedDict("JobValueValue", {
-        "value": AnyValueType,
+        # qualified value allow any object (not list directly though)
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
+    JobValueObject = Union[JobValueData, JobValueValue, JobValueBbox, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": Required[str],
@@ -405,9 +419,13 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueValueItem = TypedDict("JobValueValueItem", {
         "id": Required[str],
-        "value": Required[AnyValueType],
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
+    JobValueBboxItem = TypedDict("JobValueBboxItem", {
+        "id": Required[str],
+        "value": Required[JobValueBbox],
+    }, total=False)
+    JobValueItem = Union[JobValueDataItem, JobValueValueItem, JobValueBboxItem, JobValueFileItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
     JobInputs = List[JobInputItem]

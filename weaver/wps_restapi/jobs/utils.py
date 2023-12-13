@@ -10,6 +10,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
     HTTPForbidden,
+    HTTPInternalServerError,
     HTTPNoContent,
     HTTPNotFound,
     HTTPNotImplemented,
@@ -347,7 +348,9 @@ def get_results(job,                                # type: Job
     out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
     references = {}
     for result in job.results:
-        rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
+        # Complex result could contain both 'data' and a reference (eg: JSON file and its direct representation).
+        # Literal result is only by itself. Therefore, find applicable field by non 'data' match.
+        rtype = "href" if get_any_value(result, key=True, file=True, data=False) else "data"
         value = get_any_value(result)
         out_key = rtype
         out_id = get_any_id(result)
@@ -375,13 +378,16 @@ def get_results(job,                                # type: Job
                     if field in result:
                         output["format"][field] = result[field]
         elif rtype != "href":
-            # literal data
-            # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
             dtype = result.get("dataType", any2wps_literal_datatype(value, is_value=True) or "string")
             if ogc_api:
                 output["dataType"] = {"name": dtype}
             else:
                 output["dataType"] = dtype
+
+        if schema == JobInputsOutputsSchema.OGC_STRICT:
+            out_fmt = output.pop("format", {})
+            for fmt_key, fmt_val in out_fmt.items():
+                output.setdefault(fmt_key, fmt_val)
 
         if ogc_api or as_ref:
             mapping = references if as_ref else outputs
@@ -443,11 +449,30 @@ def get_job_results_response(job, container, headers=None):
         headers["Location"] = job.status_url(container)
 
     if not is_raw:
+        try:
+            results_schema = sd.Result()
+            results_json = results_schema.deserialize(results)
+            if len(results_json) != len(results):  # pragma: no cover  # ensure no outputs silently dismissed
+                raise colander.Invalid(
+                    results_schema,
+                    msg=f"Failed validation for values of outputs: {list(set(results) - set(results_json))}",
+                    value=results,
+                )
+        except colander.Invalid as exc:  # pragma: no cover
+            raise HTTPInternalServerError(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "InvalidSchema",
+                    "title": "Invalid Results",
+                    "detail": "Results body failed schema validation.",
+                    "status": HTTPInternalServerError.status_code,
+                    "error": exc.msg,
+                    "value": repr_json(exc.value),
+                })
+            )
         # note:
         #   Cannot add "links" field in response body because variable Output ID keys are directly at the root
         #   Possible conflict with an output that would be named "links".
-        results = sd.Result().deserialize(results)
-        return HTTPOk(json=results, headers=headers)
+        return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body

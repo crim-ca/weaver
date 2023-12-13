@@ -54,10 +54,14 @@ def j2n(json_reference, output_dir):
             json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)
             json_path = get_secure_path(json_path)
             LOGGER.info("Reading JSON file: [%s]", json_path)
-            with open(json_path, mode="r", encoding="utf-8") as json_file:
-                json_content = json.load(json_file)
+            try:
+                with open(json_path, mode="r", encoding="utf-8") as json_file:
+                    json_content = json.load(json_file)
+            except json.JSONDecodeError:
+                LOGGER.error("Invalid JSON could not be parsed.")
+                raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
             if not isinstance(json_content, list) or any(not isinstance(item, str) for item in json_content):
-                LOGGER.error("Invalid JSON: [%s]", json_content)
+                LOGGER.error("Invalid JSON: %s", json_content)
                 raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
             LOGGER.info("Parsing JSON file references from file contents:\n%s", repr_json(json_content))
             for file_url in json_content:

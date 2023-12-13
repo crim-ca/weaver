@@ -1,10 +1,11 @@
+import base64
 import datetime
 import json
 import logging
 import os
 import re
 import socket
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -18,10 +19,15 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union
+    from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
     from weaver.typedefs import AnyRequestType, JSON
+
+    FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
+    FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
+    DataStrT = TypeVar("DataStrT")
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,9 +53,9 @@ class AcceptLanguage(Constants):
 
 class ContentType(Constants):
     """
-    Supported Content-Types.
+    Supported ``Content-Type`` values.
 
-    Media-type nomenclature::
+    Media-Type nomenclature::
 
         <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
     """
@@ -77,7 +83,7 @@ class ContentType(Constants):
     APP_YAML = "application/x-yaml"
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
-    IMAGE_OGC_GEOTIFF = "mage/tiff; application=geotiff"
+    IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
@@ -91,9 +97,179 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
+    ANY_JSON = {
+        APP_JSON, APP_YAML,
+        APP_GEOJSON, APP_VDN_GEOJSON,
+        APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
+        APP_OAS_JSON,
+        APP_OGC_PKG_JSON, APP_OGC_PKG_YAML,
+    }
     ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
     ANY_XML = {APP_XML, TEXT_XML}
     ANY = "*/*"
+
+
+class ContentEncoding(Constants):
+    """
+    Supported ``Content-Encoding`` values.
+
+    .. note::
+        Value ``binary`` is kept for convenience and backward compatibility with older definitions.
+        It will default to the same encoding strategy as if ``base64`` was specified explicitly.
+        Value ``binary`` is not part of :rfc:`4648`, but remains a common occurrence that dates from
+        when ``format: binary`` was the approach employed to represent binary (JSON-schema Draft-04 and prior)
+        instead of what is now recommended using ``contentEncoding: base64`` (JSON-schema Draft-07).
+
+    .. seealso::
+        - https://github.com/json-schema-org/json-schema-spec/issues/803
+        - https://github.com/json-schema-org/json-schema-spec/pull/862
+    """
+    UTF_8 = "UTF-8"
+    BINARY = "binary"
+    BASE16 = "base16"
+    BASE32 = "base32"
+    BASE64 = "base64"
+
+    @staticmethod
+    def is_text(encoding):
+        # type: (Any) -> bool
+        """
+        Indicates if the ``Content-Encoding`` value can be categorized as textual data.
+        """
+        return ContentEncoding.get(encoding) in [ContentEncoding.UTF_8, None]
+
+    @staticmethod
+    def is_binary(encoding):
+        # type: (Any) -> bool
+        """
+        Indicates if the ``Content-Encoding`` value can be categorized as binary data.
+        """
+        return not ContentEncoding.is_text(encoding)
+
+    @staticmethod
+    def open_parameters(encoding, mode="r"):
+        # type: (Any, FileModeSteamType) -> Tuple[FileModeEncoding, Literal["UTF-8", None]]
+        """
+        Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
+        """
+        is_text = ContentEncoding.is_text(encoding)
+        return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
+
+    @staticmethod
+    @overload
+    def encode(data, encoding=BASE64, binary=True):
+        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        ...
+
+    @staticmethod
+    @overload
+    def encode(data, encoding=BASE64, binary=False):
+        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        ...
+
+    @staticmethod
+    @overload
+    def encode(data, encoding=BASE64, binary=None):
+        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
+        ...
+
+    @staticmethod
+    def encode(data, encoding=BASE64, binary=None):
+        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        """
+        Encodes the data to the requested encoding and convert it to the string-like data type representation.
+
+        :param data: Data to encode.
+        :param encoding: Target encoding method.
+        :param binary:
+            If unspecified, the string-like type will be the same as the input data.
+            Otherwise, convert the encoded data to :class:`str` or :class:`bytes` accordingly.
+        :return: Encoded and converted data.
+        """
+        data_type = type(data)
+        out_type = data_type if binary is None else (bytes if binary else str)
+        enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
+        enc_func = {
+            (str, str, ContentEncoding.UTF_8): lambda _: _,
+            (str, bytes, ContentEncoding.UTF_8): lambda s: s.encode(),
+            (bytes, bytes, ContentEncoding.UTF_8): lambda _: _,
+            (bytes, str, ContentEncoding.UTF_8): lambda s: s.decode(),
+            (str, str, ContentEncoding.BASE16): lambda s: base64.b16encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE16): lambda s: base64.b16encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE16): lambda s: base64.b16encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE16): lambda s: base64.b16encode(s),
+            (str, str, ContentEncoding.BASE32): lambda s: base64.b32encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE32): lambda s: base64.b32encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE32): lambda s: base64.b32encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE32): lambda s: base64.b32encode(s),
+            (str, str, ContentEncoding.BASE64): lambda s: base64.b64encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE64): lambda s: base64.b64encode(s.encode()),
+            (bytes, str, ContentEncoding.BASE64): lambda s: base64.b64encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE64): lambda s: base64.b64encode(s),
+            (str, str, ContentEncoding.BINARY): lambda s: base64.b64encode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BINARY): lambda s: base64.b64encode(s.encode()),
+            (bytes, str, ContentEncoding.BINARY): lambda s: base64.b64encode(s).decode(),
+            (bytes, bytes, ContentEncoding.BINARY): lambda s: base64.b64encode(s),
+        }
+        return enc_func[(data_type, out_type, enc_type)](data)
+
+    @staticmethod
+    @overload
+    def decode(data, encoding=BASE64, binary=True):
+        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        ...
+
+    @staticmethod
+    @overload
+    def decode(data, encoding=BASE64, binary=False):
+        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        ...
+
+    @staticmethod
+    @overload
+    def decode(data, encoding=BASE64, binary=None):
+        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
+        ...
+
+    @staticmethod
+    def decode(data, encoding=BASE64, binary=None):
+        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        """
+        Decodes the data from the specified encoding and convert it to the string-like data type representation.
+
+        :param data: Data to decode.
+        :param encoding: Expected source encoding.
+        :param binary:
+            If unspecified, the string-like type will be the same as the input data.
+            Otherwise, convert the decoded data to :class:`str` or :class:`bytes` accordingly.
+        :return: Decoded and converted data.
+        """
+        data_type = type(data)
+        out_type = data_type if binary is None else (bytes if binary else str)
+        enc_type = ContentEncoding.get(encoding, default=ContentEncoding.UTF_8)
+        dec_func = {
+            (str, str, ContentEncoding.UTF_8): lambda _: _,
+            (str, bytes, ContentEncoding.UTF_8): lambda s: s.encode(),
+            (bytes, bytes, ContentEncoding.UTF_8): lambda _: _,
+            (bytes, str, ContentEncoding.UTF_8): lambda s: s.decode(),
+            (str, str, ContentEncoding.BASE16): lambda s: base64.b16decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE16): lambda s: base64.b16decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE16): lambda s: base64.b16decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE16): lambda s: base64.b16decode(s),
+            (str, str, ContentEncoding.BASE32): lambda s: base64.b32decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE32): lambda s: base64.b32decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE32): lambda s: base64.b32decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE32): lambda s: base64.b32decode(s),
+            (str, str, ContentEncoding.BASE64): lambda s: base64.b64decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BASE64): lambda s: base64.b64decode(s.encode()),
+            (bytes, str, ContentEncoding.BASE64): lambda s: base64.b64decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BASE64): lambda s: base64.b64decode(s),
+            (str, str, ContentEncoding.BINARY): lambda s: base64.b64decode(s.encode()).decode(),
+            (str, bytes, ContentEncoding.BINARY): lambda s: base64.b64decode(s.encode()),
+            (bytes, str, ContentEncoding.BINARY): lambda s: base64.b64decode(s).decode(),
+            (bytes, bytes, ContentEncoding.BINARY): lambda s: base64.b64decode(s),
+        }
+        return dec_func[(data_type, out_type, enc_type)](data)
 
 
 class OutputFormat(Constants):
@@ -209,7 +385,7 @@ class SchemaRole(Constants):
     JSON_SCHEMA = "https://www.w3.org/2019/wot/json-schema"
 
 
-# explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
+# explicit media-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
 _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
     ContentType.APP_NETCDF: ".nc",
@@ -313,7 +489,7 @@ _CONTENT_TYPE_SYNONYM_MAPPING = {
 }
 
 # Mappings for "CWL->File->Format"
-# - IANA contains most standard MIME-types, but some special/vendor-specific types are missing
+# - IANA contains most standard media-types, but some special/vendor-specific types are missing
 #   (application/x-hdf5, application/x-netcdf, etc.).
 # - EDAM contains many field-specific schemas, but don't have an implicit URL definition (uses 'format_<id>' instead).
 # - OpenGIS contains many OGC/Geospatial Media-Types and glossary of related terms, but since it includes many items
@@ -385,12 +561,21 @@ OGC_MAPPING = {
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
 }
+FORMAT_NAMESPACE_MAPPINGS = {
+    IANA_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in IANA_MAPPING.items()},
+    EDAM_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in EDAM_MAPPING.items()},
+    OGC_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OGC_MAPPING.items()},
+    OPENGIS_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OPENGIS_MAPPING.items()},
+}
 FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
     **EDAM_NAMESPACE_DEFINITION,
     **OGC_NAMESPACE_DEFINITION,
     **OPENGIS_NAMESPACE_DEFINITION
 }
+FORMAT_NAMESPACE_PREFIXES = [
+    f"{_ns}:" for _ns in FORMAT_NAMESPACE_DEFINITIONS
+] + list(FORMAT_NAMESPACE_DEFINITIONS.values())
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
 
@@ -420,18 +605,18 @@ def get_allowed_extensions():
     return list(base | extra)
 
 
-def get_format(mime_type, default=None):
+def get_format(media_type, default=None):
     # type: (str, Optional[str]) -> Optional[Format]
     """
-    Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types.
+    Obtains a :class:`Format` with predefined extension and encoding details from known media-types.
     """
-    fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
+    fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(media_type)
     if fmt is not None:
         return fmt
     if default is not None:
         ctype = default
     else:
-        ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+        ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return None
     ext = get_extension(ctype)
@@ -439,10 +624,10 @@ def get_format(mime_type, default=None):
     return fmt
 
 
-def get_extension(mime_type, dot=True):
+def get_extension(media_type, dot=True):
     # type: (str, bool) -> str
     """
-    Retrieves the extension corresponding to :paramref:`mime_type` if explicitly defined, or by parsing it.
+    Retrieves the extension corresponding to :paramref:`media_type` if explicitly defined, or by parsing it.
     """
     def _handle_dot(_ext):
         # type: (str) -> str
@@ -452,15 +637,15 @@ def get_extension(mime_type, dot=True):
             return _ext[1:]
         return _ext
 
-    fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
+    fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(media_type)
     if fmt:
         if not fmt.extension.startswith("."):
             return fmt.extension
         return _handle_dot(fmt.extension)
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type)
+    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(media_type)
     if ext:
         return _handle_dot(ext)
-    ctype = clean_mime_type_format(mime_type, strip_parameters=True)
+    ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return ""
     ext_default = f".{ctype.split('/')[-1].replace('x-', '')}"
@@ -510,13 +695,13 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
-def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
+def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the extended schema reference from the media-type identifier.
 
-    Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
-    the :paramref:`mime_type` (`Content-Type` header) using the first matched one.
+    Obtains the corresponding `IANA`/`EDAM`/etc. ``format`` value to be applied under a :term:`CWL` :term:`I/O` ``File``
+    from the :paramref:`media_type` (``Content-Type`` header) using the first matched one.
 
     Lookup procedure is as follows:
 
@@ -533,7 +718,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
     - If ``make_reference=True``:
         - If there is a match, returns the explicit format reference as ``<namespace-url>/<format>``.
         - If there is no match but ``must_exist=False``, returns the literal reference as ``<iana-url>/<format>``
-          (N.B.: literal non-official MIME-type reference will be returned even if an official synonym exists).
+          (N.B.: literal non-official media-type reference will be returned even if an official synonym exists).
         - If there is no match but ``must_exist=True`` **AND** ``allow_synonym=True``, retry the call with the
           synonym if available, or move to next step. Skip this step if ``allow_synonym=False``.
         - Returns a single ``None`` as there is no match (directly or synonym).
@@ -545,97 +730,129 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         ``must_exist=False`` before providing it to the `CWL` I/O definition. Setting ``must_exist=False`` should be
         used only for literal string comparison or pre-processing steps to evaluate formats.
 
-    :param mime_type: Some reference, namespace'd or literal (possibly extended) MIME-type string.
-    :param make_reference: Construct the full URL reference to the resolved MIME-type. Otherwise, return tuple details.
+    :param media_type: Some reference, namespace'd or literal (possibly extended) media-type string.
+    :param make_reference: Construct the full URL reference to the resolved media-type. Otherwise, return tuple details.
     :param must_exist:
-        Return result only if it can be resolved to an official MIME-type (or synonym if enabled), otherwise ``None``.
-        Non-official MIME-type can be enforced if disabled, in which case `IANA` namespace/URL is used as it preserves
+        Return result only if it can be resolved to an official media-type (or synonym if enabled), otherwise ``None``.
+        Non-official media-type can be enforced if disabled, in which case `IANA` namespace/URL is used as it preserves
         the original ``<type>/<subtype>`` format.
     :param allow_synonym:
-        Allow resolution of non-official MIME-type to an official MIME-type synonym if available.
-        Types defined as *synonym* have semantically the same format validation/resolution for `CWL`.
-        Requires ``must_exist=True``, otherwise the non-official MIME-type is employed directly as result.
-    :returns: Resolved MIME-type format for `CWL` usage, accordingly to specified arguments (see description details).
+        Allow resolution of non-official media-type to an official media-type synonym if available.
+        Types defined as *synonym* have semantically the same format validation/resolution for :term:`CWL`.
+        Requires ``must_exist=True``, otherwise the non-official media-type is employed directly as result.
+    :returns: Resolved media-type format for `CWL` usage, accordingly to specified arguments (see description details).
     """
     def _make_if_ref(_map, _key, _fmt):
         # type: (Dict[str, str], str, str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, f"{_key}:{_fmt}")
 
-    def _search_explicit_mappings(_mime_type):
+    def _search_explicit_mappings(_media_type):
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
-        if _mime_type in IANA_MAPPING:
-            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_mime_type])
-        if _mime_type in EDAM_MAPPING:  # prefer real reference if available
-            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_mime_type])
-        if _mime_type in OGC_MAPPING:  # prefer real reference if available
-            return _make_if_ref(OGC_NAMESPACE_DEFINITION, OGC_NAMESPACE, OGC_MAPPING[_mime_type])
-        if _mime_type in OPENGIS_MAPPING:  # prefer real reference if available
-            return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_mime_type])
+        if _media_type in IANA_MAPPING:
+            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_media_type])
+        if _media_type in EDAM_MAPPING:  # prefer real reference if available
+            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_media_type])
+        if _media_type in OGC_MAPPING:  # prefer real reference if available
+            return _make_if_ref(OGC_NAMESPACE_DEFINITION, OGC_NAMESPACE, OGC_MAPPING[_media_type])
+        if _media_type in OPENGIS_MAPPING:  # prefer real reference if available
+            return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_media_type])
         return None
 
-    def _request_extra_various(_mime_type):
+    def _request_extra_various(_media_type):
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         """
         Attempts multiple request-retry variants to be as permissive as possible to sporadic/temporary failures.
         """
         from weaver.utils import request_extra
 
-        _mime_type_url = f"{IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]}{_mime_type}"
-        if _mime_type in IANA_KNOWN_MEDIA_TYPES:  # avoid HTTP NotFound
+        _media_type = clean_media_type_format(_media_type, strip_parameters=True)
+        _media_type_url = f"{IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]}{_media_type}"
+        if _media_type in IANA_KNOWN_MEDIA_TYPES:  # avoid HTTP NotFound
             # prefer real reference if available
-            _found = _search_explicit_mappings(_mime_type)
+            _found = _search_explicit_mappings(_media_type)
             if _found is not None:
                 return _found
-            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
 
         retries = 3
         try:
-            resp = request_extra("head", _mime_type_url, retries=retries, timeout=2,
+            resp = request_extra("head", _media_type_url, retries=retries, timeout=2,
                                  allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
-                return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+                return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
         except ConnectionError as exc:
-            LOGGER.debug("Format request [%s] connection error: [%s]", _mime_type_url, exc)
+            LOGGER.debug("Format request [%s] connection error: [%s]", _media_type_url, exc)
         try:
             for _ in range(retries):
                 try:
-                    resp = urlopen(_mime_type_url, timeout=2)  # nosec: B310 # hardcoded HTTP(S) # pylint: disable=R1732
+                    with urlopen(_media_type_url, timeout=2) as resp:  # nosec: B310  # IANA scheme guaranteed HTTP
+                        if resp.code == HTTPOk.code:
+                            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
                 except socket.timeout:
                     continue
-                if resp.code == HTTPOk.code:
-                    return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
                 break
         except HTTPError:
             pass
         return None
 
-    if not mime_type:
+    if not media_type:
         return None if make_reference else (None, None)
     # attempt search without cleanup in case of explicit definition that needs the extra parameters
-    found = _search_explicit_mappings(mime_type)
+    found = _search_explicit_mappings(media_type)
     if found:
         return found
-    mime_type = clean_mime_type_format(mime_type, strip_parameters=True)
-    result = _request_extra_various(mime_type)
+    media_type = clean_media_type_format(media_type, strip_parameters=True)
+    result = _request_extra_various(media_type)
     if result is not None:
         return result
-    found = _search_explicit_mappings(mime_type)
+    found = _search_explicit_mappings(media_type)
     if found:
         return found
     if not must_exist:
-        return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
-    if result is None and allow_synonym and mime_type in _CONTENT_TYPE_SYNONYM_MAPPING:
-        mime_type = _CONTENT_TYPE_SYNONYM_MAPPING.get(mime_type)
-        return get_cwl_file_format(mime_type, make_reference=make_reference, must_exist=True, allow_synonym=False)
+        return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, media_type)
+    if result is None and allow_synonym and media_type in _CONTENT_TYPE_SYNONYM_MAPPING:
+        media_type = _CONTENT_TYPE_SYNONYM_MAPPING.get(media_type)
+        return get_cwl_file_format(media_type, make_reference=make_reference, must_exist=True, allow_synonym=False)
     return None if make_reference else (None, None)
 
 
-def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=False):
+def map_cwl_media_type(cwl_format):
+    # type: (Optional[str]) -> Optional[str]
+    """
+    Obtains the Media-Type that corresponds to the specified :term:`CWL` ``format``.
+
+    :param cwl_format: Long form URL or namespaced variant of a :term:`CWL` format referring to an ontology Media-Type.
+    :return: Resolved Media-Type.
+    """
+    if not cwl_format:
+        return None
+    ns, ns_fmt = get_cwl_file_format(cwl_format)  # normalize and split components
+    if not ns or not ns_fmt:
+        ns = IANA_NAMESPACE_DEFINITION
+        ns_fmt = cwl_format
+    ns_name = list(ns)[0]
+    ns_fmt = ns_fmt.split(":", 1)[-1] if "://" not in ns_fmt else ns_fmt
+    ctype = FORMAT_NAMESPACE_MAPPINGS[ns_name].get(ns_fmt)
+    if not ctype:
+        fmt = get_format(ns_fmt)
+        ctype = fmt.mime_type if fmt else None
+        if not isinstance(ctype, str) or not ctype:
+            return None
+        for ns_prefix in FORMAT_NAMESPACE_PREFIXES:
+            if ctype.startswith(ns_prefix):
+                ctype = ctype.split(ns_prefix, 1)[-1]
+                break
+        if "/" not in ctype:
+            return None
+    return ctype
+
+
+def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """
     Obtains a generic media-type identifier by cleaning up any additional parameters.
 
-    Removes any additional namespace key or URL from :paramref:`mime_type` so that it corresponds to the generic
+    Removes any additional namespace key or URL from :paramref:`media_type` so that it corresponds to the generic
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used
     in `CWL->inputs/outputs->File->format` or the complete URL reference.
 
@@ -644,54 +861,54 @@ def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=Fal
 
     According to provided arguments, it also cleans up additional parameters or extracts sub-type suffixes.
 
-    :param mime_type:
-        MIME-type, full URL to MIME-type or namespace-formatted string that must be cleaned up.
+    :param media_type:
+        Media-Type, full URL to media-type or namespace-formatted string that must be cleaned up.
     :param suffix_subtype:
         Remove additional sub-type specializations details separated by ``+`` symbol such that an explicit format like
         ``application/vnd.api+json`` returns only its most basic suffix format defined as``application/json``.
     :param strip_parameters:
-        Removes additional MIME-type parameters such that only the leading part defining the ``type/subtype`` are
+        Removes additional media-type parameters such that only the leading part defining the ``type/subtype`` are
         returned. For example, this will get rid of ``; charset=UTF-8`` or ``; version=4.0`` parameters.
 
     .. note::
         Parameters :paramref:`suffix_subtype` and :paramref:`strip_parameters` are not necessarily exclusive.
     """
-    if not mime_type:  # avoid mismatching empty string with random type
+    if not media_type:  # avoid mismatching empty string with random type
         return None
     # when 'format' comes from parsed CWL tool instance, the input/output record sets the value
     # using a temporary local file path after resolution against remote namespace ontology
-    if mime_type.startswith("file://") and "#" in mime_type:
-        mime_type = mime_type.split("#")[-1]
+    if media_type.startswith("file://") and "#" in media_type:
+        media_type = media_type.split("#")[-1]
     if strip_parameters:
-        mime_type = mime_type.split(";")[0]
-    if suffix_subtype and "+" in mime_type:
+        media_type = media_type.split(";")[0]
+    if suffix_subtype and "+" in media_type:
         # parameters are not necessarily stripped, need to re-append them after if any
-        parts = mime_type.split(";", 1)
+        parts = media_type.split(";", 1)
         if len(parts) < 2:
             parts.append("")
         else:
             parts[1] = f";{parts[1]}"
         typ, sub = parts[0].split("/")
         sub = sub.split("+")[-1]
-        mime_type = f"{typ}/{sub}{parts[1]}"
+        media_type = f"{typ}/{sub}{parts[1]}"
     for v in FORMAT_NAMESPACE_DEFINITIONS.values():
-        if v in mime_type:
-            mime_type = mime_type.replace(v, "")
+        if v in media_type:
+            media_type = media_type.replace(v, "")
             break
     for v in FORMAT_NAMESPACE_DEFINITIONS:
-        if mime_type.startswith(f"{v}:"):
-            mime_type = mime_type.replace(f"{v}:", "")
+        if media_type.startswith(f"{v}:"):
+            media_type = media_type.replace(f"{v}:", "")
             break
     search = True
     for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
         if not search:
             break
         for v in _map.values():
-            if v.endswith(mime_type):
-                mime_type = [k for k in _map if v.endswith(_map[k])][0]
+            if v.endswith(media_type):
+                media_type = [k for k in _map if v.endswith(_map[k])][0]
                 search = False
                 break
-    return mime_type
+    return media_type
 
 
 def guess_target_format(request, default=ContentType.APP_JSON):
@@ -716,7 +933,7 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
     both headers and query parameters are applied directly without question.
 
-    :returns: Matched MIME-type or default.
+    :returns: Matched media-type or default.
     """
     from weaver.utils import get_header
 
@@ -729,7 +946,7 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     if not content_type:
         content_type = get_header("accept", request.headers, default=default or "")
         for ctype in content_type.split(","):
-            ctype = clean_mime_type_format(ctype, suffix_subtype=True, strip_parameters=True)
+            ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
             if ctype != default or not default:
                 # because most browsers enforce some 'visual' list of accept header, revert to JSON if detected
                 # explicit request set by client (e.g.: using 'requests') will have full control over desired content
@@ -761,6 +978,8 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
     if default is None:
         default = json_default_handler
     try:
+        if isinstance(data, str):
+            return data  # avoid adding additional quotes
         data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110

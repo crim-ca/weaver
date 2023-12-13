@@ -170,6 +170,13 @@ OGC_API_PROC_PART1_EXAMPLES = f"{OGC_API_PROC_PART1_BASE}/examples"
 OGC_WPS_1_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/1.0.0"
 OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 
+# Because this type has special handling functionalities to distinguish it from any other usual 'complex' I/O
+# or any generic JSON-object data, define common constants that can be reused across the code.
+# If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
+OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
+OGC_API_BBOX_EPSG = "EPSG:4326"
+
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
 
@@ -929,7 +936,7 @@ class ResultFormat(FormatDescription):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/format.yaml"
     _ext_schema_fields = []  # exclude "$schema" added on each sub-deserialize (too verbose, only for reference)
 
-    mediaType = MediaType(String())
+    mediaType = MediaType(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
     schema = FormatSchema(missing=drop)
 
@@ -1220,7 +1227,7 @@ class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
 class DefinitionOAS(AnyOfKeywordSchema):
     _any_of = [
         ObjectOAS(),
-        PropertyOAS(),  # for top-level keyword schemas {allOf,anyOf,oneOf,not}
+        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
     ]
 
 
@@ -1410,8 +1417,9 @@ class LiteralReference(ExtendedMappingSchema):
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1707-L1716
 class NameReferenceType(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/nameReferenceType.yaml"
-    name = ExtendedSchemaNode(String())
-    reference = ExecuteReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
+    _schema_include_deserialize = False
+    name = ExtendedSchemaNode(String(), description="Name of the entity definition.")
+    reference = ReferenceURL(missing=drop, description="Reference URL to schema definition of the named entity.")
 
 
 class DataTypeSchema(NameReferenceType):
@@ -1423,6 +1431,26 @@ class DataTypeSchema(NameReferenceType):
 
 class UomSchema(NameReferenceType):
     title = "UnitOfMeasure"
+    name = ExtendedSchemaNode(
+        String(),
+        description="Name of the entity definition.",
+        missing=drop,  # override to make optional in contrat to 'NameReferenceType'
+    )
+    uom = ExtendedSchemaNode(
+        String(allow_empty=True),  # unit/dimension-less value
+        description="Unit applicable for the corresponding measurement representation.",
+    )
+
+
+class SupportedUoM(ExtendedSequenceSchema):
+    description = "List of supported units for the represented measurement."
+    uom_item = UomSchema()
+    validator = Length(min=1)
+
+
+class MeasurementDataDomain(ExtendedMappingSchema):
+    supported = SupportedUoM()
+    default = UomSchema(missing=drop)
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/e6893b/extensions/workflows/openapi/workflows.yaml#L1423
@@ -1513,8 +1541,8 @@ class LiteralDataDomain(ExtendedMappingSchema):
                                  description="Indicates if this literal data domain definition is the default one.")
     defaultValue = AnyLiteralType(missing=drop, description="Default value to employ if none was provided.")
     dataType = DataTypeSchema(missing=drop, description="Type name and reference of the literal data representation.")
-    uom = UomSchema(missing=drop, description="Unit of measure applicable for the data.")
     valueDefinition = LiteralDataValueDefinition(description="Literal data domain constraints.")
+    uoms = MeasurementDataDomain(name="UOMs", missing=drop, description="Unit of measure applicable for the data.")
 
 
 class LiteralDataDomainList(ExtendedSequenceSchema):
@@ -3538,6 +3566,9 @@ class ExecuteInputFileLink(Link):  # for other metadata (title, hreflang, etc.)
         description="IANA identifier of content-type located at the link."
     )
     rel = LinkRelationshipType(missing=drop)  # optional opposite to normal 'Link'
+    # schema is not official, but logical (same name as under 'format' of process description for a complex file)
+    # this extra field is not prohibited from OGC Link definition (just make it explicit here)
+    schema = FormatSchema(missing=drop)
 
 
 # same as 'ExecuteInputLink', but using 'OLD' schema with 'format' field
@@ -3546,6 +3577,7 @@ class ExecuteInputReference(Reference):
 
 
 class ExecuteInputFile(AnyOfKeywordSchema):
+    title = "ExecuteInputFile"
     _any_of = [                   # 'href' required for both to provide file link/reference
         ExecuteInputFileLink(),   # 'OGC' schema with 'type: <MediaType>'
         ExecuteInputReference(),  # 'OLD' schema with 'format: {mimeType|mediaType: <MediaType>}'
@@ -3559,33 +3591,115 @@ class ExecuteInputFile(AnyOfKeywordSchema):
 #
 # Excludes objects to avoid conflict with later object mapping and {"value": <data>} definitions.
 # Excludes array literals that will be defined separately with allowed array of any item within this schema.
-# FIXME: does not support byte/binary type (string + format:byte) - see also: 'AnyLiteralType'
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/binaryInputValue.yaml
-# FIXME: does not support bbox
-#   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/bbox.yaml
-class ExecuteInputInlineValue(AnyLiteralType):
-    title = "ExecuteInputInlineValue"
-    description = "Execute input value provided inline."
+# Note: Also supports 'binaryInputValue', since 'type: string' regardless of 'format' is valid.
+class ExecuteInputInlineLiteral(AnyLiteralType):
+    title = "ExecuteInputInlineLiteral"
+    description = "Execute input literal value provided inline."
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml
-#
-#   oneOf:
-#     - $ref: "inputValueNoObject.yaml"
-#     - type: object
-class ExecuteInputObjectData(OneOfKeywordSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValue.yaml"
-    description = "Data value of any schema "
+class BoundingBox2D(ExtendedSequenceSchema):
+    description = "Bounding Box using 2D points."
+    item = Number()
+    validator = Length(min=4, max=4)
+
+
+class BoundingBox3D(ExtendedSequenceSchema):
+    description = "Bounding Box using 3D points."
+    item = Number()
+    validator = Length(min=6, max=6)
+
+
+class BoundingBoxValue(OneOfKeywordSchema):
     _one_of = [
-        ExecuteInputInlineValue(),
-        PermissiveMappingSchema(description="Data provided as any object schema."),
+        BoundingBox2D,
+        BoundingBox3D,
     ]
 
 
-# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/qualifiedInputValue.yaml
-class ExecuteInputQualifiedValue(Format):
+class BoundingBoxObject(StrictMappingSchema):
+    _schema = OGC_API_BBOX_SCHEMA
+    description = "Execute bounding box value provided inline."
+    format = OGC_API_BBOX_FORMAT
+    bbox = BoundingBoxValue(
+        description="Point values of the bounding box."
+    )
+    crs = URL(
+        default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        description="Coordinate Reference System of the Bounding Box points.",
+    )
+
+
+class ExecuteInputInlineBoundingBox(BoundingBoxObject):
+    _schema_include_deserialize = True
+
+
+class ExecuteInputInlineValue(OneOfKeywordSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValueNoObject.yaml"
+    _one_of = [
+        ExecuteInputInlineLiteral(),
+        ExecuteInputInlineBoundingBox(),
+    ]
+
+
+class ExecuteInputMeasurement(StrictMappingSchema):
+    description = "Execute measurement value with a unit of measure."
+    measurement = Number()
+    uom = ExtendedSchemaNode(
+        String(allow_empty=True),
+        title="UoM",
+        description="Unit of Measure for the specified value.",
+    )
+    reference = ExecuteReferenceURL(
+        missing=drop,
+        description="Reference URL to schema definition of the named entity.",
+    )
+
+
+class ExecuteInputObjectData(NotKeywordSchema, PermissiveMappingSchema):
+    summary = "Data provided as any object schema."
+    description = (
+        "Data provided as any object schema. "
+        "This content can represent any JSON definition. "
+        "It is recommended to provide either a 'mediaType' or a JSON 'schema' along with this value, "
+        "although this is not strictly required."
+    )
+    _not = [
+        ExecuteInputInlineBoundingBox(),
+        ExecuteInputMeasurement(),
+    ]
+
+
+# extended 'object' part form:
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValue.yaml
+class ExecuteInputAnyObjectValue(OneOfKeywordSchema):
+    summary = "Data provided as any object schema."
+    _one_of = [
+        # NOTE: any explicit object variation added here must be applied to 'not' of the generic object schema
+        ExecuteInputMeasurement(),
+        ExecuteInputObjectData(),
+    ]
+
+
+class ExecuteInputQualifiedLiteralValue(Format):  # default 'mediaType: text/plain'
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
-    value = ExecuteInputObjectData()    # can be anything, including literal value, array of them, nested object
+    value = ExecuteInputInlineValue()
+
+
+class ExecuteInputQualifiedAnyObjectValue(Format):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    value = ExecuteInputAnyObjectValue()    # can be anything, including literal value, array of them, nested object
+    mediaType = MediaType(default=ContentType.APP_JSON, example=ContentType.APP_JSON)  # override default for object
+
+
+class ExecuteInputQualifiedValue(OneOfKeywordSchema):
+    title = "ExecuteInputQualifiedValue"
+    # not exactly the same schema, but equivalent, with alternate 'mediaType' defaults for literal vs object
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inputValue.yaml"
+    _schema_include_deserialize = False
+    _one_of = [
+        ExecuteInputQualifiedLiteralValue(),
+        ExecuteInputQualifiedAnyObjectValue(),
+    ]
 
 
 # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
@@ -3598,9 +3712,9 @@ class ExecuteInputQualifiedValue(Format):
 class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/inlineOrRefData.yaml"
     _one_of = [
-        ExecuteInputInlineValue(),     # <inline-literal>
-        ExecuteInputQualifiedValue(),  # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
-        ExecuteInputFile(),            # 'href' with either 'type' (OGC) or 'format' (OLD)
+        ExecuteInputInlineValue(),          # <inline-value> (literal, bbox, measurement)
+        ExecuteInputQualifiedValue(),       # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
+        ExecuteInputFile(),                 # 'href' with either 'type' (OGC) or 'format' (OLD)
         # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
     ]
 
@@ -3610,11 +3724,11 @@ class ExecuteInputArrayValues(ExtendedSequenceSchema):
 
 
 # combine 'inlineOrRefData' and its 'array[inlineOrRefData]' variants to simplify 'ExecuteInputAny' definition
-class ExecuteInputData(OneOfKeywordSchema):
+class ExecuteInputData(OneOfKeywordSchema, StrictMappingSchema):
     description = "Execute data definition of the input."
     _one_of = [
-        ExecuteInputInlineOrRefData,
-        ExecuteInputArrayValues,
+        ExecuteInputInlineOrRefData(),
+        ExecuteInputArrayValues(),
     ]
 
 
@@ -3628,8 +3742,10 @@ class ExecuteInputData(OneOfKeywordSchema):
 #         items:
 #           $ref: "inlineOrRefData.yaml"
 #
-class ExecuteInputMapAdditionalProperties(ExtendedMappingSchema):
-    input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputValue",
+# depend on 'StrictMappingSchema' such that any unmapped "additionalProperties"
+# caused by the nested schema to fail validation is refused in the final mapping
+class ExecuteInputMapAdditionalProperties(StrictMappingSchema):
+    input_id = ExecuteInputData(variable="{input-id}", title="ExecuteInputData",
                                 description="Received mapping input value definition during job submission.")
 
 
@@ -4994,38 +5110,44 @@ class JobOutputs(OneOfKeywordSchema):
 
 
 # implement only literal parts from following schemas:
-# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
-# https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/qualifiedInputValue.yaml
-#
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inputValueNoObject.yaml
+# https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/inlineOrRefData.yaml
 # Other parts are implemented separately with:
 #   - 'ValueFormatted' (qualifiedInputValue)
+#   - 'ResultBoundingBox' (bbox)
 #   - 'ResultReference' (link)
-class ResultLiteral(AnyLiteralValueType):
-    # value = <AnyLiteralValueType>
-    pass
+class ResultLiteral(AnyLiteralType):
+    ...
 
 
 class ResultLiteralList(ExtendedSequenceSchema):
     result = ResultLiteral()
 
 
-class ValueFormatted(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(
-        String(),
+class ValueFormatted(ResultFormat):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/qualifiedInputValue.yaml"
+    _schema_include_deserialize = False
+    value = AnyValueOAS(
         example="<xml><data>test</data></xml>",
         description="Formatted content value of the result."
     )
-    format = ResultFormat()
+    format = ResultFormat(missing=drop, schema_include_deserialize=False)  # backward compatibility
 
 
 class ValueFormattedList(ExtendedSequenceSchema):
     result = ValueFormatted()
 
 
+class ResultBoundingBox(BoundingBoxObject):
+    _schema_include_deserialize = False
+
+
 class ResultReference(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/link.yaml"
+    _schema_include_deserialize = False
     href = ReferenceURL(description="Result file reference.")
     type = MediaType(description="IANA Content-Type of the file reference.")
-    format = ResultFormat()
+    format = ResultFormat(missing=drop, schema_include_deserialize=False)  # backward compatibility
 
 
 class ResultReferenceList(ExtendedSequenceSchema):
@@ -5039,6 +5161,7 @@ class ResultData(OneOfKeywordSchema):
         # other classes require only one of the two, and therefore are more permissive during schema validation
         ValueFormatted(description="Result formatted content value."),
         ValueFormattedList(description="Result formatted content of multiple values."),
+        ResultBoundingBox(description="Result bounding box value."),
         ResultReference(description="Result reference location."),
         ResultReferenceList(description="Result locations for multiple references."),
         ResultLiteral(description="Result literal value."),

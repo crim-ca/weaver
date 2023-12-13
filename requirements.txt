@@ -44,7 +44,8 @@ geotiff>=0.2.8
 # use pserve to continue supporting config.ini with paste settings
 gunicorn>=20.0.4
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
-json2xml>=3.20.0
+# even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
+json2xml>=4.1.0
 jsonschema>=3.0.1
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
@@ -60,8 +61,9 @@ mypy_boto3_s3
 numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.28.1
+owslib==0.29.3
 PasteDeploy>=3.1.0; python_version >= "3.12"
+pint
 psutil
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
@@ -78,7 +80,7 @@ python-dateutil
 pyramid_rewrite
 pyramid_storage
 pytz
-pywps==4.5.2
+pywps==4.6.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
 requests

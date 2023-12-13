@@ -65,6 +65,7 @@ from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import List
@@ -187,7 +188,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        ogc_api_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579"
 
         desc, _ = self.deploy_process(body, process_id=self._testMethodName, describe_schema=ProcessSchema.OGC)
         assert "inputs" in desc and isinstance(desc["inputs"], dict) and len(desc["inputs"]) == len(ref["inputs"])
@@ -201,32 +201,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # check obtained/extended schemas case by case based on expected merging of definitions
         assert desc["inputs"]["arrayInput"]["schema"] == ref["inputs"]["arrayInput"]["schema"]  # no change
         assert desc["inputs"]["boundingBoxInput"]["schema"] == {
-            # what is referenced by $ref, converted to $id after retrieval
-            "type": "object",
-            "properties": {
-                "crs": {
-                    "type": "string",
-                    "format": "uri",
-                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    "enum": [
-                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-                    ]
+            "oneOf": [
+                {
+                    # what is referenced by $ref, converted to $id after retrieval
+                    "type": "object",
+                    "properties": {
+                        "crs": {
+                            "type": "string",
+                            "format": "uri",
+                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "enum": [
+                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                            ]
+                        },
+                        "bbox": {
+                            "type": "array",
+                            "items": "number",
+                            "oneOf": [
+                                {"minItems": 4, "maxItems": 4},
+                                {"minItems": 6, "maxItems": 6},
+                            ]
+                        }
+                    },
+                    "required": ["bbox"],
+                    # merged:
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    # added:
+                    "$id": sd.OGC_API_BBOX_SCHEMA,
                 },
-                "bbox": {
-                    "type": "array",
-                    "items": "number",
-                    "oneOf": [
-                        {"minItems": 4, "maxItems": 4},
-                        {"minItems": 6, "maxItems": 6},
-                    ]
+                {
+                    "type": "string",
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
                 }
-            },
-            "required": ["bbox"],
-            # merged:
-            "format": "ogc-bbox",
-            # added:
-            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+            ]
         }
         assert desc["inputs"]["complexObjectInput"]["schema"] == {
             "oneOf": [
@@ -320,10 +329,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 }
             ]
         }
-        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
-        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
-        #        since no real indication/distinction between a literal data and one with uom
-        # assert desc["inputs"]["measureInput"]["schema"] == ref["inputs"]["measureInput"]["schema"]  # no change
+        assert desc["inputs"]["measureInput"]["schema"] == {
+            "oneOf": [
+                # same as original definition with UoM requirements
+                ref["inputs"]["measureInput"]["schema"],
+                # extended additional "simple" representation of literal data directly provided
+                {"type": "number", "format": "float"},
+            ]
+        }
         assert desc["inputs"]["stringInput"]["schema"] == ref["inputs"]["stringInput"]["schema"]  # no change
 
         # NOTE:
@@ -332,32 +345,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         #   *everything else* should be identical to inputs
         assert desc["outputs"]["arrayOutput"]["schema"] == ref["outputs"]["arrayOutput"]["schema"]  # no change
         assert desc["outputs"]["boundingBoxOutput"]["schema"] == {
-            # what is referenced by $ref, converted to $id after retrieval
-            "type": "object",
-            "properties": {
-                "crs": {
-                    "type": "string",
-                    "format": "uri",
-                    "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                    "enum": [
-                        "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                        "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-                    ]
+            "oneOf": [
+                {
+                    # what is referenced by $ref, converted to $id after retrieval
+                    "type": "object",
+                    "properties": {
+                        "crs": {
+                            "type": "string",
+                            "format": "uri",
+                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "enum": [
+                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                            ]
+                        },
+                        "bbox": {
+                            "type": "array",
+                            "items": "number",
+                            "oneOf": [
+                                {"minItems": 4, "maxItems": 4},
+                                {"minItems": 6, "maxItems": 6},
+                            ]
+                        }
+                    },
+                    "required": ["bbox"],
+                    # merged:
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    # added:
+                    "$id": sd.OGC_API_BBOX_SCHEMA,
                 },
-                "bbox": {
-                    "type": "array",
-                    "items": "number",
-                    "oneOf": [
-                        {"minItems": 4, "maxItems": 4},
-                        {"minItems": 6, "maxItems": 6},
-                    ]
+                {
+                    "type": "string",
+                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
                 }
-            },
-            "required": ["bbox"],
-            # merged:
-            "format": "ogc-bbox",
-            # added:
-            "$id": f"{ogc_api_ref}/core/openapi/schemas/bbox.yaml"
+            ]
         }
         assert desc["outputs"]["complexObjectOutput"]["schema"] == {
             "oneOf": [
@@ -433,10 +455,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 }
             ]
         }
-        # FIXME: support measure I/O (https://github.com/crim-ca/weaver/issues/430)
-        #        parsing works to detect numeric type, but reverse operation WPS->OAS not obvious
-        #        since no real indication/distinction between a literal data and one with uom
-        # assert desc["outputs"]["measureOutput"]["schema"] == ref["outputs"]["measureOutput"]["schema"]  # no change
+        assert desc["outputs"]["measureOutput"]["schema"] == {
+            "oneOf": [
+                # same as original definition with UoM requirements
+                ref["outputs"]["measureOutput"]["schema"],
+                # extended additional "simple" representation of literal data directly provided
+                {"type": "number", "format": "float"},
+            ]
+        }
         assert desc["outputs"]["stringOutput"]["schema"] == ref["outputs"]["stringOutput"]["schema"]  # no change
 
         # check detection of array min/max items => min/max occurs
@@ -2136,6 +2162,41 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert processed_values["measureFloatInput"] == 10.2
         assert processed_values["measureFileInput"] == {"VALUE": {"REF": 1, "MEASUREMENT": 10.3, "UOM": "M"}}
 
+    def test_execute_job_with_bbox(self):
+        body = self.retrieve_payload("EchoBoundingBox", "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        data = self.retrieve_payload("EchoBoundingBox", "execute", local=True)
+        bbox = data["bboxInput"]
+        assert bbox["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84", (
+            "Input BBOX expects an explicit CRS reference URI. "
+            "This is used to validate interpretation of CRS by WPS data type handlers."
+        )
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": data,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+
+        # note: following CRS format is not valid unless nested under 'value' (ie: schema allows it as "object" value)
+        expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
+        assert results
+        assert "bboxOutput" in results
+        assert results["bboxOutput"]["value"] == expect_bbox, (
+            "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
+        )
+
     def test_execute_job_with_context_output_dir(self):
         cwl = {
             "cwlVersion": "v1.0",
@@ -2322,6 +2383,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_execute_with_json_listing_directory(self):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
+
+        .. fixme::
+            In some circonstances when running the complete test suite, this test fails sporadically when asserting
+            the expected output listing size and paths. Re-running this test by itself validates if this case happened.
 
         .. versionadded:: 4.27
         """
@@ -2693,7 +2758,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "inputs": [{}],   # updated after
+            # "inputs": {},   # updated after
             "outputs": {"values": {"type": "string"}}
         }
         body = {
@@ -2702,7 +2767,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
-                    "inputs": [{}]  # updated after
+                    # "inputs": {}  # updated after
                 },
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
@@ -2710,18 +2775,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
 
         # replace by invalid min/max and check that it raises
-        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
-        body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
+        cwl["inputs"] = [{"id": "test", "type": {"type": "array", "items": "string"}}]
+        body["processDescription"]["process"]["inputs"] = [{"id": "test", "minOccurs": [1], "maxOccurs": 1}]
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input minOccurs schema definition should have been raised"
-        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "DeployMinMaxOccurs" in str(resp.json["cause"])
         assert "Invalid" in resp.json["error"]
 
-        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
+        cwl["inputs"] = [{"id": "test", "type": {"type": "array", "items": "string"}}]
         body["processDescription"]["process"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
         resp = mocked_sub_requests(self.app, "post_json", "/processes", data=body, headers=self.json_headers)
         assert resp.status_code == 400, "Invalid input maxOccurs schema definition should have been raised"
-        assert "DeployMinMaxOccurs" in resp.json["cause"]
+        assert "DeployMinMaxOccurs" in str(resp.json["cause"])
         assert "Invalid" in resp.json["error"]
 
     def test_deploy_merge_complex_io_from_package(self):

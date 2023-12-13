@@ -1,0 +1,43 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  process:
+    id: EchoBoundingBox
+    title: Test Echo Bounding Box
+    version: "1.0"  # must be string, avoid interpretation as float
+    description: Dummy process that simply echo's back the input bbox for testing purposes.
+    keywords:
+      - test
+    inputs:
+      bboxInput:
+        schema:
+          type: object
+          format: ogc-bbox
+          required: ["bbox"]
+          properties:
+            bbox:
+              type: array
+              items:
+                type: number
+            crs:
+              type: string
+    outputs:
+      bboxOutput:
+        schema:
+          type: object
+          format: ogc-bbox
+          required: ["bbox"]
+          properties:
+            bbox:
+              type: array
+              items:
+                type: number
+            crs:
+              type: string
+  jobControlOptions:
+    - async-execute
+  outputTransmission:
+    - reference
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/EchoBoundingBox/echo_bbox.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

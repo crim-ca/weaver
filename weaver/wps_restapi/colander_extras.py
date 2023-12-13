@@ -83,8 +83,8 @@ from cornice_swagger.swagger import CorniceSwagger, DefinitionHandler, Parameter
 from jsonschema.validators import Draft7Validator
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, Union
-    from typing_extensions import Literal
+    from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union
+    from typing_extensions import Literal, TypedDict
 
     from cornice import Service as CorniceService
     from pyramid.registry import Registry
@@ -94,12 +94,21 @@ if TYPE_CHECKING:
         OpenAPISchema,
         OpenAPISchemaAllOf,
         OpenAPISchemaAnyOf,
+        OpenAPISchemaKeyword,
         OpenAPISchemaNot,
         OpenAPISchemaOneOf,
         OpenAPISpecification,
         OpenAPISpecInfo,
         OpenAPISpecParameter
     )
+
+    DataT = TypeVar("DataT")
+    VariableSchemaNodeMapped = TypedDict("VariableSchemaNodeMapped", {
+        "node": str,  # variable schema-node that was mapped
+        "name": str,  # property name in cstruct that was mapped
+        "cstruct": Optional[JSON],  # child-cstruct content that was mapped
+    }, total=True)
+    VariableSchemaNodeMapping = Dict[str, List[VariableSchemaNodeMapped]]
 
 try:
     RegexPattern = re.Pattern
@@ -931,7 +940,9 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 raise SchemaNodeTypeError(
                     "Keyword 'variable' can only be applied to Mapping and literal-type schema nodes. "
                     "Got: {!s} ({!s})".format(type(self), schema_type))
-            self.name = kwargs.get("name", var)
+            node_name = _get_node_name(self, schema_name=True)
+            var_title = kwargs.get("name", var)
+            self.name = f"{node_name}<{var_title}>"
             if not self.title:
                 self.title = var
                 self.raw_title = var
@@ -968,17 +979,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             :class:`VariableSchemaNode` to ensure they pre-process potential *variable* candidates.
         """
         if self.schema_type is colander.Mapping:
+            # FIXME: handle 'patternProperties' along 'additionalProperties' (detect 'variable' + 'pattern' arguments?)
+            #   This would allow mapping to more than only one list-item in 'var_full_search'
+            #   (ie: 1 for 'additionalProperties' + N * patterns nested in 'patternProperties')
             var_children = self._get_sub_variable(self.children)
             var_full_search = [var_children]
-            # TODO: see if this will still be necessary...
-            #   When a Keyword schema contains a mapping with itself containing a variable, the mapping should directly
-            #   handle this child-variable detection mechanism. There is no need to go search for vars "2 level" lower.
-            # if isinstance(_make_node_instance(self), KeywordMapper):
-            #     keyword_objects = KeywordMapper.get_keyword_items(self)  # noqa
-            #     var_full_search.extend(
-            #         [self._get_sub_variable(_make_node_instance(var_obj).children)
-            #          for var_obj in keyword_objects if var_obj.schema_type is colander.Mapping]
-            #     )
             for var_subnodes in var_full_search:
                 if len(var_subnodes):
                     var_names = [child.name for child in var_subnodes]
@@ -987,10 +992,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                             continue
                         raise SchemaNodeTypeError("Invalid node '{}' defines multiple schema nodes "
                                                   "with name 'variable={}'.".format(type(self), var))
-                    var_names = [getattr(child, self._variable, None) for child in var_subnodes]
-                    setattr(self, self._variable_map, {var: [] for var in var_names})
+                    var_map = {getattr(child, self._variable, None): child for child in var_subnodes}
+                    setattr(self, self._variable_map, var_map)
 
     def _get_sub_variable(self, subnodes):
+        # type: (Iterable[colander.SchemaNode]) -> List[VariableSchemaNode]
         return [child for child in subnodes if getattr(child, self._variable, None)]
 
     def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
@@ -1012,7 +1018,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         # value must be a dictionary map object to allow variable key
         if not isinstance(cstruct, dict):
             msg = f"Variable key not allowed for non-mapping data: {type(cstruct).__name__}"
-            raise colander.Invalid(node=node, msg=msg)
+            raise colander.Invalid(node=node, msg=msg, value=cstruct)
         return True
 
     @staticmethod
@@ -1021,7 +1027,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         try:
             # Substitute real keys with matched variables to run full deserialize so
             # that mapping can find nodes name against attribute names, then re-apply originals.
-            # We must do this as non-variable sub-schemas could be present and we must also
+            # We must do this as non-variable sub-schemas could be present, and we must also
             # validate them against full schema.
             if not has_const_child:
                 result = node.default or {}
@@ -1053,20 +1059,20 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _deserialize_impl(self, cstruct):
         if not VariableSchemaNode._check_deserialize(self, cstruct):
             return cstruct
-        var_map = getattr(self, self._variable_map, {})
         var_children = self._get_sub_variable(self.children)
         const_child_keys = [child.name for child in self.children if child not in var_children]
         var = None
+        var_map = {}  # type: VariableSchemaNodeMapping
+        var_map_invalid = {}  # type: Dict[str, colander.Invalid]
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
             var_msg = f"Requirement not met under variable: {var}."
-            var_invalid = colander.Invalid(node=self, msg=var_msg, value=cstruct)
+            var_map_invalid[var] = colander.Invalid(node=self, msg=var_msg, value=cstruct)
             # attempt to find any sub-node matching the sub-schema under variable
             for child_key, child_cstruct in cstruct.items():
-                # skip explicit nodes as well as other variables already matched
-                # cannot match the same child-cstruct again with another variable
-                if child_key in const_child_keys or child_key in var_map:
+                # skip explicit nodes (combined use of properties and additionalProperties)
+                if child_key in const_child_keys:
                     continue
                 schema_class = _make_node_instance(var_child)
                 try:
@@ -1092,19 +1098,94 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                             "cstruct": var_child.default
                         })
                     else:
-                        var_invalid.add(invalid)
+                        # use position as tested child field name for later reference by invalid schema
+                        var_map_invalid[var].add(invalid, pos=child_key)
+
             var_val = var_map.get(var, colander.null)
             if var_val is colander.null:
                 # allow unmatched variable item under mapping if it is not required
                 if var_child.missing is colander.drop:
                     continue
-                raise var_invalid
+                # if required, don't waste more time doing lookup
+                # fail immediately since this variable schema is missing
+                raise var_map_invalid[var]
+
             # invalid if no variable match was found, unless optional
             for mapped in var_map.values():
                 if len(mapped) < 1 and var_child.missing is colander.required:
-                    raise var_invalid
+                    raise var_map_invalid[var]
 
+        self._validate_cross_variable_mapping(var_map)
+        self._validate_unmatched_variable_mapping(var_map, var_map_invalid, const_child_keys, cstruct)
         return VariableSchemaNode._deserialize_remap(self, cstruct, var_map, var, bool(const_child_keys))
+
+    def _validate_cross_variable_mapping(self, variable_mapping):
+        # type: (VariableSchemaNodeMapping) -> None
+        """
+        Ensure there are no matches of the same child-property across multiple variable child-schema.
+
+        In such case, the evaluated variable mapping is ambiguous, and cannot discriminate which property validates
+        the schema. Therefore, the full mapping schema containing the variables would be invalid.
+
+        There are 2 possible situations where there could be multiple variable child-schema.
+        Either ``additionalProperties`` and ``patternProperties`` capability is supported and employed simultaneously,
+        or the schema class definition is invalid. It is not allowed to have 2 generic ``additionalProperties``
+        assigned simultaneously to 2 distinct child-schema. A single child-schema using a keyword mapping should
+        be used instead to define such combinations.
+        """
+        if len(variable_mapping) > 1:
+            var_cross_matches = {}
+            for var, var_mapped in variable_mapping.items():
+                for other_var in set(variable_mapping) - {var}:
+                    other_mapped = variable_mapping[other_var]
+                    for mapped in var_mapped:
+                        for other in other_mapped:
+                            if mapped["name"] == other["name"]:
+                                var_cross_matches.setdefault(var, [])
+                                var_cross_matches[var].append((var, other, mapped["name"], mapped["cstruct"]))
+            if var_cross_matches:
+                err_msg = (
+                    "Mapping with multiple variable schema node is ambiguous. "
+                    "More than one variable schema matched against multiple child properties. "
+                    "Schema validation cannot disambiguate property mapping."
+                )
+                var_cross_invalid = colander.Invalid(self, msg=err_msg)
+                for match in var_cross_matches:
+                    match_msg = (
+                        f"Schemas with variables '{match[0]}' and '{match[1]}' are both valid "
+                        f"against property '{match[2]}' with value {match[3]}."
+                    )
+                    var_cross_invalid.add(colander.Invalid(self, msg=match_msg))
+                raise var_cross_invalid
+
+    def _validate_unmatched_variable_mapping(
+        self,
+        variable_mapping,                   # type: VariableSchemaNodeMapping
+        invalid_mapping,                    # type: Dict[str, colander.Invalid]
+        constant_children_schema_names,     # type: List[str]
+        cstruct,                            # type: JSON
+    ):                                      # type: (...) -> None
+        """
+        Validate if any additional properties that could not be mapped by variables are permitted in the mapping schema.
+        """
+        if self.typ.unknown == "raise":
+            mapped_child_names = {mapped["name"] for var in variable_mapping for mapped in variable_mapping[var]}
+            missing_child_names = set(cstruct) - set(constant_children_schema_names) - mapped_child_names
+            if missing_child_names:
+                var_invalid = colander.Invalid(
+                    self,
+                    msg="Unknown properties or invalid additional property schema in mapping.",
+                    value=cstruct,
+                )
+                for child_name in missing_child_names:
+                    for var_unmapped_invalid in invalid_mapping.values():
+                        for var_child_instance_invalid in var_unmapped_invalid.children:
+                            if var_child_instance_invalid.pos == child_name:
+                                var_child_instance_invalid.pos = f"{var_child_instance_invalid.node.name}({child_name})"
+                                var_child_instance_invalid.positional = True  # force "pos" name instead of schema name
+                                var_invalid.add(var_child_instance_invalid)
+                                break
+                raise var_invalid
 
 
 class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
@@ -1281,6 +1362,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return schema_result
 
     def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
+        # type: (DataT) -> DataT
         """
         Converts the data using validation against the :term:`JSON` schema definition.
         """
@@ -1297,6 +1379,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return cstruct
 
     def convert_type(self, cstruct):  # pylint: disable=W0222,signature-differs
+        # type: (OpenAPISchema) -> OpenAPISchema
         """
         Converts the node to obtain the :term:`JSON` schema definition.
         """
@@ -1351,6 +1434,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def _deserialize_extensions(self, cstruct, extensions):
+        # type: (DataT, Iterable[Type[ExtendedNodeInterface]]) -> DataT
         result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
@@ -1364,6 +1448,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         return result
 
     def deserialize(self, cstruct):
+        # type: (DataT) -> DataT
         schema_type = _get_schema_type(self)
         result = ExtendedSchemaNode._deserialize_extensions(self, cstruct, ExtendedSchemaNode._ext_first)
 
@@ -1430,6 +1515,7 @@ class ExpandStringList(colander.SchemaNode):
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
+        # type: (DataT) -> DataT
         result = super(ExpandStringList, self).deserialize(cstruct)
         if not isinstance(result, str) and result:
             return result
@@ -1645,8 +1731,7 @@ class KeywordMapper(ExtendedMappingSchema):
         if not hasattr(self, self._keyword):
             # try retrieving from a kwarg definition (either as literal keyword or OpenAPI name)
             if kwargs:
-                maybe_kwargs = [_kw for _kw in kwargs
-                                if _kw in self._keyword_map or _kw in self._keyword_inv]
+                maybe_kwargs = [_kw for _kw in kwargs if _kw in self._keyword_map or _kw in self._keyword_inv]
                 if len(maybe_kwargs) == 1:
                     self._keyword = self._keyword_inv.get(maybe_kwargs[0], maybe_kwargs[0])
                     setattr(self, self._keyword, kwargs.get(maybe_kwargs[0]))
@@ -1750,10 +1835,7 @@ class KeywordMapper(ExtendedMappingSchema):
             - :class:`ExtendedSchemaNode`
         """
         if not node.name:
-            # pass down the parent name for reference, but with an index to distinguish from it
-            # distinction is also important such that generated schema definitions in OpenAPI don't override each other
-            sub_name = _get_node_name(node, schema_name=True) or str(index)
-            node.name = f"{_get_node_name(self, schema_name=True)}.{sub_name}"
+            node.name = _get_node_name(node, schema_name=True) or str(index)
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -1970,7 +2052,7 @@ class OneOfKeywordSchema(KeywordMapper):
         """
         Test each possible case, return all corresponding errors if not exactly one of the possibilities is valid.
         """
-        invalid_one_of = {}
+        invalid_one_of = {}  # type: Dict[str, colander.Invalid]
         valid_one_of = []
         valid_nodes = []
         for index, schema_class in enumerate(self._one_of):  # noqa
@@ -1982,10 +2064,9 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_one_of.append(result)
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
-                invalid_one_of.update({_get_node_name(invalid.node, schema_name=True): invalid.asdict()})
-        message = (
-            f"Incorrect type must be one of: {list(invalid_one_of)}. Errors for each case: {invalid_one_of}"
-        )
+                invalid_node_name = _get_node_name(invalid.node, schema_name=True)
+                invalid_one_of.update({invalid_node_name: invalid})
+        message = f"Incorrect type must be one of: {list(invalid_one_of)}."
         if valid_one_of:
             # if found only one, return it, otherwise try to discriminate
             if len(valid_one_of) == 1:
@@ -2036,7 +2117,12 @@ class OneOfKeywordSchema(KeywordMapper):
         # not a single valid sub-node was found
         if self.missing is colander.drop:
             return colander.drop
-        raise colander.Invalid(node=self, msg=message, value=cstruct)
+
+        # add the invalid sub-errors to the parent oneOf for reporting each error case individually
+        invalid = colander.Invalid(node=self, msg=message, value=cstruct)
+        for inv in invalid_one_of.values():
+            invalid.add(inv)
+        raise invalid
 
 
 class AllOfKeywordSchema(KeywordMapper):
@@ -2193,7 +2279,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         """
         option_any_of = {}
         merged_any_of = colander.null
-        invalid_any_of = colander.Invalid(node=self)
+        invalid_any_of = colander.Invalid(node=self, value=cstruct)
         for index, schema_class in enumerate(self._any_of):  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
@@ -2218,11 +2304,14 @@ class AnyOfKeywordSchema(KeywordMapper):
             merged_any_of = self.default
 
         # nothing succeeded, the whole definition is invalid in this case
-        if merged_any_of is colander.null:
+        if merged_any_of is colander.null and self.missing is colander.required:
             invalid_any_of.msg = (
-                f"Incorrect type must represent any of: {list(option_any_of)}. All missing from: {cstruct}"
+                f"Incorrect type must represent any of: {list(option_any_of)}. "
+                f"All missing from input data."
             )
             raise invalid_any_of
+        if merged_any_of is colander.null:
+            return self.missing
         return merged_any_of
 
 
@@ -2344,7 +2433,7 @@ class KeywordTypeConverter(SchemaRefConverter):
 
     def convert_type(self, schema_node):
         keyword = schema_node.get_keyword_name()
-        keyword_schema = super(KeywordTypeConverter, self).convert_type(schema_node)
+        keyword_schema = super(KeywordTypeConverter, self).convert_type(schema_node)  # type: OpenAPISchemaKeyword
         keyword_schema.pop("type", None)
         keyword_schema.update({
             keyword: []
@@ -2444,7 +2533,7 @@ class NotKeywordTypeConverter(KeywordTypeConverter):
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchemaNot
         result = ExtendedObjectTypeConverter(self.dispatcher).convert_type(schema_node)
-        result["additionalProperties"] = False
+        result["additionalProperties"] = False  # type: ignore
         return result
 
 
@@ -2536,6 +2625,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         self.extend_converters()
 
     def extend_converters(self):
+        # type: () -> None
         """
         Extend base :class:`TypeConverter` derived classes to provide additional capabilities seamlessly.
         """

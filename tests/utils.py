@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING, overload
 import celery
 import mock
 import moto
-import pkg_resources
 import pyramid_celery
 import responses
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
@@ -57,6 +56,15 @@ from weaver.utils import (
     str2bytes
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
+
+try:
+    from importlib.metadata import version as get_distribution_version  # noqa  # not available for Python<=3.7
+except ImportError:  # pragma: no cover
+    import pkg_resources
+
+    def get_distribution_version(distribution: str) -> str:
+        return pkg_resources.get_distribution(distribution).version
+
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
@@ -291,12 +299,12 @@ def get_module_version(module):
         if version is not None:
             return version
         module = module.__name__
-    return pkg_resources.get_distribution(module).version
+    return get_distribution_version(module)
 
 
 def init_weaver_service(registry):
     # type: (Registry) -> None
-    service_store = registry.db.get_store(MongodbServiceStore)
+    service_store = get_db(registry).get_store(MongodbServiceStore)
     service_store.save_service(Service({
         "type": "",
         "name": "weaver",
@@ -493,16 +501,26 @@ def mocked_sub_requests(app,                # type: TestApp
         allow_json = True
         # convert 'requests.request' parameter 'files' to corresponding 'TestApp' parameter 'upload_files'
         # requests format:
-        #   { field_name: file_contents | (file_name, file_content/stream, file_content_type)  }
+        #   { field_name: file_data | (file_name[, file_data/stream[, file_content_type[, file_custom_headers]]]) }
+        #   (all intermediate variations with only 'file_name', and adding 1 more field after, are supported)
         # TestApp format:
-        #   (field_name, filename[, file_content_data][, file_content_type])
+        #   (field_name, filename[, file_bytes[, file_content_type]])
         if "files" in req_kwargs:
             files = req_kwargs.pop("files")
             if isinstance(files, dict):
                 files = [
-                    (file_key, file_key, str2bytes(file_meta[0].read()))
+                    (
+                        file_key,
+                        file_key,
+                        str2bytes(file_meta[0].read()),
+                    )
                     if len(file_meta) < 2 else
-                    (file_key, file_meta[0], str2bytes(file_meta[1].read()), *file_meta[2:])
+                    (
+                        file_key,
+                        file_meta[0],
+                        str2bytes(file_meta[1].read()),
+                        *file_meta[2:3],  # ignore custom headers if any (unsupported by TestApp)
+                    )
                     for file_key, file_meta in files.items()
                 ]
             req_kwargs["upload_files"] = files

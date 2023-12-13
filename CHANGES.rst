@@ -12,11 +12,53 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``weaver.formats.ContentEncoding`` with handlers for common encoding manipulation from input values.
+- Add |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
+  complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
+  at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings
+  (fixes `#379 <https://github.com/crim-ca/weaver/issues/379>`_).
+- Add support of `OGC` `BoundingBox` definition (``bbox`` and ``crs`` fields) as `Process` execution input value
+  with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
+- Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
+  input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add ``create_metalink`` utility function to facilitate generation of a ``.meta4`` or ``.metalink`` file definition
+  from a list of file link references (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.wps_restapi.swagger_definitions.ExecuteInputValues`` deserialization that sometimes silently dropped
+  invalid `JSON`-formatted inputs that did not fulfill schema validation. This was caused by a side effect regarding
+  how ``weaver.wps_restapi.colander_extras.VariableSchemaNode`` handled "unknown" `JSON` ``properties`` from submitted
+  content. In cases where *required* `Process` inputs were causing the invalid schema, `Job` execution would be aborted
+  and the error would be reported due to "missing" inputs. However, if the `JSON` failing schema validation happened to
+  be nested under an *optional* input definition, the `Job` execution could have resumed silently by omitting this
+  input's value propagation to the downstream `CWL`, `WPS` or `OGC API - Processes` implementation, which could make
+  it use an alternative default value than the real input that was submitted for the `Job`.
+- Fix schema name representation employed in generated ``colander.Invalid`` error when a schema validation failed, in
+  order to better represent deeply nested schema using multiple ``oneOf``, ``anyOf``, ``allOf`` schema nodes.
+  Using ``colander.Invalid.asdict``, each dictionary key now properly indicates the specific path of sub-nodes with
+  their relevant schema validation error.
+- Fix ``variable`` schema node names to provide a ``{SchemaName}<{VariableName}>`` representation, such that it can be
+  more easily identified. Schema nodes with a ``variable`` (i.e.: schema under ``additionalProperties``) previously only
+  indicated ``{VariableName}``, which made it complicated to follow reference schema classes that formed the error path.
+  Each of the evaluated fields against each possible ``variable`` schema will now report their corresponding nested
+  schema validation error as ``{SchemaName}<{VariableName}>({field})`` such that results can be understood.
+- Fix execution input reference (i.e.: using ``href``) dropping a ``schema`` URL reference if provided explicitly.
+  This parameter now remains within the produced content passed to the `Job`, and forwarded to a remote `Process` if
+  applicable, but no further schema validation is accomplished with the value in ``schema`` for the moment.
+- Fix ``ContentType.IMAGE_OGC_GEOTIFF`` using invalid media-type name (missing ``i`` in ``image``).
+- Fix `Job` input validation stripping additional parameters from provided Media-Type, potentially causing mismatching
+  Content-Type validation against the corresponding `Process` description inputs. Types should now match exactly the
+  original `Process` definition, including any additional parameters and sub-types.
+- Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
+  using ``missing=colander.drop``.
+- Fix ``$schema`` of `OGC` ``nameReferenceType`` being reported under every ``dataType`` of ``literalDataDomains`` for
+  literal `I/O` of `Process` descriptions. The reference is not only included in the `OpenAPI` definition as intended.
+- Fix override of `CWL` ``stderr`` and ``stdout`` definitions if specified by the original *Application Package* for
+  its own implementation. These stream handles are added to the `CWL` by Weaver to provide more contextual debugging
+  and traceability details of the internal application executed by the `Process`. However, a package making use of this
+  functionality of `CWL` to capture an output file would be broken unless naming the file exactly as ``stderr.log`` and
+  ``stdout.log``. Weaver will now employ the parameters provided by the *Application Package* if specified.
 
 .. _changes_4.38.0:
 
@@ -82,6 +124,9 @@ Changes:
 - Add multiple validation checks for more secure file paths handling when retrieving contents from remote locations.
 - Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
   ``file_index_selector`` with validation of happy path and error handling conditions.
+
+.. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
+.. |oap_echo| replace:: ``EchoProcess``
 
 Fixes:
 ------
@@ -1889,8 +1934,8 @@ Changes:
   where potentially inaccessible (according to settings). Definition of `CWL` package will need to add
   `InitialWorkDirRequirement <https://www.commonwl.org/v1.0/CommandLineTool.html#InitialWorkDirRequirement>`_ as per
   defined by reference specification to stage those files if they need to be accessed with write permissions
-  (see: `example <https://www.commonwl.org/user_guide/15-staging/>`_). Addresses some issues listed in
-  `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
+  (see: `example <https://www.commonwl.org/user_guide/topics/staging-input-files.html>`_).
+  Addresses some issues listed in `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
 - Enforce removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and

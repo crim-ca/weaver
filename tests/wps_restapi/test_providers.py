@@ -204,8 +204,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert unresponsive_id in resp.json["description"]
         err_msg = "Expected service to have trouble retrieving metadata, error: {} not in {}"
         # different errors/causes are raised first based on requests version, but same issue
-        known_causes = ["Connection refused", "Connection aborted", "not accessible"]
-        known_errors = ["ConnectionError", "ConnectTimeout", "SSLError"]
+        known_causes = ["Connection refused", "Connection aborted", "not accessible", "Unable to process"]
+        known_errors = ["ConnectionError", "ConnectTimeout", "ReadTimeout", "SSLError", "ServiceParsingError"]
         resp_cause = resp.json["cause"]
         resp_error = resp.json["error"]
         assert any(err_cause in resp_cause for err_cause in known_causes), err_msg.format(resp_cause, known_causes)

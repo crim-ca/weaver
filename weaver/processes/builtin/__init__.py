@@ -12,6 +12,7 @@ from cwltool.job import CommandLineJob, JobBase
 from cwltool.singularity import SingularityCommandLineJob
 
 from weaver import WEAVER_ROOT_DIR
+from weaver.compat import cache
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
@@ -26,7 +27,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Type, Union
+    from typing import Any, Callable, Dict, Optional, Type, Union
 
     from cwltool.builder import Builder
     from cwltool.context import RuntimeContext
@@ -35,21 +36,24 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer, CWL, CWL_RequirementsList, JSON, TypedDict
 
     BuiltinResourceMap = TypedDict("BuiltinResourceMap", {
-        "package": str,
+        "package": os.PathLike[str],
         "payload": JSON
     }, total=True)
 
 LOGGER = logging.getLogger(__name__)
-
+WEAVER_BUILTIN_DIR = os.path.abspath(os.path.dirname(__file__))
 
 __all__ = [
+    "WEAVER_BUILTIN_DIR",
     "BuiltinProcess",
+    "get_builtin_reference_mapping",
     "register_builtin_processes"
 ]
 
 
-def _get_builtin_reference_mapping(root):
-    # type: (str) -> Dict[str, BuiltinResourceMap]
+@cache
+def get_builtin_reference_mapping(root=WEAVER_BUILTIN_DIR):
+    # type: (os.PathLike[str]) -> Dict[str, BuiltinResourceMap]
     """
     Generates a mapping of `reference` to actual ``builtin`` package file path.
     """
@@ -68,20 +72,25 @@ def _get_builtin_reference_mapping(root):
     return refs
 
 
-def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
-    # type: (str, str, str, bool) -> Union[str, None]
+def _get_builtin_metadata(process_id, process_path, meta_field, extra_info=None, extra_param=None, *, clean=False):
+    # type: (str, os.PathLike[str], str, Optional[Dict[str, Any]], Optional[str], Any, bool) -> Union[str, None]
     """
     Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
     """
     py_file = f"{os.path.splitext(process_path)[0]}.py"
+    meta = None
     if os.path.isfile(py_file):
         try:
             mod = import_module(f"{__name__}.{process_id}")
             meta = getattr(mod, meta_field, None)
             if meta and isinstance(meta, str):
                 return clean_json_text_body(meta) if clean else meta
-        except ImportError:
+        except ImportError:  # pragma: no cover
             pass
+    if isinstance(extra_info, dict) and isinstance(extra_param, str):
+        meta = extra_info.get(extra_param)
+    if meta and isinstance(meta, str):
+        return clean_json_text_body(meta) if clean else meta
     return None
 
 
@@ -136,21 +145,24 @@ def register_builtin_processes(container):
         Specifying configuration settings will force recreation of a new database connection.
     """
     restapi_url = get_wps_restapi_base_url(container)
-    builtin_apps_mapping = _get_builtin_reference_mapping(os.path.abspath(os.path.dirname(__file__)))
+    builtin_apps_mapping = get_builtin_reference_mapping(WEAVER_BUILTIN_DIR)
     builtin_processes = []
     for process_id, process_data in builtin_apps_mapping.items():
         process_path = process_data["package"]
         process_desc = process_data["payload"]
         process_info = get_process_definition(process_desc, package=None, reference=process_path, builtin=True)
-        process_url = "/".join([restapi_url, "processes", process_id])
-        process_package = _get_builtin_package(process_id, process_info["package"])
-        process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)
-        process_version = _get_builtin_metadata(process_id, process_path, "__version__")
-        process_title = _get_builtin_metadata(process_id, process_path, "__title__")
+        process_abstract = _get_builtin_metadata(
+            process_id, process_path, "__doc__", process_info, "description", clean=True
+        )
+        process_version = _get_builtin_metadata(process_id, process_path, "__version__", process_info, "version")
+        process_title = _get_builtin_metadata(process_id, process_path, "__title__", process_info, "title")
+        process_id_resolved = process_info["identifier"]
+        process_url = "/".join([restapi_url, "processes", process_id_resolved])
+        process_package = _get_builtin_package(process_id_resolved, process_info["package"])
         process_payload = {
             "processDescription": {
                 "process": {
-                    "id": process_id,
+                    "id": process_id_resolved,
                     "type": ProcessType.BUILTIN,
                     "title": process_title,
                     "version": process_version,
@@ -162,7 +174,7 @@ def register_builtin_processes(container):
         }
         process_payload["processDescription"]["process"].update(ows_context_href(process_url))
         builtin_processes.append(Process(
-            id=process_id,
+            id=process_id_resolved,
             type=ProcessType.BUILTIN,
             title=process_title,
             version=process_version,

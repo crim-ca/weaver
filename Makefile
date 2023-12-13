@@ -281,7 +281,7 @@ install-npm:    ## install npm package manager and dependencies if they cannot b
 install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
 	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
-		npm install stylelint stylelint-config-standard --save-dev \
+		npm install "stylelint@<16" "stylelint-config-standard@<35" --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
@@ -850,3 +850,7 @@ stop: 		## kill application instance(s) started with gunicorn (pserve)
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
+
+# Reapply config if overrides were defined.
+# Ensure overrides take precedence over targets and auto-resolution logic of variables.
+-include Makefile.config

@@ -206,8 +206,9 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
 
             # execute
+            tmp_file_href = f"file://{tmp_file.name}"
             if version == "1.0.0":
-                wps_inputs = [f"file={tmp_file.name}@mimeType={ContentType.TEXT_PLAIN}"]
+                wps_inputs = [f"file={tmp_file_href}@mimeType={ContentType.TEXT_PLAIN}"]
                 wps_params = {
                     "service": "WPS",
                     "request": "Execute",
@@ -218,7 +219,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 wps_headers = {"Accept": accept}
                 wps_data = None
             else:
-                wps_inputs = [("file", ComplexDataInput(tmp_file.name, mimeType=ContentType.TEXT_PLAIN))]
+                wps_inputs = [("file", ComplexDataInput(tmp_file_href, mimeType=ContentType.TEXT_PLAIN))]
                 wps_outputs = [(self.out_key, True)]  # as reference
                 wps_exec = WPSExecution(version=version, url=wps_url)
                 wps_req = wps_exec.buildRequest(self.process_id, wps_inputs, wps_outputs)

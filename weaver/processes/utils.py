@@ -224,7 +224,7 @@ def _check_deploy(payload):
                         f"to avoid mismatching definitions."
                     )
                     raise HTTPBadRequest(json={
-                        "description": message,
+                        "title": message,
                         "cause": "unknown",
                         "error": "Invalid",
                         "value": d_io
@@ -249,7 +249,7 @@ def _check_deploy(payload):
                     "package. Aborting deployment to avoid mismatching package definitions."
                 )
                 raise HTTPBadRequest(json={
-                    "description": message,
+                    "title": message,
                     "cause": "unknown",
                     "error": PackageRegistrationError.__name__,
                     "value": d_exec_unit
@@ -263,10 +263,11 @@ def _check_deploy(payload):
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
-            "description": message,
-            "cause": f"Invalid schema: [{exc.msg!s}]",
+            "title": message,
+            "detail": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
-            "value": exc.value
+            "cause": exc.asdict(),
+            "value": repr_json(exc.value),
         })
 
 

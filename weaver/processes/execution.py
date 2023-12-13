@@ -9,18 +9,18 @@ from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
 from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
-from owslib.wps import ComplexDataInput
+from owslib.wps import BoundingBoxDataInput, ComplexDataInput
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
 from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType, clean_mime_type_format
+from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
-from weaver.processes.constants import WPS_COMPLEX_DATA, JobInputsOutputsSchema
+from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
     convert_output_params_schema,
@@ -40,6 +40,7 @@ from weaver.utils import (
     get_registry,
     get_settings,
     now,
+    parse_kvp,
     parse_number_with_unit,
     parse_prefer_header_execute_mode,
     raise_on_xml_exception,
@@ -67,7 +68,7 @@ if TYPE_CHECKING:
 
     from celery.app.task import Task
     from pyramid.request import Request
-    from pywps.inout.inputs import ComplexInput
+    from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
@@ -77,9 +78,11 @@ if TYPE_CHECKING:
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
+        AnyValueType,
         CeleryResult,
         HeaderCookiesType,
         HeadersType,
+        JobValueBbox,
         JSON,
         ProcessExecution,
         SettingsType,
@@ -230,8 +233,10 @@ def execute_process(task, job_id, wps_url, headers=None):
                         job.status_message = f"Job succeeded{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
-                        job_results = [ows2json_output_data(output, process, settings)
-                                       for output in execution.processOutputs]
+                        job_results = [
+                            ows2json_output_data(output, process, settings)
+                            for output in execution.processOutputs
+                        ]
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
@@ -394,15 +399,101 @@ def fetch_wps_process(job, wps_url, headers, settings):
     return wps_process
 
 
+def parse_wps_input_format(input_info, type_field="mime_type", search_variations=True):
+    # type: (JSON, str, bool) -> Tuple[Optional[str], Optional[str]]
+    ctype = get_field(input_info, type_field, search_variations=search_variations, default=None)
+    c_enc = get_field(input_info, "encoding", search_variations=True, default=None)
+    if not c_enc:
+        ctype_params = parse_kvp(ctype)
+        c_enc = ctype_params.get("charset")
+        c_enc = c_enc[0] if c_enc and isinstance(c_enc, list) else None
+    return ctype, c_enc
+
+
+def parse_wps_input_complex(input_value, input_info):
+    # type: (Union[str, JSON], JSON) -> ComplexDataInput
+    """
+    Parse the input data details into a complex input.
+    """
+    # if provided, pass down specified input format to allow validation against supported formats
+    c_enc = ctype = schema = None
+    schema_vars = ["reference", "$schema"]
+    input_field = get_any_value(input_info, key=True)
+    if isinstance(input_value, dict):
+        ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
+        if not ctype:
+            ctype, c_enc = parse_wps_input_format(input_value)
+        schema = get_field(input_value, "schema", search_variations=True, default=None, extra_variations=schema_vars)
+        input_value = input_value[input_field]
+        input_value = repr_json(input_value, indent=None, ensure_ascii=(c_enc in ["ASCII", "ascii"]))
+    if not ctype:
+        ctype, c_enc = parse_wps_input_format(input_info)
+        media_format = get_field(input_info, "format", default=None)
+        if not ctype and isinstance(media_format, dict):
+            ctype, c_enc = parse_wps_input_format(media_format)
+    if isinstance(schema, dict):
+        schema = get_field(schema, "$ref", default=None, extra_variations=schema_vars)
+    # need to support 'file://' scheme which could be omitted
+    # to ensure owslib parses it has a link (asReference), add it if missing
+    if input_field in ["href", "reference"] and "://" not in str(input_value):
+        input_value = f"file://{input_value}"
+    return ComplexDataInput(input_value, mimeType=ctype, encoding=c_enc, schema=schema)
+
+
+def parse_wps_input_bbox(input_value, input_info):
+    # type: (Union[str, JobValueBbox], JSON) -> BoundingBoxDataInput
+    """
+    Parse the input data details into a bounding box input.
+    """
+    bbox_crs = None
+    bbox_val = input_value
+    if isinstance(input_value, dict):
+        bbox_crs = input_value.get("crs")
+        bbox_val = input_value.get("bbox")
+    if not bbox_crs:
+        bbox_crs_def = input_info.get("bbox", {})
+        if isinstance(bbox_crs_def, dict) and "default" in bbox_crs_def:
+            bbox_crs = bbox_crs_def["default"] or None
+    bbox_val = bbox_val.split(",") if isinstance(bbox_val, str) else bbox_val
+    bbox_dim = len(bbox_val) // 2
+    return BoundingBoxDataInput(bbox_val, crs=bbox_crs, dimensions=bbox_dim)
+
+
+def parse_wps_input_literal(input_value):
+    # type: (Union[AnyValueType, JSON]) -> Optional[str]
+    """
+    Parse the input data details into a literal input.
+    """
+    # if JSON 'null' was given, the execution content should simply omit the optional input
+    # cannot distinguish directly between empty string and 'null' in XML representation
+    if input_value is None:
+        return None
+
+    # measurement structure
+    # however, owslib does not care about the UoM specified as input (no way to provide it)
+    if isinstance(input_value, dict):
+        val = get_any_value(input_value, file=False, default=input_value)  # in case it was nested twice under 'value'
+        if isinstance(val, dict):
+            val = get_field(val, "measure", search_variations=True, default=val)
+        if val is not None:
+            input_value = val
+
+    # need to use literal string for any data type
+    return str(input_value)
+
+
 def parse_wps_inputs(wps_process, job):
     # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
     """
     Parses expected WPS process inputs against submitted job input values considering supported process definitions.
     """
     complex_inputs = {}  # type: Dict[str, ComplexInput]
+    bbox_inputs = {}  # type: Dict[str, BoundingBoxInput]
     for process_input in wps_process.dataInputs:
-        if WPS_COMPLEX_DATA in process_input.dataType:
+        if process_input.dataType == WPS_COMPLEX_DATA:
             complex_inputs[process_input.identifier] = process_input
+        elif process_input.dataType == WPS_BOUNDINGBOX_DATA:
+            bbox_inputs[process_input.identifier] = process_input
 
     try:
         wps_inputs = []
@@ -416,7 +507,13 @@ def parse_wps_inputs(wps_process, job):
             else:
                 input_id = get_any_id(job_input)
                 input_val = get_any_value(job_input)
-            # in case of array inputs, must repeat (id,value)
+            if input_id in bbox_inputs and input_val is None:  # inline bbox
+                input_val = job_input
+
+            # FIXME: handle minOccurs>=2 vs single-value inputs
+            #   - https://github.com/opengeospatial/ogcapi-processes/issues/373
+            #   - https://github.com/crim-ca/weaver/issues/579
+            # in case of array inputs, must repeat (id, value)
             if isinstance(input_val, list):
                 input_values = input_val
                 input_details = input_val  # each value has its own metadata
@@ -424,33 +521,20 @@ def parse_wps_inputs(wps_process, job):
                 input_values = [input_val]
                 input_details = [job_input]  # metadata directly in definition, not nested per array value
 
-            # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-            input_values = [
-                # when value is an array of dict that each contain a file reference
-                (get_any_value(val)[7:] if str(get_any_value(val)).startswith("file://") else get_any_value(val))
-                if isinstance(val, dict) else
-                # when value is directly a single dict with file reference
-                (val[7:] if str(val).startswith("file://") else val)
-                for val in input_values
-            ]
-
-            for input_value, input_detail in zip(input_values, input_details):
-                # need to use ComplexDataInput structure for complex input
+            for input_value, input_info in zip(input_values, input_details):
                 if input_id in complex_inputs:
-                    # if provided, pass down specified data input format to allow validation against supported formats
-                    ctype = get_field(input_detail, "type", default=None)
-                    encoding = None
-                    if not ctype:
-                        media_format = get_field(input_detail, "format", default=None)
-                        if isinstance(media_format, dict):
-                            ctype = get_field(input_detail, "mime_type", search_variations=True, default=None)
-                            encoding = get_field(input_detail, "encoding", search_variations=True, default=None)
-                    wps_inputs.append((input_id, ComplexDataInput(input_value, mimeType=ctype, encoding=encoding)))
-                # need to use literal String for anything else than complex
-                # FIXME: pre-validate allowed literal values?
-                # TODO: BoundingBox not supported
+                    input_data = parse_wps_input_complex(input_value, input_info)
+                elif input_id in bbox_inputs:
+                    input_data = parse_wps_input_bbox(input_value, input_info)
                 else:
-                    wps_inputs.append((input_id, str(input_value)))
+                    input_data = parse_wps_input_literal(input_value)
+                if input_data is None:
+                    job.save_log(
+                        message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
+                        logger=LOGGER, level=logging.WARNING,
+                    )
+                else:
+                    wps_inputs.append((input_id, input_data))
     except KeyError:
         wps_inputs = []
     return wps_inputs
@@ -610,7 +694,17 @@ def submit_job_handler(payload,             # type: ProcessExecution
     try:
         json_body = sd.Execute().deserialize(payload)
     except colander.Invalid as ex:
-        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]")
+        raise HTTPBadRequest(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidSchema",
+                "title": "Execute",
+                "detail": "Execution body failed schema validation.",
+                "status": HTTPBadRequest.code,
+                "error": ex.msg,
+                "cause": ex.asdict(),
+                "value": repr_json(ex.value),
+            })
+        )
 
     db = get_db(settings)
 
@@ -755,7 +849,7 @@ def validate_process_io(process, payload):
                     get_field(io_fmt, "mime_type", search_variations=True, default="")
                     for io_fmt in io_format
                 }
-                io_accept = [clean_mime_type_format(ctype, strip_parameters=True) for ctype in io_accept if ctype]
+                io_accept = [clean_media_type_format(ctype) for ctype in io_accept if ctype]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
                     io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)
@@ -779,7 +873,7 @@ def validate_process_io(process, payload):
                         "code": "InvalidParameterValue",
                         "name": io_name,
                         "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect"
+                            f"Submitted '{io_name}' requested Content-Types that do not respect "
                             "supported formats specified by the process description."
                         ),
                         "value": {
