@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.0.0:
+
+`5.0.0 <https://github.com/crim-ca/weaver/tree/5.0.0>`_ (2023-12-12)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.formats.ContentEncoding`` with handlers for common encoding manipulation from input values.
 - Add |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
   complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
