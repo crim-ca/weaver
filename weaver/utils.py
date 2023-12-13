@@ -1901,6 +1901,7 @@ def _patch_cached_request_stream(response, stream=False):
             iter_content = getattr(response, "iter_content")
 
             def cached_iter_content(*_, **__):
+                # type: (*Any, **Any) -> None
                 cached_content = b""
                 for chunk in iter_content(*_, **__):
                     cached_content += chunk
@@ -3304,6 +3305,20 @@ def fetch_directory(location,                           # type: str
     ...
 
 
+@overload
+def fetch_directory(location,                           # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_method=OutputMethod.AUTO,       # type: AnyDownloadOutputMethod
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> List[DownloadResult]
+    ...
+
+
 def fetch_directory(location,                           # type: str
                     out_dir,                            # type: Path
                     *,                                  # force named keyword arguments after
@@ -3484,8 +3499,10 @@ class SizedUrlHandler(UrlHandler):
     """
     @property
     def size(self):
-        if self._file and os.path.isfile(self._file):
-            return str(os.stat(self._file).st_size)
+        if self._file:
+            path = self._file[7:] if self._file.startswith("file://") else self._file
+            if os.path.isfile(path):
+                return int(os.stat(path).st_size)
         return super().size
 
 
@@ -3507,6 +3524,15 @@ def create_metalink(
     :param name: Global name identifier for the metalink file.
     :param workdir: Location where to store files when auto-fetching them.
     :returns: Metalink object with appropriate template generation utilities.
+
+    .. note::
+        It is always preferable to use MetaLink V4 over V3 as it adds support for ``mediaType`` which can be critical
+        for validating and/or mapping output formats in some cases. V3 also enforces "type=http" in the :mod:`pywps`
+        :term:`XML` template, which is erroneous when other schemes such as ``file://`` or ``s3://`` are employed.
+
+    .. warning::
+        Regardless of MetaLink V3 or V4, ``encoding`` are not reported.
+        This is a limitation of MetaLink specification itself.
 
     .. seealso::
         - https://en.wikipedia.org/wiki/Metalink#Example_Metalink_3.0_.metalink_file
