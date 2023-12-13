@@ -1,6 +1,5 @@
 # pylint: disable=C0103,invalid-name
 import base64
-
 import contextlib
 import inspect
 import io
@@ -2273,7 +2272,8 @@ def test_create_metalink():
         meta_lines = [line.strip() for line in meta_xml.splitlines()]
         for file, data in zip(meta_files, test_data):
             size = len(data)
-            href = f"file://" + file["href"] if file["href"].startswith("/") else file["href"]
+            href = file["href"]
+            href = f"file://{href}" if href.startswith("/") else href
             ctype = file["type"]
             size_line = f"<size>{size}</size>"
             href_line = f"<metaurl mediatype=\"{ctype}\">{href}</metaurl>"
