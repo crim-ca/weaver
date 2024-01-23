@@ -3,13 +3,8 @@ import uuid
 import colander
 import pytest
 
-from weaver.formats import IANA_NAMESPACE, IANA_NAMESPACE_URL, EDAM_NAMESPACE, EDAM_NAMESPACE_URL, ContentType
-from weaver.processes.constants import (
-    CWL_NAMESPACE,
-    CWL_NAMESPACE_URL,
-    CWL_NAMESPACE_WEAVER,
-    CWL_NAMESPACE_WEAVER_URL
-)
+from weaver.formats import EDAM_NAMESPACE, EDAM_NAMESPACE_URL, IANA_NAMESPACE, IANA_NAMESPACE_URL, ContentType
+from weaver.processes.constants import CWL_NAMESPACE, CWL_NAMESPACE_URL, CWL_NAMESPACE_WEAVER, CWL_NAMESPACE_WEAVER_URL
 from weaver.wps_restapi import swagger_definitions as sd
 
 

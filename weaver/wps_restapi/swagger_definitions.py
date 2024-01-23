@@ -48,11 +48,11 @@ from weaver.formats import (
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_NAMESPACE,
-    CWL_NAMESPACE_URL,
     CWL_NAMESPACE_CWLTOOL,
     CWL_NAMESPACE_CWLTOOL_URL,
     CWL_NAMESPACE_SCHEMA,
     CWL_NAMESPACE_SCHEMA_URL,
+    CWL_NAMESPACE_URL,
     CWL_NAMESPACE_WEAVER,
     CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
