@@ -7,7 +7,6 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 import contextlib
 import copy
 import io
-import itertools
 import json
 import logging
 import os

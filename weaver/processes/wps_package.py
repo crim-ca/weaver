@@ -1635,14 +1635,14 @@ class WpsPackage(Process):
 
         Doing this resolution avoids reused definitions being considered as "conflicts" because of missing ``name``.
         To avoid introducing a real conflict, names are injected only under corresponding :term:`CWL` I/O by ID.
-        The most common type of definition resolve this way is when :term:`CWL` ``Enum`` is reused for single and
-        array-based definitions simultaneously.
+        The most common type of definition resolved this way is when :term:`CWL` ``Enum`` is reused for single and
+        array-based definitions simultaneously without using an explicit ``SchemaDefRequirement`` for them.
 
         .. seealso::
             - :func:`weaver.processes.convert.resolve_cwl_io_type_schema`
             - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
 
-        .. fixme::
+        .. todo::
             Workaround for https://github.com/common-workflow-language/cwltool/issues/1908.
         """
         for io_select in ["inputs", "outputs"]:
