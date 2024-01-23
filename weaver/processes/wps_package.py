@@ -7,7 +7,7 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
 
 .. seealso::
     - `CWL specification <https://www.commonwl.org/specification/>`_
-    - `WPS-1/2 schemas <http://schemas.opengis.net/wps/>`_
+    - `WPS-1/2 XML schemas <http://schemas.opengis.net/wps/>`_
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """

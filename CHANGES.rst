@@ -12,7 +12,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CWL` schema definitions with ``weaver`` namespace (see ``weaver/schemas/cwl`` files) that provide explicit
+  requirement classes for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+  and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``.
 
 Fixes:
 ------
