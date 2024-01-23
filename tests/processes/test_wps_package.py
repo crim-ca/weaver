@@ -8,17 +8,22 @@ import contextlib
 import copy
 import io
 import itertools
+import json
 import logging
 import os
 import re
 import shutil
 import sys
 import tempfile
+import warnings
 from typing import TYPE_CHECKING
 
 import cwltool.process
 import mock
 import pytest
+from _pytest.outcomes import Failed
+from cwltool.errors import WorkflowException
+from cwltool.factory import Factory as CWLFactory
 
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Process
@@ -602,13 +607,16 @@ def test_cwl_extension_requirements_no_error():
                 with pytest.raises(cwltool.process.ValidationException) as exc_info:
                     _load_package_content(cwl, "test")
                 message = str(exc_info.value)
-                assert all(
-                    info in message for info in [
-                        "checking field `requirements`",
-                        "Field `class` contains undefined reference to",
-                        CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
-                    ]
-                ), "Validation error should have been caused by missing CWL CUDA extension schema, not something else."
+                valid_msg = [
+                    "checking field `requirements`",
+                    "Field `class` contains undefined reference to",
+                    CWL_REQUIREMENT_CUDA.split(":", 1)[-1],
+                ]
+                assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
+                    "Validation error should have been caused by missing CWL CUDA extension schema. "
+                    f"Error message must contain all following items: {valid_msg}. "
+                    f"Some items were missing in: \n{message}"
+                )
 
     # no error expected after when supported schema extensions are applied
     # here we reset the caches again to ensure the standard schema are overridden by the custom selection of extensions
@@ -627,13 +635,16 @@ def test_cwl_extension_requirements_no_error():
     with pytest.raises(cwltool.process.ValidationException) as exc_info:
         _load_package_content(cwl_old, "test")
     message = str(exc_info.value)
-    assert all(
-        info in message for info in [
-            "checking field `requirements`",
-            "Field `class` contains undefined reference to",
-            CWL_REQUIREMENT_TIME_LIMIT.split(":", 1)[-1],
-        ]
-    ), "Validation error should have been caused by missing CWL ToolTimeLimit extension schema, not something else."
+    valid_msg = [
+        "checking field `requirements`",
+        "Field `class` contains undefined reference to",
+        CWL_REQUIREMENT_TIME_LIMIT.split(":", 1)[-1],
+    ]
+    assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
+        "Validation error should have been caused by missing CWL ToolTimeLimit extension schema. "
+        f"Error message must contain all following items: {valid_msg}. "
+        f"Some items were missing in: \n{message}"
+    )
 
     # test unsupported schema extension to ensure still disallowed
     cwl["requirements"] = {
@@ -645,10 +656,81 @@ def test_cwl_extension_requirements_no_error():
     with pytest.raises(cwltool.process.ValidationException) as exc_info:
         _load_package_content(cwl, "test")
     message = str(exc_info.value)
-    assert all(
-        info in message for info in [
-            "checking field `requirements`",
-            "Field `class` contains undefined reference to",
-            CWL_REQUIREMENT_PROCESS_GENERATOR,
+    valid_msg = [
+        "checking field `requirements`",
+        "Field `class` contains undefined reference to",
+        CWL_REQUIREMENT_PROCESS_GENERATOR,
+    ]
+    assert all(any(msg in message for msg in [info, info.replace("`", "'")]) for info in valid_msg), (
+        "Validation failure should have been caused by an unsupported CWL extension schema. "
+        f"Error message must contain all following items: {valid_msg}. "
+        f"Some items were missing in: \n{message}"
+    )
+
+
+def test_cwl_enum_schema_name_patched():
+    """
+    Ensure that :term:`CWL` ``Enum`` contains a ``name`` to avoid false-positive conflicting schemas.
+
+    When an ``Enum`` is reused multiple times to define an I/O, omitting the ``name`` makes the duplicate definition
+    to be considered a conflict, since :mod:`cwltool` will automatically apply an auto-generated ``name`` for that
+    schema.
+
+    .. seealso::
+        - https://github.com/common-workflow-language/cwltool/issues/1908
+        - :meth:`weaver.processes.wps_package.WpsPackage.update_cwl_schema_names`
+    """
+    test_symbols = [str(i) for i in range(100)]
+    cwl_input_without_name = {
+        "type": [
+            "null",
+            {
+                "type": "enum",
+                "symbols": test_symbols,
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "enum",
+                    "symbols": test_symbols,
+                },
+            },
         ]
-    ), "Validation failure should have been caused by unsupported CWL extension schema, not something else."
+    }
+    cwl_without_name = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": "echo",
+        "inputs": {
+            "test": cwl_input_without_name,
+        },
+        "outputs": {
+            "output": {"type": "stdout"},
+        }
+    }  # type: CWL
+
+    factory = CWLFactory()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(cwl_without_name, tmp_file)
+        tmp_file.flush()
+        try:
+            with pytest.raises(WorkflowException):
+                tool = factory.make(f"file://{tmp_file.name}")
+                tool(test=test_symbols[0])
+        except Failed:
+            # WARNING:
+            #   CWL tool schema-salad validator seems to inconsistently raise in some situations and not others (?)
+            #   (see https://github.com/common-workflow-language/cwltool/issues/1908)
+            #   Ignore if it raises since it is not breaking for our test and implementation.
+            warnings.warn("CWL nested enums without 'name' did not raise, but not breaking...")
+
+    # our implementation that eventually gets called goes through 'update_cwl_schema_names', that one MUST NOT raise
+    pkg = WpsPackage(package=cwl_without_name, identifier="test", title="test")
+    pkg.update_cwl_schema_names()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(pkg.package, tmp_file)
+        tmp_file.flush()
+        tool = factory.make(f"file://{tmp_file.name}")
+        tool(test=None)
+        tool(test=test_symbols[0])
+        tool(test=[test_symbols[0]])

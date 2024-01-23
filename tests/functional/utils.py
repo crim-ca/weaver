@@ -28,6 +28,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
+from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
@@ -35,14 +36,18 @@ from weaver.utils import fully_qualified_name, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterable, Optional, Tuple, Union
+    from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
     from typing_extensions import Literal
+
+    from pyramid.config import Configurator
+    from webtest import TestApp
 
     from weaver.typedefs import (
         AnyRequestMethod,
         AnyResponseType,
         AnyUUID,
         CWL,
+        ExecutionResults,
         JSON,
         ProcessDeployment,
         ProcessDescription,
@@ -164,7 +169,7 @@ class ResourcesUtil(object):
             if local:
                 var_locations = [APP_PKG_ROOT]
             else:
-                base_url = "https://raw.githubusercontent.com/"
+                base_url = "https://raw.githubusercontent.com"
                 var_locations = list(dict.fromkeys([  # don't use set to preserve this prioritized order
                     APP_PKG_ROOT,
                     os.getenv("TEST_GITHUB_SOURCE_URL"),
@@ -254,6 +259,16 @@ class ResourcesUtil(object):
         except (IOError, ValueError):
             pass
 
+    @staticmethod
+    def get_builtin_process_names():
+        # type: () -> List[str]
+        info = get_builtin_reference_mapping()
+        proc_names = [
+            data["payload"].get("id") or proc
+            for proc, data in info.items()
+        ]
+        return proc_names
+
 
 class JobUtils(object):
     job_store = None
@@ -303,9 +318,13 @@ class JobUtils(object):
 @pytest.mark.functional
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+    xml_headers = {"Content-Type": ContentType.TEXT_XML}
     monitor_timeout = 30
     monitor_interval = 1
-    settings = {}  # type: SettingsType
+    settings = {}   # type: SettingsType
+    config = None   # type: Configurator
+    app = None      # type: TestApp
+    url = None      # type: str
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
@@ -419,8 +438,9 @@ class WpsConfigBase(unittest.TestCase):
             return f"Error logs:\n{_text}"
         return ""
 
-    def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace(".", "-")
+    def fully_qualified_test_process_name(self, name=""):
+        name = fully_qualified_name(self) + (f"-{name}" if name else "")
+        return name.replace(".", "-")
 
     def monitor_job(self,
                     status_url,                         # type: str
@@ -429,7 +449,7 @@ class WpsConfigBase(unittest.TestCase):
                     return_status=False,                # type: bool
                     wait_for_status=None,               # type: Optional[str]
                     expect_failed=False,                # type: bool
-                    ):                                  # type: (...) -> Dict[str, JSON]
+                    ):                                  # type: (...) -> ExecutionResults
         """
         Job polling of status URL until completion or timeout.
 

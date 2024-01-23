@@ -34,7 +34,7 @@
 .. _cwl-workflow: https://www.commonwl.org/v1.1/Workflow.html
 .. |cwl-workdir-req| replace:: InitialWorkDirRequirement
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
-.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
+.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/topics/staging-input-files.html
 .. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
 .. FIXME apply official CWL specification location
@@ -49,7 +49,7 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
-.. _cwl-metadata: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
@@ -58,7 +58,7 @@
 .. |esgf-cwt-git| replace:: ESGF Compute API
 .. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
-.. _edam-link: http://edamontology.org/
+.. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
 .. |metalink| replace:: Metalink
@@ -102,8 +102,6 @@
 .. _pywps-multi-output: https://pywps.readthedocs.io/en/master/process.html#returning-multiple-files
 .. |wkt-example| replace:: WKT Examples
 .. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
-.. |wkt-format| replace:: WKT Formats
-.. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
 .. |weaver-issues| replace:: Weaver issues
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
@@ -139,7 +137,8 @@
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
-.. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. |default-notify-email-template| replace:: Default Notification Email Mako Template
 .. |opensearch-deploy| replace:: OpenSearch Deploy
 .. _opensearch-deploy: ../../../tests/opensearch/json/opensearch_deploy.json
 .. |opensearch-examples| replace:: OpenSearch Examples

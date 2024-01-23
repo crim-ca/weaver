@@ -1,0 +1,11 @@
+bboxInput:
+  # note: values can be integer, but use float here to make testing easier (values are auto-converted)
+  bbox: [1., 2., 3., 4.]
+  # note:
+  #   OGC-API BBOX definition is strict about needing an URI.
+  #   A simple namespaced CRS (eg: "urn:ogc:def:crs:EPSG::4326" or "EPSG:4326") is not sufficient.
+  #   Definitions can be loosened when using a nested qualified value, since bbox essentially becomes a generic object.
+  #   see:
+  #   - https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
+  #   - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/bbox.yaml
+  crs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84"

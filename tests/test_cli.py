@@ -1,9 +1,12 @@
 """
 Unit test for :mod:`weaver.cli` utilities.
 """
+import argparse
 import base64
+import contextlib
 import inspect
 import json
+import os
 import tempfile
 import uuid
 from contextlib import ExitStack
@@ -20,10 +23,11 @@ from weaver.cli import (
     BearerAuthHandler,
     CookieAuthHandler,
     OperationResult,
+    SubscriberAction,
     WeaverClient,
     main as weaver_cli
 )
-from weaver.formats import ContentType
+from weaver.formats import ContentEncoding, ContentType
 
 
 @pytest.mark.cli
@@ -221,6 +225,14 @@ def test_auth_handler_cookie():
     assert resp.headers["Cookie"] == token
 
 
+def test_upload_file_not_found():
+    with tempfile.NamedTemporaryFile() as tmp_file_deleted:
+        pass   # delete on close
+    result = WeaverClient().upload(tmp_file_deleted.name)
+    assert not result.success
+    assert "does not exist" in result.message
+
+
 @pytest.mark.cli
 def test_href_inputs_not_uploaded_to_vault():
     mock_result = OperationResult(False, code=500)
@@ -236,8 +248,16 @@ def test_href_inputs_not_uploaded_to_vault():
 
 
 @pytest.mark.cli
-def test_file_inputs_uploaded_to_vault():
-    fake_href = "https://some-host.com/some-file.zip"
+@pytest.mark.parametrize(
+    ["test_file_name", "expect_file_format"],
+    [
+        ("some-file.zip", {"mediaType": ContentType.APP_ZIP, "encoding": ContentEncoding.BASE64}),
+        ("some-text.txt", {"mediaType": ContentType.TEXT_PLAIN}),
+        ("some-data.json", {"mediaType": ContentType.APP_JSON}),
+    ]
+)
+def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
+    fake_href = f"https://some-host.com/{test_file_name}"
     fake_id = "fake_id"
     fake_token = "fake_token"
 
@@ -245,9 +265,7 @@ def test_file_inputs_uploaded_to_vault():
     expected_output = (
         {
             "file": {
-                "format": {
-                    "mediaType": ContentType.APP_ZIP
-                },
+                "format": expect_file_format,
                 "href": fake_href
             }
         },
@@ -261,8 +279,56 @@ def test_file_inputs_uploaded_to_vault():
     def mock_upload(_href, *_, **__):
         return mock_result
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(test_file_name)[-1]) as input_file:
         inputs = {"file": {"href": input_file.name}}
+        with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+            result = WeaverClient()._upload_files(inputs=inputs)
+    assert result == expected_output
+
+
+@pytest.mark.cli
+def test_file_inputs_array_uploaded_to_vault():
+    fake_href1 = "https://some-host.com/file1.json"
+    fake_href2 = "https://some-host.com/file2.zip"
+    fake_id = "fake_id"
+    fake_token = "fake_token"
+
+    expected_output = (
+        {
+            "file": [
+                {
+                    "href": fake_href1,
+                    "format": {"mediaType": ContentType.APP_JSON},
+                },
+                {
+                    "href": fake_href2,
+                    "format": {
+                        "mediaType": ContentType.APP_ZIP,
+                        "encoding": ContentEncoding.BASE64,
+                    },
+                }
+            ]
+        },
+        {
+            "X-Auth-Vault": f"token {fake_token}; id={fake_id}"
+        }
+    )
+
+    def mock_upload(_href, *_, **__):
+        fake_href = fake_href1 if _href.endswith(".json") else fake_href2
+        output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
+        mock_result = OperationResult(True, code=200, body=output_body)
+        return mock_result
+
+    with contextlib.ExitStack() as stack:
+        input1 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href1)[-1]))
+        input2 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href2)[-1]))
+        inputs = {
+            "file": [
+                {"href": input1.name},
+                {"href": input2.name}
+            ]
+        }
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result == expected_output
@@ -280,3 +346,91 @@ def test_file_inputs_not_uploaded_to_vault():
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
+
+
+@pytest.mark.parametrize(
+    ["expect_error", "subscriber_option", "subscriber_dest", "subscriber_value", "subscriber_result"],
+    [
+        (
+            None,
+            "--subscriber-email",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "https://some-server.com/path",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "test@email.com",
+            None,
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "random",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "random",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "test@email.com",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "https://some-server.com/path",
+            None
+        ),
+    ]
+)
+def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, subscriber_value, subscriber_result):
+    ns = argparse.Namespace()
+    try:
+        action = SubscriberAction(["-sXX", subscriber_option], dest=subscriber_dest)
+        action(argparse.ArgumentParser(), ns, subscriber_value)
+    except Exception as exc:
+        assert expect_error is not None, f"Test was not expected to fail, but raised {exc!s}."
+        assert isinstance(exc, expect_error), f"Test expected to raise {expect_error}, but raised {exc!s} instead."
+    else:
+        assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
+        assert dict(**vars(ns)) == subscriber_result  # pylint: disable=R1735

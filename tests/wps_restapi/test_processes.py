@@ -601,7 +601,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for pkg in package_mock:
                 stack.enter_context(pkg)
             path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
@@ -625,6 +625,30 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+    def test_deploy_process_short_name(self):
+        process_name = "x"
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        process_data["processDescription"]["visibility"] = Visibility.PUBLIC
+        process_data["processDescription"]["outputs"] = {"output": {"schema": {"type": "string"}}}
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=False)
+            assert resp.status_code == 201
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["processSummary"]["id"] == process_name
+            assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
+
+            # perform get to make sure all name checks in the chain, going through db save/load, are validated
+            path = f"{path}/{process_name}"
+            query = {"schema": ProcessSchema.OLD}
+            resp = self.app.get(path, headers=self.json_headers, params=query, expect_errors=False)
+            assert resp.status_code == 200
+            assert resp.json["process"]["id"] == process_name
 
     def test_deploy_process_bad_name(self):
         process_name = f"{self.fully_qualified_test_process_name()}..."
@@ -836,7 +860,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         headers = {"Content-Type": ContentType.APP_CWL_JSON, "Accept": ContentType.APP_JSON}
         resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
         assert resp.status_code == 400
-        assert "'Deploy.DeployCWL.id': 'Missing required field.'" in resp.json["cause"]
+        assert "DeployCWL.id" in resp.json["cause"]
+        assert "Missing required field." in resp.json["cause"]["DeployCWL.id"]
 
     def deploy_process_CWL_direct(self,
                                   content_type,                         # type: ContentType
@@ -1035,6 +1060,86 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             cwl_out = cwl["outputs"]["output"]
             cwl_out["id"] = "output"
             cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
+
+    def test_deploy_process_CWL_DockerRequirement_executionUnit_DirectUnit(self):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": cwl,
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
+            assert pkg == cwl
+
+            # process description should have been generated with relevant I/O
+            proc = desc["process"]
+            assert proc["id"] == p_id
+            assert proc["inputs"] == []
+            assert proc["outputs"] == [{
+                "id": "output",
+                "title": "output",
+                "schema": {"type": "string", "contentMediaType": "text/plain"},
+                "formats": [{"default": True, "mediaType": "text/plain"}]
+            }]
+
+    def test_deploy_process_CWL_DockerRequirement_executionUnit_UnitWithMediaType(self):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            cwl = self.get_cwl_docker_python_version()
+
+            p_id = "test-docker-python-version"
+            body = {
+                "processDescription": {"process": {"id": p_id}},
+                "executionUnit": {"unit": cwl, "type": ContentType.APP_CWL_JSON},
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            }
+            desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
+            pkg = self.get_application_package(p_id)
+            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+
+            # once parsed, CWL I/O are converted to listing form
+            # rest should remain intact with the original definition
+            cwl["inputs"] = []
+            cwl_out = cwl["outputs"]["output"]
+            cwl_out["id"] = "output"
+            cwl["outputs"] = [cwl_out]
+            cwl.pop("$schema", None)
+            cwl.pop("$id", None)
+            pkg.pop("$schema", None)
+            pkg.pop("$id", None)
             assert pkg == cwl
 
             # process description should have been generated with relevant I/O
@@ -1535,7 +1640,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         data["id"] = "invalid-process:1.2.3"
         resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
         assert resp.status_code in [400, 422]
-        assert "invalid" in resp.json["description"]
+        assert "Invalid" in resp.json["error"]
 
         data = {
             "processDescription": {"process": {"id": "invalid-process:1.2.3"}},
@@ -1544,7 +1649,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         resp = self.app.post_json("/processes", params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422]
-        assert "invalid" in resp.json["description"]
+        assert "Invalid" in resp.json["error"]
 
     def test_update_process_not_found(self):
         resp = self.app.patch_json("/processes/not-found", params={}, headers=self.json_headers, expect_errors=True)
@@ -2030,6 +2135,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.post_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
         assert resp.content_type == ContentType.APP_JSON
+
+    def test_execute_process_valid_empty_string(self):
+        """
+        Ensure that a process expecting an input string parameter can be provided as empty (not resolved as "missing").
+        """
+        path = f"/processes/{self.process_public.identifier}/jobs"
+        data = self.get_process_execute_template(test_input="")
+
+        with contextlib.ExitStack() as stack:
+            for exe in mocked_process_job_runner():
+                stack.enter_context(exe)
+            resp = self.app.post_json(path, params=data, headers=self.json_headers)
+            assert resp.status_code == 201, "Expected job submission without inputs created without error."
+            job = self.job_store.fetch_by_id(resp.json["jobID"])
+            assert job.inputs[0]["data"] == "", "Input value should be an empty string."
 
     def test_execute_process_missing_required_params(self):
         """

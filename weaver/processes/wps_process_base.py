@@ -96,7 +96,6 @@ class WpsProcessInterface(abc.ABC):
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
         self.temp_staging = set()
-        self.stage_output_id_nested = False
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
@@ -159,7 +158,7 @@ class WpsProcessInterface(abc.ABC):
         self.update_status("Execution of remote process execution completed successfully.",
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
 
-    def prepare(self):
+    def prepare(self):  # noqa: B027  # intentionally not an abstract method to allow no-op
         # type: () -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
@@ -329,18 +328,10 @@ class WpsProcessInterface(abc.ABC):
             We cannot rely on specific file names to be mapped, since glob can match many (eg: ``"*.txt"``).
 
         .. seealso::
-            Function :func:`weaver.processes.convert.any2cwl_io` defines a generic glob pattern using the output ID
-            and expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
-            doesn't necessarily produces file names with the output ID as expected to find them (could be anything),
+            Function :func:`weaver.processes.convert._convert_any2cwl_io_complex` defines a generic glob pattern from
+            the expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
+            doesn't necessarily produce file names with the output ID as expected to find them (could be anything),
             staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
-
-        .. warning::
-            Only remote :term:`Provider` implementations (which auto-generate a pseudo :term:`CWL` to map components)
-            that produce outputs with inconsistent file names as described above should set attribute
-            :attr:`WpsProcessInterface.stage_output_id_nested` accordingly. For :term:`Process` that directly provide
-            an actual :term:`CWL` :term:`Application Package` definition (e.g.: Docker application), auto-mapping
-            of glob patterns should be avoided, as it is expected that the :term:`CWL` contains real mapping to be
-            respected for correct execution and retrieval of outputs from the application.
         """
         for result in results:
             res_id = get_any_id(result)
@@ -351,10 +342,7 @@ class WpsProcessInterface(abc.ABC):
             result_values = get_any_value(result)
             if not isinstance(result_values, list):
                 result_values = [result_values]
-            if self.stage_output_id_nested:
-                cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
-            else:
-                cwl_out_dir = out_dir.rstrip("/")
+            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
             os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
             for value in result_values:
                 src_name = value.split("/")[-1]

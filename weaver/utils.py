@@ -4,6 +4,7 @@ import fnmatch
 import functools
 import importlib.util
 import inspect
+import io
 import logging
 import os
 import posixpath
@@ -20,7 +21,7 @@ from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
 from typing import TYPE_CHECKING, overload
-from urllib.parse import ParseResult, unquote, urlparse, urlunsplit
+from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
 import colander
@@ -33,7 +34,6 @@ from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
 from bs4 import BeautifulSoup
 from celery.app import Celery
-from jsonschema.validators import RefResolver as JsonSchemaRefResolver
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -49,6 +49,9 @@ from pyramid.response import _guess_type as guess_file_contents  # noqa: W0212
 from pyramid.settings import asbool, aslist
 from pyramid.threadlocal import get_current_registry
 from pyramid_beaker import set_cache_regions_from_settings
+from pyramid_celery import celery_app as app
+from pywps.inout.basic import UrlHandler
+from pywps.inout.outputs import MetaFile, MetaLink, MetaLink4
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
@@ -62,10 +65,15 @@ from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType, get_content_type, get_extension, repr_json
+from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
 from weaver.status import map_status
-from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
+
+try:  # refactor in jsonschema==4.18.0
+    from jsonschema.validators import _RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
+except ImportError:  # pragma: no cover
+    from jsonschema.validators import RefResolver as JsonSchemaRefResolver  # pylint: disable=E0611
 
 if TYPE_CHECKING:
     import importlib.abc
@@ -101,6 +109,8 @@ if TYPE_CHECKING:
         AnyKey,
         AnyRegistryContainer,
         AnyRequestMethod,
+        AnyRequestQueryMultiDict,
+        AnyRequestType,
         AnyResponseType,
         AnySettingsContainer,
         AnyUUID,
@@ -164,6 +174,16 @@ if TYPE_CHECKING:
     ]
     AnyOutputMethod = Union[AnyMetadataOutputMethod, AnyDownloadOutputMethod]
     AnyOutputResult = Union[MetadataResult, DownloadResult]
+
+    AnyMetalink = Union[MetaLink, MetaLink4]
+    FileLink = TypedDict("FileLink", {
+        "href": str,
+        "file": NotRequired[Optional[str]],
+        "name": NotRequired[Optional[str]],
+        "type": NotRequired[Optional[str]],         # mediaType equivalent
+        "mediaType": NotRequired[Optional[str]],    # for convenience
+        "encoding": NotRequired[Optional[str]],
+    }, total=True)
 
     FilterType = TypeVar("FilterType")  # pylint: disable=C0103,invalid-name
 
@@ -400,7 +420,7 @@ def get_weaver_url(container):
 
 
 def get_any_id(info, default=None, pop=False, key=False):
-    # type: (MutableMapping, Optional[str], bool, bool) -> Optional[str]
+    # type: (MutableMapping[str, Any], Optional[str], bool, bool) -> Optional[str]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
@@ -418,7 +438,7 @@ def get_any_id(info, default=None, pop=False, key=False):
 
 
 def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
-    # type: (MutableMapping, Any, bool, bool, bool, bool) -> AnyValueType
+    # type: (MutableMapping[str, Any], Any, bool, bool, bool, bool) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 
@@ -450,6 +470,14 @@ def get_any_message(info, default=""):
     return (info.get("message") or info.get("description") or info.get("detail") or default).strip()
 
 
+def is_celery():
+    # type: () -> bool
+    """
+    Detect if the current application was executed as a :mod:`celery` command.
+    """
+    return sys.argv[0].rsplit("/", 1)[-1] == "celery"
+
+
 def get_registry(container=None, nothrow=False):
     # type: (Optional[AnyRegistryContainer], bool) -> Optional[Registry]
     """
@@ -461,6 +489,17 @@ def get_registry(container=None, nothrow=False):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if container is None:
+        # find 2 parents since 'get_settings' calls 'get_registry' to provide better context
+        warnings.warn(
+            f"Function [{get_caller_name()}] called from [{get_caller_name(skip=2)}] "
+            "did not provide a settings container. Consider providing it explicitly.",
+            UndefinedContainerWarning,
+        )
+    # preemptively check registry in celery if applicable
+    # avoids error related to forked processes when restarting workers
+    if container is None and is_celery():
+        return app.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, WerkzeugRequest) or container is None:
         return get_current_registry()
     if nothrow:
@@ -545,6 +584,35 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
     except KeyError:  # No cookie
         return {}
+
+
+def get_request_args(request):
+    # type: (AnyRequestType) -> AnyRequestQueryMultiDict
+    """
+    Extracts the parsed query string arguments from the appropriate request object strategy.
+
+    Depending on the request implementation, attribute ``query_string`` are expected as :class:`bytes` (:mod:`werkzeug`)
+    or :class:`str` (:mod:`pyramid`, :mod:`webob`). The ``query_string`` attribute is then used by ``args`` and
+    ``params`` for respective implementations, but assuming their string-like formats are respected.
+
+    .. seealso::
+        https://github.com/pallets/werkzeug/issues/2710
+    """
+    try:
+        # cannot assume/check only by object type, since they are sometimes extended with both (see 'extend_instance')
+        # instead, rely on the expected 'query_string' type by each implementation
+        if isinstance(request.query_string, bytes) and hasattr(request, "args"):
+            return request.args
+        if isinstance(request.query_string, str) and hasattr(request, "params"):
+            return request.params
+    except (AttributeError, TypeError):  # pragma: no cover
+        LOGGER.warning(
+            "Could not resolve expected query string parameter parser in request of type: [%s]. Using default parsing.",
+            type(request)
+        )
+    # perform essentially what both implementations do
+    params = parse_qsl(bytes2str(request.query_string), keep_blank_values=True)
+    return dict(params)
 
 
 def parse_kvp(query,                    # type: str
@@ -1055,7 +1123,7 @@ def import_target(target, default_root=None):
 
 
 def open_module_resource_file(module, file_path):
-    # type: (Union[str, ModuleType], str) -> IO[bytes]
+    # type: (Union[str, ModuleType], str) -> IO[str]
     """
     Opens a resource (data file) from an installed module.
 
@@ -1070,7 +1138,8 @@ def open_module_resource_file(module, file_path):
             reader = loader.get_resource_reader()  # type: importlib.abc.ResourceReader  # noqa
         except AttributeError:
             reader = loader  # noqa
-        return reader.open_resource(file_path)
+        buffer = reader.open_resource(file_path)
+        return io.TextIOWrapper(buffer, encoding="utf-8")
     except AttributeError:
         path = os.path.join(module.__path__[0], file_path)
         return open(path, mode="r", encoding="utf-8")
@@ -1146,6 +1215,7 @@ def get_href_headers(path,                      # type: str
     """
     Obtain headers applicable for the provided file or directory reference.
 
+    :rtype: object
     :param path: File to describe. Either a local path or remote URL.
     :param download_headers:
         If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
@@ -1320,7 +1390,7 @@ def raise_on_xml_exception(xml_node):
 
 
 def str2bytes(string):
-    # type: (Union[str, bytes]) -> bytes
+    # type: (AnyStr) -> bytes
     """
     Obtains the bytes representation of the string.
     """
@@ -1332,7 +1402,7 @@ def str2bytes(string):
 
 
 def bytes2str(string):
-    # type: (Union[str, bytes]) -> str
+    # type: (AnyStr) -> str
     """
     Obtains the unicode representation of the string.
     """
@@ -1470,14 +1540,23 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def get_caller_name(skip=2, base_class=False):
+def get_caller_name(skip=0, base_class=False):
     # type: (int, bool) -> str
     """
     Find the name of a parent caller function or method.
 
     The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
-    :param skip: specifies how many levels of stack to skip while getting the caller.
+    Supposing the following call stack ``main -> func1 -> func2 -> func3 -> get_caller_name``.
+
+    Calling ``get_caller_name()`` or ``get_caller_name(skip=1)`` would return the full package location of ``func2``
+    because it is 1-level higher than were ``get_caller_name`` is called from (inside ``func3``).
+    Calling ``get_caller_name(skip=0)`` would return ``func3`` directly, and ``func1`` for ``get_caller_name(skip=2)``.
+
+    :param skip:
+        Specifies how many levels of stack to skip for getting the caller.
+        By default, uses ``skip=1`` to obtain the immediate parent function that called :func:`get_caller_name`,
+        were ``skip=0`` would be the function itself that called :func:`get_caller_name`.
     :param base_class:
         Specified if the base class should be returned or the top-most class in case of inheritance
         If the caller is not a class, this doesn't do anything.
@@ -1694,6 +1773,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
                        *args,                   # type: Params.args
                        condition=Exception,     # type: RetryCondition
                        retries=1,               # type: int
+                       interval=0,              # type: Number
                        **kwargs,                # type: Params.kwargs
                        ):                       # type: (...) -> Return
     """
@@ -1705,6 +1785,7 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
         In case of a callable, success/failure result should be returned to indicate if retry is needed.
         If retry is not requested by the handler for the specified exception, it is raised directly.
     :param retries: Amount of retries to perform. If retries are exhausted, the final exception is re-raised.
+    :param interval: wait time interval (seconds) between retries.
     :return: Expected normal operation return value if it was handled within the specified amount of retries.
     """
     if (
@@ -1743,6 +1824,8 @@ def retry_on_condition(operation,               # type: AnyCallableAnyArgs
             last_exc = exc
             LOGGER.warning("Operation '%s' failed but matched handler condition for retry. Retrying (%s/%s)...",
                            name, attempt, retries)
+            if interval and remain:
+                time.sleep(interval)
     LOGGER.error("Operation '%s' still failing. Maximum retry attempts reached (%s).", name, retries)
     raise last_exc
 
@@ -1818,6 +1901,7 @@ def _patch_cached_request_stream(response, stream=False):
             iter_content = getattr(response, "iter_content")
 
             def cached_iter_content(*_, **__):
+                # type: (*Any, **Any) -> None
                 cached_content = b""
                 for chunk in iter_content(*_, **__):
                     cached_content += chunk
@@ -2044,6 +2128,29 @@ def get_secure_directory_name(location):
     return unique_directory_name
 
 
+def get_secure_path(location):
+    # type: (str) -> str
+    """
+    Obtain a secure path location with validation of each nested component.
+    """
+    # consider path with potential scheme
+    parts = location.split("://", 1)
+    if len(parts) > 1:
+        scheme, ref = parts
+    else:
+        scheme, ref = None, parts[0]
+
+    # validate parts
+    parts = ref.split("/")
+    for i, part in enumerate(parts):
+        parts[i] = get_secure_filename(part)
+    start = "/" if ref.startswith("/") else ""
+    trail = "/" if ref.endswith("/") and ref != "/" else ""
+    secure_ref = start + "/".join(path for path in parts if path) + trail
+    secure_loc = f"{scheme}://{secure_ref}" if scheme else secure_ref
+    return secure_loc
+
+
 def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
     # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
     """
@@ -2068,8 +2175,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     LOGGER.debug("Fetch file resolved as remote URL reference.")
     request_kwargs.pop("stream", None)
     resp = request_extra("GET", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
-    if resp.status_code >= 400:
-        # pragma: no cover
+    if resp.status_code >= 400:  # pragma: no cover
         # use method since response object does not derive from Exception, therefore cannot be raised directly
         if hasattr(resp, "raise_for_status"):
             resp.raise_for_status()
@@ -2421,37 +2527,38 @@ def fetch_file(file_reference,                      # type: str
     :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
     :raises ValueError: when the reference scheme cannot be identified.
     """
-    if file_reference.startswith("file://"):
-        file_reference = file_reference[7:]
-    file_href = file_reference
-    file_name = os.path.basename(os.path.realpath(file_reference))  # resolve any different name to use the original
+    file_href = file_reference  # keep original for reporting in case of error
+    if file_href.startswith("file://"):
+        file_href = file_href[7:]
+    file_name = os.path.basename(os.path.realpath(file_href))  # resolve any different name to use the original
     file_name = get_secure_filename(file_name)
     file_path = os.path.join(file_outdir, file_name)
     LOGGER.debug("Fetching file reference: [%s] using options:\n%s", file_href, repr_json(option_kwargs))
     options, kwargs = resolve_scheme_options(**option_kwargs)
-    if os.path.isfile(file_reference):
+    if os.path.isfile(file_href):
         LOGGER.debug("Fetch file resolved as local reference.")
+        file_href = get_secure_path(file_href)
         file_path = adjust_file_local(file_href, file_outdir, out_method)
-    elif file_reference.startswith("s3://"):
+    elif file_href.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
         s3_params = resolve_s3_http_options(**options["http"], **kwargs)
         s3_region = options["s3"].pop("region_name", None)
-        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_reference)
+        s3_bucket, file_key, s3_region_ref = resolve_s3_reference(file_href)
         if s3_region and s3_region_ref and s3_region != s3_region_ref:
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
         s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
         s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
-    elif file_reference.startswith("http"):
+    elif file_href.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
-        if file_reference.startswith("https://s3.") or urlparse(file_reference).hostname.endswith(".amazonaws.com"):
+        if file_href.startswith("https://s3.") or urlparse(file_href).hostname.endswith(".amazonaws.com"):
             LOGGER.debug("Detected HTTP-like S3 bucket file reference. Retrying file fetching with S3 reference.")
-            s3_ref, s3_region = resolve_s3_from_http(file_reference)
+            s3_ref, s3_region = resolve_s3_from_http(file_href)
             option_kwargs.pop("s3_region", None)
             return fetch_file(s3_ref, file_outdir, settings=settings, s3_region_name=s3_region, **option_kwargs)
         file_path = download_file_http(
-            file_reference,
+            file_href,
             file_outdir,
             settings=settings,
             callback=callback,
@@ -2459,7 +2566,7 @@ def fetch_file(file_reference,                      # type: str
             **kwargs
         )
     else:
-        scheme = file_reference.split("://")
+        scheme = file_reference.split("://", 1)
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
         raise ValueError(
             f"Unresolved location and/or fetch file scheme: '{scheme!s}', "
@@ -3122,13 +3229,16 @@ def adjust_directory_local(location,                            # type: Path
         LOGGER.debug("Local directory reference [%s] matches output, but desired listing differs. "
                      "Removing additional items:\n%s", loc_dir, repr_json(extras))
         for file_path in extras:
-            os.remove(file_path)
+            file_path = get_secure_path(file_path)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
         return filtered
 
     # Any operation (islink, remove, etc.) that must operate on the link itself rather than the directory it points
     # to must not have the final '/' in the path. Otherwise, the link path (without final '/') is resolved before
     # evaluating the operation, which make them attempt their call on the real directory itself.
     link_dir = location.rstrip("/")
+    link_dir = get_secure_path(link_dir)
 
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
         LOGGER.debug("References under [%s] cannot be placed under target path [%s] "
@@ -3192,6 +3302,20 @@ def fetch_directory(location,                           # type: str
                     settings=None,                      # type: Optional[AnySettingsContainer]
                     **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
                     ):                                  # type: (...) -> List[MetadataResult]
+    ...
+
+
+@overload
+def fetch_directory(location,                           # type: str
+                    out_dir,                            # type: Path
+                    *,                                  # force named keyword arguments after
+                    out_method=OutputMethod.AUTO,       # type: AnyDownloadOutputMethod
+                    include=None,                       # type: Optional[List[str]]
+                    exclude=None,                       # type: Optional[List[str]]
+                    matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
+                    settings=None,                      # type: Optional[AnySettingsContainer]
+                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    ):                                  # type: (...) -> List[DownloadResult]
     ...
 
 
@@ -3369,6 +3493,97 @@ def fetch_reference(reference,                          # type: str
     return [path] if out_listing and isinstance(path, str) else path
 
 
+class SizedUrlHandler(UrlHandler):
+    """
+    Avoids an unnecessary request to obtain the content size if the expected file is already available locally.
+    """
+    @property
+    def size(self):
+        if self._file:
+            path = self._file[7:] if self._file.startswith("file://") else self._file
+            if os.path.isfile(path):
+                return int(os.stat(path).st_size)
+        return super().size
+
+
+def create_metalink(
+    files,          # type: List[FileLink]
+    version=4,      # type: Literal[3, 4]
+    name=None,      # type: Optional[str]
+    workdir=None,   # type: Optional[Path]
+):                  # type: (...) -> AnyMetalink
+    """
+    Generates a MetaLink definition with provided link references.
+
+    If the link includes a local ``file`` path, or when the ``href`` itself is a local path, the IO handler will employ
+    those references to avoid the usual behavior performed by :mod:`pywps` that auto-fetches the remote file. To retain
+    that behavior, simply make sure that ``href`` is a remote file and that ``path`` is unset or does not exist.
+
+    :param files: File link, and optionally, with additional name, local path, media-type and encoding.
+    :param version: Desired metalink content as defined by the corresponding version.
+    :param name: Global name identifier for the metalink file.
+    :param workdir: Location where to store files when auto-fetching them.
+    :returns: Metalink object with appropriate template generation utilities.
+
+    .. note::
+        It is always preferable to use MetaLink V4 over V3 as it adds support for ``mediaType`` which can be critical
+        for validating and/or mapping output formats in some cases. V3 also enforces "type=http" in the :mod:`pywps`
+        :term:`XML` template, which is erroneous when other schemes such as ``file://`` or ``s3://`` are employed.
+
+    .. warning::
+        Regardless of MetaLink V3 or V4, ``encoding`` are not reported.
+        This is a limitation of MetaLink specification itself.
+
+    .. seealso::
+        - https://en.wikipedia.org/wiki/Metalink#Example_Metalink_3.0_.metalink_file
+        - https://en.wikipedia.org/wiki/Metalink#Example_Metalink_4.0_.meta4_file
+        - :rfc:`5854`
+        - :rfc:`6249`
+    """
+    meta_files = []
+    for link in files:
+        # find generic details
+        meta_name = link.get("name")
+        meta_name = str(meta_name) if meta_name is not None else None
+        meta_type = link.get("type") or link.get("mediaType")
+        meta_enc = link.get("encoding")
+        meta_fmt = get_format(meta_type)
+        if meta_fmt and not meta_fmt.encoding and meta_enc:
+            meta_fmt.encoding = meta_enc
+        meta_href = link["href"]
+        meta_path = link.get("file")
+        if meta_href.startswith("/"):
+            meta_href = f"file://{meta_href}"
+            meta_path = meta_path or meta_href
+        elif meta_href.startswith("file://"):
+            meta_path = meta_path or meta_href[7:]
+        meta_file = MetaFile(identity=meta_name, fmt=meta_fmt)
+
+        # define source IO handler
+        # following steps order are important to avoid duplicate copy/fetch by pywps
+        # generate a 'SizedUrlHandler' with '._output._iohandler.prop="url"' and sets '._output._iohandler._url'
+        # normally, a 'UrlHandler' would be assigned automatically by using 'meta_file.file = meta_href'
+        meta_file._output._iohandler = SizedUrlHandler(meta_href, meta_file._output)
+        href_scheme = meta_href.split("://", 1)[0]
+        # then, need to set '._output._iohandler._file' to avoid 'UrlHandler' trying to automatically fetch it
+        if href_scheme == "file":
+            meta_file._output._iohandler._file = meta_href
+        elif meta_path and os.path.isfile(meta_path):
+            meta_file._output._iohandler._file = os.path.abspath(meta_path)
+        else:
+            LOGGER.warning(
+                "No local file path provided for [%s]."
+                "Metalink reference will attempt to automatically fetch it.",
+                meta_href
+            )
+        meta_files.append(meta_file)
+
+    workdir = str(workdir) if workdir else None
+    meta_cls = MetaLink4 if version == 4 else MetaLink
+    meta_link = meta_cls(identity=name, workdir=workdir, files=tuple(meta_files))
+    return meta_link
+
+
 def load_file(file_path, text=False):
     # type: (str, bool) -> Union[JSON, str]
     """
@@ -3475,15 +3690,32 @@ def assert_sane_name(name, min_len=3, max_len=None):
         raise InvalidIdentifierValue(f"Invalid name : {name}")
 
 
-def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
-    # type: (str, bool, bool) -> str
+def clean_json_text_body(body, remove_newlines=True, remove_indents=True, convert_quotes=True):
+    # type: (str, bool, bool, bool) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\n'", "'"), ("\"", "\'"),
-                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("'. ", ""), ("'. '", ""),
-                ("}'", "}"), ("'{", "{")]
+    replaces = [
+        (",\n", ", "),
+        ("\\n", " "),
+        (" \n", " "),
+        ("\n'", "'"),
+        ("u\'", "\'"),
+        ("u\"", "\""),
+        ("'. ", ""),
+        ("'. '", ""),
+        ("}'", "}"),
+        ("'{", "{"),
+    ]
+    patterns = [
+        (re.compile(r"(\w+)('{2,})([\s\]\}\)]+)"), "\\1'\\3"),
+        (re.compile(r"([\s\[\{\(]+)('{2,})(\w+)"), "\\1'\\3"),
+        (re.compile(r"(\w+)(\"{2,})([\s\]\}\)]+)"), "\\1\"\\3"),
+        (re.compile(r"([\s\[\{\(]+)(\"{2,})(\w+)"), "\\1\"\\3"),
+    ]
+    if convert_quotes:
+        replaces.extend([("\"", "\'")])
     if remove_indents:
         replaces.extend([("\\", " "), ("  ", " ")])
     else:
@@ -3495,6 +3727,8 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
+    for _from, _to in patterns:
+        body = re.sub(_from, _to, body)
 
     if remove_newlines:
         body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
@@ -3505,8 +3739,13 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
         body_clean = body
 
     # re-process without newlines to remove escapes created by concat of lines
-    if any(rf in body_clean for rf in replaces_from):
-        body_clean = clean_json_text_body(body_clean, remove_newlines=remove_newlines, remove_indents=remove_indents)
+    if any(rf in body_clean if isinstance(rf, str) else re.match(rf, body) for rf in replaces_from):
+        body_clean = clean_json_text_body(
+            body_clean,
+            remove_newlines=remove_newlines,
+            remove_indents=remove_indents,
+            convert_quotes=convert_quotes,
+        )
     return body_clean
 
 

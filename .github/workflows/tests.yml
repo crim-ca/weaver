@@ -7,6 +7,12 @@ on:
   - release
   - workflow_dispatch
 
+# cancel the current workflow if another commit was pushed on the same PR or reference
+# uses the GitHub workflow name to avoid collision with other workflows running on the same PR/reference
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
   skip_duplicate:
@@ -33,6 +39,7 @@ jobs:
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
+      DOCKER_TEST_EXEC_ARGS: "-T"
     services:
       # Label used to access the service container
       mongodb:
@@ -42,26 +49,17 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
-          # end-of-life python
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-unit-only
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-func-only
           # linter tests

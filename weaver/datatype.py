@@ -24,7 +24,7 @@ import pyramid.httpexceptions
 import requests.exceptions
 from cryptography.fernet import Fernet
 from dateutil.parser import parse as dt_parse
-from docker.auth import decode_auth
+from docker.auth import decode_auth  # pylint: disable=E0611
 from owslib.util import ServiceException as OWSServiceException
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
@@ -85,6 +85,7 @@ if TYPE_CHECKING:
         CWL,
         ExecutionInputs,
         ExecutionOutputs,
+        ExecutionSubscribers,
         JSON,
         Link,
         Metadata,
@@ -925,28 +926,29 @@ class Job(Base):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
-    def status_url(self, container=None):
-        # type: (Optional[AnySettingsContainer]) -> str
-        """
-        Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
-        """
-        settings = get_settings(container)
-        location_base = f"/providers/{self.service}" if self.service else ""
-        api_base_url = get_wps_restapi_base_url(settings)
-        location_url = f"{api_base_url}{location_base}/processes/{self.process}/jobs/{self.id}"
-        return location_url
-
     @property
-    def notification_email(self):
-        # type: () -> Optional[str]
-        return self.get("notification_email")
+    def subscribers(self):
+        # type: () -> Optional[ExecutionSubscribers]
+        return self.get("subscribers")
 
-    @notification_email.setter
-    def notification_email(self, email):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(email, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.notification_email'")
-        self["notification_email"] = email
+    @subscribers.setter
+    def subscribers(self, subscribers):
+        # type: (Optional[ExecutionSubscribers]) -> None
+        if subscribers and not (
+            isinstance(subscribers, dict) and
+            all(
+                sub_type and isinstance(sub_type, str) and
+                sub and isinstance(sub, str) and
+                val and isinstance(val, str)
+                for sub_type, subs in subscribers.items()
+                for sub, val in (subs if isinstance(subs, dict) else {None: None}).items()
+            )
+        ):
+            raise TypeError(
+                "Mapping of subscriber types, status and notification references "
+                f"is required for '{self.__name__}.subscribers'."
+            )
+        self["subscribers"] = subscribers or None
 
     @property
     def accept_language(self):
@@ -1236,12 +1238,42 @@ class Job(Base):
             response = xml_util.tostring(response)
         self["response"] = response
 
-    def _job_url(self, base_url=None):
-        # type: (Optional[str]) -> str
+    def _job_url(self, base_url):
+        # type: (str) -> str
         if self.service is not None:
             base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
         return base_url + job_path
+
+    def job_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        return self._job_url(base_url) + (extra_path or "")
+
+    def status_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container)
+
+    def logs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/logs")
+
+    def exceptions_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/exceptions")
+
+    def inputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/inputs")
+
+    def outputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/outputs")
+
+    def results_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/results")
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
@@ -1308,10 +1340,10 @@ class Job(Base):
             link.update(link_meta)
         return job_links
 
-    def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer]) -> JSON
         """
-        Obtains the JSON data representation for response body.
+        Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -1340,7 +1372,7 @@ class Job(Base):
             # new name as per OGC-API, enforced integer
             # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
             "progress": int(self.progress),
-            "links": self.links(settings, self_link=self_link)
+            "links": self.links(settings, self_link="status")
         }
         return sd.JobStatusInfo().deserialize(job_json)
 
@@ -1375,7 +1407,7 @@ class Job(Base):
             "context": self.context,
             "request": self.request,
             "response": self.response,
-            "notification_email": self.notification_email,
+            "subscribers": self.subscribers,
             "accept_language": self.accept_language,
         }
 
@@ -2247,7 +2279,7 @@ class Process(Base):
     @property
     def visibility(self):
         # type: () -> Visibility
-        return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
+        return Visibility.get(self.get("visibility"), Visibility.PUBLIC)
 
     @visibility.setter
     def visibility(self, visibility):
@@ -2371,6 +2403,8 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
+            {"href": f"{proc_desc}?f=xml", "rel": "alternate",
+             "title": "Alternate process description.", "type": ContentType.APP_XML},
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
@@ -2510,9 +2544,9 @@ class Process(Base):
             for io_type in ["inputs", "outputs"]:
                 process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
             process.update({"process": dict(process)})
-            return sd.ProcessDescriptionOLD().deserialize(process)
+            return sd.ProcessDescriptionOLD(schema_meta_include=True).deserialize(process)
         # process fields directly at root + I/O as mappings
-        return sd.ProcessDescriptionOGC().deserialize(process)
+        return sd.ProcessDescriptionOGC(schema_meta_include=True).deserialize(process)
 
     def summary(self, revision=False, links=True, container=None):
         # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON

@@ -20,9 +20,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+import celery
 import mock
 import moto
-import pkg_resources
 import pyramid_celery
 import responses
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
@@ -32,6 +32,7 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from pyramid.testing import DummyRequest
+from pytest_server_fixtures.http import HTTPTestServer, SimpleHTTPTestServer
 from requests import Response
 from webtest import TestApp, TestResponse
 
@@ -57,8 +58,17 @@ from weaver.utils import (
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
+try:
+    from importlib.metadata import version as get_distribution_version  # noqa  # not available for Python<=3.7
+except ImportError:  # pragma: no cover
+    import pkg_resources
+
+    def get_distribution_version(distribution: str) -> str:
+        return pkg_resources.get_distribution(distribution).version
+
+
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal
 
     from mypy_boto3_s3.client import S3Client
@@ -84,8 +94,8 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
 
-    # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
+    MockConfigWPS1 = Sequence[str, str, Union[Sequence[str], Dict[str, str]]]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -290,12 +300,12 @@ def get_module_version(module):
         if version is not None:
             return version
         module = module.__name__
-    return pkg_resources.get_distribution(module).version
+    return get_distribution_version(module)
 
 
 def init_weaver_service(registry):
     # type: (Registry) -> None
-    service_store = registry.db.get_store(MongodbServiceStore)
+    service_store = get_db(registry).get_store(MongodbServiceStore)
     service_store.save_service(Service({
         "type": "",
         "name": "weaver",
@@ -492,16 +502,26 @@ def mocked_sub_requests(app,                # type: TestApp
         allow_json = True
         # convert 'requests.request' parameter 'files' to corresponding 'TestApp' parameter 'upload_files'
         # requests format:
-        #   { field_name: file_contents | (file_name, file_content/stream, file_content_type)  }
+        #   { field_name: file_data | (file_name[, file_data/stream[, file_content_type[, file_custom_headers]]]) }
+        #   (all intermediate variations with only 'file_name', and adding 1 more field after, are supported)
         # TestApp format:
-        #   (field_name, filename[, file_content_data][, file_content_type])
+        #   (field_name, filename[, file_bytes[, file_content_type]])
         if "files" in req_kwargs:
             files = req_kwargs.pop("files")
             if isinstance(files, dict):
                 files = [
-                    (file_key, file_key, str2bytes(file_meta[0].read()))
+                    (
+                        file_key,
+                        file_key,
+                        str2bytes(file_meta[0].read()),
+                    )
                     if len(file_meta) < 2 else
-                    (file_key, file_meta[0], str2bytes(file_meta[1].read()), *file_meta[2:])
+                    (
+                        file_key,
+                        file_meta[0],
+                        str2bytes(file_meta[1].read()),
+                        *file_meta[2:3],  # ignore custom headers if any (unsupported by TestApp)
+                    )
                     for file_key, file_meta in files.items()
                 ]
             req_kwargs["upload_files"] = files
@@ -673,6 +693,16 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         def test_function():
             pass
 
+    Process description ID override Mock example:
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1(
+            [ "<server-url>", "<getcaps-xml-path>", {"proc-1": "<describe-xml>", "proc-2": "<describe-xml>", ...} ]
+        )
+        def test_function():
+            pass
+
     The generated responses mock can be obtained as follows to add further request definitions to simulate:
 
     .. code-block:: python
@@ -696,12 +726,13 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         Single level or nested 2D list/tuples of 3 elements, where each one defines:
             1. WPS server URL to be mocked to simulate response contents from requests for following items.
             2. Single XML file path to the expected response body of a server ``GetCapabilities`` request.
-            3. List of XML file paths to one or multiple expected response body of ``DescribeProcess`` requests.
+            3. List of XML file paths or data to one or multiple expected response body of ``DescribeProcess`` requests,
+               or mapping of desired process ID to their corresponding ``DescribeProcess`` XML file path or string data.
     :param mock_responses:
         Handle to the generated mock instance by this decorator on the first wrapped call to add more configurations.
         In this case, wrapper function is not returned.
     :param data:
-        Flag indicating that provided strings are the literal data instead of file references.
+        Flag indicating that provided strings are directly the XML data instead of file references.
         All server configurations must be file OR data references, no mixing between them supported.
     :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
@@ -718,20 +749,33 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
 
     for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
         assert isinstance(resource_xml_getcap, str)
-        assert isinstance(resource_xml_describe, (set, list, tuple))
+        assert isinstance(resource_xml_describe, (set, list, tuple, dict))
         if not data:
             assert os.path.isfile(resource_xml_getcap)
-            assert all(os.path.isfile(file) for file in resource_xml_describe)
+            if isinstance(resource_xml_describe, dict):
+                assert all(os.path.isfile(file) for file in resource_xml_describe.values())
+            else:
+                assert all(os.path.isfile(file) for file in resource_xml_describe)
+        if isinstance(resource_xml_describe, dict):
+            map_describe = list(resource_xml_describe.items())
+        else:
+            map_describe = [(None, desc) for desc in resource_xml_describe]
 
         get_cap_xml = get_xml(resource_xml_getcap)
         version_query = "&version=1.0.0"
         get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
-        for proc_desc_xml in resource_xml_describe:
+        for map_desc_id, proc_desc_xml in map_describe:
             describe_xml = get_xml(proc_desc_xml)
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
+            if map_desc_id is not None and map_desc_id != proc_desc_id:
+                describe_xml = describe_xml.replace(
+                    f"<ows:Identifier>{proc_desc_id}</ows:Identifier>",
+                    f"<ows:Identifier>{map_desc_id}</ows:Identifier>",
+                )
+                proc_desc_id = map_desc_id
             proc_desc_url = f"{test_server_wps}?service=WPS&request=DescribeProcess&identifier={proc_desc_id}"
             all_request.add((responses.GET, proc_desc_url, describe_xml))
             all_request.add((responses.GET, proc_desc_url + version_query, describe_xml))
@@ -844,6 +888,30 @@ def mocked_dir_listing(local_directory,             # type: str
     </html>
     """)
     return dir_html
+
+
+class FileServer(SimpleHTTPTestServer):
+    """
+    Generate a file server that can host files under :attr:`document_root`.
+
+    Contrary to :func:`mocked_file_server` where requests are captured and redirected to the corresponding files,
+    this server receives *real* requests (via a socket) and returns matched files. This is particularly important
+    during tests that call subprocesses independently of the main Python test process
+    (e.g.: :term:`CWL` ``CommandLineTool` for a ``Builtin`` :term:`Process`), because mocks applied in the main test
+    process are not reflected in the other subprocesses.
+
+    .. warning::
+        This server takes more time to start than usual mocks. Use it sparingly, and consider maintaining a single
+        instance over multiple tests of a complete test suite rather than recreating a server for each test.
+    """
+    def __init__(self):  # pylint: disable=W0231
+        self._port = self.get_port()
+        self._uri = f"http://0.0.0.0:{self._port}"
+
+        # purposely call 'HTTPTestServer' instead of 'SimpleHTTPTestServer' to enforce the URI hostname
+        # otherwise, 'socket.gethostname()' is used (machine name), and the obtained URI fails our schema validation
+        HTTPTestServer.__init__(self, hostname="0.0.0.0", port=self._port, uri=self._uri)  # pylint: disable=W0233
+        self.cwd = self.document_root
 
 
 def mocked_file_server(directory,                   # type: str
@@ -999,8 +1067,12 @@ def mocked_wps_output(settings,                 # type: SettingsType
     )
 
 
-def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):
-    # type: (str, Optional[Callable[[...], Any]]) -> Iterable[MockPatch]
+def mocked_execute_celery(
+    celery_task="weaver.processes.execution.execute_process",   # type: str
+    func_execute_task=None,                                     # type: Optional[Callable[[...], Any]]
+    web_test_app=None,                                          # type: Optional[TestApp]
+    celery_app_name="app",                                      # type: str
+):                                                              # type: (...) -> Iterable[MockPatch]
     """
     Contextual mock of a task execution to run locally instead of dispatched :mod:`celery` worker.
 
@@ -1024,11 +1096,17 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         should omit the input argument for the :class:`celery.task.Task` that will not be automatically inserted.
         The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
         If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
+    :param web_test_app:
+        Test web application employed to execute tasks that would normally be dispatched to a :mod:`celery` worker.
+        If provided, ensures that references to :mod:`celery` that would normally look for the :mod:`pyramid` registry
+        will find the one provided by this test application, and all relevant settings set for it.
+    :param celery_app_name:
+        Name of the :mod:`celery` application or imported alias within the module referenced by :paramref:`celery_task`.
     """
 
-    class MockTask(object):
+    class MockTaskContext(object):
         """
-        Mocks the Celery Task for testing.
+        Mocks the :class:`celery.app.task.Context` for testing.
 
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
         call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
@@ -1046,15 +1124,17 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         # all following methods return what would be returned normally in sync mode
 
         def wait(self, *_, **__):
+            # type: (*Any, **Any) -> Type[CeleryTaskTimeoutError]
             raise CeleryTaskTimeoutError
 
         def ready(self, *_, **__):
+            # type: (*Any, **Any) -> bool
             return True
 
-    task = MockTask()
+    mocked_task_context = MockTaskContext()
 
     def mock_execute_task(*args, **kwargs):
-        # type: (*Any, **Any) -> MockTask
+        # type: (*Any, **Any) -> MockTaskContext
         if func_execute_task is None:
             mod, func = celery_task.rsplit(".", 1)
             module = importlib.import_module(mod)
@@ -1062,17 +1142,37 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
             task_func(*args, **kwargs)
         else:
             func_execute_task(*args, **kwargs)  # noqa
-        return task
+        return mocked_task_context
 
-    return (
+    celery_mocks = [
         mock.patch(f"{celery_task}.delay", side_effect=mock_execute_task),
-        mock.patch("celery.app.task.Context", return_value=task)
-    )
+        mock.patch("celery.app.task.Context", return_value=mocked_task_context),
+    ]
+
+    class MockCeleryApp(celery.Celery):
+        @property
+        def conf(self):
+            return {"PYRAMID_REGISTRY": web_test_app.app.registry}
+
+    if isinstance(web_test_app, TestApp):
+        # WARNING:
+        #   It is very critical that the mock referencing to the above test app registry is applied as context manager.
+        #   Since the Celery app is created globally by 'pyramid_celery', omitting to reset the mock could cause the
+        #   Pyramid registry and the underlying settings to be make its way across tests references. This can cause
+        #   unexpected side-effects if configurations vary between tests to evaluate distinct use cases. Using the
+        #   context manager, we make sure that the mock should live only during the corresponding 'with' block lifetime,
+        #   which should be limited to more controlled duration than globally.
+        celery_task_module = celery_task.rsplit(".", 1)[0]
+        celery_mocks.append(
+            mock.patch(f"{celery_task_module}.{celery_app_name}", new_callable=MockCeleryApp, spec=celery.Celery)
+        )
+
+    return celery_mocks
 
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> mock.MagicMock
+    # type: () -> contextlib.AbstractContextManager[mock.MagicMock]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 
@@ -1087,7 +1187,8 @@ def mocked_dismiss_process():
         with mock_celery_revoke:
             yield   # for direct use by context or decorator
     finally:
-        return mock_celery_revoke  # for use by combined ExitStack context  # pylint: disable=W0150.lost-exception
+        # used by ExitStack context, which would handle the exception appropriately
+        return mock_celery_revoke  # noqa: B012  # pylint: disable=W0150,lost-exception
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):

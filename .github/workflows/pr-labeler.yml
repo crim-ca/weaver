@@ -12,6 +12,12 @@ on:
   schedule:
     - cron: '0 */12 * * *'
 
+# cancel the current workflow if another commit was pushed on the same PR or reference
+# uses the GitHub workflow name to avoid collision with other workflows running on the same PR/reference
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   original-labeler:
     # reference: https://github.com/actions/labeler

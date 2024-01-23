@@ -13,6 +13,7 @@ from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
 from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
+from weaver.wps_restapi.swagger_definitions import CWL_SCHEMA_URL
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 
@@ -119,8 +120,17 @@ class WpsPackageDockerAppTest(WpsConfigBase):
         # process already deployed by setUpClass
         body = self.get_deploy_body()
         process = self.process_store.fetch_by_id(self.process_id)
-        assert process.package == body["executionUnit"][0]["unit"]
-        assert process.payload == body
+        assert "$schema" in process.package
+        assert process.package["$schema"] == CWL_SCHEMA_URL
+
+        payload = process.payload
+        payload.pop("$schema", None)
+        payload.pop("$id", None)
+        package = process.package
+        package.pop("$schema", None)
+        package.pop("$id", None)
+        assert package == body["executionUnit"][0]["unit"]
+        assert payload == body
 
     def test_execute_wps_rest_resp_json(self):
         """
@@ -196,8 +206,9 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 stack_exec.enter_context(mock_exec)
 
             # execute
+            tmp_file_href = f"file://{tmp_file.name}"
             if version == "1.0.0":
-                wps_inputs = [f"file={tmp_file.name}@mimeType={ContentType.TEXT_PLAIN}"]
+                wps_inputs = [f"file={tmp_file_href}@mimeType={ContentType.TEXT_PLAIN}"]
                 wps_params = {
                     "service": "WPS",
                     "request": "Execute",
@@ -208,7 +219,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 wps_headers = {"Accept": accept}
                 wps_data = None
             else:
-                wps_inputs = [("file", ComplexDataInput(tmp_file.name, mimeType=ContentType.TEXT_PLAIN))]
+                wps_inputs = [("file", ComplexDataInput(tmp_file_href, mimeType=ContentType.TEXT_PLAIN))]
                 wps_outputs = [(self.out_key, True)]  # as reference
                 wps_exec = WPSExecution(version=version, url=wps_url)
                 wps_req = wps_exec.buildRequest(self.process_id, wps_inputs, wps_outputs)

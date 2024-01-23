@@ -12,7 +12,7 @@ from weaver.utils import get_settings
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Optional, Text
+    from typing import Optional
 
     from weaver.typedefs import DataSourceConfig
 
@@ -90,7 +90,7 @@ def get_default_data_source(data_sources):
 
 
 def retrieve_data_source_url(data_source):
-    # type: (Optional[Text]) -> str
+    # type: (Optional[str]) -> str
     """
     Finds the data source URL using the provided data source identifier.
 

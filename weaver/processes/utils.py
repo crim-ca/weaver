@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import colander
 import docker
 import yaml
-from docker.errors import ImageNotFound
+from docker.errors import ImageNotFound  # pylint: disable=E0611
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -195,7 +195,7 @@ def _check_deploy(payload):
     """
     message = "Process deployment definition is invalid."
     try:
-        results = sd.Deploy().deserialize(payload)
+        results = sd.Deploy(schema_meta_include=False, schema_include=False).deserialize(payload)
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
@@ -224,7 +224,7 @@ def _check_deploy(payload):
                         f"to avoid mismatching definitions."
                     )
                     raise HTTPBadRequest(json={
-                        "description": message,
+                        "title": message,
                         "cause": "unknown",
                         "error": "Invalid",
                         "value": d_io
@@ -239,14 +239,17 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitVariations(
+                schema_meta_include=False,
+                schema_include=False,
+            ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
                     "package. Aborting deployment to avoid mismatching package definitions."
                 )
                 raise HTTPBadRequest(json={
-                    "description": message,
+                    "title": message,
                     "cause": "unknown",
                     "error": PackageRegistrationError.__name__,
                     "value": d_exec_unit
@@ -260,10 +263,11 @@ def _check_deploy(payload):
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
-            "description": message,
-            "cause": f"Invalid schema: [{exc.msg!s}]",
+            "title": message,
+            "detail": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
-            "value": exc.value
+            "cause": exc.asdict(),
+            "value": repr_json(exc.value),
         })
 
 
@@ -352,6 +356,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)
+    payload.pop("$id", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -396,7 +401,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             if not any(deployment_profile_name.lower().endswith(typ) for typ in allowed_profile_suffix):
                 raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
-        if not isinstance(execution_units, list):
+        if isinstance(execution_units, dict):
+            if "unit" not in execution_units:
+                execution_units = {"unit": execution_units}
+            execution_units = [execution_units]
+        if not isinstance(execution_units, list) or not len(execution_units) == 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         for execution_unit in execution_units:
             if not isinstance(execution_unit, dict):
@@ -446,6 +455,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     process_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
     process_info["outputTransmission"] = process_desc.get("outputTransmission", [])
     process_info["processDescriptionURL"] = description_url
+
     # insert the "resolved" context using details retrieved from "executionUnit"/"href" or directly with "owsContext"
     if "owsContext" not in process_info and reference:
         process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
@@ -459,6 +469,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # remove schema to avoid later deserialization error if different, but remaining content is valid
     # also, avoid storing this field in the process object, regenerate it as needed during responses
     process_info.pop("$schema", None)
+    process_info.pop("$id", None)
 
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
@@ -471,11 +482,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         raise HTTPBadRequest(detail=str(exc))
     except HTTPException:
         raise
+    links = process.links(container)
+    process_summary["links"] = links
     data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,
         "deploymentDone": True,
-        "links": process.links(container),
     }
     if deployment_profile_name:
         data["deploymentProfileName"] = deployment_profile_name
@@ -865,8 +877,8 @@ def parse_wps_process_config(config_entry):
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
     # if explicit name was provided, validate it (assert fail if not),
-    # otherwise replace silently bad character since since is requested to be inferred
-    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
+    # otherwise replace silently bad character since it is requested to be inferred
+    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name), min_len=1)
     svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
@@ -914,7 +926,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
     for wps_process in wps_processes:
-        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier)}"
+        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier, min_len=1)}"
         wps_pid = wps_process.identifier
         proc_url = f"{service_url}?service=WPS&request=DescribeProcess&identifier={wps_pid}&version={wps.version}"
         svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE
@@ -1233,7 +1245,7 @@ def pull_docker(docker_auth, logger=LOGGER):
     ref = docker_auth.reference
     try:
         # load from env is the same as CLI call
-        client = docker.from_env()
+        client = docker.from_env()  # pylint: disable=I1101
         # following login does not update '~/.docker/config.json' by design, but can use it if available
         # session remains active only within the client
         # Note:

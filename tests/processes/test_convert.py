@@ -9,30 +9,50 @@ from collections import OrderedDict
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+import pint
 import pytest
 import yaml
-from owslib.wps import ComplexData, Input as OWSInput
+from cwltool.errors import WorkflowException
+from cwltool.factory import Factory as CWLFactory
+from owslib.crs import Crs
+from owslib.wps import ComplexData, Input as OWSInput, Output as OWSOutput
+from pywps.inout.basic import UOM
 from pywps.inout.formats import Format
 from pywps.inout.inputs import ComplexInput, LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
-from tests.utils import assert_equal_any_order
+from tests import resources
+from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
 from weaver.exceptions import PackageTypeError
-from weaver.formats import IANA_NAMESPACE_DEFINITION, OGC_MAPPING, OGC_NAMESPACE_DEFINITION, ContentType
+from weaver.formats import (
+    EDAM_MAPPING,
+    EDAM_NAMESPACE,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_DEFINITION,
+    OGC_MAPPING,
+    OGC_NAMESPACE_DEFINITION,
+    ContentType
+)
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    IO_INPUT,
+    IO_OUTPUT,
     WPS_BOUNDINGBOX,
+    WPS_BOUNDINGBOX_DATA,
     WPS_COMPLEX,
+    WPS_COMPLEX_DATA,
     WPS_COMPLEX_TYPES,
-    WPS_INPUT,
     WPS_LITERAL,
     WPS_LITERAL_DATA_TYPES,
-    WPS_OUTPUT,
     ProcessSchema
 )
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
+from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
+from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
@@ -40,23 +60,31 @@ from weaver.processes.convert import (
     any2cwl_io,
     complex2json,
     convert_input_values_schema,
+    convert_value_units,
     cwl2json_input_values,
     cwl2wps_io,
     get_cwl_io_type,
     get_io_type_category,
     is_cwl_complex_type,
+    json2oas_io,
     json2wps_allowed_values,
     json2wps_datatype,
+    json2wps_supported_uoms,
     merge_io_formats,
     normalize_ordered_io,
+    oas2json_io,
     ogcapi2cwl_process,
+    ows2json_io,
+    ows2json_output_data,
     parse_cwl_array_type,
     parse_cwl_enum_type,
     repr2json_input_values,
     set_field,
-    wps2json_io
+    wps2json_io,
+    xml_wps2cwl
 )
 from weaver.utils import null
+from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
 
 if TYPE_CHECKING:
     from typing import List
@@ -122,6 +150,99 @@ def test_are_different_and_set_single_null():
     assert _are_different_and_set(null, item) is False
 
 
+@pytest.mark.parametrize(
+    ["wps_io", "cwl_io_expect"],
+    [
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_JSON, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{IANA_NAMESPACE}:{ContentType.APP_JSON}",
+                "outputBinding": {
+                    "glob": "*.json"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.TEXT_PLAIN, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}",
+                "outputBinding": {
+                    "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.TEXT_PLAIN, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_JSON, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "outputBinding": {
+                    "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_XML, "encoding": "base64", "default": True},
+                    {"mimeType": ContentType.APP_XML, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                "format": f"{IANA_NAMESPACE}:{ContentType.APP_XML}",
+                "outputBinding": {
+                    "glob": "*.xml"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_NETCDF, "encoding": "base64", "default": True},
+                    {"mimeType": ContentType.APP_ZIP, "encoding": "base64", "default": False}
+                ]
+            },
+            {
+                "id": "output",
+                "type": "File",
+                # no "format" since more than one, CWL does not support many
+                "outputBinding": {
+                    "glob": ["*.nc", "*.zip"]
+                }
+            }
+        )
+    ]
+)
+def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
+    cwl_io = {"id": wps_io["id"]}
+    _convert_any2cwl_io_complex(cwl_io, {}, wps_io, IO_OUTPUT)
+    assert cwl_io == cwl_io_expect
+
+
 def test_any2cwl_io_from_wps():
     fmt = Format(ContentType.APP_NETCDF)
     wps_io = ComplexInput("test", "", supported_formats=[fmt], data_format=fmt)
@@ -174,10 +295,21 @@ class MockElementXML(dict):
     def __getattr__(self, _):
         return MockElementXML({})
 
+    @property
+    def tag(self):
+        return [""]
+
     def find(self, key):
         if isinstance(self.value, dict):
             return self.value.get(key)
         return None
+
+
+class MockBboxElementXML(MockElementXML):
+    def __init__(self, bbox, crs):
+        super().__init__(None)
+        self.minx, self.miny, self.maxx, self.maxy = bbox
+        self.crs = crs
 
 
 def test_any2cwl_io_from_ows():
@@ -270,6 +402,318 @@ def test_any2cwl_io_from_oas():
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
 
 
+@pytest.mark.parametrize(
+    ["io_select", "test_io", "expect"],
+    [
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "enum",
+                    "symbols": ["1", "2", "3"],
+                },
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 2,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["1", "2", "3"],
+                    },
+                },
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "string",
+                "allowed_values": ["1", "2", "3"],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "symbols": ["1", "2", "3"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["1", "2", "3"],
+                        },
+                    },
+                ]
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "id": "test",
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 2,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "data_type": "integer",
+                "allowed_values": [1, 2, 3],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 3,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    "int",
+                    {
+                        "type": "array",
+                        "items": "int",
+                    },
+                ],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+        ),
+    ]
+)
+def test_any2cwl_io_enum_convert(io_select, test_io, expect):
+    cwl_io, _ = any2cwl_io(test_io, io_select)  # type: ignore
+    assert cwl_io == expect
+
+
+@pytest.mark.parametrize(
+    ["test_io", "test_input", "expect_valid"],
+    [
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            1,
+            True,
+        ),
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            [1],
+            False,
+        ),
+        (
+            {
+                "type": "int",
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=False)},
+            },
+            ["1"],
+            False,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            [1],
+            True,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            1,
+            False,
+        ),
+        (
+            {
+                "type": {"type": "array", "items": "int"},
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=False, allow_array=True)},
+            },
+            ["1"],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            None,
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            1,
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1],
+            True,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [0],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1, 4],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            [1, 2.3],
+            False,
+        ),
+        (
+            {
+                "type": ["null", "int", {"type": "array", "items": "int"}],
+                "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
+            },
+            0,
+            False,
+        ),
+    ]
+)
+def test_any2cwl_io_enum_validate(test_io, test_input, expect_valid):
+    cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "baseCommand": "echo",
+        "requirements": {
+            "InlineJavascriptRequirement": {}
+        },
+        "inputs": {
+            "input": test_io,
+        },
+        "outputs": {
+            "output": "stdout",
+        }
+    }
+    factory = CWLFactory()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp_file:
+        json.dump(cwl, tmp_file)
+        tmp_file.flush()
+        tool = factory.make(f"file://{tmp_file.name}")
+    inputs = {"input": test_input}
+    if expect_valid:
+        tool(**inputs)
+    else:
+        with pytest.raises(WorkflowException):
+            tool(**inputs)
+
+
+@pytest.mark.parametrize(
+    ["test_io", "expect"],
+    [
+        (
+            {
+                "literalDataDomains": [
+                    {"default": True, "dataType": {"name": "integer"}, "valueDefinition": [1, 2, 3]}
+                ],
+                "any_value": False,
+                "min_occurs": 1,
+                "max_occurs": 1,
+            },
+            {
+                "type": "integer",
+                "enum": [1, 2, 3],
+            },
+        ),
+        (
+            {
+                "literalDataDomains": [
+                    {"default": True, "dataType": {"name": "integer"}, "valueDefinition": [1, 2, 3]}
+                ],
+                "any_value": False,
+                "min_occurs": 0,
+                "max_occurs": 2,
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "integer",
+                    "enum": [1, 2, 3],
+                },
+                "minItems": 0,
+                "maxItems": 2,
+            },
+        )
+    ]
+)
+def test_json2oas_io(test_io, expect):
+    copy_io = deepcopy(test_io)  # can get modified by function
+    assert json2oas_io(test_io) == expect, f"Failed for [{copy_io}]"
+
+
 @pytest.mark.parametrize("expect, test_io", [
     ("float",   {"type": WPS_LITERAL, "data_type": "float"}),                       # noqa: E241
     ("integer", {"type": WPS_LITERAL, "data_type": "integer"}),                     # noqa: E241
@@ -335,7 +779,7 @@ def test_cwl2wps_io_null_or_array_of_enums():
             {"type": "array", "items": {"type": "enum", "symbols": allowed_values}},  # but also this for maxOccurs>1
         ],
     }
-    wps_io = cwl2wps_io(io_info, WPS_INPUT)
+    wps_io = cwl2wps_io(io_info, IO_INPUT)
     assert isinstance(wps_io, LiteralInput)
     assert wps_io.min_occurs == 0
     assert wps_io.max_occurs == PACKAGE_ARRAY_MAX_SIZE
@@ -363,7 +807,7 @@ def test_cwl2wps_io_null_or_array_of_enums():
 def test_cwl2wps_io_raise_mixed_types(test_type):
     io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
-        cwl2wps_io(io_info, WPS_INPUT)
+        cwl2wps_io(io_info, IO_INPUT)
 
 
 def test_cwl2wps_io_record_format():
@@ -380,7 +824,7 @@ def test_cwl2wps_io_record_format():
         "outputBinding": {"glob": "*.json"},
         "format": f"file:///tmp/tmp-random-dir/package#{ContentType.APP_JSON}",
     }
-    wps_io = cwl2wps_io(cwl_io_record, WPS_OUTPUT)
+    wps_io = cwl2wps_io(cwl_io_record, IO_OUTPUT)
     assert isinstance(wps_io, ComplexOutput)
     assert len(wps_io.supported_formats) == 1
     assert isinstance(wps_io.supported_formats[0], Format)
@@ -388,7 +832,7 @@ def test_cwl2wps_io_record_format():
 
 
 @pytest.mark.parametrize(
-    "io_type, io_info",
+    ["io_type", "io_info"],
     [
         (WPS_LITERAL, {"type": WPS_LITERAL}),
         (WPS_COMPLEX, {"type": WPS_COMPLEX}),
@@ -407,26 +851,62 @@ def test_get_io_type_category(io_type, io_info):
     assert get_io_type_category(io_info) == io_type, f"Testing: {io_info}"
 
 
-@pytest.mark.parametrize("io_info, io_def", [
-    ({"type": "string"},
-     CWLIODefinition(type="string")),
-    ({"type": "int"},
-     CWLIODefinition(type="int")),
-    ({"type": "float"},
-     CWLIODefinition(type="float")),
-    ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
-     CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
-    ({"type": {"type": "array", "items": "string"}},
-     CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
-    ({"type": ["null", "string"]},
-     CWLIODefinition(type="string", null=True, min_occurs=0)),
-    ({"type": "string?"},
-     CWLIODefinition(type="string", null=True, min_occurs=0)),
-])
+@pytest.mark.parametrize(
+    ["io_info", "io_def"],
+    [
+        ({"type": "string"},
+         CWLIODefinition(type="string")),
+        ({"type": "int"},
+         CWLIODefinition(type="int")),
+        ({"type": "float"},
+         CWLIODefinition(type="float")),
+        ({"type": {"type": "enum", "symbols": ["a", "b", "c"]}},
+         CWLIODefinition(type="string", enum=True, symbols=["a", "b", "c"], mode=MODE.SIMPLE)),
+        ({"type": {"type": "array", "items": "string"}},
+         CWLIODefinition(type="string", array=True, min_occurs=1, max_occurs=PACKAGE_ARRAY_MAX_SIZE)),
+        ({"type": ["null", "string"]},
+         CWLIODefinition(type="string", null=True, min_occurs=0)),
+        ({"type": "string?"},
+         CWLIODefinition(type="string", null=True, min_occurs=0)),
+    ]
+)
 def test_get_cwl_io_type(io_info, io_def):
     io_def.name = io_info["name"] = "test"
     io_res = get_cwl_io_type(io_info)
     assert io_res == io_def
+
+
+@pytest.mark.parametrize(
+    ["io_info", "io_def"],
+    [
+        (
+            {
+                "name": "test",
+                "type": "org.w3id.cwl.cwl.File",
+                "format": "https://www.iana.org/assignments/media-types/application/json",
+                "location": "/tmp/random.json",
+            },
+            CWLIODefinition(name="test", type="File")
+        )
+    ]
+)
+def test_get_cwl_io_type_unmodified(io_info, io_def):
+    """
+    Ensure that the input I/O details do not cause a side effect modification of the data when parsing the definition.
+
+    When :func:`get_cwl_io_type` was called with a definition containing ``type: org.w3id.cwl.cwl.File``, the resulting
+    parsing caused the input information to be overriden by ``type: File``. Although they are essentially equivalent
+    once resolved, this modification performed before :mod:`cwltool` had the time to parse the definition made it
+    incorrectly resolve ``class: File``, which in turn, caused :class:`cwltool.pathmapper.PathMapper` to be missing
+    the mapped ``location`` of provided inputs, leading to full :term:`CWL` execution failure.
+
+    .. seealso::
+        - https://github.com/crim-ca/weaver/pull/546
+    """
+    io_copy = deepcopy(io_info)
+    io_res = get_cwl_io_type(io_info)
+    assert io_res == io_def
+    assert io_info == io_copy, "Argument I/O information should not be modified from parsing."
 
 
 def test_parse_cwl_array_type_explicit_invalid_item():
@@ -1471,8 +1951,12 @@ def test_ogcapi2cwl_process_without_extra():
             "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
         },
         "outputs": {
-            "output": {"type": "File", "format": "ogc:geotiff",
-                       "outputBinding": {"glob": "output/*.tiff"}},
+            "output": {
+                "type": "File", "format": "ogc:geotiff",
+                "outputBinding": {
+                    "glob": "*.tiff"  # "output/*.tiff" only during Workflow step execution
+                }
+            },
         },
         "$namespaces": cwl_ns
     }
@@ -1480,3 +1964,439 @@ def test_ogcapi2cwl_process_without_extra():
     body["executionUnit"] = [{"unit": cwl}]
     body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     assert info == body, "Process information should be updated with minimal details since no CWL detected in input."
+
+
+@pytest.mark.parametrize(
+    ["input_str", "input_int", "input_float"],
+    [
+        # OpenAPI schema references
+        (
+            {"schema": {"type": "string", "enum": ["a", "b", "c"]}},
+            {"schema": {"type": "integer", "enum": [1, 2, 3]}},
+            {"schema": {"type": "number", "format": "float", "enum": [1.2, 3.4]}},
+        ),
+        # OGC-API input definitions
+        (
+            {"data_type": "string", "allowed_values": ["a", "b", "c"]},
+            {"data_type": "integer", "allowed_values": [1, 2, 3]},
+            {"data_type": "float", "allowed_values": [1.2, 3.4]},
+        ),
+    ]
+)
+def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
+    """
+    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+
+    .. seealso::
+        - :func:`test_any2cwl_io_enum_convert`
+        - :func:`test_any2cwl_io_enum_validate`
+    """
+    href = "https://remote-server.com/processes/test-process"
+    body = {
+        "inputs": {
+            "enum-str": input_str,
+            "enum-int": input_int,
+            "enum-float": input_float,
+        },
+        "outputs": {
+            "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
+        }
+    }
+    cwl, info = ogcapi2cwl_process(body, href)
+    assert info is not body, "copy should be created, not inplace modifications"
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_OGC_API: {"process": href}}
+
+    assert cwl["inputs"]["enum-str"]["type"] == {"type": "enum", "symbols": ["a", "b", "c"]}
+    assert "inputBinding" not in cwl["inputs"]["enum-str"]
+
+    assert cwl["inputs"]["enum-int"]["type"] == "int"
+    assert "symbols" not in cwl["inputs"]["enum-int"]
+    cwl_value_from = cwl["inputs"]["enum-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1, 2, 3]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl["inputs"]["enum-float"]["type"] == "float"
+    assert "symbols" not in cwl["inputs"]["enum-float"]
+    cwl_value_from = cwl["inputs"]["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+
+@mocked_remote_server_requests_wps1([
+    resources.TEST_REMOTE_SERVER_URL,
+    resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+    [resources.WPS_LITERAL_ENUM_IO_XML]
+])
+def test_xml_wps2cwl_enum_updated():
+    """
+    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+
+    .. seealso::
+        - :func:`test_any2cwl_io_enum_convert`
+        - :func:`test_any2cwl_io_enum_validate`
+    """
+    prov = resources.TEST_REMOTE_SERVER_URL
+    href = f"{prov}?service=WPS&version=1.0.0&request=DescribeProcess&identifier={resources.WPS_LITERAL_ENUM_IO_ID}"
+    body = resources.load_resource("wps_literal_enum_io.xml")
+    resp = MockedResponse()
+    resp.url = href
+    resp.content = body
+    cwl, _ = xml_wps2cwl(resp, {})  # type: ignore
+    cwl_inputs = {cwl_io["id"]: cwl_io for cwl_io in cwl["inputs"]}
+
+    assert cwl["requirements"] == {CWL_REQUIREMENT_INLINE_JAVASCRIPT: {}}
+    assert cwl["hints"] == {CWL_REQUIREMENT_APP_WPS1: {"provider": prov, "process": resources.WPS_LITERAL_ENUM_IO_ID}}
+
+    assert cwl_inputs["enum-str"]["type"] == [
+        "null",
+        {"type": "enum", "symbols": ["A", "B", "C"]}
+    ]
+    assert "inputBinding" not in cwl_inputs["enum-str"]
+
+    assert cwl_inputs["enum-array-str"]["type"] == {
+        "type": "array",
+        "items": {"type": "enum", "symbols": ["A", "B", "C"]}
+    }
+    assert "inputBinding" not in cwl_inputs["enum-array-str"]
+
+    assert cwl_inputs["enum-int"]["type"] == ["null", "int"]
+    assert "symbols" not in cwl_inputs["enum-int"]
+    cwl_value_from = cwl_inputs["enum-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1, 2, 3]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl_inputs["enum-array-int"]["type"] == {"type": "array", "items": "int"}
+    assert "symbols" not in cwl_inputs["enum-array-int"]
+    cwl_value_from = cwl_inputs["enum-array-int"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1, 2, 3]" in cwl_value_from
+    assert "values.includes(self)" not in cwl_value_from
+    assert "self.every(item => values.includes(item))" in cwl_value_from
+
+    assert cwl_inputs["enum-float"]["type"] == "float"
+    assert "symbols" not in cwl_inputs["enum-float"]
+    cwl_value_from = cwl_inputs["enum-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4, 5.6]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl_inputs["enum-array-float"]["type"] == ["null", "float", {"type": "array", "items": "float"}]
+    assert "symbols" not in cwl_inputs["enum-array-float"]
+    cwl_value_from = cwl_inputs["enum-array-float"]["inputBinding"]["valueFrom"].strip()
+    assert cwl_value_from.startswith("${") and cwl_value_from.endswith("}")
+    assert "[1.2, 3.4, 5.6]" in cwl_value_from
+    assert "values.includes(self)" in cwl_value_from
+    assert "self.every(item => values.includes(item))" in cwl_value_from
+
+
+@pytest.mark.parametrize(
+    ["io_schema", "io_expected"],
+    [
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {"type": "string"},  # generic representation, will not convert units
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+            }
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "default": "m",
+                    },
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uom": {"uom": "m", "reference": ""}
+            }
+        ),
+        (
+            {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                    "type": "object",
+                    "required": ["measurement", "uom"],
+                    "properties": {
+                        "measurement": {"type": "number"},
+                        "uom": {"type": "string"},  # generic representation, will not convert units
+                        "reference": {"type": "string", "format": "uri"},
+                    }
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "minOccurs": 2,
+            }
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {"type": "string", "const": "m"},  # specific unit, auto-convert unit/values
+                    "reference": {"type": "string", "format": "uri"},
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uoms": [{"uom": "m", "reference": ""}],
+            }
+        ),
+        (
+            {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                    "type": "object",
+                    "required": ["measurement", "uom"],
+                    "properties": {
+                        "measurement": {"type": "number"},
+                        "uom": {"type": "string", "enum": ["s", "h"]},  # specific unit, auto-convert unit/values
+                        "reference": {"type": "string", "format": "uri"},
+                    }
+                }
+            },
+            {
+                "data_type": "float",
+                "type": "literal",
+                "uoms": [{"uom": "s", "reference": ""}, {"uom": "h", "reference": ""}],
+                "minOccurs": 2,
+            }
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": ["random"],  # unknown unit
+                    },
+                }
+            },
+            pint.PintError,
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": [],  # bad
+                    },
+                }
+            },
+            ValueError,
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["measurement", "uom"],
+                "properties": {
+                    "measurement": {"type": "number"},
+                    "uom": {
+                        "type": "string",
+                        "enum": ["m"],
+                    },
+                    "reference": {
+                        "type": "string",
+                        "enum": ["", "", ""],  # bad, must match UoM amount
+                    },
+                }
+            },
+            ValueError,
+        )
+    ]
+)
+def test_oas2json_io_convert_literal_uom_definition(io_schema, io_expected):
+    try:
+        io_result = oas2json_io(io_schema)
+    except Exception as exc:
+        if isinstance(io_expected, type) and issubclass(io_expected, Exception):
+            assert isinstance(exc, io_expected)
+        else:
+            pytest.fail(f"Exception not expected: [{exc}]")
+    else:
+        if isinstance(io_expected, type) and issubclass(io_expected, Exception):
+            pytest.fail(f"Expected [{io_expected}] did not raise.")
+        assert io_result == io_expected
+
+
+@pytest.mark.parametrize(
+    ["uoms", "expect"],
+    [
+        (
+            [UOM("m"), {"uom": "km"}, {"uom": "ft"}],
+            [UOM("m"), UOM("km"), UOM("ft")],
+        ),
+        (
+            [UOM("m"), None],
+            null,
+        ),
+        (
+            [UOM("m"), {}],
+            null,
+        ),
+        (
+            [UOM("m"), "random"],
+            null,
+        ),
+        (
+            [],
+            null,
+        ),
+        (
+            {},
+            null,
+        ),
+    ]
+)
+def test_json2wps_supported_uoms(uoms, expect):
+    data = {"uoms": uoms}
+    result = json2wps_supported_uoms(data)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["ows_io", "json_io"],
+    [
+        (
+            {
+                "identifier": "test",
+                "type": "float",
+                "data_type": "float",
+                "uoms": [{"uom": "m", "reference": ""}, {"uom": "ft", "reference": ""}],
+                "uom": {"uom": "m", "reference": "urn:ogc:def:uom:OGC:1.0:metre"},
+            },
+            {
+                "id": "test",
+                "literalDataDomains": [
+                    {
+                        "default": True,
+                        "valueDefinition": {"anyValue": False},
+                        "dataType": {"name": "float"},
+                        "UOMs": {
+                            "default": {"uom": "m", "reference": "urn:ogc:def:uom:OGC:1.0:metre"},
+                            "supported": [{"uom": "m", "reference": ""}, {"uom": "ft", "reference": ""}],
+                        },
+                    }
+                ],
+            },
+        )
+    ]
+)
+def test_ows2json_io_convert_literal_uom(ows_io, json_io):
+    result = ows2json_io(ows_io)  # type: ignore
+    for key in ows_io:  # avoid copying everything to make test definitions easier
+        result.pop(key, None)
+    assert result == json_io
+
+
+@pytest.mark.parametrize(
+    ["value", "dtype", "ctype", "expect"],
+    [
+        # note: OWSLib encodes literal data as array of string since parsed from XML
+        (
+            [123456],
+            "integer",
+            None,
+            {"data": 123456, "dataType": "integer"},
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("EPSG:4326"))],  # auto-resolve axis order YX
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": "urn:ogc:def:crs:EPSG::4326",
+                    "bbox": [2., 1., 4., 3.],
+                    "format": OGC_API_BBOX_FORMAT,
+                    "schema": OGC_API_BBOX_SCHEMA,
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("CRS:84"))],  # auto-resolve axis order XY
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": "urn:ogc:def:crs:CRS::84",
+                    "bbox": [1., 2., 3., 4.],
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs("custom", axisorder="xy"))],
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {"dataType": WPS_BOUNDINGBOX_DATA, "data": {"crs": "urn:ogc:def:crs:::-1", "bbox": [1., 2., 3., 4.]}},
+        ),
+        (
+            ["random"],
+            WPS_COMPLEX_DATA,
+            "text/plain",
+            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": "text/plain"},
+        ),
+        (
+            [1, 2, 3],
+            WPS_COMPLEX_DATA,
+            "application/json",
+            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": "application/json"},
+        ),
+    ]
+)
+def test_ows2json_output_data(value, dtype, ctype, expect):
+    output = OWSOutput(MockElementXML({}))  # skip parsing from XML, inject corresponding results directly
+    output.identifier = "test"
+    output.title = "TEST"
+    output.dataType = dtype
+    output.data = value
+    if ctype:
+        output.mimeType = ctype
+    result = ows2json_output_data(output, None, {})  # type: ignore
+    expect.update({"identifier": "test", "title": "TEST"})
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["value", "uom", "to", "expected"],
+    [
+        (9.81, "m/s²", "km/min²", 35.316)
+    ]
+)
+def test_convert_value_units_literal_uom(value, uom, to, expected):
+    assert convert_value_units(value, uom, to) == expected

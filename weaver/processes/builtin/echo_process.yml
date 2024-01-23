@@ -1,0 +1,289 @@
+# additional process description details
+# based on: https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/core/examples/json/ProcessDescription.json
+# NOTE:
+#   Official schema is broken. See:
+#   - https://github.com/opengeospatial/ogcapi-processes/issues/370
+#   - https://github.com/opengeospatial/ogcapi-processes/pull/371
+# $schema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/process.yaml"
+# Alternate schema that works:
+$schema: "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/schemas/processes-core/process.yaml"
+$id: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json"
+id: EchoProcess  # name to use for deployment
+version: "1.0.0"
+inputs:
+  stringInput:
+    schema:
+      type: string
+      enum:
+        - Value1
+        - Value2
+        - Value3
+  measureInput:
+    title: Numerical Value with UOM Example
+    description: This is an example of a NUMERIC literal with an associated unit of measure.
+    schema:
+      type: object
+      required:
+      - measurement
+      - uom
+      properties:
+        measurement:
+          type: number
+        uom:
+          type: string
+          # Following 'enum' requirement is not part of the original OGC EchoProcess definition.
+          # However, without this, the resolved input would only be considered as any plain Literal Value.
+          # To validate that Weaver understands and interprets this structure with additional context using UoMs,
+          # we add the applicable units for validation. These references should propagate all the way to the
+          # corresponding 'supported UoM' that can be defined in WPS I/O literalDataDomains.
+          enum:
+            - "m/s²"
+            - "km/min²"
+        reference:
+          type: string
+          format: uri
+  dateInput:
+    title: Date Literal Input Example
+    description: This is an example of a DATE literal input.
+    schema:
+      type: string
+      format: date-time
+  doubleInput:
+    title: Bounded Double Literal Input Example
+    description: |
+      This is an example of a DOUBLE literal input that is bounded between
+      a value greater than 0 and 10.  The default value is 5.
+    schema:
+      type: number
+      format: double
+    literalDataDomains:
+    - minimum: 0
+      maximum: 10
+      exclusive_min: true
+      default: 5
+  arrayInput:
+    title: Array Input Example
+    description: |
+      This is an example of a single process input that is an array of values.
+      In this case, the input array would be interpreted as a single value
+      and not as individual inputs.
+    schema:
+      type: array
+      items:
+        type: integer
+    minOccurs: 2
+    maxOccurs: 10
+  complexObjectInput:
+    title: Complex Object Input Example
+    description: This is an example of a complex object input.
+    schema:
+      type: object
+      required:
+      - property1
+      - property5
+      properties:
+        property1:
+          type: string
+        property2:
+          type: string
+          format: uri
+        property3:
+          type: number
+        property4:
+          type: string
+          format: date-time
+        property5:
+          type: boolean
+  geometryInput:
+    title: Geometry input
+    description: |
+      This is an example of a geometry input.
+      In this case the geometry can be expressed as a GML of GeoJSON geometry.
+    minOccurs: 2
+    maxOccurs: 5
+    schema:
+      oneOf:
+      - type: string
+        contentMediaType: application/gml+xml; version=3.2
+        contentSchema: https://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
+      - allOf:
+        - format: geojson-geometry
+        - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+      # following are extended from the original OGC EchoProcess, with two compatible variants of 'GeoJSON'
+      # only distinction is the media-type and type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/GeoJSON.json
+      - type: string
+        contentMediaType: application/json
+        contentSchema: https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+  boundingBoxInput:
+    title: Bounding Box Input Example
+    description: |
+      This is an example of an image input.
+      In this case, the input is an array of up to 150 images that might,
+      for example, be a set of tiles.  The oneOf[] conditional is used to
+      indicate the acceptable image content types; GeoTIFF and JPEG 2000 in
+      this case.  Each input image in the input array can be included inline
+      in the execute request as a base64-encoded string or referenced using
+      the link.yaml schema.  The use of a base64-encoded string is implied by
+      the specification and does not need to be specified in the definition 
+      of the input.
+    schema:
+      type: string
+      format: ogc-bbox
+      contentSchema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
+  imagesInput:
+    title: Inline Images Value Input
+    description: |
+      This is an example of an image input.  In this case, the input is
+      an array of up to 150 images that might, for example, be a set of tiles.  The
+      oneOf[] conditional is used to indicate the acceptable image content types;
+      GeoTIFF and JPEG 2000 in this case.  Each input image in the input array can
+      be included inline in the execute request as a base64-encoded string or referenced
+      using the link.yaml schema.  The use of a base64-encoded string is implied by
+      the specification and does not need to be specified in the definition of the
+      input.
+    minOccurs: 1
+    maxOccurs: 150
+    schema:
+      oneOf:
+      - type: string
+        contentEncoding: base64
+        contentMediaType: image/tiff; application=geotiff
+      - type: string
+        contentEncoding: base64
+        contentMediaType: image/jp2
+  featureCollectionInput:
+    title: Feature Collection Input Example
+    description: |
+      This is an example of an input that is a feature collection that
+      can be encoded in one of three ways. As a GeoJSON feature collection, 
+      as a GML feature collection retrieved from a WFS or as a KML document.
+    schema:
+      oneOf:
+      - type: string
+        contentMediaType: application/gml+xml; version=3.2
+      - type: string
+        contentSchema: https://schemas.opengis.net/kml/2.3/ogckml23.xsd
+        contentMediaType: application/vnd.google-earth.kml+xml
+      - allOf:
+        - format: geojson-feature-collection
+        - $ref: https://geojson.org/schema/FeatureCollection.json
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the expected media-type to represent GeoJSON
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/FeatureCollection.json
+outputs:
+  stringOutput:
+    schema:
+      type: string
+      enum:
+      - Value1
+      - Value2
+      - Value3
+  measureOutput:
+    schema:
+      type: object
+      required:
+      - measurement
+      - uom
+      properties:
+        measurement:
+          type: number
+        uom:
+          type: string
+          # see corresponding "measureInput" for details
+          enum:
+            - "m/s²"
+            - "km/min²"
+        reference:
+          type: string
+          format: uri
+  dateOutput:
+    schema:
+      type: string
+      format: date-time
+  doubleOutput:
+    schema:
+      type: number
+      format: double
+  arrayOutput:
+    schema:
+      type: array
+      items:
+        type: integer
+      minItems: 2
+      maxItems: 10
+  complexObjectOutput:
+    schema:
+      type: object
+      required:
+      - property1
+      - property5
+      properties:
+        property1:
+          type: string
+        property2:
+          type: string
+          format: uri
+        property3:
+          type: number
+        property4:
+          type: string
+          format: date-time
+        property5:
+          type: boolean
+  geometryOutput:
+    schema:
+      oneOf:
+      - type: string
+        contentMediaType: application/gml+xml
+        contentSchema: http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd
+      - allOf:
+        - format: geojson-geometry
+        - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the media-type for OGC-specific 'GeoJSON' (FeatureCollection -> GeometryCollection)
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/GeoJSON.json
+      - type: string
+        contentMediaType: application/json
+        contentSchema: https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+  boundingBoxOutput:
+    schema:
+      oneOf:
+        - allOf:
+            - format: "ogc-bbox"
+              # use a static reference here instead of the repository reference that can change on commit
+            - $ref: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
+        - type: string
+          format: ogc-bbox
+          contentSchema: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml"
+  imagesOutput:
+    schema:
+      oneOf:
+      - type: string
+        contentEncoding: base64
+        contentMediaType: image/tiff; application=geotiff
+      - type: string
+        contentEncoding: base64
+        contentMediaType: image/jp2
+  featureCollectionOutput:
+    schema:
+      oneOf:
+      - type: string
+        contentMediaType: application/gml+xml; version=3.2
+      - type: string
+        contentMediaType: application/vnd.google-earth.kml+xml
+        contentSchema: https://schemas.opengis.net/kml/2.3/ogckml23.xsd
+      - allOf:
+        - format: geojson-feature-collection
+        - $ref: https://geojson.org/schema/FeatureCollection.json
+      # following is extended from the original OGC EchoProcess
+      # it corresponds to the expected media-type to represent GeoJSON
+      - type: string
+        contentMediaType: application/geo+json
+        contentSchema: https://geojson.org/schema/FeatureCollection.json

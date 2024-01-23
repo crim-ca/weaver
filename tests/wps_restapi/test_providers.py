@@ -204,8 +204,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert unresponsive_id in resp.json["description"]
         err_msg = "Expected service to have trouble retrieving metadata, error: {} not in {}"
         # different errors/causes are raised first based on requests version, but same issue
-        known_causes = ["Connection refused", "Connection aborted", "not accessible"]
-        known_errors = ["ConnectionError", "ConnectTimeout", "SSLError"]
+        known_causes = ["Connection refused", "Connection aborted", "not accessible", "Unable to process"]
+        known_errors = ["ConnectionError", "ConnectTimeout", "ReadTimeout", "SSLError", "ServiceParsingError"]
         resp_cause = resp.json["cause"]
         resp_error = resp.json["error"]
         assert any(err_cause in resp_cause for err_cause in known_causes), err_msg.format(resp_cause, known_causes)
@@ -623,6 +623,35 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         inputs = resp.json["process"]["inputs"]
         assert "maximumMegabytes" in inputs[11]["formats"][0]
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
+
+
+class WpsShortNameProviderTest(WpsProviderBase):
+    remote_provider_name = "x"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.configuration": WeaverConfiguration.HYBRID
+    }
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        {"y": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML},
+    ])
+    def test_get_provider_process_description_short_names(self):
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == self.remote_provider_name
+
+        path = f"/providers/{self.remote_provider_name}/processes/y"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == "y"
 
 
 class WpsProviderLocalOnlyTest(WpsProviderBase):

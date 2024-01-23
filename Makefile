@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 4.30.0
+APP_VERSION ?= 5.0.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -37,7 +37,7 @@ else
   else
     CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
   endif
-  CONDA_BIN := $(CONDA_BIN_DIR)/conda
+  CONDA_BIN ?= $(CONDA_BIN_DIR)/conda
   CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
   CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 
@@ -281,7 +281,7 @@ install-npm:    ## install npm package manager and dependencies if they cannot b
 install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
 	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
-		npm install stylelint stylelint-config-standard --save-dev \
+		npm install "stylelint@<16" "stylelint-config-standard@<35" --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
@@ -802,6 +802,7 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
@@ -811,6 +812,7 @@ docker-test: docker-build stop	## execute smoke test of the built images (valida
 	@curl localhost:4001 | grep "Weaver Information" || \
 		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	docker-compose $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
 	docker-compose $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat
@@ -848,3 +850,7 @@ stop: 		## kill application instance(s) started with gunicorn (pserve)
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
+
+# Reapply config if overrides were defined.
+# Ensure overrides take precedence over targets and auto-resolution logic of variables.
+-include Makefile.config

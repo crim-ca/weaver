@@ -1,5 +1,5 @@
 # pylint: disable=C0103,invalid-name
-
+import base64
 import contextlib
 import inspect
 import io
@@ -30,9 +30,11 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPOk
 )
+from pyramid.request import Request as PyramidRequest
 from pywps.response.status import WPS_STATUS
 from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
+from werkzeug import Request as WerkzeugRequest
 
 from tests.utils import (
     MOCK_AWS_REGION,
@@ -45,7 +47,7 @@ from tests.utils import (
 )
 from weaver import xml_util
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import ContentType, repr_json
+from weaver.formats import ContentEncoding, ContentType, repr_json
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
     AWS_S3_BUCKET_REFERENCE_PATTERN,
@@ -58,15 +60,18 @@ from weaver.utils import (
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    create_metalink,
     fetch_directory,
     fetch_file,
     get_any_value,
     get_base_url,
     get_path_kvp,
+    get_request_args,
     get_request_options,
     get_sane_name,
     get_secure_directory_name,
     get_secure_filename,
+    get_secure_path,
     get_ssl_verify_option,
     get_url_without_query,
     is_update_version,
@@ -481,6 +486,45 @@ def test_bytes2str():
     assert bytes2str(u"test-unicode") == u"test-unicode"
 
 
+class PseudoRequest(object):
+    query_string = ""
+
+    def __init__(self, *_):
+        ...
+
+
+class BadQueryStringTypeRequest(PseudoRequest):
+    @property
+    def args(self):
+        raise AttributeError
+
+    @property
+    def params(self):
+        raise AttributeError
+
+
+@pytest.mark.parametrize(
+    ["request_cls", "converter", "query_string_expect_params"],
+    itertools.product(
+        [PyramidRequest, WerkzeugRequest, PseudoRequest, BadQueryStringTypeRequest],
+        [str, str2bytes],
+        [
+            ("", {}),
+            ("param=", {"param": ""}),
+            ("param=value", {"param": "value"}),
+            ("param=val1,val2", {"param": "val1,val2"}),
+            ("param1=val1,val2&param2=val3", {"param1": "val1,val2", "param2": "val3"}),
+        ]
+    )
+)
+def test_get_request_args(request_cls, converter, query_string_expect_params):
+    query_string, expect_params = query_string_expect_params
+    request = request_cls({})
+    request.query_string = converter(query_string)
+    result = get_request_args(request)
+    assert dict(result) == expect_params
+
+
 def test_get_ssl_verify_option():
     assert get_ssl_verify_option("get", "http://test.com", {}) is True
     assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": False}) is False
@@ -647,7 +691,7 @@ def test_request_extra_zero_values():
 
     # since backoff factor multiplies all incrementally increasing delays between requests,
     # proper detection of input backoff=0 makes all sleep calls equal to zero
-    assert all(backoff == 0 for backoff in sleep_counter["called_with"])
+    assert all([backoff == 0 for backoff in sleep_counter["called_with"]])
     assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep from retry
 
 
@@ -803,6 +847,20 @@ def test_get_secure_directory_name_uuid():
     with mock.patch("uuid.uuid4", side_effect=mock_uuid):
         result = get_secure_directory_name(invalid_location)
         assert result == fake_uuid
+
+
+@pytest.mark.parametrize(
+    ["test_path", "expect_path"],
+    [
+        ("/tmp/././/../.././test.txt", "/tmp/test.txt"),
+        ("./../../../../../tmp/test.txt", "tmp/test.txt"),
+        ("file://./../../../../../tmp/test.txt", "file://tmp/test.txt"),
+    ]
+)
+def test_get_secure_path(test_path, expect_path):
+    # type: (str, str) -> None
+    result = get_secure_path(test_path)
+    assert result == expect_path
 
 
 @pytest.mark.parametrize(
@@ -2130,3 +2188,102 @@ def test_retry_on_condition(errors, raises, conditions, retries):
 
     run_test()
     run_test(1, keyword="test")
+
+
+def test_create_metalink():
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        tmp_out = stack.enter_context(tempfile.TemporaryDirectory())
+
+        tmp_file1 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a", suffix=".json"))
+        tmp_file2 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a+b", suffix=".tif"))
+        tmp_file3 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a", suffix=".txt"))
+        tmp_href3 = f"file://{tmp_file3.name}"
+        tmp_file4 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a+b", suffix=".tar.gz"))
+        tmp_href4 = f"{tmp_host}/{os.path.basename(tmp_file4.name)}"
+        tmp_file5 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a", suffix=".xml"))
+        tmp_href5 = f"{tmp_host}/{os.path.basename(tmp_file5.name)}"
+        tmp_file6 = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="a", suffix=".txt"))
+        tmp_href6 = f"{tmp_host}/{os.path.basename(tmp_file6.name)}"
+
+        # purposely use different content sizes and formats to validate their resolution
+        tmp_data1 = json.dumps({"test": "data", "info": [1, 2, 3]})
+        tmp_file1.write(tmp_data1)
+        tmp_file1.flush()
+        tmp_file1.seek(0)
+        tmp_data2 = base64.b64encode(b"255 128 64")
+        tmp_file2.write(tmp_data2)
+        tmp_file2.flush()
+        tmp_file2.seek(0)
+        tmp_data3 = "abcdef"
+        tmp_file3.write(tmp_data3)
+        tmp_file3.flush()
+        tmp_file3.seek(0)
+        tmp_data4 = base64.b64encode(b"TEST")
+        tmp_file4.write(tmp_data4)
+        tmp_file4.flush()
+        tmp_file4.seek(0)
+        tmp_data5 = "<xml>test</xml>"
+        tmp_file5.write(tmp_data5)
+        tmp_file5.flush()
+        tmp_file5.seek(0)
+        tmp_data6 = "locally available remote file"
+        tmp_file6.write(tmp_data6)
+        tmp_file6.flush()
+        tmp_file6.seek(0)
+
+        test_data = [
+            tmp_data1,
+            tmp_data2,
+            tmp_data3,
+            tmp_data4,
+            tmp_data5,
+            tmp_data6,
+        ]
+        # validate different resolution strategies according to which references are available
+        meta_files = [
+            {"href": tmp_file1.name, "type": ContentType.APP_JSON},
+            {"href": tmp_file2.name, "type": ContentType.IMAGE_GEOTIFF, "encoding": ContentEncoding.BASE64},
+            {"href": tmp_href3, "type": ContentType.TEXT_PLAIN},
+            {"href": tmp_href4, "type": ContentType.APP_TAR_GZ, "encoding": ContentEncoding.BASE64},
+            {"href": tmp_href5, "type": ContentType.APP_XML},
+            {"href": tmp_href6, "type": ContentType.TEXT_PLAIN, "file": tmp_file6.name},
+        ]
+
+        req_mock = responses.RequestsMock(assert_all_requests_are_fired=False)
+        stack.enter_context(mocked_file_server(
+            tmp_dir, tmp_host,
+            settings={},
+            requests_mock=req_mock,
+        ))
+
+        # note:
+        #   unfortunately, metalink specification does not define 'encoding'
+        #   therefore, they will be missing from the generated references even if we provided them
+        #   however, prefer V4 as it at least defines 'mediaType', which V3 does not include
+        meta_link = create_metalink(meta_files, version=4, name="test", workdir=tmp_out)
+
+        assert meta_link.identity == "test"
+
+        meta_xml = meta_link.xml
+        assert "version=\"3\"" not in meta_xml
+
+        meta_lines = [line.strip() for line in meta_xml.splitlines()]
+        for file, data in zip(meta_files, test_data):
+            size = len(data)
+            href = file["href"]
+            href = f"file://{href}" if href.startswith("/") else href
+            ctype = file["type"]
+            size_line = f"<size>{size}</size>"
+            href_line = f"<metaurl mediatype=\"{ctype}\">{href}</metaurl>"
+            assert href_line in meta_lines
+            line_index = meta_lines.index(href_line)
+            assert meta_lines[line_index - 1] == size_line
+
+        assert len(req_mock.calls) == 2, (
+            "Only HTTP references should have been fetched for content-size resolution. "
+            "Local files or HTTP with a resolvable local file should have been used directly."
+        )
+        assert req_mock.calls[0].request.url == tmp_href4
+        assert req_mock.calls[1].request.url == tmp_href5

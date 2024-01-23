@@ -1,16 +1,12 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
-# FIXME:
-#  replace invalid 'Optional' (type or None) used instead of 'NotRequired' (optional key) when better supported
-#  https://youtrack.jetbrains.com/issue/PY-53611/Support-PEP-655-typingRequiredtypingNotRequired-for-TypedDicts
 if TYPE_CHECKING:
     import os
     import sys
-    import typing
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
@@ -61,15 +57,17 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from webob.acceptparse import AcceptLanguageInvalidHeader, AcceptLanguageNoHeader, AcceptLanguageValidHeader
     from webob.headers import EnvironHeaders, ResponseHeaders
+    from webob.multidict import MultiDict as PyramidMultiDict
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
+    from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
-    from weaver.status import AnyStatusType
+    from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
     Path = Union[os.PathLike, str, bytes]
@@ -146,7 +144,7 @@ if TYPE_CHECKING:
         "type": CWL_IO_ArrayBaseType,
         "items": Union[str, CWL_IO_EnumType],  # "items" => type of every item
     })
-    CWL_IO_TypeItem = Union[str, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
+    CWL_IO_TypeItem = Union[CWL_IO_BaseType, CWL_IO_NestedType, CWL_IO_ArrayType, CWL_IO_EnumType]
     CWL_IO_DataType = Union[CWL_IO_TypeItem, List[CWL_IO_TypeItem]]
     CWL_Input_Type = TypedDict("CWL_Input_Type", {
         "id": NotRequired[str],     # representation used by plain CWL definition
@@ -167,6 +165,13 @@ if TYPE_CHECKING:
     }, total=False)
     CWL_Inputs = Union[List[CWL_Input_Type], Dict[str, CWL_Input_Type]]
     CWL_Outputs = Union[List[CWL_Output_Type], Dict[str, CWL_Output_Type]]
+    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
+
+    class CWL_SchemaName(Protocol):
+        name: str
+        _props: CWL_IO_Type
+
+    CWL_SchemaNames = Dict[str, CWL_SchemaName]
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {
@@ -272,10 +277,16 @@ if TYPE_CHECKING:
         "size": NotRequired[Literal[0]],
         "listing": List[CWL_RuntimeOutputFile],
     }, total=False)
-    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]
+    CWL_RuntimeInputFileItem = Union[CWL_RuntimeInputFile, List[CWL_RuntimeInputFile]]
+    CWL_RuntimeInputDirectoryItem = Union[CWL_RuntimeInputDirectory, List[CWL_RuntimeInputDirectory]]
+    CWL_RuntimeInput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
     CWL_RuntimeInputsMap = Dict[str, CWL_RuntimeInput]
-    CWL_RuntimeInputList = List[Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFile, CWL_RuntimeInputDirectory]]
-    CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile, CWL_RuntimeOutputDirectory]
+    CWL_RuntimeInputList = List[
+        Union[CWL_RuntimeLiteralObject, CWL_RuntimeInputFileItem, CWL_RuntimeInputDirectoryItem]
+    ]
+    CWL_RuntimeOutputFileItem = Union[CWL_RuntimeOutputFile, List[CWL_RuntimeOutputFile]]
+    CWL_RuntimeOutputDirectoryItem = Union[CWL_RuntimeOutputDirectory, List[CWL_RuntimeOutputDirectory]]
+    CWL_RuntimeOutput = Union[CWL_RuntimeLiteralItem, CWL_RuntimeOutputFileItem, CWL_RuntimeOutputDirectoryItem]
     CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # CWL loading
@@ -293,8 +304,8 @@ if TYPE_CHECKING:
     # PyWPS Execution
     WPS_InputData = Tuple[str, AnyInputData]
     WPS_OutputAsRef = Tuple[str, Optional[bool]]                            # (output_id, as_ref)
-    WPS_OutputAsRefMimeType = Tuple[str, Optional[bool], Optional[str]]     # (output_id, as_ref, mime_type)
-    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMimeType]
+    WPS_OutputAsRefMediaType = Tuple[str, Optional[bool], Optional[str]]    # (output_id, as_ref, mime_type)
+    WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMediaType]
 
     KVP_Item = Union[ValueType, Sequence[ValueType]]
     KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
@@ -325,6 +336,7 @@ if TYPE_CHECKING:
         "head", "get", "post", "put", "patch", "delete",
     ]
     AnyRequestMethod = Union[RequestMethod, str]
+    AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
@@ -365,6 +377,10 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
+    JobValueBbox = TypedDict("JobValueBbox", {
+        "bbox": Required[List[Number]],
+        "crs": NotRequired[str],
+    })
     JobValueFormat = TypedDict("JobValueFormat", {
         "mime_type": NotRequired[str],
         "media_type": NotRequired[str],
@@ -376,19 +392,26 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
         "href": str,
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueData = TypedDict("JobValueData", {
-        "data": AnyValueType,
+        "data": Required[AnyValueType],
     }, total=False)
     JobValueValue = TypedDict("JobValueValue", {
-        "value": AnyValueType,
+        # qualified value allow any object (not list directly though)
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueValue, JobValueFile]
+    JobValueObject = Union[JobValueData, JobValueValue, JobValueBbox, JobValueFile]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
-        "format": NotRequired[JobValueFormat],
+        "format": NotRequired[JobValueFormat],  # old method
+        "type": NotRequired[str],               # ogc method
+        "encoding": NotRequired[str],
+        "schema": NotRequired[str],
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": Required[str],
@@ -396,9 +419,13 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueValueItem = TypedDict("JobValueValueItem", {
         "id": Required[str],
-        "value": Required[AnyValueType],
+        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueFileItem, JobValueValueItem]
+    JobValueBboxItem = TypedDict("JobValueBboxItem", {
+        "id": Required[str],
+        "value": Required[JobValueBbox],
+    }, total=False)
+    JobValueItem = Union[JobValueDataItem, JobValueValueItem, JobValueBboxItem, JobValueFileItem]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
     JobInputs = List[JobInputItem]
@@ -406,6 +433,14 @@ if TYPE_CHECKING:
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
     JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobSubscribers = TypedDict("JobSubscribers", {
+        "failedUri": NotRequired[str],
+        "successUri": NotRequired[str],
+        "inProgressUri": NotRequired[str],
+        "failedEmail": NotRequired[str],
+        "successEmail": NotRequired[str],
+        "inProgressEmail": NotRequired[str],
+    }, total=True)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
     ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
@@ -425,8 +460,10 @@ if TYPE_CHECKING:
     ExecutionOutputsMap = Dict[str, ExecutionOutputObject]
     ExecutionOutputs = Union[ExecutionOutputsList, ExecutionOutputsMap]
     ExecutionResultObjectRef = TypedDict("ExecutionResultObjectRef", {
-        "href": Optional[str],
+        "href": str,
         "type": NotRequired[str],
+        "title": NotRequired[str],
+        "rel": NotRequired[str],
     }, total=False)
     ExecutionResultObjectValue = TypedDict("ExecutionResultObjectValue", {
         "value": Optional[AnyValueType],
@@ -436,6 +473,10 @@ if TYPE_CHECKING:
     ExecutionResultArray = List[ExecutionResultObject]
     ExecutionResultValue = Union[ExecutionResultObject, ExecutionResultArray]
     ExecutionResults = Dict[str, ExecutionResultValue]
+    ExecutionSubscribers = TypedDict("ExecutionSubscribers", {
+        "emails": NotRequired[Dict[StatusType, str]],
+        "callbacks": NotRequired[Dict[StatusType, str]],
+    }, total=True)
 
     # reference employed as 'JobMonitorReference' by 'WPS1Process'
     JobExecution = TypedDict("JobExecution", {"execution": WPSExecution})
@@ -819,12 +860,17 @@ if TYPE_CHECKING:
     ProcessDescriptionListing = Union[ProcessOfferingListing, ProcessDescriptionNestedListing]
     ProcessDescription = Union[ProcessDescriptionMapping, ProcessDescriptionListing]
 
-    ExecutionUnitItem = TypedDict("ExecutionUnitItem", {
+    ExecutionUnitNested = TypedDict("ExecutionUnitNested", {
         "unit": CWL
     }, total=True)
+    ExecutionUnitItem = Union[CWL, ExecutionUnitNested, Link]
+    ExecutionUnit = Union[
+        ExecutionUnitItem,
+        List[ExecutionUnitItem],
+    ]
     ProcessDeployment = TypedDict("ProcessDeployment", {
         "processDescription": ProcessDescription,
-        "executionUnit": List[Union[ExecutionUnitItem, Link]],
+        "executionUnit": ExecutionUnit,
         "immediateDeployment": NotRequired[bool],
         "deploymentProfileName": str,
     }, total=True)
@@ -834,5 +880,6 @@ if TYPE_CHECKING:
         "response": NotRequired[AnyExecuteResponse],
         "inputs": NotRequired[ExecutionInputs],
         "outputs": NotRequired[ExecutionOutputs],
-        "notification_email": NotRequired[str],
+        "subscribers": NotRequired[JobSubscribers],
+        "notification_email": NotRequired[str],  # deprecated, backward-compatibility
     }, total=False)

@@ -20,6 +20,7 @@ from tests.utils import (
     setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
+    setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
 from weaver import xml_util
@@ -45,6 +46,7 @@ class WpsAppTest(unittest.TestCase):
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
         self.process_store = setup_mongodb_processstore(config)
+        self.job_store = setup_mongodb_jobstore(config)
         self.app = get_test_weaver_app(config=config, settings=settings)
 
         # add processes by database Process type
@@ -132,6 +134,22 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
+    def test_describeprocess_no_format_default_api_client(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Robot"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
+    def test_describeprocess_no_format_default_web_browser(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Mozilla/Test"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
     def test_execute_allowed_demo(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
@@ -145,6 +163,24 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain(f"PyWPS Process {HelloWPS.identifier}")
+
+    def test_execute_allowed_empty_string(self):
+        template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name="
+        params = template.format(HelloWPS.identifier)
+        url = self.make_url(params)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url)
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain(f"PyWPS Process {HelloWPS.identifier}")
+        loc = resp.xml.get("statusLocation")
+        job_id = loc.rsplit("/", 1)[-1].split(".", 1)[0]
+        job = self.job_store.fetch_by_id(job_id)
+        assert job.inputs[0]["data"] == ""
 
     def test_execute_deployed_with_visibility_allowed(self):
         headers = {"Accept": ContentType.APP_XML}

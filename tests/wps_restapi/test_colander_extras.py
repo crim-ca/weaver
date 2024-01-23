@@ -6,6 +6,7 @@ objects.
 """
 import copy
 import inspect
+import json
 from typing import TYPE_CHECKING
 
 import colander
@@ -14,7 +15,7 @@ import pytest
 from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import List, Tuple, Type, Union
+    from typing import List, Optional, Tuple, Type, Union
 
     from weaver.typedefs import JSON
 
@@ -108,12 +109,171 @@ def test_oneof_io_formats_deserialize_as_listing():
     assert result[2]["type"]["items"] == "string"
 
 
+@pytest.mark.parametrize(
+    ["missing", "value", "result"],
+    [
+        (colander.required, 1.2, 1.2),
+        (colander.required, "ok", "ok"),
+        (colander.required, "", colander.Invalid),
+        (colander.required, None, colander.Invalid),
+        (colander.required, True, colander.Invalid),
+        (colander.required, {}, colander.Invalid),
+        (colander.drop, 1.2, 1.2),
+        (colander.drop, "ok", "ok"),
+        (colander.drop, "", colander.drop),
+        (colander.drop, None, colander.drop),
+        (colander.drop, True, colander.drop),
+        (colander.drop, {}, colander.drop),
+    ]
+)
+def test_any_of_missing(missing, value, result):
+    class AnyOf(ce.AnyOfKeywordSchema):
+        _any_of = [
+            ce.ExtendedSchemaNode(ce.ExtendedString(allow_empty=False), name="string"),
+            ce.ExtendedSchemaNode(ce.ExtendedFloat(), name="number"),
+        ]
+
+    class Nested(ce.ExtendedMappingSchema):
+        data = AnyOf(missing=missing)
+
+    for data, schema, expect in [
+        (value, AnyOf(missing=missing), result),
+        ({"data": value}, Nested(), {} if result is colander.drop else {"data": result}),
+    ]:
+        if result is colander.Invalid:
+            with pytest.raises(colander.Invalid):
+                schema.deserialize(data)
+        else:
+            assert schema.deserialize(data) == expect
+
+
 def test_any_of_under_variable():
     key = "this-variable-key-does-not-matter"
     result = sd.CWLInputMap(name=__name__).deserialize({key: {"type": "float"}})
     assert isinstance(result, dict)
     assert key in result
     assert result[key] == {"type": "float"}
+
+
+def test_any_of_one_of_variable_error_nested_chain():
+    """
+    Validate a nested chain of oneOf, anyOf and variable schema nodes.
+
+    Ensures that the produced error has the expected reference details when schema validation fails for the input data.
+    """
+    # pre-validate that schema is still valid for this test (expected structure)
+    test_schema = sd.ExecuteInputValues(name="test_input")
+    one_of_item = "ExecuteInputMapValues"
+    any_of_item = "ExecuteInputMapAdditionalProperties"
+    var_item_key = "{input-id}"
+    var_item_obj = "ExecuteInputData"
+    nested_item = "ExecuteInputInlineOrRefData"
+    nested_sub_item = "ExecuteInputInlineValue"
+    assert test_schema._one_of
+    assert ce._get_node_name(test_schema._one_of[-1]) == one_of_item
+    assert test_schema._one_of[-1]._any_of
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0]) == any_of_item
+    assert test_schema._one_of[-1]._any_of[0].children
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0].children[0]) == f"{var_item_obj}<{var_item_key}>"
+    assert test_schema._one_of[-1]._any_of[0].children[0].variable
+    assert test_schema._one_of[-1]._any_of[0].children[0].title == var_item_obj
+    assert test_schema._one_of[-1]._any_of[0].children[0]._one_of
+    assert test_schema._one_of[-1]._any_of[0].children[0]._one_of[0]._one_of
+    assert ce._get_node_name(test_schema._one_of[-1]._any_of[0].children[0]._one_of[0]._one_of[0]) == nested_sub_item
+
+    # generate error from invalid schema
+    with pytest.raises(colander.Invalid) as error:
+        test_schema.deserialize({"some-key": [{"type": "invalid"}]})
+
+    # validate that provided information does not duplicate key references
+    invalid_info = error.value.asdict()
+    invalid_keys = list(invalid_info)
+    invalid_test = [
+        f"{one_of_item}.{one_of_item}",
+        f"{any_of_item}.{any_of_item}",
+        f"{var_item_obj}.{var_item_obj}",
+    ]
+    valid_expect_keys = [
+        f"{test_schema.name}.{one_of_item}.{any_of_item}.{var_item_obj}<{var_item_key}>.{nested_item}.{nested_sub_item}"
+    ]
+    test_cases = [
+        (test not in err_key, err_key, test)  # status: expected keys?
+        for test in invalid_test
+        for err_key in invalid_keys
+    ]
+    test_bad_keys = list(filter(lambda _: not _[0], test_cases))
+    assert all(test[0] for test in test_cases), json.dumps(test_bad_keys, indent=2)
+    assert all([
+        any(valid_key in partial_key for partial_key in invalid_keys)
+        for valid_key in valid_expect_keys
+    ]), json.dumps(invalid_keys, indent=2)
+
+
+def test_variable_error_nested_messages():
+    """
+    Validate that appropriate error messages for each combination of variable property schemas are reported.
+    """
+    class VarItem(ce.ExtendedMappingSchema):
+        num = ce.ExtendedSchemaNode(ce.ExtendedInteger())
+        val = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    class VarMap(ce.VariableMappingSchema):
+        var = VarItem(variable="{var}")
+
+    class NestedMap(ce.ExtendedMappingSchema):
+        obj = VarMap()
+
+    error_key_var = "VarItem<{var}>"
+    error_key_num = "VarItem<{var}>.num"
+    error_key_val = "VarItem<{var}>.val"
+    error_obj_key_var = "obj"
+    error_obj_key_num = "obj.VarItem<{var}>.num"
+    error_obj_key_val = "obj.VarItem<{var}>.val"
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": 123})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_var]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_var]
+    assert "\"123\" is not a mapping type" in error_info[error_key_var]
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": {"val": 123}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_num, error_key_val]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_num]
+    assert "Requirement not met under variable: {var}" in error_info[error_key_val]
+    assert "Missing value for required field without any default" in error_info[error_key_num]
+    assert "123 is not a string" in error_info[error_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        VarMap().deserialize({"random": {"num": 123}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_key_val], "Numeric field is valid, should not be in dict"
+    assert "Requirement not met under variable: {var}" in error_info[error_key_val]
+    assert "Missing value for required field without any default" in error_info[error_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_var]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_var]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {"random": {}}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_num, error_obj_key_val]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_num]
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_val]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_num]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_val]
+
+    with pytest.raises(colander.Invalid) as error:
+        NestedMap().deserialize({"obj": {"random": {"num": 123}}})
+    error_info = error.value.asdict()
+    assert list(error_info) == [error_obj_key_val], "Numeric field is valid, should not be in dict"
+    assert "Requirement not met under variable: {var}" in error_info[error_obj_key_val]
+    assert "Missing value for required field without any default" in error_info[error_obj_key_val]
 
 
 def test_oneof_variable_dict_or_list():
@@ -1027,3 +1187,201 @@ def test_media_type_pattern_invalid(test_value):
         pass
     else:
         pytest.fail(f"Expected valid format from [{sd.MediaType.__name__}] with: '{test_value}'")
+
+
+def test_invalid_multi_child_variable():
+    class VarMap(ce.ExtendedMappingSchema):
+        var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
+        var_2 = ce.ExtendedSchemaNode(colander.String(), variable="<var-2>")
+
+    with pytest.raises(colander.Invalid, match=".*ambiguous.*"):
+        VarMap().deserialize({"random": "abc"})
+
+
+def test_variable_not_additional_properties():
+    class VarMap(ce.StrictMappingSchema):
+        var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
+
+    err = (
+        r".*ExtendedSchemaNode<<var-1>>\(other\)"
+        r".*Unknown properties or invalid additional property schema in mapping"
+        r".*1 is not a string.*"
+    ).replace(" ", r"[\s\"']+")  # must add some extra handling because of colander formatting by max-width
+    with pytest.raises(colander.Invalid, match=err):
+        VarMap().deserialize({"random": "abc", "other": 1})
+
+
+def test_media_type_pattern():
+    test_schema = sd.MediaType
+    test_cases = [
+        "application/atom+xml",
+        "application/EDI-X12",
+        "application/xml-dtd",
+        "application/zip",
+        "application/vnd.api+json",
+        "application/json; indent=4",
+        "video/mp4",
+        "plain/text;charset=UTF-8",
+        "plain/text; charset=UTF-8",
+        "plain/text;    charset=UTF-8",
+        "plain/text; charset=UTF-8; boundary=10"
+    ]
+    for test_value in test_cases:
+        assert test_schema().deserialize(test_value) == test_value
+    test_cases = [
+        "random",
+        "bad\\value",
+        "; missing=type"
+    ]
+    for test_value in test_cases:
+        try:
+            test_schema().deserialize(test_value)
+        except colander.Invalid:
+            pass
+        else:
+            pytest.fail(f"Expected valid format from [{test_schema.__name__}] with: '{test_value}'")
+
+
+@pytest.mark.parametrize(
+    [
+        "schema",
+        "schema_include",
+        "schema_include_deserialize",
+        "schema_include_convert_type",
+        "schema_expected_deserialize",
+        "schema_expected_convert_type",
+        "schema_meta",
+        "schema_meta_include",
+        "schema_meta_include_convert_type",
+        "schema_meta_expected_convert_type",
+    ],
+    [
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", False, True, True, None, None,
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            "https://json-schema.com#", False, True, None,
+        ),
+        (
+            "https://schema.com/item", False, True, True, None, None,
+            "https://json-schema.com#", False, True, None,
+        ),
+        (
+            None, True, True, True, None, None,
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, True, "https://schema.com/item", "https://schema.com/item",
+            None, True, True, None,
+        ),
+        (
+            "https://schema.com/item", True, False, True, None, "https://schema.com/item",
+            "https://json-schema.com#", True, True, "https://json-schema.com#",
+        ),
+        (
+            "https://schema.com/item", True, True, False, "https://schema.com/item", None,
+            "https://json-schema.com#", True, False, None,
+        ),
+        (
+            None, True, True, True, None, None,
+            None, True, True, None,
+        ),
+        (
+            # even when provided by attribute/argument, invalid URIs are ignored
+            # this is to avoid injecting them and generate invalid JSON schema/data instances
+            "--not-an-uri!", True, True, True, None, None,
+            "://not_an_uri", True, True, None,
+        ),
+    ]
+)
+def test_schema_ref_resolution(
+    schema,                             # type: Optional[str]
+    schema_include,                     # type: bool
+    schema_include_deserialize,         # type: bool
+    schema_include_convert_type,        # type: bool
+    schema_expected_deserialize,        # type: Optional[str]
+    schema_expected_convert_type,       # type: Optional[str]
+    schema_meta,                        # type: Optional[str]
+    schema_meta_include,                # type: bool
+    schema_meta_include_convert_type,   # type: bool
+    schema_meta_expected_convert_type,  # type: Optional[str]
+):                                      # type: (...) -> None
+    class MapByAttribute(ce.ExtendedMappingSchema):
+        title = "Item"
+        child = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    # do the same as if _schema, _schema_meta, etc. were set at the same place as 'title'
+    # but use 'setattr' here to allow combinations with/without them being set as needed
+    for schema_field, schema_value in [
+        ("_schema", schema),
+        ("_schema_include", schema_include),
+        ("_schema_include_deserialize", schema_include_deserialize),
+        ("_schema_include_convert_type", schema_include_convert_type),
+        ("_schema_meta", schema_meta),
+        ("_schema_meta_include", schema_meta_include),
+        ("_schema_meta_include_convert_type", schema_meta_include_convert_type),
+    ]:
+        setattr(MapByAttribute, schema_field, schema_value)
+
+    class MapByArgument(ce.ExtendedMappingSchema):
+        title = "Item"
+        child = ce.ExtendedSchemaNode(ce.ExtendedString())
+
+    # must be valid for both mappings above
+    test_data = {"child": "test"}
+
+    for schema_node in [
+        MapByAttribute(),
+        MapByArgument(
+            schema=schema,
+            schema_include=schema_include,
+            schema_include_deserialize=schema_include_deserialize,
+            schema_include_convert_type=schema_include_convert_type,
+            schema_meta=schema_meta,
+            schema_meta_include=schema_meta_include,
+            schema_meta_include_convert_type=schema_meta_include_convert_type,
+        ),
+    ]:
+        dispatcher = ce.OAS3TypeConversionDispatcher()
+        schema_json = dispatcher(schema_node)
+        schema_data = schema_node.deserialize(test_data)
+
+        err_msg = f"Failed using {schema_node}"
+        assert "$id" not in schema_data, err_msg
+        if schema_expected_convert_type:
+            assert "$id" in schema_json, err_msg
+            assert schema_json["$id"] == schema_expected_convert_type, err_msg
+        else:
+            assert "$id" not in schema_json, err_msg
+        if schema_expected_deserialize:
+            assert "$schema" in schema_data, err_msg
+            assert schema_data["$schema"] == schema_expected_deserialize, err_msg
+        else:
+            assert "$schema" not in schema_data, err_msg
+        if schema_meta_expected_convert_type:
+            assert "$schema" in schema_json, err_msg
+            assert schema_json["$schema"] == schema_meta_expected_convert_type, err_msg
+        else:
+            assert "$schema" not in schema_json, err_msg
+
+        # check that the remaining of the resolution is as expected
+        schema_json.pop("$id", None)
+        schema_data.pop("$id", None)
+        schema_json.pop("$schema", None)
+        schema_data.pop("$schema", None)
+        assert schema_data == test_data, err_msg
+        assert schema_json == {
+            "type": "object",
+            "title": "Item",
+            "required": ["child"],
+            "properties": {
+                "child": {"type": "string", "title": "child"}
+            },
+            "additionalProperties": {}
+        }, err_msg
