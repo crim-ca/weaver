@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add option to make requests with ``WeaverClient`` using a ``requests.Session`` instance. This allows requests to be
+  made with the session cookies that may already be attached to this ``requests.Session`` instance.
 
 Fixes:
 ------

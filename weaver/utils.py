@@ -1856,12 +1856,12 @@ def retry_on_cache_error(func):
     return wrapped
 
 
-def _request_call(method, url, kwargs):
-    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
+def _request_call(method, url, kwargs, session=None):
+    # type: (AnyRequestMethod, str, RequestCachingKeywords, Optional[requests.Session]) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
     """
-    with requests.Session() as request_session:
+    with (session or requests.Session()) as request_session:
         if urlparse(url).scheme in ["", "file"]:
             url = f"file://{os.path.abspath(url)}" if not url.startswith("file://") else url
             request_session.mount("file://", FileAdapter())
@@ -1870,12 +1870,12 @@ def _request_call(method, url, kwargs):
 
 
 @cache_region("request")
-def _request_cached(method, url, kwargs):
-    # type: (AnyRequestMethod, str, RequestCachingKeywords) -> Response
+def _request_cached(method, url, kwargs, session):
+    # type: (AnyRequestMethod, str, RequestCachingKeywords, Optional[requests.Session]) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
-    return _request_call(method, url, kwargs)
+    return _request_call(method, url, kwargs, session=session)
 
 
 def _patch_cached_request_stream(response, stream=False):
@@ -1929,6 +1929,7 @@ def request_extra(method,                           # type: AnyRequestMethod
                   cache_request=_request_cached,    # type: RequestCachingFunction
                   cache_enabled=True,               # type: bool
                   settings=None,                    # type: Optional[AnySettingsContainer]
+                  session=None,                     # type: Optional[requests.Session]
                   **request_kwargs,                 # type: Any  # RequestOptions
                   ):                                # type: (...) -> AnyResponseType
     """
@@ -2006,6 +2007,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
     :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
     :param settings: Additional settings from which to retrieve configuration details for requests.
+    :param session: A requests.Session instance that should be used to send this request
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
         This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
@@ -2048,7 +2050,7 @@ def request_extra(method,                           # type: AnyRequestMethod
         request_kwargs.pop(req_opt)
     stream = request_kwargs.get("stream", False)
     region = cache_request._arg_region  # noqa
-    request_args = (method, url, request_kwargs)
+    request_args = (method, url, request_kwargs, session)
     caching_args = (cache_request, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
@@ -2061,7 +2063,7 @@ def request_extra(method,                           # type: AnyRequestMethod
             time.sleep(delay)
         try:
             if no_cache:
-                resp = _request_call(*request_args)
+                resp = _request_call(*request_args, session=session)
             else:
                 resp = cache_request(*request_args)
                 _patch_cached_request_stream(resp, stream)

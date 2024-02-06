@@ -328,8 +328,8 @@ class WeaverClient(object):
     monitor_interval = 5    # interval between monitor pooling job status requests
     auth = None  # type: AuthHandler
 
-    def __init__(self, url=None, auth=None):
-        # type: (Optional[str], Optional[AuthHandler]) -> None
+    def __init__(self, url=None, auth=None, session=None):
+        # type: (Optional[str], Optional[AuthHandler], Optional[Session]) -> None
         """
         Initialize the client with predefined parameters.
 
@@ -346,6 +346,7 @@ class WeaverClient(object):
             self._url = None
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
         self.auth = auth
+        self.session = session
         self._headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self._settings = {
             "weaver.request_options": {}
@@ -362,6 +363,8 @@ class WeaverClient(object):
                  ):                     # type: (...) -> AnyResponseType
         if self.auth is not None and kwargs.get("auth") is None:
             kwargs["auth"] = self.auth
+        if self.session is not None and kwargs.get("session") is None:
+            kwargs["session"] = self.session
 
         if not headers and x_headers:
             headers = x_headers

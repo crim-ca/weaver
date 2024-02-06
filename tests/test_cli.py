@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 import mock
 import pytest
+import requests
 import yaml
 from webtest import TestRequest as WebTestRequest  # avoid pytest collect warning
 

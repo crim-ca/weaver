@@ -145,6 +145,24 @@ When using the :ref:`Python Interface <client_commands>`, the desired implementa
     client.capabilities(auth=requests_magpie.MagpieAuth(MAGPIE_URL, MAGPIE_USERNAME, MAGPIE_PASSWORD))
 
 
+If using the :ref:`Python Interface <client_commands>`, you can also pass a `requests.Session` instance as an argument
+during initialization of the :py:class:`weaver.cli.WeaverClient` or as argument to individual methods when calling the
+respective operation.
+
+This is useful when you have previously authenticated and the session cookies are stored in a `requests.Session`
+instance.
+
+.. code-block:: python
+
+    # This example uses Magpie as a login example but this can be used for any authentication mechanism
+    # that returns a session cookie.
+    MAGPIE_URL = os.getenv("MAGPIE_URL")
+    MAGPIE_USERNAME = os.getenv("MAGPIE_USERNAME")
+    MAGPIE_PASSWORD = os.getenv("MAGPIE_PASSWORD")
+    s = requests.Session()
+    s.post(f"{MAGPIE_URL}/signin", data={"user_name": MAGPIE_USERNAME, "password": MAGPIE_PASSWORD, "provider_name": "ziggurat"})
+    client.capabilities(session=s)
+
 .. _cli_example_deploy:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
