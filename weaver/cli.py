@@ -559,7 +559,7 @@ class WeaverClient(object):
                  provider_id,           # type: str
                  provider_url,          # type: str
                  url=None,              # type: Optional[str]
-                 auth=None,             # type: Optional[AuthBase]
+                 auth=None,             # type: Optional[AuthHandler]
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  with_links=True,       # type: bool
                  with_headers=False,    # type: bool
@@ -600,7 +600,7 @@ class WeaverClient(object):
     def unregister(self,
                    provider_id,             # type: str
                    url=None,                # type: Optional[str]
-                   auth=None,               # type: Optional[AuthBase]
+                   auth=None,               # type: Optional[AuthHandler]
                    headers=None,            # type: Optional[AnyHeadersContainer]
                    with_links=True,         # type: bool
                    with_headers=False,      # type: bool
@@ -647,7 +647,7 @@ class WeaverClient(object):
                password=None,           # type: Optional[str]
                undeploy=False,          # type: bool
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthBase]
+               auth=None,               # type: Optional[AuthHandler]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -735,7 +735,7 @@ class WeaverClient(object):
     def undeploy(self,
                  process_id,            # type: str
                  url=None,              # type: Optional[str]
-                 auth=None,             # type: Optional[AuthBase]
+                 auth=None,             # type: Optional[AuthHandler]
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  with_links=True,       # type: bool
                  with_headers=False,    # type: bool
@@ -770,7 +770,7 @@ class WeaverClient(object):
 
     def capabilities(self,
                      url=None,              # type: Optional[str]
-                     auth=None,             # type: Optional[AuthBase]
+                     auth=None,             # type: Optional[AuthHandler]
                      headers=None,          # type: Optional[AnyHeadersContainer]
                      with_links=True,       # type: bool
                      with_headers=False,    # type: bool
@@ -846,7 +846,7 @@ class WeaverClient(object):
                  process_id,                # type: str
                  provider_id=None,          # type: Optional[str]
                  url=None,                  # type: Optional[str]
-                 auth=None,                 # type: Optional[AuthBase]
+                 auth=None,                 # type: Optional[AuthHandler]
                  headers=None,              # type: Optional[AnyHeadersContainer]
                  schema=ProcessSchema.OGC,  # type: Optional[ProcessSchemaType]
                  with_links=True,           # type: bool
@@ -904,7 +904,7 @@ class WeaverClient(object):
                 process_id,                 # type: str
                 provider_id=None,           # type: Optional[str]
                 url=None,                   # type: Optional[str]
-                auth=None,                  # type: Optional[AuthBase]
+                auth=None,                  # type: Optional[AuthHandler]
                 headers=None,               # type: Optional[AnyHeadersContainer]
                 with_links=True,            # type: bool
                 with_headers=False,         # type: bool
@@ -1080,7 +1080,7 @@ class WeaverClient(object):
                 interval=None,          # type: Optional[int]
                 subscribers=None,       # type: Optional[JobSubscribers]
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthBase]
+                auth=None,              # type: Optional[AuthHandler]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
@@ -1218,7 +1218,7 @@ class WeaverClient(object):
                content_type=None,       # type: Optional[str]
                content_encoding=None,   # type: Optional[ContentEncoding]
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthBase]
+               auth=None,               # type: Optional[AuthHandler]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -1309,7 +1309,7 @@ class WeaverClient(object):
 
     def jobs(self,
              url=None,              # type: Optional[str]
-             auth=None,             # type: Optional[AuthBase]
+             auth=None,             # type: Optional[AuthHandler]
              headers=None,          # type: Optional[AnyHeadersContainer]
              with_links=True,       # type: bool
              with_headers=False,    # type: bool
@@ -1391,7 +1391,7 @@ class WeaverClient(object):
     def status(self,
                job_reference,           # type: str
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthBase]
+               auth=None,               # type: Optional[AuthHandler]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -1431,7 +1431,7 @@ class WeaverClient(object):
                   x_path,                   # type: str
                   job_reference,            # type: str
                   url=None,                 # type: Optional[str]
-                  auth=None,                # type: Optional[AuthBase]
+                  auth=None,                # type: Optional[AuthHandler]
                   headers=None,             # type: Optional[AnyHeadersContainer]
                   with_links=True,          # type: bool
                   with_headers=False,       # type: bool
@@ -1492,7 +1492,7 @@ class WeaverClient(object):
                 interval=None,                      # type: Optional[int]
                 wait_for_status=Status.SUCCEEDED,   # type: str
                 url=None,                           # type: Optional[str]
-                auth=None,                          # type: Optional[AuthBase]
+                auth=None,                          # type: Optional[AuthHandler]
                 headers=None,                       # type: Optional[AnyHeadersContainer]
                 with_links=True,                    # type: bool
                 with_headers=False,                 # type: bool
@@ -1558,7 +1558,7 @@ class WeaverClient(object):
         return OperationResult(False, msg)
 
     def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
-        # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthBase]) -> ExecutionResults
+        # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthHandler]) -> ExecutionResults
         """
         Download file references from results response contents and link headers.
 
@@ -1628,7 +1628,7 @@ class WeaverClient(object):
                 out_dir=None,           # type: Optional[str]
                 download=False,         # type: bool
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthBase]
+                auth=None,              # type: Optional[AuthHandler]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
@@ -1688,7 +1688,7 @@ class WeaverClient(object):
     def dismiss(self,
                 job_reference,          # type: str
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthBase]
+                auth=None,              # type: Optional[AuthHandler]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
