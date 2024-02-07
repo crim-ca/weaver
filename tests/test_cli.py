@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 import mock
 import pytest
+import requests
 import yaml
 from webtest import TestRequest as WebTestRequest  # avoid pytest collect warning
 
@@ -25,7 +26,7 @@ from weaver.cli import (
     OperationResult,
     SubscriberAction,
     WeaverClient,
-    main as weaver_cli
+    main as weaver_cli, SessionAuthHandler
 )
 from weaver.formats import ContentEncoding, ContentType
 
@@ -223,6 +224,20 @@ def test_auth_handler_cookie():
     assert "Authorization" not in resp.headers
     assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
     assert resp.headers["Cookie"] == token
+
+
+def test_auth_handler_session():
+    req = requests.Request("GET", "http://example.com")
+    prepared_req = req.prepare()
+    session = requests.Session()
+    cookie_key = "auth_example"
+    cookie_value = str(uuid.uuid4())
+    session.cookies.set(cookie_key, cookie_value)
+    auth = SessionAuthHandler(session)
+    resp = auth(prepared_req)  # type: ignore
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert f"{cookie_key}={cookie_value}" in resp.headers["Cookie"].split("; ")
 
 
 def test_upload_file_not_found():
