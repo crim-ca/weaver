@@ -60,7 +60,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
 
-    from requests import Response
+    from requests import Response, PreparedRequest
 
     # avoid failing sphinx-argparse documentation
     # https://github.com/ashb/sphinx-argparse/issues/7
@@ -319,6 +319,19 @@ class CookieAuthHandler(RequestAuthHandler):
         return {"Cookie": token}
 
 
+class SessionAuthHandler(AuthBase):
+    """
+    Adds the cookies from the session to the request.
+    """
+    def __init__(self, session):
+        self.session = session
+
+    def __call__(self, request):
+        # type: (PreparedRequest) -> PreparedRequest
+        request.prepare_cookies(self.session.cookies)
+        return request
+
+
 class WeaverClient(object):
     """
     Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC API - Processes` instance.
@@ -329,7 +342,7 @@ class WeaverClient(object):
     auth = None  # type: AuthHandler
 
     def __init__(self, url=None, auth=None):
-        # type: (Optional[str], Optional[AuthHandler]) -> None
+        # type: (Optional[str], Optional[AuthBase]) -> None
         """
         Initialize the client with predefined parameters.
 

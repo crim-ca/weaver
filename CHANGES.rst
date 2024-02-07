@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``weaver.cli.SessionAuthHandler`` class which uses the cookies stored in a pre-existing ``requests.Session``
+  instance to authenticate.
 
 Fixes:
 ------
