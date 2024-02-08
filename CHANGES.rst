@@ -12,8 +12,8 @@ Changes
 
 Changes:
 --------
-- Add ``weaver.cli.SessionAuthHandler`` class which uses the cookies stored in a pre-existing ``requests.Session``
-  instance to authenticate.
+- Add ``token`` optional argument to the ``weaver.cli.RequestAuthHandler`` class. If specified, the handler will use
+  this token instead of making an authentication request to obtain the token.
 
 Fixes:
 ------

@@ -14,7 +14,6 @@ from urllib.parse import quote
 
 import mock
 import pytest
-import requests
 import yaml
 from webtest import TestRequest as WebTestRequest  # avoid pytest collect warning
 
@@ -26,7 +25,7 @@ from weaver.cli import (
     OperationResult,
     SubscriberAction,
     WeaverClient,
-    main as weaver_cli, SessionAuthHandler
+    main as weaver_cli
 )
 from weaver.formats import ContentEncoding, ContentType
 
@@ -212,6 +211,17 @@ def test_auth_handler_bearer():
     assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
 
 
+def test_auth_handler_bearer_explicit_token():
+    req = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth = BearerAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
+    assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
+
+
 def test_auth_handler_cookie():
     req = WebTestRequest({})
     auth = CookieAuthHandler(identity=str(uuid.uuid4()))
@@ -226,18 +236,43 @@ def test_auth_handler_cookie():
     assert resp.headers["Cookie"] == token
 
 
-def test_auth_handler_session():
-    req = requests.Request("GET", "http://example.com")
-    prepared_req = req.prepare()
-    session = requests.Session()
-    cookie_key = "auth_example"
-    cookie_value = str(uuid.uuid4())
-    session.cookies.set(cookie_key, cookie_value)
-    auth = SessionAuthHandler(session)
-    resp = auth(prepared_req)  # type: ignore
+def test_auth_handler_cookie_explicit_token_string():
+    req = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
     assert "Authorization" not in resp.headers
     assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
-    assert f"{cookie_key}={cookie_value}" in resp.headers["Cookie"].split("; ")
+    assert resp.headers["Cookie"] == token
+
+
+def test_auth_handler_cookie_explicit_token_mapping_single():
+    req = WebTestRequest({})
+    cookie_key = "auth_example"
+    cookie_value = str(uuid.uuid4())
+    token = {cookie_key: cookie_value}
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert resp.headers["Cookie"] == f"{cookie_key}={cookie_value}"
+
+
+def test_auth_handler_cookie_explicit_token_mapping_multi():
+    req = WebTestRequest({})
+    token = {"auth_example": str(uuid.uuid4()), "auth_example2": str(uuid.uuid4())}
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert f"auth_example={token['auth_example']}" in resp.headers["Cookie"].split("; ")
+    assert f"auth_example2={token['auth_example2']}" in resp.headers["Cookie"].split("; ")
 
 
 def test_upload_file_not_found():

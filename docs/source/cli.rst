@@ -112,7 +112,6 @@ request toward the service.
     - :py:class:`weaver.cli.BasicAuthHandler`
     - :py:class:`weaver.cli.BearerAuthHandler`
     - :py:class:`weaver.cli.CookieAuthHandler`
-    - :py:class:`weaver.cli.SessionAuthHandler`
     - |requests-magpie-auth|_
 
 .. |requests-magpie-auth| replace:: ``requests_magpie.MagpieAuth``
@@ -145,9 +144,6 @@ When using the :ref:`Python Interface <client_commands>`, the desired implementa
     MAGPIE_PASSWORD = os.getenv("MAGPIE_PASSWORD")
     client.capabilities(auth=requests_magpie.MagpieAuth(MAGPIE_URL, MAGPIE_USERNAME, MAGPIE_PASSWORD))
 
-.. note::
-    The :py:class:`weaver.cli.SessionAuthHandler` is only available when using the
-    :ref:`Python Interface <client_commands>`.
 
 .. _cli_example_deploy:
 
