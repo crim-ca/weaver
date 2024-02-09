@@ -245,11 +245,8 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
 
     def __init__(self, token=None, **kwargs):
         # type: (Any, **Any) -> None
-        if token is None:
-            self.token = token
-        else:
-            self.token = self.parse_token(token)
         AuthHandler.__init__(self, **kwargs)
+        self.token = token
 
     @property
     def auth_token_name(self):
@@ -308,13 +305,14 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
         if self.token is None:
-            auth_token = self.token
-        else:
             auth_token = self.request_auth()
+        else:
+            auth_token = self.token
         if not auth_token:
             LOGGER.warning("Expected authorization token could not be retrieved from: [%s] in [%s]",
                            self.url, fully_qualified_name(self))
         else:
+            auth_token = self.parse_token(auth_token)
             auth_header = self.auth_header(auth_token)
             request.headers.update(auth_header)
         return request
@@ -346,7 +344,7 @@ class CookieAuthHandler(RequestAuthHandler):
 
     @staticmethod
     def parse_token(token):
-        # type: (Union[str, Mapping]) -> str
+        # type: (Union[str, Mapping[str, str]]) -> str
         """
         Convert token to a form that can be included in a request header.
 
