@@ -1,6 +1,8 @@
 $namespaces:
   cwl: "https://w3id.org/cwl/cwl#"
-  weaver: "http://crim.ca/weaver#"
+  # see redirect:
+  # https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/schemas/cwl/weaver-extensions.yml
+  weaver: "https://schemas.crim.ca/cwl/weaver#"
 
 $graph:
 

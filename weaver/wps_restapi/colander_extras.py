@@ -1053,7 +1053,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                                 node,
                                 msg=(
                                     f"Two distinct variable schema nodes named ['{var_prev}', '{var_node}'] "
-                                    f"under '{_get_node_name(node)}' were simultaneously mapped as valid matches"
+                                    f"under '{_get_node_name(node)}' were simultaneously mapped as valid matches "
                                     f"for field '{var_prop}' resolution. "
                                     "Ambiguous children schema definitions cannot be resolved. "
                                     "Consider defining more strict schema types, validators, keywords, "

@@ -551,7 +551,7 @@ BASE_TESTS_CUDA_REQUIREMENT = [
     "original, expected",
     # tests with CUDA/Docker by themselves in requirements/hints
     BASE_TESTS_CUDA_REQUIREMENT +
-    # same tests, but with additional requirements/hints to validate their remain in the result
+    # same tests, but with additional requirements/hints to validate that they remain in the result
     [
         (_add_requirement(_cuda_req, _extra_req), _add_requirement(_expect_req, _extra_req))  # type: ignore
         for _cuda_req, _expect_req in BASE_TESTS_CUDA_REQUIREMENT

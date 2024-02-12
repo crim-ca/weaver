@@ -131,7 +131,7 @@ Set of :term:`CWL` requirements defined by `Weaver` for an :term:`Application Pa
 """
 
 CWL_NAMESPACE_WEAVER = "weaver"
-CWL_NAMESPACE_WEAVER_URL = "http://crim.ca/weaver#"
+CWL_NAMESPACE_WEAVER_URL = "https://schemas.crim.ca/cwl/weaver#"
 CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL})
 """
 Namespace used to reference :term:`CWL` definitions provided by `Weaver`.
