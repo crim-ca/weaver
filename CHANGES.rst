@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``moto>=5`` used in tests to mock AWS S3 operations that replaced ``mock_s3`` context manager by ``mock_aws``.
 
 .. _changes_5.0.0:
 
