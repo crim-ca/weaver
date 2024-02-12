@@ -492,7 +492,7 @@ check-all: install-dev $(CHECKS_ALL) 	## check all code linters
 
 .PHONY: check-pep8-only
 check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
-	@echo "Running pep8 code style checks..."
+	@echo "Running PEP8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'

@@ -38,6 +38,7 @@ from webtest import TestApp, TestResponse
 
 from weaver import __name__ as __package__
 from weaver.app import main as weaver_app
+from weaver.compat import Version
 from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -1285,7 +1286,11 @@ def mocked_aws_s3(test_func):
     @functools.wraps(test_func)
     def wrapped(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        with moto.mock_s3():
+        if Version(moto.__version__).major >= 5:
+            mock_aws_s3 = moto.mock_aws  # pylint: disable=E1101,no-member
+        else:
+            mock_aws_s3 = moto.mock_s3  # pylint: disable=E1101,no-member
+        with mock_aws_s3():
             return test_func(*args, **kwargs)
     return wrapped
 
