@@ -246,6 +246,7 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
     def __init__(self, token=None, **kwargs):
         # type: (Any, **Any) -> None
         AuthHandler.__init__(self, **kwargs)
+        HTTPBasicAuth.__init__(self, username=kwargs.get("username"), password=kwargs.get("password"))
         self.token = token
 
     @property
@@ -328,6 +329,7 @@ class BearerAuthHandler(RequestAuthHandler):
         # type: (str) -> str
         """
         Convert token to a form that can be included in a request header.
+
         Returns the token string as is.
         """
         return token
@@ -1910,6 +1912,7 @@ def add_shared_options(parser):
             "instead."
         )
     )
+
 
 def add_listing_options(parser, item):
     # type: (argparse.ArgumentParser, str) -> None
