@@ -14,9 +14,11 @@ from tests.utils import mocked_remote_wps
 from weaver import xml_util
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.owsexceptions import OWSAccessForbidden, OWSException, OWSMissingParameterValue, OWSNoApplicableCode
+from weaver.utils import null
 from weaver.wps.utils import (
     get_exception_from_xml_status,
     get_wps_client,
+    get_wps_client_filtered_headers,
     get_wps_output_context,
     map_wps_output_location,
     set_wps_language
@@ -91,14 +93,17 @@ def test_get_wps_client_headers_preserved():
     """
     Validate that original request headers are not modified following WPS client sub-requests.
     """
-    test_wps_url = "http://dont-care.com/wps"
+    test_wps_host = "dont-care.com"
+    test_wps_url = f"http://{test_wps_host}/wps"
     test_headers = {
+        "Host": test_wps_host,  # this should be filtered out
         "Content-Type": ContentType.APP_XML,
         "Content-Length": "0",
         "Accept-Language": AcceptLanguage.FR_CA,
         "Accept": ContentType.APP_JSON,
         "Authorization": "Bearer: FAKE",  # nosec
     }
+    test_settings = {"weaver.wps_client_headers_filter": "Host,"}
     test_copy_headers = copy.deepcopy(test_headers)
     # following are removed for sub-request
     test_wps_headers = {
@@ -112,7 +117,7 @@ def test_get_wps_client_headers_preserved():
         for patch in patches:
             mocks.append(stack.enter_context(patch))
 
-        wps = get_wps_client(test_wps_url, headers=test_headers)
+        wps = get_wps_client(test_wps_url, headers=test_headers, container=test_settings)
 
     for mocked in mocks:
         assert mocked.called
@@ -120,6 +125,31 @@ def test_get_wps_client_headers_preserved():
     assert wps.headers == test_wps_headers, "Only allowed headers should have been passed down to WPS client"
     assert wps.language == AcceptLanguage.FR_CA, "Language should have been passed down to WPS client from header"
     assert wps.url == test_wps_url
+
+
+@pytest.mark.parametrize(
+    ["test_headers", "test_filter", "expect_result"],
+    [
+        # 'null' not supported by function itself, only for us to consider no settings container at all
+        ({}, null, {}),
+        ({"Host": "test.com"}, null, {}),  # Host is default if no settings
+        ({}, None, {}),
+        ({"Host": "test.com"}, None, {}),
+        ({}, "", {}),
+        ({}, [], {}),
+        ({"Authorization": "random"}, [], {"Authorization": "random"}),
+        ({"Authorization": "random"}, "Host", {"Authorization": "random"}),
+        ({"X-Test": "OK", "x-custom": "bye", "Host": "test.com"}, ["Host", "X-custom"], {"X-Test": "OK"}),
+        ({"Host": "example.com", "Authorization": "random"}, "host", {"Authorization": "random"}),
+        ({"Host": "example.com", "Authorization": "random"}, "Host,", {"Authorization": "random"}),
+        ({"Host": "example.com", "Authorization": "random"}, "HOST,", {"Authorization": "random"}),
+        ({"Host": "example.com", "Authorization": "random"}, ["Host"], {"Authorization": "random"}),
+    ]
+)
+def test_get_wps_client_filtered_headers(test_headers, test_filter, expect_result):
+    settings = {"weaver.wps_client_headers_filter": test_filter} if test_filter is not null else None
+    result = get_wps_client_filtered_headers(test_headers, settings)
+    assert result == expect_result
 
 
 def test_get_wps_output_context_validation():
