@@ -58,7 +58,7 @@ from weaver.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union, Mapping
+    from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type, Union
 
     from requests import Response
 
