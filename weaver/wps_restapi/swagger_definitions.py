@@ -89,7 +89,6 @@ from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
-    URI,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -387,9 +386,29 @@ class Tag(ExtendedSchemaNode):
 
 
 class URL(ExtendedSchemaNode):
+    """
+    String format that will be automatically mapped to a URL-pattern validator.
+
+    .. seealso::
+        - :data:`weaver.wps_restapi.colander_extras.URL`
+        - :class:`weaver.wps_restapi.colander_extras.ExtendedSchemaBase`
+    """
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class URI(ExtendedSchemaNode):
+    """
+    String format that will be automatically mapped to a URI-pattern validator.
+
+    .. seealso::
+        - :data:`weaver.wps_restapi.colander_extras.URI`
+        - :class:`weaver.wps_restapi.colander_extras.ExtendedSchemaBase`
+    """
+    schema_type = String
+    description = "URI reference."
+    format = "uri"
 
 
 class Email(ExtendedSchemaNode):
@@ -4990,50 +5009,63 @@ class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
 
-class CWLNamespaces(ExtendedMappingSchema):
+class CWLNamespaces(StrictMappingSchema):
+    """
+    Mapping of :term:`CWL` namespace definitions for shorthand notation.
+
+    .. note::
+        Use a combination of `strict` mapping and ``variable`` (see ``var`` field) such that any additional namespace
+        other than the ones explicitly listed are allowed, but if provided, they must succeed URI validation minimally.
+        If no additional namespace is provided, including none at all, the mapping definition remains valid because
+        of ``missing=drop`` under ``var``. If a URI is invalid for additional namespaces, the failing validation causes
+        the property to be unmapped to the variable, which leads to an ``"unknown"`` property raised by the `strict`
+        mapping. For explicit URI definitions, the specific URI combinations provided must be matched exactly to
+        succeed. This ensures that no invalid mapping gets applied for commonly-known URI namespaces.
+    """
     name = "$namespaces"
     title = "CWL Namespaces Mapping"
-    cwl = URL(
+    description = "Mapping of CWL namespace definitions for shorthand notation."
+    var = URI(variable="{namespace}", missing=drop)
+    cwl = URI(
         missing=drop,
         name=CWL_NAMESPACE,
-        validator=OneOf([CWL_NAMESPACE_URL]),
+        validator=OneOf([CWL_NAMESPACE_URL, CWL_NAMESPACE_URL.rstrip("#")]),
     )
-    cwltool = URL(
+    cwltool = URI(
         missing=drop,
         name=CWL_NAMESPACE_CWLTOOL,
-        validator=OneOf([CWL_NAMESPACE_CWLTOOL_URL]),
+        validator=OneOf([CWL_NAMESPACE_CWLTOOL_URL, CWL_NAMESPACE_CWLTOOL_URL.rstrip("#")]),
     )
-    edam = URL(
+    edam = URI(
         missing=drop,
         name=EDAM_NAMESPACE,
-        validator=OneOf([EDAM_NAMESPACE_URL]),
+        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("#")]),
     )
-    iana = URL(
+    iana = URI(
         missing=drop,
         name=IANA_NAMESPACE,
-        validator=OneOf([IANA_NAMESPACE_URL]),
+        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("#")]),
     )
-    ogc = URL(
+    ogc = URI(
         missing=drop,
         name=OGC_NAMESPACE,
-        validator=OneOf([OGC_NAMESPACE_URL]),
+        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
     )
-    opengis = URL(
+    opengis = URI(
         missing=drop,
         name=OPENGIS_NAMESPACE,
-        validator=OneOf([OPENGIS_NAMESPACE_URL]),
+        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("#")]),
     )
-    s = URL(
+    s = URI(
         missing=drop,
         name=CWL_NAMESPACE_SCHEMA,
-        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL]),
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
     )
-    weaver = URL(
+    weaver = URI(
         missing=drop,
         name=CWL_NAMESPACE_WEAVER,
-        validator=OneOf([CWL_NAMESPACE_WEAVER_URL]),
+        validator=OneOf([CWL_NAMESPACE_WEAVER_URL, CWL_NAMESPACE_WEAVER_URL.rstrip("#")]),
     )
-    var = URL(variable="{namespace}", missing=drop)
 
 
 class CWLSchemas(ExtendedSequenceSchema):
@@ -6096,7 +6128,7 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
-    instance = ExtendedSchemaNode(String(), validator=URI, missing=drop)
+    instance = URI(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
 

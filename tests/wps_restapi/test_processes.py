@@ -41,6 +41,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, E
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import (
+    CWL_NAMESPACE_WEAVER,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
@@ -1545,7 +1546,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         ref = self.get_application_package(remote_process)
         pkg = self.get_application_package(process_id)
         assert pkg["hints"] == {
-            "OGCAPIRequirement": {
+            f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_OGC_API}": {
                 "process": ref_url
             }
         }

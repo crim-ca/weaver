@@ -51,6 +51,7 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
+import copy
 import inspect
 import re
 import uuid
@@ -134,7 +135,7 @@ URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTER
 URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
 FILE_URL_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
 FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
-URI_REGEX = rf"{colander.URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
+URI_REGEX = rf"{URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
 URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
     "uri": {"converter": BaseStringTypeConverter, "validator": URI},
@@ -1025,6 +1026,9 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _deserialize_remap(node, cstruct, var_map, var_name, has_const_child):
         invalid_var = colander.Invalid(node, value=var_map)
         try:
+            # ensure to use a copy to avoid modifying a structure passed down to here since we pop variable-mapped keys
+            cstruct = copy.deepcopy(cstruct)
+
             # Substitute real keys with matched variables to run full deserialize so
             # that mapping can find nodes name against attribute names, then re-apply originals.
             # We must do this as non-variable sub-schemas could be present, and we must also
@@ -1072,7 +1076,9 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 if mapped is None and node.missing is colander.required:
                     raise colander.Invalid(node, value=cstruct)
                 for var_mapped in mapped:
-                    result[var_mapped["name"]] = var_mapped["cstruct"]
+                    # variable schema validation failed, but it is not marked as 'required'
+                    if var_mapped["cstruct"] not in [colander.drop, colander.null]:
+                        result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
             if invalid.msg:
                 invalid_var.msg = invalid.msg
@@ -1100,7 +1106,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         var_map_invalid = {}  # type: Dict[str, colander.Invalid]
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
-            var_map[var] = []
+            var_map.setdefault(var, [])
             var_msg = f"Requirement not met under variable: {var}."
             var_map_invalid[var] = colander.Invalid(node=self, msg=var_msg, value=cstruct)
             # attempt to find any sub-node matching the sub-schema under variable
@@ -1135,10 +1141,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                         # use position as tested child field name for later reference by invalid schema
                         var_map_invalid[var].add(invalid, pos=child_key)
 
-            var_val = var_map.get(var, colander.null)
-            if var_val is colander.null:
-                # allow unmatched variable item under mapping if it is not required
-                if var_child.missing is colander.drop:
+            var_mapped = var_map.get(var, [])
+            if not var_mapped:
+                # allow unmatched/unprovided variable item under mapping if it is not required
+                if var_child.missing in [colander.drop, colander.null]:
                     continue
                 # if required, don't waste more time doing lookup
                 # fail immediately since this variable schema is missing
