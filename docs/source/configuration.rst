@@ -199,6 +199,16 @@ they are optional and which default value or operation is applied in each situat
   |
   | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
 
+- | ``weaver.wps_client_headers_filter = <headers>``
+  | (default: ``Host,``)
+  |
+  | List of comma-separated case-insensitive headers that will be removed from incoming requests before
+  | passing them down to invoke an operation with the corresponding :term:`WPS` provider through the :term:`WPS` client.
+
+.. seealso::
+    - :func:`weaver.wps.utils.get_wps_client_filtered_headers`
+    - :func:`weaver.wps.utils.get_wps_client`
+
 - | ``weaver.wps_restapi = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |

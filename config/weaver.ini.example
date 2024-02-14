@@ -113,6 +113,10 @@ weaver.wps_output_s3_bucket =
 weaver.wps_output_s3_region =
 weaver.wps_workdir =
 
+# List of comma-separated case-insensitive headers that will be removed from incoming requests before
+# passing them down to invoke an operation with the corresponding WPS provider through the WPS client.
+weaver.wps_client_headers_filter = Host,
+
 # --- Weaver WPS metadata ---
 # all attributes under "metadata:main" can be specified as 'weaver.wps_metadata_<field>'
 # (reference: https://pywps.readthedocs.io/en/master/configuration.html#metadata-main)

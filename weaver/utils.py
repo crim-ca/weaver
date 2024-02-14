@@ -149,6 +149,8 @@ if TYPE_CHECKING:
         "headers": NotRequired[AnyHeadersContainer],
         "cookies": NotRequired[AnyCookiesContainer],
         "stream": NotRequired[bool],
+        "cache": NotRequired[bool],
+        "cache_enabled": NotRequired[bool],
     }, total=False)
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
@@ -1670,7 +1672,7 @@ def invalidate_region(caching_args):
 
 
 def get_ssl_verify_option(method, url, settings, request_options=None):
-    # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
+    # type: (str, str, AnySettingsContainer, Optional[RequestOptions]) -> bool
     """
     Obtains the SSL verification option considering multiple setting definitions and the provided request context.
 
@@ -1695,9 +1697,9 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
 
 def get_no_cache_option(request_headers, **cache_options):
-    # type: (HeadersType, **bool) -> bool
+    # type: (HeadersType, **bool | RequestOptions) -> bool
     """
-    Obtains the No-Cache result from request headers and configured request options.
+    Obtains the ``No-Cache`` result from request headers and configured :term:`Request Options`.
 
     .. seealso::
         - :meth:`Request.headers`
@@ -1717,7 +1719,7 @@ def get_no_cache_option(request_headers, **cache_options):
 def get_request_options(method, url, settings):
     # type: (str, str, AnySettingsContainer) -> RequestOptions
     """
-    Obtains the *request options* corresponding to the request from the configuration file.
+    Obtains the :term:`Request Options` corresponding to the request from the configuration file.
 
     The configuration file specified is expected to be pre-loaded within setting ``weaver.request_options``.
     If no file was pre-loaded or no match is found for the request, an empty options dictionary is returned.

@@ -12,6 +12,7 @@ from owslib.util import Authentication
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
+from requests.structures import CaseInsensitiveDict
 from webob.acceptparse import create_accept_language_header
 
 from weaver import owsexceptions, xml_util
@@ -281,6 +282,7 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
         language = str(language)
     if headers is not None and not isinstance(headers, dict):
         headers = dict(headers)
+    headers = get_wps_client_filtered_headers(headers, container)
     request_args = (url, headers, verify, language)
     if get_no_cache_option(headers, request_options=opts):
         for func in (_get_wps_client_cached, _describe_process_cached):
@@ -288,6 +290,30 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
             invalidate_region(caching_args)
     wps = _get_wps_client_cached(*request_args)
     return wps
+
+
+def get_wps_client_filtered_headers(headers, container):
+    # type: (Optional[HeadersType], AnySettingsContainer) -> HeadersType
+    """
+    Filters out any headers configured for the :term:`WPS` client by the ``weaver.wps_client_headers_filter`` setting.
+
+    :param headers: Headers to filter as applicable.
+    :param container: Any settings container to retrieve application settings.
+    :return: Filtered :term:`WPS` headers.
+    """
+    if not headers:
+        return {}
+    settings = get_settings(container) or {}
+    hdr_spec = settings.get("weaver.wps_client_headers_filter") or "Host,"  # default if missing (match docs/example)
+    if isinstance(hdr_spec, str):
+        hdr_spec = [hdr.strip() for hdr in hdr_spec.split(",")]
+    hdr_spec = [hdr for hdr in hdr_spec if hdr]
+    if not hdr_spec:
+        return headers
+    headers = CaseInsensitiveDict(headers.copy())
+    for hdr in hdr_spec:
+        headers.pop(hdr, None)
+    return dict(headers)
 
 
 def check_wps_status(location=None,     # type: Optional[str]
