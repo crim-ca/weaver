@@ -249,6 +249,13 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         HTTPBasicAuth.__init__(self, username=kwargs.get("username"), password=kwargs.get("password"))
         self.token = token
 
+    # Update __init__'s signature to include keyword arguments from AuthHandler's __init__. This is required because
+    # the CLI entrypoint inspects the auth class' signature in order to figure out which arguments to pass to it.
+    _signature_AuthHandler = inspect.signature(AuthHandler.__init__)
+    __init__.__signature__ = _signature_AuthHandler.replace(
+        parameters=(*_signature_AuthHandler.parameters.values(), inspect.signature(__init__).parameters["token"])
+    )
+
     @property
     def auth_token_name(self):
         # type: () -> str
@@ -2954,7 +2961,6 @@ def main(*args):
     except Exception as exc:
         msg = "Operation failed due to exception."
         err = fully_qualified_name(exc)
-        result = OperationResult(False, message=msg, body={"message": msg, "cause": str(exc), "error": err})
     if result.success:
         LOGGER.info("%s successful. %s\n", oper.title(), result.message)
         print(result.text)  # use print in case logger disabled or level error/warn
