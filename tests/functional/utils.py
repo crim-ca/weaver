@@ -439,7 +439,7 @@ class WpsConfigBase(unittest.TestCase):
         return ""
 
     def fully_qualified_test_process_name(self, name=""):
-        name = fully_qualified_name(self) + (f"-{name}" if name else "")
+        name = fully_qualified_name(self) + "." + self._testMethodName + (f"-{name}" if name else "")
         return name.replace(".", "-")
 
     def monitor_job(self,
