@@ -9,3 +9,4 @@ Contributors
 * David Byrns <david.byrns@crim.ca> @dbyrns
 * David Caron <david.caron@crim.ca> @davidcaron
 * Mathieu Provencher <mathieu.provencher@crim.ca> @MatProv
+* Misha Schwartz @mishaschwartz
