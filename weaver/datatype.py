@@ -36,7 +36,14 @@ from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_OGC_API, ProcessSchema
+from weaver.processes.constants import (
+    CWL_NAMESPACE_WEAVER,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    ProcessSchema
+)
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
@@ -2184,11 +2191,20 @@ class Process(Base):
 
         if cls == ProcessType.WORKFLOW:
             profile = f"{base}workflow"
-        elif ProcessType.is_wps(typ):
+        elif ProcessType.is_wps(typ) or req in [
+            CWL_REQUIREMENT_APP_WPS1,
+            f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_WPS1}",
+        ]:
             profile = f"{base}wpsApplication"
-        elif typ == ProcessType.OGC_API or req == CWL_REQUIREMENT_APP_OGC_API:
+        elif typ == ProcessType.OGC_API or req in [
+            CWL_REQUIREMENT_APP_OGC_API,
+            f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_OGC_API}",
+        ]:
             profile = f"{base}ogcapiApplication"
-        elif typ == ProcessType.APPLICATION or req == CWL_REQUIREMENT_APP_DOCKER:
+        elif typ == ProcessType.APPLICATION or req in [
+            CWL_REQUIREMENT_APP_DOCKER,
+            CWL_REQUIREMENT_APP_DOCKER_GPU,
+        ]:
             profile = f"{base}dockerizedApplication"
         else:
             profile = base + typ
