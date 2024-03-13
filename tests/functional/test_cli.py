@@ -2358,7 +2358,7 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
 
         # create client with proxied endpoint
         # do not add auth by default to test unauthorized/forbidden access
-        # each CLI/Client operation should provided it explicitly to obtain access using auth token
+        # each CLI/Client operation should provide it explicitly to obtain access using auth token
         cls.client = WeaverClient(cls.proxy_url)
 
     @classmethod
