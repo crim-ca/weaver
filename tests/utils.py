@@ -334,12 +334,17 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     :param expect_error:
         Expect the returned code to be any non-zero value. Otherwise, the returned code must be zero for success.
         Any mismatching error code between expected success/failure is asserted to ensure expected conditions happened.
-        If error is expected, ``stderr`` is captured and returned. Otherwise, ``stdout`` is captured and returned.
+        The returned lines from standard stream are prioritized depending on the expected error status.
+        If an error is expected, ``stderr`` is returned, unless empty, for which case ``stdout`` is returned instead.
+        If no error is expected, ``stdout`` is returned, unless empty, for which case ``stderr`` is returned instead.
+        Fallback standard stream sources according to expected error are returned in order to consider certain commands
+        that report an *"error"* in the form of a (``stdout``) output message, or that simply use ``stderr``/``stdout``
+        interchangeably without any further consideration of the type of message to communicate.
     :param entrypoint:
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
         Python context to preserve any active mocks.
-    :return: retrieved command outputs.
+    :return: retrieved command standard output or error as applicable.
     """
     # pylint: disable=R1732
 
@@ -354,33 +359,38 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
         env = {"PATH": f"{python_path}:{debug_path}"}
-        std = {"stderr": subprocess.PIPE} if expect_error else {"stdout": subprocess.PIPE}
+        std = {"stderr": subprocess.PIPE, "stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
+        ret = proc.returncode
     else:
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
             with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
-                err = entrypoint(*tuple(command))
-            out = stdout.getvalue()
+                ret = entrypoint(*tuple(command))
         except SystemExit as exc:
-            err = exc.code
-            if not expect_error and err != 0:
+            ret = exc.code
+            if not expect_error and ret != 0:
                 raise  # raise directly to have the most context/traceback as possible in failed test
-            if expect_error:
-                out = stderr.getvalue()
-            else:
-                out = stdout.getvalue()
+        finally:
+            out = stdout.getvalue()
+            err = stderr.getvalue()
+    out_n = f"{out}\n" if out and not out.endswith("\n") else out
+    err_n = f"{err}\n" if err and not err.endswith("\n") else err
+    msg = f"\n---\ncollected stdout:\n---\n{out_n}---\ncollected stderr:\n---\n{err_n}---\n"
     if expect_error:
-        assert err, f"process returned successfully when error was expected: {err!s}"
+        assert ret, f"process returned successfully when error was expected:{msg}"
     else:
-        assert not err, f"process returned with error code: {err!s}"
+        assert not ret, f"process returned with error code {ret}:{msg}"
         # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
-        assert out != "", "process did not execute as expected, no output available"
-    out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
+        assert out != "", f"process did not execute as expected, no output available!{msg}"
+    # prioritize with expectation, but use the other as fallback
+    # sometimes, the expected result is an "error", but this error consist only of a printed output from the command
+    src = (err or out) if expect_error else (out or err)
+    out_lines = [line for line in src.splitlines() if not trim or (line and not line.startswith(" "))]
     if not expect_error:
-        assert len(out_lines), "could not retrieve any console output"
+        assert len(out_lines), f"could not retrieve any console output{msg}"
     return out_lines
 
 
@@ -566,7 +576,7 @@ def mocked_sub_requests(app,                # type: TestApp
         # type: (AnyResponseType, str) -> None
         if not hasattr(response, "content"):
             setattr(response, "content", response.body)
-        if not hasattr(response, "reason"):
+        if not hasattr(response, "reason") and hasattr(response, "errors"):
             setattr(response, "reason", response.errors)
         if not hasattr(response, "raise_for_status"):
             setattr(response, "raise_for_status", lambda: Response.raise_for_status(response))

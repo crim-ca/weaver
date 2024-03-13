@@ -58,7 +58,7 @@ from weaver.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type, Union
 
     from requests import Response
 
@@ -242,6 +242,19 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
     """
     Base class to send a request in order to retrieve an authorization token.
     """
+
+    def __init__(self,
+                 identity=None,  # Optional[str]
+                 password=None,  # Optional[str]
+                 url=None,  # Optional[str]
+                 method="GET",  # AnyRequestMethod
+                 headers=None,  # Optional[AnyHeadersContainer]
+                 token=None):  # Any
+        # type: (...) -> None
+        AuthHandler.__init__(self, identity=identity, password=password, url=url, method=method, headers=headers)
+        HTTPBasicAuth.__init__(self, username=identity, password=password)
+        self.token = token
+
     @property
     def auth_token_name(self):
         # type: () -> str
@@ -257,6 +270,15 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         # type: (str) -> AnyHeadersContainer
         """
         Obtain the header definition with the provided authorization token.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    @abc.abstractmethod
+    def parse_token(token):
+        # type: (Any) -> str
+        """
+        Convert token to a form that can be included in a request header.
         """
         raise NotImplementedError
 
@@ -289,11 +311,15 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
 
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
-        auth_token = self.request_auth()
+        if self.token is None:
+            auth_token = self.request_auth()
+        else:
+            auth_token = self.token
         if not auth_token:
             LOGGER.warning("Expected authorization token could not be retrieved from: [%s] in [%s]",
                            self.url, fully_qualified_name(self))
         else:
+            auth_token = self.parse_token(auth_token)
             auth_header = self.auth_header(auth_token)
             request.headers.update(auth_header)
         return request
@@ -304,6 +330,16 @@ class BearerAuthHandler(RequestAuthHandler):
     Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
     """
 
+    @staticmethod
+    def parse_token(token):
+        # type: (str) -> str
+        """
+        Convert token to a form that can be included in a request header.
+
+        Returns the token string as is.
+        """
+        return token
+
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
         return {"Authorization": f"Bearer {token}"}
@@ -311,8 +347,23 @@ class BearerAuthHandler(RequestAuthHandler):
 
 class CookieAuthHandler(RequestAuthHandler):
     """
-    Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
+    Adds the ``Cookie`` header formed from the authentication bearer token from the underlying request.
     """
+
+    @staticmethod
+    def parse_token(token):
+        # type: (Union[str, Mapping[str, str]]) -> str
+        """
+        Convert token to a form that can be included in a request header.
+
+        Returns the token string as is if it is a string. Otherwise, if the token is a mapping, where keys are cookie
+        names and values are cookie values, convert the cookie representation to a string that can be accepted as the
+        value of the "Cookie" header.
+        """
+        if isinstance(token, str):
+            return token
+        cookie_dict = CaseInsensitiveDict(token)
+        return "; ".join(f"{key}={val}" for key, val in cookie_dict.items())
 
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
@@ -1859,6 +1910,14 @@ def add_shared_options(parser):
             "Surrounding spaces are trimmed."
         )
     )
+    auth_grp.add_argument(
+        "-aT", "--auth-token", dest="auth_token", metavar="TOKEN",
+        help=(
+            "Token to be added directly to the request headers. If this is specified, the authenticator will not make "
+            "an additional authentication request in order to obtain a token. The token specified here will be used "
+            "instead."
+        )
+    )
 
 
 def add_listing_options(parser, item):
@@ -1894,6 +1953,7 @@ def parse_auth(kwargs):
     auth_url = kwargs.pop("auth_url", None)
     auth_method = kwargs.pop("auth_method", None)
     auth_headers = kwargs.pop("auth_headers", {})
+    auth_token = kwargs.pop("auth_token", None)
     if not (auth_handler and issubclass(auth_handler, (AuthHandler, AuthBase))):
         return None
     auth_handler_name = fully_qualified_name(auth_handler)
@@ -1905,6 +1965,7 @@ def parse_auth(kwargs):
         ("url", auth_url),
         ("method", auth_method),
         ("headers", CaseInsensitiveDict(auth_headers)),
+        ("token", auth_token)
     ]
     if len(auth_sign.parameters) == 0:
         auth_handler = auth_handler()
