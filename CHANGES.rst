@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_5.1.1:
+
+`5.1.1 <https://github.com/crim-ca/weaver/tree/5.1.1>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Use ``typing_extensions.Unpack`` to correctly represent expected types
   for respective ``request-options`` keywords parameters.
 - Fix ``linkcheck`` failing due to inconsistent HTTP responses
