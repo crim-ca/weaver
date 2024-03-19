@@ -53,7 +53,13 @@ LOGGER = logging.getLogger(__name__)
 
 
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-                          response_schemas=sd.get_processes_responses)
+                          response_schemas=sd.get_processes_responses, accept=ContentType.APP_JSON)
+@sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+                          accept=ContentType.TEXT_HTML, renderer="weaver.wps_restapi:templates/processes.mako",
+                          response_schemas=sd.derive_responses(
+                              sd.get_processes_responses,
+                              sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
+                          ))
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     # type: (PyramidRequest) -> AnyViewResponse

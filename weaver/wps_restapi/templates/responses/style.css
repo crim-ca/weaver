@@ -1,0 +1,64 @@
+/* --- Top-Level Containers --- */
+
+.content {
+    margin: 5em;
+}
+
+/* --- Labels --- */
+
+.label {
+    display: inline;
+    padding: 0.2em 0.5em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    color: #FFFFFF;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25em;
+    background-color: #5BC0DE; /* info default */
+}
+
+.label-danger {
+    background-color: #CD0000;
+}
+
+.label-warning {
+    background-color: #F0AD4E;
+}
+
+.label-info {
+    background-color: #5BC0DE;
+}
+
+.label-success {
+    background-color: #4CAF50;
+}
+
+.label-null {
+    background-color: #808080;
+    font-style: italic;
+}
+
+/* --- Version Footer --- */
+
+.version-box {
+    position: absolute;
+    right: 0;
+}
+
+.version-box > div {
+    font-size: 75%;
+    display: inline-block;
+    position: relative;
+    bottom: 1em;
+    right: 1em;
+}
+
+.version-title {
+    color: gray;
+}
+
+.version-tag {
+}

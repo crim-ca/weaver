@@ -99,7 +99,7 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Dict, Type, Union
     from typing_extensions import TypedDict
 
     from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType
@@ -241,14 +241,14 @@ QUOTES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 # load examples by file names as keys
 SCHEMA_EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), "examples")
 EXAMPLES = {}
-for name in os.listdir(SCHEMA_EXAMPLE_DIR):
-    path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
-    ext = os.path.splitext(name)[-1]
-    with open(path, "r", encoding="utf-8") as f:
-        if ext in [".json", ".yaml", ".yml"]:
-            EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
+for _name in os.listdir(SCHEMA_EXAMPLE_DIR):
+    _path = os.path.join(SCHEMA_EXAMPLE_DIR, _name)
+    _ext = os.path.splitext(_name)[-1]
+    with open(_path, "r", encoding="utf-8") as f:
+        if _ext in [".json", ".yaml", ".yml"]:
+            EXAMPLES[_name] = yaml.safe_load(f)  # both JSON/YAML
         else:
-            EXAMPLES[name] = f.read()
+            EXAMPLES[_name] = f.read()
 
 
 #########################################################
@@ -560,7 +560,6 @@ class AcceptHeader(ExtendedSchemaNode):
         ContentType.APP_XML,
         ContentType.TEXT_XML,
         ContentType.TEXT_HTML,
-        ContentType.TEXT_PLAIN,
         ContentType.ANY,
     ])
     missing = drop
@@ -5952,6 +5951,39 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
 # Responses schemas
 # ################################################################
 
+
+class GenericHTMLResponse(ExtendedMappingSchema):
+    """
+    Generic HTML response.
+    """
+    header = HtmlHeader()
+    body = ExtendedMappingSchema()
+
+    def __new__(cls, name, **kwargs):
+        # type: (Type["GenericHTMLResponse"], str, **Any) -> "GenericHTMLResponse"
+        """
+        Generates a derived HTML response schema with direct forwarding of custom parameters to the body's schema.
+
+        This strategy allows the quicker definition of schema variants without duplicating class definitions only
+        providing alternate documentation parameters.
+        """
+        if not isinstance(name, str) or not re.match(r"^[A-Z][A-Z0-9_-]*$", name, re.I):
+            raise ValueError(
+                "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
+                f"Name '{name}' is invalid."
+            )
+        obj = super().__new__(cls)
+        obj.__init__(name=name, title=name, **kwargs)
+        obj.__class__.__name__ = name
+        obj.children = [
+            child
+            if child.name != "body" else
+            ExtendedMappingSchema(name="body", **kwargs)
+            for child in obj.children
+        ]
+        return obj
+
+
 class ErrorDetail(ExtendedMappingSchema):
     code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
     status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
@@ -6028,6 +6060,13 @@ class UnsupportedMediaTypeResponseSchema(ServerErrorBaseResponseSchema):
 class MethodNotAllowedErrorResponseSchema(ServerErrorBaseResponseSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotAllowed.yaml"
     description = "HTTP method not allowed for requested path."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class NotAcceptableErrorResponseSchema(ServerErrorBaseResponseSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotSupported.yaml"
+    description = "Requested media-types are not supported at the path."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -6651,31 +6690,37 @@ class GoneVaultFileDownloadResponse(ExtendedMappingSchema):
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_redoc_ui_responses = {
     "200": OkGetRedocUIResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_versions_responses = {
     "200": OkGetVersionsResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_conformance_responses = {
     "200": OkGetConformanceResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
@@ -6699,6 +6744,7 @@ get_processes_responses = {
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
@@ -6710,6 +6756,7 @@ post_processes_responses = {
     }),
     "400": BadRequestResponseSchema(description="Unable to parse process definition"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
     "415": UnsupportedMediaTypeResponseSchema(description="Unsupported Media-Type for process deployment."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
@@ -6719,6 +6766,7 @@ put_process_responses = copy(post_processes_responses)
 put_process_responses.update({
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
 })
 patch_process_responses = {
@@ -6726,6 +6774,7 @@ patch_process_responses = {
     "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
@@ -6750,6 +6799,7 @@ get_process_responses = {
     "400": BadRequestGetProcessInfoResponse(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {
@@ -6762,6 +6812,7 @@ get_process_package_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_payload_responses = {
@@ -6774,12 +6825,14 @@ get_process_payload_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
     "403": ForbiddenProcessAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_visibility_responses = {
@@ -6787,6 +6840,7 @@ put_process_visibility_responses = {
     "403": ForbiddenVisibilityUpdateResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
@@ -6799,6 +6853,7 @@ delete_process_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_providers_list_responses = {
@@ -6814,6 +6869,7 @@ get_providers_list_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_responses = {
@@ -6825,12 +6881,14 @@ get_provider_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedDeleteProviderResponse(),
 }
@@ -6838,6 +6896,7 @@ get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_responses = {
@@ -6849,6 +6908,7 @@ get_provider_process_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_package_responses = copy(get_process_package_responses)
@@ -6860,6 +6920,7 @@ post_provider_responses = {
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedPostProviderResponse(),
 }
@@ -6870,6 +6931,7 @@ post_provider_process_job_responses = {
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
@@ -6879,6 +6941,7 @@ post_process_jobs_responses = {
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_all_jobs_responses = {
@@ -6890,6 +6953,7 @@ get_all_jobs_responses = {
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid search query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6897,6 +6961,7 @@ delete_jobs_responses = {
     "200": OkBatchDismissJobsResponseSchema(description="success"),
     "400": BadRequestResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
 }
 get_prov_all_jobs_responses = copy(get_all_jobs_responses)
@@ -6917,6 +6982,7 @@ get_single_job_status_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_single_job_status_responses = copy(get_single_job_status_responses)
@@ -6933,6 +6999,7 @@ delete_job_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6950,6 +7017,7 @@ get_job_inputs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_inputs_responses = copy(get_job_inputs_responses)
@@ -6966,6 +7034,7 @@ get_job_outputs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -6987,6 +7056,7 @@ get_job_results_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7004,6 +7074,7 @@ get_exceptions_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7021,6 +7092,7 @@ get_logs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7038,6 +7110,7 @@ get_stats_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7048,12 +7121,14 @@ get_prov_stats_responses.update({
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_quote_responses = {
     "200": OkGetQuoteInfoResponse(description="success"),
     "404": NotFoundQuoteResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
@@ -7061,6 +7136,7 @@ post_quotes_responses = {
     "202": AcceptedQuoteResponse(),
     "400": InvalidJobParametersResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
@@ -7068,34 +7144,40 @@ post_quote_responses = {
     "400": InvalidJobParametersResponse(),
     "402": QuotePaymentRequiredResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_quote_estimator_responses = {
     "200": OkGetEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_quote_estimator_responses = {
     "200": OkPutEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_quote_estimator_responses = {
     "204": OkDeleteEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_vault_responses = {
@@ -7107,6 +7189,7 @@ post_vault_responses = {
     }),
     "400": BadRequestVaultFileUploadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7120,6 +7203,7 @@ head_vault_file_responses = {
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7128,6 +7212,7 @@ get_vault_file_responses = {
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7161,6 +7246,7 @@ wps_responses = {
         }
     }),
     "405": ErrorWPSResponse(),
+    "406": ErrorWPSResponse(),
     "500": ErrorWPSResponse(),
 }
 
@@ -7168,6 +7254,21 @@ wps_responses = {
 #################################################################
 # Utility methods
 #################################################################
+
+
+def derive_responses(responses, response_schema, status_code=200):
+    # type: (Dict[str, ExtendedSchemaNode], ExtendedSchemaNode, int) -> Dict[str, ExtendedSchemaNode]
+    """
+    Generates a derived definition of the responses mapping using the specified schema and status code.
+
+    :param responses: Mapping of status codes to response schemas.
+    :param response_schema: Desired response schema to apply.
+    :param status_code: Desired status code for which to apply the response schema.
+    :return: Derived responses mapping.
+    """
+    responses = copy(responses)
+    responses[str(status_code)] = response_schema
+    return responses
 
 
 def service_api_route_info(service_api, settings):

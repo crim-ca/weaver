@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
 from pyramid.tweens import EXCVIEW, INGRESS
 
+from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import clean_json_text_body, fully_qualified_name
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Callable, Union
@@ -21,6 +23,86 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
+
+
+def validate_accept_header_tween(handler, registry):    # noqa: F811
+    # type: (ViewHandler, Registry) -> ViewHandler
+    """
+    Tween that validates that the specified request ``Accept`` header or format queries (if any) is supported.
+
+    Supported values are defined by :py:data:`SUPPORTED_ACCEPT_TYPES` and for the given context of API or UI.
+
+    :raises HTTPNotAcceptable: if desired ``Accept`` or ``format`` specifier of content-type is not supported.
+    """
+    def validate_format(request):
+        # type: (PyramidRequest) -> AnyViewResponse
+        """
+        Validates the specified request according to its ``Accept`` header or ``format`` query, ignoring UI related
+        routes that require more content-types than the ones supported by the API for displaying purposes of other
+        elements (styles, images, etc.).
+        """
+        sd.AcceptHeader.validator.choices
+        if not is_magpie_ui_path(request):
+            accept, _ = guess_target_format(request)
+            http_msg = s.NotAcceptableResponseSchema.description
+            content = get_request_info(request, default_message=http_msg)
+            ax.verify_param(accept, is_in=True, param_compare=SUPPORTED_ACCEPT_TYPES,
+                            param_name="Accept Header or Format Query",
+                            http_error=HTTPNotAcceptable, msg_on_fail=http_msg,
+                            content=content, content_type=CONTENT_TYPE_JSON)  # enforce type to avoid recursion
+        return handler(request)
+    return validate_format
+
+
+def apply_response_format_tween(handler, registry):    # noqa: F811
+    # type: (Callable[[PyramidRequest], HTTPException], Registry) -> Callable[[PyramidRequest], PyramidResponse]
+    """
+    Tween that applies the response ``Content-Type`` according to the requested ``Accept`` header or ``format`` query.
+
+    The target ``Content-Type`` is expected to have been validated by :func:`validate_accept_header_tween` beforehand
+    to handle not-acceptable errors. If an invalid format is detected at this stage, JSON is used by default.
+    This can be the case for example for :func:`validate_accept_header_tween` itself that raises the error about
+    the invalid ``Accept`` header or ``format`` query, but detects these inadequate parameters from incoming request.
+
+    The tween also ensures that additional request metadata extracted from :func:`get_request_info` is applied to
+    the response body if not already provided by a previous operation.
+    """
+    def apply_format(request):
+        # type: (Request) -> HTTPException
+        """
+        Validates the specified request according to its ``Accept`` header, ignoring UI related routes that request more
+        content-types than the ones supported by the application for display purposes (styles, images etc.).
+
+        Alternatively, if no ``Accept`` header is found, look for equivalent value provided via query parameter.
+        """
+        # all magpie API routes expected to either call 'valid_http' or 'raise_http' of 'magpie.api.exception' module
+        # an HTTPException is always returned, and content is a JSON-like string
+        content_type, is_header = guess_target_format(request)
+        if not is_header:
+            # NOTE:
+            # enforce the accept header in case it was specified with format query, since some renderer implementations
+            # will afterward erroneously overwrite the 'content-type' value that we enforce when converting the response
+            # from the HTTPException. See:
+            #   - https://github.com/Pylons/webob/issues/204
+            #   - https://github.com/Pylons/webob/issues/238
+            #   - https://github.com/Pylons/pyramid/issues/1344
+            request.accept = content_type
+        resp = handler(request)  # no exception when EXCVIEW tween is placed under this tween
+        if is_magpie_ui_path(request):
+            if not resp.content_type:
+                resp.content_type = CONTENT_TYPE_HTML
+            return resp
+        # return routes already converted (valid_http/raise_http where not used, pyramid already generated response)
+        if not isinstance(resp, HTTPException):
+            return resp
+        # forward any headers such as session cookies to be applied
+        metadata = get_request_info(request)
+        resp_kwargs = {"headers": resp.headers}
+        # patch any invalid content-type that should have been validated
+        if content_type not in SUPPORTED_ACCEPT_TYPES:
+            content_type = CONTENT_TYPE_JSON
+        return ax.generate_response_http_format(type(resp), resp_kwargs, resp.text, content_type, metadata)
+    return apply_format
 
 
 # FIXME:

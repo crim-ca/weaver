@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 from pyramid.config import Configurator
+from pyramid.settings import asbool
 
 from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration
 from weaver.database import get_db
