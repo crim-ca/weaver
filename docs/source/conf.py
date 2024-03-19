@@ -442,6 +442,10 @@ linkcheck_ignore = [
     "https://ogc-ades.crim.ca/.*",
     "https://ogc.crim.ca/.*",
     "https://github.com/.*\\.rst#.*",
+    # FIXME: ignore URL causing HTTP 405 inconsistently
+    #   - https://github.com/sphinx-doc/sphinx/issues/12030
+    #   - https://github.com/orgs/sphinx-doc/discussions/12032
+    "https://app.dimensions.ai/details/grant/grant.8105745",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
