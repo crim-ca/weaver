@@ -95,7 +95,7 @@ if TYPE_CHECKING:
         TypeVar,
         Union
     )
-    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard
+    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard, Unpack
 
     from mypy_boto3_s3.client import S3Client
 
@@ -1212,7 +1212,7 @@ def get_href_headers(path,                      # type: str
                      content_headers=False,     # type: bool
                      content_type=None,         # type: Optional[str]
                      settings=None,             # type: Optional[SettingsType]
-                     **option_kwargs,           # type: Any  # Union[SchemeOptions, RequestOptions]
+                     **option_kwargs,           # type: Unpack[Union[SchemeOptions, RequestOptions]]
                      ):                         # type: (...) -> MetadataResult
     """
     Obtain headers applicable for the provided file or directory reference.
@@ -1931,7 +1931,7 @@ def request_extra(method,                           # type: AnyRequestMethod
                   cache_request=_request_cached,    # type: RequestCachingFunction
                   cache_enabled=True,               # type: bool
                   settings=None,                    # type: Optional[AnySettingsContainer]
-                  **request_kwargs,                 # type: Any  # RequestOptions
+                  **request_kwargs,                 # type: Unpack[RequestOptions]
                   ):                                # type: (...) -> AnyResponseType
     """
     Standard library :mod:`requests` with additional functional utilities.
@@ -2493,7 +2493,7 @@ def fetch_file(file_reference,                      # type: str
                out_method=OutputMethod.AUTO,        # type: OutputMethod
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
-               **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+               **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
                ):                                   # type: (...) -> str
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
@@ -2743,7 +2743,7 @@ def fetch_files_s3(location,                            # type: str
                    exclude=None,                        # type: Optional[List[str]]
                    matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
                    settings=None,                       # type: Optional[SettingsType]
-                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
                    ):                                   # type: (...) -> List[MetadataResult]
     ...
 
@@ -2756,7 +2756,7 @@ def fetch_files_s3(location,                            # type: str
                    exclude=None,                        # type: Optional[List[str]]
                    matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
                    settings=None,                       # type: Optional[SettingsType]
-                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
                    ):                                   # type: (...) -> List[DownloadResult]
     ...
 
@@ -2768,7 +2768,7 @@ def fetch_files_s3(location,                            # type: str
                    exclude=None,                        # type: Optional[List[str]]
                    matcher=PathMatchingMethod.GLOB,     # type: PathMatchingMethod
                    settings=None,                       # type: Optional[SettingsType]
-                   **option_kwargs,                     # type: Any  # Union[SchemeOptions, RequestOptions]
+                   **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
                    ):                                   # type: (...) -> List[AnyOutputResult]
     """
     Download all listed S3 files references under the output directory using the provided S3 bucket and client.
@@ -2893,7 +2893,7 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
                     exclude=None,                       # type: Optional[List[str]]
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[SettingsType]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> Iterator[AnyOutputResult]
     """
     Download all listed files references under the output directory.
@@ -3018,7 +3018,7 @@ def fetch_files_html(html_data,                         # type: str
                      exclude=None,                      # type: Optional[List[str]]
                      matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
                      settings=None,                     # type: Optional[AnySettingsContainer]
-                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     **option_kwargs,                   # type: Unpack[Union[SchemeOptions, RequestOptions]]
                      ):                                 # type: (...) -> Iterator[MetadataResult]
     ...
 
@@ -3032,7 +3032,7 @@ def fetch_files_html(html_data,                         # type: str
                      exclude=None,                      # type: Optional[List[str]]
                      matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
                      settings=None,                     # type: Optional[AnySettingsContainer]
-                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     **option_kwargs,                   # type: Unpack[Union[SchemeOptions, RequestOptions]]
                      ):                                 # type: (...) -> Iterator[DownloadResult]
     ...
 
@@ -3045,7 +3045,7 @@ def fetch_files_html(html_data,                         # type: str
                      exclude=None,                      # type: Optional[List[str]]
                      matcher=PathMatchingMethod.GLOB,   # type: PathMatchingMethod
                      settings=None,                     # type: Optional[AnySettingsContainer]
-                     **option_kwargs,                   # type: Any  # Union[SchemeOptions, RequestOptions]
+                     **option_kwargs,                   # type: Unpack[Union[SchemeOptions, RequestOptions]]
                      ):                                 # type: (...) -> Iterator[AnyOutputResult]
     """
     Retrieves files from a directory listing provided as an index of plain HTML with file references.
@@ -3302,7 +3302,7 @@ def fetch_directory(location,                           # type: str
                     exclude=None,                       # type: Optional[List[str]]
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> List[MetadataResult]
     ...
 
@@ -3316,7 +3316,7 @@ def fetch_directory(location,                           # type: str
                     exclude=None,                       # type: Optional[List[str]]
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> List[DownloadResult]
     ...
 
@@ -3329,7 +3329,7 @@ def fetch_directory(location,                           # type: str
                     exclude=None,                       # type: Optional[List[str]]
                     matcher=PathMatchingMethod.GLOB,    # type: PathMatchingMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> List[AnyOutputResult]
     """
     Fetches all files that can be listed from a directory in local or remote location.
@@ -3427,7 +3427,7 @@ def fetch_reference(reference,                          # type: str
                     out_listing=False,                  # type: Literal[False]
                     out_method=OutputMethod.AUTO,       # type: OutputMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> str
     ...
 
@@ -3439,7 +3439,7 @@ def fetch_reference(reference,                          # type: str
                     out_listing=False,                  # type: Literal[True]
                     out_method=OutputMethod.AUTO,       # type: OutputMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> List[str]
     ...
 
@@ -3450,7 +3450,7 @@ def fetch_reference(reference,                          # type: str
                     out_listing=False,                  # type: bool
                     out_method=OutputMethod.AUTO,       # type: OutputMethod
                     settings=None,                      # type: Optional[AnySettingsContainer]
-                    **option_kwargs,                    # type: Any  # Union[SchemeOptions, RequestOptions]
+                    **option_kwargs,                    # type: Unpack[Union[SchemeOptions, RequestOptions]]
                     ):                                  # type: (...) -> Union[str, List[str]]
     """
     Fetches the single file or nested directory files from a local or remote location.
