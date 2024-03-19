@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.1.0:
+
+`5.1.0 <https://github.com/crim-ca/weaver/tree/5.1.0>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
   (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).
