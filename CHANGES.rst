@@ -16,7 +16,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Use ``typing_extensions.Unpack`` to correctly represent expected types
+  for respective ``request-options`` keywords parameters.
+- Fix ``linkcheck`` failing due to inconsistent HTTP responses
+  (relates to `sphinx-doc/sphinx#12030 <https://github.com/sphinx-doc/sphinx/issues/12030>`_).
 
 .. _changes_5.1.0:
 
