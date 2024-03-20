@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Update Swagger-UI version for latest rendering fixes of OpenAPI definitions.
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
   (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).
