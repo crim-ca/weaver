@@ -316,6 +316,18 @@ class OutputFormat(Constants):
     Representation as plain text content without any specific reformatting or validation.
     """)
 
+    HTML = classproperty(fget=lambda self: "html", doc="""
+    Representation as HTML content formatted as serialized string.
+    """)
+
+    HTML_STR = classproperty(fget=lambda self: "html+str", doc="""
+    Representation as HTML content formatted as string with indentation and newlines.
+    """)
+
+    HTML_RAW = classproperty(fget=lambda self: "html+raw", doc="""
+    Representation as HTML content formatted as raw string without indentation or newlines.
+    """)
+
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
@@ -353,7 +365,8 @@ class OutputFormat(Constants):
             requested format to ensure the contents are properly represented as intended. In the case of :term:`JSON`
             as target format or unknown format, the original object is returned directly.
         :param item_root:
-            When using :term:`XML` representations, defines the top-most item name. Unused for other representations.
+            When using :term:`XML` or HTML representations, defines the top-most item name.
+            Unused for other representations.
         :return: Formatted output.
         """
         from weaver.utils import bytes2str
@@ -365,10 +378,13 @@ class OutputFormat(Constants):
             return repr_json(data, indent=2, ensure_ascii=False)
         if fmt in [OutputFormat.JSON_RAW, OutputFormat.TEXT, OutputFormat.TXT]:
             return repr_json(data, indent=None, ensure_ascii=False)
-        if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
-            pretty = fmt == OutputFormat.XML_STR
+        if fmt in [
+            OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR,
+            OutputFormat.HTML, OutputFormat.HTML_RAW, OutputFormat.HTML_STR,
+        ]:
+            pretty = fmt in [OutputFormat.XML_STR, OutputFormat.HTML_STR]
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
-            if fmt == OutputFormat.XML_RAW:
+            if fmt in [OutputFormat.XML_RAW, OutputFormat.HTML_RAW]:
                 xml = bytes2str(xml)
             if isinstance(xml, str):
                 xml = xml.strip()

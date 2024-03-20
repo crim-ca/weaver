@@ -557,6 +557,7 @@ class AcceptHeader(ExtendedSchemaNode):
     # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
         ContentType.APP_JSON,
+        ContentType.APP_YAML,
         ContentType.APP_XML,
         ContentType.TEXT_XML,
         ContentType.TEXT_HTML,
@@ -2949,7 +2950,7 @@ class JobInputsEndpoint(JobPath):
     querystring = JobInputsOutputsQuery()
 
 
-class JobResultsQuery(ExtendedMappingSchema):
+class JobResultsQuery(FormatQuery):
     schema = ExtendedSchemaNode(
         String(),
         title="JobOutputResultsSchema",
@@ -5537,6 +5538,7 @@ class DeployHeaders(RequestHeaders):
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
     header = DeployHeaders(description="Headers employed for process deployment.")
+    querystring = FormatQuery()
     body = Deploy(title="Deploy", examples={
         "DeployCWL": {
             "summary": "Deploy a process from a CWL definition.",
@@ -6234,6 +6236,7 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/ProcessList.yaml"
     description = "Listing of available processes successful."
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = MultiProcessesListing()
 
 
@@ -6282,11 +6285,13 @@ class NotFoundProcessResponse(NotFoundResponseSchema):
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = ProcessDescription()
 
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = CWL()
 
 
@@ -6403,6 +6408,7 @@ class OkDeleteProcessJobResponse(ExtendedMappingSchema):
 
 class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = GetQueriedJobsSchema()
 
 

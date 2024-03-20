@@ -1,9 +1,16 @@
+import colander
 import logging
 import sys
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
-from pyramid.tweens import EXCVIEW, INGRESS
+from pyramid.httpexceptions import (
+    HTTPException,
+    HTTPInternalServerError,
+    HTTPNotAcceptable,
+    HTTPRedirection,
+    HTTPSuccessful
+)
+from pyramid.tweens import EXCVIEW, INGRESS, MAIN
 
 from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSException, OWSNotImplemented
@@ -11,12 +18,12 @@ from weaver.utils import clean_json_text_body, fully_qualified_name
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Callable, Union
+    from typing import Any, Callable, Dict, Optional, Type, Union
 
     from pyramid.config import Configurator
     from pyramid.registry import Registry
 
-    from weaver.typedefs import AnyViewResponse, PyramidRequest
+    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
 
     ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
 
@@ -25,10 +32,10 @@ LOGGER = logging.getLogger(__name__)
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
-def validate_accept_header_tween(handler, registry):    # noqa: F811
+def http_validate_response_format_tween_factory(handler, registry):    # noqa: F811
     # type: (ViewHandler, Registry) -> ViewHandler
     """
-    Tween that validates that the specified request ``Accept`` header or format queries (if any) is supported.
+    Tween factory that validates that the specified request ``Accept`` header or format queries (if any) is supported.
 
     Supported values are defined by :py:data:`SUPPORTED_ACCEPT_TYPES` and for the given context of API or UI.
 
@@ -41,23 +48,31 @@ def validate_accept_header_tween(handler, registry):    # noqa: F811
         routes that require more content-types than the ones supported by the API for displaying purposes of other
         elements (styles, images, etc.).
         """
-        sd.AcceptHeader.validator.choices
-        if not is_magpie_ui_path(request):
-            accept, _ = guess_target_format(request)
-            http_msg = s.NotAcceptableResponseSchema.description
-            content = get_request_info(request, default_message=http_msg)
-            ax.verify_param(accept, is_in=True, param_compare=SUPPORTED_ACCEPT_TYPES,
-                            param_name="Accept Header or Format Query",
-                            http_error=HTTPNotAcceptable, msg_on_fail=http_msg,
-                            content=content, content_type=CONTENT_TYPE_JSON)  # enforce type to avoid recursion
+        try:
+            content_type = guess_target_format(request)
+            sd.AcceptHeader().deserialize(content_type)  # raise on invalid/unacceptable
+        except colander.Invalid as invalid:
+            raise HTTPNotAcceptable(json={
+                "type": "NotAcceptable",
+                "title": "Response format is not acceptable.",
+                "detail": f"Specified response format by query parameter or Accept header is not supported.",
+                "status": HTTPNotAcceptable.code,
+                "cause": invalid.value,
+            })
         return handler(request)
     return validate_format
 
 
-def apply_response_format_tween(handler, registry):    # noqa: F811
-    # type: (Callable[[PyramidRequest], HTTPException], Registry) -> Callable[[PyramidRequest], PyramidResponse]
+# FIXME:
+#   - auto resolve predefined formatter (mako) based on mapped router + cornice service spec
+#   - apply auto-converters based on mapped router path + cornice service spec
+#   - allow/disallow (by service config?) some specific path formats (ex: /package CWL in JSON/YAML ok, but not others)
+def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
+    # type: (Callable[[PyramidRequest], HTTPException], Registry) -> Callable[[PyramidRequest], AnyViewResponse]
     """
-    Tween that applies the response ``Content-Type`` according to the requested ``Accept`` header or ``format`` query.
+    Tween factory that applies the response ``Content-Type`` according to the requested format.
+
+    Format can be provided by ``Accept`` header or ``format`` query.
 
     The target ``Content-Type`` is expected to have been validated by :func:`validate_accept_header_tween` beforehand
     to handle not-acceptable errors. If an invalid format is detected at this stage, JSON is used by default.
@@ -68,42 +83,106 @@ def apply_response_format_tween(handler, registry):    # noqa: F811
     the response body if not already provided by a previous operation.
     """
     def apply_format(request):
-        # type: (Request) -> HTTPException
+        # type: (PyramidRequest) -> HTTPException
         """
         Validates the specified request according to its ``Accept`` header, ignoring UI related routes that request more
         content-types than the ones supported by the application for display purposes (styles, images etc.).
 
         Alternatively, if no ``Accept`` header is found, look for equivalent value provided via query parameter.
         """
-        # all magpie API routes expected to either call 'valid_http' or 'raise_http' of 'magpie.api.exception' module
-        # an HTTPException is always returned, and content is a JSON-like string
-        content_type, is_header = guess_target_format(request)
-        if not is_header:
-            # NOTE:
-            # enforce the accept header in case it was specified with format query, since some renderer implementations
-            # will afterward erroneously overwrite the 'content-type' value that we enforce when converting the response
-            # from the HTTPException. See:
-            #   - https://github.com/Pylons/webob/issues/204
-            #   - https://github.com/Pylons/webob/issues/238
-            #   - https://github.com/Pylons/pyramid/issues/1344
-            request.accept = content_type
+        content_type = guess_target_format(request)
+        # NOTE:
+        # enforce the accept header in case it was specified with format query, since some renderer implementations
+        # will afterward erroneously overwrite the 'content-type' value that we enforce when converting the response
+        # from the HTTPException. See:
+        #   - https://github.com/Pylons/webob/issues/204
+        #   - https://github.com/Pylons/webob/issues/238
+        #   - https://github.com/Pylons/pyramid/issues/1344
+        request.accept = content_type
         resp = handler(request)  # no exception when EXCVIEW tween is placed under this tween
-        if is_magpie_ui_path(request):
-            if not resp.content_type:
-                resp.content_type = CONTENT_TYPE_HTML
-            return resp
-        # return routes already converted (valid_http/raise_http where not used, pyramid already generated response)
+        # return routes already converted (pyramid already generated response)
         if not isinstance(resp, HTTPException):
             return resp
         # forward any headers such as session cookies to be applied
-        metadata = get_request_info(request)
         resp_kwargs = {"headers": resp.headers}
         # patch any invalid content-type that should have been validated
-        if content_type not in SUPPORTED_ACCEPT_TYPES:
-            content_type = CONTENT_TYPE_JSON
-        return ax.generate_response_http_format(type(resp), resp_kwargs, resp.text, content_type, metadata)
+        if content_type not in sd.AcceptHeader.validator.choices:
+            content_type = ContentType.APP_JSON
+        ###return generate_response_http_format(type(resp), resp_kwargs, resp.text, content_type)
+        return resp
     return apply_format
 
+
+# def generate_response_http_format(http_class, http_kwargs, content, content_type=None):
+#     # type: (Type[HTTPException], Optional[Dict[str, Any]], Union[JSON, str], Optional[str]) -> HTTPException
+#     """
+#     Formats the HTTP response content according to desired ``content_type`` using provided HTTP code and content.
+#
+#     :param http_class: `HTTPException` derived class to use for output (code, generic title/explanation, etc.)
+#     :param http_kwargs: additional keyword arguments to pass to `http_class` when called
+#     :param content: formatted JSON content or literal string content providing additional details for the response
+#     :param content_type: One of the supported types by the application.
+#     :return: `http_class` instance with requested information and content type if creation succeeds
+#     :raises: `HTTPInternalServerError` instance details about requested information and content type if creation fails
+#     """
+#     content = str(content) if not isinstance(content, six.string_types) else content
+#
+#     # adjust additional keyword arguments and try building the http response class with them
+#     http_kwargs = {} if http_kwargs is None else http_kwargs
+#     http_headers = http_kwargs.get("headers", {})
+#     # omit content-type and related headers that we override
+#     for header in dict(http_headers):
+#         if header.lower().startswith("content-"):
+#             http_headers.pop(header, None)
+#
+#     try:
+#         # Pass down Location if it is provided and should be given as input parameter for this HTTP class.
+#         # Omitting this step would inject a (possibly extra) empty Location that defaults to the current application.
+#         # When resolving HTTP redirects, injecting this extra Location when the requested one is not the current
+#         # application will lead to redirection failures because all locations are appended in the header as CSV list.
+#         if issubclass(http_class, HTTPRedirection):
+#             location = get_header("Location", http_headers, pop=True)
+#             if location and "location" not in http_kwargs:
+#                 http_kwargs["location"] = location
+#
+#         # directly output json
+#         if content_type == ContentType.APP_JSON:
+#             content_type = "{}; charset=UTF-8".format(CONTENT_TYPE_JSON)
+#             http_response = http_class(body=content, content_type=content_type, **http_kwargs)
+#
+#         # otherwise json is contained within the html <body> section
+#         elif content_type == ContentType.TEXT_HTML:
+#             if http_class is HTTPOk:
+#                 http_class.explanation = "Operation successful."
+#             if not http_class.explanation:
+#                 http_class.explanation = http_class.title  # some don't have any defined
+#             # add preformat <pre> section to output as is within the <body> section
+#             html_status = "Exception" if http_class.code >= 400 else "Response"
+#             html_header = "{}<br><h2>{} Details</h2>".format(http_class.explanation, html_status)
+#             html_template = "<pre style='word-wrap: break-word; white-space: pre-wrap;'>{}</pre>"
+#             content_type = "{}; charset=UTF-8".format(CONTENT_TYPE_HTML)
+#             if json_content:
+#                 html_body = html_template.format(json.dumps(json_content, indent=True, ensure_ascii=False))
+#             else:
+#                 html_body = html_template.format(content)
+#             html_body = html_header + html_body
+#             http_response = http_class(body_template=html_body, content_type=content_type, **http_kwargs)
+#
+#         elif content_type in [CONTENT_TYPE_APP_XML, CONTENT_TYPE_TXT_XML]:
+#             xml_body = OutputFormat.convert(json_content, ContentType.APP_XML, item_root="response")
+#             http_response = http_class(body=xml_body, content_type=CONTENT_TYPE_TXT_XML, **http_kwargs)
+#
+#         # default back to plain text
+#         else:
+#             http_response = http_class(body=content, content_type=CONTENT_TYPE_PLAIN, **http_kwargs)
+#
+#         return http_response
+#     except Exception as exc:  # pylint: disable=W0703
+#         raise HTTPInternalServerError(json={
+#             "detail": "Failed to build HTTP response",
+#             "cause": repr(exc),
+#             "value": str(content_type),
+#         })
 
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
@@ -212,6 +291,8 @@ def ows_response_tween_factory_ingress(handler, registry):  # noqa: F811
 # names must differ to avoid conflicting configuration error
 OWS_RESPONSE_EXCVIEW = fully_qualified_name(ows_response_tween_factory_excview)
 OWS_RESPONSE_INGRESS = fully_qualified_name(ows_response_tween_factory_ingress)
+HTTP_FORMAT_VALIDATE = fully_qualified_name(http_validate_response_format_tween_factory)
+HTTP_FORMAT_RESPONSE = fully_qualified_name(http_apply_response_format_tween_factory)
 
 
 def includeme(config):
@@ -219,5 +300,10 @@ def includeme(config):
 
     # using 'INGRESS' to run `weaver.wps_restapi.api` views that fix HTTP code before OWS response
     config.add_tween(OWS_RESPONSE_INGRESS, under=INGRESS)
+
+    # intermediate tweens to modify the request/response
+    config.add_tween(HTTP_FORMAT_VALIDATE, over=MAIN)
+    config.add_tween(HTTP_FORMAT_RESPONSE, over=OWS_RESPONSE_EXCVIEW)
+
     # using 'EXCVIEW' to run over any other 'valid' exception raised to adjust formatting and log
     config.add_tween(OWS_RESPONSE_EXCVIEW, over=EXCVIEW)
