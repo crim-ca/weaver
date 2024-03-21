@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from beaker.cache import cache_region
@@ -17,7 +17,7 @@ from pyramid.httpexceptions import (
     HTTPUnauthorized
 )
 from pyramid.renderers import render_to_response
-from pyramid.request import Request
+from pyramid.request import Request as PyramidRequest
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
@@ -33,8 +33,12 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_
 
 if TYPE_CHECKING:
     from typing import Any, Callable, List, Optional
+    from typing_extensions import TypedDict
 
-    from weaver.typedefs import JSON, OpenAPISpecification, SettingsType, TypedDict
+    from pyramid.config import Configurator
+    from pyramid.registry import Registry
+
+    from weaver.typedefs import AnyRequestType, JSON, OpenAPISpecification, OpenAPISpecInfo, SettingsType, ViewHandler
     from weaver.wps_restapi.constants import AnyConformanceCategory
 
     Conformance = TypedDict("Conformance", {
@@ -45,8 +49,8 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-def get_conformance(category):
-    # type: (Optional[AnyConformanceCategory]) -> Conformance
+def get_conformance(category, settings):
+    # type: (Optional[AnyConformanceCategory], SettingsType) -> Conformance
     """
     Obtain the conformance references.
 
@@ -64,14 +68,8 @@ def get_conformance(category):
 
     ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
     ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
-    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
-    ogcapi_proc_core = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
-    ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
-    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
-    ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
-    # FIXME: https://github.com/crim-ca/weaver/issues/412
-    # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
-    conformance = [
+    ows_wps_enabled = asbool(settings.get("weaver.wps", True))
+    ows_wps_conformance = [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
@@ -81,6 +79,17 @@ def get_conformance(category):
         f"{ows_wps2}/req/service/binding/rest-json/core",
         f"{ows_wps2}/req/service/binding/rest-json/oas30",  # /ows/wps?...&f=json
         # ows_wps2 + "/req/service/binding/rest-json/html"
+    ] if ows_wps_enabled else []
+
+    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
+    ogcapi_proc_core = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
+    ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
+    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
+    ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
+    # FIXME: https://github.com/crim-ca/weaver/issues/412
+    # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
+    ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))
+    ogcapi_proc_conformance = [
         f"{ogcapi_common}/conf/core",
         f"{ogcapi_common}/per/core/additional-link-relations",
         f"{ogcapi_common}/per/core/additional-status-codes",
@@ -351,6 +360,7 @@ def get_conformance(category):
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part3}/conf/openeo-workflows",
         # f"{ogcapi_proc_part3}/req/openeo-workflows",
+        # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
@@ -408,7 +418,9 @@ def get_conformance(category):
         f"{ogcapi_proc_apppkg}/conf/plt-stage-out",
         f"{ogcapi_proc_apppkg}/req/plt-stage-out",
         # f"{ogcapi_proc_apppkg}/req/plt-stage-out/stac-stage",
-    ]
+    ] if ogcapi_proc_enabled else []
+
+    conformance = ows_wps_conformance + ogcapi_proc_conformance
     if category not in [None, ConformanceCategory.ALL]:
         cat = f"/{category}/"
         conformance = filter(lambda item: cat in item, conformance)
@@ -561,7 +573,7 @@ def api_frontpage_body(settings):
 @sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):  # noqa: F811
-    # type: (Request) -> HTTPException
+    # type: (PyramidRequest) -> HTTPException
     """
     Weaver versions information.
     """
@@ -572,12 +584,12 @@ def api_versions(request):  # noqa: F811
 @sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                                 schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
 def api_conformance(request):  # noqa: F811
-    # type: (Request) -> HTTPException
+    # type: (PyramidRequest) -> HTTPException
     """
     Weaver specification conformance information.
     """
     cat = ConformanceCategory.get(request.params.get("category"), ConformanceCategory.CONFORMANCE)
-    data = get_conformance(cat)
+    data = get_conformance(cat, get_settings(request))
     return HTTPOk(json=data)
 
 
@@ -638,8 +650,14 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
             if terms:
                 swagger_info["termsOfService"] = terms[0]
 
-    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__, info=swagger_info,
-                                    base_path=swagger_base_path, openapi_spec=3)
+    swagger_info = cast("OpenAPISpecInfo", swagger_info)
+    swagger_json = swagger.generate(
+        title=sd.API_TITLE,
+        version=__meta__.__version__,
+        info=swagger_info,
+        base_path=swagger_base_path,
+        openapi_spec=3,
+    )
     swagger_json["externalDocs"] = sd.API_DOCS
     return swagger_json
 
@@ -653,7 +671,7 @@ def openapi_json_cached(*args, **kwargs):
 @sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
-    # type: (Request) -> HTTPException
+    # type: (PyramidRequest) -> HTTPException
     """
     Weaver OpenAPI schema definitions.
     """
@@ -677,9 +695,11 @@ def swagger_ui_cached(request):
 
 
 @sd.api_openapi_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
-                               response_schemas=sd.get_api_swagger_ui_responses)
+                               response_schemas=sd.get_api_swagger_ui_responses,
+                               renderer="templates/swagger_ui.mako")
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
-                               response_schemas=sd.get_api_swagger_ui_responses)
+                               response_schemas=sd.get_api_swagger_ui_responses,
+                               renderer="templates/swagger_ui.mako")
 def api_swagger_ui(request):
     """
     Weaver OpenAPI schema definitions rendering using Swagger-UI viewer.
@@ -699,7 +719,8 @@ def redoc_ui_cached(request):
 
 
 @sd.api_redoc_ui_service.get(tags=[sd.TAG_API], schema=sd.RedocUIEndpoint(),
-                             response_schemas=sd.get_api_redoc_ui_responses)
+                             response_schemas=sd.get_api_redoc_ui_responses,
+                             renderer="templates/redoc_ui.mako")
 def api_redoc_ui(request):
     """
     Weaver OpenAPI schema definitions rendering using Redoc viewer.
@@ -708,7 +729,7 @@ def api_redoc_ui(request):
 
 
 def get_request_info(request, detail=None):
-    # type: (Request, Optional[str]) -> JSON
+    # type: (PyramidRequest, Optional[str]) -> JSON
     """
     Provided additional response details based on the request and execution stack on failure.
     """
@@ -733,12 +754,12 @@ def get_request_info(request, detail=None):
 
 
 def ows_json_format(function):
-    # type: (Callable[[Request], HTTPException]) -> Callable[[HTTPException, Request], HTTPException]
+    # type: (ViewHandler) -> Callable[[HTTPException, PyramidRequest], HTTPException]
     """
     Decorator that adds additional detail in the response's JSON body if this is the returned content-type.
     """
     def format_response_details(response, request):
-        # type: (HTTPException, Request) -> HTTPException
+        # type: (HTTPException, AnyRequestType) -> HTTPException
         http_response = function(request)
         http_headers = get_header("Content-Type", http_response.headers) or []
         req_headers = get_header("Accept", request.headers) or []
@@ -755,6 +776,7 @@ def ows_json_format(function):
 
 @ows_json_format
 def not_found_or_method_not_allowed(request):
+    # type: (PyramidRequest) -> HTTPException
     """
     Overrides the default is HTTPNotFound [404] by appropriate HTTPMethodNotAllowed [405] when applicable.
 
@@ -777,6 +799,7 @@ def not_found_or_method_not_allowed(request):
 
 @ows_json_format
 def unauthorized_or_forbidden(request):
+    # type: (PyramidRequest) -> HTTPException
     """
     Overrides the default is HTTPForbidden [403] by appropriate HTTPUnauthorized [401] when applicable.
 
@@ -788,9 +811,24 @@ def unauthorized_or_forbidden(request):
     .. seealso::
         - http://www.restapitutorial.com/httpstatuscodes.html
     """
-    authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
+    registry: "Registry" = request.registry  # type: ignore
+    authn_policy = registry.queryUtility(IAuthenticationPolicy)
     if authn_policy:
         principals = authn_policy.effective_principals(request)
         if Authenticated not in principals:
             return HTTPUnauthorized("Unauthorized access to this resource.")
     return HTTPForbidden("Forbidden operation under this resource.")
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding API core views...")
+    config.add_forbidden_view(unauthorized_or_forbidden)
+    config.add_notfound_view(not_found_or_method_not_allowed, append_slash=True)
+    config.add_cornice_service(sd.api_frontpage_service)
+    config.add_cornice_service(sd.openapi_json_service)
+    config.add_cornice_service(sd.api_openapi_ui_service)
+    config.add_cornice_service(sd.api_swagger_ui_service)
+    config.add_cornice_service(sd.api_redoc_ui_service)
+    config.add_cornice_service(sd.api_versions_service)
+    config.add_cornice_service(sd.api_conformance_service)

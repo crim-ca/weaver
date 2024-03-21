@@ -29,6 +29,8 @@ from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 if TYPE_CHECKING:
     from typing import Iterable, List
 
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyResponseType, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
@@ -368,3 +370,37 @@ def redirect_job_result(request):
     location = f"{request.url.rsplit('/', 1)[0]}/outputs"
     LOGGER.warning("Deprecated route redirection [%s] -> [%s]", request.url, location)
     return HTTPPermanentRedirect(comment="deprecated", location=location)
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API jobs views...")
+    config.add_cornice_service(sd.jobs_service)
+    config.add_cornice_service(sd.job_service)
+    config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_outputs_service)
+    config.add_cornice_service(sd.job_inputs_service)
+    config.add_cornice_service(sd.job_exceptions_service)
+    config.add_cornice_service(sd.job_logs_service)
+    config.add_cornice_service(sd.job_stats_service)
+    config.add_cornice_service(sd.provider_job_service)
+    config.add_cornice_service(sd.provider_jobs_service)
+    config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_inputs_service)
+    config.add_cornice_service(sd.provider_exceptions_service)
+    config.add_cornice_service(sd.provider_logs_service)
+    config.add_cornice_service(sd.provider_stats_service)
+    config.add_cornice_service(sd.process_jobs_service)
+    config.add_cornice_service(sd.process_job_service)
+    config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_outputs_service)
+    config.add_cornice_service(sd.process_inputs_service)
+    config.add_cornice_service(sd.process_exceptions_service)
+    config.add_cornice_service(sd.process_logs_service)
+    config.add_cornice_service(sd.process_stats_service)
+
+    # backward compatibility routes (deprecated)
+    config.add_cornice_service(sd.job_result_service)
+    config.add_cornice_service(sd.process_result_service)
+    config.add_cornice_service(sd.provider_result_service)

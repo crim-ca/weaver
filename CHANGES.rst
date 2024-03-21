@@ -12,6 +12,11 @@ Changes
 
 Changes:
 --------
+- Refactor ``pyramid`` configuration to employ ``Configurator.add_cornice_service``
+  utility instead of ``Configurator.add_route`` and ``Configurator.add_view`` handlers that were causing a lot of
+  duplication between the ``cornice.Service`` parametrization and their corresponding view decorators. All metadata
+  is now embedded within the same decorator operation.
+
 - Update Swagger-UI version for latest rendering fixes of OpenAPI definitions.
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider

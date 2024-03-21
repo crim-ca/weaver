@@ -23,9 +23,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from pyramid.registry import Registry
 
-    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest
-
-    ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
+    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest, ViewHandler
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,7 +66,7 @@ def http_validate_response_format_tween_factory(handler, registry):    # noqa: F
 #   - apply auto-converters based on mapped router path + cornice service spec
 #   - allow/disallow (by service config?) some specific path formats (ex: /package CWL in JSON/YAML ok, but not others)
 def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
-    # type: (Callable[[PyramidRequest], HTTPException], Registry) -> Callable[[PyramidRequest], AnyViewResponse]
+    # type: (ViewHandler, Registry) -> Callable[[PyramidRequest], AnyViewResponse]
     """
     Tween factory that applies the response ``Content-Type`` according to the requested format.
 

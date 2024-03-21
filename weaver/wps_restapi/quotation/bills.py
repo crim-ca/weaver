@@ -10,6 +10,8 @@ from weaver.store.base import StoreBills
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -43,3 +45,10 @@ def get_bill_info(request):
     except BillNotFound:
         raise HTTPNotFound("Could not find bill with specified 'bill_id'.")
     return HTTPOk(json={"bill": bill.json()})
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API bill views...")
+    config.add_cornice_service(sd.bills_service)
+    config.add_cornice_service(sd.bill_service)

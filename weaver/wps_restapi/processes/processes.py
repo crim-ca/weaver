@@ -47,6 +47,8 @@ from weaver.wps_restapi.processes.utils import get_process_list_links, get_proce
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -393,3 +395,17 @@ def submit_local_job(request):
         http_request.shallow = False
         return service.call(http_request)
     return submit_job(request, process, tags=["wps-rest"])
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API processes views...")
+    config.add_cornice_service(sd.processes_service)
+    config.add_cornice_service(sd.process_service)
+    config.add_cornice_service(sd.process_package_service)
+    config.add_cornice_service(sd.process_payload_service)
+    config.add_cornice_service(sd.process_visibility_service)
+    # added within jobs (conflict)
+    # config.add_cornice_service(sd.process_jobs_service)
+    # config.add_cornice_service(sd.jobs_full_service)
+    config.add_cornice_service(sd.process_execution_service)

@@ -337,6 +337,7 @@ if TYPE_CHECKING:
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
+    ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]

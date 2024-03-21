@@ -26,6 +26,8 @@ from weaver.wps_restapi.providers.utils import check_provider_requirements, get_
 from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
 if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -240,3 +242,14 @@ def submit_provider_job(request):
     provider_id = request.matchdict.get("provider_id")
     service = store.fetch_by_name(provider_id)
     return submit_job(request, service, tags=["wps-rest"])
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API provider views...")
+    config.add_cornice_service(sd.providers_service)
+    config.add_cornice_service(sd.provider_service)
+    config.add_cornice_service(sd.provider_processes_service)
+    config.add_cornice_service(sd.provider_process_service)
+    config.add_cornice_service(sd.provider_process_package_service)
+    config.add_cornice_service(sd.provider_execution_service)

@@ -32,6 +32,8 @@ from weaver.wps_restapi.quotation.utils import get_quote
 if TYPE_CHECKING:
     from typing import Type, Union
 
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnySettingsContainer, AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -267,3 +269,13 @@ def execute_quote(request):
     })
     data = sd.CreatedQuoteExecuteResponse().deserialize(job_json)
     return HTTPCreated(json=data)
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API quote views...")
+    config.add_cornice_service(sd.process_estimator_service)
+    config.add_cornice_service(sd.process_quotes_service)
+    config.add_cornice_service(sd.process_quote_service)
+    config.add_cornice_service(sd.quotes_service)
+    config.add_cornice_service(sd.quote_service)

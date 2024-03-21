@@ -13,6 +13,7 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
+import contextlib
 import datetime
 import inspect
 import os
@@ -99,8 +100,10 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Type, Union
+    from typing import Any, Dict, Optional, NoReturn, Type, Union
     from typing_extensions import TypedDict
+
+    from pyramid.config import Configurator
 
     from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType
 
@@ -5961,8 +5964,8 @@ class GenericHTMLResponse(ExtendedMappingSchema):
     header = HtmlHeader()
     body = ExtendedMappingSchema()
 
-    def __new__(cls, name, **kwargs):
-        # type: (Type["GenericHTMLResponse"], str, **Any) -> "GenericHTMLResponse"
+    def __init__(self, *, name, description, **kwargs):
+        # type: (*Any, str, str, **Any) -> None
         """
         Generates a derived HTML response schema with direct forwarding of custom parameters to the body's schema.
 
@@ -5974,16 +5977,14 @@ class GenericHTMLResponse(ExtendedMappingSchema):
                 "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
                 f"Name '{name}' is invalid."
             )
-        obj = super().__new__(cls)
-        obj.__init__(name=name, title=name, **kwargs)
-        obj.__class__.__name__ = name
-        obj.children = [
+        super().__init__(self, name=name, description=description)
+        self.__class__.__name__ = name
+        self.children = [
             child
             if child.name != "body" else
             ExtendedMappingSchema(name="body", **kwargs)
-            for child in obj.children
+            for child in self.children
         ]
-        return obj
 
 
 class ErrorDetail(ExtendedMappingSchema):
@@ -7262,6 +7263,35 @@ wps_responses = {
 #################################################################
 
 
+class cornice_route_prefix(contextlib.ContextDecorator):
+    """
+    Context manager or decorator that will set the route prefix for service views configured within its context.
+
+    Requires that the `:mod:`cornice` utility is included beforehand in the configurator
+    (i.e.: ``config.include("cornice")``) to provide the relevant configuration properties.
+    To configure the views decorated with :class:`cornice.service.Service`, the ``config.add_cornice_service``
+    directive (i.e.: :func:`cornice.pyramidhook.register_service_views`) should be called within the context.
+    """
+    def __init__(self, config, *, route_prefix):
+        # type: (Configurator, Any, str) -> None
+        self.config = config
+        self.route_prefix = route_prefix
+        self.prev_route_prefix = config.route_prefix
+
+    def __enter__(self):
+        # type: () -> None
+        self.prev_route_prefix = self.config.route_prefix
+        self.config.route_prefix = self.route_prefix
+
+    def __exit__(
+        self,
+        exc_type,   # type: Optional[Type[Exception]]
+        exc_val,    # type: Optional[Exception]
+        exc_tb,     # type: Optional["traceback.TracebackException"]
+    ):              # type: (...) -> Optional[bool] | NoReturn
+        self.config.route_prefix = self.prev_route_prefix
+
+
 def derive_responses(responses, response_schema, status_code=200):
     # type: (Dict[str, ExtendedSchemaNode], ExtendedSchemaNode, int) -> Dict[str, ExtendedSchemaNode]
     """
@@ -7277,6 +7307,7 @@ def derive_responses(responses, response_schema, status_code=200):
     return responses
 
 
+# FIXME: remove [obsolete in favor of cornice_route_prefix decorator]
 def service_api_route_info(service_api, settings):
     # type: (Service, SettingsType) -> ViewInfo
     """
