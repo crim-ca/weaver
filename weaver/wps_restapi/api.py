@@ -24,12 +24,12 @@ from simplejson import JSONDecodeError
 from weaver import __meta__
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSException
-from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CorniceOpenAPI
 from weaver.wps_restapi.constants import ConformanceCategory
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, List, Optional
@@ -38,7 +38,14 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from pyramid.registry import Registry
 
-    from weaver.typedefs import AnyRequestType, JSON, OpenAPISpecification, OpenAPISpecInfo, SettingsType, ViewHandler
+    from weaver.typedefs import (
+        AnyRequestType,
+        AnySettingsContainer,
+        JSON,
+        OpenAPISpecification,
+        SettingsType,
+        ViewHandler
+    )
     from weaver.wps_restapi.constants import AnyConformanceCategory
 
     Conformance = TypedDict("Conformance", {
@@ -453,16 +460,16 @@ def api_frontpage_body(settings):
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_oas_ui = weaver_api_url + sd.api_openapi_ui_service.path if weaver_api else None
-    weaver_api_swagger = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
+    weaver_api_oas_ui = sd.api_openapi_ui_service.path if weaver_api else None
+    weaver_api_swagger = sd.api_swagger_ui_service.path if weaver_api else None
+    weaver_api_spec = sd.openapi_json_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
-    weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
-    weaver_conform_url = weaver_url + sd.api_conformance_service.path
-    weaver_process_url = weaver_url + sd.processes_service.path
-    weaver_jobs_url = weaver_url + sd.jobs_service.path
+    weaver_conform_url = sd.api_conformance_service.path
+    weaver_process_url = weaver_api_url + sd.processes_service.path
+    weaver_jobs_url = weaver_api_url + sd.jobs_service.path
     weaver_vault = asbool(settings.get("weaver.vault"))
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
@@ -525,7 +532,7 @@ def api_frontpage_body(settings):
             # sample:
             #   https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
             if "." in weaver_api_doc:  # pylint: disable=E1135,unsupported-membership-test
-                ext_type = weaver_api_doc.split(".")[-1]
+                ext_type = weaver_api_doc.rsplit(".", 1)[-1]
                 doc_type = f"application/{ext_type}"
             else:
                 doc_type = ContentType.TEXT_PLAIN  # default most basic type
@@ -562,7 +569,7 @@ def api_frontpage_body(settings):
             "parameters": [
                 {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
                 {"name": "vault", "enabled": weaver_vault},
-                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url},
+                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url, "api": weaver_api_oas_ui},
             ],
             "links": weaver_links,
         }
@@ -594,8 +601,8 @@ def api_conformance(request):  # noqa: F811
 
 
 def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
-                     use_refs=True, use_docstring_summary=True, settings=None):
-    # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> OpenAPISpecification
+                     use_refs=True, use_docstring_summary=True, container=None):
+    # type: (str, str, Optional[str], bool, bool, Optional[AnySettingsContainer]) -> OpenAPISpecification
     """
     Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
@@ -604,13 +611,25 @@ def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
     :param base_url: Explicit base URL to employ of as API base instead of HTTP scheme/host parameters.
     :param use_refs: Generate schemas with ``$ref`` definitions or expand every schema content.
     :param use_docstring_summary: Extra function docstring to auto-generate the summary field of responses.
-    :param settings: Application settings to retrieve further metadata details to be added to the OpenAPI.
+    :param container:
+        Container with the :mod:`pyramid` registry and settings to retrieve
+        further metadata details to be added to the :term:`OpenAPI`.
 
     .. seealso::
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
     depth = -1 if use_refs else 0
-    swagger = CorniceOpenAPI(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
+    registry = get_registry(container)
+    settings = get_settings(registry)
+    swagger = CorniceOpenAPI(
+        get_services(),
+        def_ref_depth=depth,
+        param_ref=use_refs,
+        resp_ref=use_refs,
+        # registry needed to map to the resolved paths using any relevant route prefix
+        # if unresolved, routes will use default endpoint paths without configured setting prefixes (if any)
+        pyramid_registry=registry,
+    )
     swagger.ignore_methods = ["OPTIONS"]  # don't ignore HEAD, used by vault
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
@@ -677,17 +696,16 @@ def openapi_json(request):  # noqa: F811
     """
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    settings = get_settings(request)
-    weaver_server_url = get_weaver_url(settings)
+    weaver_server_url = get_weaver_url(request)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    spec = openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
+    spec = openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, container=request)
     return HTTPOk(json=spec, content_type=ContentType.APP_OAS_JSON)
 
 
 @cache_region("doc", sd.api_swagger_ui_service.name)
 def swagger_ui_cached(request):
-    json_path = wps_restapi_base_path(request) + sd.openapi_json_service.path
+    json_path = sd.openapi_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "openapi_json_path": json_path, "api_version": __meta__.__version__}
     resp = render_to_response("templates/swagger_ui.mako", data_mako, request=request)

@@ -16,8 +16,11 @@ Changes:
   utility instead of ``Configurator.add_route`` and ``Configurator.add_view`` handlers that were causing a lot of
   duplication between the ``cornice.Service`` parametrization and their corresponding view decorators. All metadata
   is now embedded within the same decorator operation.
-
-- Update Swagger-UI version for latest rendering fixes of OpenAPI definitions.
+- Add missing documentation for ``weaver.wps_restapi_doc`` and ``weaver.wps_restapi_ref`` configuration settings.
+- Modified the base path/URL resolution of the `OpenAPI` endpoint to be located at the application root instead of being
+  nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
+  are employed for representing supported requests and responses both the `REST` and the `OWS` `WPS` interfaces.
+- Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
   (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).
@@ -26,6 +29,9 @@ Changes:
 
 Fixes:
 ------
+- Fix invalid resolution of reported API endpoints in the `OpenAPI` and frontpage response when
+  ``weaver.wps_restapi_path``, ``weaver.wps_restapi_url``, ``weaver.wps_path`` or ``weaver.wps_url``
+  were set to other prefix path values than the default root base URL.
 - Fix ``moto>=5`` used in tests to mock AWS S3 operations that replaced ``mock_s3`` context manager by ``mock_aws``.
 
 .. _changes_5.0.0:

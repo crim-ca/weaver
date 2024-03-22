@@ -44,5 +44,10 @@ def includeme(config):
     wps_service.add_view("POST", pywps_view, tags=wps_tags, renderer=OutputFormat.XML,
                          schema=sd.WPSEndpointPost(), response_schemas=sd.wps_responses)
     LOGGER.debug("Applying WPS KVP/XML service schemas with views to application.")
-    with sd.cornice_route_prefix(config=config, route_prefix=wps_path):
-        config.add_cornice_service(wps_service)
+    # note:
+    #   cannot use 'add_cornice_service' directive in this case
+    #   it uses a decorator-wrapper that provides arguments in a different manner than what is expected by 'pywps_view'
+    config.add_route(wps_service.name, path=wps_path)
+    config.add_view(pywps_view, route_name=wps_service.name)
+    # provide the route name explicitly to resolve the correct path when generating the OpenAPI definition
+    wps_service.pyramid_route = wps_service.name

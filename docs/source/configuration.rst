@@ -231,6 +231,25 @@ they are optional and which default value or operation is applied in each situat
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
 
+- | ``weaver.wps_restapi_doc = <full-url>``
+  | (default: ``None``)
+  |
+  | Location that will be displayed as reference specification document for the service.
+  |
+  | Typically, this value would be set to a reference similar
+    to :ref:`ogc-api-proc-part1-spec-html` or :ref:`ogc-api-proc-part1-spec-pdf`.
+    However, this value is left by default empty to let maintainers chose which specification document is more relevant
+    for their own deployment, considering that they might want to support different parts of the extended specification.
+
+- | ``weaver.wps_restapi_ref = <full-url>``
+  | (default: ``None``)
+  |
+  | Location that will be displayed as reference specification :term:`JSON` schema for the service.
+  |
+  | Typically, this value would be set to a reference similar to :ref:`ogc-api-proc-part1-spec-json`.
+    However, this value is left by default empty to let maintainers chose which specification schema is more relevant
+    for their own deployment, considering that they might want to support different parts of the extended specification.
+
 - | ``weaver.wps_metadata_[...]`` (multiple settings) [:class:`str`]
   |
   | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints

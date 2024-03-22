@@ -31,7 +31,8 @@ if TYPE_CHECKING:
         HeadersType,
         JSON,
         Params,
-        Return
+        Return,
+        SettingsType
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ class HTTPHeadFileResponse(HTTPSuccessful):
         )
 
     def prepare(self, environ):
+        # type: (SettingsType) -> None
         """
         No contents for HEAD request.
         """
@@ -93,6 +95,9 @@ class HTTPHeadFileResponse(HTTPSuccessful):
 
 def wps_restapi_base_path(container):
     # type: (AnySettingsContainer) -> str
+    """
+    Obtain the REST :term:`API` base path.
+    """
     settings = get_settings(container)
     restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip("/").strip()
     return restapi_path
@@ -100,6 +105,9 @@ def wps_restapi_base_path(container):
 
 def get_wps_restapi_base_url(container):
     # type: (AnySettingsContainer) -> str
+    """
+    Obtain the REST :term:`API` base URL.
+    """
     settings = get_settings(container)
     weaver_rest_url = settings.get("weaver.wps_restapi_url")
     if not weaver_rest_url:
