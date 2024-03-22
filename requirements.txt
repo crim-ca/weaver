@@ -22,7 +22,8 @@ celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
 celery[mongodb]>=5.2.2,<6; sys_platform != "win32"
 cffi
 colander<2
-cornice
+# FIXME: patch fix of the cornice service prefixed route path resolution (https://github.com/Cornices/cornice/pull/584)
+cornice @ git+https://github.com/fmigneault/cornice.git@fix-service-route-prefix
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography
