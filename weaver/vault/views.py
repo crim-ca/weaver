@@ -31,9 +31,9 @@ from weaver.wps_restapi.utils import HTTPHeadFileResponse
 if TYPE_CHECKING:
     from typing import Optional
 
+    import cgi
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
-    from webob.compat import cgi_FieldStorage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def upload_file(request):
     """
     error = "File missing."
     try:
-        req_file = request.POST.get("file")         # type: Optional[cgi_FieldStorage]
+        req_file = request.POST.get("file")         # type: Optional[cgi.FieldStorage]
         req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedIOBase]
     except Exception as exc:
         error = str(exc)
