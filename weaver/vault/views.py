@@ -29,9 +29,9 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
 if TYPE_CHECKING:
+    import cgi
     from typing import Optional
 
-    import cgi
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
 
