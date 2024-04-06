@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import colander
+from box import Box
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
@@ -54,14 +55,18 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+@sd.processes_service.get(
+    schema=sd.GetProcessesEndpoint(),
+    tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/processes.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_processes_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
+    )
+)
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                           response_schemas=sd.get_processes_responses, accept=ContentType.APP_JSON)
-@sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-                          accept=ContentType.TEXT_HTML, renderer="weaver.wps_restapi:templates/processes.mako",
-                          response_schemas=sd.derive_responses(
-                              sd.get_processes_responses,
-                              sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
-                          ))
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -83,6 +88,8 @@ def get_processes(request):
 
     detail = asbool(params.get("detail", True))
     ignore = asbool(params.get("ignore", True))
+    if request.accept == ContentType.TEXT_HTML:
+        detail = ignore = True
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
@@ -147,7 +154,7 @@ def get_processes(request):
         body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
-        return HTTPOk(json=body)
+        return Box(body)
 
     except ServiceException as exc:
         LOGGER.debug("Error when listing provider processes using query parameter raised: [%s]", exc, exc_info=exc)

@@ -77,9 +77,10 @@ pyramid_beaker>=0.8
 #pyramid_celery>=4.0.0   # required for celery>=5
 pyramid_celery @ git+https://github.com/crim-ca/pyramid_celery.git@5.0.0a
 pyramid_mako
-python-dateutil
 pyramid_rewrite
 pyramid_storage
+python-box
+python-dateutil
 pytz
 pywps==4.6.0
 pyyaml>=5.2

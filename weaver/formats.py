@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import socket
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -124,11 +124,11 @@ class ContentEncoding(Constants):
         - https://github.com/json-schema-org/json-schema-spec/issues/803
         - https://github.com/json-schema-org/json-schema-spec/pull/862
     """
-    UTF_8 = "UTF-8"
-    BINARY = "binary"
-    BASE16 = "base16"
-    BASE32 = "base32"
-    BASE64 = "base64"
+    UTF_8 = "UTF-8"    # type: Literal["UTF-8"]
+    BINARY = "binary"  # type: Literal["BINARY"]
+    BASE16 = "base16"  # type: Literal["BASE16"]
+    BASE32 = "base32"  # type: Literal["BASE32"]
+    BASE64 = "base64"  # type: Literal["BASE64"]
 
     @staticmethod
     def is_text(encoding):
@@ -152,8 +152,10 @@ class ContentEncoding(Constants):
         """
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
-        is_text = ContentEncoding.is_text(encoding)
-        return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
+        if ContentEncoding.is_text(encoding):
+            mode = cast("FileModeEncoding", f"{mode}b")
+            return mode, None
+        return mode, ContentEncoding.UTF_8
 
     @staticmethod
     @overload
@@ -278,55 +280,55 @@ class OutputFormat(Constants):
     """
     JSON = classproperty(fget=lambda self: "json", doc="""
     Representation as :term:`JSON` (object), which can still be manipulated in code.
-    """)  # noqa: F811  # false-positive redefinition of JSON typing
+    """)  # type: Literal["JSON", "json"]  # noqa: F811  # false-positive redefinition of JSON typing
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
     Representation as :term:`JSON` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["JSON+STR", "json+str"]
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
     Representation as :term:`JSON` content formatted as raw string without any indentation or newlines.
-    """)
+    """)  # type: Literal["JSON+RAW", "json+raw"]
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
     Representation as :term:`YAML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["YAML", "yaml"]
 
     YML = classproperty(fget=lambda self: "yml", doc="""
     Alias to YAML.
-    """)
+    """)  # type: Literal["YML", "yml"]
 
     XML = classproperty(fget=lambda self: "xml", doc="""
     Representation as :term:`XML` content formatted as serialized string.
-    """)
+    """)  # type: Literal["XML", "xml"]
 
     XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
     Representation as :term:`XML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["XML+STR", "xml+str"]
 
     XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
     Representation as :term:`XML` content formatted as raw string without indentation or newlines.
-    """)
+    """)  # type: Literal["XML+RAW", "xml+raw"]
 
     TXT = classproperty(fget=lambda self: "txt", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["TXT", "txt"]
 
     TEXT = classproperty(fget=lambda self: "text", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["TEXT", "text"]
 
     HTML = classproperty(fget=lambda self: "html", doc="""
     Representation as HTML content formatted as serialized string.
-    """)
+    """)  # type: Literal["HTML", "html"]
 
     HTML_STR = classproperty(fget=lambda self: "html+str", doc="""
     Representation as HTML content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["HTML+STR", "html+str"]
 
     HTML_RAW = classproperty(fget=lambda self: "html+raw", doc="""
     Representation as HTML content formatted as raw string without indentation or newlines.
-    """)
+    """)  # type: Literal["HTML+RAW", "html+raw"]
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
@@ -423,7 +425,8 @@ _CONTENT_TYPE_EXCLUDE = [
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": ContentType.APP_YAML,  # common alternative to .yml
+    ".yaml": ContentType.APP_YAML,    # common alternative to .yml
+    ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -1003,9 +1006,8 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
 
 
 if TYPE_CHECKING:
-    from weaver.typedefs import Literal
-
-    AnyOutputFormat = Literal[
+    AnyOutputFormat: OutputFormat = Union[
+        OutputFormat,
         OutputFormat.JSON,
         OutputFormat.XML,
         OutputFormat.YAML,

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import colander
 import yaml
+from box import Box
+from pyramid.events import BeforeRender, subscriber
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPInternalServerError,
@@ -15,6 +17,7 @@ from pyramid.httpexceptions import (
     status_map
 )
 
+from weaver import __meta__
 from weaver.formats import repr_json
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -239,3 +242,16 @@ def parse_content(request=None,                                         # type: 
             "value": repr_json(exc.value, force_string=False),
         })
     return content
+
+
+@subscriber(BeforeRender)
+def add_renderer_context(event):
+    # type: (BeforeRender) -> None
+    """
+    Adds an event subscriber that provides additional metadata for renderers.
+    """
+    event["weaver"] = Box({
+        "__meta__": __meta__,
+        "url": get_weaver_url(event["request"]),
+        "wps_restapi_url": get_wps_restapi_base_url(event["request"]),
+    })

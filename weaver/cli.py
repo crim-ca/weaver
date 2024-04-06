@@ -84,14 +84,9 @@ if TYPE_CHECKING:
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
         CWL = JSON = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = HeadersType = Any
         JobSubscribers = Any
-    try:
-        from weaver.formats import AnyOutputFormat
-        from weaver.processes.constants import ProcessSchemaType
-        from weaver.status import AnyStatusSearch
-    except ImportError:
-        AnyOutputFormat = str
-        AnyStatusSearch = str
-        ProcessSchemaType = str
+    from weaver.formats import AnyOutputFormat
+    from weaver.processes.constants import ProcessSchemaType
+    from weaver.status import AnyStatusSearch
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
