@@ -10,6 +10,7 @@ from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import (
     HTTPException,
     HTTPForbidden,
+    HTTPFound,
     HTTPMethodNotAllowed,
     HTTPNotFound,
     HTTPOk,
@@ -29,7 +30,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CorniceOpenAPI
 from weaver.wps_restapi.constants import ConformanceCategory
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_path, get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, List, Optional
@@ -96,7 +97,8 @@ def get_conformance(category, settings):
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
     ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))
-    ogcapi_proc_conformance = [
+    ogcapi_proc_html = asbool(settings.get("weaver.wps_restapi_html", True))
+    ogcapi_proc_conformance = ([
         f"{ogcapi_common}/conf/core",
         f"{ogcapi_common}/per/core/additional-link-relations",
         f"{ogcapi_common}/per/core/additional-status-codes",
@@ -176,10 +178,11 @@ def get_conformance(category, settings):
         # FIXME: https://github.com/crim-ca/weaver/issues/230
         # ogcapi_proc_core + "/conf/callback",
         f"{ogcapi_proc_core}/conf/dismiss",
-        # FIXME: https://github.com/crim-ca/weaver/issues/210
-        # ogcapi_proc_core + "/conf/html",
-        # ogcapi_proc_core + "/conf/html/content",
-        # ogcapi_proc_core + "/conf/html/definition",
+    ] + ([
+        f"{ogcapi_proc_core}/conf/html",
+        f"{ogcapi_proc_core}/conf/html/content",
+        f"{ogcapi_proc_core}/conf/html/definition",
+    ] if ogcapi_proc_html else []) + [
         f"{ogcapi_proc_core}/conf/json",
         f"{ogcapi_proc_core}/conf/job-list",
         f"{ogcapi_proc_core}/conf/oas30",
@@ -291,10 +294,11 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core}/req/dismiss",
         f"{ogcapi_proc_core}/req/dismiss/job-dismiss-op",
         f"{ogcapi_proc_core}/req/dismiss/job-dismiss-success",
-        # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/clause_7_core.adoc#sc_requirements_class_html
-        # ogcapi_proc_core + "/req/html",
-        # ogcapi_proc_core + "/req/html/content",
-        # ogcapi_proc_core + "/req/html/definition",
+    ] + ([
+        f"{ogcapi_proc_core}/req/html",
+        f"{ogcapi_proc_core}/req/html/content",
+        f"{ogcapi_proc_core}/req/html/definition",
+    ] if ogcapi_proc_html else []) + [
         # FIXME: https://github.com/crim-ca/weaver/issues/231
         #  List all supported requirements, recommendations and abstract tests
         f"{ogcapi_proc_core}/conf/ogc-process-description",
@@ -425,7 +429,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_apppkg}/conf/plt-stage-out",
         f"{ogcapi_proc_apppkg}/req/plt-stage-out",
         # f"{ogcapi_proc_apppkg}/req/plt-stage-out/stac-stage",
-    ] if ogcapi_proc_enabled else []
+    ]) if ogcapi_proc_enabled else []
 
     conformance = ows_wps_conformance + ogcapi_proc_conformance
     if category not in [None, ConformanceCategory.ALL]:
@@ -460,14 +464,14 @@ def api_frontpage_body(settings):
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_oas_ui = sd.api_openapi_ui_service.path if weaver_api else None
-    weaver_api_swagger = sd.api_swagger_ui_service.path if weaver_api else None
-    weaver_api_spec = sd.openapi_json_service.path if weaver_api else None
+    weaver_api_oas_ui = weaver_url + sd.api_openapi_ui_service.path if weaver_api else None
+    weaver_api_swagger = weaver_url + sd.api_swagger_ui_service.path if weaver_api else None
+    weaver_api_spec = weaver_url + sd.openapi_json_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
-    weaver_conform_url = sd.api_conformance_service.path
+    weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_api_url + sd.processes_service.path
     weaver_jobs_url = weaver_api_url + sd.jobs_service.path
     weaver_vault = asbool(settings.get("weaver.vault"))
@@ -547,16 +551,16 @@ def api_frontpage_body(settings):
             {"href": weaver_wps_url,
              "rel": "wps", "type": ContentType.TEXT_XML,
              "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
-            {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
+            {"href": "https://docs.opengeospatial.org/is/14-065/14-065.html",
              "rel": "wps-specification", "type": ContentType.TEXT_HTML,
              "title": "WPS 1.0.0/2.0 definition of this service."},
-            {"href": "http://schemas.opengis.net/wps/",
+            {"href": "https://schemas.opengis.net/wps/",
              "rel": "wps-schema-repository", "type": ContentType.TEXT_HTML,
              "title": "WPS 1.0.0/2.0 XML schemas repository."},
-            {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
+            {"href": "https://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
              "rel": "wps-schema-1", "type": ContentType.TEXT_XML,
              "title": "WPS 1.0.0 XML validation schemas entrypoint."},
-            {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
+            {"href": "https://schemas.opengis.net/wps/2.0/wps.xsd",
              "rel": "wps-schema-2", "type": ContentType.TEXT_XML,
              "title": "WPS 2.0 XML validation schemas entrypoint."},
         ])
@@ -827,7 +831,7 @@ def unauthorized_or_forbidden(request):
     Without this fix, both situations return [403] regardless.
 
     .. seealso::
-        - http://www.restapitutorial.com/httpstatuscodes.html
+        - https://www.restapitutorial.com/httpstatuscodes.html
     """
     registry: "Registry" = request.registry  # type: ignore
     authn_policy = registry.queryUtility(IAuthenticationPolicy)
@@ -838,15 +842,47 @@ def unauthorized_or_forbidden(request):
     return HTTPForbidden("Forbidden operation under this resource.")
 
 
+def redirect_view(request):
+    # type: (PyramidRequest) -> HTTPException
+    """
+    Handles redirection of :term:`API` core requests to the :term:`OGC API - Processes` prefixed endpoints.
+
+    When ``weaver.wps_restapi_path`` is set to another endpoint than the default, the core :term:`API` endpoints
+    used to report documentation details such as the :term:`OpenAPI` definition and the entrypoint page become
+    available on both the prefixed and non-prefixed paths. This is required to provide details that are not *only*
+    relevant for the :term:`OGC API - Processes` endpoints, but also other locations such as for the :term:`WPS`
+    and :term:`Vault` requests.
+    """
+    api_base = get_wps_restapi_base_path(request)
+    url_base = request.path.rsplit(api_base, 1)[-1] or "/"
+    return HTTPFound(location=url_base)
+
+
 def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding API core views...")
     config.add_forbidden_view(unauthorized_or_forbidden)
     config.add_notfound_view(not_found_or_method_not_allowed, append_slash=True)
-    config.add_cornice_service(sd.api_frontpage_service)
-    config.add_cornice_service(sd.openapi_json_service)
-    config.add_cornice_service(sd.api_openapi_ui_service)
-    config.add_cornice_service(sd.api_swagger_ui_service)
-    config.add_cornice_service(sd.api_redoc_ui_service)
-    config.add_cornice_service(sd.api_versions_service)
-    config.add_cornice_service(sd.api_conformance_service)
+
+    api_base_services = [
+        sd.api_frontpage_service,
+        sd.openapi_json_service,
+        sd.api_openapi_ui_service,
+        sd.api_swagger_ui_service,
+        sd.api_redoc_ui_service,
+        sd.api_versions_service,
+        sd.api_conformance_service,
+    ]
+    for api_svc in api_base_services:
+        config.add_cornice_service(api_svc)
+
+    url_base = get_weaver_url(config)
+    api_base = get_wps_restapi_base_url(config)
+    if url_base != api_base:
+        api_path = get_wps_restapi_base_path(config)
+        LOGGER.info("Adding API core redirect views [%s => /]...", api_path)
+        for api_svc in api_base_services:
+            redirect_name = f"redirect-{api_svc.name}"
+            redirect_path = api_path + api_svc.path.rstrip("/")
+            config.add_route(name=redirect_name, pattern=redirect_path)
+            config.add_view(route_name=redirect_name, view=redirect_view, request_method="GET")

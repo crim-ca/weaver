@@ -10,11 +10,12 @@ from pyramid.httpexceptions import (
     HTTPRedirection,
     HTTPSuccessful
 )
+from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW, INGRESS, MAIN
 
 from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSException, OWSNotImplemented
-from weaver.utils import clean_json_text_body, fully_qualified_name
+from weaver.utils import clean_json_text_body, fully_qualified_name, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -53,10 +54,21 @@ def http_validate_response_format_tween_factory(handler, registry):    # noqa: F
             raise HTTPNotAcceptable(json={
                 "type": "NotAcceptable",
                 "title": "Response format is not acceptable.",
-                "detail": f"Specified response format by query parameter or Accept header is not supported.",
+                "detail": "Specified response format by query parameter or Accept header is not supported.",
                 "status": HTTPNotAcceptable.code,
                 "cause": invalid.value,
             })
+        if content_type == ContentType.TEXT_HTML:
+            settings = get_settings(request)
+            html_acceptable = asbool(settings.get("weaver.wps_restapi_html", True))
+            if not html_acceptable:
+                raise HTTPNotAcceptable(json={
+                    "type": "NotAcceptable",
+                    "title": "Response format is not acceptable.",
+                    "detail": "This 'OGC API - Processes' implementation does not support HTML responses.",
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {"weaver.wps_restapi_html": False}
+                })
         return handler(request)
     return validate_format
 

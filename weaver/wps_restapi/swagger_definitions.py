@@ -7263,35 +7263,6 @@ wps_responses = {
 #################################################################
 
 
-class cornice_route_prefix(contextlib.ContextDecorator):
-    """
-    Context manager or decorator that will set the route prefix for service views configured within its context.
-
-    Requires that the `:mod:`cornice` utility is included beforehand in the configurator
-    (i.e.: ``config.include("cornice")``) to provide the relevant configuration properties.
-    To configure the views decorated with :class:`cornice.service.Service`, the ``config.add_cornice_service``
-    directive (i.e.: :func:`cornice.pyramidhook.register_service_views`) should be called within the context.
-    """
-    def __init__(self, config, *, route_prefix):
-        # type: (Configurator, Any, str) -> None
-        self.config = config
-        self.route_prefix = route_prefix
-        self.prev_route_prefix = config.route_prefix
-
-    def __enter__(self):
-        # type: () -> None
-        self.prev_route_prefix = self.config.route_prefix
-        self.config.route_prefix = self.route_prefix
-
-    def __exit__(
-        self,
-        exc_type,   # type: Optional[Type[Exception]]
-        exc_val,    # type: Optional[Exception]
-        exc_tb,     # type: Optional["traceback.TracebackException"]
-    ):              # type: (...) -> Optional[bool] | NoReturn
-        self.config.route_prefix = self.prev_route_prefix
-
-
 def derive_responses(responses, response_schema, status_code=200):
     # type: (Dict[str, ExtendedSchemaNode], ExtendedSchemaNode, int) -> Dict[str, ExtendedSchemaNode]
     """
@@ -7305,22 +7276,6 @@ def derive_responses(responses, response_schema, status_code=200):
     responses = copy(responses)
     responses[str(status_code)] = response_schema
     return responses
-
-
-# FIXME: remove [obsolete in favor of cornice_route_prefix decorator]
-def service_api_route_info(service_api, settings):
-    # type: (Service, SettingsType) -> ViewInfo
-    """
-    Automatically generates the view configuration parameters from the :mod:`cornice` service definition.
-
-    :param service_api: cornice service with name and path definition.
-    :param settings: settings to obtain the base path of the application.
-    :return: view configuration parameters that can be passed directly to ``config.add_route`` call.
-    """
-    from weaver.wps_restapi.utils import wps_restapi_base_path  # import here to avoid circular import errors
-
-    api_base = wps_restapi_base_path(settings)
-    return {"name": service_api.name, "pattern": f"{api_base}{service_api.path}"}
 
 
 def datetime_interval_parser(datetime_interval):

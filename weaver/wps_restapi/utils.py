@@ -93,7 +93,7 @@ class HTTPHeadFileResponse(HTTPSuccessful):
         """
 
 
-def wps_restapi_base_path(container):
+def get_wps_restapi_base_path(container):
     # type: (AnySettingsContainer) -> str
     """
     Obtain the REST :term:`API` base path.
@@ -112,7 +112,7 @@ def get_wps_restapi_base_url(container):
     weaver_rest_url = settings.get("weaver.wps_restapi_url")
     if not weaver_rest_url:
         weaver_url = get_weaver_url(settings)
-        restapi_path = wps_restapi_base_path(settings)
+        restapi_path = get_wps_restapi_base_path(settings)
         weaver_rest_url = weaver_url + restapi_path
     return weaver_rest_url.rstrip("/").strip()
 

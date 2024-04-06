@@ -212,18 +212,26 @@ they are optional and which default value or operation is applied in each situat
 - | ``weaver.wps_restapi = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
-  | Enable the WPS-REST endpoint.
+  | Enable the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoint.
 
 .. warning::
 
     `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
-    it without REST endpoint, but it should technically be possible to run it as WPS-1/2 only if desired.
+    it without REST endpoint, but it should technically be possible to run it as :term:`WPS`-1/2 only if desired.
+
+- | ``weaver.wps_restapi_html = true|false`` [:class:`bool`-like]
+  | (default: ``true``)
+  |
+  | Enable support of HTML responses for :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints.
+  |
+  | When enabled, endpoints will support ``Accept: text/html`` header and ``?f=html`` query to return contents in HTML
+    instead of the default :term:`JSON` responses. Otherwise, HTTP ``406 Not Acceptable`` code will be returned instead.
 
 - | ``weaver.wps_restapi_path = <url-path>``
   | ``weaver.wps_restapi_url = <full-url>``
   | (default: *path* ``/``)
   |
-  | Endpoint that will be employed as prefix to refer to WPS-REST requests
+  | Endpoint that will be employed as prefix to refer to :term:`WPS-REST` requests
   | (including but not limited to |ogc-api-proc|_ schemas).
   |
   | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
@@ -252,7 +260,7 @@ they are optional and which default value or operation is applied in each situat
 
 - | ``weaver.wps_metadata_[...]`` (multiple settings) [:class:`str`]
   |
-  | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints
+  | Metadata fields that will be rendered by either or both the :term:`WPS`-1/2 and :term:`WPS-REST` endpoints
     (:ref:`GetCapabilities <proc_op_getcap>`).
 
 - | ``weaver.wps_email_[...]`` (multiple settings)

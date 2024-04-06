@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Add support of `HTML` responses for `OGC API - Processes` endpoints
+  (fixes `#210 <https://github.com/crim-ca/weaver/issues/210>`_).
+- Add ``weaver.wps_restapi_html`` configuration setting to control support of `HTML` responses.
 - Refactor ``pyramid`` configuration to employ ``Configurator.add_cornice_service``
   utility instead of ``Configurator.add_route`` and ``Configurator.add_view`` handlers that were causing a lot of
   duplication between the ``cornice.Service`` parametrization and their corresponding view decorators. All metadata
