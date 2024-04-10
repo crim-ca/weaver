@@ -1,39 +1,51 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
-<%inherit file="weaver.wps_restapi:templates/responses/util.mako"/>
+<%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
 <h2>Processes</h2>
 
 <div class="format-link">
-View <a href="${get_processes_link(query='f=json')}">JSON</a> representation.
+(<a href="${util.get_processes_link(query='f=json')}">JSON</a>)
 </div>
 
 <div class="process-listing">
-    <div>
+
+    <div class="content-section">
     Total processes: ${total}
     </div>
+
+    <div class="content-section">
     <dl>
         %for process in processes:
-        <dt>
-            <a href="${get_process_link(process, query='f=html'))}">${process.id}</a>
+        <dt class="process-list-item ">
+            <a href="${util.get_process_link(process.id, query='f=html')}">${process.id}</a>
             %if process.get("title"):
                 <span class="title">${process.title}</span>
             %endif
             <div class="format-link">
-                <a href="${get_process_link(process, query='f=json'))}">JSON</a>
+                (<a href="${util.get_process_link(process.id, query='f=json')}">OGC JSON</a>,
+                 <a href="${util.get_process_link(process.id, query='f=xml')}">WPS XML</a>)
             </div>
         </dt>
         <dd>
             %if process.get("description"):
-                ${process.description}
+                <div class="field">
+                    <span class="description">${process.description}</span>
+                </div>
             %endif
             %if process.version:
-                <span class="version">${process.version}</span>
+                <div class="field">
+                    <div class="field-title">Version: </div>
+                    <div class="label label-info version-tag">${process.version}</div>
+                </div>
             %endif
             %if process.keywords:
-            <br>
-            <b>Keywords</b>: ${", ".join(process.keywords)}
+                <div class="field">
+                    <div class="field-title">Keywords: </div>${", ".join(process.keywords)}
+                </div>
             %endif
         </dd>
         %endfor
     </dl>
+    </div>
+
 </div>

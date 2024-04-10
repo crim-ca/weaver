@@ -4,6 +4,27 @@
     margin: 5em 2em 2em;
 }
 
+/* --- Generic Formats ---*/
+
+.undefined {
+    font-style: italic;
+    font-size: 90%;
+    color: dimgray;
+}
+
+.field {
+    display: flex;
+    display: -webkit-box;
+}
+
+.field-title {
+    font-weight: bold;
+}
+
+.format-link {
+    font-size: 80%;
+}
+
 /* --- Labels --- */
 
 .label {
@@ -61,4 +82,10 @@
 }
 
 .version-tag {
+}
+
+/* --- Process ---*/
+
+.process-list-item {
+    margin-top: 1em;
 }

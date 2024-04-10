@@ -15,6 +15,7 @@ from pyramid.httpexceptions import (
 from pyramid.response import Response
 from pyramid.settings import asbool
 from werkzeug.wrappers.request import Request as WerkzeugRequest
+from webob.acceptparse import AcceptInvalidHeader
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions
@@ -219,17 +220,18 @@ def patch_local_process(request):
     return update_process_metadata(request)
 
 
-@sd.processes_service.get(
-    schema=sd.GetProcessesEndpoint(),
+@sd.process_service.get(
+    schema=sd.ProcessEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/process_description.mako",
     response_schemas=sd.derive_responses(
-        sd.get_processes_responses,
+        sd.get_process_responses,
         sd.GenericHTMLResponse(name="HTMLProcessDescription", description="Process description.")
     )
 )
-@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
+@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+                        renderer=OutputFormat.JSON,  # omit 'accept' on purpose for JSON/XML (pyramid disallows list)
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
@@ -243,19 +245,25 @@ def get_local_process(request):
         schema = request.params.get("schema")
         ctype = guess_target_format(request)
         ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+        ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
         ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
         proc_url = process.href(request)
         if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
             offering = process.offering(ProcessSchema.WPS, request=request)
             headers = [
                 ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
+                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
                 ("Content-Type", ctype_xml),
             ]
             return Response(offering, headerlist=headers)
         else:
             offering = process.offering(schema)
-            headers = [("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}")]
-            return HTTPOk(json=offering, headers=headers)
+            fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
+            request.response.headers.extend([
+                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+                ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
+            ])
+            return Box(offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")
