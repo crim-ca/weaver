@@ -39,7 +39,7 @@ for each process.
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
-      - | |version| |commits-since| |license|
+      - | |version| |commits-since| |license| |docker_image|
 
 .. |py_ver| image:: https://img.shields.io/badge/python-3.7%2B-blue.svg
     :alt: Requires Python 3.7+
@@ -81,6 +81,10 @@ for each process.
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
 .. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.1.1?label=tag%20status
     :alt: Docker Build Status (latest version)
+    :target: https://hub.docker.com/r/pavics/weaver/tags
+
+.. |docker_image| image:: https://img.shields.io/badge/docker-pavics%2Fweaver-blue
+    :alt: Docker Image
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
@@ -196,13 +200,15 @@ Links
 
 Docker image repositories:
 
-- CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
-- OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
-- DockerHub: `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_
+- DockerHub: `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ |docker_image|
+- CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_ |restricted|
+- OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_ |restricted|
 
-::
+.. |restricted| image:: https://img.shields.io/badge/docker-restricted-orange
 
-    $ docker pull pavics/weaver:5.1.1
+.. code-block:: shell
+
+    docker pull pavics/weaver:5.1.1
 
 For convenience, following tags are also available:
 
@@ -214,25 +220,21 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
 .. list-table::
     :header-rows: 1
 
-    * - Status
-      - Description
+    * - Description
+      - Version
       - Entrypoint
-    * - <span style="color:green">**active**</span>
-      - HYBRID Server
-      - https://service.crim.ca/
-    * - <span style="color:grey">**deprecated**</span>
-      - ADES Test server
-      - https://ogc-ades.crim.ca/weaver/
-    * - <span style="color:grey">**deprecated**</span>
-      - EMS Test server
-      - https://ogc-ems.crim.ca/weaver/
-    * - <span style="color:grey">**deprecated**</span>
-      - EMS Extra server
-      - https://ogc.crim.ca/weaver/
+    * - CRIM Services Portal
+      - |crim-services-version|
+      - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
+    * - `DACCS Project <https://github.com/DACCS-Climate>`_ - CRIM Development Instance
+      - |hirondelle-version|
+      - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
+
+.. |crim-services-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |hirondelle-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
-    Request the ``${server}/weaver/versions`` route to verify the running version.
 
 ----------------
 Configuration
