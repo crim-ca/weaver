@@ -200,11 +200,26 @@ Links
 
 Docker image repositories:
 
-- DockerHub: `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ |docker_image|
-- CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_ |restricted|
-- OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_ |restricted|
+.. list-table::
+    :header-rows: 1
 
-.. |restricted| image:: https://img.shields.io/badge/docker-restricted-orange
+    * - Name
+      - Reference
+      - Access
+    * - DockerHub
+      - `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_
+      - |public|
+    * - CRIM registry
+      - `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
+      - |restricted|
+    * - CRIM OGC Processes
+      - `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
+      - |restricted|
+
+.. |public| image:: https://img.shields.io/badge/public-green
+.. |restricted| image:: https://img.shields.io/badge/restricted-orange
+
+For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
