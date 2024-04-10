@@ -219,6 +219,16 @@ def patch_local_process(request):
     return update_process_metadata(request)
 
 
+@sd.processes_service.get(
+    schema=sd.GetProcessesEndpoint(),
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/process_description.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_processes_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessDescription", description="Process description.")
+    )
+)
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
