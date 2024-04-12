@@ -15,7 +15,6 @@ from pyramid.httpexceptions import (
 from pyramid.response import Response
 from pyramid.settings import asbool
 from werkzeug.wrappers.request import Request as WerkzeugRequest
-from webob.acceptparse import AcceptInvalidHeader
 
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound, ServiceException, log_unhandled_exceptions

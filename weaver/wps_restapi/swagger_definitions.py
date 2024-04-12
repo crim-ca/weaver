@@ -5964,27 +5964,38 @@ class GenericHTMLResponse(ExtendedMappingSchema):
     header = HtmlHeader()
     body = ExtendedMappingSchema()
 
-    def __init__(self, *, name, description, **kwargs):
-        # type: (*Any, str, str, **Any) -> None
+    def __new__(cls, *, name, description, **kwargs):
+        # type: (Type[GenericHTMLResponse], *Any, str, str, **Any) -> GenericHTMLResponse
         """
         Generates a derived HTML response schema with direct forwarding of custom parameters to the body's schema.
 
         This strategy allows the quicker definition of schema variants without duplicating class definitions only
         providing alternate documentation parameters.
+
+        .. note::
+            Method ``__new__`` is used instead of ``__init__`` because some :mod:`cornice_swagger` operations will
+            look explicitly for ``schema_node.__class__.__name__``. If using ``__init__``, the first instance would
+            set the name value for all following instances instead of the intended reusable meta-schema class.
         """
         if not isinstance(name, str) or not re.match(r"^[A-Z][A-Z0-9_-]*$", name, re.I):
             raise ValueError(
                 "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
                 f"Name '{name}' is invalid."
             )
-        super().__init__(self, name=name, description=description)
-        self.__class__.__name__ = name
-        self.children = [
+        obj = super().__new__(cls)
+        obj.__init__(name=name, description=description)
+        obj.__class__.__name__ = name
+        obj.children = [
             child
             if child.name != "body" else
             ExtendedMappingSchema(name="body", **kwargs)
-            for child in self.children
+            for child in obj.children
         ]
+        return obj
+
+    def __deepcopy__(self, *args, **kwargs):
+        # type: (*Any, *Any) -> GenericHTMLResponse
+        return GenericHTMLResponse(name=self.name, description=self.description, children=self.children)
 
 
 class ErrorDetail(ExtendedMappingSchema):
