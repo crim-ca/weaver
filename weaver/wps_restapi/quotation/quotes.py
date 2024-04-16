@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import colander
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
+from cornice.validators import colander_validator
 from pyramid.httpexceptions import HTTPAccepted, HTTPCreated, HTTPOk, HTTPPaymentRequired, HTTPUnprocessableEntity
 from pyramid.settings import asbool
 
@@ -11,7 +12,7 @@ from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import log_unhandled_exceptions
 from weaver.execute import ExecuteMode
-from weaver.formats import OutputFormat
+from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.execution import validate_process_io
 from weaver.processes.types import ProcessType
@@ -39,12 +40,13 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-def get_quote_response(quote,           # type: Quote
-                       http_class,      # type: Union[Type[HTTPOk], Type[HTTPCreated]]
-                       schema_class,    # type: Type[colander.SchemaNode]
-                       description,     # type: str
-                       settings,        # type: AnySettingsContainer
-                       ):               # type: (...) -> Union[HTTPOk, HTTPCreated]
+def get_quote_response(
+    quote,          # type: Quote
+    http_class,     # type: Union[Type[HTTPOk], Type[HTTPCreated]]
+    schema_class,   # type: Type[colander.SchemaNode]
+    description,    # type: str
+    settings,       # type: AnySettingsContainer
+):                  # type: (...) -> Union[HTTPOk, HTTPCreated]
     """
     Validate the quote contents and generate the response with its relevant details.
     """
@@ -55,8 +57,15 @@ def get_quote_response(quote,           # type: Quote
     return http_class(json=data)
 
 
-@sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
+@sd.process_quotes_service.post(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessQuoteRequestEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_quotes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def request_quote(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -140,9 +149,14 @@ def request_quote(request):
     return HTTPAccepted(headers=headers, json=data)
 
 
-@sd.process_estimator_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                  schema=sd.ProcessQuoteEstimatorGetEndpoint(),
-                                  response_schemas=sd.get_process_quote_estimator_responses)
+@sd.process_estimator_service.get(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    schema=sd.ProcessQuoteEstimatorGetEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_quote_estimator_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -154,9 +168,15 @@ def get_process_quote_estimator(request):
     return HTTPOk(json=estimator_config)
 
 
-@sd.process_estimator_service.put(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                  schema=sd.ProcessQuoteEstimatorPutEndpoint(),
-                                  response_schemas=sd.put_process_quote_estimator_responses)
+@sd.process_estimator_service.put(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    content_type=ContentType.APP_JSON,
+    schema=sd.ProcessQuoteEstimatorPutEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.put_process_quote_estimator_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def update_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -170,9 +190,14 @@ def update_process_quote_estimator(request):
     return HTTPOk(json={"description": "Process quote estimator updated."})
 
 
-@sd.process_estimator_service.delete(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                     schema=sd.ProcessQuoteEstimatorDeleteEndpoint(),
-                                     response_schemas=sd.delete_process_quote_estimator_responses)
+@sd.process_estimator_service.delete(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    schema=sd.ProcessQuoteEstimatorDeleteEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_process_quote_estimator_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def delete_process_quote_estimator(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -185,10 +210,22 @@ def delete_process_quote_estimator(request):
     return HTTPOk(json={"description": "Process quote estimator deleted. Defaults will be used."})
 
 
-@sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                               schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
-@sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
-                       schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
+@sd.process_quotes_service.get(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    schema=sd.ProcessQuotesEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_quote_list_responses,
+)
+@sd.quotes_service.get(
+    tags=[sd.TAG_BILL_QUOTE],
+    schema=sd.QuotesEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_quote_list_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_list(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -219,10 +256,22 @@ def get_quote_list(request):
     return HTTPOk(json=body)
 
 
-@sd.process_quote_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                              schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
-@sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OutputFormat.JSON,
-                      schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
+@sd.process_quote_service.get(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES],
+    schema=sd.ProcessQuoteEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_quote_responses,
+)
+@sd.quote_service.get(
+    tags=[sd.TAG_BILL_QUOTE],
+    schema=sd.QuoteEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_quote_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_info(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -234,10 +283,24 @@ def get_quote_info(request):
     return resp
 
 
-@sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                               schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
-@sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OutputFormat.JSON,
-                       schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
+@sd.process_quote_service.post(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessQuote(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_quote_responses,
+)
+@sd.quote_service.post(
+    tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostQuote(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_quote_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def execute_quote(request):
     # type: (PyramidRequest) -> AnyViewResponse
