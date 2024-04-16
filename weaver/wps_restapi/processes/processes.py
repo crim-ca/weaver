@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import colander
 from box import Box
-from cornice.validators import colander_validator
+from cornice.validators import colander_validator, colander_path_validator, colander_querystring_validator
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
@@ -246,18 +246,26 @@ def patch_local_process(request):
 
 
 @sd.process_service.get(
-    schema=sd.ProcessEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
     accept=ContentType.TEXT_HTML,
+    # FIXME: multi-colander-validator not working (see https://github.com/Cornices/cornice/issues/587)
+    validators=[colander_path_validator, colander_querystring_validator],
     renderer="weaver.wps_restapi:templates/responses/process_description.mako",
     response_schemas=sd.derive_responses(
         sd.get_process_responses,
         sd.GenericHTMLResponse(name="HTMLProcessDescription", description="Process description.")
     )
 )
-@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
-                        renderer=OutputFormat.JSON,  # omit 'accept' on purpose for JSON/XML (pyramid disallows list)
-                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
+    accept=[ContentType.APP_JSON] + list(ContentType.ANY_XML),
+    # FIXME: multi-colander-validator not working (see https://github.com/Cornices/cornice/issues/587)
+    validators=[colander_path_validator, colander_querystring_validator],
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
