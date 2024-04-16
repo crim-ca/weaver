@@ -557,9 +557,11 @@ class AcceptHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Accept"
     schema_type = String
-    validator = OneOf([ContentType.APP_JSON])  # responses offering alternate formats should override explicitly
     missing = drop
     default = ContentType.APP_JSON  # defaults to JSON for easy use within browsers
+    # responses offering alternate formats should override explicitly
+    # consider using: 'accept = AcceptHeader(validator=OneOf([<media-type>]))'
+    validator = OneOf([ContentType.APP_JSON])
 
 
 class AcceptLanguageHeader(ExtendedSchemaNode):
@@ -573,15 +575,27 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
 
 
 class JsonHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=ContentType.APP_JSON, default=ContentType.APP_JSON)
+    content_type = ContentTypeHeader(
+        example=ContentType.APP_JSON,
+        default=ContentType.APP_JSON,
+        validator=OneOf(ContentType.ANY_JSON),
+    )
 
 
 class HtmlHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=ContentType.TEXT_HTML, default=ContentType.TEXT_HTML)
+    content_type = ContentTypeHeader(
+        example=ContentType.TEXT_HTML,
+        default=ContentType.TEXT_HTML,
+        validator=OneOf([ContentType.TEXT_HTML]),
+    )
 
 
 class XmlHeader(ExtendedMappingSchema):
-    content_type = ContentTypeHeader(example=ContentType.APP_XML, default=ContentType.APP_XML)
+    content_type = ContentTypeHeader(
+        example=ContentType.APP_XML,
+        default=ContentType.APP_XML,
+        validator=OneOf(ContentType.ANY_XML),
+    )
 
 
 class XAuthDockerHeader(ExtendedSchemaNode):
@@ -617,8 +631,17 @@ class RequestHeaders(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
     """
-    accept = AcceptHeader()
-    accept_language = AcceptLanguageHeader()
+    # default JSON only, override as applicable for each endpoint
+    accept = AcceptHeader(description="Output format selector. Equivalent to 'f' or 'format' queries.")
+    accept_language = AcceptLanguageHeader(description="Output content language if supported.")
+
+
+class RequestHeadersFormat(ExtendedMappingSchema):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
+    accept = AcceptHeader(description="Output format selector. Equivalent to 'f' or 'format' queries.")
+    accept_language = AcceptLanguageHeader(description="Output content language if supported.")
 
 
 class RequestHeadersContent(RequestHeaders):
@@ -637,11 +660,6 @@ class ResponseHeaders(ExtendedMappingSchema):
 
 class RedirectHeaders(ResponseHeaders):
     Location = URL(example="https://job/123/result", description="Redirect resource location.")
-
-
-class AcceptFormatHeaders(ExtendedMappingSchema):
-    accept = AcceptHeader(description="Output format selector. Equivalent to 'f' or 'format' queries.")
-    accept_language = AcceptLanguageHeader(description="Output content language if supported.")
 
 
 class OutputFormatQuery(ExtendedSchemaNode):
@@ -2874,8 +2892,13 @@ class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery, F
     pass
 
 
-class LocalProcessEndpointHeaders(AcceptFormatHeaders, RequestHeaders):  # order important for descriptions to appear
-    pass
+class LocalProcessEndpointHeaders(RequestHeaders):
+    accept = AcceptHeader(
+        validator=OneOf({
+            ContentType.APP_JSON,
+            ContentType.TEXT_HTML,
+        } | ContentType.ANY_XML)
+    )
 
 
 class ProcessEndpoint(ExtendedMappingSchema):

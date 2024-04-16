@@ -97,15 +97,20 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
-    ANY_JSON = {
-        APP_JSON, APP_YAML,
+    ANY_JSON = frozenset({
+        APP_JSON,
         APP_GEOJSON, APP_VDN_GEOJSON,
-        APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
+        APP_CWL, APP_CWL_JSON, APP_CWL_X,
         APP_OAS_JSON,
-        APP_OGC_PKG_JSON, APP_OGC_PKG_YAML,
-    }
-    ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
-    ANY_XML = {APP_XML, TEXT_XML}
+        APP_OGC_PKG_JSON,
+    })
+    ANY_YAML = frozenset({
+        APP_YAML,
+        APP_CWL_YAML,
+        APP_OGC_PKG_YAML,
+    })
+    ANY_CWL = frozenset({APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X})
+    ANY_XML = frozenset({APP_XML, TEXT_XML})
     ANY = "*/*"
 
 

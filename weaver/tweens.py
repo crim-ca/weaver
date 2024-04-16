@@ -97,7 +97,7 @@ def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
     be interpreted normally.
     """
     def apply_format(request):
-        # type: (PyramidRequest) -> HTTPException
+        # type: (PyramidRequest) -> AnyViewResponse
         content_type = guess_target_format(request)
         # NOTE:
         # enforce the accept header in case it was specified with format query, since some renderer implementations

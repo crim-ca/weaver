@@ -45,6 +45,7 @@ from weaver.visibility import Visibility
 from weaver.wps.service import get_pywps_service
 from weaver.wps.utils import get_wps_path
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import handle_schema_validation
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
 from weaver.wps_restapi.providers.utils import get_provider_services
 
@@ -249,8 +250,7 @@ def patch_local_process(request):
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessEndpoint(),
     accept=ContentType.TEXT_HTML,
-    # FIXME: multi-colander-validator not working (see https://github.com/Cornices/cornice/issues/587)
-    validators=[colander_path_validator, colander_querystring_validator],
+    validators=colander_validator,
     renderer="weaver.wps_restapi:templates/responses/process_description.mako",
     response_schemas=sd.derive_responses(
         sd.get_process_responses,
@@ -261,45 +261,42 @@ def patch_local_process(request):
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessEndpoint(),
     accept=[ContentType.APP_JSON] + list(ContentType.ANY_XML),
-    # FIXME: multi-colander-validator not working (see https://github.com/Cornices/cornice/issues/587)
-    validators=[colander_path_validator, colander_querystring_validator],
+    validators=colander_validator,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_process_responses,
 )
+@handle_schema_validation()  # FIXME: handle colander invalid in tween (https://github.com/crim-ca/weaver/issues/112)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
     Get a registered local process information (DescribeProcess).
     """
-    try:
-        process = get_process(request=request)
-        process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-        schema = request.params.get("schema")
-        ctype = guess_target_format(request)
-        ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
-        ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
-        ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
-        proc_url = process.href(request)
-        if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
-            offering = process.offering(ProcessSchema.WPS, request=request)
-            headers = [
-                ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
-                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
-                ("Content-Type", ctype_xml),
-            ]
-            return Response(offering, headerlist=headers)
-        else:
-            offering = process.offering(schema)
-            fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
-            request.response.headers.extend([
-                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
-                ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
-            ])
-            return Box(offering)
-    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")
+    process = get_process(request=request)
+    process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+    schema = request.params.get("schema")
+    ctype = guess_target_format(request)
+    ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+    ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
+    ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
+    proc_url = process.href(request)
+
+    if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
+        offering = process.offering(ProcessSchema.WPS, request=request)
+        headers = [
+            ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
+            ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
+            ("Content-Type", ctype_xml),
+        ]
+        return Response(offering, headerlist=headers)
+
+    offering = process.offering(schema)
+    fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
+    request.response.headers.extend([
+        ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+        ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
+    ])
+    return Box(offering)
 
 
 @sd.process_package_service.get(

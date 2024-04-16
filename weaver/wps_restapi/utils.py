@@ -123,7 +123,7 @@ def get_wps_restapi_base_url(container):
 def get_schema_ref(schema, container=None, ref_type="$id", ref_name=True):
     # type: (colander.SchemaNode, Optional[AnySettingsContainer], str, True) -> Dict[str, str]
     """
-    Generates the JSON OpenAPI schema reference relative to the current `Weaver` instance.
+    Generates the :term:`JSON` :term:`OpenAPI` schema reference relative to the current `Weaver` instance.
 
     The provided schema should be one of the items listed in ``#/definitions`` of the ``/json`` endpoint.
     No validation is accomplished to avoid long processing of all references.
@@ -158,29 +158,30 @@ def get_schema_ref(schema, container=None, ref_type="$id", ref_name=True):
 def handle_schema_validation(schema=None):
     # type: (Optional[colander.SchemaNode]) -> AnyCallableWrapped
     """
-    Convert a schema validation error into an HTTP error with error details about the failure.
+    View decorator to convert a schema validation error into an HTTP error with error details about the failure.
 
-    :param schema: If provided, document this schema as the reference of the failed schema validation.
+    :param schema:
+        If provided, document this schema as the reference of the failed schema validation.
+        Otherwise, uses the schema node reference provided by the raised validation exception.
     :raises HTTPBadRequest: If any schema validation error occurs when handling the decorated function.
     """
-    def decorator(func):  # type: (AnyCallableWrapped) -> AnyCallableWrapped
+    def decorator(func):
+        # type: (AnyCallableWrapped) -> AnyCallableWrapped
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
             # type: (Params.args, Params.kwargs) -> Return
             try:
                 return func(*args, **kwargs)
             except colander.Invalid as ex:
+                schema_ref = get_schema_ref(schema or ex.node)
                 data = {
                     "type": "InvalidSchema",
                     "detail": "Invalid value failed schema validation.",
+                    "schema": schema_ref,
                     "error": colander.Invalid.__name__,
                     "cause": ex.asdict(),
                     "value": ex.value,
                 }
-                if schema:
-                    data.update({
-                        "schema": get_schema_ref(schema)
-                    })
                 raise HTTPBadRequest(json=data)
         return wrapped
     return decorator
