@@ -37,12 +37,30 @@ if TYPE_CHECKING:
 LOGGER = get_task_logger(__name__)
 
 
-@sd.provider_jobs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                              schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_prov_all_jobs_responses)
-@sd.process_jobs_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS], renderer=OutputFormat.JSON,
-                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@sd.jobs_service.get(tags=[sd.TAG_JOBS], renderer=OutputFormat.JSON,
-                     schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
+@sd.provider_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_prov_all_jobs_responses,
+)
+@sd.process_jobs_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS],
+    schema=sd.GetProcessJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_all_jobs_responses,
+)
+@sd.jobs_service.get(
+    tags=[sd.TAG_JOBS],
+    schema=sd.GetJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_all_jobs_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_queried_jobs(request):
     # type: (PyramidRequest) -> HTTPOk
@@ -123,12 +141,30 @@ def get_queried_jobs(request):
     return HTTPOk(json=body)
 
 
-@sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                             schema=sd.ProviderJobEndpoint(), response_schemas=sd.get_prov_single_job_status_responses)
-@sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OutputFormat.JSON,
-                            schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OutputFormat.JSON,
-                    schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.provider_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_prov_single_job_status_responses,
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_single_job_status_responses,
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.JobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_single_job_status_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
     # type: (PyramidRequest) -> HTTPOk
@@ -140,12 +176,30 @@ def get_job_status(request):
     return HTTPOk(json=job_status)
 
 
-@sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                                schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_prov_job_responses)
-@sd.process_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                               schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
-@sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OutputFormat.JSON,
-                       schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.provider_job_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_prov_job_responses,
+)
+@sd.process_job_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES],
+    schema=sd.DeleteProcessJobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_job_responses,
+)
+@sd.job_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS],
+    schema=sd.JobEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_job_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job(request):
     # type: (PyramidRequest) -> AnyResponseType
@@ -166,12 +220,30 @@ def cancel_job(request):
     })
 
 
-@sd.provider_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                                 schema=sd.DeleteProviderJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
-@sd.process_jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                schema=sd.DeleteProcessJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
-@sd.jobs_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OutputFormat.JSON,
-                        schema=sd.DeleteJobsEndpoint(), response_schemas=sd.delete_jobs_responses)
+@sd.provider_jobs_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS],
+    schema=sd.DeleteProviderJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_jobs_responses,
+)
+@sd.process_jobs_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES],
+    schema=sd.DeleteProcessJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_jobs_responses,
+)
+@sd.jobs_service.delete(
+    tags=[sd.TAG_JOBS, sd.TAG_DISMISS],
+    schema=sd.DeleteJobsEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_jobs_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def cancel_job_batch(request):
     # type: (PyramidRequest) -> AnyResponseType
