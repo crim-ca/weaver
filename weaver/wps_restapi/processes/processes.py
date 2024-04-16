@@ -66,8 +66,14 @@ LOGGER = logging.getLogger(__name__)
         sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
     )
 )
-@sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-                          response_schemas=sd.get_processes_responses, accept=ContentType.APP_JSON)
+@sd.processes_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
+    accept=ContentType.APP_JSON,
+    validators=colander_validator,
+    renderer=ContentType.APP_JSON,
+    response_schemas=sd.get_processes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -199,6 +205,8 @@ def add_local_process(request):
 @sd.process_service.put(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
     schema=sd.PutProcessEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
     renderer=OutputFormat.JSON,
     response_schemas=sd.put_process_responses,
 )
@@ -215,8 +223,14 @@ def put_local_process(request):
     return deploy_process_from_payload(request.text, request, overwrite=process)
 
 
-@sd.process_service.patch(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                          schema=sd.PatchProcessEndpoint(), response_schemas=sd.patch_process_responses)
+@sd.process_service.patch(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PatchProcessEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def patch_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -280,8 +294,14 @@ def get_local_process(request):
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")
 
 
-@sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
-                                schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
+@sd.process_package_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessPackageEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_package_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_package(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -292,8 +312,14 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
-                                schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+@sd.process_payload_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessPayloadEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_payload_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_payload(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -304,9 +330,14 @@ def get_local_process_payload(request):
     return HTTPOk(json=process.payload or {})
 
 
-@sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OutputFormat.JSON,
-                                   schema=sd.ProcessVisibilityGetEndpoint(),
-                                   response_schemas=sd.get_process_visibility_responses)
+@sd.process_visibility_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY],
+    schema=sd.ProcessVisibilityGetEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_visibility_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_process_visibility(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -317,9 +348,15 @@ def get_process_visibility(request):
     return HTTPOk(json={"value": process.visibility})
 
 
-@sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OutputFormat.JSON,
-                                   schema=sd.ProcessVisibilityPutEndpoint(),
-                                   response_schemas=sd.put_process_visibility_responses)
+@sd.process_visibility_service.put(
+    tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY],
+    content_type=ContentType.APP_JSON,
+    schema=sd.ProcessVisibilityPutEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.put_process_visibility_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def set_process_visibility(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -348,8 +385,14 @@ def set_process_visibility(request):
         raise HTTPNotFound(str(ex))
 
 
-@sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                           schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
+@sd.process_service.delete(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.ProcessEndpoint(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def delete_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -388,26 +431,42 @@ def delete_local_process(request):
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 
 
-@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                   content_type=ContentType.APP_XML,
-                                   renderer=OutputFormat.JSON,
-                                   schema=sd.PostProcessJobsEndpointXML(),
-                                   response_schemas=sd.post_process_jobs_responses)
-@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                              content_type=ContentType.APP_XML,
-                              renderer=OutputFormat.JSON,
-                              schema=sd.PostProcessJobsEndpointXML(),
-                              response_schemas=sd.post_process_jobs_responses)
-@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                   content_type=ContentType.APP_JSON,
-                                   renderer=OutputFormat.JSON,
-                                   schema=sd.PostProcessJobsEndpointJSON(),
-                                   response_schemas=sd.post_process_jobs_responses)
-@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                              content_type=ContentType.APP_JSON,
-                              renderer=OutputFormat.JSON,
-                              schema=sd.PostProcessJobsEndpointJSON(),
-                              response_schemas=sd.post_process_jobs_responses)
+@sd.process_execution_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_XML,
+    schema=sd.PostProcessJobsEndpointXML(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_jobs_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_XML,
+    schema=sd.PostProcessJobsEndpointXML(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_execution_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessJobsEndpointJSON(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_jobs_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessJobsEndpointJSON(),
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
     # type: (PyramidRequest) -> AnyViewResponse
