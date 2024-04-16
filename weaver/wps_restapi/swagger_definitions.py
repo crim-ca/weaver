@@ -6308,7 +6308,13 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+class GetProcessesQuery(
+    ProcessPagingQuery,
+    ProcessDetailQuery,
+    ProcessLinksQuery,
+    ProcessRevisionsQuery,
+    FormatQuery,
+):
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
@@ -6324,7 +6330,17 @@ class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuer
     )
 
 
+class GetProcessesHeaders(RequestHeaders):
+    accept = AcceptHeader(
+        validator=OneOf({
+            ContentType.APP_JSON,
+            ContentType.TEXT_HTML,
+        })
+    )
+
+
 class GetProcessesEndpoint(ExtendedMappingSchema):
+    header = GetProcessesHeaders()
     querystring = GetProcessesQuery()
 
 

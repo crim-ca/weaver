@@ -72,7 +72,7 @@ LOGGER = logging.getLogger(__name__)
     schema=sd.GetProcessesEndpoint(),
     accept=ContentType.APP_JSON,
     validators=colander_validator,
-    renderer=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
     response_schemas=sd.get_processes_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
