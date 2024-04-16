@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import colander
 from box import Box
+from cornice.validators import colander_validator
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
@@ -56,8 +57,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 @sd.processes_service.get(
-    schema=sd.GetProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/processes.mako",
     response_schemas=sd.derive_responses(
@@ -177,8 +178,15 @@ def get_processes(request):
         })
 
 
-@sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                           schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+@sd.processes_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PostProcessesEndpoint(),
+    content_type=sd.DeployContentType.validator.choices,
+    accept=sd.AcceptHeader.validator.choices,
+    validators=colander_validator,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_processes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -188,8 +196,12 @@ def add_local_process(request):
     return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
 
 
-@sd.process_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                        schema=sd.PutProcessEndpoint(), response_schemas=sd.put_process_responses)
+@sd.process_service.put(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PutProcessEndpoint(),
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.put_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def put_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse

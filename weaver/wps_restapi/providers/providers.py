@@ -56,7 +56,7 @@ def get_providers(request):
 
 
 @sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                           schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
+                           schema=sd.PostProviderEndpoint(), response_schemas=sd.post_provider_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def add_provider(request):

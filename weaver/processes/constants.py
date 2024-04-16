@@ -295,14 +295,20 @@ if TYPE_CHECKING:
         CWL_RequirementToolTimeLimitType,
         CWL_RequirementWorkReuseType,
     ]
-    ProcessSchemaType = Literal["OGC", "ogc", "OLD", "old", "WPS", "wps"]
-    JobInputsOutputsSchemaType = Literal[
-        "ogc+strict",
-        "OGC+STRICT",
-        "old+strict",
-        "OLD+STRICT",
-        "ogc",
-        "OGC",
-        "old",
-        "OLD",
+    ProcessSchemaType = Union[
+        ProcessSchema,
+        Literal["OGC", "ogc", "OLD", "old", "WPS", "wps"]
+    ]
+    JobInputsOutputsSchemaType = Union[
+        JobInputsOutputsSchema,
+        Literal[
+            "ogc+strict",
+            "OGC+STRICT",
+            "old+strict",
+            "OLD+STRICT",
+            "ogc",
+            "OGC",
+            "old",
+            "OLD",
+        ]
     ]
