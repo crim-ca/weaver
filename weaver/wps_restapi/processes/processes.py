@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import colander
 from box import Box
-from cornice.validators import colander_validator, colander_path_validator, colander_querystring_validator
+from cornice.validators import colander_validator
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
