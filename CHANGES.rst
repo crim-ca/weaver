@@ -16,7 +16,11 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Adjust ``weaver.utils.get_caller_name`` to better handle decorated functions, and apply more precise warning messages
+  to hunt down places were ``weaver.utils.get_request_options`` might still be causing inconsistent HTTP requests due
+  to missing *request options* for certain use cases.
+- Fix passing down of application settings for `WPS` requests of `Provider`/`Service` operations
+  potentially making use of *request options*, which could not obtain the relevant configuration.
 
 .. _changes_5.1.1:
 

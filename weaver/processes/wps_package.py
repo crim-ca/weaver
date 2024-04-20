@@ -156,6 +156,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
+        AnySettingsContainer,
         AnyValueType,
         CWL,
         CWL_AnyRequirements,
@@ -1213,8 +1214,14 @@ class DirectoryNestedStorage(CachedStorage):
 
 
 class WpsPackage(Process):
-    def __init__(self, package=None, payload=None, **kw):
-        # type: (CWL, Optional[JSON], **Any) -> None
+    def __init__(
+        self,
+        *,
+        package=None,   # type: CWL
+        payload=None,   # type; Optional[JSON]
+        settings=None,  # type: Optional[AnySettingsContainer]
+        **kw,           # type: Any
+    ):                  # type: (...) -> None
         """
         Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
@@ -1243,7 +1250,7 @@ class WpsPackage(Process):
 
         self.payload = payload
         self.package = package
-        self.settings = get_settings()
+        self.settings = get_settings(settings)
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
         if not isinstance(self.package, dict):
