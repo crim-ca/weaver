@@ -602,7 +602,7 @@ check-imports-only: mkdir-reports 	## check imports ordering and styles
 check-css-only: mkdir-reports  	## check CSS linting
 	@echo "Running CSS style checks..."
 	@npx --no-install stylelint \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/check-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -617,7 +617,7 @@ check-md-only: mkdir-reports 	## check Markdown linting
 		--inspect --frail \
 		--silently-ignore \
 		--stdout --color \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		> "$(REPORTS_DIR)/check-md.txt"
