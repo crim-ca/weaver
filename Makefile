@@ -694,7 +694,7 @@ fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
 	@npx --no-install stylelint \
 		--fix \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -708,7 +708,7 @@ fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
 	@npx --no-install remark \
 		--output --frail \
 		--silently-ignore \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
