@@ -692,7 +692,7 @@ fix-fstring-only: mkdir-reports
 .PHONY: fix-css-only
 fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
-	@npx stylelint \
+	@npx --no-install stylelint \
 		--fix \
 		--config "$(APP_ROOT)/.stylelintrc.json" \
 		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
