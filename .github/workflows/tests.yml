@@ -116,7 +116,9 @@ jobs:
       - name: Display Packages
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        run: pip freeze
+        run: |
+          pip freeze
+          npm list
       #- name: Setup Environment Variables
       #  uses: c-py/action-dotenv-to-setenv@v2
       #  with:

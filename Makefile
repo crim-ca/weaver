@@ -279,23 +279,16 @@ install-npm:    ## install npm package manager and dependencies if they cannot b
 
 .PHONY: install-npm-stylelint
 install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
-	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
+	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
-		npm install "stylelint" "stylelint-config-standard" --save-dev \
+		npm install --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
 install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
-	@[ `npm ls 2>/dev/null | grep remark-lint | wc -l` = 1 ] || ( \
+	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
-		 	remark-lint \
-		 	remark-gfm \
-		 	remark-cli \
-		 	remark-lint-maximum-line-length \
-		 	remark-lint-checkbox-content-indent \
-		 	remark-preset-lint-recommended \
-		 	remark-preset-lint-markdown-style-guide \
 	)
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
