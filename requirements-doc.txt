@@ -6,7 +6,7 @@
 jinja2
 sphinx>=6,<8
 sphinx-argparse
-sphinx-autoapi>=1.7.0,<3
+sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1
 # adds redoc OpenAPI directly served on readthedocs
 sphinxcontrib-redoc>=1.6.0
