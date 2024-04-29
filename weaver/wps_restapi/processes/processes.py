@@ -73,12 +73,13 @@ def get_processes(request):
             "value": repr_json(ex.value or dict(request.params), force_string=False),
         })
 
+    links = asbool(params.get("links", True))
     detail = asbool(params.get("detail", True))
     ignore = asbool(params.get("ignore", True))
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
-        results = get_processes_filtered_by_valid_schemas(request, detail=detail)
+        results = get_processes_filtered_by_valid_schemas(request, detail=detail, links=links)
         processes, invalid_processes, paging, with_providers, total_processes = results
         if invalid_processes:
             raise HTTPServiceUnavailable(
