@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
+  conformance class ``/conf/core/process-summary-links`` as default behavior
+  (relates to `opengeospatial/ogcapi-processes#406 <https://github.com/opengeospatial/ogcapi-processes/pull/406>`_).
 
 Fixes:
 ------
