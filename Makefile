@@ -271,32 +271,28 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 
 # install locally to ensure they can be found by config extending them
 .PHONY: install-npm
-install-npm:    ## install npm package manager and dependencies if they cannot be found
+install-npm:	## install npm package manager and dependencies if they cannot be found
 	@[ -f "$(shell which npm)" ] || ( \
 		echo "Binary package manager npm not found. Attempting to install it."; \
 		apt-get install npm \
 	)
 
 .PHONY: install-npm-stylelint
-install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
-	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
+install-npm-stylelint: install-npm	## install stylelint dependency for 'check-css' target using npm
+	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
-		npm install "stylelint@<16" "stylelint-config-standard@<35" --save-dev \
+		npm install --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
-install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
-	@[ `npm ls 2>/dev/null | grep remark-lint | wc -l` = 1 ] || ( \
+install-npm-remarklint: install-npm		## install remark-lint dependency for 'check-md' target using npm
+	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
-		 	remark-lint \
-		 	remark-gfm \
-		 	remark-cli \
-		 	remark-lint-maximum-line-length \
-		 	remark-lint-checkbox-content-indent \
-		 	remark-preset-lint-recommended \
-		 	remark-preset-lint-markdown-style-guide \
 	)
+
+.PHONY: install-dev-npm
+install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -602,7 +598,7 @@ check-imports-only: mkdir-reports 	## check imports ordering and styles
 check-css-only: mkdir-reports  	## check CSS linting
 	@echo "Running CSS style checks..."
 	@npx --no-install stylelint \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/check-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -617,7 +613,7 @@ check-md-only: mkdir-reports 	## check Markdown linting
 		--inspect --frail \
 		--silently-ignore \
 		--stdout --color \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		> "$(REPORTS_DIR)/check-md.txt"
@@ -692,9 +688,9 @@ fix-fstring-only: mkdir-reports
 .PHONY: fix-css-only
 fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
-	@npx stylelint \
+	@npx --no-install stylelint \
 		--fix \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -708,7 +704,7 @@ fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
 	@npx --no-install remark \
 		--output --frail \
 		--silently-ignore \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
