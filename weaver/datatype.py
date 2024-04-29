@@ -2405,6 +2405,13 @@ class Process(Base):
             {"href": proc_self, "rel": "self", "title": "Current process description."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
+        ]
+        if self.service:
+            links.append(
+                {"href": f"{proc_desc}?f=html", "rel": "alternate",
+                 "title": "Alternate process description.", "type": ContentType.TEXT_HTML}
+            )
+        links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
@@ -2413,7 +2420,7 @@ class Process(Base):
             {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
-        ]
+        ])
         if self.version:
             proc_tag = f"{proc_list}/{self.tag}"
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
