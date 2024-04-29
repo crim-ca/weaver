@@ -112,11 +112,14 @@ jobs:
         if: ${{ matrix.test-case != 'test-docker' }}
         # install package and dependencies directly,
         # skip sys/conda setup to use active python
-        run: make install-sys install-pkg install-pip install-raw install-dev version
+        run: make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
       - name: Display Packages
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        run: pip freeze
+        run: |
+          pip freeze
+          npm list
+          make version
       #- name: Setup Environment Variables
       #  uses: c-py/action-dotenv-to-setenv@v2
       #  with:
