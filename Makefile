@@ -271,25 +271,28 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 
 # install locally to ensure they can be found by config extending them
 .PHONY: install-npm
-install-npm:    ## install npm package manager and dependencies if they cannot be found
+install-npm:	## install npm package manager and dependencies if they cannot be found
 	@[ -f "$(shell which npm)" ] || ( \
 		echo "Binary package manager npm not found. Attempting to install it."; \
 		apt-get install npm \
 	)
 
 .PHONY: install-npm-stylelint
-install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
+install-npm-stylelint: install-npm	## install stylelint dependency for 'check-css' target using npm
 	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
 		npm install --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
-install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
+install-npm-remarklint: install-npm		## install remark-lint dependency for 'check-md' target using npm
 	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
 	)
+
+.PHONY: install-dev-npm
+install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
