@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Pin ``gunicorn>=22`` to address CVE-2024-1135.
 
 Fixes:
 ------
