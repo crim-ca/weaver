@@ -1,5 +1,6 @@
 import functools
 import inspect
+import json
 import logging
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -256,3 +257,4 @@ def add_renderer_context(event):
         "wps_restapi_url": get_wps_restapi_base_url(event["request"]),
     })
     event["body"] = event.rendering_val  # shortcut name
+    event["json"] = json  # reference for 'json.dumps' use in rendered HTML

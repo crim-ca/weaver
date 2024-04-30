@@ -14,12 +14,32 @@
 
 .field {
     display: flex;
-    display: -webkit-box;
+}
+
+.field-key {
+    font-weight: bold;
+    font-size: 99%;  /* offset extra size from bold to keep 'title: value' aligned */
+    margin-right: 0.25em;
+}
+
+.field-sub {
+    font-size: 90%;
+}
+
+.field-extra {
+    font-size: 80%;
 }
 
 .field-title {
-    font-weight: bold;
-    font-size: 99%;  /* offset extra size from bold to keep 'title: value' aligned */
+    font-size: 90%;
+    font-style: italic;
+    text-align: justify;
+}
+
+.field-description {
+    font-size: 90%;
+    font-style: italic;
+    text-align: justify;
 }
 
 .format-link {
@@ -42,10 +62,18 @@
     font-family: monospace;
 }
 
-.process-title {
-    display: flex;
+.inline {
+    display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
+}
+
+.indent {
+    margin-left: 1em;
+}
+
+.process-title .code {
+    font-size: 130%;
 }
 
 .process-title > div {

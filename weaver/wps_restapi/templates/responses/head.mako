@@ -17,5 +17,13 @@
     <link href="${request.static_url('weaver.wps_restapi:templates/static/favicon.ico')}"
           rel="icon" type="image/x-icon" />
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <!--
+    Requirements for rendering JSON contents.
+    -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.4.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.4.0/highlight.min.js"></script>
+    <script charset="UTF-8" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.4.0/languages/json.min.js"></script>
+    <script charset="UTF-8" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.4.0/languages/yaml.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 </%block>

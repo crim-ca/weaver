@@ -1,10 +1,13 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
-<h2>
-    <div class="process-title">
+<h2 id="id">
+    <div class="process-title inline">
         <div>
-        Process: ${id}
+            Process:
+            <div class="code inline">
+                <a href="#id">${id}</a>
+            </div>
         </div>
         %if version:
         <div class="label label-info version-tag code">${version}</div>
@@ -75,18 +78,14 @@
         <a href="#inputs">Inputs</a>
     </h3>
     <div class="content-section">
-    %for input_id, input_data in inputs.items():
-        ${util.render_input(input_id, input_data)}
-    %endfor
+        ${util.render_inputs(inputs)}
     </div>
 
     <h3 id="outputs">
         <a href="#outputs">Outputs</a>
     </h3>
     <div class="content-section">
-    %for output_id, output_data in outputs.items():
-        ${util.render_output(output_id, output_data)}
-    %endfor
+        ${util.render_outputs(outputs)}
     </div>
 
     <h3 id="links">
