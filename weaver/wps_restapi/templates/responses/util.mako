@@ -14,31 +14,75 @@ Utilities for rendering elements in other pages.
 
 <%def name="render_metadata(metadata)">
 <dl>
-%for meta in process.metadata:
+%for meta in metadata:
     <dt>
         ${meta.title}
+    </dt>
+    <dd>
+        %if "href" in meta:
+            <a href="${meta.href}">${meta.href}</a>
+        %else:
+            <div class="code">${meta.value}</div>
+        %endif
         %if "lang" in meta:
-            <div class="language">${meta.lang}</div>
+            <div class="field">
+                <div class="field-title">Language:</div>
+                &nbsp;
+                <div class="language">${meta.lang}</div>
+            </div>
         %elif "hreflang" in meta:
-            <div class="language">${meta.hreflang}</div>
+            <div class="field">
+                <div class="field-title">Language:</div>
+                &nbsp;
+                <div class="language">${meta.hreflang}</div>
+            </div>
         %endif
         %if "role" in meta:
-            <div class="code">${meta.role}</div>
+            <div class="field">
+                <div class="field-title">Role:</div>
+                &nbsp;
+                <div class="code">${meta.role}</div>
+            </div>
         %endif
         %if "type" in meta:
-            <div class="code">${meta.type}</div>
+            <div class="field">
+                <div class="field-title">Media-Type:</div>
+                &nbsp;
+                <div class="code">${meta.type}</div>
+            </div>
         %endif
-    </dt>
-    %if "href" in meta:
-        <dd>
-            ${meta.href}
+    </dd>
+%endfor
+</dl>
+</%def>
 
-        </dd>
-    %else:
-        <dd>
-            ${meta.value}
-        </dd>
-    %endif
+
+<%def name="render_links(links)">
+<dl>
+%for link in links:
+    <dt>
+        <div class="label code">${link.rel}</div>
+    </dt>
+    <dd>
+        %if "title" in link:
+            <div class="description">${link.title}</div>
+        %endif
+        <a href="${link.href}">${link.href}</a>
+        %if "hreflang" in link:
+            <div class="field">
+                <div class="field-title">Language:</div>
+                &nbsp;
+                <div class="language">${link.hreflang}</div>
+            </div>
+        %endif
+        %if "type" in link:
+            <div class="field">
+                <div class="field-title">Media-Type:</div>
+                &nbsp;
+                <div class="code">${link.type}</div>
+            </div>
+        %endif
+    </dd>
 %endfor
 </dl>
 </%def>

@@ -255,3 +255,4 @@ def add_renderer_context(event):
         "url": get_weaver_url(event["request"]),
         "wps_restapi_url": get_wps_restapi_base_url(event["request"]),
     })
+    event["body"] = event.rendering_val  # shortcut name

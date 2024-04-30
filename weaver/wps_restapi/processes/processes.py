@@ -59,7 +59,7 @@ LOGGER = logging.getLogger(__name__)
     schema=sd.GetProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
     accept=ContentType.TEXT_HTML,
-    renderer="weaver.wps_restapi:templates/responses/processes.mako",
+    renderer="weaver.wps_restapi:templates/responses/process_listing.mako",
     response_schemas=sd.derive_responses(
         sd.get_processes_responses,
         sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")

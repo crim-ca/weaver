@@ -19,9 +19,40 @@
 
 .field-title {
     font-weight: bold;
+    font-size: 99%;  /* offset extra size from bold to keep 'title: value' aligned */
 }
 
 .format-link {
+    font-size: 80%;
+}
+
+.field > .code {
+    margin-top: 0.2em;
+}
+
+.field > .language {
+    margin-top: 0.2em;
+}
+
+.code {
+    font-family: monospace;
+}
+
+.language {
+    font-family: monospace;
+}
+
+.process-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.process-title > div {
+    margin-right: 0.25em;
+}
+
+.process-title > .label {
     font-size: 80%;
 }
 
@@ -49,6 +80,10 @@
     background-color: #F0AD4E;
 }
 
+.label-note {
+    background-color: #7E5BDE;
+}
+
 .label-info {
     background-color: #5BC0DE;
 }
@@ -60,6 +95,14 @@
 .label-null {
     background-color: #808080;
     font-style: italic;
+}
+
+.field > .label {
+    padding-bottom: 0.1em;
+}
+
+.label.code {
+    font-size: 100%;
 }
 
 /* --- Version Footer --- */
@@ -82,6 +125,8 @@
 }
 
 .version-tag {
+    display: inline-block;
+    padding-bottom: 0.1em;
 }
 
 /* --- Process ---*/

@@ -34,13 +34,18 @@
             %endif
             %if process.version:
                 <div class="field">
-                    <div class="field-title">Version: </div>
+                    <div class="field-title">Version:</div>
+                    &nbsp;
                     <div class="label label-info version-tag">${process.version}</div>
                 </div>
             %endif
             %if process.keywords:
                 <div class="field">
-                    <div class="field-title">Keywords: </div>${", ".join(process.keywords)}
+                    <div class="field-title">Keywords:</div>
+                    &nbsp;
+                    %for keyword in process.keywords:
+                        <div class="label label-note">${keyword}</div>
+                    %endfor
                 </div>
             %endif
         </dd>

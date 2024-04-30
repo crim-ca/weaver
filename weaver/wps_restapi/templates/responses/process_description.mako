@@ -1,40 +1,51 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
-<h2>Process: ${id}</h2>
+<h2>
+    <div class="process-title">
+        <div>
+        Process: ${id}
+        </div>
+        %if version:
+        <div class="label label-info version-tag code">${version}</div>
+        %endif
+    </div>
+</h2>
 
 <div class="format-link">
     (<a href="${util.get_process_link(id, query='f=json')}">OGC JSON</a>,
      <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>)
 </div>
 
-<ul>
-    <li>
-        <div class="nav-link">
-        Return to <a href="${util.get_processes_link(query='f=html')}">processes listing</a>.
-        </div>
-    </li>
-    <li>
-        <div class="nav-link">
-        <a href="#metadata">Process Metadata</a>
-        </div>
-    </li>
-    <li>
-        <div class="nav-link">
-        <a href="#inputs">Process Inputs</a>
-        </div>
-    </li>
-    <li>
-        <div class="nav-link">
-        <a href="#outputs">Process Outputs</a>
-        </div>
-    </li>
-    <li>
-        <div class="nav-link">
-        <a href="#links">Process Links</a>
-        </div>
-    </li>
-</ul>
+<div class="nav-menu">
+    <ul>
+        <li>
+            <div class="nav-link">
+                Return to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>.
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="#metadata">Process Metadata</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="#inputs">Process Inputs</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="#outputs">Process Outputs</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="#links">Process Links</a>
+            </div>
+        </li>
+    </ul>
+</div>
 
 <div class="process-description">
 
@@ -81,4 +92,7 @@
     <h3 id="links">
         <a href="#links">Links</a>
     </h3>
+    <div class="content-section">
+        ${util.render_links(links)}
+    </div>
 </div>
