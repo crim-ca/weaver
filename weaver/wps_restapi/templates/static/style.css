@@ -30,6 +30,11 @@
     font-size: 80%;
 }
 
+.field-id {
+    font-size: 120%;
+    font-weight: bold;
+}
+
 .field-title {
     font-size: 90%;
     font-style: italic;
@@ -56,6 +61,9 @@
 
 .code {
     font-family: monospace;
+}
+
+.dash {
 }
 
 .language {
@@ -89,6 +97,7 @@
 .label {
     display: inline;
     padding: 0.2em 0.5em;
+    margin-right: 0.25em;
     font-size: 75%;
     font-weight: 700;
     line-height: 1;
@@ -154,7 +163,6 @@
 
 .version-tag {
     display: inline-block;
-    padding-bottom: 0.1em;
 }
 
 /* --- Process ---*/

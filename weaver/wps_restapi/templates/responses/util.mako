@@ -100,10 +100,16 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 %for input_id, input_data in inputs.items():
     <div class="process-input">
         <dt id="input-${input_id}">
-            <a href="#input-${input_id}">${input_id}</a>
+            <div class="field-id inline code">
+                <a href="#input-${input_id}">${input_id}</a>
+            </div>
+            %if "title" in input_data:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${input_data.title}</span>
+            %endif
         </dt>
         <dd>
-            %for field in ["title", "description"]:
+            %for field in ["description"]:
                 %if field in input_data:
                 <div class="field">
                     <div class="field-key field-sub">${field.capitalize()}:</div>

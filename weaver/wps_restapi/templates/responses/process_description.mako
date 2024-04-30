@@ -5,7 +5,7 @@
     <div class="process-title inline">
         <div>
             Process:
-            <div class="code inline">
+            <div class="field-id code inline">
                 <a href="#id">${id}</a>
             </div>
         </div>
@@ -54,12 +54,12 @@
 
     <div class="content-section">
     %if title:
-        <span class="title">${title}</span>
+        <span class="field-title">${title}</span>
     %endif
     %if description:
-        <span class="description">${description}</span>
+        <span class="field-description">${description}</span>
     %else:
-        <span class="description undefined">No description available.</span>
+        <span class="field-description undefined">No description available.</span>
     %endif
     </div>
 
