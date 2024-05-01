@@ -24,6 +24,35 @@ Changes:
   nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
   are employed for representing supported requests and responses both the `REST` and the `OWS` `WPS` interfaces.
 - Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
+- Pin ``gunicorn>=22`` to address CVE-2024-1135.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.1.1:
+
+`5.1.1 <https://github.com/crim-ca/weaver/tree/5.1.1>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Use ``typing_extensions.Unpack`` to correctly represent expected types
+  for respective ``request-options`` keywords parameters.
+- Fix ``linkcheck`` failing due to inconsistent HTTP responses
+  (relates to `sphinx-doc/sphinx#12030 <https://github.com/sphinx-doc/sphinx/issues/12030>`_).
+
+.. _changes_5.1.0:
+
+`5.1.0 <https://github.com/crim-ca/weaver/tree/5.1.0>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
   (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).

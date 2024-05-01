@@ -442,6 +442,10 @@ linkcheck_ignore = [
     "https://ogc-ades.crim.ca/.*",
     "https://ogc.crim.ca/.*",
     "https://github.com/.*\\.rst#.*",
+    # FIXME: ignore URL causing HTTP 405 inconsistently
+    #   - https://github.com/sphinx-doc/sphinx/issues/12030
+    #   - https://github.com/orgs/sphinx-doc/discussions/12032
+    "https://app.dimensions.ai/details/grant/grant.8105745",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
@@ -453,7 +457,7 @@ linkcheck_timeout = 30
 linkcheck_retries = 5
 
 # avoid 403 by some links that explicitly block robots/scripts with mocked user-agent
-user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"
+# user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"
 
 # known warning issues to be ignored
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-nitpick_ignore
