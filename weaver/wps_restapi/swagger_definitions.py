@@ -5910,7 +5910,7 @@ class ProcessDetailQuery(ExtendedMappingSchema):
 
 class ProcessLinksQuery(ExtendedMappingSchema):
     links = ExtendedSchemaNode(
-        QueryBoolean(), example=True, default=True, missing=drop,
+        QueryBoolean(), example=True, default=True, missing=True,
         description="Return summary details with included links for each process."
     )
 

@@ -630,10 +630,11 @@ if TYPE_CHECKING:
     }, total=True)
     OpenAPISpecInfo = TypedDict("OpenAPISpecInfo", {
         "description": NotRequired[str],
-        "licence": OpenAPISpecLicence,
-        "contact": OpenAPISpecContact,
-        "title": str,
-        "version": str,
+        "licence": NotRequired[OpenAPISpecLicence],
+        "contact": NotRequired[OpenAPISpecContact],
+        "termsOfService": NotRequired[str],
+        "title": NotRequired[str],
+        "version": NotRequired[str],
     }, total=True)
     OpenAPISpecContent = TypedDict("OpenAPISpecContent", {
         "schema": OpenAPISchema,

@@ -35,6 +35,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, E
 from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
+from weaver.processes.types import ProcessType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
@@ -152,6 +153,34 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         processes_id = [p["id"] for p in resp.json["processes"]]
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
+
+    def test_get_processes_summary_links(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert "processes" in resp.json
+        assert len(resp.json["processes"])
+        for process in resp.json["processes"]:
+            self_link = [link for link in process["links"] if link["rel"] == "self"]
+            alt_link = [link for link in process["links"] if link["rel"] == "alternate"]
+            assert len(self_link) == 1
+            assert len(alt_link) >= 1
+
+        path = "/conformance"
+        resp = self.app.get(path, headers=self.json_headers)
+        conf = resp.json["conformsTo"]
+        assert "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core/process-summary-links" in conf
+
+    def test_get_processes_no_links(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.json_headers, params={"links": False})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert "processes" in resp.json
+        assert len(resp.json["processes"])
+        for process in resp.json["processes"]:
+            assert "links" not in process
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -2224,6 +2253,25 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         # validate cannot be found anymore
         resp = self.app.get(path_describe, params=proc_schema, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 403
+
+    def test_set_process_visibility_immutable(self):
+        test_process = self.process_public.identifier
+        path_describe = f"/processes/{test_process}"
+        path_visibility = f"{path_describe}/visibility"
+
+        process = self.process_store.fetch_by_id(test_process)
+        process["type"] = ProcessType.BUILTIN  # this defines an immutable process
+        self.process_store.save_process(process, overwrite=True)
+
+        # self-check accessible
+        resp = self.app.get(path_describe, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert not resp.json["mutable"]
+
+        # try to make private
+        data = {"value": Visibility.PRIVATE}
+        resp = self.app.put_json(path_visibility, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
 
     def test_set_process_visibility_bad_formats(self):
