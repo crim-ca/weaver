@@ -32,7 +32,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.types import ProcessType
@@ -532,6 +532,44 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 503
         assert resp.content_type == ContentType.APP_JSON
         assert process_name in resp.json.get("description")
+
+    def test_get_processes_html_accept_header(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_get_processes_html_format_query(self):
+        path = "/processes"
+        resp = self.app.get(path, params={"f": OutputFormat.HTML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_describe_process_html_accept_header(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Process:" in resp.text
+        assert self.process_public.identifier in resp.text
+
+    def test_describe_process_html_format_query(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, params={"f": OutputFormat.HTML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Process:" in resp.text
+        assert self.process_public.identifier in resp.text
 
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"
