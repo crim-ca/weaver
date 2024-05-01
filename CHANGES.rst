@@ -12,6 +12,11 @@ Changes
 
 Changes:
 --------
+- Add multiple missing `OGC API - Processes` conformance references.
+- Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
+  conformance class ``/conf/core/process-summary-links`` as default behavior
+  (relates to `opengeospatial/ogcapi-processes#406 <https://github.com/opengeospatial/ogcapi-processes/pull/406>`_,
+  fixes `crim-ca/weaver#622 <https://github.com/crim-ca/weaver/issues/622>`_).
 - Pin ``gunicorn>=22`` to address CVE-2024-1135.
 
 Fixes:

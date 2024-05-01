@@ -507,7 +507,7 @@ def _save_deploy_process(process, override, container):
         process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": str(exc),
             "status": HTTPConflict.code,
@@ -545,7 +545,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     """
     if not process.mutable:
         raise HTTPForbidden(json={
-            "type": "ProcessImmutable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
             "title": "Process immutable.",
             "detail": "Cannot update an immutable process.",
             "status": HTTPForbidden.code,
@@ -615,7 +615,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
         if new_version is not None:
             new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": "Failed update of process conflicting with another definition or revision.",
             "status": HTTPConflict.code,
