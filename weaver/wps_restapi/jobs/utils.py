@@ -315,7 +315,7 @@ def make_result_link(result_id, result, job_id, settings):
 def get_results(job,                                # type: Job
                 container,                          # type: AnySettingsContainer
                 value_key=None,                     # type: Optional[str]
-                schema=JobInputsOutputsSchema.OLD,  # type: JobInputsOutputsSchemaType
+                schema=JobInputsOutputsSchema.OLD,  # type: Optional[JobInputsOutputsSchemaType]
                 link_references=False,              # type: bool
                 ):                                  # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
     """

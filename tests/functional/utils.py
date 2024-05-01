@@ -32,7 +32,7 @@ from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, load_file
+from weaver.utils import fully_qualified_name, get_weaver_url, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from webtest import TestApp
 
+    from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
     from weaver.typedefs import (
         AnyRequestMethod,
         AnyResponseType,
@@ -326,6 +327,10 @@ class WpsConfigBase(unittest.TestCase):
     app = None      # type: TestApp
     url = None      # type: str
 
+    service_store = None    # type: MongodbServiceStore
+    process_store = None    # type: MongodbProcessStore
+    job_store = None        # type: MongodbJobStore
+
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
         setattr(self, "__test__", self is not WpsConfigBase)
@@ -341,6 +346,7 @@ class WpsConfigBase(unittest.TestCase):
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
+        cls.url = get_weaver_url(cls.app.app.registry)
         cls.db = get_db(config)
         cls.config = config
         cls.settings.update(cls.config.registry.settings)  # back propagate changes

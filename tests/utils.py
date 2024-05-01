@@ -69,7 +69,7 @@ except ImportError:  # pragma: no cover
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
-    from typing_extensions import Literal
+    from typing_extensions import Annotated, Literal
 
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
@@ -95,7 +95,10 @@ if TYPE_CHECKING:
     MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Union[Sequence[str], Dict[str, str]]]
+    MockConfigWPS1 = Union[
+        Tuple[str, str, Union[Sequence[str], Dict[str, str]]],
+        Annotated[Sequence[str], 3]
+    ]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -250,8 +253,6 @@ def get_test_weaver_config(config=None, settings=None):
     config.registry.settings["weaver.wps_processes"] = ""
     if settings:
         config.registry.settings.update(settings)
-    # create the test application
-    config.include("weaver")
     return config
 
 
@@ -1182,7 +1183,7 @@ def mocked_execute_celery(
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> contextlib.AbstractContextManager[mock.MagicMock]
+    # type: () -> Union[contextlib.ContextDecorator, contextlib.AbstractContextManager[mock.MagicMock]]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 
@@ -1303,6 +1304,12 @@ def mocked_aws_s3(test_func):
         with mock_aws_s3():
             return test_func(*args, **kwargs)
     return wrapped
+
+
+@overload
+def setup_aws_s3_bucket(region=MOCK_AWS_REGION, bucket=""):
+    # type: (BucketLocationConstraintType, str) -> Callable[[...], Any]
+    ...
 
 
 @overload

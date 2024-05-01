@@ -230,7 +230,10 @@ def patch_local_process(request):
     )
 )
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
-                        renderer=OutputFormat.JSON,  # omit 'accept' on purpose for JSON/XML (pyramid disallows list)
+                        accept=ContentType.TEXT_XML,
+                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+                        renderer=OutputFormat.JSON, accept=ContentType.APP_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):

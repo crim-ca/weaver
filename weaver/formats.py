@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
     DataStrT = TypeVar("DataStrT")
 
+    FormatSource = Literal["header", "query", "default"]
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -930,8 +932,35 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
     return media_type
 
 
-def guess_target_format(request, default=ContentType.APP_JSON):
+@overload
+def guess_target_format(request):
+    # type: (AnyRequestType) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, default):
     # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, return_source):
+    # type: (AnyRequestType, Literal[True]) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+@overload
+def guess_target_format(request, default, return_source):
+    # type: (AnyRequestType, Optional[Union[ContentType, str]], Literal[True]) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+def guess_target_format(
+    request,                        # type: AnyRequestType
+    default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
+    return_source=False,            # type: bool
+):                                  # type: (...) -> Union[ContentType, Tuple[ContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -952,18 +981,21 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
     both headers and query parameters are applied directly without question.
 
-    :returns: Matched media-type or default.
+    :returns: Matched media-type or default, and optionally, the source of resolution.
     """
     from weaver.utils import get_header
 
     format_query = request.params.get("format") or request.params.get("f")
+    format_source = "default"  # type: FormatSource
     content_type = None
     if format_query:
         content_type = OutputFormat.get(format_query, default=None, allow_version=False)
         if content_type:
             content_type = get_content_type(content_type)
+            format_source = "query"
     if not content_type:
         content_type = get_header("accept", request.headers, default=default or "")
+        format_source = "header"
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
             if ctype != default or not default:
@@ -974,6 +1006,9 @@ def guess_target_format(request, default=ContentType.APP_JSON):
                     content_type = default or ContentType.APP_JSON
     if not content_type or content_type == ContentType.ANY:
         content_type = default or ContentType.APP_JSON
+        format_source = "default"
+    if return_source:
+        return content_type, format_source
     return content_type
 
 

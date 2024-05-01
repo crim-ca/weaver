@@ -5,7 +5,6 @@ from pyramid.settings import asbool
 
 from weaver.utils import get_settings
 from weaver.vault import views as v
-from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator

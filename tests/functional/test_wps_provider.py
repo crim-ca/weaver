@@ -11,9 +11,6 @@ from tests.utils import (
     mocked_execute_celery,
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore,
-    setup_mongodb_servicestore
 )
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
@@ -43,10 +40,9 @@ class WpsProviderTest(WpsConfigBase):
 
     def setUp(self):
         # rebuild clean db on each test
-        self.service_store = setup_mongodb_servicestore(self.config)
-        self.process_store = setup_mongodb_processstore(self.config)
-        self.job_store = setup_mongodb_jobstore(self.config)
-        self.app_url = self.settings["weaver.url"]
+        self.service_store.clear_services()
+        self.process_store.clear_processes()
+        self.job_store.clear_jobs()
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -65,8 +61,6 @@ class WpsProviderTest(WpsConfigBase):
               override :meth:`weaver.xml_util.fromstring` employed by :mod:`OWSLib` during WPS-XML requests.
             - Comments in :data:`resources.TEST_INVALID_ESCAPE_CHARS_GETCAP_WPS1_XML` file describe bad characters.
         """
-        self.service_store.clear_services()
-
         # register the provider
         remote_provider_name = "test-wps-remote-provider-finch"
         path = "/providers"
@@ -101,8 +95,6 @@ class WpsProviderTest(WpsConfigBase):
               https://github.com/Ouranosinc/pavics-sdi/blob/master/docs/source/notebook-components/weaver_example.ipynb
             - Evaluate format of submitted Execute body (see `#340 <https://github.com/crim-ca/weaver/issues/340>`_).
         """
-        self.service_store.clear_services()
-
         # register the provider
         remote_provider_name = "test-wps-remote-provider-hummingbird"
         path = "/providers"
@@ -138,8 +130,8 @@ class WpsProviderTest(WpsConfigBase):
         proc_wps1_url = processes["ncdump"]["processEndpointWPS1"]
         proc_exec_url = processes["ncdump"]["executeEndpoint"]
         assert proc_wps1_url.startswith(resources.TEST_REMOTE_SERVER_URL)
-        assert proc_desc_url == f"{self.app_url + path}/ncdump"
-        assert proc_exec_url == f"{self.app_url + path}/ncdump/jobs"
+        assert proc_desc_url == f"{self.url + path}/ncdump"
+        assert proc_exec_url == f"{self.url + path}/ncdump/jobs"
 
         # validate process description
         resp = self.app.get(proc_desc_url, headers=self.json_headers)

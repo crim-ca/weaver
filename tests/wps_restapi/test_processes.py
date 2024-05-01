@@ -5,7 +5,6 @@ import copy
 import json
 import os
 import tempfile
-import unittest
 import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -21,18 +20,14 @@ from pywps.inout import LiteralInput
 from tests import resources
 from tests.utils import (
     get_links,
-    get_test_weaver_app,
     mocked_execute_celery,
     mocked_process_job_runner,
     mocked_process_package,
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     mocked_wps_output,
-    setup_config_with_mongodb,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore,
-    setup_mongodb_servicestore
 )
+from tests.functional.utils import WpsConfigBase
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
@@ -42,7 +37,7 @@ from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file, ows_context_href
+from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -50,44 +45,30 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
 
-    from pyramid.config import Configurator
-
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution
 
 
 # pylint: disable=C0103,invalid-name
-class WpsRestApiProcessesTest(unittest.TestCase):
+@pytest.mark.functional
+class WpsRestApiProcessesTest(WpsConfigBase):
     remote_server = None    # type: str
-    settings = {}           # type: SettingsType
-    config = None           # type: Configurator
-
-    @classmethod
-    def setUpClass(cls):
-        cls.settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps_path": "/ows/wps",
-            "weaver.wps_output_url": "http://localhost/wpsoutputs",
-        }
-        cls.config = setup_config_with_mongodb(settings=cls.settings)
-        cls.app = get_test_weaver_app(config=cls.config)
-        cls.url = get_weaver_url(cls.app.app.registry)
-        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.wps_output_url": "http://localhost/wpsoutputs",
+    }
 
     @classmethod
     def tearDownClass(cls):
         pyramid.testing.tearDown()
 
-    def fully_qualified_test_process_name(self):
-        return (f"{fully_qualified_name(self)}-{self._testMethodName}").replace(".", "-")
-
     def setUp(self):
         # rebuild clean db on each test
-        self.service_store = setup_mongodb_servicestore(self.config)
-        self.process_store = setup_mongodb_processstore(self.config)
-        self.job_store = setup_mongodb_jobstore(self.config)
+        self.service_store.clear_services()
+        self.process_store.clear_processes()
+        self.job_store.clear_jobs()
 
-        self.remote_server = "local"
         self.process_remote_WPS1 = "process_remote_wps1"
         self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
@@ -830,7 +811,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
-        expect_cwl = copy.deepcopy(cwl_base)
+        expect_cwl = copy.deepcopy(cwl_base)  # type: CWL
         expect_cwl.update(cwl_core)
         expect_cwl["inputs"] = []
         cwl_out = cwl_core["outputs"]["output"]
@@ -2306,3 +2287,25 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 pass
             else:
                 self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")
+
+
+# pylint: disable=C0103,invalid-name
+@pytest.mark.functional
+class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_restapi_html": False,
+        "weaver.vault": False,
+    }
+
+    @classmethod
+    def tearDownClass(cls):
+        pyramid.testing.tearDown()
+
+    def test_not_acceptable_html_format_query(self):
+        resp = self.app.get("/processes", params={"f": "html"}, expect_errors=True)
+        assert resp.status_code == 406
+
+    def test_not_acceptable_html_accept_header(self):
+        resp = self.app.get("/processes", headers={"Accept": ContentType.TEXT_HTML}, expect_errors=True)
+        assert resp.status_code == 406

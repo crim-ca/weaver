@@ -9,6 +9,7 @@ from pyramid.response import Response
 from pyramid.settings import asbool
 from pyramid.static import QueryStringConstantCacheBuster
 
+from weaver.formats import ContentType
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import add_renderer_context, get_wps_restapi_base_path
 
@@ -29,13 +30,37 @@ def includeme(config):
         LOGGER.info("Adding WPS REST API views...")
         api_base = get_wps_restapi_base_path(settings)
         with config.route_prefix_context(route_prefix=api_base):
-            config.include("weaver.wps_restapi.jobs")
             config.include("weaver.wps_restapi.providers")
             config.include("weaver.wps_restapi.processes")
+            # Note:
+            #   Important to add quotation and jobs last since providers/processes-prefixed
+            #   routes for execution are defined in their respective modules.
+            #   If not done this way, route/views get created before all cornice decorators could be found.
             config.include("weaver.wps_restapi.quotation")
+            config.include("weaver.wps_restapi.jobs")
+
+        # Note:
+        #   Following definitions avoids WPS XML -> REST JSON redirects to default to the HTML renderer.
+        #   By default, Pyramid prioritized HTML-based headers.
+        #   (see https://docs.pylonsproject.org/projects/pyramid/en/latest/narr/viewconfig.html#default-accept-ordering)
+        config.add_accept_view_order(
+            ContentType.APP_JSON,
+            weighs_more_than=ContentType.TEXT_HTML,
+        )
+        config.add_accept_view_order(
+            ContentType.TEXT_HTML,
+            weighs_more_than=ContentType.TEXT_XML,
+        )
+        config.add_accept_view_order(
+            ContentType.TEXT_XML,
+            weighs_more_than=ContentType.APP_XML,
+        )
 
     if not asbool(settings.get("weaver.wps_restapi_html", True)):
         LOGGER.warning("Skipping WPS REST API HTML views [weaver.wps_restapi_html=false].")
+    elif asbool(settings.get("weaver.wps_restapi", True)) is False:
+        LOGGER.error("Cannot use HTML views without REST API view [weaver.wps_restapi=false].")
+        raise RuntimeError("Cannot use HTML views without REST API views.")
     else:
         LOGGER.info("Adding API HTML views resources...")
         config.add_static_view("static", "weaver.wps_restapi:templates/static/", cache_max_age=3600)
