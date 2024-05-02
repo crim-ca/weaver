@@ -10,6 +10,12 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+.. FIXME:
+    - Resolve `Configurator.add_cornice_service` vs `cornice-swagger` `route_prefix` resolution for listing OpenAPI
+      endpoints with the appropriate prefix (https://github.com/Cornices/cornice/pull/584#issuecomment-2089676743).
+    - Add test validating that `route_prefix` is applied for HTTP requests.
+    - Add test validating that `route_prefix` is applied in paths of the resulting OpenAPI JSON from CorniceSwagger.
+
 Changes:
 --------
 - Add support of `HTML` responses for `OGC API - Processes` endpoints
@@ -22,7 +28,7 @@ Changes:
 - Add missing documentation for ``weaver.wps_restapi_doc`` and ``weaver.wps_restapi_ref`` configuration settings.
 - Modified the base path/URL resolution of the `OpenAPI` endpoint to be located at the application root instead of being
   nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
-  are employed for representing supported requests and responses both the `REST` and the `OWS` `WPS` interfaces.
+  are employed for representing supported requests and responses of both the `REST` and the `OWS` `WPS` interfaces.
 - Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
 - Add multiple missing `OGC API - Processes` conformance references.
 - Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
