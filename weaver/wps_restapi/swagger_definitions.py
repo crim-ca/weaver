@@ -5691,14 +5691,12 @@ class ExecuteHeadersXML(ExecuteHeadersBase):
 
 
 class PostProcessJobsEndpointJSON(LocalProcessPath):
-    content_type = ContentType.APP_JSON
     header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
 
 
 class PostProcessJobsEndpointXML(LocalProcessPath):
-    content_type = ContentType.APP_XML
     header = ExecuteHeadersXML()
     querystring = LocalProcessQuery()
     body = WPSExecutePost(

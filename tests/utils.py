@@ -500,7 +500,7 @@ def mocked_sub_requests(app,                # type: TestApp
         url = req_kwargs.pop("base_url", url)
         body = req_kwargs.pop("data", None)
         _json = req_kwargs.pop("json", None)
-        query = req_kwargs.pop("query", None)
+        query = req_kwargs.pop("query", None)  # type: Optional[str]
         params = req_kwargs.pop("params", {})
         if query:
             url += ("" if query.startswith("?") else "?") + query

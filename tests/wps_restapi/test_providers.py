@@ -49,10 +49,6 @@ class WpsProviderBase(unittest.TestCase):
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
 
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
     def setUp(self):
         # rebuild clean db on each test
         self.service_store = setup_mongodb_servicestore(self.config)

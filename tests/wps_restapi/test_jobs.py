@@ -73,10 +73,6 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         cls.datetime_interval = cls.generate_test_datetimes()
 
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
     def setUp(self):
         # rebuild clean db on each test
         self.job_store = setup_mongodb_jobstore(self.config)

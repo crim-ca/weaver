@@ -570,6 +570,8 @@ def api_frontpage_body(settings):
     weaver_api_spec = weaver_url + sd.openapi_json_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+    weaver_api_html = asbool(settings.get("weaver.wps_restapi_html", True))
+    weaver_api_html_url = f"{weaver_api_url}?f={OutputFormat.HTML}"
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
@@ -647,6 +649,13 @@ def api_frontpage_body(settings):
             weaver_links.append({"href": __meta__.__documentation_url__, "rel": "documentation",
                                  "type": ContentType.TEXT_HTML,
                                  "title": "API reference documentation about this service."})
+    if weaver_api_html:
+        weaver_links.append({
+            "href": weaver_api_html_url,
+            "type": ContentType.TEXT_HTML,
+            "rel": "alternate",
+            "title": "HTML view of the API frontpage."
+        })
     if weaver_wps:
         weaver_links.extend([
             {"href": weaver_wps_url,
@@ -673,6 +682,7 @@ def api_frontpage_body(settings):
             "attribution": __meta__.__author__,
             "parameters": [
                 {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+                {"name": "html", "enabled": weaver_api_html, "url": weaver_api_html_url, "api": weaver_api_oas_ui},
                 {"name": "vault", "enabled": weaver_vault},
                 {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url, "api": weaver_api_oas_ui},
             ],

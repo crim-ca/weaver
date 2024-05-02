@@ -1,5 +1,6 @@
 import json
 import unittest
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import colander
@@ -10,20 +11,24 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
+from tests.functional.utils import WpsConfigBase
 from weaver.formats import ContentType
 from weaver.utils import get_header, request_extra
 from weaver.wps_restapi import swagger_definitions as sd
 
+if TYPE_CHECKING:
+    from typing import List, Tuple
 
-class GenericApiRoutesTestCase(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.testapp = get_test_weaver_app(settings={"weaver.wps": True, "weaver.wps_restapi": True})
-        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+
+class GenericApiRoutesTestCase(WpsConfigBase):
+    settings = {
+        "weaver.wps": True,
+        "weaver.wps_restapi": True,
+    }
 
     @pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
     def test_frontpage_format(self):
-        resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers)
+        resp = self.app.get(sd.api_frontpage_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         body = resp.json
         try:
@@ -60,7 +65,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
             # request endpoint to validate it is accessible
             if "localhost" in path:
-                resp = self.testapp.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
+                resp = self.app.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
             else:
                 resp = request_extra("GET", path, retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
             user_agent = get_header("user-agent", resp.request.headers)
@@ -85,7 +90,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             assert ctype in rtype, f"Reference link content does not match [{ctype}]!=[{rtype}] for {test}"
 
     def test_version_format(self):
-        resp = self.testapp.get(sd.api_versions_service.path, headers=self.json_headers)
+        resp = self.app.get(sd.api_versions_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         try:
             sd.VersionsSchema().deserialize(resp.json)
@@ -93,19 +98,25 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
     def test_conformance_format(self):
-        resp = self.testapp.get(sd.api_conformance_service.path, headers=self.json_headers)
+        resp = self.app.get(sd.api_conformance_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         try:
             sd.ConformanceSchema().deserialize(resp.json)
         except colander.Invalid as ex:
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
+    def test_conformance_html(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        assert resp.status_code == 200
+        html_conformance = [conf for conf in resp.json["conformsTo"] if "html" in conf]
+        assert html_conformance
+
     def test_swagger_api_format(self):
-        resp = self.testapp.get(sd.api_swagger_ui_service.path)
+        resp = self.app.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200
         assert f"<title>{sd.API_TITLE}</title>" in resp.text
 
-        resp = self.testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
+        resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         assert "tags" in resp.json
         assert "info" in resp.json
@@ -115,7 +126,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert "basePath" in resp.json
 
     def test_openapi_includes_schema(self):
-        resp = self.testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
+        resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         body = resp.json
         assert "$id" in body["components"]["schemas"]["CWL"]
@@ -130,10 +141,10 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         # mock any function called inside the corresponding views just so that the exception is raised
         # check for the resulting status code to see if that raised HTTP exception was correctly handled
         with mock.patch("weaver.wps_restapi.api.api_frontpage_body", side_effect=HTTPUnauthorized):
-            resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
+            resp = self.app.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 401
         with mock.patch("weaver.wps_restapi.api.api_frontpage_body", side_effect=HTTPForbidden):
-            resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
+            resp = self.app.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 403
 
     def test_status_not_found_and_method_not_allowed(self):
@@ -142,16 +153,40 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
         Shouldn't be the default behaviour to employ 404 on both cases.
         """
-        resp = self.testapp.post("/random", headers=self.json_headers, expect_errors=True)
+        resp = self.app.post("/random", headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
 
         # test an existing route with wrong method, shouldn't be the default '404' on both cases
-        resp = self.testapp.post(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
+        resp = self.app.post(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 405
 
 
+@pytest.mark.functional
+class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_restapi_html": False,
+    }
+
+    def test_frontpage_html(self):
+        resp = self.app.get("/", headers=self.json_headers)
+        assert resp.status_code == 200
+        html_param = [param for param in resp.json["parameters"] if param["name"] == "html"]
+        assert len(html_param) == 1
+        assert not html_param[0]["enabled"]
+
+    def test_conformance_no_html(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        assert resp.status_code == 200
+        html_conformance = [conf for conf in resp.json["conformsTo"] if "html" in conf]
+        assert not html_conformance
+
+
 class RebasedApiRoutesTestCase(unittest.TestCase):
-    proxy_calls = []
+    proxy_calls = []        # type: List[Tuple[str, str]]
+    proxy_path = None       # type: str
+    app_host = None         # type: str
+    app_base_url = None     # type: str
 
     @classmethod
     def redirect_api_view(cls, request):

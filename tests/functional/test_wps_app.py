@@ -8,7 +8,6 @@ Based on tests from:
 """
 import contextlib
 
-import pyramid.testing
 import pytest
 import xmltodict
 
@@ -50,10 +49,6 @@ class WpsAppTest(WpsConfigBase):
         # add processes by pywps Process type
         cls.process_store.save_process(HelloWPS())
         cls.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def make_url(self, params):
         return f"{self.wps_path}?{params}"

@@ -60,10 +60,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         "weaver.wps_output_url": "http://localhost/wpsoutputs",
     }
 
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
     def setUp(self):
         # rebuild clean db on each test
         self.service_store.clear_services()
@@ -2381,12 +2377,7 @@ class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
     settings = {
         "weaver.url": "https://localhost",
         "weaver.wps_restapi_html": False,
-        "weaver.vault": False,
     }
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def test_not_acceptable_html_format_query(self):
         resp = self.app.get("/processes", params={"f": "html"}, expect_errors=True)

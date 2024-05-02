@@ -316,7 +316,6 @@ class JobUtils(object):
         )
 
 
-@pytest.mark.functional
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
     html_headers = {"Accept": ContentType.TEXT_HTML}
@@ -516,20 +515,3 @@ class WpsConfigBase(unittest.TestCase):
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"
         return body
-
-
-@pytest.mark.functional
-class AuthTokenApp(WpsConfigBase):
-    @classmethod
-    def setUpClass(cls):
-        config = get_test_weaver_config(settings=cls.settings)
-        config = setup_config_with_mongodb(config)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        cls.service_store = setup_mongodb_servicestore(config)  # force reset
-        cls.process_store = setup_mongodb_processstore(config)  # force reset
-        cls.job_store = setup_mongodb_jobstore(config)
-        cls.app = get_test_weaver_app(config=config, settings=cls.settings)
-        cls.db = get_db(config)
-        cls.config = config
-        cls.settings.update(cls.config.registry.settings)  # back propagate changes

@@ -2,7 +2,6 @@ import contextlib
 from typing import TYPE_CHECKING
 
 import mock
-import pyramid.testing
 import pytest
 
 from tests import resources
@@ -33,10 +32,6 @@ class WpsProviderTest(WpsConfigBase):
         "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
         "weaver.wps_output_url": f"{resources.TEST_REMOTE_SERVER_URL}/wps-outputs"
     }
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def setUp(self):
         # rebuild clean db on each test
