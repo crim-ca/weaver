@@ -1004,6 +1004,7 @@ def guess_target_format(
                 user_agent = get_header("user-agent", request.headers)
                 if user_agent and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"]):
                     content_type = default or ContentType.APP_JSON
+                    format_source = "default"
     if not content_type or content_type == ContentType.ANY:
         content_type = default or ContentType.APP_JSON
         format_source = "default"

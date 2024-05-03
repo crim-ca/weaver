@@ -676,6 +676,21 @@ class FormatQuery(ExtendedMappingSchema):
     )
 
 
+class FormatQueryJSON(ExtendedMappingSchema):
+    f = OutputFormatQuery(
+        title="OutputFormatShortQueryJSON",
+        missing=drop,
+        description="Output format selector. Equivalent to 'format' query or 'Accept' header.",
+        validator=OneOf([OutputFormat.JSON]),
+    )
+    format = OutputFormatQuery(
+        title="OutputFormatLongQueryJSON",
+        missing=drop,
+        description="Output format selector. Equivalent to 'f' query or 'Accept' header.",
+        validator=OneOf([OutputFormat.JSON]),
+    )
+
+
 class NoContent(ExtendedMappingSchema):
     description = "Empty response body."
     default = {}
@@ -2096,6 +2111,11 @@ class OpenAPIRequestHeaders(RequestHeaders):
 
 class OpenAPIEndpoint(ExtendedMappingSchema):
     header = OpenAPIRequestHeaders()
+
+
+class OpenAPIFormatRedirect(OpenAPIEndpoint):
+    header = OpenAPIAcceptHeader()
+    querystring = FormatQueryJSON()
 
 
 class SwaggerUIEndpoint(ExtendedMappingSchema):

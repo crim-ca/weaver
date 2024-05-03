@@ -30,6 +30,10 @@ Changes:
   nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
   are employed for representing supported requests and responses of both the `REST` and the `OWS` `WPS` interfaces.
 - Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
+- Add automatic redirect from ``/api?f=json`` to ``/json`` response to allow `OpenAPI` schema access directly
+  from the same endpoint as the `Swagger-UI` rendering of the schemas. The ``Accept`` header
+  for ``application/json`` or explicitly ``application/vnd.oai.openapi+json; version=3.0`` are also supported
+  (fixes `#623 <https://github.com/crim-ca/weaver/issues/623>`_)
 - Add multiple missing `OGC API - Processes` conformance references.
 - Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
   conformance class ``/conf/core/process-summary-links`` as default behavior

@@ -23,7 +23,7 @@ from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
 from weaver import __meta__
-from weaver.formats import ContentType, OutputFormat
+from weaver.formats import ContentType, OutputFormat, guess_target_format
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import (
         AnyRequestType,
+        AnyResponseType,
         AnySettingsContainer,
         JSON,
         OpenAPISpecification,
@@ -58,6 +59,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+@cache_region("doc", sd.api_conformance_service.name)
 def get_conformance(category, settings):
     # type: (Optional[AnyConformanceCategory], SettingsType) -> Conformance
     """
@@ -540,8 +542,14 @@ def get_conformance(category, settings):
     return data
 
 
-@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                              schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
+# FIXME: add HTML view
+@sd.api_frontpage_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.FrontpageEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_api_frontpage_responses,
+)
 def api_frontpage(request):
     """
     Frontpage of Weaver.
@@ -692,8 +700,13 @@ def api_frontpage_body(settings):
     return body
 
 
-@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                             schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
+@sd.api_versions_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.VersionsEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_api_versions_responses,
+)
 def api_versions(request):  # noqa: F811
     # type: (PyramidRequest) -> HTTPException
     """
@@ -703,8 +716,13 @@ def api_versions(request):  # noqa: F811
     return HTTPOk(json={"versions": [weaver_info]})
 
 
-@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                                schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
+@sd.api_conformance_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.ConformanceEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_api_conformance_responses,
+)
 def api_conformance(request):  # noqa: F811
     # type: (PyramidRequest) -> HTTPException
     """
@@ -801,8 +819,13 @@ def openapi_json_cached(*args, **kwargs):
     return get_openapi_json(*args, **kwargs)
 
 
-@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OutputFormat.JSON,
-                             schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
+@sd.openapi_json_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_openapi_json_responses,
+)
 def openapi_json(request):  # noqa: F811
     # type: (PyramidRequest) -> HTTPException
     """
@@ -826,16 +849,35 @@ def swagger_ui_cached(request):
     return resp
 
 
-@sd.api_openapi_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
-                               response_schemas=sd.get_api_swagger_ui_responses,
-                               renderer="templates/swagger_ui.mako")
-@sd.api_swagger_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
-                               response_schemas=sd.get_api_swagger_ui_responses,
-                               renderer="templates/swagger_ui.mako")
+@sd.api_openapi_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_openapi_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_OAS_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_openapi_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.SwaggerUIEndpoint(),
+    renderer="templates/swagger_ui.mako",
+    response_schemas=sd.get_api_swagger_ui_responses,
+)
 def api_swagger_ui(request):
+    # type: (PyramidRequest) -> AnyResponseType
     """
     Weaver OpenAPI schema definitions rendering using Swagger-UI viewer.
     """
+    if guess_target_format(request, default=ContentType.TEXT_HTML) in [ContentType.APP_JSON, ContentType.APP_OAS_JSON]:
+        url = get_weaver_url(request)
+        path = request.route_path(sd.openapi_json_service.name)
+        return HTTPFound(location=f"{url}{path}")
     return swagger_ui_cached(request)
 
 
@@ -962,10 +1004,19 @@ def redirect_view(request):
     available on both the prefixed and non-prefixed paths. This is required to provide details that are not *only*
     relevant for the :term:`OGC API - Processes` endpoints, but also other locations such as for the :term:`WPS`
     and :term:`Vault` requests.
+
+    Because the `HTTP 302 Found` request emitted for redirection could "loose" the ``Accept`` header originally
+    provided (or resolved from a format query), an ``f`` query parameter reflecting the desired format will be
+    re-applied to ensure the redirection yields the intended ``Content-Type`` result. If none of the format specifier
+    where provided, the default resolution will leave out the ``f`` query to let the destination URL resolved its own
+    default ``Content-Type``.
     """
     api_base = get_wps_restapi_base_path(request)
     url_base = request.path.rsplit(api_base, 1)[-1] or "/"
-    return HTTPFound(location=url_base)
+    content_type, source = guess_target_format(request, return_source=True)
+    format_query = f"?f={OutputFormat.get(content_type)}" if source != "default" else ""
+    location = f"{url_base}{format_query}"
+    return HTTPFound(location=location)
 
 
 def includeme(config):

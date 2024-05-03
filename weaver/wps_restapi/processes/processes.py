@@ -444,7 +444,7 @@ def delete_local_process(request):
 
 @sd.process_execution_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-    content_type=ContentType.ANY_XML,
+    content_type=list(ContentType.ANY_XML),
     schema=sd.PostProcessJobsEndpointXML(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
@@ -452,7 +452,7 @@ def delete_local_process(request):
 )
 @sd.process_jobs_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-    content_type=ContentType.ANY_XML,
+    content_type=list(ContentType.ANY_XML),
     schema=sd.PostProcessJobsEndpointXML(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,

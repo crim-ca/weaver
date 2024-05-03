@@ -1,3 +1,5 @@
+import itertools
+
 import json
 import unittest
 from typing import TYPE_CHECKING
@@ -7,12 +9,13 @@ import colander
 import mock
 import pyramid.testing
 import pytest
+from parameterized import parameterized
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
 from tests.functional.utils import WpsConfigBase
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_header, request_extra
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -20,10 +23,12 @@ if TYPE_CHECKING:
     from typing import List, Tuple
 
 
+@pytest.mark.functional
 class GenericApiRoutesTestCase(WpsConfigBase):
     settings = {
         "weaver.wps": True,
         "weaver.wps_restapi": True,
+        "weaver.wps_restapi_path": "/",
     }
 
     @pytest.mark.filterwarnings("ignore::urllib3.exceptions.InsecureRequestWarning")
@@ -114,6 +119,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
     def test_swagger_api_format(self):
         resp = self.app.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
         assert f"<title>{sd.API_TITLE}</title>" in resp.text
 
         resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
@@ -124,6 +130,30 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert "paths" in resp.json
         assert "openapi" in resp.json
         assert "basePath" in resp.json
+
+    def test_swagger_api_redirect_format_explicit(self):
+        resp = self.app.get(sd.api_swagger_ui_service.path, params={"f": OutputFormat.HTML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert f"<title>{sd.API_TITLE}</title>" in resp.text
+
+    @parameterized.expand(["f", "format"])
+    def test_swagger_api_redirect_format_query(self, format_query):
+        resp = self.app.get(sd.api_swagger_ui_service.path, params={format_query: OutputFormat.JSON})
+        assert resp.status_code == 302
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert "json" in resp.content_type
+        assert "openapi" in resp.json
+
+    @parameterized.expand([ContentType.APP_JSON, ContentType.APP_OAS_JSON])
+    def test_swagger_api_redirect_accept_header(self, accept_header):
+        resp = self.app.get(sd.api_swagger_ui_service.path, headers={"Accept": accept_header})
+        assert resp.status_code == 302
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert "json" in resp.content_type
+        assert "openapi" in resp.json
 
     def test_openapi_includes_schema(self):
         resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
@@ -162,6 +192,64 @@ class GenericApiRoutesTestCase(WpsConfigBase):
 
 
 @pytest.mark.functional
+class GenericApiRoutesPrefixedTestCase(WpsConfigBase):
+    settings = {
+        "weaver.wps_restapi": True,
+        "weaver.wps_restapi_path": "/ogcapi"
+    }
+
+    def test_base_api_non_prefixed(self):
+        resp = self.app.get("/")
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["title"] == "Weaver"
+
+    def test_base_api_prefixed_redirect(self):
+        resp = self.app.get("/ogcapi/")
+        assert resp.status_code == 302
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["title"] == "Weaver"
+
+    def test_ogc_api_prefixed(self):
+        resp = self.app.get("/processes", expect_errors=True)
+        assert resp.status_code == 404
+        resp = self.app.get("/ogcapi/processes", expect_errors=True)
+        assert resp.status_code == 200
+
+    @parameterized.expand(itertools.product(
+        ["f", "format"],
+        ["/api", "/ogcapi/api"],
+    ))
+    def test_swagger_api_redirect_format_query(self, format_query, api_path):
+        resp = self.app.get(api_path, params={format_query: OutputFormat.JSON})
+        for i in range(5):
+            if resp.status_code == 200:
+                break
+            assert resp.status_code == 302
+            resp = resp.follow()
+        assert resp.status_code == 200
+        assert "json" in resp.content_type
+        assert "openapi" in resp.json
+
+    @parameterized.expand(itertools.product(
+        [ContentType.APP_JSON, ContentType.APP_OAS_JSON],
+        ["/api", "/ogcapi/api"],
+    ))
+    def test_swagger_api_redirect_accept_header(self, accept_header, api_path):
+        resp = self.app.get(api_path, headers={"Accept": accept_header})
+        for i in range(5):
+            if resp.status_code == 200:
+                break
+            assert resp.status_code == 302
+            resp = resp.follow()
+        assert resp.status_code == 200
+        assert "json" in resp.content_type
+        assert "openapi" in resp.json
+
+
+@pytest.mark.functional
 class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
     settings = {
         "weaver.url": "https://localhost",
@@ -182,6 +270,7 @@ class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
         assert not html_conformance
 
 
+@pytest.mark.functional
 class RebasedApiRoutesTestCase(unittest.TestCase):
     proxy_calls = []        # type: List[Tuple[str, str]]
     proxy_path = None       # type: str
@@ -230,8 +319,9 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         resp = resp.follow()
         assert resp.status_code == 200
         assert resp.json["host"] == self.app_host
-        assert resp.json["basePath"] == self.proxy_path, \
+        assert resp.json["basePath"] == self.proxy_path, (
             "Proxy path specified by setting 'weaver.url' should be used in API definition to allow live requests."
+        )
 
         # validate that swagger UI still renders and has valid URL
         resp = redirect_app.get(self.app_proxy_ui)
