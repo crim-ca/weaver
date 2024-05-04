@@ -56,24 +56,24 @@ LOGGER = logging.getLogger(__name__)
 
 
 @sd.processes_service.get(
-    schema=sd.GetProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/process_listing.mako",
     response_schemas=sd.derive_responses(
         sd.get_processes_responses,
         sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
-    )
+    ),
 )
 @sd.processes_service.get(
-    schema=sd.GetProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-    accept=ContentType.TEXT_HTML,
+    schema=sd.GetProcessesEndpoint(),
+    accept=ContentType.TEXT_XML,
     response_schemas=sd.get_processes_responses,
 )
 @sd.processes_service.get(
-    schema=sd.GetProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_processes_responses,
@@ -190,8 +190,8 @@ def get_processes(request):
 
 
 @sd.processes_service.post(
-    schema=sd.PostProcessesEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PostProcessesEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
@@ -246,24 +246,24 @@ def patch_local_process(request):
 
 
 @sd.process_service.get(
-    schema=sd.ProcessEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/process_description.mako",
     response_schemas=sd.derive_responses(
         sd.get_process_responses,
         sd.GenericHTMLResponse(name="HTMLProcessDescription", description="Process description.")
-    )
+    ),
 )
 @sd.process_service.get(
-    schema=sd.ProcessEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
     accept=ContentType.TEXT_XML,
     response_schemas=sd.get_process_responses,
 )
 @sd.process_service.get(
-    schema=sd.ProcessEndpoint(),
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_process_responses,

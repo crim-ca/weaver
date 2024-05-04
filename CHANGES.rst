@@ -43,7 +43,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.wps_restapi_path`` incorrectly resolved when populating `Process` paging links.
 
 .. _changes_5.1.1:
 

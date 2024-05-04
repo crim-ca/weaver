@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from beaker.cache import cache_region
+from box import Box
 from cornice.service import get_services
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
 from pyramid.exceptions import PredicateMismatch
@@ -542,7 +543,16 @@ def get_conformance(category, settings):
     return data
 
 
-# FIXME: add HTML view
+@sd.api_frontpage_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.FrontpageEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/frontpage.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_api_frontpage_responses,
+        sd.GenericHTMLResponse(name="HTMLFrontpage", description="API Frontpage.")
+    ),
+)
 @sd.api_frontpage_service.get(
     tags=[sd.TAG_API],
     schema=sd.FrontpageEndpoint(),
@@ -551,11 +561,13 @@ def get_conformance(category, settings):
     response_schemas=sd.get_api_frontpage_responses,
 )
 def api_frontpage(request):
+    # type: (SettingsType) -> JSON
     """
     Frontpage of Weaver.
     """
     settings = get_settings(request)
-    return api_frontpage_body(settings)
+    body = api_frontpage_body(settings)
+    return Box(body)
 
 
 @cache_region("doc", sd.api_frontpage_service.name)
@@ -733,9 +745,14 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=data)
 
 
-def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
-                     use_refs=True, use_docstring_summary=True, container=None):
-    # type: (str, str, Optional[str], bool, bool, Optional[AnySettingsContainer]) -> OpenAPISpecification
+def get_openapi_json(
+    http_scheme="http",             # type: str
+    http_host="localhost",          # type: str
+    base_url=None,                  # type: Optional[str]
+    use_refs=True,                  # type: bool
+    use_docstring_summary=True,     # type: bool
+    container=None,                 # type: Optional[AnySettingsContainer]
+):                                  # type: (...) -> OpenAPISpecification
     """
     Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
@@ -842,6 +859,7 @@ def openapi_json(request):  # noqa: F811
 
 @cache_region("doc", sd.api_swagger_ui_service.name)
 def swagger_ui_cached(request):
+    # type: (PyramidRequest) -> AnyResponseType
     json_path = sd.openapi_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "openapi_json_path": json_path, "api_version": __meta__.__version__}
@@ -892,9 +910,13 @@ def redoc_ui_cached(request):
     return resp
 
 
-@sd.api_redoc_ui_service.get(tags=[sd.TAG_API], schema=sd.RedocUIEndpoint(),
-                             response_schemas=sd.get_api_redoc_ui_responses,
-                             renderer="templates/redoc_ui.mako")
+@sd.api_redoc_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.RedocUIEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="templates/redoc_ui.mako",
+    response_schemas=sd.get_api_redoc_ui_responses,
+)
 def api_redoc_ui(request):
     """
     Weaver OpenAPI schema definitions rendering using Redoc viewer.

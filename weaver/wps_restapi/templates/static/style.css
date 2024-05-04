@@ -4,6 +4,27 @@
     margin: 5em 2em 2em;
 }
 
+.content-section {
+    border-top: 0.1em solid #BBBBBB;
+    padding-bottom: 0.5em;
+    padding-top: 0.5em;
+}
+
+.page-title {
+    margin-bottom: 0.1em;
+}
+
+.nav-menu {
+}
+
+.nav-link {
+}
+
+.format-link {
+    font-size: 80%;
+    margin-bottom: 0.5em;
+}
+
 /* --- Generic Formats ---*/
 
 .undefined {
@@ -14,6 +35,7 @@
 
 .field {
     display: flex;
+    margin: 0.1em 0;
 }
 
 .field-key {
@@ -47,10 +69,6 @@
     text-align: justify;
 }
 
-.format-link {
-    font-size: 80%;
-}
-
 .field > .code {
     margin-top: 0.2em;
 }
@@ -61,6 +79,14 @@
 
 .code {
     font-family: monospace;
+}
+
+.true {
+    color: green;
+}
+
+.false {
+    color: darkred;
 }
 
 .dash {
@@ -90,6 +116,45 @@
 
 .process-title > .label {
     font-size: 80%;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted black;
+}
+
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    background-color: #BBBBBB;
+    color: #FFFFFF;
+    text-align: center;
+    border: 1px solid #606060;
+    border-radius: 0.25em;
+    padding: 0.25em;
+    position: absolute;
+    z-index: 1;
+    top: -0.25em;
+    left: 130%;
+    white-space: nowrap;
+}
+/* Tooltip arrow pointing at reference text */
+.tooltip .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    margin-top: -0.5em;
+    border-width: 0.5em;
+    border-style: solid;
+    border-color: transparent black transparent transparent;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
 }
 
 /* --- Labels --- */

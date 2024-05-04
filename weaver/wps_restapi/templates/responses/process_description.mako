@@ -1,7 +1,7 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
-<h2 id="id">
+<h2 id="id" class="page-title">
     <div class="process-title inline">
         <div>
             Process:
@@ -20,8 +20,13 @@
      <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>)
 </div>
 
-<div class="nav-menu">
+<div class="content-section nav-menu">
     <ul>
+        <li>
+            <div class="nav-link">
+                Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+            </div>
+        </li>
         <li>
             <div class="nav-link">
                 Return to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>.
@@ -63,35 +68,35 @@
     %endif
     </div>
 
-    <h3 id="metadata">
-        <a href="#metadata">Metadata</a>
-    </h3>
     <div class="content-section">
-    %if metadata:
-        ${util.render_metadata(metadata)}
-    %else:
-        <span class="undefined">No metadata provided.</span>
-    %endif
+        <h3 id="metadata">
+            <a href="#metadata">Metadata</a>
+        </h3>
+        %if metadata:
+            ${util.render_metadata(metadata)}
+        %else:
+            <span class="undefined">No metadata provided.</span>
+        %endif
     </div>
 
-    <h3 id="inputs">
-        <a href="#inputs">Inputs</a>
-    </h3>
     <div class="content-section">
+        <h3 id="inputs">
+            <a href="#inputs">Inputs</a>
+        </h3>
         ${util.render_inputs(inputs)}
     </div>
 
-    <h3 id="outputs">
-        <a href="#outputs">Outputs</a>
-    </h3>
     <div class="content-section">
+        <h3 id="outputs">
+            <a href="#outputs">Outputs</a>
+        </h3>
         ${util.render_outputs(outputs)}
     </div>
 
-    <h3 id="links">
-        <a href="#links">Links</a>
-    </h3>
     <div class="content-section">
+        <h3 id="links">
+            <a href="#links">Links</a>
+        </h3>
         ${util.render_links(links)}
     </div>
 </div>

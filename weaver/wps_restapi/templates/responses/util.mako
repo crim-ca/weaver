@@ -13,11 +13,68 @@ Utilities for rendering elements in other pages.
 
 
 <!--
+Assume that the definitions will be inserted into a 'nav-menu' with a parent HTML list block.
+-->
+<%def name="get_paging_links()">
+    <%
+        next_page = None
+        prev_page = None
+        last_page = None
+        first_page = None
+        for link in body.get("links") or []:
+            if link.rel == "prev":
+                prev_page = link.href
+            if link.rel == "next":
+                next_page = link.href
+            if link.rel == "last":
+                last_page = link.href
+            if link.rel == "first":
+                first_page = link.href
+    %>
+    %if first_page:
+        <li>
+            <div class="nav-link">
+                Go to <a href="${first_page}">first page</a>.
+            </div>
+        </li>
+    %endif
+    %if prev_page:
+        <li>
+            <div class="nav-link">
+                Go to <a href="${prev_page}">previous page</a>.
+            </div>
+        </li>
+    %endif
+    %if next_page:
+        <li>
+            <div class="nav-link">
+                Go to <a href="${next_page}">next page</a>.
+            </div>
+        </li>
+    %endif
+    %if last_page:
+        <li>
+            <div class="nav-link">
+                Go to <a href="${last_page}">last page</a>.
+            </div>
+        </li>
+    %endif
+</%def>
+
+
+<!--
 WARNING: newlines matter between 'pre', they will add extra whitespace. Leave them on the same line.
 NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserted in the head scripts.
 -->
 <%def name="render_json(json_data, indent=2, **kwargs)">
     <pre><code class="language-json">${json.dumps(json_data, indent=indent, **kwargs)}</code></pre>
+</%def>
+
+
+<%def name="render_bool(value)">
+    <div class="code ${str(value).lower()}">
+        ${str(value).lower()}
+    </div>
 </%def>
 
 

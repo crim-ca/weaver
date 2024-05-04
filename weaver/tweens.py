@@ -79,7 +79,11 @@ def http_validate_response_format_tween_factory(handler, registry):    # noqa: F
 def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
     # type: (ViewHandler, Registry) -> Callable[[PyramidRequest], AnyViewResponse]
     """
-    Tween factory that applies the response ``Content-Type`` according to the requested query format.
+    Tween factory that applies the request ``Accept`` header according to the requested format for the response.
+
+    The *requested format* in this case takes into account Web-Browsers automatically applying ``Accept`` with a
+    combination of *visual rendering* headers, notably with ``text/html``. In such case, the format is considered
+    to auto-resolve with the *default* response format of the specific endpoint.
     """
     def apply_format(request):
         # type: (PyramidRequest) -> HTTPException
@@ -95,6 +99,8 @@ def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
         #   Otherwise, we could be undoing some pre-resolutions performed during HTTP redirects between OWS/REST views.
         if format_source == "query":
             request.accept = content_type
+        if format_source == "default":
+            request.accept = "*/*"  # let per-endpoint resolution of their default
         resp = handler(request)
         return resp
     return apply_format

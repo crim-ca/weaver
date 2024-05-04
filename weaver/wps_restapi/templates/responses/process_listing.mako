@@ -1,7 +1,9 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
-<h2>Processes</h2>
+<h2 id="processes" class="page-title">
+    <a href="#processes">Processes</a>
+</h2>
 
 <div class="format-link">
 (<a href="${util.get_processes_link(query='f=json')}">JSON</a>)
@@ -9,11 +11,23 @@
 
 <div class="process-listing">
 
-    <div class="content-section">
-    Total processes: ${total}
+    <div class="content-section nav-menu">
+        <ul>
+            <li>
+                <div class="nav-link">
+                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+                </div>
+            </li>
+            ${util.get_paging_links()}
+        </ul>
     </div>
 
     <div class="content-section">
+
+    <div>
+    Total processes: ${total}
+    </div>
+
     <dl>
         %for process in processes:
         <dt class="process-list-item ">
