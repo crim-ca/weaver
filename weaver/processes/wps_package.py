@@ -237,19 +237,20 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
         LOGGER.warning("Failed retrieving package log for %s", job)
 
 
-def get_process_location(process_id_or_url, data_source=None):
-    # type: (Union[Dict[str, Any], str], Optional[str]) -> str
+def get_process_location(process_id_or_url, data_source=None, container=None):
+    # type: (Union[Dict[str, Any], str], Optional[str], Optional[AnySettingsContainer]) -> str
     """
     Obtains the URL of a WPS REST DescribeProcess given the specified information.
 
     :param process_id_or_url: process "identifier" or literal URL to DescribeProcess WPS-REST location.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
+    :param container: Container that provides access to application settings.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
-    data_source_url = retrieve_data_source_url(data_source)
+    data_source_url = retrieve_data_source_url(data_source, container=container)
     process_id = get_sane_name(process_id_or_url, min_len=1)
     process_url = sd.process_service.path.format(process_id=process_id)
     return f"{data_source_url}{process_url}"
@@ -280,8 +281,8 @@ def get_package_workflow_steps(package_dict_or_url):
     return workflow_steps_ids
 
 
-def _fetch_process_info(process_info_url, fetch_error):
-    # type: (str, Type[Exception]) -> JSON
+def _fetch_process_info(process_info_url, fetch_error, container=None):
+    # type: (str, Type[Exception], Optional[AnySettingsContainer]) -> JSON
     """
     Fetches the JSON process information from the specified URL and validates that it contains something.
 
@@ -292,7 +293,8 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": ContentType.APP_JSON}, settings=get_settings())
+    settings = get_settings(container)
+    resp = request_extra("get", process_info_url, headers={"Accept": ContentType.APP_JSON}, settings=settings)
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -301,8 +303,8 @@ def _fetch_process_info(process_info_url, fetch_error):
     return body
 
 
-def _get_process_package(process_url):
-    # type: (str) -> Tuple[CWL, str]
+def _get_process_package(process_url, container=None):
+    # type: (str, Optional[AnySettingsContainer]) -> Tuple[CWL, str]
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
@@ -310,13 +312,13 @@ def _get_process_package(process_url):
     :return: tuple of package body as dictionary and package reference name.
     """
     package_url = f"{process_url}/package"
-    package_body = _fetch_process_info(package_url, PackageNotFound)
+    package_body = _fetch_process_info(package_url, PackageNotFound, container=container)
     package_name = process_url.split("/")[-1]
     return package_body, package_name
 
 
-def _get_process_payload(process_url):
-    # type: (str) -> JSON
+def _get_process_payload(process_url, container=None):
+    # type: (str, Optional[AnySettingsContainer]) -> JSON
     """
     Retrieves the WPS process payload content from given process ID or literal URL.
 
@@ -325,7 +327,7 @@ def _get_process_payload(process_url):
     """
     process_url = get_process_location(process_url)
     payload_url = f"{process_url}/payload"
-    payload_body = _fetch_process_info(payload_url, PayloadNotFound)
+    payload_body = _fetch_process_info(payload_url, PayloadNotFound, container=container)
     return payload_body
 
 
@@ -478,6 +480,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):                                        # type: (...) -> None
     ...
 
@@ -491,6 +494,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):  # type: (...) -> Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]
     ...
 
@@ -503,6 +507,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]]
     """
     Loads :term:`CWL` package definition using various contextual resources.
@@ -528,6 +533,7 @@ def _load_package_content(package_dict,                             # type: CWL
     :param loading_context: :mod:`cwltool` context used to create the :term:`CWL` package.
     :param runtime_context: :mod:`cwltool` context used to execute the :term:`CWL` package.
     :param process_offering: :term:`JSON` body of the process description payload (used as I/O hint ordering).
+    :param container: Container that provides access to application settings.
     :returns:
         If :paramref:`only_dump_file` is ``True``, returns ``None``.
         Otherwise, :class:`tuple` of:
@@ -551,10 +557,16 @@ def _load_package_content(package_dict,                             # type: CWL
     step_packages = {}
     for step in workflow_steps:
         # generate sub-package file and update workflow step to point to it
-        step_process_url = get_process_location(step["reference"], data_source)
-        package_body, package_name = _get_process_package(step_process_url)
-        _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
-                              data_source=data_source, only_dump_file=True)
+        step_process_url = get_process_location(step["reference"], data_source, container=container)
+        package_body, package_name = _get_process_package(step_process_url, container=container)
+        _load_package_content(
+            package_body,
+            package_name,
+            tmp_dir=tmp_dir,
+            data_source=data_source,
+            container=container,
+            only_dump_file=True,
+        )
         step_name = step["name"]
         package_dict["steps"][step_name]["run"] = package_name
         step_packages[step_name] = {"id": package_name, "package": package_body}
@@ -985,13 +997,15 @@ def get_process_identifier(process_info, package):
     return process_id
 
 
-def get_process_definition(process_offering,    # type: JSON
-                           reference=None,      # type: Optional[str]
-                           package=None,        # type: Optional[CWL]
-                           data_source=None,    # type: Optional[str]
-                           headers=None,        # type: Optional[AnyHeadersContainer]
-                           builtin=False,       # type: bool
-                           ):                   # type: (...) -> JSON
+def get_process_definition(
+    process_offering,   # type: JSON
+    reference=None,     # type: Optional[str]
+    package=None,       # type: Optional[CWL]
+    data_source=None,   # type: Optional[str]
+    headers=None,       # type: Optional[AnyHeadersContainer]
+    builtin=False,      # type: bool
+    container=None,     # type: Optional[AnySettingsContainer]
+):                      # type: (...) -> JSON
     """
     Resolve the process definition considering corresponding metadata from the offering, package and references.
 
@@ -1005,6 +1019,7 @@ def get_process_definition(process_offering,    # type: JSON
     :param data_source: Where to resolve process IDs (default: localhost if ``None``).
     :param headers: Request headers provided during deployment to retrieve details such as authentication tokens.
     :param builtin: Indicate if the package is expected to be a :data:`CWL_REQUIREMENT_APP_BUILTIN` definition.
+    :param container: Container that provides access to application settings.
     :return: Updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
@@ -1040,7 +1055,12 @@ def get_process_definition(process_offering,    # type: JSON
 
     LOGGER.debug("Using data source: '%s'", data_source)
     package_factory, process_type, _ = try_or_raise_package_error(
-        lambda: _load_package_content(package, data_source=data_source, process_offering=process_info),
+        lambda: _load_package_content(
+            package,
+            data_source=data_source,
+            process_offering=process_info,
+            container=container,
+        ),
         reason="Loading package content",
     )
 
@@ -2488,7 +2508,7 @@ class WpsPackage(Process):
             req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT]
         ):
             LOGGER.debug("Retrieve WPS-3 process payload for potential Data Source definitions to resolve.")
-            step_payload = _get_process_payload(step_process)
+            step_payload = _get_process_payload(step_process, container=self.settings)
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
             self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)

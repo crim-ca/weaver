@@ -73,12 +73,13 @@ def get_processes(request):
             "value": repr_json(ex.value or dict(request.params), force_string=False),
         })
 
+    links = asbool(params.get("links", True))
     detail = asbool(params.get("detail", True))
     ignore = asbool(params.get("ignore", True))
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
-        results = get_processes_filtered_by_valid_schemas(request, detail=detail)
+        results = get_processes_filtered_by_valid_schemas(request, detail=detail, links=links)
         processes, invalid_processes, paging, with_providers, total_processes = results
         if invalid_processes:
             raise HTTPServiceUnavailable(
@@ -293,7 +294,13 @@ def set_process_visibility(request):
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id)
         if not process.mutable:
-            raise HTTPForbidden("Cannot change the visibility of builtin process.")
+            raise HTTPForbidden(json={
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
+                "title": "Process immutable.",
+                "detail": "Cannot change the visibility of builtin process.",
+                "status": HTTPForbidden.code,
+                "cause": {"mutable": False}
+            })
         store.set_visibility(process_id, visibility)
         return HTTPOk(json={"value": visibility})
     except TypeError:
@@ -318,8 +325,8 @@ def delete_local_process(request):
     process_id = process.id
     if not process.mutable:
         raise HTTPForbidden(json={
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
             "title": "Process immutable.",
-            "type": "ProcessImmutable",
             "detail": "Cannot delete an immutable process.",
             "status": HTTPForbidden.code,
             "cause": {"mutable": False}
@@ -330,7 +337,7 @@ def delete_local_process(request):
         raise HTTPForbidden(json={
             "title": "ProcessBusy",
             "type": "ProcessBusy",
-            "detail": "Process with specified identifier is in use by a least one job and cannot be undeployed.",
+            "detail": "Process with specified identifier is in use by at least one job and cannot be undeployed.",
             "status": HTTPForbidden.code,
             "cause": {"jobs": [str(job.id) for job in jobs]}
         })
