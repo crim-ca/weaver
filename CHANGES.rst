@@ -21,7 +21,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` failing to resolve a `CWL` Workflow step local reference to a `Process` using ``run: {process}.cwl``
+  definition due to the local `CLI` context not having the same URL resolution as the remote `Weaver` server
+  (fixes `#630 <https://github.com/crim-ca/weaver/issues/630>`_).
 
 .. _changes_5.1.1:
 
