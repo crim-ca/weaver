@@ -1,4 +1,5 @@
 import pytest
+from pyramid.testing import tearDown
 
 from weaver.processes.sources import fetch_data_sources, retrieve_data_source_url
 from weaver.utils import get_settings
@@ -19,7 +20,8 @@ def test_retrieve_data_source_url_no_settings(settings):
     This ensures that the raised exception is more specific to the actual cause, rather than
     an obscure :class:`AttributeError` or :class:`KeyError` related to settings container.
     """
-    assert get_settings() is None, "Settings should resolve to None for this test."
+    tearDown()  # avoid left-over global registry to be found
+    assert get_settings() is None, "Settings and Pyramid Registry must resolve to None for this test."
     with pytest.raises(ValueError, match="No data sources"):
         retrieve_data_source_url("", container=settings)
 
@@ -39,5 +41,7 @@ def test_fetch_data_sources_no_settings(settings):
     This ensures that the raised exception is more specific to the actual cause, rather than
     an obscure :class:`AttributeError` or :class:`KeyError` related to settings container.
     """
+    tearDown()  # avoid left-over global registry to be found
+    assert get_settings() is None, "Settings and Pyramid Registry must resolve to None for this test."
     with pytest.raises(ValueError, match="No data sources"):
         fetch_data_sources(settings)
