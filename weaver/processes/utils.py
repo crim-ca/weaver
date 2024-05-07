@@ -284,7 +284,14 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
     from weaver.processes.wps_package import check_package_instance_compatible, get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        info = get_process_definition(process_info, reference, package, data_source=None, headers=headers)
+        info = get_process_definition(
+            process_info,
+            reference,
+            package,
+            data_source=None,
+            headers=headers,
+            container=settings,
+        )
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)

@@ -401,7 +401,7 @@ class TestWeaverClient(TestWeaverClientBase):
             """
             if _container is None:
                 raise ValueError("Test missing registry for settings reference!")
-            return get_registry
+            return get_registry(_container)
 
         with mock.patch("weaver.utils.get_registry", side_effect=get_registry_no_auto_pyramid):
             result = mocked_sub_requests(self.app, self.client.deploy, test_id, cwl=package)
