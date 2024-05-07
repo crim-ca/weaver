@@ -38,9 +38,9 @@ from weaver.processes.constants import (
 )
 from weaver.processes.wps_package import (
     WpsPackage,
-    get_application_requirement,
     _load_package_content,
     _update_package_compatibility,
+    get_application_requirement
 )
 from weaver.wps.service import WorkerRequest
 
