@@ -12,8 +12,8 @@ import pyramid.testing
 import pytest
 import xmltodict
 
-from tests.utils import mocked_execute_celery
 from tests.functional.utils import WpsConfigBase
+from tests.utils import mocked_execute_celery
 from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
