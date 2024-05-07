@@ -61,7 +61,7 @@ def fetch_data_sources(container=None):
     if DATA_SOURCES:
         return DATA_SOURCES
 
-    settings = get_settings(container)
+    settings = get_settings(container) or {}
     data_source_config = settings.get("weaver.data_sources", "")
     if data_source_config:
         data_source_config = get_weaver_config_file(str(data_source_config), WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
@@ -96,7 +96,7 @@ def retrieve_data_source_url(data_source, container=None):
 
     :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`.
     """
-    settings = get_settings(container)
+    settings = get_settings(container) or {}
     if data_source is None:
         # get local data source
         return get_wps_restapi_base_url(settings)
