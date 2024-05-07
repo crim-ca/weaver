@@ -1135,9 +1135,8 @@ def is_cwl_package(package):
 def load_package_file(file_path):
     # type: (str) -> CWL
     """
-    Loads the package in YAML/JSON format specified by the file path.
+    Loads the package in :term:`YAML`/:term:`JSON` format specified by the file path.
     """
-
     file_path = _check_package_file(file_path)
     try:
         file_data = load_file(file_path)

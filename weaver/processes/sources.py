@@ -14,7 +14,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from typing import Optional
 
-    from weaver.typedefs import DataSourceConfig
+    from weaver.typedefs import AnySettingsContainer, DataSourceConfig
 
 DATA_SOURCES = {}  # type: DataSourceConfig
 """
@@ -54,14 +54,14 @@ Following JSON schema format is expected (corresponding YAML also supported):
 """
 
 
-def fetch_data_sources():
-    # type: () -> DataSourceConfig
+def fetch_data_sources(container=None):
+    # type: (Optional[AnySettingsContainer]) -> DataSourceConfig
     global DATA_SOURCES  # pylint: disable=W0603,global-statement
 
     if DATA_SOURCES:
         return DATA_SOURCES
 
-    settings = get_settings()
+    settings = get_settings(container)
     data_source_config = settings.get("weaver.data_sources", "")
     if data_source_config:
         data_source_config = get_weaver_config_file(str(data_source_config), WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
@@ -89,23 +89,24 @@ def get_default_data_source(data_sources):
     return next(iter(data_sources))
 
 
-def retrieve_data_source_url(data_source):
-    # type: (Optional[str]) -> str
+def retrieve_data_source_url(data_source, container=None):
+    # type: (Optional[str], Optional[AnySettingsContainer]) -> str
     """
     Finds the data source URL using the provided data source identifier.
 
     :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`.
     """
+    settings = get_settings(container) or {}
     if data_source is None:
         # get local data source
-        return get_wps_restapi_base_url(get_settings())
-    data_sources = fetch_data_sources()
+        return get_wps_restapi_base_url(settings)
+    data_sources = fetch_data_sources(settings)
     return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]["ades"]
 
 
-def get_data_source_from_url(data_url):
-    # type: (str) -> str
-    data_sources = fetch_data_sources()
+def get_data_source_from_url(data_url, container=None):
+    # type: (str, Optional[AnySettingsContainer]) -> str
+    data_sources = fetch_data_sources(container)
     try:
         parsed = urlparse(data_url)
         netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme

@@ -43,7 +43,7 @@ from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fully_qualified_name
+from weaver.utils import fully_qualified_name, get_registry
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
@@ -374,6 +374,38 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
         assert not result.success
         assert result.code == 403
+
+    def test_deploy_workflow(self):
+        """
+        Ensure the :term:`CLI` can infer "remote" processes references in the Workflow even though checking locally.
+        """
+        step_id = f"{self.test_process_prefix}echo"
+        package = self.retrieve_payload("Echo", "package", local=True)
+        result = mocked_sub_requests(self.app, self.client.deploy, step_id, cwl=package)
+        assert result.success
+
+        test_id = f"{self.test_process_prefix}workflow-echo"
+        package = self.retrieve_payload("WorkflowEcho", "package", local=True)
+        assert all(step["run"] == "Echo.cwl" for step in package["steps"].values()), "Requirement for test not met"
+        for step in package["steps"].values():
+            step["run"] = f"{step_id}.cwl"  # replace by test id used for cleanup
+
+        def get_registry_no_auto_pyramid(_container):
+            """
+            Raise if the registry resolver gets called with nothing in this context, as it should not be available.
+
+            .. note::
+                Given we are running in a test-suite, a pseudo test registry is actually injected as global *current*
+                registry, making the evaluation of this specific case hard to validate otherwise, since that registry
+                is still needed for the test web app to receive the valid requests for lookup.
+            """
+            if _container is None:
+                raise ValueError("Test missing registry for settings reference!")
+            return get_registry
+
+        with mock.patch("weaver.utils.get_registry", side_effect=get_registry_no_auto_pyramid):
+            result = mocked_sub_requests(self.app, self.client.deploy, test_id, cwl=package)
+        assert result.success
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available
