@@ -16,6 +16,44 @@ Changes:
   requirement classes for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
   and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
   due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``.
+- Add multiple missing `OGC API - Processes` conformance references.
+- Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
+  conformance class ``/conf/core/process-summary-links`` as default behavior
+  (relates to `opengeospatial/ogcapi-processes#406 <https://github.com/opengeospatial/ogcapi-processes/pull/406>`_,
+  fixes `crim-ca/weaver#622 <https://github.com/crim-ca/weaver/issues/622>`_).
+- Pin ``gunicorn>=22`` to address CVE-2024-1135.
+
+Fixes:
+------
+- Fix `CLI` failing to resolve a `CWL` Workflow step local reference to a `Process` using ``run: {process}.cwl``
+  definition due to the local `CLI` context not having the same URL resolution as the remote `Weaver` server
+  (fixes `#630 <https://github.com/crim-ca/weaver/issues/630>`_).
+- Fix `CWL` JSON schema reference pointing at older ``1.2.1_proposed`` branch in favor of ``v1.2.1`` tag (relates
+  to `common-workflow-language/cwl-v1.2#278 <https://github.com/common-workflow-language/cwl-v1.2/issues/278>`_).
+
+.. _changes_5.1.1:
+
+`5.1.1 <https://github.com/crim-ca/weaver/tree/5.1.1>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Use ``typing_extensions.Unpack`` to correctly represent expected types
+  for respective ``request-options`` keywords parameters.
+- Fix ``linkcheck`` failing due to inconsistent HTTP responses
+  (relates to `sphinx-doc/sphinx#12030 <https://github.com/sphinx-doc/sphinx/issues/12030>`_).
+
+.. _changes_5.1.0:
+
+`5.1.0 <https://github.com/crim-ca/weaver/tree/5.1.0>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
   incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
   (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).

@@ -39,19 +39,19 @@ for each process.
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
-      - | |version| |commits-since| |license|
+      - | |version| |commits-since| |license| |docker_image|
 
 .. |py_ver| image:: https://img.shields.io/badge/python-3.7%2B-blue.svg
     :alt: Requires Python 3.7+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/5.0.0.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/5.1.1.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/5.0.0...master
+    :target: https://github.com/crim-ca/weaver/compare/5.1.1...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-5.0.0-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-5.1.1-blue
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/5.0.0
+    :target: https://github.com/crim-ca/weaver/tree/5.1.1
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
     :alt: Libraries.io Dependencies Status
@@ -65,9 +65,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=5.0.0&branch=5.0.0
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=5.1.1&branch=5.1.1
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A5.0.0
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A5.1.1
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: ReadTheDocs Build Status (master branch)
@@ -79,8 +79,12 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.0.0?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.1.1?label=tag%20status
     :alt: Docker Build Status (latest version)
+    :target: https://hub.docker.com/r/pavics/weaver/tags
+
+.. |docker_image| image:: https://img.shields.io/badge/docker-pavics%2Fweaver-blue
+    :alt: Docker Image
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
@@ -196,43 +200,56 @@ Links
 
 Docker image repositories:
 
-- CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
-- OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
-- DockerHub: `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_
+.. list-table::
+    :header-rows: 1
 
-::
+    * - Name
+      - Reference
+      - Access
+    * - DockerHub
+      - `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_
+      - |public|
+    * - CRIM registry
+      - `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
+      - |restricted|
+    * - CRIM OGC Processes
+      - `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
+      - |restricted|
 
-    $ docker pull pavics/weaver:5.0.0
+.. |public| image:: https://img.shields.io/badge/public-green
+.. |restricted| image:: https://img.shields.io/badge/restricted-orange
+
+For a prebuilt image, pull as follows:
+
+.. code-block:: shell
+
+    docker pull pavics/weaver:5.1.1
 
 For convenience, following tags are also available:
 
-- ``weaver:5.0.0-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:5.0.0-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:5.1.1-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:5.1.1-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
 .. list-table::
     :header-rows: 1
 
-    * - Status
-      - Description
+    * - Description
+      - Version
       - Entrypoint
-    * - <span style="color:green">**active**</span>
-      - HYBRID Server
-      - https://service.crim.ca/
-    * - <span style="color:grey">**deprecated**</span>
-      - ADES Test server
-      - https://ogc-ades.crim.ca/weaver/
-    * - <span style="color:grey">**deprecated**</span>
-      - EMS Test server
-      - https://ogc-ems.crim.ca/weaver/
-    * - <span style="color:grey">**deprecated**</span>
-      - EMS Extra server
-      - https://ogc.crim.ca/weaver/
+    * - CRIM Services Portal
+      - |crim-services-version|
+      - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
+    * - `DACCS Project <https://github.com/DACCS-Climate>`_ - CRIM Development Instance
+      - |hirondelle-version|
+      - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
+
+.. |crim-services-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |hirondelle-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
-    Request the ``${server}/weaver/versions`` route to verify the running version.
 
 ----------------
 Configuration

@@ -40,9 +40,8 @@ esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # (https://github.com/KipCrossing/geotiff/pull/59)
 geotiff>=0.2.8
 # gunicorn >20 breaks some config.ini loading parameters (paste)
-# it is also only available for Python >=3.5
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=20.0.4
+gunicorn>=22
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
 json2xml>=4.1.0

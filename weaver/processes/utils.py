@@ -284,7 +284,14 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
     from weaver.processes.wps_package import check_package_instance_compatible, get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        info = get_process_definition(process_info, reference, package, data_source=None, headers=headers)
+        info = get_process_definition(
+            process_info,
+            reference,
+            package,
+            data_source=None,
+            headers=headers,
+            container=settings,
+        )
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)
@@ -507,7 +514,7 @@ def _save_deploy_process(process, override, container):
         process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": str(exc),
             "status": HTTPConflict.code,
@@ -545,7 +552,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     """
     if not process.mutable:
         raise HTTPForbidden(json={
-            "type": "ProcessImmutable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
             "title": "Process immutable.",
             "detail": "Cannot update an immutable process.",
             "status": HTTPForbidden.code,
@@ -615,7 +622,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
         if new_version is not None:
             new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": "Failed update of process conflicting with another definition or revision.",
             "status": HTTPConflict.code,
@@ -1135,9 +1142,8 @@ def is_cwl_package(package):
 def load_package_file(file_path):
     # type: (str) -> CWL
     """
-    Loads the package in YAML/JSON format specified by the file path.
+    Loads the package in :term:`YAML`/:term:`JSON` format specified by the file path.
     """
-
     file_path = _check_package_file(file_path)
     try:
         file_data = load_file(file_path)
