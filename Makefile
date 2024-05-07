@@ -553,7 +553,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 	@echo "Checking PEP8 doc formatting problems..."
 	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --check --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --check --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
 # FIXME: no configuration file support
@@ -674,7 +674,7 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --in-place --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --in-place --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only

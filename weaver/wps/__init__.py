@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """
 Views for WPS-XML endpoint implemented with :mod:`pywps`.
 """
