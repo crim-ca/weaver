@@ -76,7 +76,8 @@ if TYPE_CHECKING:
             ExecutionResults,
             HeadersType,
             JobSubscribers,
-            JSON
+            JSON,
+            SettingsType
         )
     except ImportError:
         # avoid linter issue
@@ -541,26 +542,47 @@ class WeaverClient(object):
         return OperationResult(True, "", data)
 
     @staticmethod
-    def _parse_deploy_package(body, cwl, wps, process_id, headers):
-        # type: (JSON, Optional[CWL], Optional[str], Optional[str], HeadersType) -> OperationResult
+    def _parse_deploy_package(
+        body,           # type: JSON
+        cwl,            # type: Optional[Union[CWL, str]]
+        wps,            # type: Optional[str]
+        process_id,     # type: Optional[str]
+        headers,        # type: HeadersType
+        settings,       # type: SettingsType
+    ):                  # type: (...) -> OperationResult
         try:
             p_desc = get_process_information(body)
             p_id = get_any_id(p_desc, default=process_id)
             info = {"id": p_id}  # minimum requirement for process offering validation
             if (isinstance(cwl, str) and not cwl.startswith("{")) or isinstance(wps, str):
                 LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", p_id)
-                proc = get_process_definition(info, reference=cwl or wps, headers=headers)  # validate
+                proc = get_process_definition(  # validate
+                    info,
+                    reference=cwl or wps,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, str) and cwl.startswith("{") and cwl.endswith("}"):
                 LOGGER.debug("Override parsed CWL into provided/loaded body for process: [%s]", p_id)
                 pkg = yaml.safe_load(cwl)
                 if not isinstance(pkg, dict) or pkg.get("cwlVersion") is None:
                     raise PackageRegistrationError("Failed parsing or invalid CWL from expected literal JSON string.")
-                proc = get_process_definition(info, package=pkg, headers=headers)  # validate
+                proc = get_process_definition(  # validate
+                    info,
+                    package=pkg,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, dict):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
-                get_process_definition(info, package=cwl, headers=headers)  # validate
+                get_process_definition(  # validate
+                    info,
+                    package=cwl,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": cwl}]
         except (PackageRegistrationError, ScannerError) as exc:  # pragma: no cover
             message = f"Failed resolution of package definition: [{exc!s}]"
@@ -745,12 +767,14 @@ class WeaverClient(object):
         req_headers = copy.deepcopy(self._headers)
         req_headers.update(self._parse_auth_token(token, username, password))
         data = result.body
-        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers)
+        base = self._get_url(url)
+        settings = copy.deepcopy(self._settings)
+        settings["weaver.wps_restapi_url"] = base
+        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers, settings)
         if not result.success:
             return result
         p_id = result.message
         data = result.body
-        base = self._get_url(url)
         if undeploy:
             LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
             result = self.undeploy(process_id=p_id, url=base)

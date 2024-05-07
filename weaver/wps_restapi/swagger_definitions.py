@@ -125,7 +125,7 @@ DOC_URL = f"{__meta__.__documentation_url__}/en/latest"
 
 CWL_VERSION = "v1.2"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
-CWL_SCHEMA_BRANCH = "1.2.1_proposed"
+CWL_SCHEMA_BRANCH = "v1.2.1"
 CWL_SCHEMA_PATH = "json-schema/cwl.yaml"
 CWL_SCHEMA_REPO = f"https://raw.githubusercontent.com/common-workflow-language/cwl-{CWL_VERSION}"
 CWL_SCHEMA_URL = f"{CWL_SCHEMA_REPO}/{CWL_SCHEMA_BRANCH}/{CWL_SCHEMA_PATH}"
