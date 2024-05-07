@@ -92,9 +92,10 @@ jobs:
       - name: Setup Python
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: 'pip'
       - name: Parse Python Version
         id: python-semver
         run: |
