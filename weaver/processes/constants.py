@@ -5,6 +5,9 @@ from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
+if TYPE_CHECKING:
+    from weaver.typedefs import CWL_Namespace
+
 IO_SelectInput_Type = Literal["input"]
 IO_SelectOutput_Type = Literal["output"]
 IO_Select_Type = Literal[IO_SelectInput_Type, IO_SelectOutput_Type]
@@ -72,11 +75,11 @@ class OpenSearchField(Constants):
 
 CWL_NAMESPACE_ID = "cwl"
 CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})
+CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})  # type: CWL_Namespace
 
 CWL_TOOL_NAMESPACE_ID = "cwltool"
 CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
-CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})
+CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})  # type: CWL_Namespace
 
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
 CWL_RequirementDockerType = Literal["DockerRequirement"]
@@ -95,7 +98,7 @@ CWL_RequirementNetworkAccessType = Literal["NetworkAccess"]
 CWL_RequirementProcessGeneratorType = Literal["ProcessGenerator"]
 CWL_RequirementResourceType = Literal["ResourceRequirement"]
 CWL_RequirementScatterFeatureType = Literal["ScatterFeatureRequirement"]
-CWL_RequirementSecretsType = Literal["Secrets"]
+CWL_RequirementSecretsType = Literal["cwltool:Secrets"]
 CWL_RequirementToolTimeLimitType = Literal["ToolTimeLimit"]
 CWL_RequirementWorkReuseType = Literal["WorkReuse"]
 
