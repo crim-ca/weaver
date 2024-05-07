@@ -179,8 +179,11 @@ if TYPE_CHECKING:
         "provider": NotRequired[str],
         "process": NotRequired[str],
     }, total=False)
-    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, ValueType]]   # {'<req>': {<param>: <val>}}
-    CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
+    CWL_RequirementsDict = Dict[  # {'<req>': {<param>: <val>}}
+        CWL_RequirementNames,
+        Dict[str, JSON],
+    ]
+    CWL_RequirementsList = List[CWL_Requirement]  # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
     CWL_Namespace = Dict[str, str]

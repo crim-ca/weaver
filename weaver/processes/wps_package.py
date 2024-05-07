@@ -464,6 +464,7 @@ def _update_package_compatibility(package):
                     if hint["class"] == weaver_hint:
                         hint["class"] = weaver_req
                         break
+            package.setdefault("$namespaces", {})
             package["$namespaces"].update(CWL_NAMESPACE_WEAVER_DEFINITION)
             LOGGER.warning(
                 "CWL package definition with '%s' updated using namespaced '%s' definition. "

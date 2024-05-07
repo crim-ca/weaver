@@ -95,12 +95,20 @@ CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL
 })  # type: CWL_Namespace
 
+# weaver-specific requirements, but non-namespaced for backward support
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
-CWL_RequirementDockerType = Literal["DockerRequirement"]
-CWL_RequirementDockerGpuType = Literal["DockerGpuRequirement"]
 CWL_RequirementESGFCWTType = Literal["ESGF-CWTRequirement"]
 CWL_RequirementOGCAPIType = Literal["OGCAPIRequirement"]
 CWL_RequirementWPS1Type = Literal["WPS1Requirement"]
+
+# weaver-specific requirements with namespace
+CWL_RequirementWeaverBuiltinType = Literal["weaver:BuiltinRequirement"]
+CWL_RequirementWeaverESGFCWTType = Literal["weaver:ESGF-CWTRequirement"]
+CWL_RequirementWeaverOGCAPIType = Literal["weaver:OGCAPIRequirement"]
+CWL_RequirementWeaverWPS1Type = Literal["weaver:WPS1Requirement"]
+
+CWL_RequirementDockerType = Literal["DockerRequirement"]
+CWL_RequirementDockerGpuType = Literal["DockerGpuRequirement"]
 CWL_RequirementCUDANameType = Literal["CUDARequirement"]
 CWL_RequirementCUDAType = Literal["cwltool:CUDARequirement"]
 CWL_RequirementEnvVarType = Literal["EnvVarRequirement"]
@@ -316,11 +324,15 @@ if TYPE_CHECKING:
     # pylint: disable=invalid-name
     CWL_RequirementNames = Literal[
         CWL_RequirementBuiltinType,
-        CWL_RequirementDockerType,
-        CWL_RequirementDockerGpuType,
         CWL_RequirementESGFCWTType,
         CWL_RequirementOGCAPIType,
         CWL_RequirementWPS1Type,
+        CWL_RequirementWeaverBuiltinType,
+        CWL_RequirementWeaverESGFCWTType,
+        CWL_RequirementWeaverOGCAPIType,
+        CWL_RequirementWeaverWPS1Type,
+        CWL_RequirementDockerType,
+        CWL_RequirementDockerGpuType,
         CWL_RequirementCUDAType,
         CWL_RequirementEnvVarType,
         CWL_RequirementInitialWorkDirType,
