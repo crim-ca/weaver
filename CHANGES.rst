@@ -21,7 +21,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CWL` JSON schema reference pointing at older ``1.2.1_proposed`` branch in favor of ``v1.2.1`` tag (relates
+  to `common-workflow-language/cwl-v1.2#278 <https://github.com/common-workflow-language/cwl-v1.2/issues/278>`_).
 
 .. _changes_5.1.1:
 
