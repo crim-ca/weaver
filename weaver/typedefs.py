@@ -183,6 +183,7 @@ if TYPE_CHECKING:
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
+    CWL_Namespace = Dict[str, str]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
         "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
@@ -212,7 +213,7 @@ if TYPE_CHECKING:
         "steps": NotRequired[Dict[CWL_WorkflowStepID, CWL_WorkflowStep]],
         "stderr": NotRequired[str],
         "stdout": NotRequired[str],
-        "$namespaces": NotRequired[Dict[str, str]],
+        "$namespaces": NotRequired[CWL_Namespace],
         "$schemas": NotRequired[Dict[str, str]],
         "$graph": NotRequired[CWL_Graph],
     }, total=False)

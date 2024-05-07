@@ -5,6 +5,9 @@ from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
+if TYPE_CHECKING:
+    from weaver.typedefs import CWL_Namespace
+
 IO_SelectInput_Type = Literal["input"]
 IO_SelectOutput_Type = Literal["output"]
 IO_Select_Type = Literal[IO_SelectInput_Type, IO_SelectOutput_Type]
@@ -72,21 +75,21 @@ class OpenSearchField(Constants):
 
 CWL_NAMESPACE = "cwl"
 CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE_DEFINITION = MappingProxyType({CWL_NAMESPACE: CWL_NAMESPACE_URL})
+CWL_NAMESPACE_DEFINITION = MappingProxyType({CWL_NAMESPACE: CWL_NAMESPACE_URL})  # type: CWL_Namespace
 """
 Namespace used to reference :term:`CWL` definitions provided the common specification.
 """
 
 CWL_NAMESPACE_CWLTOOL = "cwltool"
 CWL_NAMESPACE_CWLTOOL_URL = "http://commonwl.org/cwltool#"
-CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL})
+CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL})  # type: CWL_Namespace
 """
 Namespace used to reference :term:`CWL` definitions provided by mod:`cwltool`.
 """
 
 CWL_NAMESPACE_SCHEMA = "s"
 CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
-CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL})
+CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL})  # type: CWL_Namespace
 
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
 CWL_RequirementDockerType = Literal["DockerRequirement"]
@@ -106,7 +109,7 @@ CWL_RequirementNetworkAccessType = Literal["NetworkAccess"]
 CWL_RequirementProcessGeneratorType = Literal["ProcessGenerator"]
 CWL_RequirementResourceType = Literal["ResourceRequirement"]
 CWL_RequirementScatterFeatureType = Literal["ScatterFeatureRequirement"]
-CWL_RequirementSecretsType = Literal["Secrets"]
+CWL_RequirementSecretsType = Literal["cwltool:Secrets"]
 CWL_RequirementToolTimeLimitType = Literal["ToolTimeLimit"]
 CWL_RequirementWorkReuseType = Literal["WorkReuse"]
 

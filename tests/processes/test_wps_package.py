@@ -26,7 +26,7 @@ from cwltool.factory import Factory as CWLFactory
 
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Process
-from weaver.exceptions import PackageExecutionError
+from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -38,7 +38,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_TIME_LIMIT
 )
-from weaver.processes.wps_package import WpsPackage, _load_package_content, _update_package_compatibility
+from weaver.processes.wps_package import (
+    WpsPackage,
+    _load_package_content,
+    _update_package_compatibility,
+    get_application_requirement
+)
 from weaver.wps.service import WorkerRequest
 
 if TYPE_CHECKING:
@@ -593,7 +598,7 @@ def test_cwl_extension_requirements_no_error():
         "outputs": {},
         "requirements": {CWL_REQUIREMENT_CUDA: dict(CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS)},
         "$namespaces": dict(CWL_REQUIREMENT_CUDA_NAMESPACE)
-    }
+    }  # type: CWL
 
     # default behaviour without loading supported extensions should fail validation
     with mock.patch("weaver.processes.wps_package._load_supported_schemas", side_effect=lambda: None):
@@ -646,7 +651,7 @@ def test_cwl_extension_requirements_no_error():
     )
 
     # test unsupported schema extension to ensure still disallowed
-    cwl["requirements"] = {
+    cwl["requirements"] = {  # type: ignore  # purposely invalid/unsupported type
         CWL_REQUIREMENT_PROCESS_GENERATOR: {
             "class": "CommandLineTool",
             "run": copy.deepcopy(cwl),
@@ -665,6 +670,31 @@ def test_cwl_extension_requirements_no_error():
         f"Error message must contain all following items: {valid_msg}. "
         f"Some items were missing in: \n{message}"
     )
+
+
+@pytest.mark.parametrize(
+    "cwl",
+    [
+        {"requirements": {"custom": {}}},
+        {"requirements": {"custom": {}, "DockerRequirement": {"dockerPull": "debian:latest"}}},
+        {"hints": {"custom": {}}, "requirements": {"DockerRequirement": {"dockerPull": "debian:latest"}}},
+    ]
+)
+def test_get_application_requirement_hints_supported(cwl):
+    # type: (CWL) -> None
+    """
+    Ensure that unknown :term:`CWL` requirements or hints are raised.
+
+    Although ``hints`` are considered optional from typical :term:`CWL` specification, they could be employed in
+    an :term:`Application Package` definition, and produce valid operations to be applied when the :term:`CWL`
+    execution is handed of to :mod:`cwltool`. To ensure no undesired side-effects occur this way, our ``hints``
+    are handled more strictly as if they were ``requirements``.
+
+    .. seealso::
+        :data:`weaver.processes.constants.CWL_REQUIREMENTS_SUPPORTED`
+    """
+    with pytest.raises(PackageTypeError):
+        get_application_requirement(cwl, validate=True, required=True)
 
 
 def test_cwl_enum_schema_name_patched():
