@@ -82,14 +82,18 @@ Namespace used to reference :term:`CWL` definitions provided the common specific
 
 CWL_NAMESPACE_CWLTOOL = "cwltool"
 CWL_NAMESPACE_CWLTOOL_URL = "http://commonwl.org/cwltool#"
-CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL})  # type: CWL_Namespace
+CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL
+})  # type: CWL_Namespace
 """
 Namespace used to reference :term:`CWL` definitions provided by mod:`cwltool`.
 """
 
 CWL_NAMESPACE_SCHEMA = "s"
 CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
-CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL})  # type: CWL_Namespace
+CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL
+})  # type: CWL_Namespace
 
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
 CWL_RequirementDockerType = Literal["DockerRequirement"]
