@@ -2384,9 +2384,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
 
-        .. fixme::
+        .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when asserting
             the expected output listing size and paths. Re-running this test by itself validates if this case happened.
+            Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
 
         .. versionadded:: 4.27
         """

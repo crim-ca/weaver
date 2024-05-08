@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+from typing import cast
 
 import mock
 import pytest
@@ -15,7 +16,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.exceptions import PackageRegistrationError
-from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1
+from weaver.processes.constants import CWL_NAMESPACE_WEAVER, CWL_REQUIREMENT_APP_WPS1, CWL_RequirementWeaverWPS1Type
 from weaver.processes.utils import _check_package_file  # noqa: W0212
 from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
 
@@ -214,32 +215,33 @@ def test_register_wps_processes_from_config_valid():
     # static processes inferred names are a concatenation of the URL sanitized/slug + process-ID
     proc1_id = f"{infer_name1}_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
     proc1 = p_store.fetch_by_id(proc1_id)
-    assert proc1.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL1}/"
-    assert proc1.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    wps_req = cast(CWL_RequirementWeaverWPS1Type, f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_WPS1}")
+    assert proc1.package["hints"][wps_req]["provider"] == f"{WPS1_URL1}/"
+    assert proc1.package["hints"][wps_req]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc2_id = f"{infer_name2}_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
     proc2 = p_store.fetch_by_id(proc2_id)
-    assert proc2.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL2}/"
-    assert proc2.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    assert proc2.package["hints"][wps_req]["provider"] == f"{WPS1_URL2}/"
+    assert proc2.package["hints"][wps_req]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc3_id = f"{infer_name3}_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
     proc3 = p_store.fetch_by_id(proc3_id)
-    assert proc3.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL3}/"
-    assert proc3.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    assert proc3.package["hints"][wps_req]["provider"] == f"{WPS1_URL3}/"
+    assert proc3.package["hints"][wps_req]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     # although an explicit name is provided, the URL point to generic GetCapabilities
     # therefore, multiple processes *could* be registered, which require same server-name+process-id concat as above
     proc4_id = f"test-static-process_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
     proc4 = p_store.fetch_by_id(proc4_id)
-    assert proc4.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL1}/"
-    assert proc4.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+    assert proc4.package["hints"][wps_req]["provider"] == f"{WPS1_URL1}/"
+    assert proc4.package["hints"][wps_req]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     # last server is the same, but specific IDs are given
     # still, concat happens to avoid conflicts against multiple servers sharing process-IDs, although distinct
     proc5_id = f"test-filter-process_{resources.WPS_ENUM_ARRAY_IO_ID}"
     proc5 = p_store.fetch_by_id(proc5_id)
-    assert proc5.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL4}/"
-    assert proc5.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.WPS_ENUM_ARRAY_IO_ID
+    assert proc5.package["hints"][wps_req]["provider"] == f"{WPS1_URL4}/"
+    assert proc5.package["hints"][wps_req]["process"] == resources.WPS_ENUM_ARRAY_IO_ID
     proc6_id = f"test-filter-process_{resources.WPS_LITERAL_COMPLEX_IO_ID}"
     proc6 = p_store.fetch_by_id(proc6_id)
-    assert proc6.package["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] == f"{WPS1_URL4}/"
-    assert proc6.package["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == resources.WPS_LITERAL_COMPLEX_IO_ID
+    assert proc6.package["hints"][wps_req]["provider"] == f"{WPS1_URL4}/"
+    assert proc6.package["hints"][wps_req]["process"] == resources.WPS_LITERAL_COMPLEX_IO_ID
 
 
 def test_register_cwl_processes_from_config_undefined():

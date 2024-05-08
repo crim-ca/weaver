@@ -32,9 +32,29 @@ from dateutil import parser as date_parser
 from weaver import WEAVER_SCHEMA_DIR, __meta__
 from weaver.config import WeaverFeature
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, OutputFormat
+from weaver.formats import (
+    EDAM_NAMESPACE,
+    EDAM_NAMESPACE_URL,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
+    OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
+    OPENGIS_NAMESPACE,
+    OPENGIS_NAMESPACE_URL,
+    AcceptLanguage,
+    ContentType,
+    OutputFormat
+)
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
+    CWL_NAMESPACE,
+    CWL_NAMESPACE_CWLTOOL,
+    CWL_NAMESPACE_CWLTOOL_URL,
+    CWL_NAMESPACE_SCHEMA,
+    CWL_NAMESPACE_SCHEMA_URL,
+    CWL_NAMESPACE_URL,
+    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -69,7 +89,6 @@ from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
-    URI,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
     BoundedRange,
@@ -367,9 +386,29 @@ class Tag(ExtendedSchemaNode):
 
 
 class URL(ExtendedSchemaNode):
+    """
+    String format that will be automatically mapped to a URL-pattern validator.
+
+    .. seealso::
+        - :data:`weaver.wps_restapi.colander_extras.URL`
+        - :class:`weaver.wps_restapi.colander_extras.ExtendedSchemaBase`
+    """
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class URI(ExtendedSchemaNode):
+    """
+    String format that will be automatically mapped to a URI-pattern validator.
+
+    .. seealso::
+        - :data:`weaver.wps_restapi.colander_extras.URI`
+        - :class:`weaver.wps_restapi.colander_extras.ExtendedSchemaBase`
+    """
+    schema_type = String
+    description = "URI reference."
+    format = "uri"
 
 
 class Email(ExtendedSchemaNode):
@@ -4970,6 +5009,103 @@ class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
 
+class CWLNamespaces(StrictMappingSchema):
+    """
+    Mapping of :term:`CWL` namespace definitions for shorthand notation.
+
+    .. note::
+        Use a combination of `strict` mapping and ``variable`` (see ``var`` field) such that any additional namespace
+        other than the ones explicitly listed are allowed, but if provided, they must succeed URI validation minimally.
+        If no additional namespace is provided, including none at all, the mapping definition remains valid because
+        of ``missing=drop`` under ``var``. If a URI is invalid for additional namespaces, the failing validation causes
+        the property to be unmapped to the variable, which leads to an ``"unknown"`` property raised by the `strict`
+        mapping. For explicit URI definitions, the specific URI combinations provided must be matched exactly to
+        succeed. This ensures that no invalid mapping gets applied for commonly-known URI namespaces.
+    """
+    name = "$namespaces"
+    title = "CWL Namespaces Mapping"
+    description = "Mapping of CWL namespace definitions for shorthand notation."
+    var = URI(variable="{namespace}", missing=drop)
+    cwl = URI(
+        missing=drop,
+        name=CWL_NAMESPACE,
+        validator=OneOf([CWL_NAMESPACE_URL, CWL_NAMESPACE_URL.rstrip("#")]),
+    )
+    cwltool = URI(
+        missing=drop,
+        name=CWL_NAMESPACE_CWLTOOL,
+        validator=OneOf([CWL_NAMESPACE_CWLTOOL_URL, CWL_NAMESPACE_CWLTOOL_URL.rstrip("#")]),
+    )
+    edam = URI(
+        missing=drop,
+        name=EDAM_NAMESPACE,
+        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("#")]),
+    )
+    iana = URI(
+        missing=drop,
+        name=IANA_NAMESPACE,
+        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("#")]),
+    )
+    ogc = URI(
+        missing=drop,
+        name=OGC_NAMESPACE,
+        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
+    )
+    opengis = URI(
+        missing=drop,
+        name=OPENGIS_NAMESPACE,
+        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("#")]),
+    )
+    s = URI(
+        missing=drop,
+        name=CWL_NAMESPACE_SCHEMA,
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
+    )
+    weaver = URI(
+        missing=drop,
+        name=CWL_NAMESPACE_WEAVER,
+        validator=OneOf([CWL_NAMESPACE_WEAVER_URL, CWL_NAMESPACE_WEAVER_URL.rstrip("#")]),
+    )
+
+
+class CWLSchemas(ExtendedSequenceSchema):
+    name = "$schemas"
+    url = URL(title="CWLSchemaURL", description="Schema reference for the CWL definition.")
+
+
+class CWLMetadata(ExtendedMappingSchema):
+    _sort_first = [
+        "cwlVersion",
+        "class",
+        "id",
+        "version",
+        "label",
+        "doc",
+        "intent",
+        f"{CWL_NAMESPACE_SCHEMA}:author",
+        f"{CWL_NAMESPACE_SCHEMA}:keywords",
+    ]
+    _sort_after = ["$namespaces", "$schemas"]
+
+    _id = ExtendedSchemaNode(String(), name="id", missing=drop)
+    label = ExtendedSchemaNode(String(), missing=drop)
+    doc = ExtendedSchemaNode(String(), missing=drop)
+    intent = ExtendedSchemaNode(String(), missing=drop)
+    author = ExtendedSchemaNode(
+        String(),
+        name=f"{CWL_NAMESPACE_SCHEMA}:author",
+        missing=drop,
+        description="Author of the Application Package.",
+    )
+    keywords = KeywordList(
+        name=f"{CWL_NAMESPACE_SCHEMA}:keywords",
+        missing=drop,
+        description="Keywords applied to the Application Package.",
+    )
+    namespaces = CWLNamespaces(missing=drop)
+    schemas = CWLSchemas(missing=drop)
+
+
 class CWLScatterMulti(ExtendedSequenceSchema):
     id = CWLIdentifier("")
 
@@ -5016,9 +5152,10 @@ class CWLApp(PermissiveMappingSchema):
     scatterMethod = CWLScatterMethod(missing=drop)
 
 
-class CWL(CWLBase, CWLApp):
+class CWL(CWLBase, CWLMetadata, CWLApp):
+    _sort_first = ["$schema"] + CWLMetadata._sort_first
+    _sort_after = ["requirements", "hints", "inputs", "outputs", "steps", "$graph", "$namespaces", "$schemas"]
     _schema = CWL_SCHEMA_URL
-    _sort_first = ["$schema", "cwlVersion", "id", "class"]
 
 
 class ExecutionUnitCWL(CWL):
@@ -5487,11 +5624,10 @@ class UpdateVersion(ExtendedMappingSchema):
 
 
 class DeployCWLGraph(CWLBase, CWLGraphBase, UpdateVersion):
-    _sort_first = ["cwlVersion", "version", "$graph"]
+    pass
 
 
 class DeployCWL(NotKeywordSchema, CWL, UpdateVersion):
-    _sort_first = ["cwlVersion", "version", "id", "class"]
     _not = [
         CWLGraphBase()
     ]
@@ -5992,7 +6128,7 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
     error = ErrorDetail(missing=drop)
-    instance = ExtendedSchemaNode(String(), validator=URI, missing=drop)
+    instance = URI(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
 

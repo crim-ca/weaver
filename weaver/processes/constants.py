@@ -73,20 +73,43 @@ class OpenSearchField(Constants):
     LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
 
-CWL_NAMESPACE_ID = "cwl"
+CWL_NAMESPACE = "cwl"
 CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})  # type: CWL_Namespace
+CWL_NAMESPACE_DEFINITION = MappingProxyType({CWL_NAMESPACE: CWL_NAMESPACE_URL})  # type: CWL_Namespace
+"""
+Namespace used to reference :term:`CWL` definitions provided the common specification.
+"""
 
-CWL_TOOL_NAMESPACE_ID = "cwltool"
-CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
-CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})  # type: CWL_Namespace
+CWL_NAMESPACE_CWLTOOL = "cwltool"
+CWL_NAMESPACE_CWLTOOL_URL = "http://commonwl.org/cwltool#"
+CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_CWLTOOL: CWL_NAMESPACE_CWLTOOL_URL
+})  # type: CWL_Namespace
+"""
+Namespace used to reference :term:`CWL` definitions provided by mod:`cwltool`.
+"""
 
+CWL_NAMESPACE_SCHEMA = "s"
+CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
+CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_SCHEMA: CWL_NAMESPACE_SCHEMA_URL
+})  # type: CWL_Namespace
+
+# weaver-specific requirements, but non-namespaced for backward support
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
-CWL_RequirementDockerType = Literal["DockerRequirement"]
-CWL_RequirementDockerGpuType = Literal["DockerGpuRequirement"]
 CWL_RequirementESGFCWTType = Literal["ESGF-CWTRequirement"]
 CWL_RequirementOGCAPIType = Literal["OGCAPIRequirement"]
 CWL_RequirementWPS1Type = Literal["WPS1Requirement"]
+
+# weaver-specific requirements with namespace
+CWL_RequirementWeaverBuiltinType = Literal["weaver:BuiltinRequirement"]
+CWL_RequirementWeaverESGFCWTType = Literal["weaver:ESGF-CWTRequirement"]
+CWL_RequirementWeaverOGCAPIType = Literal["weaver:OGCAPIRequirement"]
+CWL_RequirementWeaverWPS1Type = Literal["weaver:WPS1Requirement"]
+
+CWL_RequirementDockerType = Literal["DockerRequirement"]
+CWL_RequirementDockerGpuType = Literal["DockerGpuRequirement"]
+CWL_RequirementCUDANameType = Literal["CUDARequirement"]
 CWL_RequirementCUDAType = Literal["cwltool:CUDARequirement"]
 CWL_RequirementEnvVarType = Literal["EnvVarRequirement"]
 CWL_RequirementInitialWorkDirType = Literal["InitialWorkDirRequirement"]
@@ -112,6 +135,23 @@ CWL_REQUIREMENT_APP_ESGF_CWT = get_args(CWL_RequirementESGFCWTType)[0]
 CWL_REQUIREMENT_APP_OGC_API = get_args(CWL_RequirementOGCAPIType)[0]
 CWL_REQUIREMENT_APP_WPS1 = get_args(CWL_RequirementWPS1Type)[0]
 
+CWL_REQUIREMENT_APP_WEAVER = frozenset([
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+])
+"""
+Set of :term:`CWL` requirements defined by `Weaver` for an :term:`Application Package` implementation.
+"""
+
+CWL_NAMESPACE_WEAVER = "weaver"
+CWL_NAMESPACE_WEAVER_URL = "https://schemas.crim.ca/cwl/weaver#"
+CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL})
+"""
+Namespace used to reference :term:`CWL` definitions provided by `Weaver`.
+"""
+
 CWL_RequirementAppTypes = Literal[
     CWL_RequirementBuiltinType,
     CWL_RequirementDockerType,
@@ -120,7 +160,10 @@ CWL_RequirementAppTypes = Literal[
     CWL_RequirementOGCAPIType,
     CWL_RequirementWPS1Type,
 ]
-CWL_REQUIREMENT_APP_TYPES = frozenset(get_args(CWL_RequirementAppTypes))
+CWL_REQUIREMENT_APP_TYPES = frozenset(
+    list(get_args(CWL_RequirementAppTypes))
+    + [f"{CWL_NAMESPACE_WEAVER}:{_req}" for _req in CWL_REQUIREMENT_APP_WEAVER]
+)
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
 """
@@ -159,7 +202,8 @@ Parameters employed by default for updating :data:`CWL_REQUIREMENT_APP_DOCKER_GP
 # FIXME: convert to 'Constants' class
 # NOTE: depending on the 'cwlVersion' of the document, some items are extensions or native to the standard specification
 CWL_REQUIREMENT_CUDA = get_args(CWL_RequirementCUDAType)[0]
-CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_TOOL_NAMESPACE
+CWL_REQUIREMENT_CUDA_NAME = get_args(CWL_RequirementCUDANameType)[0]
+CWL_REQUIREMENT_CUDA_NAMESPACE = CWL_NAMESPACE_CWLTOOL_DEFINITION
 CWL_REQUIREMENT_ENV_VAR = get_args(CWL_RequirementEnvVarType)[0]
 CWL_REQUIREMENT_INIT_WORKDIR = get_args(CWL_RequirementInitialWorkDirType)[0]
 CWL_REQUIREMENT_INLINE_JAVASCRIPT = get_args(CWL_RequirementInlineJavascriptType)[0]
@@ -177,6 +221,7 @@ CWL_REQUIREMENT_WORK_REUSE = get_args(CWL_RequirementWorkReuseType)[0]
 
 CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA_NAME,  # extension import does not have namespace, but it requires it during execution
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INPLACE_UPDATE,
@@ -282,11 +327,15 @@ if TYPE_CHECKING:
     # pylint: disable=invalid-name
     CWL_RequirementNames = Literal[
         CWL_RequirementBuiltinType,
-        CWL_RequirementDockerType,
-        CWL_RequirementDockerGpuType,
         CWL_RequirementESGFCWTType,
         CWL_RequirementOGCAPIType,
         CWL_RequirementWPS1Type,
+        CWL_RequirementWeaverBuiltinType,
+        CWL_RequirementWeaverESGFCWTType,
+        CWL_RequirementWeaverOGCAPIType,
+        CWL_RequirementWeaverWPS1Type,
+        CWL_RequirementDockerType,
+        CWL_RequirementDockerGpuType,
         CWL_RequirementCUDAType,
         CWL_RequirementEnvVarType,
         CWL_RequirementInitialWorkDirType,

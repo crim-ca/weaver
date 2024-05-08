@@ -12,6 +12,10 @@ Changes
 
 Changes:
 --------
+- Add `CWL` schema definitions with ``weaver`` namespace (see ``weaver/schemas/cwl`` files) that provide explicit
+  requirement classes for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+  and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``.
 - Add multiple missing `OGC API - Processes` conformance references.
 - Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
   conformance class ``/conf/core/process-summary-links`` as default behavior
