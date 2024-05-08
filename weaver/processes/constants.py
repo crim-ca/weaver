@@ -98,7 +98,7 @@ CWL_RequirementNetworkAccessType = Literal["NetworkAccess"]
 CWL_RequirementProcessGeneratorType = Literal["ProcessGenerator"]
 CWL_RequirementResourceType = Literal["ResourceRequirement"]
 CWL_RequirementScatterFeatureType = Literal["ScatterFeatureRequirement"]
-CWL_RequirementStepInputExpression = Literal["StepInputExpressionRequirement"]
+CWL_RequirementStepInputExpressionType = Literal["StepInputExpressionRequirement"]
 CWL_RequirementSecretsType = Literal["cwltool:Secrets"]
 CWL_RequirementToolTimeLimitType = Literal["ToolTimeLimit"]
 CWL_RequirementWorkReuseType = Literal["WorkReuse"]
@@ -171,7 +171,7 @@ CWL_REQUIREMENT_NETWORK_ACCESS = get_args(CWL_RequirementNetworkAccessType)[0]
 CWL_REQUIREMENT_PROCESS_GENERATOR = get_args(CWL_RequirementProcessGeneratorType)[0]
 CWL_REQUIREMENT_RESOURCE = get_args(CWL_RequirementResourceType)[0]
 CWL_REQUIREMENT_SCATTER = get_args(CWL_RequirementScatterFeatureType)[0]
-CWL_REQUIREMENT_STEP_INPUT_EXPRESSION = get_args(CWL_RequirementStepInputExpression)[0]
+CWL_REQUIREMENT_STEP_INPUT_EXPRESSION = get_args(CWL_RequirementStepInputExpressionType)[0]
 CWL_REQUIREMENT_SECRETS = get_args(CWL_RequirementSecretsType)[0]
 CWL_REQUIREMENT_TIME_LIMIT = get_args(CWL_RequirementToolTimeLimitType)[0]
 # default is to reuse, employed to explicitly disable
@@ -300,7 +300,7 @@ if TYPE_CHECKING:
         CWL_RequirementNetworkAccessType,
         CWL_RequirementResourceType,
         CWL_RequirementScatterFeatureType,
-        CWL_RequirementStepInputExpression,
+        CWL_RequirementStepInputExpressionType,
         CWL_RequirementSecretsType,
         CWL_RequirementToolTimeLimitType,
         CWL_RequirementWorkReuseType,
