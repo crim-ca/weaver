@@ -1,0 +1,8 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  process:
+    id: EchoSecret
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - test: "tests/functional/application-packages/Echo/echo.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

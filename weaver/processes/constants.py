@@ -178,7 +178,7 @@ CWL_REQUIREMENT_TIME_LIMIT = get_args(CWL_RequirementToolTimeLimitType)[0]
 CWL_REQUIREMENT_WORK_REUSE = get_args(CWL_RequirementWorkReuseType)[0]
 
 CWL_REQUIREMENT_FEATURES = frozenset([
-    CWL_REQUIREMENT_CUDA,
+    CWL_REQUIREMENT_CUDA,  # note: only allowed in 'hints' because of 'cwltool:' namespace
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INPLACE_UPDATE,
@@ -190,7 +190,7 @@ CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_RESOURCE,  # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     CWL_REQUIREMENT_SCATTER,
     CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
-    # CWL_REQUIREMENT_SECRETS,  # FIXME: support CWL Secrets (https://github.com/crim-ca/weaver/issues/511)
+    CWL_REQUIREMENT_SECRETS,  # note: only allowed in 'hints' because of 'cwltool:' namespace
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,  # allow it, but makes sense only for Workflow steps if cwltool handles it by itself
 ])
