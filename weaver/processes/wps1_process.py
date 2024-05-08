@@ -146,7 +146,7 @@ class Wps1Process(WpsProcessInterface):
             headers = {}
             headers.update(self.get_auth_cookies())
             headers.update(self.get_auth_headers())
-            self.wps_provider = get_wps_client(self.provider, headers=headers)
+            self.wps_provider = get_wps_client(self.provider, self.settings, headers=headers)
             raise_on_xml_exception(self.wps_provider._capabilities)  # noqa: W0212
         except Exception as ex:
             raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")

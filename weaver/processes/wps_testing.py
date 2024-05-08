@@ -11,9 +11,9 @@ if TYPE_CHECKING:
     from typing import List, Optional
 
     from weaver.processes.wps_package import ANY_IO_Type
+    from weaver.typedefs import AnySettingsContainer
 
 
-# FIXME: transform into official test EchoProcess (https://github.com/crim-ca/weaver/issues/379)
 class WpsTestProcess(Process):
     """
     Test WPS process definition that simply returns its input string as output.
@@ -21,8 +21,13 @@ class WpsTestProcess(Process):
 
     type = ProcessType.TEST   # allows to map WPS class
 
-    def __init__(self, inputs=None, outputs=None, **kw):
-        # type: (Optional[List[ANY_IO_Type]], Optional[List[ANY_IO_Type]], **str) -> None
+    def __init__(
+        self,
+        inputs=None,    # type: Optional[List[ANY_IO_Type]]
+        outputs=None,   # type: Optional[List[ANY_IO_Type]]
+        settings=None,  # type: Optional[AnySettingsContainer]
+        **kw,           # type: str
+    ):                  # type: (...) -> None
         """
         Initialize the test process with minimal definition requirements.
 

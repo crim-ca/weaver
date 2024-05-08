@@ -1,6 +1,7 @@
 # pylint: disable=C0103,invalid-name
 import base64
 import contextlib
+import functools
 import inspect
 import io
 import itertools
@@ -95,7 +96,7 @@ from weaver.utils import (
 )
 
 # WARNING: make sure to reset cache after use since state is applied globally, could break other tests
-from weaver.utils import setup_cache  # isort:skip # noqa: E402
+from weaver.utils import get_caller_name, setup_cache  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Type
@@ -796,6 +797,80 @@ def test_request_extra_cached_stream_iter_content():
 
     finally:
         setup_cache({})  # ensure reset since globally applied
+
+
+def test_get_caller_name():
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapped(**__):
+            return func(**__)
+        return wrapped
+
+    def func3(**__):
+        return get_caller_name(**__)
+
+    @decorator
+    def func2(**__):
+        return func3(**__)
+
+    def func1(**__):
+        return func2(**__)
+
+    def func0(**__):
+        return func1(**__)
+
+    assert func0() == "tests.test_utils.func3"
+
+    assert func0(skip=0, unwrap=False) == "tests.test_utils.func3"
+    assert func0(skip=1, unwrap=False) == "tests.test_utils.func2"
+    assert func0(skip=2, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=3, unwrap=False) == "tests.test_utils.func1"
+    assert func0(skip=4, unwrap=False) == "tests.test_utils.func0"
+
+    assert func0(skip=0, unwrap=True) == "tests.test_utils.func3"
+    assert func0(skip=1, unwrap=True) == "tests.test_utils.func2"
+    assert func0(skip=2, unwrap=True) == "tests.test_utils.func1"
+
+    # here, 'func1' is obtained because 'skip=2' is actually the 'decorator(func2)(...)' call implied by 'func2(...)'
+    # unwrapping happens only on the specific index specified by 'skip', not on intermediate levels
+    # therefore, going 1 level above the 'decorator' call ends up at the 'func1' that called the decorated 'func2'
+    assert func0(skip=3, unwrap=True) == "tests.test_utils.func1"
+
+
+def test_get_caller_name_multi_decorator():
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapped(**__):
+            return func(**__)
+        return wrapped
+
+    def func2(**__):
+        return get_caller_name(**__)
+
+    @decorator
+    @decorator
+    @decorator
+    @decorator
+    @decorator
+    def func1(**__):
+        return func2(**__)
+
+    def func0(**__):
+        return func1(**__)
+
+    assert func0(skip=0) == "tests.test_utils.func2"
+    assert func0(skip=1) == "tests.test_utils.func1"
+    assert func0(skip=2) == "tests.test_utils.func0"
+
+    assert func0(skip=1, unwrap=False) == "tests.test_utils.func1"
+    assert func0(skip=2, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=3, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=4, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=5, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=6, unwrap=False) == "tests.test_utils.wrapped"
+    assert func0(skip=7, unwrap=False) == "tests.test_utils.func0"
 
 
 @pytest.mark.parametrize(

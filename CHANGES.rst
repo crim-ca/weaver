@@ -20,6 +20,11 @@ Changes:
 
 Fixes:
 ------
+- Adjust ``weaver.utils.get_caller_name`` to better handle decorated functions, and apply more precise warning messages
+  to hunt down places were ``weaver.utils.get_request_options`` might still be causing inconsistent HTTP requests due
+  to missing *request options* for certain use cases.
+- Fix passing down of application settings for `WPS` requests of `Provider`/`Service` operations
+  potentially making use of *request options*, which could not obtain the relevant configuration.
 - Fix `CLI` failing to resolve a `CWL` Workflow step local reference to a `Process` using ``run: {process}.cwl``
   definition due to the local `CLI` context not having the same URL resolution as the remote `Weaver` server
   (fixes `#630 <https://github.com/crim-ca/weaver/issues/630>`_).

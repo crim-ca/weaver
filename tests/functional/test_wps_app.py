@@ -7,22 +7,13 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 import contextlib
-import unittest
 
 import pyramid.testing
 import pytest
 import xmltodict
 
-from tests.utils import (
-    get_test_weaver_app,
-    get_test_weaver_config,
-    mocked_execute_celery,
-    setup_config_with_celery,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore
-)
+from tests.functional.utils import WpsConfigBase
+from tests.utils import mocked_execute_celery
 from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
@@ -31,23 +22,20 @@ from weaver.visibility import Visibility
 
 
 @pytest.mark.functional
-class WpsAppTest(unittest.TestCase):
+class WpsAppTest(WpsConfigBase):
+    wps_path = "/ows/wps"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps": True,
+        "weaver.wps_path": wps_path,
+        "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+        "weaver.wps_metadata_provider_name": "WpsAppTest"
+    }
+
     def setUp(self):
-        self.wps_path = "/ows/wps"
-        settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps": True,
-            "weaver.wps_path": self.wps_path,
-            "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
-            "weaver.wps_metadata_provider_name": WpsAppTest.__name__
-        }
-        config = get_test_weaver_config(settings=settings)
-        config = setup_config_with_mongodb(config)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        self.process_store = setup_mongodb_processstore(config)
-        self.job_store = setup_mongodb_jobstore(config)
-        self.app = get_test_weaver_app(config=config, settings=settings)
+        super(WpsAppTest, self).setUp()
+        self.process_store.clear_processes()
+        self.job_store.clear_jobs()
 
         # add processes by database Process type
         self.process_public = WpsTestProcess(identifier="process_public")

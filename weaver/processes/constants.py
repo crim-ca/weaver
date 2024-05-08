@@ -192,8 +192,11 @@ CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_WORK_REUSE,  # allow it, but makes sense only for Workflow steps if cwltool handles it by itself
 ])
 """
-Set of :term:`CWL` requirements that corresponds to extra functionalities not completely defining
-an :term:`Application Package` by themselves.
+Set of :term:`CWL` requirements that corresponds to extra functionalities.
+
+An :term:`Application Package` that only contains these requirements by themselves would not be considered complete.
+These extra requirements must be accompanied by another one from :data:`CWL_REQUIREMENT_APP_TYPES` to be considered
+a complete definition.
 """
 
 CWL_REQUIREMENTS_SUPPORTED = frozenset(
