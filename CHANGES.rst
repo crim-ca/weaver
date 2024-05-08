@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.2.0:
+
+`5.2.0 <https://github.com/crim-ca/weaver/tree/5.2.0>`_ (2024-05-08)
+========================================================================
+
+Changes:
+--------
 - Add multiple missing `OGC API - Processes` conformance references.
 - Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
   conformance class ``/conf/core/process-summary-links`` as default behavior
