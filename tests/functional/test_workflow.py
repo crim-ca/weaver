@@ -39,10 +39,12 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
+from weaver.processes.constants import CWL_REQUIREMENT_STEP_INPUT_EXPRESSION
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, request_extra
 from weaver.visibility import Visibility
+from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -55,6 +57,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyResponseType,
         CookiesType,
+        CWL,
         ExecutionResults,
         HeadersType,
         ProcessDeployment,
@@ -72,9 +75,19 @@ class WorkflowProcesses(enum.Enum):
         They will be loaded by :class:`WorkflowTestRunnerBase` derived classes in alphabetical order.
         All atomic :term:`Application Package` will be loaded before :term:`Workflow` definitions.
     """
+
+    # https://github.com/crim-ca/testbed14/tree/master/application-packages
     APP_STACKER = "Stacker"
     APP_SFS = "SFS"
     APP_FLOOD_DETECTION = "FloodDetection"
+    WORKFLOW_CUSTOM = "CustomWorkflow"
+    WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
+    WORKFLOW_STACKER_SFS = "Workflow"
+    WORKFLOW_SC = "WorkflowSimpleChain"
+    WORKFLOW_S2P = "WorkflowS2ProbaV"
+
+    # local in 'tests/functional/application-packages'
+    APP_ECHO = "Echo"
     APP_ICE_DAYS = "Finch_IceDays"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
@@ -87,13 +100,9 @@ class WorkflowProcesses(enum.Enum):
     APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
-    WORKFLOW_STACKER_SFS = "Workflow"
-    WORKFLOW_SC = "WorkflowSimpleChain"
-    WORKFLOW_S2P = "WorkflowS2ProbaV"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
-    WORKFLOW_CUSTOM = "CustomWorkflow"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
-    WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
+    WORKFLOW_ECHO = "WorkflowEcho"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -112,16 +121,18 @@ class ProcessInfo(object):
     """
 
     def __init__(self,
-                 process_id,            # type: Union[str, WorkflowProcesses]
-                 test_id=None,          # type: Optional[str]
-                 deploy_payload=None,   # type: Optional[ProcessDeployment]
-                 execute_payload=None,  # type: Optional[ProcessExecution]
-                 ):                     # type: (...) -> None
-        self.pid = WorkflowProcesses(process_id)    # type: WorkflowProcesses
-        self.id = self.pid.value                    # type: Optional[str]  # noqa
-        self.test_id = test_id                      # type: Optional[str]
-        self.deploy_payload = deploy_payload        # type: Optional[ProcessDeployment]
-        self.execute_payload = execute_payload      # type: Optional[ProcessExecution]
+                 process_id,                # type: Union[str, WorkflowProcesses]
+                 test_id=None,              # type: Optional[str]
+                 deploy_payload=None,       # type: Optional[ProcessDeployment]
+                 execute_payload=None,      # type: Optional[ProcessExecution]
+                 application_package=None,  # type: Optional[CWL]
+                 ):                         # type: (...) -> None
+        self.pid = WorkflowProcesses(process_id)        # type: WorkflowProcesses
+        self.id = self.pid.value                        # type: Optional[str]  # noqa
+        self.test_id = test_id                          # type: Optional[str]
+        self.deploy_payload = deploy_payload            # type: Optional[ProcessDeployment]
+        self.execute_payload = execute_payload          # type: Optional[ProcessExecution]
+        self.application_package = application_package  # type: Optional[CWL]
 
 
 @pytest.mark.functional
@@ -520,7 +531,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             1. Look in the local ``tests.functional`` directory.
             2. Look in remote repository:
                 https://github.com/crim-ca/testbed14
-                i.e.:  directory ``TB14`` under in
+                i.e.:  directory ``TB14`` under
                 https://github.com/crim-ca/application-packages/tree/master/OGC
             3. Look in remote repository directory:
                 https://github.com/crim-ca/application-packages/tree/master/OGC/TB16
@@ -537,17 +548,21 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 - ``Execute_<PROCESS_ID>.[json|yaml|yml]``
                 - ``<PROCESS_ID>.[cwl|json|yaml|yml]`` (package)
 
-            2. Contents defined within a sub0directory named ``<PROCESS_ID>`` with either the previous names or simply:
+            2. Contents defined within a sub-directory named ``<PROCESS_ID>`` with either the previous names or simply:
                 - ``deploy.[json|yaml|yml]``
                 - ``execute.[json|yaml|yml]``
                 - ``package.[cwl|json|yaml|yml]``
 
-        For each group of content definitions, Deploy and Execute contents are mandatory.
-        The package file can be omitted if it is already explicitly embedded within the Deploy contents.
+        For each group of content definitions, "deploy" and "execute" contents are mandatory.
+        The "package" file can be omitted if it is already explicitly embedded within the "deploy" contents.
 
         .. note::
             Only when references are local (tests), the package can be referred by relative ``tests/...`` path
-            within the Deploy content ``executionUnit`` using ``test`` key instead of ``unit`` or ``href``.
+            within the "deploy" content's ``executionUnit`` using ``test`` key instead of ``unit`` or ``href``.
+            In such case, the "package" contents will be loaded and injected dynamically as ``unit`` in the "deploy"
+            body at the relevant location. Alternatively to the ``test`` key, ``href`` can also be used, but will be
+            loaded only if using the ``tests/..`` relative path. This is to ensure cross-support with other test
+            definitions using this format outside of "workflow" use cases.
 
         :param process_id: identifier of the process to retrieve contents.
         :return: found content definitions.
@@ -559,10 +574,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must use the full 'href' references)
-        test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
+        test_exec_unit = deploy_payload.get("executionUnit", [{}])[0]
+        unit_app_pkg = None
+        test_app_pkg = test_exec_unit.pop("test", None)
         if test_app_pkg:
             unit_app_pkg = cls.retrieve_payload(pid, "package")
-            deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
+        elif "href" in test_exec_unit and str(test_exec_unit["href"]).startswith("tests/"):
+            unit_app_pkg = cls.retrieve_payload(pid, "package", local=True, location=test_exec_unit["href"])
+        if unit_app_pkg:
+            deploy_payload["executionUnit"][0] = {"unit": unit_app_pkg}
 
         # Apply collection swapping
         for swap in cls.swap_data_collection():
@@ -570,7 +590,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 if "data" in i and i["data"] == swap[0]:
                     i["data"] = swap[1]
 
-        return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload)
+        return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload, unit_app_pkg)
 
     @classmethod
     def assert_response(cls, response, status=None, message=""):
@@ -938,12 +958,14 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
         WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
+        WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
+        WorkflowProcesses.WORKFLOW_ECHO,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
@@ -1281,8 +1303,28 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                         f"\n{self.logger_separator_calls}"
             )
             # check that all expected files made it through the listing/directory input/output chaining between steps
-            output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)
+            output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)  # type: ignore
             expect_files = "\n".join(os.path.join("output_dir", os.path.split(file)[-1]) for file in expect_http_files)
             self.assert_test(lambda: output_files == expect_files,
                              message="Workflow output file expected to contain single file with raw string listing of "
                                      "input files chained from generated output directory listing of the first step.")
+
+    def test_workflow_echo_step_expression(self):
+        """
+        Validate that a Workflow using 'StepInputExpressionRequirement' is supported.
+        """
+        pkg = self.test_processes_info[WorkflowProcesses.WORKFLOW_ECHO].application_package
+        assert CWL_REQUIREMENT_STEP_INPUT_EXPRESSION in pkg["requirements"], "missing requirement for test"
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO,
+            [WorkflowProcesses.APP_ECHO],
+            log_full_trace=True,
+        )
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read()
+        out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
+        assert out == "test-workflow-echo", (
+            f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO}'"
+        )
