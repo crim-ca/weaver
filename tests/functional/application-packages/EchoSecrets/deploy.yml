@@ -4,5 +4,5 @@ processDescription:
     id: EchoSecrets
 executionUnit:
   # note: This does not work by itself! The test suite injects the file dynamically.
-  - test: "tests/functional/application-packages/Echo/echo.cwl"
+  - href: "tests/functional/application-packages/Echo/echo.cwl"
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

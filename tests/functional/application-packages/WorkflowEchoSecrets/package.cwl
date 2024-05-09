@@ -13,7 +13,7 @@ inputs:
 outputs:
   output:
     type: File
-    outputSource: echo2/output
+    outputSource: echo/output
 steps:
   echo:
     run: EchoSecrets.cwl
