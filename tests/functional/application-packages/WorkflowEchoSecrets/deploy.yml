@@ -1,0 +1,7 @@
+processDescription:
+  process:
+    id: WorkflowEchoSecrets
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - test: "tests/functional/application-packages/WorkflowEchoSecrets/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/workflow"

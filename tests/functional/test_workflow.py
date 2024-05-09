@@ -88,6 +88,7 @@ class WorkflowProcesses(enum.Enum):
 
     # local in 'tests/functional/application-packages'
     APP_ECHO = "Echo"
+    APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
@@ -103,6 +104,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
+    WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecretS"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -1328,3 +1330,19 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         assert out == "test-workflow-echo", (
             f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO}'"
         )
+
+    def test_workflow_secrets(self):
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+            [WorkflowProcesses.APP_ECHO_SECRETS],
+            log_full_trace=True,
+        )
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read()
+        out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
+        assert out == "secret message", (
+            f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO_SECRETS}'"
+        )
+        # FIXME: add checks no 'secrets' in output logs
