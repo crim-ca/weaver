@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CWL` ``StepInputExpressionRequirement`` support.
 
 Fixes:
 ------

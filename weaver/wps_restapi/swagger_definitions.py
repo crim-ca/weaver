@@ -49,6 +49,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SCATTER,
+    CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,
     OAS_COMPLEX_TYPES,
@@ -4505,6 +4506,23 @@ class ScatterFeatureRequirementClass(ScatterFeatureRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_SCATTER, validator=OneOf([CWL_REQUIREMENT_SCATTER]))
 
 
+class StepInputExpressionSpecification(StrictMappingSchema):
+    description = inspect.cleandoc(f"""
+        Indicate that the workflow platform must support the 'valueFrom' field of {CWL_WORKFLOW_URL}#WorkflowStepInput.
+    """)
+
+
+class StepInputExpressionRequirementMap(ExtendedMappingSchema):
+    req = StepInputExpressionSpecification(name=CWL_REQUIREMENT_STEP_INPUT_EXPRESSION)
+
+
+class StepInputExpressionRequirementClass(StepInputExpressionSpecification):
+    _class = RequirementClass(
+        example=CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+        validator=OneOf([CWL_REQUIREMENT_STEP_INPUT_EXPRESSION]),
+    )
+
+
 class TimeLimitValue(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(Float(), validator=Range(min=0.0)),
@@ -4664,6 +4682,7 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
+        StepInputExpressionRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
         UnknownRequirementMap(missing=drop),  # allows anything, must be last
@@ -4684,6 +4703,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
+        StepInputExpressionRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
@@ -4714,6 +4734,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
+        StepInputExpressionRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
@@ -4739,6 +4760,7 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
+        StepInputExpressionRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
