@@ -59,6 +59,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_RESOURCE,
+    CWL_REQUIREMENT_SECRETS,
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
@@ -997,6 +998,20 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert desc["inputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
+
+    def test_deploy_cwl_with_secrets(self):
+        """
+        Ensure that a process deployed with secrets as :term:`CWL` hints remains defined in the result.
+        """
+        cwl = self.retrieve_payload("EchoSecrets", "package", local=True)
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        _, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert "hints" in pkg
+        assert pkg["hints"] == {CWL_REQUIREMENT_SECRETS: {"secrets": ["message"]}}
 
     def test_execute_file_type_io_format_references(self):
         """

@@ -31,6 +31,7 @@ import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from cwltool.process import use_custom_schema
+from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
@@ -80,6 +81,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
+    CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENTS_SUPPORTED,
     CWL_TOOL_NAMESPACE_URL,
     IO_INPUT,
@@ -118,6 +120,7 @@ from weaver.utils import (
     fully_qualified_name,
     generate_diff,
     get_any_id,
+    get_any_value,
     get_header,
     get_job_log_msg,
     get_log_date_fmt,
@@ -159,6 +162,7 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_AnyRequirementObject,
         CWL_AnyRequirements,
         CWL_Input_Type,
         CWL_IO_ComplexType,
@@ -173,6 +177,7 @@ if TYPE_CHECKING:
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
         Default,
+        ExecutionInputs,
         JSON,
         Literal,
         Number,
@@ -836,7 +841,7 @@ def get_application_requirement(package,        # type: CWL
                                 default=null,   # type: Optional[Union[CWL_Requirement, Default]]
                                 validate=True,  # type: bool
                                 required=True,  # type: bool
-                                ):              # type: (...) -> Union[CWL_Requirement, Default]
+                                ):              # type: (...) -> Union[CWL_AnyRequirementObject, Default]
     """
     Retrieves a requirement or hint from the :term:`CWL` package definition.
 
@@ -983,6 +988,36 @@ def get_auth_requirements(requirement, headers):
 
     LOGGER.debug("No associated authentication details for application requirement: %s", requirement["class"])
     return None
+
+
+def mask_process_inputs(package, inputs):
+    # type: (CWL, ExecutionInputs) -> ExecutionInputs
+    """
+    Obtains a masked representation of the input values as applicable.
+
+    .. seealso::
+        :data:`CWL_REQUIREMENT_SECRETS`
+    """
+    if not package:
+        return inputs
+    req_secrets = get_application_requirement(package, search=CWL_REQUIREMENT_SECRETS, required=False, default={})
+    if not req_secrets or "secrets" not in req_secrets:
+        return inputs
+    masked_inputs = copy.deepcopy(inputs)
+    secrets = SecretStore()
+    is_input_map = isinstance(inputs, dict)
+    for idx_or_key, input_def in (masked_inputs.items() if is_input_map else enumerate(masked_inputs)):
+        input_id = idx_or_key if is_input_map else get_any_id(input_def)
+        if input_id in req_secrets["secrets"]:
+            if isinstance(input_def, dict):
+                val_key = get_any_value(input_def, key=True, data=True)
+                value = input_def.get(val_key)
+                if val_key and isinstance(value, str):
+                    input_def[val_key] = secrets.add(value)
+                    masked_inputs[idx_or_key] = input_def
+            elif isinstance(input_def, str):
+                masked_inputs[idx_or_key] = secrets.add(input_def)
+    return masked_inputs
 
 
 def get_process_identifier(process_info, package):
@@ -1874,7 +1909,9 @@ class WpsPackage(Process):
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, Status.RUNNING)
-                self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    log_inputs = mask_process_inputs(self.package, cwl_inputs)
+                    self.logger.debug("Launching process package with inputs:\n%s", json.dumps(log_inputs, indent=2))
                 result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, Status.RUNNING)
             except Exception as exc:

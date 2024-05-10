@@ -34,13 +34,15 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_PROCESS_GENERATOR,
+    CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENT_TIME_LIMIT
 )
 from weaver.processes.wps_package import (
     WpsPackage,
     _load_package_content,
     _update_package_compatibility,
-    get_application_requirement
+    get_application_requirement,
+    mask_process_inputs
 )
 from weaver.wps.service import WorkerRequest
 
@@ -589,3 +591,40 @@ def test_cwl_enum_schema_name_patched():
         tool(test=None)
         tool(test=test_symbols[0])
         tool(test=[test_symbols[0]])
+
+
+@pytest.mark.parametrize(
+    ["inputs", "expect"],
+    [
+        (
+            [{"id": "normal", "value": "ok to show"}, {"id": "hidden", "value": "value to mask"}],
+            [{"id": "normal", "value": "ok to show"}, {"id": "hidden", "value": "(secret)"}],
+        ),
+        (
+            {"normal": {"value": "ok to show"}, "hidden": {"value": "value to mask"}},
+            {"normal": {"value": "ok to show"}, "hidden": {"value": "(secret)"}},
+        ),
+        (
+            {"normal": "ok to show", "hidden": "value to mask"},
+            {"normal": "ok to show", "hidden": "(secret)"},
+        ),
+    ]
+)
+def test_mask_process_inputs(inputs, expect):
+    cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "inputs": {
+            "normal": {"type": "string"},
+            "hidden": {"type": "string"},
+        },
+        "hints": {
+            CWL_REQUIREMENT_SECRETS: {
+                "secrets": ["hidden"]
+            }
+        }
+    }  # type: CWL
+    with mock.patch("cwltool.secrets.SecretStore.add", return_value="(secret)"):  # avoid unique UUID for each
+        result = mask_process_inputs(cwl, inputs)
+    assert result == expect, "expected inputs should have been masked"
+    assert inputs != expect, "original inputs should not be modified"

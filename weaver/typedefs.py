@@ -179,7 +179,8 @@ if TYPE_CHECKING:
         "provider": NotRequired[str],
         "process": NotRequired[str],
     }, total=False)
-    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, ValueType]]   # {'<req>': {<param>: <val>}}
+    CWL_AnyRequirementObject = Union[CWL_Requirement, Dict[str, JSON]]
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, CWL_AnyRequirementObject]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
@@ -444,7 +445,7 @@ if TYPE_CHECKING:
     }, total=True)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
-    ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
+    ExecutionInputsMap = Dict[str, Union[AnyValueType, JobValueObject, List[JobValueObject]]]
     # when schema='weaver.processes.constants.ProcessSchema.OLD'
     ExecutionInputsList = List[JobValueItem]
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]

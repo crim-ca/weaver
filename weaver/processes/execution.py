@@ -721,6 +721,10 @@ def submit_job_handler(payload,             # type: ProcessExecution
             process, provider_id
         )
 
+    # ensure format is unified to respect expected job definition
+    job_inputs = convert_input_values_schema(json_body.get("inputs", {}), JobInputsOutputsSchema.OLD)
+    job_outputs = convert_output_params_schema(json_body.get("outputs", {}), JobInputsOutputsSchema.OLD)
+
     headers = headers or {}
     if is_local:
         job_ctl_opts = process.jobControlOptions
@@ -741,7 +745,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
-                         inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
+                         inputs=job_inputs, outputs=job_outputs,
                          is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
                          execute_async=is_execute_async, execute_response=exec_resp,
                          custom_tags=tags, accept_language=language, subscribers=subscribers)
