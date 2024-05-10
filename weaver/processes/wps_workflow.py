@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_RequirementsList,
+        CWL_RuntimeInputsMap,
         CWL_ToolPathObject,
         JobProcessDefinitionCallback
     )
@@ -265,8 +266,16 @@ class WpsWorkflowJob(CommandLineJob):
 
         Because the remote :term:`Process` (of any type) will not have the local runtime store definition,
         they cannot themselves resolve the original values.
+
+        .. warning::
+            Any following steps after this call must be mindful of what they log to avoid leaking secrets.
         """
-        return self.builder.job   # FIXME: implement and move to WpsProcessInterface for last-second reverse lookup?
+        inputs = self.builder.job
+        if not runtime_context.secret_store:
+            return inputs
+        for name in list(inputs):
+            inputs[name] = runtime_context.secret_store.retrieve(inputs[name])
+        return inputs
 
     def _execute(self,
                  runtime,                   # type: List[str]
