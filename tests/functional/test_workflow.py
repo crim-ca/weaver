@@ -1448,3 +1448,15 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                     "job": job_detail["job"],
                 })
         assert not found_secrets, f"Found exposed secrets that should have been masked:\n{repr_json(found_secrets)}"
+
+        # make sure the logs included stdout with expected output
+        # (ie: check that the fact that secrets are omitted is not only because no logs were captured...)
+        capture_regex = re.compile(
+            # note: each line is prefixed by the loggers details including the job state
+            r".*running\s+----- Captured Log \(stdout\) -----\n"
+            r".*running\s+OK!\n"
+            r".*running\s+----- End of Logs -----\n"
+        )
+        for job in details.values():
+            if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
+                assert capture_regex.search(job["logs"])

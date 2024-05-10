@@ -569,6 +569,8 @@ def _load_package_content(package_dict,                             # type: CWL
             package_name,
             tmp_dir=tmp_dir,
             data_source=data_source,
+            loading_context=loading_context,
+            runtime_context=runtime_context,
             container=container,
             only_dump_file=True,
         )
@@ -990,8 +992,8 @@ def get_auth_requirements(requirement, headers):
     return None
 
 
-def mask_process_inputs(package, inputs):
-    # type: (CWL, ExecutionInputs) -> ExecutionInputs
+def mask_process_inputs(package, inputs, secret_store=None):
+    # type: (CWL, ExecutionInputs, Optional[SecretStore]) -> ExecutionInputs
     """
     Obtains a masked representation of the input values as applicable.
 
@@ -1004,7 +1006,7 @@ def mask_process_inputs(package, inputs):
     if not req_secrets or "secrets" not in req_secrets:
         return inputs
     masked_inputs = copy.deepcopy(inputs)
-    secrets = SecretStore()
+    secret_store = secret_store or SecretStore()
     is_input_map = isinstance(inputs, dict)
     for idx_or_key, input_def in (masked_inputs.items() if is_input_map else enumerate(masked_inputs)):
         input_id = idx_or_key if is_input_map else get_any_id(input_def)
@@ -1013,10 +1015,10 @@ def mask_process_inputs(package, inputs):
                 val_key = get_any_value(input_def, key=True, data=True)
                 value = input_def.get(val_key)
                 if val_key and isinstance(value, str):
-                    input_def[val_key] = secrets.add(value)
+                    input_def[val_key] = secret_store.add(value)
                     masked_inputs[idx_or_key] = input_def
             elif isinstance(input_def, str):
-                masked_inputs[idx_or_key] = secrets.add(input_def)
+                masked_inputs[idx_or_key] = secret_store.add(input_def)
     return masked_inputs
 
 
@@ -1857,6 +1859,7 @@ class WpsPackage(Process):
             runtime_params = self.setup_runtime()
             self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
+            runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
             try:
                 self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -1910,7 +1913,7 @@ class WpsPackage(Process):
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, Status.RUNNING)
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    log_inputs = mask_process_inputs(self.package, cwl_inputs)
+                    log_inputs = mask_process_inputs(self.package, cwl_inputs, runtime_context.secret_store)
                     self.logger.debug("Launching process package with inputs:\n%s", json.dumps(log_inputs, indent=2))
                 result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, Status.RUNNING)
