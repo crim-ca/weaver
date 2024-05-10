@@ -1912,9 +1912,8 @@ class WpsPackage(Process):
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, Status.RUNNING)
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    log_inputs = mask_process_inputs(self.package, cwl_inputs, runtime_context.secret_store)
-                    self.logger.debug("Launching process package with inputs:\n%s", json.dumps(log_inputs, indent=2))
+                cwl_inputs = mask_process_inputs(self.package, cwl_inputs, runtime_context.secret_store)
+                self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
                 result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, Status.RUNNING)
             except Exception as exc:

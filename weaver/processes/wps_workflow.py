@@ -258,7 +258,16 @@ class WpsWorkflowJob(CommandLineJob):
                     out_globs.add(out_glob)
                 self.expected_outputs[output_id] = out_globs if glob_list else list(out_globs)[0]
 
-    # pylint: disable=W0221,W0237 # naming using python like arguments
+    def _retrieve_secret_inputs(self, runtime_context):
+        # type: (RuntimeContext) -> CWL_RuntimeInputsMap
+        """
+        Retrieve the job inputs with reverse resolution of any secrets defined in the store.
+
+        Because the remote :term:`Process` (of any type) will not have the local runtime store definition,
+        they cannot themselves resolve the original values.
+        """
+        return self.builder.job   # FIXME: implement and move to WpsProcessInterface for last-second reverse lookup?
+
     def _execute(self,
                  runtime,                   # type: List[str]
                  env,                       # type: MutableMapping[str, str]
@@ -268,6 +277,7 @@ class WpsWorkflowJob(CommandLineJob):
         """
         Execute the :term:`WPS` :term:`Process` defined as :term:`Workflow` step and chains their intermediate results.
         """
-        self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
+        cwl_inputs = self._retrieve_secret_inputs(runtime_context)
+        self.wps_process.execute(cwl_inputs, self.outdir, self.expected_outputs)
         outputs = self.collect_outputs(self.outdir, 0)
         self.output_callback(outputs, "success")
