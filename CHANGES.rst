@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Pin ``json2xml==4.1.0`` to fix major release breaking older Python typings without any actual change to functionality.
 
 .. _changes_5.2.0:
 

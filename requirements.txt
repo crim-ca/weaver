@@ -44,7 +44,7 @@ geotiff>=0.2.8
 gunicorn>=22
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
-json2xml>=4.1.0
+json2xml==4.1.0
 jsonschema>=3.0.1
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
