@@ -799,6 +799,17 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         self,
         test_workflow_id,               # type: WorkflowProcesses
         test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace,                 # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+    ):                                  # type: (...) -> ExecutionResults
+        ...
+
+    @overload
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
         log_full_trace=False,           # type: bool
         requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
         override_execute_body=None,     # type: Optional[ProcessExecution]
@@ -1397,8 +1408,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             [WorkflowProcesses.APP_ECHO],
             log_full_trace=True,
         )
-        assert "output" in result
-        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        assert "output" in result  # pylint: disable=E1135
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)  # pylint: disable=E1136
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read()
         out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
@@ -1429,7 +1440,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
 
         # validate there are no 'secrets' in responses
         found_secrets = []
-        for job_id, job_detail in details.items():
+        for job_detail in details.values():
             for loc in ["inputs", "outputs"]:  # type: Literal["inputs", "outputs"]
                 for loc_id, loc_data in job_detail[loc].items():
                     if expect_secret in str(loc_data):
