@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.3.0:
+
+`5.3.0 <https://github.com/crim-ca/weaver/tree/5.3.0>`_ (2024-05-13)
+========================================================================
+
+Changes:
+--------
 - Add `CWL` ``cwltool:Secrets`` support (fixes `#511 <https://github.com/crim-ca/weaver/issues/511>`_).
 - Add `CWL` ``StepInputExpressionRequirement`` support.
 
