@@ -1199,3 +1199,98 @@ Below is a list of compatible elements.
    :trim:
 
 .. |<=>| unicode:: 0x21D4
+
+.. _app_pkg_secret_parameters:
+
+Using Secret Parameters
+=======================
+
+Under some circumstances, input parameters to a :term:`Job` must be hidden, whether to avoid leaking credentials
+required by the underlying application, or for using sensible information that should not be easily accessible.
+In such cases, typical :term:`CWL` ``string`` inputs should not be directly employed.
+
+There are 2 strategies available to employ *secrets* when working with `Weaver`:
+
+1. Using the :term:`Vault` feature
+2. Using ``cwltool:Secrets`` hint
+
+.. _app_pkg_secret_vault:
+
+Secrets using the File Vault
+----------------------------
+
+Using :ref:`file_vault_inputs` essentially consists of wrapping any sensible data within an input of type ``File``,
+which will be :ref:`Uploaded to the Vault <vault_upload>` for :term:`Job` execution. Once the file is accessed and
+staged by the relevant :term:`Job`, its contents are automatically deleted from the :term:`Vault`. This offers a
+secured single access endpoint only available by the client that uploaded the file, for a short period of time,
+which decides for which :term:`Process` it should be summited to with the corresponding authentication token and
+:term:`Vault` ID. Since the sensible data is contained within a file, its contents are only available by the targeted
+:term:`Job` for the selected :term:`Process`, while logs will only display a temporary path.
+
+However, the :term:`Vault` approach as potential drawbacks.
+
+1. It is a feature specific to `Weaver`, which will not be available an easily interoperable when involving
+   other :term:`OGC API - Processes` servers.
+
+2. It forces the :term:`CWL` to be implemented using a ``File`` input. While this is not necessarily an issue
+   in some cases, it becomes the responsibility of the :term:`Application Package` developer to figure out how
+   to propagate the contained data to the relevant piece of code if a plain string is needed. To do so, the
+   developer must also avoid outputting any information to ``stdout``. Otherwise, the data would be captured
+   in :term:`Job` logs and defeating the purpose of using the :term:`Vault`.
+
+.. note::
+    For more details about the :term:`Vault`, refer to sections :ref:`file_vault_inputs`, :ref:`vault_upload`,
+    and the corresponding capabilities in :term:`cli_example_upload`.
+
+.. _app_pkg_secret_cwltool:
+
+Secrets using the CWL Hints
+---------------------------
+
+An alternative approach is to use the :term:`CWL` hints as follows:
+
+.. code-block:: json
+    :caption: CWL Secrets Definition
+
+    {
+        "cwlVersion": "v1.2",
+        "inputs": {
+            "<input-name>": {
+                "type": "string"
+            }
+        },
+        "hints": {
+            "cwltool:Secrets": {
+                "secrets": [
+                    "<input-name>"
+                ]
+            }
+        },
+        "$namespaces": {
+            "cwltool": "http://commonwl.org/cwltool#"
+        }
+    }
+
+Using this definition either in a ``class: CommandLineTool`` (see :ref:`app_pkg_cmd`)
+or a ``class: Workflow`` (see :ref:`app_pkg_workflow`) will instruct the underlying :term:`Job` execution
+to replace all specified inputs (i.e.: ``<input-name>`` in the above example) to be masked in commands and logs.
+Looking at :term:`Job` logs, all sensible inputs will be replaced by a representation similar to ``(secret-<UUID>)``
+The original data identified by this masked definition will be substituted back only at the last possible moment,
+when the underlying operation accessed it to perform its processing.
+
+A few notable considerations must be taken when using the ``cwltool:Secrets`` definition.
+
+1. It is limited to ``string`` inputs. Any other literal data type and intermediate conversions would need
+   to be handled explicitly by the :term:`Application Package` maintainer.
+
+2. The secrets definition can only be provided in the ``hints`` section of the :term:`CWL` document, meaning
+   that any remote server supporting :term:`CWL` are not required to support this feature.
+   If the :term:`Application Package` is expected to be deployed remotely, it is up to the client to
+   determine whether the remote server will perform the necessary actions to mask sensible data.
+   If unsupported, secrets could become visible in the :term:`Job` logs as if they were submitted using
+   typical ``string`` inputs.
+
+3. The feature does not avoid any misuse of underlying commands that could expose the sensible data due
+   to manipulation errors or the use of operations that are redirected to ``stdout``. For example, if the
+   shell ``echo`` command is used within the :term:`CWL` with an input listed in ``cwltool:Secrets``, its
+   value will still be displayed in plain text in the :term:`Job` logs.

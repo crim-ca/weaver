@@ -49,6 +49,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SCATTER,
+    CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,
@@ -4506,6 +4507,23 @@ class ScatterFeatureRequirementClass(ScatterFeatureRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_SCATTER, validator=OneOf([CWL_REQUIREMENT_SCATTER]))
 
 
+class SecretsRequirementSpecification(StrictMappingSchema):
+    description = "Lists input parameters containing sensitive information to be masked."
+    secrets = IdentifierArray(
+        title="Secrets",
+        description="Input parameter identifiers to consider as secrets.",
+        validator=Length(min=1),
+    )
+
+
+class SecretsRequirementMap(ExtendedMappingSchema):
+    req = SecretsRequirementSpecification(name=CWL_REQUIREMENT_SECRETS)
+
+
+class SecretsRequirementClass(SecretsRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_SECRETS, validator=OneOf([CWL_REQUIREMENT_SECRETS]))
+
+
 class StepInputExpressionSpecification(StrictMappingSchema):
     description = inspect.cleandoc(f"""
         Indicate that the workflow platform must support the 'valueFrom' field of {CWL_WORKFLOW_URL}#WorkflowStepInput.
@@ -4734,6 +4752,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
+        SecretsRequirementMap(missing=drop),
         StepInputExpressionRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
@@ -4760,6 +4779,7 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
+        SecretsRequirementClass(missing=drop),
         StepInputExpressionRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),

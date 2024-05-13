@@ -9,7 +9,7 @@ import os
 import re
 import tempfile
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, overload
 from unittest import TestCase
 from urllib.parse import urlparse
 
@@ -39,16 +39,17 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
-from weaver.processes.constants import CWL_REQUIREMENT_STEP_INPUT_EXPRESSION
+from weaver.processes.constants import CWL_REQUIREMENT_STEP_INPUT_EXPRESSION, JobInputsOutputsSchema
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, request_extra
+from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, repr_json, request_extra
 from weaver.visibility import Visibility
 from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
+    from typing import Any, Callable, Dict, Iterable, Optional, Set, Tuple, Union
+    from typing_extensions import Literal, TypedDict
 
     from responses import RequestsMock
 
@@ -56,14 +57,32 @@ if TYPE_CHECKING:
         AnyLogLevel,
         AnyRequestMethod,
         AnyResponseType,
+        AnyUUID,
         CookiesType,
         CWL,
+        ExecutionInputsMap,
         ExecutionResults,
         HeadersType,
         ProcessDeployment,
         ProcessExecution,
         SettingsType
     )
+
+    DetailedExecutionResultObject = TypedDict(
+        "DetailedExecutionResultObject",
+        {
+            "job": AnyUUID,
+            "process": str,
+            "inputs": ExecutionInputsMap,
+            "outputs": ExecutionResults,
+            "logs": str,
+        },
+        total=True,
+    )
+    DetailedExecutionResults = Dict[
+        AnyUUID,
+        DetailedExecutionResultObject
+    ]
 
 
 class WorkflowProcesses(enum.Enum):
@@ -88,6 +107,7 @@ class WorkflowProcesses(enum.Enum):
 
     # local in 'tests/functional/application-packages'
     APP_ECHO = "Echo"
+    APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
@@ -103,6 +123,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
+    WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -773,13 +794,38 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     cls.indent(f"Headers: {headers}\n", 1))
         return resp
 
-    def workflow_runner(self,
-                        test_workflow_id,               # type: WorkflowProcesses
-                        test_application_ids,           # type: Iterable[WorkflowProcesses]
-                        log_full_trace=False,           # type: bool
-                        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
-                        override_execute_body=None,     # type: Optional[ProcessExecution]
-                        ):                              # type: (...) -> ExecutionResults
+    @overload
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace,                 # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+    ):                                  # type: (...) -> ExecutionResults
+        ...
+
+    @overload
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace=False,           # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+        detailed_results=True,          # type: Literal[True]
+    ):                                  # type: (...) -> DetailedExecutionResults
+        ...
+
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace=False,           # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+        detailed_results=False,         # type: bool
+    ):                                  # type: (...) -> Union[ExecutionResults, DetailedExecutionResults]
         """
         Main runner method that prepares and evaluates the full :term:`Workflow` execution and its step dependencies.
 
@@ -803,6 +849,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             Function to add further requests mock specifications as needed by the calling test case.
         :param override_execute_body:
             Alternate execution request content from the default one loaded from the referenced Workflow location.
+        :param detailed_results:
+            If enabled, each step involved in the :term:`Workflow` chain will provide their respective details
+            including the :term:`Process` ID, the :term:`Job` UUID, intermediate outputs and logs.
+            Otherwise (default), only the final results of :term:`Workflow` chain are returned.
         :returns: Response contents of the final :term:`Workflow` results for further validations if needed.
         """
 
@@ -862,11 +912,17 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             job_id = resp.json.get("jobID")
             self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
                              message="Response process execution job ID must match to validate results.")
-            resp = self.validate_test_job_execution(job_location, None, None)
+            resp, details = self.validate_test_job_execution(job_location, None, None)
+        if detailed_results:
+            self.assert_test(
+                lambda: bool(details) and len(details) > 1,  # minimally 1 workflow and 1 step
+                message="Could not obtain execution result details when requested by test.",
+            )
+            return details
         return resp.json
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
-        # type: (str, Optional[HeadersType], Optional[CookiesType]) -> AnyResponseType
+        # type: (str, Optional[HeadersType], Optional[CookiesType]) -> Tuple[AnyResponseType, DetailedExecutionResults]
         """
         Validates that the job is stated, running, and polls it until completed successfully.
 
@@ -874,6 +930,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         timeout_accept = self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT
         timeout_running = self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT
+        details = {}  # type: DetailedExecutionResults
         while True:
             self.assert_test(
                 lambda: timeout_accept > 0,
@@ -904,27 +961,30 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
             if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-                msg = f"Job execution '{job_location_url}' failed, but expected to succeed."
                 failed = status != Status.SUCCEEDED
-                if failed:
-                    msg += "\n" + self.try_retrieve_logs(job_location_url)
-                self.assert_test(lambda: not failed, message=msg)
+                logs, details = self.try_retrieve_logs(job_location_url, detailed_results=not failed)
+                self.assert_test(
+                    lambda: not failed,
+                    message=f"Job execution '{job_location_url}' failed, but expected to succeed.\n{logs}",
+                )
                 break
             self.assert_test(lambda: False, message=f"Unknown job execution status: '{status}'.")
         path = f"{job_location_url}/results"
         resp = self.request("GET", path, headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
-        return resp
+        return resp, details
 
-    def try_retrieve_logs(self, workflow_job_url):
+    def try_retrieve_logs(self, workflow_job_url, detailed_results):
+        # type: (str, bool) -> Tuple[str, DetailedExecutionResults]
         """
         Attempt to retrieve the main workflow job logs and any underlying step process logs.
 
         Because jobs are dispatched by the Workflow execution itself, there are no handles to the actual step jobs here.
         Try to parse the workflow logs to guess output logs URLs. If not possible, skip silently.
         """
+        details = {}  # type: DetailedExecutionResults
         try:
             msg = ""
-            path = workflow_job_url + "/logs"
+            path = f"{workflow_job_url}/logs"
             resp = self.request("GET", path, ignore_errors=True)
             if resp.status_code == 200 and isinstance(resp.json, list):
                 logs = resp.json
@@ -932,19 +992,45 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 tab_n = "\n" + self.indent("", 1)
                 workflow_logs = tab_n.join(logs)
                 msg += f"Workflow logs [JobID: {job_id}]" + tab_n + workflow_logs
-                log_matches = set(re.findall(r".*(https?://.+/logs).*", workflow_logs)) - {workflow_job_url}
-                log_refs = {}
+                if detailed_results:
+                    details[job_id] = self.extract_job_details(workflow_job_url, workflow_logs)
+                log_matches = set(re.findall(r".*(https?://.+/jobs/.+(?:/logs)?).*", workflow_logs))
+                log_matches -= {workflow_job_url}
+                log_matches = {url if url.rstrip("/").endswith("/logs") else f"{url}/logs" for url in log_matches}
                 for log_url in log_matches:
                     job_id = log_url.split("/")[-2]
-                    log_refs[job_id] = log_url
-                for job_id, log_url in log_refs.items():
                     resp = self.request("GET", log_url, ignore_errors=True)
                     if resp.status_code == 200 and isinstance(resp.json, list):
                         step_logs = tab_n.join(resp.json)
+                        if detailed_results:
+                            step_job_url = log_url.split("/logs", 1)[0]
+                            details[job_id] = self.extract_job_details(step_job_url, step_logs)
                         msg += f"\nStep process logs [JobID: {job_id}]" + tab_n + step_logs
         except Exception:  # noqa
-            return "Could not retrieve job logs."
-        return msg
+            return "Could not retrieve job logs.", {}
+        return msg, details
+
+    def extract_job_details(self, job_url, job_logs):
+        # type: (str, str) -> DetailedExecutionResultObject
+        """
+        Extracts more details about a *successful* :term:`Job` execution using known endpoints.
+        """
+        proc_url, job_id = job_url.split("/jobs/", 1)
+        proc_id = proc_url.rsplit("/", 1)[-1]
+        path = f"{job_url}/inputs"
+        resp = self.request("GET", path, params={"schema": JobInputsOutputsSchema.OGC}, ignore_errors=True)
+        job_inputs = cast("ExecutionInputsMap", resp.json["inputs"])
+        path = f"{job_url}/outputs"
+        resp = self.request("GET", path, params={"schema": JobInputsOutputsSchema.OGC}, ignore_errors=True)
+        job_outputs = cast("ExecutionResults", resp.json["outputs"])
+        detail = {
+            "job": job_id,
+            "process": proc_id,
+            "logs": job_logs,
+            "inputs": job_inputs,
+            "outputs": job_outputs,
+        }
+        return detail
 
 
 class WorkflowTestCase(WorkflowTestRunnerBase):
@@ -959,6 +1045,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
+        WorkflowProcesses.APP_ECHO_SECRETS,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
@@ -966,6 +1053,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_ECHO,
+        WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
@@ -1320,11 +1408,66 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             [WorkflowProcesses.APP_ECHO],
             log_full_trace=True,
         )
-        assert "output" in result
-        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        assert "output" in result  # pylint: disable=E1135
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)  # pylint: disable=E1136
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read()
         out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
         assert out == "test-workflow-echo", (
             f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO}'"
         )
+
+    def test_workflow_secrets(self):
+        details = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+            [WorkflowProcesses.APP_ECHO_SECRETS],
+            log_full_trace=True,
+            detailed_results=True,
+        )
+        result = [res for res in details.values() if res["process"] == WorkflowProcesses.WORKFLOW_ECHO_SECRETS.value]
+        result = result[0]["outputs"]
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read()
+        out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
+        expect_secret = "secret message"
+        # the secret is valid within the file only because of the nature of the job that echoes it in the output
+        # however, it should not be directly in the logs or output responses
+        assert out == expect_secret, (
+            f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO_SECRETS}'"
+        )
+
+        # validate there are no 'secrets' in responses
+        found_secrets = []
+        for job_detail in details.values():
+            for loc in ["inputs", "outputs"]:  # type: Literal["inputs", "outputs"]
+                for loc_id, loc_data in job_detail[loc].items():
+                    if expect_secret in str(loc_data):
+                        found_secrets.append({
+                            "where": loc,
+                            "id": loc_id,
+                            "data": loc_data,
+                            "process": job_detail["process"],
+                            "job": job_detail["job"],
+                        })
+            if expect_secret in str(job_detail["logs"]):
+                found_secrets.append({
+                    "where": "logs",
+                    "data": job_detail["logs"],
+                    "process": job_detail["process"],
+                    "job": job_detail["job"],
+                })
+        assert not found_secrets, f"Found exposed secrets that should have been masked:\n{repr_json(found_secrets)}"
+
+        # make sure the logs included stdout with expected output
+        # (ie: check that the fact that secrets are omitted is not only because no logs were captured...)
+        capture_regex = re.compile(
+            # note: each line is prefixed by the loggers details including the job state
+            r".*running\s+----- Captured Log \(stdout\) -----\n"
+            r".*running\s+OK!\n"
+            r".*running\s+----- End of Logs -----\n"
+        )
+        for job in details.values():
+            if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
+                assert capture_regex.search(job["logs"])

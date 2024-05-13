@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Add `CWL` ``cwltool:Secrets`` support (fixes `#511 <https://github.com/crim-ca/weaver/issues/511>`_).
 - Add `CWL` ``StepInputExpressionRequirement`` support.
 
 Fixes:
