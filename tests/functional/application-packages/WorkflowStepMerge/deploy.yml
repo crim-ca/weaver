@@ -1,0 +1,7 @@
+processDescription:
+  process:
+    id: WorkflowStepMerge
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - test: "tests/functional/application-packages/WorkflowStepMerge/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/workflow"

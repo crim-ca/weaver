@@ -21,7 +21,7 @@ import sys
 import tempfile
 import time
 import uuid
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import parse_qsl, urlparse
 
 import colander
@@ -170,6 +170,7 @@ if TYPE_CHECKING:
         CWL_Requirement,
         CWL_RequirementNames,
         CWL_RequirementsDict,
+        CWL_RequirementsList,
         CWL_Results,
         CWL_SchemaNames,
         CWL_ToolPathObject,
@@ -359,9 +360,13 @@ def _get_package_requirements_normalized(requirements, as_dict=False):
             reqs.append({"class": req})
             reqs[-1].update(requirements[req] or {})
         return reqs
-    reqs = [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
+    # ensure list-of-dict instead of sequence of dict-like
+    reqs = [dict(req) for req in requirements]  # type: CWL_RequirementsList
     if as_dict:
-        return {req.pop("class"): req for req in reqs}
+        return cast(
+            "CWL_RequirementsDict",
+            {req.pop("class"): req for req in reqs}  # noqa
+        )
     return reqs
 
 
@@ -2196,7 +2201,7 @@ class WpsPackage(Process):
                 # Because a directory reference can contain multiple sub-dir definitions,
                 # avoid possible conflicts with other inputs by nesting them under the ID.
                 # This also ensures that each directory input can work with a clean staging directory.
-                out_dir = os.path.join(input_definition.workdir, input_definition.identifier)
+                out_dir = cast(str, os.path.join(input_definition.workdir, input_definition.identifier))
                 locations = fetch_directory(input_location, out_dir,
                                             settings=self.settings, headers=self.auth)
                 if not locations:
@@ -2527,7 +2532,7 @@ class WpsPackage(Process):
             )
 
         def _get_req_params(_requirement, required_params):
-            # type: (CWL_AnyRequirements, List[str]) -> CWL_Requirement
+            # type: (CWL_AnyRequirementObject, List[str]) -> CWL_Requirement
             _wps_params = {}
             for _param in required_params:
                 if _param not in _requirement:

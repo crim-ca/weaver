@@ -109,6 +109,7 @@ class WorkflowProcesses(enum.Enum):
     APP_ECHO = "Echo"
     APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
+    APP_READ_FILE = "ReadFile"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
     APP_SUBSET_NASA_ESGF = "SubsetNASAESGF"
@@ -121,9 +122,11 @@ class WorkflowProcesses(enum.Enum):
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
+    WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
     WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
+    WORKFLOW_STEP_MERGE = "WorkflowStepMerge"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -1046,15 +1049,18 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_SECRETS,
+        WorkflowProcesses.APP_READ_FILE,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+        WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_ECHO,
         WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
+        WorkflowProcesses.WORKFLOW_STEP_MERGE,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
@@ -1471,3 +1477,24 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         for job in details.values():
             if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
                 assert capture_regex.search(job["logs"])
+
+    def test_workflow_multi_input_and_subworkflow(self):
+        """
+        Workflow that evaluates :term:`CWL` features simultaneously.
+
+        Features tested:
+          - ``MultipleInputFeatureRequirement``
+          - ``InlineJavascriptRequirement``
+          - ``StepInputExpressionRequirement``
+          - ``SubworkflowFeatureRequirement``
+        """
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_STEP_MERGE,
+            [
+                WorkflowProcesses.APP_ECHO,
+                WorkflowProcesses.APP_READ_FILE,
+                WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
+            ],
+            log_full_trace=True,
+        )
+        assert result["output"] == "Hello,World"
