@@ -12,11 +12,22 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CWL` ``MultipleInputFeatureRequirement`` support.
+- Add `CWL` ``SubworkflowFeatureRequirement`` support.
+- Add `CWL` ``Workflow`` explicit schema validation of its ``steps``.
+- Remove "unknown" definitions in `CWL` ``requirements``. Only fully defined and resolved definitions will be allowed.
+  If an unsupported `CWL` requirement by `Weaver` must be provided (but is a valid definition supported by ``cwltool``),
+  it must now be provided through ``hints`` to succeed schema validation.
 
 Fixes:
 ------
-- No change.
+- Fix invalid `CWL` schema definition for ``ScatterFeatureRequirement`` that directly
+  contained the corresponding fields ``scatter`` and ``scatterMethod``, instead of the expected
+  definition within a `Workflow Step <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStep>`_.
+- Fix `CWL` ``requirements`` schema definition using ``OneOf`` and the ``discriminator`` property that could sometime
+  drop a definition when it only contained an empty mapping ``{}``, and that the corresponding requirement allows it.
+- Fix ``weaver.wps_restapi.colander_extras.AnyOfKeywordSchema`` not allowing distinct `JSON` structure ``type`` to be
+  combined simultaneously.
 
 .. _changes_5.3.0:
 

@@ -490,6 +490,15 @@ class AnyIdentifier(SLUG):
     pass
 
 
+class CWLFileName(SLUG):
+    schema_type = String
+    description = "File with a CWL extension."
+    pattern = re.compile(
+        f"{SLUG.pattern.pattern[:-1]}"  # remove '$'
+        r"\.cwl$"
+    )
+
+
 class ProcessIdentifier(AnyOfKeywordSchema):
     description = "Process identifier."
     _any_of = [
@@ -4423,6 +4432,12 @@ class InplaceUpdateRequirementClass(InplaceUpdateRequirementSpecification):
                               validator=OneOf([CWL_REQUIREMENT_INPLACE_UPDATE]))
 
 
+class LoadContents(ExtendedSchemaNode):
+    schema_type = Boolean
+    title = "LoadContents"
+    description = "Indicates if  a 'File' type reference should be loaded under the 'contents' property."
+
+
 class LoadListingEnum(ExtendedSchemaNode):
     schema_type = String
     title = "LoadListingEnum"
@@ -4450,7 +4465,7 @@ class IdentifierArray(ExtendedSequenceSchema):
     item = AnyIdentifier()
 
 
-class MultipleInputRequirementSpecification(StrictMappingSchema):
+class MultipleInputRequirementSpecification(PermissiveMappingSchema):
     description = inspect.cleandoc(f"""
         Indicates that a Workflow Step Input must support multiple 'source' simultaneously
         (see also: {CWL_WORKFLOW_URL}#WorkflowStepInput).
@@ -4486,17 +4501,11 @@ class ScatterIdentifiersSchema(OneOfKeywordSchema):
     ]
 
 
-class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
-    description = inspect.cleandoc(f"""
-        A 'scatter' operation specifies that the associated Workflow step should execute separately over a list of
-        input elements. Each job making up a scatter operation is independent and may be executed concurrently
-        (see also: {CWL_WORKFLOW_URL}#WorkflowStep).
-    """)
-    scatter = ScatterIdentifiersSchema()
+class ScatterFeatureReference(PermissiveMappingSchema):
+    scatter = ScatterIdentifiersSchema(missing=drop)
     scatterMethod = ExtendedSchemaNode(
         String(),
         validator=OneOf(["dotproduct", "nested_crossproduct", "flat_crossproduct"]),
-        default="dotproduct",
         missing=drop,
         description=inspect.cleandoc("""
             If 'scatter' declares more than one input parameter, 'scatterMethod' describes how to decompose the
@@ -4514,6 +4523,14 @@ class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
               the order that the input arrays are listed in the 'scatter' field.
         """)
     )
+
+
+class ScatterFeatureRequirementSpecification(StrictMappingSchema):
+    description = inspect.cleandoc(f"""
+        A 'scatter' operation specifies that the associated Workflow step should execute separately over a list of
+        input elements. Each job making up a scatter operation is independent and may be executed concurrently
+        (see also: {CWL_WORKFLOW_URL}#WorkflowStep).
+    """)
 
 
 class ScatterFeatureRequirementMap(ExtendedMappingSchema):
@@ -4734,13 +4751,14 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         SubworkflowRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
-        UnknownRequirementMap(missing=drop),  # allows anything, must be last
     ]
 
 
 class CWLRequirementsItem(OneOfKeywordSchema):
     # in case there is any conflict between definitions,
-    # the class field can be used to discriminate which one is expected.
+    # the 'class' field can be used to discriminate which one is expected.
+    # however, this **requires** that every mapping defined in '_one_of' should
+    # provide a 'class' definition that can perform discrimination using a validator
     discriminator = "class"
     _one_of = [
         DockerRequirementClass(missing=drop),
@@ -4757,7 +4775,6 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         SubworkflowRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
-        UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -4796,11 +4813,8 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     ]
 
 
-class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
-    # validators of individual requirements define which one applies
-    # in case of ambiguity, 'discriminator' distinguish between them using their 'example' values in 'class' field
-    discriminator = "class"
-    _one_of = [
+class CWLHintsItem(AnyOfKeywordSchema, PermissiveMappingSchema):
+    _any_of = [
         BuiltinRequirementClass(missing=drop),
         CUDARequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
@@ -4920,6 +4934,7 @@ class CWLInputObject(PermissiveMappingSchema):
     default = CWLDefault(missing=drop, description="Default value of input if not provided for task execution.")
     inputBinding = PermissiveMappingSchema(missing=drop, title="Input Binding",
                                            description="Defines how to specify the input for the command.")
+    loadContents = LoadContents(missing=drop)
 
 
 class CWLTypeStringList(ExtendedSequenceSchema):
@@ -4963,18 +4978,20 @@ class CWLInputsDefinition(OneOfKeywordSchema):
 
 
 class OutputBinding(PermissiveMappingSchema):
-    glob = ExtendedSchemaNode(String(), missing=drop,
-                              description="Glob pattern to find the output on disk or mounted docker volume.")
+    description = "Defines how to retrieve the output result from the command."
+    glob = ExtendedSchemaNode(
+        String(),
+        missing=drop,
+        description="Glob pattern to find the output on disk or mounted docker volume.",
+    )
 
 
 class CWLOutputObject(PermissiveMappingSchema):
     type = CWLType()
     # 'outputBinding' should usually be there most of the time (if not always) to retrieve file,
     # but can technically be omitted in some very specific use-cases such as output literal or output is std logs
-    outputBinding = OutputBinding(
-        missing=drop,
-        description="Defines how to retrieve the output result from the command."
-    )
+    outputBinding = OutputBinding(missing=drop)
+    loadContents = LoadContents(missing=drop)
 
 
 class CWLOutputType(OneOfKeywordSchema):
@@ -5045,6 +5062,11 @@ class CWLBase(ExtendedMappingSchema):
     cwlVersion = CWLVersion()
 
 
+class CWLTool(PermissiveMappingSchema):
+    description = "Base definition of the type of CWL tool represented by the object."
+    _class = CWLClass()
+
+
 class CWLScatterMulti(ExtendedSequenceSchema):
     id = CWLIdentifier("")
 
@@ -5081,25 +5103,27 @@ class CWLScatterDefinition(PermissiveMappingSchema):
 
 
 class CWLWorkflowStepRunDefinition(AnyOfKeywordSchema):
-    # note:
-    #   Nested definitions are possible in pure CWL, but Weaver will support only references to another process.
-    #   To support references, URL are allowed as well.
     _any_of = [
         AnyIdentifier(
             title="CWLWorkflowStepRunID",
             description="Reference to local process ID, with or without '.cwl' extension."
         ),
+        CWLFileName(),
         ProcessURL(),
+        # do not perform deeper validation other than checking there is a CWL 'class'
+        # cwltool should perform any relevant cross-reference check of other files when resolving the workflow
+        # Weaver runtime requirements (application package type) should be checked when reaching that step
+        CWLTool(),
     ]
 
 
 class CWLWorkflowStepInputSourceValue(ExtendedSchemaNode):
     description = "Specifies the workflow parameter that will provide input to the underlying step parameter."
-    schema_type = String()
+    schema_type = String
 
 
 class CWLWorkflowStepInputSourceList(ExtendedSequenceSchema):
-    source = CWLWorkflowStepInputSourceValue()
+    item = CWLWorkflowStepInputSourceValue()
     validator = Length(min=1)
 
 
@@ -5122,12 +5146,13 @@ class PickValueMethod(ExtendedSchemaNode):
     validator = OneOf(["first_non_null", "the_only_non_null", "all_non_null"])
 
 
-class CWLWorkflowStepInputObject(PermissiveSequenceSchema):
+class CWLWorkflowStepInputObject(ScatterFeatureReference):
     id = AnyIdentifier(description="Identifier of the step input.", missing=drop)
     source = CWLWorkflowStepInputSource(missing=drop)
     linkMerge = LinkMergeMethod(missing=drop)
     pickValue = PickValueMethod(missing=drop)
     loadListing = LoadListingEnum(missing=drop)
+    loadContents = LoadContents(missing=drop)
     valueFrom = CWLExpression(missing=drop)
 
 
@@ -5187,9 +5212,9 @@ class CWLWorkflowStepOutputDefinition(OneOfKeywordSchema):
     ]
 
 
-class CWLWorkflowStepObject(PermissiveMappingSchema, CWLScatterDefinition):
+class CWLWorkflowStepObject(CWLScatterDefinition, PermissiveMappingSchema):
     id = AnyIdentifier(description="Identifier of the step.", missing=drop)
-    _in = CWLWorkflowStepInputDefinition()
+    _in = CWLWorkflowStepInputDefinition(name="in")
     out = CWLWorkflowStepOutputDefinition()
     run = CWLWorkflowStepRunDefinition()
     requirements = CWLRequirements(missing=drop)
@@ -5215,8 +5240,7 @@ class CWLWorkflowStepsDefinition(OneOfKeywordSchema):
     ]
 
 
-class CWLApp(PermissiveMappingSchema, CWLScatterDefinition):
-    _class = CWLClass()
+class CWLApp(CWLTool, CWLScatterDefinition, PermissiveMappingSchema):
     id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
     intent = CWLIntent(missing=drop)
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)

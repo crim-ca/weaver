@@ -2012,22 +2012,43 @@ class OneOfKeywordSchema(KeywordMapper):
             if isinstance(discriminator_spec, dict) and "mapping" not in discriminator_spec:
                 mapping = {}
                 for node in self.get_keyword_items():
-                    node_fields = [getattr(field, "example", colander.null) for field in node.children
-                                   if field.name == discriminator_spec["propertyName"]]
+                    node_fields = [
+                        field for field in node.children
+                        if field.name == discriminator_spec["propertyName"]
+                    ]
                     if len(node_fields) != 1:
                         continue
-                    example = node_fields[0]
+                    example = getattr(node_fields[0], "example", colander.null)
+                    values = getattr(node_fields[0], "validator", StringOneOf([colander.null]))
+                    discriminator_value = colander.null
                     if example is not colander.null:
-                        if example in mapping:
-                            raise SchemaNodeTypeError(
-                                "Keyword schema '{}' of type '{}' specification with 'discriminator' attempts "
-                                "to refer to duplicate example values '{}' between '{}' and '{}'".format(
-                                    schema_name, keyword, example,
-                                    _get_node_name(mapping[example], schema_name=True),
-                                    _get_node_name(node, schema_name=True),
-                                )
+                        discriminator_value = example
+                    elif (
+                        isinstance(values, colander.OneOf)
+                        and len(values.choices) == 1
+                        and isinstance(values.choices[0], str)
+                    ):
+                        discriminator_value = values.choices[0]
+                    if not discriminator_value:
+                        raise SchemaNodeTypeError(
+                            "Keyword schema '{}' of type '{}' specification with 'discriminator' "
+                            "could not resolve any value defining the discriminator for nested "
+                            "field '{}' in schema '{}'.".format(
+                                schema_name, keyword,
+                                discriminator_spec["propertyName"],
+                                _get_node_name(node_fields[0], schema_name=True),
                             )
-                        mapping[example] = node
+                        )
+                    if discriminator_value in mapping:
+                        raise SchemaNodeTypeError(
+                            "Keyword schema '{}' of type '{}' specification with 'discriminator' attempts "
+                            "to refer to duplicate example values '{}' between '{}' and '{}'".format(
+                                schema_name, keyword, discriminator_value,
+                                _get_node_name(mapping[discriminator_value], schema_name=True),
+                                _get_node_name(node, schema_name=True),
+                            )
+                        )
+                    mapping[discriminator_value] = node
                 discriminator_spec["mapping"] = mapping
             if not (
                 isinstance(discriminator_spec, dict)
@@ -2259,7 +2280,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         - :class:`NotKeywordSchema`
     """
     _keyword_schemas_only_object = False
-    _keyword_schemas_same_struct = True
+    _keyword_schemas_same_struct = False
     _keyword = "_any_of"
 
     @classmethod
