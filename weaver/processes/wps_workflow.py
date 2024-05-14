@@ -96,7 +96,6 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
     """
 
     # imposed by original CWL implementation
-    # pylint: disable=C0103,invalid-name
     # pylint: disable=W0201,attribute-defined-outside-init
 
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):

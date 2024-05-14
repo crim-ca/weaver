@@ -85,6 +85,9 @@ if TYPE_CHECKING:
     ]
 
 
+# pylint: disable=E1135,E1136  # false positives about return value of 'workflow_runner' depending on 'detailed_results'
+
+
 class WorkflowProcesses(enum.Enum):
     """
     Known process ID definitions for tests.
@@ -1414,8 +1417,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             [WorkflowProcesses.APP_ECHO],
             log_full_trace=True,
         )
-        assert "output" in result  # pylint: disable=E1135
-        path = map_wps_output_location(result["output"]["href"], container=self.settings)  # pylint: disable=E1136
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read()
         out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
