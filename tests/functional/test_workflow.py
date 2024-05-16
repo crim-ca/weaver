@@ -129,6 +129,7 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
     APP_DIRECTORY_LISTING_PROCESS = "DirectoryListingProcess"
     APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
+    APP_PASSTHROUGH_EXPRESSIONS = "PassthroughExpressions"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
@@ -136,6 +137,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
     WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
+    WORKFLOW_PASSTHROUGH_EXPRESSIONS = "WorkflowPassthroughExpressions"
     WORKFLOW_STEP_MERGE = "WorkflowStepMerge"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
@@ -1059,6 +1061,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_SECRETS,
+        WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.APP_READ_FILE,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
@@ -1069,6 +1072,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_ECHO,
         WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+        WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
         WorkflowProcesses.WORKFLOW_STEP_MERGE,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
@@ -1487,6 +1491,31 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         for job in details.values():
             if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
                 assert capture_regex.search(job["logs"])
+
+    def test_workflow_passthrough_expressions(self):
+        """
+        Test that validate literal data passed between steps.
+
+        Validates that values are propagated property without the need of intermediate ``File`` type explicitly
+        within the :term:`Workflow` or any of its underlying application steps. Also, uses various combinations of
+        expression formats (:term:`CWL` ``$(...)`` reference and pure JavaScript ``${ ... }`` reference) to ensure
+        they are handled correctly when collecting outputs.
+        """
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
+            [WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS],
+            log_full_trace=True,
+        )
+        assert result == {
+            "code1": {"value": 123456},
+            "code2": {"value": 123456},
+            "integer1": {"value": 3},
+            "integer2": {"value": 3},
+            "message1": {"value": "msg"},
+            "message2": {"value": "msg"},
+            "number1": {"value": 3.1416},
+            "number2": {"value": 3.1416},
+        }
 
     def test_workflow_multi_input_and_subworkflow(self):
         """

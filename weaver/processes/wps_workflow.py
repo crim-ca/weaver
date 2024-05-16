@@ -76,8 +76,10 @@ def default_make_tool(toolpath_object,  # type: CWL_ToolPathObject
         raise WorkflowException(f"Not a dict: '{toolpath_object}'")
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
-            builtin_process_hints = [h.get("process") for h in toolpath_object.get("hints")
-                                     if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)]
+            builtin_process_hints = [
+                h.get("process") for h in toolpath_object.get("hints") or []
+                if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)
+            ]
             if len(builtin_process_hints) == 1:
                 return cast(BuiltinProcess, BuiltinProcess(toolpath_object, loading_context))
             return cast(WpsWorkflow, WpsWorkflow(toolpath_object, loading_context, package_process))

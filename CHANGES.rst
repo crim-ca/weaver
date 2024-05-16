@@ -18,6 +18,10 @@ Changes:
 - Remove "unknown" definitions in `CWL` ``requirements``. Only fully defined and resolved definitions will be allowed.
   If an unsupported `CWL` requirement by `Weaver` must be provided (but is a valid definition supported by ``cwltool``),
   it must now be provided through ``hints`` to succeed schema validation.
+- Improve support of `CWL` output definition using ``loadContents`` to an ``outputBinding.glob`` reference to
+  load the ``File`` contents into a ``string`` output.
+- Improve support of `CWL` JavaScript expressions within intermediate steps of a ``Workflow`` to collect output results
+  from relevant sources with better data manipulation flexibility.
 
 Fixes:
 ------
@@ -28,6 +32,8 @@ Fixes:
   drop a definition when it only contained an empty mapping ``{}``, and that the corresponding requirement allows it.
 - Fix ``weaver.wps_restapi.colander_extras.AnyOfKeywordSchema`` not allowing distinct `JSON` structure ``type`` to be
   combined simultaneously.
+- Fix `CWL` ``Workflow`` not retrieving output results when returned directly as literal data from a remote `Process`.
+- Fix `CWL` ``Workflow`` potentially failing tool resolution for a local step `Process` if ``hints`` where omitted.
 
 .. _changes_5.3.0:
 
