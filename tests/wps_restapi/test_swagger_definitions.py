@@ -183,8 +183,7 @@ def test_execute_input_inline_object_invalid(test_data, expect_result):
 @pytest.mark.parametrize(
     "cwl_path",
     glob.glob(
-        "**/*.cwl",
-        root_dir=TEST_DIR,
+        os.path.join(TEST_DIR, "**/*.cwl"),
         recursive=True,
     )
 )
@@ -193,7 +192,6 @@ def test_cwl_package(cwl_path):
     """
     Test that our :term:`CWL` schema definition works with the many examples used for testsing.
     """
-    cwl_path = os.path.join(TEST_DIR, cwl_path)
     cwl = load_file(cwl_path)  # type: CWL
     cwl_check = sd.CWL().deserialize(cwl)
     cwl_check.pop("$schema", None)  # our definition injects this reference
