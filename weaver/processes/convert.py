@@ -1167,11 +1167,11 @@ def is_cwl_complex_type(io_info, complex_types=PACKAGE_COMPLEX_TYPES):
 def parse_cwl_array_type(io_info, strict=True):
     # type: (CWL_IO_Type, bool) -> CWLIODefinition
     """
-    Parses the specified I/O for one of the various potential CWL array definitions.
+    Parses the specified :term:`I/O` for one of the various potential CWL array definitions.
 
-    :param io_info: :term:`CWL` I/O definition to parse.
+    :param io_info: :term:`CWL` :term:`I/O` definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
-    :returns: Updated :term:`CWL` I/O definition with applicable properties.
+    :returns: Updated :term:`CWL` :term:`I/O` definition with applicable properties.
     :raises PackageTypeError: if the array element doesn't have the required values and valid format.
     """
     # use mapping to allow sub-function updates
@@ -1187,7 +1187,7 @@ def parse_cwl_array_type(io_info, strict=True):
         """
         Updates the ``io_return`` parameters if ``io_item`` evaluates to a valid ``enum`` type.
 
-        Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
+        Parameter ``io_item`` should correspond to field ``items`` of an array :term:`I/O` definition.
         Simple pass-through if the array item is not an ``enum``.
         """
         _def = parse_cwl_enum_type({"type": _io_item})

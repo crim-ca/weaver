@@ -12,7 +12,7 @@ from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -98,7 +98,7 @@ class WpsProcessInterface(abc.ABC):
         self.temp_staging = set()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
+        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> JobOutputs
         """
         Execute the core operation of the remote :term:`Process` using the given inputs.
 
@@ -107,7 +107,7 @@ class WpsProcessInterface(abc.ABC):
 
         :param workflow_inputs: :term:`CWL` job dictionary.
         :param out_dir: directory where the outputs must be written.
-        :param expected_outputs: expected value outputs as ``{"id": "value"}``.
+        :param expected_outputs: expected outputs to collect from complex references.
         """
         self.update_status("Preparing process for remote execution.",
                            RemoteJobProgress.PREPARE, Status.RUNNING)
@@ -157,6 +157,7 @@ class WpsProcessInterface(abc.ABC):
 
         self.update_status("Execution of remote process execution completed successfully.",
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
+        return results
 
     def prepare(self):  # noqa: B027  # intentionally not an abstract method to allow no-op
         # type: () -> None
@@ -336,6 +337,13 @@ class WpsProcessInterface(abc.ABC):
         for result in results:
             res_id = get_any_id(result)
             if res_id not in expected_outputs:
+                continue
+
+            # Ignore outputs 'collected' by CWL tool to allow a 'string' value to resolve 'loadContent' operation.
+            # However, the reference file used to load contents from an expression, does not (and should not)
+            # itself need staging or fetching from the remote process. The resulting 'string' value only is used.
+            res_type = expected_outputs[res_id]["type"]
+            if res_type not in PACKAGE_COMPLEX_TYPES:
                 continue
 
             # plan ahead when list of multiple output values could be supported

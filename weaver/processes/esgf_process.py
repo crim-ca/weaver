@@ -8,12 +8,11 @@ import cwt  # noqa  # package: esgf-compute-api
 from weaver.processes.constants import PACKAGE_FILE_TYPE
 from weaver.processes.wps1_process import Wps1Process
 from weaver.status import Status
-from weaver.utils import fetch_file
 
 if TYPE_CHECKING:
-    from typing import Dict, List, Tuple
+    from typing import List, Tuple
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import CWL_ExpectedOutputs, CWL_RuntimeInputsMap, JobResults, JSON
 
 LAST_PERCENT_REGEX = re.compile(r".+ (\d{1,3})$")
 
@@ -43,38 +42,9 @@ class InputArguments(object):
 class ESGFProcess(Wps1Process):
     required_inputs = (InputNames.VARIABLE, )
 
-    def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (JSON, str, Dict[str, str]) -> None
-        """
-        Execute an ESGF process from cwl inputs.
-        """
-        self._check_required_inputs(workflow_inputs)
-
-        api_key = workflow_inputs.get(InputNames.API_KEY)
-        inputs = self._prepare_inputs(workflow_inputs)
-        domain = self._get_domain(workflow_inputs)
-
-        esgf_process = self._run_process(api_key, inputs, domain)
-        self._process_results(esgf_process, out_dir, expected_outputs)
-
-    def _prepare_inputs(self, workflow_inputs):
-        # type: (JSON) -> List[cwt.Variable]
-        """
-        Convert inputs from cwl inputs to ESGF format.
-        """
-        message = "Preparing execute request for remote ESGF provider."
-        self.update_status(message, Percent.PREPARING, Status.RUNNING)
-
-        files = self._get_files_urls(workflow_inputs)
-        varname = self._get_variable(workflow_inputs)
-
-        inputs = [cwt.Variable(url, varname) for url in files]
-
-        return inputs
-
     @staticmethod
     def _get_domain(workflow_inputs):
-        # type: (JSON) -> Optional[cwt.Domain]
+        # type: (CWL_RuntimeInputsMap) -> Optional[cwt.Domain]
 
         dimensions_names = [
             InputNames.TIME,
@@ -166,11 +136,30 @@ class ESGFProcess(Wps1Process):
             raise ValueError(f"Missing required input {InputNames.VARIABLE}")
         return workflow_inputs[InputNames.VARIABLE]
 
-    def _run_process(self, api_key, inputs, domain=None):
-        # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
+    def format_inputs(self, workflow_inputs):
+        # type: (CWL_RuntimeInputsMap) -> Tuple[str, List[cwt.Variable], Optional[cwt.Domain]]
+        """
+        Convert inputs from cwl inputs to ESGF format.
+        """
+        message = "Preparing inputs of execute request for remote ESGF provider."
+        self.update_status(message, Percent.PREPARING, Status.RUNNING)
+
+        self._check_required_inputs(workflow_inputs)
+
+        api_key = workflow_inputs.get(InputNames.API_KEY)
+        files = self._get_files_urls(workflow_inputs)
+        varname = self._get_variable(workflow_inputs)
+        domain = self._get_domain(workflow_inputs)
+        inputs = [cwt.Variable(url, varname) for url in files]
+        return api_key, inputs, domain
+
+    def dispatch(self, job_inputs, expect_outputs):
+        # type: (Tuple[str, List[cwt.Variable], Optional[cwt.Domain]], CWL_ExpectedOutputs) -> cwt.Process
         """
         Run an ESGF process.
         """
+        api_key, inputs, domain = job_inputs
+
         wps = cwt.WPSClient(self.provider, api_key=api_key, verify=True)
         process = wps.processes(self.process)[0]
 
@@ -178,12 +167,9 @@ class ESGFProcess(Wps1Process):
         self.update_status(message, Percent.SENDING, Status.RUNNING)
 
         wps.execute(process, inputs=inputs, domain=domain)
-
-        self._wait(process)
-
         return process
 
-    def _wait(self, esgf_process, sleep_time=2):
+    def monitor(self, esgf_process, sleep_time=2):
         # type: (cwt.Process, float) -> bool
         """
         Wait for an ESGF process to finish, while reporting its status.
@@ -215,37 +201,35 @@ class ESGFProcess(Wps1Process):
 
         return esgf_process.succeeded
 
-    def _process_results(self, esgf_process, output_dir, expected_outputs):
-        # type: (cwt.Process, str, Dict[str, str]) -> None
+    def get_results(self, esgf_process):
+        # type: (cwt.Process) -> JobResults
         """
         Process the result of the execution.
         """
-        if not esgf_process.succeeded:
-            message = "Process failed."
-            self.update_status(message, Percent.FINISHED, Status.FAILED)
-            return
-
-        message = "Process successful."
-        self.update_status(message, Percent.COMPUTE_DONE, Status.RUNNING)
-        try:
-            self._write_outputs(esgf_process.output.uri, output_dir, expected_outputs)
-        except Exception:
-            message = "Error while downloading files."
-            self.update_status(message, Percent.FINISHED, Status.FAILED)
-            raise
-
-    def _write_outputs(self, url, output_dir, expected_outputs):
-        """
-        Write the output netcdf url to a local drive.
-        """
-        message = "Downloading outputs."
+        message = "Retrieving outputs."
         self.update_status(message, Percent.COMPUTE_DONE, Status.RUNNING)
 
-        nc_outputs = [v for v in expected_outputs.values() if v.lower().endswith(".nc")]
+        outputs = esgf_process.output
+        if not isinstance(outputs, list):
+            outputs = [outputs]
+
+        results = [
+            {
+                "id": out.var_name,
+                "href": out.uri,
+                "type": out.mime_type,
+            }
+            for out in outputs
+        ]
+        return results
+
+    def stage_results(self, results, expected_outputs, out_dir):
+        # type: (JobResults, CWL_ExpectedOutputs, str) -> None
+
+        nc_outputs = [v for v in expected_outputs.values() if v["glob"].lower().endswith(".nc")]
         if len(nc_outputs) > 1:
             raise NotImplementedError("Multiple outputs are not implemented")
 
-        fetch_file(url, output_dir, settings=self.settings)
-
+        super().stage_results(results, expected_outputs, out_dir)
         message = "Download successful."
-        self.update_status(message, Percent.FINISHED, Status.SUCCEEDED)
+        self.update_status(message, Percent.FINISHED, Status.RUNNING)
