@@ -43,6 +43,8 @@ if TYPE_CHECKING:
         CWL_ExpectedOutputs,
         CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
+        JobCustomInputs,
+        JobCustomOutputs,
         JobInputs,
         JobMonitorReference,
         JobOutputs,
@@ -111,7 +113,7 @@ class WpsProcessInterface(abc.ABC):
         """
         self.update_status("Preparing process for remote execution.",
                            RemoteJobProgress.PREPARE, Status.RUNNING)
-        self.prepare()
+        self.prepare(workflow_inputs, expected_outputs)
         self.update_status("Process ready for execute remote process.",
                            RemoteJobProgress.READY, Status.RUNNING)
 
@@ -159,16 +161,21 @@ class WpsProcessInterface(abc.ABC):
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
         return results
 
-    def prepare(self):  # noqa: B027  # intentionally not an abstract method to allow no-op
-        # type: () -> None
+    def prepare(  # noqa: B027  # intentionally not an abstract method to allow no-op
+        self,
+        workflow_inputs,    # type: CWL_RuntimeInputsMap
+        expected_outputs,   # type: CWL_ExpectedOutputs
+    ):                      # type: (...) -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
 
         This is an optional step that can be omitted entirely if not needed.
+        This step should be considered for the creation of a reusable client or object handler that does not need to be
+        recreated on any subsequent steps, such as for :meth:`dispatch` and :meth:`monitor` calls.
         """
 
     def format_inputs(self, workflow_inputs):
-        # type: (JobInputs) -> Union[JobInputs, Any]
+        # type: (JobInputs) -> Union[JobInputs, JobCustomInputs]
         """
         Implementation dependent operations to configure input values for :term:`Job` execution.
 
@@ -179,7 +186,7 @@ class WpsProcessInterface(abc.ABC):
         return workflow_inputs
 
     def format_outputs(self, workflow_outputs):
-        # type: (JobOutputs) -> JobOutputs
+        # type: (JobOutputs) -> Union[JobOutputs, JobCustomOutputs]
         """
         Implementation dependent operations to configure expected outputs for :term:`Job` execution.
 
@@ -191,7 +198,7 @@ class WpsProcessInterface(abc.ABC):
 
     @abc.abstractmethod
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> JobMonitorReference
+        # type: (Union[JobInputs, JobCustomInputs], Union[JobOutputs, JobCustomOutputs]) -> JobMonitorReference
         """
         Implementation dependent operations to dispatch the :term:`Job` execution to the remote :term:`Process`.
 

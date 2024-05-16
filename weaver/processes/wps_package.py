@@ -30,7 +30,7 @@ import cwltool.docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
-from cwltool.process import use_custom_schema
+from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
@@ -895,7 +895,7 @@ def get_application_requirement(package,        # type: CWL
     requirement = app_hints[0] if app_hints else req_default
 
     if validate:
-        all_classes = sorted(list(set(item.get("class") for item in all_hints)))
+        all_classes = sorted(list(set(shortname(str(item.get("class"))) for item in all_hints)))
         app_required = _get_package_type(package) == ProcessType.APPLICATION
         if required and app_required:
             cwl_impl_type_reqs = sorted(list(CWL_REQUIREMENT_APP_TYPES))

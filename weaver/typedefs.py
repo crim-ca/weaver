@@ -439,7 +439,18 @@ if TYPE_CHECKING:
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobCustomInputs = TypeVar(
+        "JobCustomInputs",
+        bound=Any,
+    )
+    JobCustomOutputs = TypeVar(
+        "JobCustomOutputs",
+        bound=Any,
+    )
+    JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
+        "JobMonitorReference",
+        bound=Any,
+    )
     JobSubscribers = TypedDict("JobSubscribers", {
         "failedUri": NotRequired[str],
         "successUri": NotRequired[str],

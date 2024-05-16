@@ -1,18 +1,35 @@
 import re
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import cwt  # noqa  # package: esgf-compute-api
 
 from weaver.processes.constants import PACKAGE_FILE_TYPE
-from weaver.processes.wps1_process import Wps1Process
+from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.status import Status
 
 if TYPE_CHECKING:
-    from typing import List, Tuple
+    from typing import List, Optional, Tuple
+    from typing_extensions import TypedDict
 
-    from weaver.typedefs import CWL_ExpectedOutputs, CWL_RuntimeInputsMap, JobResults, JSON
+    from weaver.typedefs import (
+        CWL_ExpectedOutputs,
+        CWL_RuntimeInputsMap,
+        JobResults,
+        JSON,
+        UpdateStatusPartialFunction
+    )
+    from weaver.wps.service import WorkerRequest
+
+    ESGFProcessInputs = TypedDict(
+        "ESGFProcessInputs",
+        {
+            "inputs": List[cwt.Variable],
+            "domain": Optional[cwt.Domain],
+        },
+        total=True,
+    )
 
 LAST_PERCENT_REGEX = re.compile(r".+ (\d{1,3})$")
 
@@ -39,8 +56,21 @@ class InputArguments(object):
     CRS = "crs"
 
 
-class ESGFProcess(Wps1Process):
+class ESGFProcess(WpsProcessInterface):
     required_inputs = (InputNames.VARIABLE, )
+
+    def __init__(
+        self,
+        provider,       # type: str
+        process,        # type: str
+        request,        # type: WorkerRequest
+        update_status,  # type: UpdateStatusPartialFunction
+    ):                  # type: (...) -> None
+        super().__init__(request=request, update_status=update_status)
+        self.provider = provider
+        self.process = process
+        self.wps_provider = None    # type: Optional[cwt.WPSClient]
+        self.wps_process = None     # type: Optional[cwt.Process]
 
     @staticmethod
     def _get_domain(workflow_inputs):
@@ -63,7 +93,7 @@ class ESGFProcess(Wps1Process):
         # grouped_inputs is of the form:
         # {"lat": {"start": 1, "end": 3, "crs": "values"}}
 
-        # ensure data is casted properly
+        # ensure data is cast properly
         for dim_name, values in grouped_inputs.items():
             for value_name, value in values.items():
                 if value_name in [InputArguments.START, InputArguments.END] and value:
@@ -122,7 +152,7 @@ class ESGFProcess(Wps1Process):
                 raise ValueError(f"Input named '{InputNames.FILES}' must have a class named 'File'")
             location = cwl_file["location"]
             if not location.startswith("http"):
-                raise ValueError("ESGF processes only support urls for files inputs.")
+                raise ValueError("ESGF-CWT processes only support urls for files inputs.")
             urls.append(location)
         return urls
 
@@ -136,43 +166,57 @@ class ESGFProcess(Wps1Process):
             raise ValueError(f"Missing required input {InputNames.VARIABLE}")
         return workflow_inputs[InputNames.VARIABLE]
 
+    def prepare(self, workflow_inputs, expected_outputs):
+        # type: (CWL_RuntimeInputsMap, CWL_ExpectedOutputs) -> None
+        """
+        Prepare the :term:`ESGF-CWT` :term:`WPS` client.
+        """
+        headers = {}
+        headers.update(self.get_auth_cookies())
+        headers.update(self.get_auth_headers())
+
+        api_key = workflow_inputs.get(InputNames.API_KEY)
+
+        self.wps_provider = cwt.WPSClient(
+            self.provider,
+            api_key=api_key,
+            headers=headers,
+            verify=True,
+        )
+        self.wps_process = self.wps_provider.processes(self.process)[0]
+
     def format_inputs(self, workflow_inputs):
-        # type: (CWL_RuntimeInputsMap) -> Tuple[str, List[cwt.Variable], Optional[cwt.Domain]]
+        # type: (CWL_RuntimeInputsMap) -> ESGFProcessInputs
         """
-        Convert inputs from cwl inputs to ESGF format.
+        Convert inputs from cwl inputs to :term:`ESGF-CWT` format.
         """
-        message = "Preparing inputs of execute request for remote ESGF provider."
+        message = "Preparing inputs of execute request for remote ESGF-CWT provider."
         self.update_status(message, Percent.PREPARING, Status.RUNNING)
 
         self._check_required_inputs(workflow_inputs)
 
-        api_key = workflow_inputs.get(InputNames.API_KEY)
         files = self._get_files_urls(workflow_inputs)
         varname = self._get_variable(workflow_inputs)
         domain = self._get_domain(workflow_inputs)
         inputs = [cwt.Variable(url, varname) for url in files]
-        return api_key, inputs, domain
 
-    def dispatch(self, job_inputs, expect_outputs):
-        # type: (Tuple[str, List[cwt.Variable], Optional[cwt.Domain]], CWL_ExpectedOutputs) -> cwt.Process
+        return {"inputs": inputs, "domain": domain}
+
+    def dispatch(self, process_inputs, process_outputs):
+        # type: (ESGFProcessInputs, CWL_ExpectedOutputs) -> cwt.Process
         """
-        Run an ESGF process.
+        Run an :term:`ESGF-CWT` process.
         """
-        api_key, inputs, domain = job_inputs
-
-        wps = cwt.WPSClient(self.provider, api_key=api_key, verify=True)
-        process = wps.processes(self.process)[0]
-
         message = "Sending request."
         self.update_status(message, Percent.SENDING, Status.RUNNING)
 
-        wps.execute(process, inputs=inputs, domain=domain)
-        return process
+        self.wps_provider.execute(self.wps_process, **process_inputs)
+        return self.wps_process
 
-    def monitor(self, esgf_process, sleep_time=2):
+    def monitor(self, esgf_process, sleep_time=2):  # pylint: disable=W0237  # renamed parameter to be clearer
         # type: (cwt.Process, float) -> bool
         """
-        Wait for an ESGF process to finish, while reporting its status.
+        Wait for an :term:`ESGF-CWT` process to finish, while reporting its status.
         """
         status_history = set()
 
@@ -188,7 +232,7 @@ class ESGFProcess(Wps1Process):
 
                 status_history.add(status)
 
-                message = f"ESGF status: {status}"
+                message = f"ESGF-CWT status: {status}"
                 self.update_status(message, status_percent, Status.RUNNING)
 
         update_history()
@@ -201,7 +245,7 @@ class ESGFProcess(Wps1Process):
 
         return esgf_process.succeeded
 
-    def get_results(self, esgf_process):
+    def get_results(self, esgf_process):  # pylint: disable=W0237  # renamed parameter to be clearer
         # type: (cwt.Process) -> JobResults
         """
         Process the result of the execution.

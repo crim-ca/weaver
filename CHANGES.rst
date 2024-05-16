@@ -22,6 +22,10 @@ Changes:
   load the ``File`` contents into a ``string`` output.
 - Improve support of `CWL` JavaScript expressions within intermediate steps of a ``Workflow`` to collect output results
   from relevant sources with better data manipulation flexibility.
+- Modify signature of ``weaver.processes.wps_process_base.WpsProcessInterface`` to allow better reuse of the
+  common operations shared by derived `CWL` ``Workflow`` steps implemented by ``ESGFProcess``, ``Wps1Process``,
+  ``Wps3Process`` and ``OGCAPIRemoteProcessBase``.
+- Refactor ``ESGFProcess`` to use the common operations of `CWL` ``Workflow`` steps defined by ``WpsProcessInterface``.
 
 Fixes:
 ------
@@ -34,6 +38,9 @@ Fixes:
   combined simultaneously.
 - Fix `CWL` ``Workflow`` not retrieving output results when returned directly as literal data from a remote `Process`.
 - Fix `CWL` ``Workflow`` potentially failing tool resolution for a local step `Process` if ``hints`` where omitted.
+- Fix `CWL` ``Workflow`` resolution of step ``requirements`` from one of the `Weaver` application types
+  (i.e.: ``builtin``, ``docker``, ``ESGF-CWT``, ``OGCAPI``, ``WPS1``) due to ``cwltool`` namespace adding a
+  prefixed URI.
 
 .. _changes_5.3.0:
 

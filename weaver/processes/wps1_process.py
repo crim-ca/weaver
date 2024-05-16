@@ -17,7 +17,6 @@ from weaver.status import Status, map_status
 from weaver.utils import (
     bytes2str,
     get_any_id,
-    get_any_value,
     get_job_log_msg,
     get_log_monitor_msg,
     raise_on_xml_exception,
@@ -32,7 +31,8 @@ if TYPE_CHECKING:
     from owslib.wps import WebProcessingService
 
     from weaver.typedefs import (
-        CWL_RuntimeInputList,
+        CWL_RuntimeInputsMap,
+        CWL_ExpectedOutputs,
         JobExecution,
         JobInputs,
         JobOutputs,
@@ -70,7 +70,7 @@ class Wps1Process(WpsProcessInterface):
         )
 
     def format_inputs(self, workflow_inputs):
-        # type: (CWL_RuntimeInputList) -> OWS_InputDataValues
+        # type: (CWL_RuntimeInputsMap) -> OWS_InputDataValues
         """
         Convert submitted :term:`CWL` workflow inputs into corresponding :mod:`OWSLib.wps` representation for execution.
 
@@ -84,9 +84,7 @@ class Wps1Process(WpsProcessInterface):
                 complex_inputs.append(process_input.identifier)
 
         wps_inputs = []
-        for input_item in workflow_inputs:
-            input_key = get_any_id(input_item)
-            input_val = get_any_value(input_item)
+        for input_key, input_val in workflow_inputs.items():
 
             # ignore optional inputs resolved as omitted
             if input_val is None:
@@ -138,8 +136,8 @@ class Wps1Process(WpsProcessInterface):
                            "Provided: %s\nExpected: %s", list(expected_outputs), list(provided_outputs))
         return outputs_as_ref
 
-    def prepare(self):
-        # type: () -> None
+    def prepare(self, workflow_inputs, expected_outputs):
+        # type: (CWL_RuntimeInputsMap, CWL_ExpectedOutputs) -> None
         LOGGER.debug("Execute WPS-1 provider: [%s]", self.provider)
         LOGGER.debug("Execute WPS-1 process: [%s]", self.process)
         try:
