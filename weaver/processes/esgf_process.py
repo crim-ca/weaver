@@ -8,6 +8,7 @@ import cwt  # noqa  # package: esgf-compute-api
 from weaver.processes.constants import PACKAGE_FILE_TYPE
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.status import Status
+from weaver.utils import get_any_id
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         CWL_ExpectedOutputs,
         CWL_RuntimeInputsMap,
+        JobInputs,
         JobResults,
         JSON,
         UpdateStatusPartialFunction
@@ -185,14 +187,15 @@ class ESGFProcess(WpsProcessInterface):
         )
         self.wps_process = self.wps_provider.processes(self.process)[0]
 
-    def format_inputs(self, workflow_inputs):
-        # type: (CWL_RuntimeInputsMap) -> ESGFProcessInputs
+    def format_inputs(self, job_inputs):
+        # type: (JobInputs) -> ESGFProcessInputs
         """
         Convert inputs from cwl inputs to :term:`ESGF-CWT` format.
         """
         message = "Preparing inputs of execute request for remote ESGF-CWT provider."
         self.update_status(message, Percent.PREPARING, Status.RUNNING)
 
+        workflow_inputs = {get_any_id(job_in): job_in for job_in in job_inputs}
         self._check_required_inputs(workflow_inputs)
 
         files = self._get_files_urls(workflow_inputs)

@@ -174,7 +174,7 @@ class WpsProcessInterface(abc.ABC):
         recreated on any subsequent steps, such as for :meth:`dispatch` and :meth:`monitor` calls.
         """
 
-    def format_inputs(self, workflow_inputs):
+    def format_inputs(self, job_inputs):
         # type: (JobInputs) -> Union[JobInputs, JobCustomInputs]
         """
         Implementation dependent operations to configure input values for :term:`Job` execution.
@@ -183,9 +183,9 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step inputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_inputs
+        return job_inputs
 
-    def format_outputs(self, workflow_outputs):
+    def format_outputs(self, job_outputs):
         # type: (JobOutputs) -> Union[JobOutputs, JobCustomOutputs]
         """
         Implementation dependent operations to configure expected outputs for :term:`Job` execution.
@@ -194,7 +194,7 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step outputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_outputs
+        return job_outputs
 
     @abc.abstractmethod
     def dispatch(self, process_inputs, process_outputs):
@@ -436,11 +436,11 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         self.deploy_body = step_payload
         self.process = process
 
-    def format_outputs(self, workflow_outputs):
+    def format_outputs(self, job_outputs):
         # type: (JobOutputs) -> JobOutputs
-        for output in workflow_outputs:
+        for output in job_outputs:
             output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
-        return workflow_outputs
+        return job_outputs
 
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> str
