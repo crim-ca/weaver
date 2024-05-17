@@ -1,5 +1,5 @@
-import json
 import collections.abc
+import json
 import logging
 import os
 import pathlib
@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from cwltool.pathmapper import PathMapper
     from cwltool.utils import CWLObjectType, CWLOutputType, JobsGeneratorType
 
-    from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.processes.wps_package import WpsPackage
+    from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.typedefs import (
         CWL_ExpectedOutputs,
         CWL_Output_Type,
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         CWL_Results,
         CWL_RuntimeInputsMap,
         CWL_ToolPathObject,
-        JobResults,
+        JobResults
     )
 
     MonitorFunction = Optional[Callable[[Popen[str]], None]]

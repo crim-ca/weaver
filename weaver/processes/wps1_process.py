@@ -32,8 +32,8 @@ if TYPE_CHECKING:
     from owslib.wps import WebProcessingService
 
     from weaver.typedefs import (
-        CWL_RuntimeInputsMap,
         CWL_ExpectedOutputs,
+        CWL_RuntimeInputsMap,
         JobExecution,
         JobInputs,
         JobOutputs,
