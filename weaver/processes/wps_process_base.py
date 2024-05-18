@@ -13,6 +13,7 @@ from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, repr_json
 from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.convert import get_cwl_io_type
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
         AnyResponseType,
         CookiesTupleType,
         CWL_ExpectedOutputs,
+        CWL_Output_Type,
         CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
         JobCustomInputs,
@@ -349,7 +351,8 @@ class WpsProcessInterface(abc.ABC):
             # Ignore outputs 'collected' by CWL tool to allow a 'string' value to resolve 'loadContent' operation.
             # However, the reference file used to load contents from an expression, does not (and should not)
             # itself need staging or fetching from the remote process. The resulting 'string' value only is used.
-            res_type = expected_outputs[res_id]["type"]
+            res_def = {"name": res_id, "type": expected_outputs[res_id]["type"]}  # type: CWL_Output_Type
+            res_type = get_cwl_io_type(res_def).type  # resolve atomic type in case of nested/array/nullable definition
             if res_type not in PACKAGE_COMPLEX_TYPES:
                 continue
 

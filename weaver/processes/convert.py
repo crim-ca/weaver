@@ -39,6 +39,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import (
+    CWL_NAMESPACES_REVERSED,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
@@ -1349,6 +1350,26 @@ def resolve_cwl_io_type_schema(io_info, cwl_schema_names=None):
             io_name = cwl_schema_names[io_type]._props
         io_info["type"] = io_name
     return io_info
+
+
+def resolve_cwl_namespaced_name(name):
+    # type: (str) -> str
+    """
+    Remove any :term:`URN` prefixes added by :term:`CWL` from a name.
+
+    Includes removal of contextual reference of the source :term:`CWL` file that contained the name.
+    Includes reversing :term:`CWL`-specific namespaces :term:`URN` extended to their full URL form.
+    """
+    ns = name.split("#")
+    if len(ns) < 2:
+        return name.rsplit("/", 1)[-1]
+
+    ns_uri = f"{ns[0]}#"
+    ns_urn = CWL_NAMESPACES_REVERSED.get(ns_uri)
+    if ns_urn:
+        return f"{ns_urn}:{ns[-1]}"
+
+    return ns[-1]
 
 
 @dataclass

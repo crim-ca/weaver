@@ -55,6 +55,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_SUBWORKFLOW,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,
+    CWL_REQUIREMENTS_SUPPORTED,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -4735,7 +4736,7 @@ class UnknownRequirementClass(PermissiveMappingSchema):
     _class = RequirementClass(example="UnknownRequirement")
 
 
-class CWLRequirementsMap(AnyOfKeywordSchema):
+class CWLRequirementsMapDefinitions(AnyOfKeywordSchema):
     _any_of = [
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
@@ -4751,6 +4752,40 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         SubworkflowRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
+    ]
+
+
+class CWLRequirementsMapSupported(StrictMappingSchema):
+    description = "Schema that ensures only supported CWL requirements are permitted."
+
+    def __init__(self, *_, **__):
+        """
+        Initialize the mapping to allow only supported CWL requirements.
+
+        Because :class:`StrictMappingSchema` is used, initialized sub-nodes are equivalent
+        the following :term:`JSON` schema definition, with a key of every known requirement name.
+
+        .. code-block::
+
+            {
+              "<supported-requirement>": {},
+              "additionalProperties: false
+            }
+
+        The actual validation of nested fields under each requirement will be
+        handled by their respective schema in :class:`CWLRequirementsMapDefinitions`.
+        """
+        super().__init__(*_, **__)
+        self.children = [
+            PermissiveMappingSchema(name=req, missing=drop)
+            for req in CWL_REQUIREMENTS_SUPPORTED
+        ]
+
+
+class CWLRequirementsMap(AllOfKeywordSchema):
+    _all_of = [
+        CWLRequirementsMapDefinitions(),
+        CWLRequirementsMapSupported(),
     ]
 
 
