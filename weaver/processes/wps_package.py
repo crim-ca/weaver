@@ -1327,6 +1327,7 @@ class WpsPackage(Process):
         # prepare some metadata about the package that are often reused
         self.package_type = _get_package_type(self.package)
         self.package_requirement = get_application_requirement(self.package)
+        self.step_packages = self.package.get("steps") or {}
 
         inputs = kw.pop("inputs", [])
         # handle EOImage inputs
@@ -1372,8 +1373,8 @@ class WpsPackage(Process):
         self._job_status_file = status_file
         return status_file
 
-    def setup_loggers(self, log_stdout_stderr=True, log_job_status_file=True):
-        # type: (bool, bool) -> None
+    def setup_loggers(self, log_stdout_stderr=True):
+        # type: (bool) -> None
         """
         Configures useful loggers to catch most of the common output and/or error messages during package execution.
 
@@ -1384,28 +1385,27 @@ class WpsPackage(Process):
         setup_loggers(self.settings)
         self._log_level = self._log_level or logging.getLogger("weaver").getEffectiveLevel()
 
-        log_handler = None
-        if log_job_status_file:
-            # file logger for output
-            self._log_file = get_status_location_log_path(self.status_location)
-            log_handler = logging.FileHandler(self._log_file)
-        else:
-            log_handler = logging.StreamHandler(sys.stderr)
-        log_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
-        log_formatter.converter = time.gmtime
-        log_handler.setFormatter(log_formatter)
+        # file logger for output
+        self._log_file = get_status_location_log_path(self.status_location)
+        log_file_handler = logging.FileHandler(self._log_file)
+        log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
+        log_file_formatter.converter = time.gmtime
+        log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
         self._logger = logging.getLogger(f"{LOGGER.name}|{self.package_id}")
-        self._logger.addHandler(log_handler)
+        if not any(isinstance(handler, logging.FileHandler) for handler in self._logger.handlers):
+            self._logger.addHandler(log_file_handler)
         self._logger.setLevel(self._log_level)
 
         # add CWL job and CWL runner logging to current package logger
         job_logger = logging.getLogger(f"job {PACKAGE_DEFAULT_FILE_NAME}")
-        self._logger.addHandler(log_handler)
+        if not any(isinstance(handler, logging.FileHandler) for handler in job_logger.handlers):
+            job_logger.addHandler(log_file_handler)
         job_logger.setLevel(self._log_level)
         cwl_logger = logging.getLogger("cwltool")
-        self._logger.addHandler(log_handler)
+        if not any(isinstance(handler, logging.FileHandler) for handler in cwl_logger.handlers):
+            cwl_logger.addHandler(log_file_handler)
         cwl_logger.setLevel(self._log_level)
 
         # add stderr/stdout CWL hook to capture logs/prints/echos from subprocess execution
@@ -1435,7 +1435,8 @@ class WpsPackage(Process):
 
         # add weaver Tweens logger to current package logger
         weaver_tweens_logger = logging.getLogger("weaver.tweens")
-        weaver_tweens_logger.addHandler(log_handler)
+        if not any(isinstance(handler, logging.FileHandler) for handler in weaver_tweens_logger.handlers):
+            weaver_tweens_logger.addHandler(log_file_handler)
         weaver_tweens_logger.setLevel(self._log_level)
 
     def insert_package_log(self, result):
@@ -2529,20 +2530,37 @@ class WpsPackage(Process):
         """
         from weaver.processes.wps_workflow import default_make_tool
 
+        # When the tool package ID corresponds directly to the toolpath object ID,
+        # it means that either an atomic process was invoked, or that the top-most Workflow is called.
+        # In such case, it is safe to return the self-reference for the tool job, as it will refer to the same log/job.
+        # Also, this avoids duplicate setup of log handlers, which would result in inconsistant progress tracking.
         process_id = toolpath_object["id"].rsplit("/", 1)[-1]
+        if self.package_id == process_id:
+            return default_make_tool(toolpath_object, loading_context, self)
+
+        # Otherwise, the tool creation was triggered by a step under the Workflow.
+        # An intermediate package definition must be created to pass around references.
+        # However, the PyWPS response and UUID references will not exist yet (since the step job is not yet started).
+        # Therefore, only partial initialization can be performed.
+        # Their respective full-initialization will be done by the resulting job submitted by the 'remote' execution.
         package_process = WpsPackage(
             identifier=process_id,
             title=process_id,
             package=toolpath_object,
             settings=self.settings,
         )
-        # not logging tool yet, since not in 'runtime context' at this point
-        # however, make sure the logger references are defined to allow logging minimal status update messages
+        # transfer references that will allow the workflow step to correctly
+        # update its intermediate logs relative to the overall workflow execution
         package_process.request = self.request
         package_process.response = self.response
         package_process.uuid = self.uuid
         package_process._job = self.job
-        package_process.setup_loggers(log_stdout_stderr=False)  #, log_job_status_file=False)
+        package_process.step_packages = self.step_packages
+        package_process.step_launched = self.step_launched
+
+        # make sure the logger references are defined to allow logging minimal status update messages
+        # however, skip stdout/stderr setup that is not supported by workflows (each steps will do it as needed)
+        package_process.setup_loggers(log_stdout_stderr=False)
         return default_make_tool(toolpath_object, loading_context, package_process)
 
     def get_workflow_step_package(self, job_name):
