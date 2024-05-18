@@ -116,6 +116,7 @@ if TYPE_CHECKING:
         AnyUUID,
         AnyValueType,
         AnyVersion,
+        Default,
         HeadersType,
         JSON,
         KVP,
@@ -422,7 +423,7 @@ def get_weaver_url(container):
 
 
 def get_any_id(info, default=None, pop=False, key=False):
-    # type: (MutableMapping[str, Any], Optional[str], bool, bool) -> Optional[str]
+    # type: (MutableMapping[str, Any], Default, bool, bool) -> Union[str, Default]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
@@ -830,7 +831,7 @@ def get_url_without_query(url):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
-    return urlunsplit(url[:4] + tuple([""]))
+    return str(urlunsplit(url[:4] + tuple([""])))
 
 
 def is_valid_url(url):
@@ -2165,7 +2166,7 @@ def get_secure_path(location):
     Obtain a secure path location with validation of each nested component.
     """
     # consider path with potential scheme
-    parts = location.split("://", 1)
+    parts = location.split("://", 1)  # type: List[str]
     if len(parts) > 1:
         scheme, ref = parts
     else:
@@ -3268,7 +3269,7 @@ def adjust_directory_local(location,                            # type: Path
     # Any operation (islink, remove, etc.) that must operate on the link itself rather than the directory it points
     # to must not have the final '/' in the path. Otherwise, the link path (without final '/') is resolved before
     # evaluating the operation, which make them attempt their call on the real directory itself.
-    link_dir = location.rstrip("/")
+    link_dir = str(location).rstrip("/")
     link_dir = get_secure_path(link_dir)
 
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
@@ -3986,7 +3987,7 @@ def parse_number_with_unit(number, binary=None):
 
 
 def copy_doc(copy_func):
-    # type: (AnyCallableAnyArgs) -> AnyCallableAnyArgs
+    # type: (AnyCallableAnyArgs) -> Callable[[AnyCallableAnyArgs], Return]
     """
     Decorator to copy the docstring from one callable to another.
 
