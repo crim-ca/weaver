@@ -1384,29 +1384,28 @@ class WpsPackage(Process):
         setup_loggers(self.settings)
         self._log_level = self._log_level or logging.getLogger("weaver").getEffectiveLevel()
 
-        log_file_handler = None
+        log_handler = None
         if log_job_status_file:
             # file logger for output
             self._log_file = get_status_location_log_path(self.status_location)
-            log_file_handler = logging.FileHandler(self._log_file)
-            log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
-            log_file_formatter.converter = time.gmtime
-            log_file_handler.setFormatter(log_file_formatter)
+            log_handler = logging.FileHandler(self._log_file)
+        else:
+            log_handler = logging.StreamHandler(sys.stderr)
+        log_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
+        log_formatter.converter = time.gmtime
+        log_handler.setFormatter(log_formatter)
 
         # prepare package logger
         self._logger = logging.getLogger(f"{LOGGER.name}|{self.package_id}")
-        if log_job_status_file:
-            self._logger.addHandler(log_file_handler)
+        self._logger.addHandler(log_handler)
         self._logger.setLevel(self._log_level)
 
         # add CWL job and CWL runner logging to current package logger
         job_logger = logging.getLogger(f"job {PACKAGE_DEFAULT_FILE_NAME}")
-        if log_job_status_file:
-            job_logger.addHandler(log_file_handler)
+        self._logger.addHandler(log_handler)
         job_logger.setLevel(self._log_level)
         cwl_logger = logging.getLogger("cwltool")
-        if log_job_status_file:
-            cwl_logger.addHandler(log_file_handler)
+        self._logger.addHandler(log_handler)
         cwl_logger.setLevel(self._log_level)
 
         # add stderr/stdout CWL hook to capture logs/prints/echos from subprocess execution
@@ -1436,8 +1435,7 @@ class WpsPackage(Process):
 
         # add weaver Tweens logger to current package logger
         weaver_tweens_logger = logging.getLogger("weaver.tweens")
-        if log_job_status_file:
-            weaver_tweens_logger.addHandler(log_file_handler)
+        weaver_tweens_logger.addHandler(log_handler)
         weaver_tweens_logger.setLevel(self._log_level)
 
     def insert_package_log(self, result):
@@ -2526,6 +2524,9 @@ class WpsPackage(Process):
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
+        """
+        Method called by :mod:`cwltool` to generate the tool object from the :term:`CWL` definition.
+        """
         from weaver.processes.wps_workflow import default_make_tool
 
         process_id = toolpath_object["id"].rsplit("/", 1)[-1]
@@ -2537,7 +2538,11 @@ class WpsPackage(Process):
         )
         # not logging tool yet, since not in 'runtime context' at this point
         # however, make sure the logger references are defined to allow logging minimal status update messages
-        package_process.setup_loggers(log_stdout_stderr=False, log_job_status_file=False)
+        package_process.request = self.request
+        package_process.response = self.response
+        package_process.uuid = self.uuid
+        package_process._job = self.job
+        package_process.setup_loggers(log_stdout_stderr=False)  #, log_job_status_file=False)
         return default_make_tool(toolpath_object, loading_context, package_process)
 
     def get_workflow_step_package(self, job_name):
@@ -2588,7 +2593,7 @@ class WpsPackage(Process):
         end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(job_name)
-        self.update_status(f"Preparing to launch {job_type} {job_name}.", start_step_progress, Status.RUNNING)
+        self.update_status(f"Preparing to launch {job_type} [{job_name}].", start_step_progress, Status.RUNNING)
 
         def _update_status_dispatch(_message, _progress, _status, _provider, *_, error=None, **__):
             # type: (str, Number, AnyStatusType, str, Any, Optional[Exception], Any) -> None
