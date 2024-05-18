@@ -1501,7 +1501,7 @@ class WpsPackage(Process):
                     level=logging.INFO,
                 )
                 return captured_log
-            with open(self.log_file, mode="r", encoding="utf-8") as pkg_log_fd:
+            with open(self._log_file, mode="r", encoding="utf-8") as pkg_log_fd:
                 pkg_log = pkg_log_fd.readlines()
             cwl_end_index = -1
             cwl_end_search = f"[cwltool] [job {self.package_id}] completed"  # success/permanentFail
@@ -1511,7 +1511,7 @@ class WpsPackage(Process):
                     break
             captured_log = out_log + err_log + ["----- End of Logs -----\n"]
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
-            with open(self.log_file, mode="w", encoding="utf-8") as pkg_log_fd:
+            with open(self._log_file, mode="w", encoding="utf-8") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
         except Exception as exc:  # pragma: no cover  # log exception, but non-failing
             self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=status,
@@ -1996,7 +1996,7 @@ class WpsPackage(Process):
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"
-            error_msg = f"Package completed with errors. Server logs: [{self.log_file}], Available at: [{log_url}]"
+            error_msg = f"Package completed with errors. Server logs: [{self._log_file}], Available at: [{log_url}]"
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
