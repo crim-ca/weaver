@@ -76,6 +76,7 @@ if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
+    from requests.models import PreparedRequest, Response as RequestsResponse
     from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
@@ -95,7 +96,8 @@ if TYPE_CHECKING:
     MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Union[Sequence[str], Dict[str, str]]]
+    MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
+    MockConfigWPS1 = Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -499,7 +501,7 @@ def mocked_sub_requests(app,                # type: TestApp
         url = req_kwargs.pop("base_url", url)
         body = req_kwargs.pop("data", None)
         _json = req_kwargs.pop("json", None)
-        query = req_kwargs.pop("query", None)
+        query = req_kwargs.pop("query", None) or ""
         params = req_kwargs.pop("params", {})
         if query:
             url += ("" if query.startswith("?") else "?") + query
@@ -541,7 +543,7 @@ def mocked_sub_requests(app,                # type: TestApp
             if key in req_kwargs:
                 LOGGER.warning("Dropping unsupported '%s' parameter for mocked test request.", key)
             req_kwargs.pop(key, None)
-        cookies = req_kwargs.pop("cookies", None)
+        cookies = req_kwargs.pop("cookies", None) or {}
         if cookies:
             cookies = dict(cookies)  # in case list of tuples
             for name, value in cookies.items():
@@ -668,10 +670,11 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wps1(server_configs,          # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
-                                       mock_responses=None,     # type: Optional[responses.RequestsMock]
-                                       data=False,              # type: bool
-                                       ):                       # type: (...) -> Optional[MockPatch]
+def mocked_remote_server_requests_wps1(
+    server_configs,         # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
+    mock_responses=None,    # type: Optional[responses.RequestsMock]
+    data=False,             # type: bool
+):                          # type: (...) -> Optional[MockPatch]
     """
     Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
 
@@ -757,30 +760,36 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     if not isinstance(server_configs[0], (tuple, list)):
         server_configs = [server_configs]
 
-    for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
-        assert isinstance(resource_xml_getcap, str)
+    for svr_config in server_configs:
+        test_server_wps, resource_xml_getcap, resource_xml_describe = svr_config
+        assert isinstance(resource_xml_getcap, str) or callable(resource_xml_getcap)
         assert isinstance(resource_xml_describe, (set, list, tuple, dict))
         if not data:
-            assert os.path.isfile(resource_xml_getcap)
+            if isinstance(resource_xml_getcap, str):
+                assert os.path.isfile(resource_xml_getcap)
             if isinstance(resource_xml_describe, dict):
-                assert all(os.path.isfile(file) for file in resource_xml_describe.values())
+                desc_values = resource_xml_describe.values()
             else:
-                assert all(os.path.isfile(file) for file in resource_xml_describe)
+                desc_values = resource_xml_describe
+            assert all(
+                os.path.isfile(file_or_call) if isinstance(file_or_call, str) else callable(file_or_call)
+                for file_or_call in desc_values
+            )
         if isinstance(resource_xml_describe, dict):
             map_describe = list(resource_xml_describe.items())
         else:
             map_describe = [(None, desc) for desc in resource_xml_describe]
 
-        get_cap_xml = get_xml(resource_xml_getcap)
+        get_cap_xml = get_xml(resource_xml_getcap) if isinstance(resource_xml_getcap, str) else resource_xml_getcap
         version_query = "&version=1.0.0"
         get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
         for map_desc_id, proc_desc_xml in map_describe:
-            describe_xml = get_xml(proc_desc_xml)
+            describe_xml = get_xml(proc_desc_xml) if isinstance(proc_desc_xml, str) else proc_desc_xml
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
-            if map_desc_id is not None and map_desc_id != proc_desc_id:
+            if map_desc_id is not None and map_desc_id != proc_desc_id and isinstance(describe_xml, str):
                 describe_xml = describe_xml.replace(
                     f"<ows:Identifier>{proc_desc_id}</ows:Identifier>",
                     f"<ows:Identifier>{map_desc_id}</ows:Identifier>",
@@ -795,10 +804,19 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
-        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, str]]) -> None
+        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, Union[str, MockConfigCall]]]) -> None
         xml_header = {"Content-Type": ContentType.APP_XML}
-        for meth, url, body in _requests:
-            _mock_resp.add(meth, url, body=body, headers=xml_header)
+        for meth, url, _body_or_call in _requests:
+            if isinstance(_body_or_call, str):
+                _mock_resp.add(meth, url, body=_body_or_call, headers=xml_header)
+            else:
+                _mock_resp.add_callback(
+                    meth,
+                    url,
+                    callback=_body_or_call,
+                    match_querystring=True,
+                    content_type=xml_header["Content-Type"],
+                )
 
     def mocked_remote_server_wrapper(test):
         # type: (Callable[[..., Any], Any]) -> Callable[[..., Any], Any]

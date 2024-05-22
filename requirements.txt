@@ -82,7 +82,11 @@ pytz
 pywps==4.6.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
-requests
+# FIXME: temporary workaround
+# 'requests=2.32' needed for CVE-2024-35195
+# (https://github.com/psf/requests/releases/tag/v2.32.0, https://github.com/psf/requests/pull/6710)
+# however, https://github.com/docker/docker-py/pull/3257 not yet released, 'docker-py' broken by 'requests=2.32' change
+requests!=2.32.*
 requests_file
 ruamel.yaml>=0.16
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
