@@ -182,6 +182,7 @@ if TYPE_CHECKING:
         CWL_WorkflowStepReference,
         Default,
         ExecutionInputs,
+        JobValueItem,
         JSON,
         Literal,
         Number,
@@ -1016,7 +1017,9 @@ def mask_process_inputs(package, inputs, secret_store=None):
     masked_inputs = copy.deepcopy(inputs)
     secret_store = secret_store or SecretStore()
     is_input_map = isinstance(inputs, dict)
-    for idx_or_key, input_def in (masked_inputs.items() if is_input_map else enumerate(masked_inputs)):
+    for idx_or_key, input_def in (
+        masked_inputs.items() if is_input_map else enumerate(masked_inputs)
+    ):  # type: Union[str, int], JobValueItem
         input_id = idx_or_key if is_input_map else get_any_id(input_def)
         if input_id in req_secrets["secrets"]:
             if isinstance(input_def, dict):
@@ -1313,6 +1316,7 @@ class WpsPackage(Process):
         self.step_launched = []                 # type: List[str]
         self.request = None                     # type: Optional[WorkerRequest]
         self.response = None                    # type: Optional[ExecuteResponse]
+        self.uuid = None                        # type: Optional[uuid.UUID]
         self._job = None                        # type: Optional[Job]
         self._job_status_file = None            # type: Optional[str]
 
