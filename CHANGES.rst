@@ -16,6 +16,9 @@ Changes:
 
 Fixes:
 ------
+- Use ``requests.auth.AuthBase`` type for ``auth`` parameter of ``weaver.cli.WeaverClient`` methods to allow
+  any ``requests`` compatible package to use their own implementation of the authentication mechanism without
+  explicitly deriving from ``weaver.cli.AuthHandler`` (fixes `#628 <https://github.com/crim-ca/weaver/issues/628>`_).
 - Pin ``requests!=2.32`` to avoid issue with ``docker-py`` custom adapter not (yet) supporting it
   (relates to `psf/requests#6710 <https://github.com/psf/requests/pull/6710>`_
   and `docker/docker-py#3257 <https://github.com/docker/docker-py/pull/3257>`_).
