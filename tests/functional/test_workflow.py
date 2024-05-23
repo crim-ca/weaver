@@ -39,7 +39,13 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
-from weaver.processes.constants import CWL_REQUIREMENT_STEP_INPUT_EXPRESSION, JobInputsOutputsSchema
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_MULTIPLE_INPUT,
+    CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+    CWL_REQUIREMENT_SUBWORKFLOW,
+    JobInputsOutputsSchema
+)
+from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, repr_json, request_extra
@@ -60,6 +66,7 @@ if TYPE_CHECKING:
         AnyUUID,
         CookiesType,
         CWL,
+        CWL_RequirementsList,
         ExecutionInputsMap,
         ExecutionResults,
         HeadersType,
@@ -83,6 +90,9 @@ if TYPE_CHECKING:
         AnyUUID,
         DetailedExecutionResultObject
     ]
+
+
+# pylint: disable=E1135,E1136  # false positives about return value of 'workflow_runner' depending on 'detailed_results'
 
 
 class WorkflowProcesses(enum.Enum):
@@ -109,6 +119,7 @@ class WorkflowProcesses(enum.Enum):
     APP_ECHO = "Echo"
     APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
+    APP_READ_FILE = "ReadFile"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
     APP_SUBSET_NASA_ESGF = "SubsetNASAESGF"
@@ -118,12 +129,16 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
     APP_DIRECTORY_LISTING_PROCESS = "DirectoryListingProcess"
     APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
+    APP_PASSTHROUGH_EXPRESSIONS = "PassthroughExpressions"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
+    WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
     WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
+    WORKFLOW_PASSTHROUGH_EXPRESSIONS = "WorkflowPassthroughExpressions"
+    WORKFLOW_STEP_MERGE = "WorkflowStepMerge"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -1046,15 +1061,20 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_SECRETS,
+        WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
+        WorkflowProcesses.APP_READ_FILE,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+        WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_ECHO,
         WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+        WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
+        WorkflowProcesses.WORKFLOW_STEP_MERGE,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
@@ -1408,8 +1428,8 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             [WorkflowProcesses.APP_ECHO],
             log_full_trace=True,
         )
-        assert "output" in result  # pylint: disable=E1135
-        path = map_wps_output_location(result["output"]["href"], container=self.settings)  # pylint: disable=E1136
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read()
         out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
@@ -1471,3 +1491,74 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         for job in details.values():
             if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
                 assert capture_regex.search(job["logs"])
+
+    def test_workflow_passthrough_expressions(self):
+        """
+        Test that validate literal data passed between steps.
+
+        Validates that values are propagated property without the need of intermediate ``File`` type explicitly
+        within the :term:`Workflow` or any of its underlying application steps. Also, uses various combinations of
+        expression formats (:term:`CWL` ``$(...)`` reference and pure JavaScript ``${ ... }`` reference) to ensure
+        they are handled correctly when collecting outputs.
+        """
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
+            [WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS],
+            log_full_trace=True,
+        )
+        assert result == {
+            "code1": {"value": 123456},
+            "code2": {"value": 123456},
+            "integer1": {"value": 3},
+            "integer2": {"value": 3},
+            "message1": {"value": "msg"},
+            "message2": {"value": "msg"},
+            "number1": {"value": 3.1416},
+            "number2": {"value": 3.1416},
+        }
+
+    def test_workflow_multi_input_and_subworkflow(self):
+        """
+        Workflow that evaluates :term:`CWL` features simultaneously.
+
+        Features tested:
+          - ``MultipleInputFeatureRequirement``
+          - ``InlineJavascriptRequirement``
+          - ``StepInputExpressionRequirement``
+          - ``SubworkflowFeatureRequirement``
+        """
+        wf_pkg = self.test_processes_info[WorkflowProcesses.WORKFLOW_STEP_MERGE].application_package
+        wf_req = cast("CWL_RequirementsList", wf_pkg["requirements"])  # type: CWL_RequirementsList
+        wf_req_classes = [req["class"] for req in wf_req]
+        assert all(
+            req in wf_req_classes
+            for req in [
+                CWL_REQUIREMENT_MULTIPLE_INPUT,
+                CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+                CWL_REQUIREMENT_SUBWORKFLOW,
+            ]
+        ), "missing pre-requirements for test"
+        wf_step_ids = [wf_step["run"].split(".", 1)[0] for wf_step in wf_pkg["steps"].values()]
+        wf_step_classes = [
+            self.test_processes_info[WorkflowProcesses(step)].application_package["class"]
+            for step in wf_step_ids
+        ]
+        assert len(
+            [wf_step_cls == ProcessType.WORKFLOW for wf_step_cls in wf_step_classes]
+        ), "missing sub-workflow pre-requirement for test"
+
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_STEP_MERGE,
+            [
+                WorkflowProcesses.APP_ECHO,
+                WorkflowProcesses.APP_READ_FILE,
+                WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
+            ],
+            log_full_trace=True,
+        )
+        assert len(result) == 1
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read().strip()
+        assert data == "Hello,World"

@@ -39,6 +39,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import (
+    CWL_NAMESPACES_REVERSED,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
@@ -1167,11 +1168,11 @@ def is_cwl_complex_type(io_info, complex_types=PACKAGE_COMPLEX_TYPES):
 def parse_cwl_array_type(io_info, strict=True):
     # type: (CWL_IO_Type, bool) -> CWLIODefinition
     """
-    Parses the specified I/O for one of the various potential CWL array definitions.
+    Parses the specified :term:`I/O` for one of the various potential CWL array definitions.
 
-    :param io_info: :term:`CWL` I/O definition to parse.
+    :param io_info: :term:`CWL` :term:`I/O` definition to parse.
     :param strict: Indicates if only pure :term:`CWL` definition is allowed, or allow implicit data-type conversions.
-    :returns: Updated :term:`CWL` I/O definition with applicable properties.
+    :returns: Updated :term:`CWL` :term:`I/O` definition with applicable properties.
     :raises PackageTypeError: if the array element doesn't have the required values and valid format.
     """
     # use mapping to allow sub-function updates
@@ -1187,7 +1188,7 @@ def parse_cwl_array_type(io_info, strict=True):
         """
         Updates the ``io_return`` parameters if ``io_item`` evaluates to a valid ``enum`` type.
 
-        Parameter ``io_item`` should correspond to field ``items`` of an array I/O definition.
+        Parameter ``io_item`` should correspond to field ``items`` of an array :term:`I/O` definition.
         Simple pass-through if the array item is not an ``enum``.
         """
         _def = parse_cwl_enum_type({"type": _io_item})
@@ -1349,6 +1350,26 @@ def resolve_cwl_io_type_schema(io_info, cwl_schema_names=None):
             io_name = cwl_schema_names[io_type]._props
         io_info["type"] = io_name
     return io_info
+
+
+def resolve_cwl_namespaced_name(name):
+    # type: (str) -> str
+    """
+    Remove any :term:`URN` prefixes added by :term:`CWL` from a name.
+
+    Includes removal of contextual reference of the source :term:`CWL` file that contained the name.
+    Includes reversing :term:`CWL`-specific namespaces :term:`URN` extended to their full URL form.
+    """
+    ns = name.split("#")
+    if len(ns) < 2:
+        return name.rsplit("/", 1)[-1]
+
+    ns_uri = f"{ns[0]}#"
+    ns_urn = CWL_NAMESPACES_REVERSED.get(ns_uri)
+    if ns_urn:
+        return f"{ns_urn}:{ns[-1]}"
+
+    return ns[-1]
 
 
 @dataclass

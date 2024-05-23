@@ -293,7 +293,12 @@ if TYPE_CHECKING:
 
     # CWL loading
     CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, str]        # mapping of ID:glob-pattern (File/Directory only)
+    # mapping of ID:glob-pattern (File/Directory or string with loadContents)
+    CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
+        "type": Literal["File", "Directory", "string"],
+        "glob": str,
+    }, total=True)
+    CWL_ExpectedOutputs = Dict[str, CWL_ExpectedOutputDef]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # OWSLib Execution
@@ -434,7 +439,18 @@ if TYPE_CHECKING:
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobCustomInputs = TypeVar(
+        "JobCustomInputs",
+        bound=Any,
+    )
+    JobCustomOutputs = TypeVar(
+        "JobCustomOutputs",
+        bound=Any,
+    )
+    JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
+        "JobMonitorReference",
+        bound=Any,
+    )
     JobSubscribers = TypedDict("JobSubscribers", {
         "failedUri": NotRequired[str],
         "successUri": NotRequired[str],

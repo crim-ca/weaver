@@ -398,7 +398,7 @@ def assert_equal_requirements_any_order(result, expected):
 ])
 def test_update_package_compatibility(original, expected):
     # type: (CWL, CWL) -> None
-    cwl_base = {"cwlVersion": "v1.2", "class": "CommandLineTool"}
+    cwl_base = {"cwlVersion": "v1.2", "class": "CommandLineTool"}  # type: CWL
     original = _combine(cwl_base, original)
     expected = _combine(cwl_base, expected)
     test_cwl = _update_package_compatibility(original)
@@ -558,6 +558,11 @@ def test_cwl_enum_schema_name_patched():
         "cwlVersion": "v1.2",
         "class": "CommandLineTool",
         "baseCommand": "echo",
+        "requirements": {
+            CWL_REQUIREMENT_APP_DOCKER: {
+                "dockerPull": "debian:latest",
+            }
+        },
         "inputs": {
             "test": cwl_input_without_name,
         },
@@ -618,9 +623,15 @@ def test_mask_process_inputs(inputs, expect):
             "normal": {"type": "string"},
             "hidden": {"type": "string"},
         },
+        "outputs": {},
+        "requirements": {
+            CWL_REQUIREMENT_APP_DOCKER: {
+                "dockerPull": "debian:latest",
+            }
+        },
         "hints": {
             CWL_REQUIREMENT_SECRETS: {
-                "secrets": ["hidden"]
+                "secrets": ["hidden"],
             }
         }
     }  # type: CWL
