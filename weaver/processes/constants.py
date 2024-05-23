@@ -73,13 +73,18 @@ class OpenSearchField(Constants):
     LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
 
-CWL_NAMESPACE_ID = "cwl"
-CWL_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE = MappingProxyType({CWL_NAMESPACE_ID: CWL_NAMESPACE_URL})  # type: CWL_Namespace
+CWL_SPEC_NAMESPACE_ID = "cwl"
+CWL_SPEC_NAMESPACE_URL = "https://w3id.org/cwl/cwl#"
+CWL_SPEC_NAMESPACE = MappingProxyType({CWL_SPEC_NAMESPACE_ID: CWL_SPEC_NAMESPACE_URL})  # type: CWL_Namespace
 
 CWL_TOOL_NAMESPACE_ID = "cwltool"
 CWL_TOOL_NAMESPACE_URL = "http://commonwl.org/cwltool#"
 CWL_TOOL_NAMESPACE = MappingProxyType({CWL_TOOL_NAMESPACE_ID: CWL_TOOL_NAMESPACE_URL})  # type: CWL_Namespace
+
+CWL_NAMESPACES = {}  # type: CWL_Namespace
+CWL_NAMESPACES.update(CWL_SPEC_NAMESPACE)
+CWL_NAMESPACES.update(CWL_TOOL_NAMESPACE)
+CWL_NAMESPACES_REVERSED = {_urn: _ns for _ns, _urn in CWL_NAMESPACES.items()}  # type: CWL_Namespace
 
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
 CWL_RequirementDockerType = Literal["DockerRequirement"]
@@ -94,12 +99,14 @@ CWL_RequirementInlineJavascriptType = Literal["InlineJavascriptRequirement"]
 CWL_RequirementInplaceUpdateType = Literal["InplaceUpdateRequirement"]
 CWL_RequirementLoadListingType = Literal["LoadListingRequirement"]
 CWL_RequirementMPIType = Literal["MPIRequirement"]
+CWL_RequirementMultipleInputFeatureType = Literal["MultipleInputFeatureRequirement"]
 CWL_RequirementNetworkAccessType = Literal["NetworkAccess"]
 CWL_RequirementProcessGeneratorType = Literal["ProcessGenerator"]
 CWL_RequirementResourceType = Literal["ResourceRequirement"]
 CWL_RequirementScatterFeatureType = Literal["ScatterFeatureRequirement"]
-CWL_RequirementStepInputExpressionType = Literal["StepInputExpressionRequirement"]
 CWL_RequirementSecretsType = Literal["cwltool:Secrets"]
+CWL_RequirementStepInputExpressionType = Literal["StepInputExpressionRequirement"]
+CWL_RequirementSubworkflowFeatureType = Literal["SubworkflowFeatureRequirement"]
 CWL_RequirementToolTimeLimitType = Literal["ToolTimeLimit"]
 CWL_RequirementWorkReuseType = Literal["WorkReuse"]
 
@@ -167,12 +174,14 @@ CWL_REQUIREMENT_INLINE_JAVASCRIPT = get_args(CWL_RequirementInlineJavascriptType
 CWL_REQUIREMENT_INPLACE_UPDATE = get_args(CWL_RequirementInplaceUpdateType)[0]
 CWL_REQUIREMENT_LOAD_LISTING = get_args(CWL_RequirementLoadListingType)[0]
 CWL_REQUIREMENT_MPI = get_args(CWL_RequirementMPIType)[0]  # no implication yet
+CWL_REQUIREMENT_MULTIPLE_INPUT = get_args(CWL_RequirementMultipleInputFeatureType)[0]
 CWL_REQUIREMENT_NETWORK_ACCESS = get_args(CWL_RequirementNetworkAccessType)[0]
 CWL_REQUIREMENT_PROCESS_GENERATOR = get_args(CWL_RequirementProcessGeneratorType)[0]
 CWL_REQUIREMENT_RESOURCE = get_args(CWL_RequirementResourceType)[0]
 CWL_REQUIREMENT_SCATTER = get_args(CWL_RequirementScatterFeatureType)[0]
-CWL_REQUIREMENT_STEP_INPUT_EXPRESSION = get_args(CWL_RequirementStepInputExpressionType)[0]
 CWL_REQUIREMENT_SECRETS = get_args(CWL_RequirementSecretsType)[0]
+CWL_REQUIREMENT_STEP_INPUT_EXPRESSION = get_args(CWL_RequirementStepInputExpressionType)[0]
+CWL_REQUIREMENT_SUBWORKFLOW = get_args(CWL_RequirementSubworkflowFeatureType)[0]
 CWL_REQUIREMENT_TIME_LIMIT = get_args(CWL_RequirementToolTimeLimitType)[0]
 # default is to reuse, employed to explicitly disable
 CWL_REQUIREMENT_WORK_REUSE = get_args(CWL_RequirementWorkReuseType)[0]
@@ -185,12 +194,14 @@ CWL_REQUIREMENT_FEATURES = frozenset([
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_LOAD_LISTING,
     # CWL_REQUIREMENT_MPI,  # no implication yet
+    CWL_REQUIREMENT_MULTIPLE_INPUT,
     CWL_REQUIREMENT_NETWORK_ACCESS,
     # CWL_REQUIREMENT_PROCESS_GENERATOR,  # explicitly unsupported, works against Weaver's behavior
     CWL_REQUIREMENT_RESOURCE,  # FIXME: perform pre-check on job submit? (https://github.com/crim-ca/weaver/issues/138)
     CWL_REQUIREMENT_SCATTER,
     CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
     CWL_REQUIREMENT_SECRETS,  # note: only allowed in 'hints' because of 'cwltool:' namespace
+    CWL_REQUIREMENT_SUBWORKFLOW,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,  # allow it, but makes sense only for Workflow steps if cwltool handles it by itself
 ])
@@ -297,11 +308,13 @@ if TYPE_CHECKING:
         CWL_RequirementInplaceUpdateType,
         CWL_RequirementLoadListingType,
         CWL_RequirementMPIType,
+        CWL_RequirementMultipleInputFeatureType,
         CWL_RequirementNetworkAccessType,
         CWL_RequirementResourceType,
         CWL_RequirementScatterFeatureType,
-        CWL_RequirementStepInputExpressionType,
         CWL_RequirementSecretsType,
+        CWL_RequirementStepInputExpressionType,
+        CWL_RequirementSubworkflowFeatureType,
         CWL_RequirementToolTimeLimitType,
         CWL_RequirementWorkReuseType,
     ]

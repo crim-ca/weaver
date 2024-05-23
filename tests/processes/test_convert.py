@@ -39,6 +39,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_SECRETS,
+    CWL_TOOL_NAMESPACE_URL,
     IO_INPUT,
     IO_OUTPUT,
     WPS_BOUNDINGBOX,
@@ -79,6 +81,7 @@ from weaver.processes.convert import (
     parse_cwl_array_type,
     parse_cwl_enum_type,
     repr2json_input_values,
+    resolve_cwl_namespaced_name,
     set_field,
     wps2json_io,
     xml_wps2cwl
@@ -1737,6 +1740,21 @@ def test_repr2json_input_values():
         {"id": "test13", "href": "/tmp/two.xml", "format": {"mediaType": ContentType.TEXT_XML}},   # nosec: B108
     ]
     result = repr2json_input_values(values)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["name", "expect"],
+    [
+        ("test", "test"),
+        (CWL_REQUIREMENT_SECRETS, CWL_REQUIREMENT_SECRETS),
+        (f"{CWL_TOOL_NAMESPACE_URL}Secrets", CWL_REQUIREMENT_SECRETS),
+        ("file:///tmp/random/package#message", "message"),
+        (f"file:///tmp/random/{CWL_REQUIREMENT_APP_WPS1}", CWL_REQUIREMENT_APP_WPS1),
+    ]
+)
+def test_resolve_cwl_namespaced_name(name, expect):
+    result = resolve_cwl_namespaced_name(name)
     assert result == expect
 
 

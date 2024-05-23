@@ -1,10 +1,19 @@
+import glob
+import os
 import uuid
+from typing import TYPE_CHECKING
 
 import colander
 import pytest
 
 from weaver.formats import ContentType
+from weaver.utils import load_file
 from weaver.wps_restapi import swagger_definitions as sd
+
+if TYPE_CHECKING:
+    from weaver.typedefs import CWL
+
+TEST_DIR = os.path.dirname(os.path.dirname(__file__))
 
 
 def test_process_id_with_version_tag_deploy_invalid():
@@ -169,3 +178,21 @@ def test_execute_input_inline_object_invalid(test_data, expect_result):
     else:
         result = schema.deserialize(test_data)
         assert result == expect_result
+
+
+@pytest.mark.parametrize(
+    "cwl_path",
+    glob.glob(
+        os.path.join(TEST_DIR, "**/*.cwl"),
+        recursive=True,
+    )
+)
+def test_cwl_package(cwl_path):
+    # type: (str) -> None
+    """
+    Test that our :term:`CWL` schema definition works with the many examples used for testsing.
+    """
+    cwl = load_file(cwl_path)  # type: CWL
+    cwl_check = sd.CWL().deserialize(cwl)
+    cwl_check.pop("$schema", None)  # our definition injects this reference
+    assert cwl_check == cwl

@@ -16,3 +16,4 @@ outputs:
       glob: "stdout.log"
       loadContents: true
       outputEval: $(self[0].contents)
+stdout: stdout.log
