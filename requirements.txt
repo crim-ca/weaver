@@ -33,7 +33,7 @@ cryptography
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
 cwltool==3.1.20230906142556
-docker
+docker>=7.1
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
@@ -82,11 +82,7 @@ pytz
 pywps==4.6.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
-# FIXME: temporary workaround
-# 'requests=2.32' needed for CVE-2024-35195
-# (https://github.com/psf/requests/releases/tag/v2.32.0, https://github.com/psf/requests/pull/6710)
-# however, https://github.com/docker/docker-py/pull/3257 not yet released, 'docker-py' broken by 'requests=2.32' change
-requests!=2.32.*
+requests>=2.32
 requests_file
 ruamel.yaml>=0.16
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)

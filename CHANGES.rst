@@ -41,13 +41,11 @@ Fixes:
 - Fix `CWL` ``Workflow`` resolution of step ``requirements`` from one of the `Weaver` application types
   (i.e.: ``builtin``, ``docker``, ``ESGF-CWT``, ``OGCAPI``, ``WPS1``) due to ``cwltool`` namespace adding a
   prefixed URI.
-- Pin ``requests!=2.32`` to avoid issue with ``docker-py`` custom adapter not (yet) supporting it
+- Pin ``requests>=2.32`` and ``docker>=7.1`` (Python Package) to address
+  `CVE-2024-35195 <https://nvd.nist.gov/vuln/detail/CVE-2024-35195>`_ to avoid inconsistent ``verify``
+  option over multiple requests when using a session
   (relates to `psf/requests#6710 <https://github.com/psf/requests/pull/6710>`_
   and `docker/docker-py#3257 <https://github.com/docker/docker-py/pull/3257>`_).
-  Pinning ``requests>=2.32.2`` *should* be applied when possible (when ``docker-py`` is released) to address
-  `CVE-2024-35195 <https://nvd.nist.gov/vuln/detail/CVE-2024-35195>`_. However, the corresponding ``verify=False``
-  option affected by this CVE is not recommended for use in `Weaver`, and should be avoided entirely anyway.
-  Could affect *requests options* if the corresponding ``verify: false`` configuration was employed.
 
 .. _changes_5.3.0:
 
