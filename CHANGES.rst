@@ -12,6 +12,14 @@ Changes
 
 Changes:
 --------
+<<<<<<< HEAD
+- No change.
+
+Fixes:
+------
+- Use ``requests.auth.AuthBase`` type for ``auth`` parameter of ``weaver.cli.WeaverClient`` methods to allow
+  any ``requests`` compatible package to use their own implementation of the authentication mechanism without
+  explicitly deriving from ``weaver.cli.AuthHandler`` (fixes `#628 <https://github.com/crim-ca/weaver/issues/628>`_).
 - Add `CWL` ``MultipleInputFeatureRequirement`` support.
 - Add `CWL` ``SubworkflowFeatureRequirement`` support.
 - Add `CWL` ``Workflow`` explicit schema validation of its ``steps``.
