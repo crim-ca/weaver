@@ -127,7 +127,9 @@ if TYPE_CHECKING:
         "path": str,
         "format": NotRequired[Optional[str]],
     }, total=True)
-    CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueObject = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueMap = Dict[str, CWL_IO_ValueObject]
+
     CWL_IO_LiteralType = Literal["string", "boolean", "float", "int", "integer", "long", "double"]
     CWL_IO_ComplexType = Literal["File", "Directory"]
     CWL_IO_SpecialType = Literal["null", "Any"]

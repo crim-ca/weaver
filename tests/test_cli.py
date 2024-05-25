@@ -67,6 +67,7 @@ def test_parse_inputs_from_file():
         inputs.append(_inputs)
         return mock_result
 
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_json:
             json.dump({"inputs": {"input1": "data"}}, input_json)
@@ -76,6 +77,66 @@ def test_parse_inputs_from_file():
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == {"input1": "data"}
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["data_inputs", "expect_inputs"],
+    [
+        (
+            # CWL definition with an input named 'inputs' not to be confused with OGC execution body
+            {
+                "inputs": {
+                    "class": "File",
+                    "path": "https://fake.domain.com/some-file.txt",
+                },
+            },
+            {
+                "inputs": {
+                    "href": "https://fake.domain.com/some-file.txt",
+                },
+            }
+        ),
+        (
+            # OGC execution body with explicit 'inputs' to be interpreted as is
+            {
+                "inputs": {
+                    "in-1": {"value": "data"},
+                    "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                },
+            },
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            }
+        ),
+        (
+            # OGC execution mapping that must not be confused as a CWL mapping
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            },
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            }
+        )
+    ]
+)
+def test_parse_inputs(data_inputs, expect_inputs):
+    inputs = []
+    mock_result = OperationResult(False, code=500)
+
+    def parsed_inputs(_inputs, *_, **__):
+        inputs.append(_inputs)
+        return mock_result
+
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
+        result = WeaverClient().execute("fake_process", inputs=data_inputs, url="http://fake.domain.com")
+    assert result is mock_result
+    assert len(inputs) == 1
+    assert inputs[0] == expect_inputs
 
 
 @pytest.mark.cli
@@ -93,6 +154,7 @@ def test_parse_inputs_with_media_type():
         weaver_cli(*args)
         return 0
 
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as input_yaml:
             yaml.safe_dump({"info": {"data": "yaml"}}, input_yaml)
