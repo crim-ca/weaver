@@ -138,7 +138,7 @@ if TYPE_CHECKING:
         CWL_IO_FileValue,
         CWL_IO_LiteralType,
         CWL_IO_Type,
-        CWL_IO_Value,
+        CWL_IO_ValueMap,
         CWL_SchemaNames,
         ExecutionInputs,
         ExecutionInputsList,
@@ -721,7 +721,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         # respective output ID.
         # However, it is very important **NOT** to add the output ID directory nesting approach here, otherwise it
         # will confuse the staging process between Workflow steps, since it won't be able to distinguish whether the
-        # nesting was already applied by Weaver (here), or provided by an user-provided CWL Application Package, since
+        # nesting was already applied by Weaver (here), or provided by a user-provided CWL Application Package, since
         # WPS-based. OGC-based, CWL-based, (or any future implementation) can be combined within a same Workflow.
         cwl_glob = [
             f"*{ext}" if ext != "/" else "./"  # handle special case of "extension" for 'Directory' type
@@ -1456,7 +1456,7 @@ class CWLIODefinition(object):
     """
     Specifies the allowed values when the definition is marked as :attr:`enum`.
 
-    When not overriden by literal values, it uses the default :class:`AnyValue`.
+    When not overridden by literal values, it uses the default :class:`AnyValue`.
     """
 
     mode: MODE = MODE.NONE
@@ -1709,7 +1709,7 @@ def cwl2wps_io(io_info, io_select):
 
 
 def cwl2json_input_values(data, schema=ProcessSchema.OGC):
-    # type: (Dict[str, CWL_IO_Value], ProcessSchemaType) -> ExecutionInputs
+    # type: (CWL_IO_ValueMap, ProcessSchemaType) -> ExecutionInputs
     """
     Converts :term:`CWL` formatted :term:`Job` inputs to corresponding :term:`OGC API - Processes` format.
 
@@ -1726,7 +1726,7 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
         if isinstance(cwl_fmt_type, str):
             fmt = get_format(cwl_fmt_type)
             if "encoding" in input_data:
-                fmt.encoding = input_data["encoding"]
+                fmt.encoding = input_data["encoding"]  # type: ignore
             input_file["format"] = fmt.json
         return input_file
 
@@ -2210,7 +2210,7 @@ def json2oas_io_complex(io_info, io_hint=null):
             io_hint = oas_resolve_remote(io_hint)
             json_objects = []
             if "oneOf" in io_hint or "anyOf" in io_hint:
-                for item in io_hint.get("oneOf", io_hint.get("anyOf", [])):
+                for item in io_hint.get("oneOf", io_hint.get("anyOf", [])):  # type: OpenAPISchema
                     if item.get("type") == "object" or "allOf" in item:
                         json_objects.append(item)
             elif "allOf" in io_hint:
@@ -2382,7 +2382,7 @@ def json2oas_io_literal(io_info, io_hint=null):
         data_fmt = {}
         data_type = get_field(data_info, "type", search_variations=True)
         if isinstance(data_type, dict) and "name" in data_type:
-            data_type = data_type["name"]
+            data_type = data_type["name"]  # type: Optional[str]
             data_href = get_field(data_type, "href", search_variations=True)
         else:
             data_type = None
@@ -2861,7 +2861,7 @@ def oas_resolve_remote(io_info):
             for keyword in OAS_KEYWORD_TYPES:  # type: Literal["oneOf", "anyOf", "allOf", "not"]
                 if keyword in io_info:
                     if isinstance(io_info[keyword], list):  # all keywords except 'not'
-                        for i, schema in enumerate(list(io_info[keyword])):
+                        for i, schema in enumerate(list(io_info[keyword])):  # type: int, OpenAPISchema
                             if "$ref" in schema:
                                 ref_id, schema = resolver.resolve(schema["$ref"])
                                 schema["$id"] = ref_id
@@ -2871,7 +2871,7 @@ def oas_resolve_remote(io_info):
                         ref_schema = io_keyword["$ref"]
                         ref_id, schema = resolver.resolve(ref_schema)
                         schema["$id"] = ref_id
-                        io_info[keyword] = schema
+                        io_info[keyword] = schema  # type: ignore
         except Exception as exc:
             raise ValueError(f"External OpenAPI schema reference [{io_href}] could not be loaded.") from exc
     return io_info
@@ -3201,7 +3201,7 @@ def wps2json_io(io_wps, forced_fields=False):
     if not hasattr(io_wps, "json"):
         raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
 
-    io_wps_json = io_wps.json
+    io_wps_json = io_wps.json  # type: JSON  # noqa
 
     # transfer additional fields normally undefined for outputs if available in original object (forcefully added)
     # when they are requested for further processing operations (eg: later OAS conversion)
