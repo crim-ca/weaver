@@ -34,7 +34,7 @@ from cwltool.process import use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout.basic import SOURCE_TYPE, BasicComplex, FileHandler, IOHandler, NoneIOHandler
+from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput
@@ -2485,7 +2485,7 @@ class WpsPackage(Process):
             if result_ext:
                 result_ctype = get_content_type(result_ext)
         if not result_ctype:
-            if output.valid_mode != MODE.NONE and output.validator == emptyvalidator:
+            if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
                 output.valid_mode = MODE.NONE  # disable to avoid ensured failure
             return
 
@@ -2517,7 +2517,7 @@ class WpsPackage(Process):
                     if fmt_type == result_format.mime_type:
                         output.data_format = fmt
                         validator = get_validator(fmt.mime_type)
-                        if output.valid_mode != MODE.NONE and validator == emptyvalidator:
+                        if output.valid_mode != MODE.NONE and validator is emptyvalidator:
                             if fmt_type == ContentType.TEXT_PLAIN:
                                 output.valid_mode = MODE.NONE  # disable since text can be used with many extensions
                             else:
@@ -2525,7 +2525,7 @@ class WpsPackage(Process):
                         return
 
         # no match found, minimally check for extension
-        if output.valid_mode != MODE.NONE and output.validator == emptyvalidator:
+        if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
             output.data_format.validate = format_extension_validator
 
     def make_location_storage(self, storage_type, location_type):
