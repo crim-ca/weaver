@@ -1045,10 +1045,13 @@ class WeaverClient(object):
             values = inputs.get("inputs", null)
             if values is null:
                 values = inputs
-            elif (
+            if (
                 # consider possible ambiguity if literal CWL input is named 'inputs'
                 # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
                 #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+                # - if value of 'inputs' is a mapping with nested objects,
+                #   they must be interpreted as the CWL form if a 'class' is found
+                #   (literals would be interpreted the same regardless of OGC or CWL form)
                 # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
                 #   unless 'value/href' (and also 'id' technically) are present
                 values is not null and
@@ -1059,8 +1062,11 @@ class WeaverClient(object):
                         "class" in values
                     ) or
                     (
-                        isinstance(values, list) and
-                        all(isinstance(v, dict) and get_any_value(v, default=null) is null for v in values)
+                        isinstance(values, (dict, list)) and
+                        any(
+                            isinstance(v, dict) and get_any_value(v, default=null) is null
+                            for v in (values if isinstance(values, list) else values.values())
+                        )
                     )
                 )
             ):
