@@ -83,6 +83,7 @@ if TYPE_CHECKING:
             SettingsType
         )
     except ImportError:
+        # pylint: disable=C0103,invalid-name
         # avoid linter issue
         AnyRequestMethod = str
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
