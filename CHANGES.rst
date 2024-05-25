@@ -12,7 +12,6 @@ Changes
 
 Changes:
 --------
-<<<<<<< HEAD
 - No change.
 
 Fixes:
@@ -37,6 +36,9 @@ Fixes:
 
 Fixes:
 ------
+- Fix ``pywps.inout.basic.BasicComplex`` using default ``emptyvalidator`` when the expected output format does not
+  provide an explicit implementation, leading to failure of the `Job` due to ``MODE.SIMPLE`` validation level being set.
+  A basic validator will instead be set to check that the expected file extension minimally matches the expected type.
 - Fix invalid `CWL` schema definition for ``ScatterFeatureRequirement`` that directly
   contained the corresponding fields ``scatter`` and ``scatterMethod``, instead of the expected
   definition within a `Workflow Step <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStep>`_.
