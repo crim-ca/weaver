@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import boto3
 import colander
+import mock
 import pytest
 import yaml
 from parameterized import parameterized
@@ -1068,6 +1069,61 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert resp.status_code in [200, 201], resp.text
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
+
+    def test_execute_output_file_format_validator(self):
+        """
+        Test with custom :mod:`pywps` file format extension validator involved in output resolution.
+        """
+        from weaver.processes.wps_package import format_extension_validator as real_validator
+
+        cwl = self.retrieve_payload("PseudoOutputGenerator", "package", local=True)
+        body = {
+            "processDescription": {
+                "id": self._testMethodName,
+                "inputs": {
+                    "image_tif": {
+                        "formats": [{"mediaType": ContentType.IMAGE_GEOTIFF}]
+                    }
+                }
+            },
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        data = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {"data": "0123456789"},
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+
+            mock_validator = stack_exec.enter_context(
+                mock.patch("weaver.processes.wps_package.format_extension_validator", side_effect=real_validator)
+            )
+
+            proc_url = f"/processes/{self._testMethodName}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 201, resp.text
+            status_url = resp.json.get("location")
+            results = self.monitor_job(status_url)  # successful (if validator did not apply correctly, execution fails)
+
+            assert mock_validator.called
+            validator_call_types = [call.args[0].data_format.mime_type for call in mock_validator.call_args_list]
+            expected_media_types = [
+                "image/jp2",
+                ContentType.IMAGE_TIFF,
+                ContentType.IMAGE_PNG,
+                ContentType.TEXT_XML,
+            ]
+            assert validator_call_types == expected_media_types
+
+            assert len(results) != len(expected_media_types), (
+                "some outputs are expected to not be validated by the extension validator"
+            )
+            assert list(results) == list(cwl["outputs"]), "all outputs should be collected in the results"
 
     def test_deploy_block_builtin_processes_from_api(self):
         """

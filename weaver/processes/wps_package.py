@@ -1163,7 +1163,7 @@ def get_process_definition(
 
 
 def format_extension_validator(data_input, mode):
-    # type: (Union[ComplexInput, ComplexOutput], MODE) -> bool
+    # type: (Union[ComplexInput, ComplexOutput], int) -> bool
     """
     Validator that will only check that the extension matches the selected data format.
     """
