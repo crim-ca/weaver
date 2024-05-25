@@ -12,7 +12,6 @@ Changes
 
 Changes:
 --------
-<<<<<<< HEAD
 - No change.
 
 Fixes:
@@ -37,6 +36,7 @@ Fixes:
 
 Fixes:
 ------
+- Fix `CLI` incorrectly parsing inputs when provided directly as `OGC` style mapping with ``href``.
 - Fix invalid `CWL` schema definition for ``ScatterFeatureRequirement`` that directly
   contained the corresponding fields ``scatter`` and ``scatterMethod``, instead of the expected
   definition within a `Workflow Step <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStep>`_.

@@ -71,6 +71,8 @@ if TYPE_CHECKING:
             AnyRequestType,
             AnyResponseType,
             CWL,
+            CWL_IO_ValueMap,
+            ExecutionInputs,
             ExecutionInputsMap,
             ExecutionResultObjectRef,
             ExecutionResults,
@@ -81,10 +83,13 @@ if TYPE_CHECKING:
             SettingsType
         )
     except ImportError:
+        # pylint: disable=C0103,invalid-name
         # avoid linter issue
         AnyRequestMethod = str
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
-        CWL = JSON = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = SettingsType = Dict[str, Any]
+        CWL = JSON = Dict[str, Any]
+        CWL_IO_ValueMap = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = SettingsType = JSON
+        ExecutionInputs = Union[JSON, List[JSON]]
         ExecutionResultValue = Union[ExecutionResultObjectRef, List[ExecutionResultObjectRef]]
         JobSubscribers = Dict[str, Any]
         HeadersType = Dict[str, str]
@@ -1009,7 +1014,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, ExecutionInputsMap]
+        # type: (Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
         """
         Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
 
@@ -1036,17 +1041,33 @@ class WeaverClient(object):
                     inputs = []
             if isinstance(inputs, list):
                 inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
-            # consider possible ambiguity if literal CWL input is named 'inputs'
-            # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
-            #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
-            # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-            #   unless 'value/href' (and also 'id' technically) are present
+
             values = inputs.get("inputs", null)
+            if values is null:
+                values = inputs
             if (
-                values is null or
-                values is not null and (
-                    (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
-                    (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
+                # consider possible ambiguity if literal CWL input is named 'inputs'
+                # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
+                #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+                # - if value of 'inputs' is a mapping with nested objects,
+                #   they must be interpreted as the CWL form if a 'class' is found
+                #   (literals would be interpreted the same regardless of OGC or CWL form)
+                # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
+                #   unless 'value/href' (and also 'id' technically) are present
+                values is not null and
+                (
+                    (
+                        isinstance(values, dict) and
+                        get_any_value(values, default=null) is null and
+                        "class" in values
+                    ) or
+                    (
+                        isinstance(values, (dict, list)) and
+                        any(
+                            isinstance(v, dict) and get_any_value(v, default=null) is null
+                            for v in (values if isinstance(values, list) else values.values())
+                        )
+                    )
                 )
             ):
                 values = cwl2json_input_values(inputs, schema=ProcessSchema.OGC)
@@ -1139,7 +1160,7 @@ class WeaverClient(object):
     def execute(self,
                 process_id,             # type: str
                 provider_id=None,       # type: Optional[str]
-                inputs=None,            # type: Optional[Union[str, JSON]]
+                inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
                 monitor=False,          # type: bool
                 timeout=None,           # type: Optional[int]
                 interval=None,          # type: Optional[int]
