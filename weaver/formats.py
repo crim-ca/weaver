@@ -19,7 +19,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -30,6 +30,24 @@ if TYPE_CHECKING:
     DataStrT = TypeVar("DataStrT")
 
     FormatSource = Literal["header", "query", "default"]
+
+    _ContentType = "ContentType"  # type: TypeAlias
+    AnyContentType = Union[str, _ContentType]
+    AnyOutputFormat = Literal[
+        "JSON", "json",
+        "JSON+RAW", "json+str",
+        "JSON+RAW", "json+raw",
+        "XML", "xml",
+        "XML+STR", "xml+str",
+        "XML+RAW", "xml+raw",
+        "HTML", "html",
+        "HTML+STR", "html+str",
+        "HTML+RAW", "html+raw",
+        "TXT", "txt",
+        "TEXT", "text",
+        "YML", "yml",
+        "YAML", "yaml",
+    ]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -335,7 +353,7 @@ class OutputFormat(Constants):
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
-            default=JSON,           # type: AnyOutputFormat
+            default=None,           # type: Optional[AnyOutputFormat]
             allow_version=True,     # type: bool
             ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
@@ -344,7 +362,9 @@ class OutputFormat(Constants):
         :param format_or_version:
             Either a :term:`WPS` version, a known value for a ``f``/``format`` query parameter, or an ``Accept`` header
             that can be mapped to one of the supported output formats.
-        :param default: Default output format if none could be resolved.
+        :param default:
+            Default output format if none could be resolved.
+            If no explicit default is specified as default in case of unresolved format, ``JSON`` is used by default.
         :param allow_version: Enable :term:`WPS` version specifiers to infer the corresponding output representation.
         :return: Resolved output format.
         """
@@ -352,13 +372,15 @@ class OutputFormat(Constants):
             return OutputFormat.XML
         if allow_version and format_or_version == "2.0.0":
             return OutputFormat.JSON
+        if not isinstance(format_or_version, str):
+            return default or OutputFormat.JSON
         if "/" in format_or_version:  # Media-Type to output format renderer
             format_or_version = get_extension(format_or_version, dot=False)
-        return super(OutputFormat, cls).get(str(format_or_version), default=default)
+        return super(OutputFormat, cls).get(str(format_or_version), default=default) or OutputFormat.JSON
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[AnyOutputFormat, str], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, str, None], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 
@@ -960,7 +982,7 @@ def guess_target_format(
     request,                        # type: AnyRequestType
     default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
     return_source=False,            # type: bool
-):                                  # type: (...) -> Union[ContentType, Tuple[ContentType, FormatSource]]
+):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -987,7 +1009,7 @@ def guess_target_format(
 
     format_query = request.params.get("format") or request.params.get("f")
     format_source = "default"  # type: FormatSource
-    content_type = None
+    content_type = None  # type: Optional[str]
     if format_query:
         content_type = OutputFormat.get(format_query, default=None, allow_version=False)
         if content_type:
@@ -1045,13 +1067,3 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)
-
-
-if TYPE_CHECKING:
-    AnyOutputFormat: OutputFormat = Union[
-        OutputFormat,
-        OutputFormat.JSON,
-        OutputFormat.XML,
-        OutputFormat.YAML,
-        OutputFormat.YML,
-    ]

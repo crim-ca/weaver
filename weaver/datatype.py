@@ -2605,7 +2605,7 @@ class Process(Base):
             svc_name = service.get("name")  # can be a custom ID or identical to provider name
             remote_service_url = service.url
             local_provider_url = f"{wps_api_url}/providers/{svc_name}"
-            svc_provider_name = service.wps().provider.name
+            svc_provider_name = service.wps(container).provider.name
         describe_process_url = f"{local_provider_url}/processes/{process.identifier}"
         execute_process_url = f"{describe_process_url}/jobs"
         package, info = ows2json(process, svc_name, remote_service_url, svc_provider_name)
@@ -2667,13 +2667,13 @@ class Process(Base):
         wps_request = WPSRequest()
         wps_request.language = http_request.accept_language.header_value or AcceptLanguage.EN_CA
         wps_request.http_request = http_request  # set instead of init param to bypass extra setup arguments
-        processes = {self.id: self.wps()}
+        processes = {self.id: self.wps(request)}
         describer = DescribeResponse(wps_request, uuid=None, processes=processes, identifiers=list(processes))
         offering, _ = describer.get_response_doc()
         return offering
 
-    def wps(self):
-        # type: () -> ProcessWPS
+    def wps(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> ProcessWPS
         """
         Converts this :class:`Process` to a corresponding format understood by :mod:`pywps`.
         """
@@ -2696,7 +2696,8 @@ class Process(Base):
             process_key = self.identifier
         if process_key not in process_map:
             raise ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
-        return process_map[process_key](**self.params_wps)
+        settings = get_settings(container)
+        return process_map[process_key](**self.params_wps, settings=settings)
 
 
 class PriceMixin(Base, abc.ABC):

@@ -1,0 +1,5 @@
+# WARNING:
+#   This is a pseudo-definition only to avoid unnecessary requests to external definitions for this Workflow.
+#   The actual execution body is overridden by the test itself.
+#   See: 'tests.functional.test_workflow.WorkflowTestCase.test_workflow_directory_input_output_chaining'
+{}

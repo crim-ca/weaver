@@ -127,7 +127,9 @@ if TYPE_CHECKING:
         "path": str,
         "format": NotRequired[Optional[str]],
     }, total=True)
-    CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueObject = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueMap = Dict[str, CWL_IO_ValueObject]
+
     CWL_IO_LiteralType = Literal["string", "boolean", "float", "int", "integer", "long", "double"]
     CWL_IO_ComplexType = Literal["File", "Directory"]
     CWL_IO_SpecialType = Literal["null", "Any"]
@@ -179,10 +181,12 @@ if TYPE_CHECKING:
         "provider": NotRequired[str],
         "process": NotRequired[str],
     }, total=False)
-    CWL_RequirementsDict = Dict[CWL_RequirementNames, Dict[str, ValueType]]   # {'<req>': {<param>: <val>}}
+    CWL_AnyRequirementObject = Union[CWL_Requirement, Dict[str, JSON]]
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, CWL_AnyRequirementObject]   # {'<req>': {<param>: <val>}}
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
+    CWL_Namespace = Dict[str, str]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
         "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
@@ -212,7 +216,7 @@ if TYPE_CHECKING:
         "steps": NotRequired[Dict[CWL_WorkflowStepID, CWL_WorkflowStep]],
         "stderr": NotRequired[str],
         "stdout": NotRequired[str],
-        "$namespaces": NotRequired[Dict[str, str]],
+        "$namespaces": NotRequired[CWL_Namespace],
         "$schemas": NotRequired[Dict[str, str]],
         "$graph": NotRequired[CWL_Graph],
     }, total=False)
@@ -291,7 +295,12 @@ if TYPE_CHECKING:
 
     # CWL loading
     CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, str]        # mapping of ID:glob-pattern (File/Directory only)
+    # mapping of ID:glob-pattern (File/Directory or string with loadContents)
+    CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
+        "type": Literal["File", "Directory", "string"],
+        "glob": str,
+    }, total=True)
+    CWL_ExpectedOutputs = Dict[str, CWL_ExpectedOutputDef]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # OWSLib Execution
@@ -433,7 +442,18 @@ if TYPE_CHECKING:
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobCustomInputs = TypeVar(
+        "JobCustomInputs",
+        bound=Any,
+    )
+    JobCustomOutputs = TypeVar(
+        "JobCustomOutputs",
+        bound=Any,
+    )
+    JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
+        "JobMonitorReference",
+        bound=Any,
+    )
     JobSubscribers = TypedDict("JobSubscribers", {
         "failedUri": NotRequired[str],
         "successUri": NotRequired[str],
@@ -444,7 +464,7 @@ if TYPE_CHECKING:
     }, total=True)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
-    ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
+    ExecutionInputsMap = Dict[str, Union[AnyValueType, JobValueObject, List[JobValueObject]]]
     # when schema='weaver.processes.constants.ProcessSchema.OLD'
     ExecutionInputsList = List[JobValueItem]
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]

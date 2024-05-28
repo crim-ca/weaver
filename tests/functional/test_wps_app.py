@@ -11,8 +11,8 @@ import contextlib
 import pytest
 import xmltodict
 
-from tests.utils import mocked_execute_celery
 from tests.functional.utils import WpsConfigBase
+from tests.utils import mocked_execute_celery
 from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
@@ -22,20 +22,19 @@ from weaver.visibility import Visibility
 
 @pytest.mark.functional
 class WpsAppTest(WpsConfigBase):
-    wps_path = None         # type: str
+    wps_path = "/ows/wps"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps": True,
+        "weaver.wps_path": wps_path,
+        "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+        "weaver.wps_metadata_provider_name": "WpsAppTest"
+    }
     process_public = None   # type: WpsTestProcess
     process_private = None  # type: WpsTestProcess
 
     @classmethod
     def setUpClass(cls):
-        cls.wps_path = "/ows/wps"
-        cls.settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps": True,
-            "weaver.wps_path": cls.wps_path,
-            "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
-            "weaver.wps_metadata_provider_name": WpsAppTest.__name__
-        }
         super(WpsAppTest, cls).setUpClass()
 
         # add processes by database Process type

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyHeadersContainer,
         CWL,
+        CWL_ExpectedOutputs,
         CWL_RuntimeInputsMap,
         HeadersType,
         JSON,
@@ -63,13 +64,14 @@ class Wps3Process(OGCAPIRemoteProcessBase):
     """
     process_type = "WPS-3"  # ADES, EMS or HYBRID (local Application or Workflow)
 
-    def __init__(self,
-                 step_payload,      # type: JSON
-                 job_order,         # type: CWL_RuntimeInputsMap
-                 process,           # type: str
-                 request,           # type: WorkerRequest
-                 update_status,     # type: UpdateStatusPartialFunction
-                 ):                 # type: (...) -> None
+    def __init__(
+        self,
+        step_payload,   # type: JSON
+        job_order,      # type: CWL_RuntimeInputsMap
+        process,        # type: str
+        request,        # type: WorkerRequest
+        update_status,  # type: UpdateStatusPartialFunction
+    ):                  # type: (...) -> None
         super(Wps3Process, self).__init__(
             step_payload,
             process,
@@ -226,8 +228,8 @@ class Wps3Process(OGCAPIRemoteProcessBase):
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True)
         response.raise_for_status()
 
-    def prepare(self):
-        # type: () -> None
+    def prepare(self, workflow_inputs, expected_outputs):
+        # type: (CWL_RuntimeInputsMap, CWL_ExpectedOutputs) -> None
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:

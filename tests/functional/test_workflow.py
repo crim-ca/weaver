@@ -9,7 +9,7 @@ import os
 import re
 import tempfile
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, overload
 from unittest import TestCase
 from urllib.parse import urlparse
 
@@ -39,14 +39,23 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_MULTIPLE_INPUT,
+    CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+    CWL_REQUIREMENT_SUBWORKFLOW,
+    JobInputsOutputsSchema
+)
+from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process_information
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, request_extra
+from weaver.utils import fetch_file, generate_diff, get_any_id, get_weaver_url, make_dirs, now, repr_json, request_extra
 from weaver.visibility import Visibility
+from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, Optional, Set, Union
+    from typing import Any, Callable, Dict, Iterable, Optional, Set, Tuple, Union
+    from typing_extensions import Literal, TypedDict
 
     from responses import RequestsMock
 
@@ -54,13 +63,36 @@ if TYPE_CHECKING:
         AnyLogLevel,
         AnyRequestMethod,
         AnyResponseType,
+        AnyUUID,
         CookiesType,
+        CWL,
+        CWL_RequirementsList,
+        ExecutionInputsMap,
         ExecutionResults,
         HeadersType,
         ProcessDeployment,
         ProcessExecution,
         SettingsType
     )
+
+    DetailedExecutionResultObject = TypedDict(
+        "DetailedExecutionResultObject",
+        {
+            "job": AnyUUID,
+            "process": str,
+            "inputs": ExecutionInputsMap,
+            "outputs": ExecutionResults,
+            "logs": str,
+        },
+        total=True,
+    )
+    DetailedExecutionResults = Dict[
+        AnyUUID,
+        DetailedExecutionResultObject
+    ]
+
+
+# pylint: disable=E1135,E1136  # false positives about return value of 'workflow_runner' depending on 'detailed_results'
 
 
 class WorkflowProcesses(enum.Enum):
@@ -72,10 +104,22 @@ class WorkflowProcesses(enum.Enum):
         They will be loaded by :class:`WorkflowTestRunnerBase` derived classes in alphabetical order.
         All atomic :term:`Application Package` will be loaded before :term:`Workflow` definitions.
     """
+
+    # https://github.com/crim-ca/testbed14/tree/master/application-packages
     APP_STACKER = "Stacker"
     APP_SFS = "SFS"
     APP_FLOOD_DETECTION = "FloodDetection"
+    WORKFLOW_CUSTOM = "CustomWorkflow"
+    WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
+    WORKFLOW_STACKER_SFS = "Workflow"
+    WORKFLOW_SC = "WorkflowSimpleChain"
+    WORKFLOW_S2P = "WorkflowS2ProbaV"
+
+    # local in 'tests/functional/application-packages'
+    APP_ECHO = "Echo"
+    APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
+    APP_READ_FILE = "ReadFile"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
     APP_SUBSET_ESGF = "SubsetESGF"
     APP_SUBSET_NASA_ESGF = "SubsetNASAESGF"
@@ -85,15 +129,16 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
     APP_DIRECTORY_LISTING_PROCESS = "DirectoryListingProcess"
     APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
+    APP_PASSTHROUGH_EXPRESSIONS = "PassthroughExpressions"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
-    WORKFLOW_STACKER_SFS = "Workflow"
-    WORKFLOW_SC = "WorkflowSimpleChain"
-    WORKFLOW_S2P = "WorkflowS2ProbaV"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
-    WORKFLOW_CUSTOM = "CustomWorkflow"
+    WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
-    WORKFLOW_FLOOD_DETECTION = "WorkflowFloodDetection"
+    WORKFLOW_ECHO = "WorkflowEcho"
+    WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
+    WORKFLOW_PASSTHROUGH_EXPRESSIONS = "WorkflowPassthroughExpressions"
+    WORKFLOW_STEP_MERGE = "WorkflowStepMerge"
     WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
     WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
     WORKFLOW_SUBSET_LLNL_SUBSET_CRIM = "WorkflowSubsetLLNL_SubsetCRIM"
@@ -112,16 +157,18 @@ class ProcessInfo(object):
     """
 
     def __init__(self,
-                 process_id,            # type: Union[str, WorkflowProcesses]
-                 test_id=None,          # type: Optional[str]
-                 deploy_payload=None,   # type: Optional[ProcessDeployment]
-                 execute_payload=None,  # type: Optional[ProcessExecution]
-                 ):                     # type: (...) -> None
-        self.pid = WorkflowProcesses(process_id)    # type: WorkflowProcesses
-        self.id = self.pid.value                    # type: Optional[str]  # noqa
-        self.test_id = test_id                      # type: Optional[str]
-        self.deploy_payload = deploy_payload        # type: Optional[ProcessDeployment]
-        self.execute_payload = execute_payload      # type: Optional[ProcessExecution]
+                 process_id,                # type: Union[str, WorkflowProcesses]
+                 test_id=None,              # type: Optional[str]
+                 deploy_payload=None,       # type: Optional[ProcessDeployment]
+                 execute_payload=None,      # type: Optional[ProcessExecution]
+                 application_package=None,  # type: Optional[CWL]
+                 ):                         # type: (...) -> None
+        self.pid = WorkflowProcesses(process_id)        # type: WorkflowProcesses
+        self.id = self.pid.value                        # type: Optional[str]  # noqa
+        self.test_id = test_id                          # type: Optional[str]
+        self.deploy_payload = deploy_payload            # type: Optional[ProcessDeployment]
+        self.execute_payload = execute_payload          # type: Optional[ProcessExecution]
+        self.application_package = application_package  # type: Optional[CWL]
 
 
 @pytest.mark.functional
@@ -521,7 +568,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             1. Look in the local ``tests.functional`` directory.
             2. Look in remote repository:
                 https://github.com/crim-ca/testbed14
-                i.e.:  directory ``TB14`` under in
+                i.e.:  directory ``TB14`` under
                 https://github.com/crim-ca/application-packages/tree/master/OGC
             3. Look in remote repository directory:
                 https://github.com/crim-ca/application-packages/tree/master/OGC/TB16
@@ -538,17 +585,21 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 - ``Execute_<PROCESS_ID>.[json|yaml|yml]``
                 - ``<PROCESS_ID>.[cwl|json|yaml|yml]`` (package)
 
-            2. Contents defined within a sub0directory named ``<PROCESS_ID>`` with either the previous names or simply:
+            2. Contents defined within a sub-directory named ``<PROCESS_ID>`` with either the previous names or simply:
                 - ``deploy.[json|yaml|yml]``
                 - ``execute.[json|yaml|yml]``
                 - ``package.[cwl|json|yaml|yml]``
 
-        For each group of content definitions, Deploy and Execute contents are mandatory.
-        The package file can be omitted if it is already explicitly embedded within the Deploy contents.
+        For each group of content definitions, "deploy" and "execute" contents are mandatory.
+        The "package" file can be omitted if it is already explicitly embedded within the "deploy" contents.
 
         .. note::
             Only when references are local (tests), the package can be referred by relative ``tests/...`` path
-            within the Deploy content ``executionUnit`` using ``test`` key instead of ``unit`` or ``href``.
+            within the "deploy" content's ``executionUnit`` using ``test`` key instead of ``unit`` or ``href``.
+            In such case, the "package" contents will be loaded and injected dynamically as ``unit`` in the "deploy"
+            body at the relevant location. Alternatively to the ``test`` key, ``href`` can also be used, but will be
+            loaded only if using the ``tests/..`` relative path. This is to ensure cross-support with other test
+            definitions using this format outside of "workflow" use cases.
 
         :param process_id: identifier of the process to retrieve contents.
         :return: found content definitions.
@@ -560,10 +611,15 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         execute_payload = cls.retrieve_payload(pid, "execute")
 
         # replace derived reference (local only, remote must use the full 'href' references)
-        test_app_pkg = deploy_payload.get("executionUnit", [{}])[0].pop("test", None)
+        test_exec_unit = deploy_payload.get("executionUnit", [{}])[0]
+        unit_app_pkg = None
+        test_app_pkg = test_exec_unit.pop("test", None)
         if test_app_pkg:
             unit_app_pkg = cls.retrieve_payload(pid, "package")
-            deploy_payload["executionUnit"][0]["unit"] = unit_app_pkg
+        elif "href" in test_exec_unit and str(test_exec_unit["href"]).startswith("tests/"):
+            unit_app_pkg = cls.retrieve_payload(pid, "package", local=True, location=test_exec_unit["href"])
+        if unit_app_pkg:
+            deploy_payload["executionUnit"][0] = {"unit": unit_app_pkg}
 
         # Apply collection swapping
         for swap in cls.swap_data_collection():
@@ -571,7 +627,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 if "data" in i and i["data"] == swap[0]:
                     i["data"] = swap[1]
 
-        return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload)
+        return ProcessInfo(process_id, test_process_id, deploy_payload, execute_payload, unit_app_pkg)
 
     @classmethod
     def assert_response(cls, response, status=None, message=""):
@@ -754,13 +810,38 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     cls.indent(f"Headers: {headers}\n", 1))
         return resp
 
-    def workflow_runner(self,
-                        test_workflow_id,               # type: WorkflowProcesses
-                        test_application_ids,           # type: Iterable[WorkflowProcesses]
-                        log_full_trace=False,           # type: bool
-                        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
-                        override_execute_body=None,     # type: Optional[ProcessExecution]
-                        ):                              # type: (...) -> ExecutionResults
+    @overload
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace,                 # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+    ):                                  # type: (...) -> ExecutionResults
+        ...
+
+    @overload
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace=False,           # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+        detailed_results=True,          # type: Literal[True]
+    ):                                  # type: (...) -> DetailedExecutionResults
+        ...
+
+    def workflow_runner(
+        self,
+        test_workflow_id,               # type: WorkflowProcesses
+        test_application_ids,           # type: Iterable[WorkflowProcesses]
+        log_full_trace=False,           # type: bool
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+        detailed_results=False,         # type: bool
+    ):                                  # type: (...) -> Union[ExecutionResults, DetailedExecutionResults]
         """
         Main runner method that prepares and evaluates the full :term:`Workflow` execution and its step dependencies.
 
@@ -784,6 +865,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             Function to add further requests mock specifications as needed by the calling test case.
         :param override_execute_body:
             Alternate execution request content from the default one loaded from the referenced Workflow location.
+        :param detailed_results:
+            If enabled, each step involved in the :term:`Workflow` chain will provide their respective details
+            including the :term:`Process` ID, the :term:`Job` UUID, intermediate outputs and logs.
+            Otherwise (default), only the final results of :term:`Workflow` chain are returned.
         :returns: Response contents of the final :term:`Workflow` results for further validations if needed.
         """
 
@@ -843,11 +928,17 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             job_id = resp.json.get("jobID")
             self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
                              message="Response process execution job ID must match to validate results.")
-            resp = self.validate_test_job_execution(job_location, None, None)
+            resp, details = self.validate_test_job_execution(job_location, None, None)
+        if detailed_results:
+            self.assert_test(
+                lambda: bool(details) and len(details) > 1,  # minimally 1 workflow and 1 step
+                message="Could not obtain execution result details when requested by test.",
+            )
+            return details
         return resp.json
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
-        # type: (str, Optional[HeadersType], Optional[CookiesType]) -> AnyResponseType
+        # type: (str, Optional[HeadersType], Optional[CookiesType]) -> Tuple[AnyResponseType, DetailedExecutionResults]
         """
         Validates that the job is stated, running, and polls it until completed successfully.
 
@@ -855,6 +946,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         timeout_accept = self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT
         timeout_running = self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT
+        details = {}  # type: DetailedExecutionResults
         while True:
             self.assert_test(
                 lambda: timeout_accept > 0,
@@ -885,27 +977,30 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
             if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-                msg = f"Job execution '{job_location_url}' failed, but expected to succeed."
                 failed = status != Status.SUCCEEDED
-                if failed:
-                    msg += "\n" + self.try_retrieve_logs(job_location_url)
-                self.assert_test(lambda: not failed, message=msg)
+                logs, details = self.try_retrieve_logs(job_location_url, detailed_results=not failed)
+                self.assert_test(
+                    lambda: not failed,
+                    message=f"Job execution '{job_location_url}' failed, but expected to succeed.\n{logs}",
+                )
                 break
             self.assert_test(lambda: False, message=f"Unknown job execution status: '{status}'.")
         path = f"{job_location_url}/results"
         resp = self.request("GET", path, headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
-        return resp
+        return resp, details
 
-    def try_retrieve_logs(self, workflow_job_url):
+    def try_retrieve_logs(self, workflow_job_url, detailed_results):
+        # type: (str, bool) -> Tuple[str, DetailedExecutionResults]
         """
         Attempt to retrieve the main workflow job logs and any underlying step process logs.
 
         Because jobs are dispatched by the Workflow execution itself, there are no handles to the actual step jobs here.
         Try to parse the workflow logs to guess output logs URLs. If not possible, skip silently.
         """
+        details = {}  # type: DetailedExecutionResults
         try:
             msg = ""
-            path = workflow_job_url + "/logs"
+            path = f"{workflow_job_url}/logs"
             resp = self.request("GET", path, ignore_errors=True)
             if resp.status_code == 200 and isinstance(resp.json, list):
                 logs = resp.json
@@ -913,19 +1008,45 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 tab_n = "\n" + self.indent("", 1)
                 workflow_logs = tab_n.join(logs)
                 msg += f"Workflow logs [JobID: {job_id}]" + tab_n + workflow_logs
-                log_matches = set(re.findall(r".*(https?://.+/logs).*", workflow_logs)) - {workflow_job_url}
-                log_refs = {}
+                if detailed_results:
+                    details[job_id] = self.extract_job_details(workflow_job_url, workflow_logs)
+                log_matches = set(re.findall(r".*(https?://.+/jobs/.+(?:/logs)?).*", workflow_logs))
+                log_matches -= {workflow_job_url}
+                log_matches = {url if url.rstrip("/").endswith("/logs") else f"{url}/logs" for url in log_matches}
                 for log_url in log_matches:
                     job_id = log_url.split("/")[-2]
-                    log_refs[job_id] = log_url
-                for job_id, log_url in log_refs.items():
                     resp = self.request("GET", log_url, ignore_errors=True)
                     if resp.status_code == 200 and isinstance(resp.json, list):
                         step_logs = tab_n.join(resp.json)
+                        if detailed_results:
+                            step_job_url = log_url.split("/logs", 1)[0]
+                            details[job_id] = self.extract_job_details(step_job_url, step_logs)
                         msg += f"\nStep process logs [JobID: {job_id}]" + tab_n + step_logs
         except Exception:  # noqa
-            return "Could not retrieve job logs."
-        return msg
+            return "Could not retrieve job logs.", {}
+        return msg, details
+
+    def extract_job_details(self, job_url, job_logs):
+        # type: (str, str) -> DetailedExecutionResultObject
+        """
+        Extracts more details about a *successful* :term:`Job` execution using known endpoints.
+        """
+        proc_url, job_id = job_url.split("/jobs/", 1)
+        proc_id = proc_url.rsplit("/", 1)[-1]
+        path = f"{job_url}/inputs"
+        resp = self.request("GET", path, params={"schema": JobInputsOutputsSchema.OGC}, ignore_errors=True)
+        job_inputs = cast("ExecutionInputsMap", resp.json["inputs"])
+        path = f"{job_url}/outputs"
+        resp = self.request("GET", path, params={"schema": JobInputsOutputsSchema.OGC}, ignore_errors=True)
+        job_outputs = cast("ExecutionResults", resp.json["outputs"])
+        detail = {
+            "job": job_id,
+            "process": proc_id,
+            "logs": job_logs,
+            "inputs": job_inputs,
+            "outputs": job_outputs,
+        }
+        return detail
 
 
 class WorkflowTestCase(WorkflowTestRunnerBase):
@@ -939,13 +1060,22 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
         WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
+        WorkflowProcesses.APP_ECHO,
+        WorkflowProcesses.APP_ECHO_SECRETS,
+        WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
+        WorkflowProcesses.APP_READ_FILE,
         WorkflowProcesses.APP_WPS1_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,
     }
     WEAVER_TEST_WORKFLOW_SET = {
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
+        WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
+        WorkflowProcesses.WORKFLOW_ECHO,
+        WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+        WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
+        WorkflowProcesses.WORKFLOW_STEP_MERGE,
         WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_REST_SELECT_COPY_NETCDF,
         WorkflowProcesses.WORKFLOW_WPS1_SCATTER_COPY_NETCDF,
@@ -1282,8 +1412,154 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                         f"\n{self.logger_separator_calls}"
             )
             # check that all expected files made it through the listing/directory input/output chaining between steps
-            output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)
+            output_files = "\n".join(os.path.join(*line.rsplit("/", 2)[-2:]) for line in output_lines)  # type: ignore
             expect_files = "\n".join(os.path.join("output_dir", os.path.split(file)[-1]) for file in expect_http_files)
             self.assert_test(lambda: output_files == expect_files,
                              message="Workflow output file expected to contain single file with raw string listing of "
                                      "input files chained from generated output directory listing of the first step.")
+
+    def test_workflow_echo_step_expression(self):
+        """
+        Validate that a Workflow using 'StepInputExpressionRequirement' is supported.
+        """
+        pkg = self.test_processes_info[WorkflowProcesses.WORKFLOW_ECHO].application_package
+        assert CWL_REQUIREMENT_STEP_INPUT_EXPRESSION in pkg["requirements"], "missing requirement for test"
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO,
+            [WorkflowProcesses.APP_ECHO],
+            log_full_trace=True,
+        )
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read()
+        out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
+        assert out == "test-workflow-echo", (
+            f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO}'"
+        )
+
+    def test_workflow_secrets(self):
+        details = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
+            [WorkflowProcesses.APP_ECHO_SECRETS],
+            log_full_trace=True,
+            detailed_results=True,
+        )
+        result = [res for res in details.values() if res["process"] == WorkflowProcesses.WORKFLOW_ECHO_SECRETS.value]
+        result = result[0]["outputs"]
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read()
+        out = data.strip()  # ignore newlines added by the echo steps, good enough to test the operations worked
+        expect_secret = "secret message"
+        # the secret is valid within the file only because of the nature of the job that echoes it in the output
+        # however, it should not be directly in the logs or output responses
+        assert out == expect_secret, (
+            f"Should match the input value from 'execute' body of '{WorkflowProcesses.WORKFLOW_ECHO_SECRETS}'"
+        )
+
+        # validate there are no 'secrets' in responses
+        found_secrets = []
+        for job_detail in details.values():
+            for loc in ["inputs", "outputs"]:  # type: Literal["inputs", "outputs"]
+                for loc_id, loc_data in job_detail[loc].items():
+                    if expect_secret in str(loc_data):
+                        found_secrets.append({
+                            "where": loc,
+                            "id": loc_id,
+                            "data": loc_data,
+                            "process": job_detail["process"],
+                            "job": job_detail["job"],
+                        })
+            if expect_secret in str(job_detail["logs"]):
+                found_secrets.append({
+                    "where": "logs",
+                    "data": job_detail["logs"],
+                    "process": job_detail["process"],
+                    "job": job_detail["job"],
+                })
+        assert not found_secrets, f"Found exposed secrets that should have been masked:\n{repr_json(found_secrets)}"
+
+        # make sure the logs included stdout with expected output
+        # (ie: check that the fact that secrets are omitted is not only because no logs were captured...)
+        capture_regex = re.compile(
+            # note: each line is prefixed by the loggers details including the job state
+            r".*running\s+----- Captured Log \(stdout\) -----\n"
+            r".*running\s+OK!\n"
+            r".*running\s+----- End of Logs -----\n"
+        )
+        for job in details.values():
+            if job["process"] == WorkflowProcesses.APP_ECHO_SECRETS.value:
+                assert capture_regex.search(job["logs"])
+
+    def test_workflow_passthrough_expressions(self):
+        """
+        Test that validate literal data passed between steps.
+
+        Validates that values are propagated property without the need of intermediate ``File`` type explicitly
+        within the :term:`Workflow` or any of its underlying application steps. Also, uses various combinations of
+        expression formats (:term:`CWL` ``$(...)`` reference and pure JavaScript ``${ ... }`` reference) to ensure
+        they are handled correctly when collecting outputs.
+        """
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
+            [WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS],
+            log_full_trace=True,
+        )
+        assert result == {
+            "code1": {"value": 123456},
+            "code2": {"value": 123456},
+            "integer1": {"value": 3},
+            "integer2": {"value": 3},
+            "message1": {"value": "msg"},
+            "message2": {"value": "msg"},
+            "number1": {"value": 3.1416},
+            "number2": {"value": 3.1416},
+        }
+
+    def test_workflow_multi_input_and_subworkflow(self):
+        """
+        Workflow that evaluates :term:`CWL` features simultaneously.
+
+        Features tested:
+          - ``MultipleInputFeatureRequirement``
+          - ``InlineJavascriptRequirement``
+          - ``StepInputExpressionRequirement``
+          - ``SubworkflowFeatureRequirement``
+        """
+        wf_pkg = self.test_processes_info[WorkflowProcesses.WORKFLOW_STEP_MERGE].application_package
+        wf_req = cast("CWL_RequirementsList", wf_pkg["requirements"])  # type: CWL_RequirementsList
+        wf_req_classes = [req["class"] for req in wf_req]
+        assert all(
+            req in wf_req_classes
+            for req in [
+                CWL_REQUIREMENT_MULTIPLE_INPUT,
+                CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+                CWL_REQUIREMENT_SUBWORKFLOW,
+            ]
+        ), "missing pre-requirements for test"
+        wf_step_ids = [wf_step["run"].split(".", 1)[0] for wf_step in wf_pkg["steps"].values()]
+        wf_step_classes = [
+            self.test_processes_info[WorkflowProcesses(step)].application_package["class"]
+            for step in wf_step_ids
+        ]
+        assert len(
+            [wf_step_cls == ProcessType.WORKFLOW for wf_step_cls in wf_step_classes]
+        ), "missing sub-workflow pre-requirement for test"
+
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_STEP_MERGE,
+            [
+                WorkflowProcesses.APP_ECHO,
+                WorkflowProcesses.APP_READ_FILE,
+                WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
+            ],
+            log_full_trace=True,
+        )
+        assert len(result) == 1
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read().strip()
+        assert data == "Hello,World"

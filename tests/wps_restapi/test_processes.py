@@ -414,8 +414,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.json["total"] == total + 2, "Grand total of local+remote processes should be reported."
 
     @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")  # unresponsive services
-    # register valid server here, and another invalid within test
-    @mocked_remote_server_requests_wps1([
+    @mocked_remote_server_requests_wps1([  # register valid server here, and another invalid within test
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
@@ -425,7 +424,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         invalid_id = "test-provider-process-listing-invalid"
         invalid_url = f"{resources.TEST_REMOTE_SERVER_URL}/invalid"
         invalid_data = "<xml> not a wps </xml>"
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
 
         # register a provider that doesn't have any responding server
         missing_id = "test-provider-process-listing-missing"

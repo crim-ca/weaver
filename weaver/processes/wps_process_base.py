@@ -12,7 +12,8 @@ from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.convert import get_cwl_io_type
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -41,8 +42,11 @@ if TYPE_CHECKING:
         AnyResponseType,
         CookiesTupleType,
         CWL_ExpectedOutputs,
+        CWL_Output_Type,
         CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
+        JobCustomInputs,
+        JobCustomOutputs,
         JobInputs,
         JobMonitorReference,
         JobOutputs,
@@ -98,20 +102,20 @@ class WpsProcessInterface(abc.ABC):
         self.temp_staging = set()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
+        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> JobOutputs
         """
         Execute the core operation of the remote :term:`Process` using the given inputs.
 
         The function is expected to monitor the process and update the status.
         Retrieve the expected outputs and store them in the ``out_dir``.
 
-        :param workflow_inputs: `CWL` job dict
-        :param out_dir: directory where the outputs must be written
-        :param expected_outputs: expected value outputs as `{'id': 'value'}`
+        :param workflow_inputs: :term:`CWL` job dictionary.
+        :param out_dir: directory where the outputs must be written.
+        :param expected_outputs: expected outputs to collect from complex references.
         """
         self.update_status("Preparing process for remote execution.",
                            RemoteJobProgress.PREPARE, Status.RUNNING)
-        self.prepare()
+        self.prepare(workflow_inputs, expected_outputs)
         self.update_status("Process ready for execute remote process.",
                            RemoteJobProgress.READY, Status.RUNNING)
 
@@ -157,17 +161,23 @@ class WpsProcessInterface(abc.ABC):
 
         self.update_status("Execution of remote process execution completed successfully.",
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
+        return results
 
-    def prepare(self):  # noqa: B027  # intentionally not an abstract method to allow no-op
-        # type: () -> None
+    def prepare(  # noqa: B027  # intentionally not an abstract method to allow no-op
+        self,
+        workflow_inputs,    # type: CWL_RuntimeInputsMap
+        expected_outputs,   # type: CWL_ExpectedOutputs
+    ):                      # type: (...) -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
 
         This is an optional step that can be omitted entirely if not needed.
+        This step should be considered for the creation of a reusable client or object handler that does not need to be
+        recreated on any subsequent steps, such as for :meth:`dispatch` and :meth:`monitor` calls.
         """
 
-    def format_inputs(self, workflow_inputs):
-        # type: (JobInputs) -> Union[JobInputs, Any]
+    def format_inputs(self, job_inputs):
+        # type: (JobInputs) -> Union[JobInputs, JobCustomInputs]
         """
         Implementation dependent operations to configure input values for :term:`Job` execution.
 
@@ -175,10 +185,10 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step inputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_inputs
+        return job_inputs
 
-    def format_outputs(self, workflow_outputs):
-        # type: (JobOutputs) -> JobOutputs
+    def format_outputs(self, job_outputs):
+        # type: (JobOutputs) -> Union[JobOutputs, JobCustomOutputs]
         """
         Implementation dependent operations to configure expected outputs for :term:`Job` execution.
 
@@ -186,11 +196,11 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step outputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_outputs
+        return job_outputs
 
     @abc.abstractmethod
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> JobMonitorReference
+        # type: (Union[JobInputs, JobCustomInputs], Union[JobOutputs, JobCustomOutputs]) -> JobMonitorReference
         """
         Implementation dependent operations to dispatch the :term:`Job` execution to the remote :term:`Process`.
 
@@ -338,6 +348,14 @@ class WpsProcessInterface(abc.ABC):
             if res_id not in expected_outputs:
                 continue
 
+            # Ignore outputs 'collected' by CWL tool to allow a 'string' value to resolve 'loadContent' operation.
+            # However, the reference file used to load contents from an expression, does not (and should not)
+            # itself need staging or fetching from the remote process. The resulting 'string' value only is used.
+            res_def = {"name": res_id, "type": expected_outputs[res_id]["type"]}  # type: CWL_Output_Type
+            res_type = get_cwl_io_type(res_def).type  # resolve atomic type in case of nested/array/nullable definition
+            if res_type not in PACKAGE_COMPLEX_TYPES:
+                continue
+
             # plan ahead when list of multiple output values could be supported
             result_values = get_any_value(result)
             if not isinstance(result_values, list):
@@ -421,11 +439,11 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         self.deploy_body = step_payload
         self.process = process
 
-    def format_outputs(self, workflow_outputs):
+    def format_outputs(self, job_outputs):
         # type: (JobOutputs) -> JobOutputs
-        for output in workflow_outputs:
+        for output in job_outputs:
             output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
-        return workflow_outputs
+        return job_outputs
 
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> str

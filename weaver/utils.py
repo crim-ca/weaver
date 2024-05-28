@@ -116,6 +116,7 @@ if TYPE_CHECKING:
         AnyUUID,
         AnyValueType,
         AnyVersion,
+        Default,
         HeadersType,
         JSON,
         KVP,
@@ -422,7 +423,7 @@ def get_weaver_url(container):
 
 
 def get_any_id(info, default=None, pop=False, key=False):
-    # type: (MutableMapping[str, Any], Optional[str], bool, bool) -> Optional[str]
+    # type: (MutableMapping[str, Any], Default, bool, bool) -> Union[str, Default]
     """
     Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
 
@@ -830,7 +831,7 @@ def get_url_without_query(url):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
-    return urlunsplit(url[:4] + tuple([""]))
+    return str(urlunsplit(url[:4] + tuple([""])))
 
 
 def is_valid_url(url):
@@ -1542,64 +1543,91 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def get_caller_name(skip=0, base_class=False):
-    # type: (int, bool) -> str
+def get_caller_name(skip=0, base_class=False, unwrap=True):
+    # type: (int, bool, bool) -> str
     """
     Find the name of a parent caller function or method.
 
     The name is returned with respective formats ``module.class.method`` or ``module.function``.
 
-    Supposing the following call stack ``main -> func1 -> func2 -> func3 -> get_caller_name``.
-
-    Calling ``get_caller_name()`` or ``get_caller_name(skip=1)`` would return the full package location of ``func2``
-    because it is 1-level higher than were ``get_caller_name`` is called from (inside ``func3``).
-    Calling ``get_caller_name(skip=0)`` would return ``func3`` directly, and ``func1`` for ``get_caller_name(skip=2)``.
+    Supposing the following call stack ``main -> func2 -> func1 -> func0 -> get_caller_name``.
+    Calling ``get_caller_name()`` or ``get_caller_name(skip=0)`` would return the full package location of ``func0``
+    because it is the function were ``get_caller_name`` is called from. Using ``get_caller_name(skip=1)``
+    would return ``func1`` directly (parent 1-level above ``func0``), and ``func2`` for ``get_caller_name(skip=2)``.
 
     :param skip:
         Specifies how many levels of stack to skip for getting the caller.
-        By default, uses ``skip=1`` to obtain the immediate parent function that called :func:`get_caller_name`,
-        were ``skip=0`` would be the function itself that called :func:`get_caller_name`.
+        By default, uses ``skip=0`` to obtain the immediate function that called :func:`get_caller_name`.
     :param base_class:
         Specified if the base class should be returned or the top-most class in case of inheritance
         If the caller is not a class, this doesn't do anything.
+    :param unwrap:
+        If the caller matching the ``skip`` position is detected to be a function decorated by :func:`functools.wraps`,
+        its parent function will be returned instead to reflect the function that was decorated rather than the
+        decorator itself.
     :returns: An empty string if skipped levels exceed stack height; otherwise, the requested caller name.
     """
     # reference: https://gist.github.com/techtonik/2151727
 
-    def stack_(frame):  # type: (FrameType) -> List[FrameType]
+    def unfold_stack(frame):
+        # type: (FrameType) -> List[FrameType]
         frame_list = []
         while frame:
             frame_list.append(frame)
             frame = frame.f_back
         return frame_list
 
-    stack = stack_(sys._getframe(1))  # noqa: W0212
+    def get_frame_caller_name(frame):
+        # type: (FrameType) -> str
+        name = []
+        module = inspect.getmodule(frame)
+        # `modname` can be None when frame is executed directly in console
+        if module:
+            # frame module in case of inherited classes will point to base class
+            # but frame local will still refer to top-most class when checking for 'self'
+            # (stack: top(mid).__init__ -> mid(base).__init__ -> base.__init__)
+            name.append(module.__name__)
+        # detect class name
+        if "self" in frame.f_locals:
+            # I don't know any way to detect call from the object method
+            # XXX: there seems to be no way to detect static method call - it will
+            #      be just a function call
+            cls = frame.f_locals["self"].__class__
+            if not base_class and module and inspect.isclass(cls):
+                name[0] = cls.__module__
+            name.append(cls.__name__)
+        codename = frame.f_code.co_name
+        if codename != "<module>":  # top level usually
+            name.append(codename)  # function or a method
+        return ".".join(name)
+
+    stack = unfold_stack(sys._getframe(1))  # noqa: W0212  # index 1 to skip this own function call
     start = 0 + skip
     if len(stack) < start + 1:
         return ""
-    parent_frame = stack[start]
-    name = []
-    module = inspect.getmodule(parent_frame)
-    # `modname` can be None when frame is executed directly in console
-    if module:
-        # frame module in case of inherited classes will point to base class
-        # but frame local will still refer to top-most class when checking for 'self'
-        # (stack: top(mid).__init__ -> mid(base).__init__ -> base.__init__)
-        name.append(module.__name__)
-    # detect class name
-    if "self" in parent_frame.f_locals:
-        # I don't know any way to detect call from the object method
-        # XXX: there seems to be no way to detect static method call - it will
-        #      be just a function call
-        cls = parent_frame.f_locals["self"].__class__
-        if not base_class and module and inspect.isclass(cls):
-            name[0] = cls.__module__
-        name.append(cls.__name__)
-    codename = parent_frame.f_code.co_name
-    if codename != "<module>":  # top level usually
-        name.append(codename)  # function or a method
-    del parent_frame
-    return ".".join(name)
+
+    callee_frame = stack[start]
+    if unwrap:
+        # must look higher levels to get the locals available within the current 'parent' level
+        # this is so that we can detect the function passed to 'functools.wraps'
+        callee_index = 1
+        callee_search = True
+        while callee_search:
+            callee_parent = stack[start + callee_index]
+            for callee in callee_parent.f_locals.values():
+                if callable(callee) and hasattr(callee, "__wrapped__"):
+                    callee_frame = callee_parent
+                    callee_index += 1
+                    break
+            else:
+                # if we did unwrap multiple levels, backtrack to the current one
+                if callee_index > 2:
+                    callee_frame = stack[start + callee_index - 2]
+                callee_search = False
+
+    callee_name = get_frame_caller_name(callee_frame)
+    del callee_frame
+    return callee_name
 
 
 def setup_cache(settings, reset=True):
@@ -1734,8 +1762,10 @@ def get_request_options(method, url, settings):
     :returns: dictionary with keyword options to be applied to the corresponding request if matched.
     """
     if not settings:
-        LOGGER.warning("No settings container provided by [%s], request options might not be applied as expected.",
-                       get_caller_name(skip=2))
+        LOGGER.warning(
+            "No settings container provided. Request options might not be applied as expected. Calling references: %s",
+            "->".join(f"[{get_caller_name(skip=pos)}]" for pos in reversed(range(1, 7)))
+        )
         return {}
     settings = get_settings(settings)  # ensure settings, could be any container
     req_opts_specs = settings.get("weaver.request_options", None)
@@ -2136,7 +2166,7 @@ def get_secure_path(location):
     Obtain a secure path location with validation of each nested component.
     """
     # consider path with potential scheme
-    parts = location.split("://", 1)
+    parts = location.split("://", 1)  # type: List[str]
     if len(parts) > 1:
         scheme, ref = parts
     else:
@@ -3239,7 +3269,7 @@ def adjust_directory_local(location,                            # type: Path
     # Any operation (islink, remove, etc.) that must operate on the link itself rather than the directory it points
     # to must not have the final '/' in the path. Otherwise, the link path (without final '/') is resolved before
     # evaluating the operation, which make them attempt their call on the real directory itself.
-    link_dir = location.rstrip("/")
+    link_dir = str(location).rstrip("/")
     link_dir = get_secure_path(link_dir)
 
     if (os.path.exists(out_dir) and not os.path.isdir(out_dir)) or (os.path.isdir(out_dir) and os.listdir(out_dir)):
@@ -3957,7 +3987,7 @@ def parse_number_with_unit(number, binary=None):
 
 
 def copy_doc(copy_func):
-    # type: (AnyCallableAnyArgs) -> AnyCallableAnyArgs
+    # type: (AnyCallableAnyArgs) -> Callable[[AnyCallableAnyArgs], Return]
     """
     Decorator to copy the docstring from one callable to another.
 

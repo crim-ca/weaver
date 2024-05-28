@@ -9,6 +9,8 @@ from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.utils import get_process
+from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
 from weaver.utils import get_settings
@@ -298,6 +300,9 @@ def get_job_inputs(request):
     schema = get_schema_query(request.params.get("schema"), strict=False)
     job_inputs = job.inputs
     job_outputs = job.outputs
+    if job.is_local:
+        process = get_process(job.process, request=request)
+        job_inputs = mask_process_inputs(process.package, job_inputs)
     if schema:
         job_inputs = convert_input_values_schema(job_inputs, schema)
         job_outputs = convert_output_params_schema(job_outputs, schema)

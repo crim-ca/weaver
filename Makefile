@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 5.1.1
+APP_VERSION ?= 5.4.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -553,7 +553,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 	@echo "Checking PEP8 doc formatting problems..."
 	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --check --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --check --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
 # FIXME: no configuration file support
@@ -674,7 +674,7 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --in-place --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --in-place --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only
