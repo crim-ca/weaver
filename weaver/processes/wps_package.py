@@ -41,6 +41,9 @@ from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
 from pywps.inout.storage.file import FileStorage, FileStorageBuilder
 from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
+from pywps.validator import get_validator
+from pywps.validator.base import emptyvalidator
+from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
@@ -61,6 +64,7 @@ from weaver.formats import (
     clean_media_type_format,
     get_content_type,
     get_cwl_file_format,
+    get_extension,
     get_format,
     map_cwl_media_type,
     repr_json
@@ -1156,6 +1160,19 @@ def get_process_definition(
         "auth": auth_requirements,
     })
     return process_offering
+
+
+def format_extension_validator(data_input, mode):
+    # type: (Union[ComplexInput, ComplexOutput], int) -> bool
+    """
+    Validator that will only check that the extension matches the selected data format.
+    """
+    if not isinstance(data_input, (ComplexInput, ComplexOutput)):
+        return False  # validator applied on wrong type
+    if mode == MODE.NONE or data_input.data_format is None:
+        return True
+    ext = get_extension(data_input.data_format.mime_type, dot=True)
+    return os.path.splitext(data_input._iohandler._file)[-1] == ext
 
 
 class DirectoryNestedStorage(CachedStorage):
@@ -2435,14 +2452,17 @@ class WpsPackage(Process):
         # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
         resp_output = self.response.outputs[output_id]  # type: ComplexOutput
         resp_output.as_reference = True
-        resp_output.file = result_wps
+
         # Since each output has its own storage already prefixed by '[Context/]JobID/', avoid JobID nesting another dir.
         # Instead, let it create a dir matching the output ID to get '[Context/]JobID/OutputID/[file(s).ext]'
         resp_output.uuid = output_id
+
         # guess the produced file media-type to override the default one selected
+        # this step must be done before setting 'file' attribute, as that will trigger the validator check
         if isinstance(resp_output, ComplexOutput):  # don't process bbox that are 'File' in CWL
             self.resolve_output_format(resp_output, result_path, result_cwl_fmt)
 
+        resp_output.file = result_wps
         self.log_message(f"Resolved WPS output [{output_id}] as file reference: [{result_wps}]")
 
     @staticmethod
@@ -2454,6 +2474,9 @@ class WpsPackage(Process):
         Considers :term:`CWL` results ``format``, the file path, and the :term:`Process` description to resolve the
         best possible match, retaining a much as possible the metadata that can be resolved from their corresponding
         details.
+
+        When the media-type is resolved, ensure that an appropriate format validator is applied to perform relevant
+        checks, or omit them when not implemented.
         """
         result_ctype = map_cwl_media_type(result_cwl_format)
         if not result_ctype:
@@ -2462,6 +2485,8 @@ class WpsPackage(Process):
             if result_ext:
                 result_ctype = get_content_type(result_ext)
         if not result_ctype:
+            if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
+                output.valid_mode = MODE.NONE  # disable to avoid ensured failure
             return
 
         # - When resolving media-types, use the corresponding supported format defined in the process definition
@@ -2491,7 +2516,17 @@ class WpsPackage(Process):
                     fmt_type = clean_media_type_format(fmt.mime_type, strip_parameters=strip, suffix_subtype=simplify)
                     if fmt_type == result_format.mime_type:
                         output.data_format = fmt
+                        validator = get_validator(fmt.mime_type)
+                        if output.valid_mode != MODE.NONE and validator is emptyvalidator:
+                            if fmt_type == ContentType.TEXT_PLAIN:
+                                output.valid_mode = MODE.NONE  # disable since text can be used with many extensions
+                            else:
+                                output.data_format.validate = format_extension_validator
                         return
+
+        # no match found, minimally check for extension
+        if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
+            output.data_format.validate = format_extension_validator
 
     def make_location_storage(self, storage_type, location_type):
         # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]

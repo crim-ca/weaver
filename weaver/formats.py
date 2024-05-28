@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import socket
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -28,6 +28,19 @@ if TYPE_CHECKING:
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
     DataStrT = TypeVar("DataStrT")
+
+    AnyOutputFormat = Literal[
+        "json",
+        "json+str",
+        "json+raw",
+        "xml",
+        "xml+str",
+        "xml+raw",
+        "txt",
+        "text",
+        "yml",
+        "yaml",
+    ]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +166,8 @@ class ContentEncoding(Constants):
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
         is_text = ContentEncoding.is_text(encoding)
-        return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
+        b_mode = cast("FileModeEncoding", f"{mode}b")  # type: FileModeEncoding
+        return (mode, ContentEncoding.UTF_8) if is_text else (b_mode, None)
 
     @staticmethod
     @overload
@@ -278,48 +292,48 @@ class OutputFormat(Constants):
     """
     JSON = classproperty(fget=lambda self: "json", doc="""
     Representation as :term:`JSON` (object), which can still be manipulated in code.
-    """)  # noqa: F811  # false-positive redefinition of JSON typing
+    """)  # type: Literal["json"]  # noqa: F811  # false-positive redefinition of JSON typing
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
     Representation as :term:`JSON` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["json+str"]
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
     Representation as :term:`JSON` content formatted as raw string without any indentation or newlines.
-    """)
+    """)  # type: Literal["json+raw"]
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
     Representation as :term:`YAML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["yaml"]
 
     YML = classproperty(fget=lambda self: "yml", doc="""
     Alias to YAML.
-    """)
+    """)  # type: Literal["yml"]
 
     XML = classproperty(fget=lambda self: "xml", doc="""
     Representation as :term:`XML` content formatted as serialized string.
-    """)
+    """)  # type: Literal["xml"]
 
     XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
     Representation as :term:`XML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["xml+str"]
 
     XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
     Representation as :term:`XML` content formatted as raw string without indentation or newlines.
-    """)
+    """)  # type: Literal["xml+raw"]
 
     TXT = classproperty(fget=lambda self: "txt", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["txt"]
 
     TEXT = classproperty(fget=lambda self: "text", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["text"]
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
-            default=JSON,           # type: AnyOutputFormat
+            default=JSON,           # type: Optional[AnyOutputFormat]
             allow_version=True,     # type: bool
             ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
@@ -912,7 +926,7 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
 
 
 def guess_target_format(request, default=ContentType.APP_JSON):
-    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
+    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> Union[ContentType, str]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -938,7 +952,7 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     from weaver.utils import get_header
 
     format_query = request.params.get("format") or request.params.get("f")
-    content_type = None
+    content_type = None  # type: Optional[str]
     if format_query:
         content_type = OutputFormat.get(format_query, default=None, allow_version=False)
         if content_type:
@@ -984,14 +998,3 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)
-
-
-if TYPE_CHECKING:
-    from weaver.typedefs import Literal
-
-    AnyOutputFormat = Literal[
-        OutputFormat.JSON,
-        OutputFormat.XML,
-        OutputFormat.YAML,
-        OutputFormat.YML,
-    ]

@@ -1324,14 +1324,14 @@ def mocked_aws_s3(test_func):
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
     ...
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
     ...
 
 

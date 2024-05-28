@@ -7,6 +7,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 import contextlib
 import copy
 import io
+import itertools
 import json
 import logging
 import os
@@ -23,10 +24,14 @@ import pytest
 from _pytest.outcomes import Failed
 from cwltool.errors import WorkflowException
 from cwltool.factory import Factory as CWLFactory
+from pywps.inout.formats import Format
+from pywps.inout.outputs import ComplexOutput
+from pywps.validator.mode import MODE
 
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
+from weaver.formats import ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -41,13 +46,14 @@ from weaver.processes.wps_package import (
     WpsPackage,
     _load_package_content,
     _update_package_compatibility,
+    format_extension_validator,
     get_application_requirement,
     mask_process_inputs
 )
 from weaver.wps.service import WorkerRequest
 
 if TYPE_CHECKING:
-    from typing import Dict, TypeVar
+    from typing import Any, Dict, TypeVar
 
     KT = TypeVar("KT")
     VT_co = TypeVar("VT_co", covariant=True)
@@ -639,3 +645,25 @@ def test_mask_process_inputs(inputs, expect):
         result = mask_process_inputs(cwl, inputs)
     assert result == expect, "expected inputs should have been masked"
     assert inputs != expect, "original inputs should not be modified"
+
+
+@pytest.mark.parametrize(
+    ["data_input", "mode", "expect"],
+    [
+        (*params, False) for params in itertools.product(
+            [object()],
+            [MODE.SIMPLE, MODE.STRICT, MODE.VERYSTRICT],
+        )
+    ] +
+    [
+        (*params, True) for params in itertools.product(
+            [ComplexOutput("test", "test")],
+            [MODE.NONE, MODE.SIMPLE, MODE.STRICT, MODE.VERYSTRICT],
+        )
+    ] + [
+        (ComplexOutput("test", "test", [Format(ContentType.APP_JSON)], mode=MODE.NONE), MODE.NONE, True),
+    ]
+)
+def test_format_extension_validator_basic(data_input, mode, expect):
+    # type: (Any, int, bool) -> None
+    assert format_extension_validator(data_input, mode) == expect
