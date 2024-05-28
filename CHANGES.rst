@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_5.4.0:
+
+`5.4.0 <https://github.com/crim-ca/weaver/tree/5.4.0>`_ (2024-05-27)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Use ``requests.auth.AuthBase`` type for ``auth`` parameter of ``weaver.cli.WeaverClient`` methods to allow
   any ``requests`` compatible package to use their own implementation of the authentication mechanism without
   explicitly deriving from ``weaver.cli.AuthHandler`` (fixes `#628 <https://github.com/crim-ca/weaver/issues/628>`_).
