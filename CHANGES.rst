@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_5.4.1:
+
+`5.4.1 <https://github.com/crim-ca/weaver/tree/5.4.1>`_ (2024-06-03)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix `Process` ID resolution from `CWL` ``Workflow`` step package from long-form URL reference included as fragment.
 
 .. _changes_5.4.0:
