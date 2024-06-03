@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `Process` ID resolution from `CWL` ``Workflow`` step package from long-form URL reference included as fragment.
 
 .. _changes_5.4.0:
 
