@@ -2573,7 +2573,7 @@ class WpsPackage(Process):
         # it means that either an atomic process was invoked, or that the top-most Workflow is called.
         # In such case, it is safe to return the self-reference for the tool job, as it will refer to the same log/job.
         # Also, this avoids duplicate setup of log handlers, which would result in inconsistant progress tracking.
-        process_id = toolpath_object["id"].rsplit("/", 1)[-1]
+        process_id = toolpath_object["id"].rsplit("/", 1)[-1].rsplit("#", 1)[-1]
         if self.package_id == process_id:
             return default_make_tool(toolpath_object, loading_context, self)
 
