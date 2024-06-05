@@ -163,9 +163,7 @@ class Wps3Process(OGCAPIRemoteProcessBase):
         Add specific user access headers for :term:`ADES` if provided in :ref:`Configuration Settings`.
         """
         headers = super(Wps3Process, self).get_auth_headers()
-        auth = headers.get("Authorization")
-        if not auth:
-            headers.update(self.get_user_auth_header())
+        headers.update(self.get_user_auth_header())
         return headers
 
     def is_deployed(self):

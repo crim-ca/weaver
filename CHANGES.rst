@@ -12,11 +12,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``POST /processes/{processId}/execution`` as fallback endpoint for ``POST /processes/{processId}/jobs`` to submit
+  the `Job` execution within a  `CWL` ``Workflow`` using a remote `OGC API - Processes` step to accommodate for varying
+  versions of the standard and implementations.
+- Add error status update of the response from a failed step ``Job`` request to allow investigating the cause from logs.
 
 Fixes:
 ------
-- No change.
+- Fix ``Cookie`` header not propagated to every underlying `CWL` ``Workflow`` step causing authorization failure
+  midway during an authorized `Process` execution.
 
 .. _changes_5.4.1:
 
