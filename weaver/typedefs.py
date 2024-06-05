@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from webob.multidict import MultiDict as PyramidMultiDict
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
+    from werkzeug.datastructures import Headers as WerkzeugHeaders
     from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
@@ -331,12 +332,14 @@ if TYPE_CHECKING:
     HeadersType = Dict[str, str]
     CookiesTupleType = List[Tuple[str, str]]
     HeadersTupleType = List[Tuple[str, str]]
+    HeaderCookiesList = Union[HeadersTupleType, CookiesTupleType]
     CookiesBaseType = Union[CookiesType, CookiesTupleType]
     HeadersBaseType = Union[HeadersType, HeadersTupleType]
     HeaderCookiesType = Union[HeadersBaseType, CookiesBaseType]
     HeaderCookiesTuple = Union[Tuple[None, None], Tuple[HeadersBaseType, CookiesBaseType]]
-    AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
+    AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict, WerkzeugHeaders]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
+    AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException]

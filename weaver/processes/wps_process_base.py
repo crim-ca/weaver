@@ -6,7 +6,7 @@ import tempfile
 import time
 from typing import TYPE_CHECKING
 
-from requests.structures import CaseInsensitiveDict
+from werkzeug.datastructures import Headers
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
@@ -263,7 +263,7 @@ class WpsProcessInterface(abc.ABC):
         headers = {}
         if self.request and self.request.auth_headers:
             headers = self.request.auth_headers.copy()
-        return CaseInsensitiveDict(headers)
+        return Headers(headers)
 
     def get_auth_cookies(self):
         # type: () -> CookiesTupleType
@@ -292,8 +292,8 @@ class WpsProcessInterface(abc.ABC):
         Sends the request with additional parameter handling for the current process definition.
         """
         retries = int(retry) if retry is not None else 0
-        cookies = CaseInsensitiveDict(cookies or {})
-        headers = CaseInsensitiveDict(headers or {})
+        cookies = Headers(cookies or {})
+        headers = Headers(headers or {})
         cookies.update(self.get_auth_cookies())
         headers.update(self.headers.copy())
         headers.update(self.get_auth_headers())
@@ -457,9 +457,19 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         LOGGER.debug("Execute process %s body for [%s]:\n%s", self.process_type, self.process, repr_json(execute_body))
         request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
         response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
+        if response.status_code in [404, 405]:
+            request_url = self.url + sd.process_execution_service.path.format(process_id=self.process)
+            response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
         if response.status_code != 201:
             LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
-            raise Exception(f"Was expecting a 201 status code from the execute request : {request_url}")
+            self.update_status(
+                f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
+                f"{repr_json(response.text, indent=2)}",
+                RemoteJobProgress.EXECUTION,
+                Status.FAILED,
+                level=logging.ERROR,
+            )
+            raise Exception(f"Was expecting a 201 status code from the execute request: [{request_url}]")
 
         job_status_uri = response.headers["Location"]
         return job_status_uri

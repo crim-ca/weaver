@@ -21,6 +21,23 @@ Fixes:
 ------
 - Fix ``weaver.wps_restapi.colander_extras.ExtendedSequenceSchema`` not allowing other item types than a mapping.
 
+.. _changes_5.4.2:
+
+`5.4.2 <https://github.com/crim-ca/weaver/tree/5.4.2>`_ (2024-06-05)
+========================================================================
+
+Changes:
+--------
+- Add ``POST /processes/{processId}/execution`` as fallback endpoint for ``POST /processes/{processId}/jobs`` to submit
+  the `Job` execution within a  `CWL` ``Workflow`` using a remote `OGC API - Processes` step to accommodate for varying
+  versions of the standard and implementations.
+- Add error status update of the response from a failed step ``Job`` request to allow investigating the cause from logs.
+
+Fixes:
+------
+- Fix ``Cookie`` header not propagated to every underlying `CWL` ``Workflow`` step causing authorization failure
+  midway during an authorized `Process` execution.
+
 .. _changes_5.4.1:
 
 `5.4.1 <https://github.com/crim-ca/weaver/tree/5.4.1>`_ (2024-06-03)
