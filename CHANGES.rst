@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.4.2:
+
+`5.4.2 <https://github.com/crim-ca/weaver/tree/5.4.2>`_ (2024-06-05)
+========================================================================
+
+Changes:
+--------
 - Add ``POST /processes/{processId}/execution`` as fallback endpoint for ``POST /processes/{processId}/jobs`` to submit
   the `Job` execution within a  `CWL` ``Workflow`` using a remote `OGC API - Processes` step to accommodate for varying
   versions of the standard and implementations.
