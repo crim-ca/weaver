@@ -34,7 +34,7 @@ from cwltool.process import use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout.basic import SOURCE_TYPE, FileHandler, IOHandler, NoneIOHandler
+from pywps.inout.basic import SOURCE_TYPE, DataHandler, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput
@@ -61,6 +61,7 @@ from weaver.exceptions import (
 )
 from weaver.formats import (
     ContentType,
+    OutputFormat,
     clean_media_type_format,
     get_content_type,
     get_cwl_file_format,
@@ -106,6 +107,7 @@ from weaver.processes.convert import (
     normalize_ordered_io,
     ogcapi2cwl_process,
     resolve_cwl_namespaced_name,
+    set_field,
     wps2json_io,
     xml_wps2cwl
 )
@@ -2330,20 +2332,14 @@ class WpsPackage(Process):
         """
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
-                # FIXME: support multiple outputs cardinality (https://github.com/crim-ca/weaver/issues/25)
-                if len(cwl_result[output_id]) > 1:
-                    self.log_message(
-                        f"Dropping additional output values ({len(cwl_result[output_id])} total), "
-                        "only 1 supported per identifier.",
-                        level=logging.WARNING
-                    )
                 # provide more details than poorly descriptive IndexError
                 if not len(cwl_result[output_id]):
                     raise PackageExecutionError(
                         f"Process output '{output_id}' expects at least one value but none was found. "
                         "Possible incorrect glob pattern definition in CWL Application Package."
                     )
-                cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
+                self.make_array_output(cwl_result, output_id)
+                continue
 
             if isinstance(cwl_result[output_id], dict):
                 if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
@@ -2361,27 +2357,63 @@ class WpsPackage(Process):
                     self.make_bbox_output(cwl_result, output_id)
                     continue
 
-            data_output = self.make_literal_output(cwl_result[output_id])
-            self.response.outputs[output_id].data = data_output
-            self.response.outputs[output_id].as_reference = False
-            self.log_message(f"Resolved WPS output [{output_id}] as literal data")
+            self.make_literal_output(cwl_result, output_id)
 
-    @staticmethod
-    def make_literal_output(data):
-        # type: (AnyValueType) -> AnyValueType
+    def make_array_output(self, cwl_result, output_id):
+        # type: (CWL_Results, str) -> None
+        """
+        Converts an array output into a :term:`JSON` literal representation.
+        """
+        # apply the relevant operation for each item type
+        # appropriate validation, storage and data-format conversion should be applied
+        collect_items = []
+        for idx, item in enumerate(cwl_result[output_id]):
+            if isinstance(item, dict):
+                if "location" in item:
+                    self.make_location_output(cwl_result, output_id, index=idx)
+                else:
+                    self.make_bbox_output(cwl_result, output_id, index=idx)
+            else:
+                self.make_literal_output(cwl_result, output_id, index=idx)
+
+            # retrieve the temporarily stored result as a single item
+            collect_items.append(self.response.outputs[output_id].json)
+
+        # use a custom representation to allow us handling the raw data array properly
+        array_data = repr_json(collect_items, force_string=True, indent=None)
+
+        # avoid error on mismatching atomic item type and the JSON array as string
+        self.response.outputs[output_id] = ComplexOutput(  # convert in case it was a literal
+            self.response.outputs[output_id].identifier,
+            self.response.outputs[output_id].title,
+            data_format=Format(mime_type=ContentType.APP_RAW_JSON),
+            supported_formats=[Format(mime_type=ContentType.APP_RAW_JSON)],
+            as_reference=False,
+            mode=MODE.NONE,
+        )
+        self.response.outputs[output_id]._iohandler = DataHandler(array_data, self.response.outputs[output_id])
+        self.log_message(f"Resolved WPS output [{output_id}] as complex array data embedded as JSON string")
+
+    def make_literal_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
         """
         Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
         """
-        return repr_json(data, force_string=False)
+        data_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        data_output = repr_json(data_cwl, force_string=False)
+        self.response.outputs[output_id].data = data_output
+        self.response.outputs[output_id].as_reference = False
+        self.log_message(f"Resolved WPS output [{output_id}] as literal data")
 
-    def make_bbox_output(self, cwl_result, output_id):
-        # type: (CWL_Results, str) -> None
+    def make_bbox_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
         """
         Generates the :term:`WPS` Bounding Box output from the :term:`CWL` ``File``.
 
         Assumes that location outputs were resolved beforehand, such that the file is available locally.
         """
-        bbox_loc = cwl_result[output_id]["location"]
+        bbox_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        bbox_loc = bbox_cwl["location"]
         if bbox_loc.startswith("file://"):
             bbox_loc = bbox_loc[7:]
         with open(bbox_loc, mode="r", encoding="utf-8") as bbox_file:
@@ -2391,8 +2423,8 @@ class WpsPackage(Process):
         self.response.outputs[output_id].dimensions = len(bbox_data["bbox"]) // 2
         self.response.outputs[output_id].as_reference = False
 
-    def make_location_output(self, cwl_result, output_id):
-        # type: (CWL_Results, str) -> None
+    def make_location_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
         """
         Rewrite the :term:`WPS` output with required location using result path from :term:`CWL` execution.
 
@@ -2404,10 +2436,11 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
-        result_loc = cwl_result[output_id]["location"].replace("file://", "").rstrip("/")
+        result_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        result_loc = result_cwl["location"].replace("file://", "").rstrip("/")
         result_path = os.path.split(result_loc)[-1]
-        result_type = cwl_result[output_id].get("class", PACKAGE_FILE_TYPE)
-        result_cwl_fmt = cwl_result[output_id].get("format")
+        result_type = result_cwl.get("class", PACKAGE_FILE_TYPE)
+        result_cwl_fmt = result_cwl.get("format")
         result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
         if result_is_dir and not result_path.endswith("/"):
             result_path += "/"

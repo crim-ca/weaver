@@ -12,11 +12,14 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of multiple-value array outputs to allow `CWL` `Application Package` that can make use of such definitions
+  (fixes `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+- Add ``weaver.wps_restapi.colander_extras.AnyType`` and ``weaver.wps_restapi.colander_extras.NoneType`` with their
+  corresponding `JSON`/`OpenAPI` schema converters to allow the definition of ``null`` and ``{}`` type definitions.
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.wps_restapi.colander_extras.ExtendedSequenceSchema`` not allowing other item types than a mapping.
 
 .. _changes_5.4.1:
 

@@ -1311,3 +1311,25 @@ def test_schema_ref_resolution(
             },
             "additionalProperties": {}
         }, err_msg
+
+
+@pytest.mark.parametrize(
+    "item", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        None,
+        {},
+        {"xyz": 1.2},
+        colander.null,
+        colander.drop,
+    ]
+)
+def test_any_array(item):
+    array = [item]
+    expect = array if item not in (colander.drop, colander.null) else []
+    result = ce.PermissiveSequenceSchema().deserialize(array)
+    assert result == expect
