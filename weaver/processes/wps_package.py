@@ -2386,6 +2386,9 @@ class WpsPackage(Process):
         self.response.outputs[output_id] = ComplexOutput(  # convert in case it was a literal
             self.response.outputs[output_id].identifier,
             self.response.outputs[output_id].title,
+            # use an alternate RAW+JSON media-type to avoid ambiguity between a real complex data
+            # that uses a JSON file (potentially reported as raw data instead of reference) and
+            # this workaround embedded JSON string for encapsulating multi-value outputs unsupported by WPS
             data_format=Format(mime_type=ContentType.APP_RAW_JSON),
             supported_formats=[Format(mime_type=ContentType.APP_RAW_JSON)],
             as_reference=False,
