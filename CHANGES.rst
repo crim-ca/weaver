@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.5.0:
+
+`5.5.0 <https://github.com/crim-ca/weaver/tree/5.5.0>`_ (2024-06-06)
+========================================================================
+
+Changes:
+--------
 - Add support of multiple-value array outputs to allow `CWL` `Application Package` that can make use of such definitions
   (fixes `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Add ``weaver.wps_restapi.colander_extras.AnyType`` and ``weaver.wps_restapi.colander_extras.NoneType`` with their
