@@ -2386,14 +2386,20 @@ def test_ows2json_io_convert_literal_uom(ows_io, json_io):
         (
             ["random"],
             WPS_COMPLEX_DATA,
-            "text/plain",
-            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": "text/plain"},
+            ContentType.TEXT_PLAIN,
+            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.TEXT_PLAIN},
         ),
         (
-            [1, 2, 3],
+            [[1, 2, 3]],
             WPS_COMPLEX_DATA,
-            "application/json",
-            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": "application/json"},
+            ContentType.APP_JSON,
+            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.APP_JSON},
+        ),
+        (
+            [[{"data": 123}, {"xyz": "ok"}]],
+            WPS_COMPLEX_DATA,
+            ContentType.APP_JSON,
+            {"data": [{"data": 123}, {"xyz": "ok"}], "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.APP_JSON},
         ),
     ]
 )

@@ -356,13 +356,16 @@ class WpsProcessInterface(abc.ABC):
             if res_type not in PACKAGE_COMPLEX_TYPES:
                 continue
 
-            # plan ahead when list of multiple output values could be supported
+            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
+            os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
+
+            # handle list in case of multiple output values
             result_values = get_any_value(result)
             if not isinstance(result_values, list):
                 result_values = [result_values]
-            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
-            os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
             for value in result_values:
+                if isinstance(value, dict):
+                    value = get_any_value(value, file=True, data=False)
                 src_name = value.split("/")[-1]
                 dst_path = "/".join([cwl_out_dir, src_name])
                 # performance improvement:

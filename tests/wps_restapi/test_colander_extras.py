@@ -1311,3 +1311,103 @@ def test_schema_ref_resolution(
             },
             "additionalProperties": {}
         }, err_msg
+
+
+@pytest.mark.parametrize(
+    "item", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        None,
+        {},
+        {"xyz": 1.2},
+        colander.null,
+        colander.drop,
+    ]
+)
+def test_any_array(item):
+    array = [item]
+    expect = array if item not in (colander.drop, colander.null) else []
+    result = ce.PermissiveSequenceSchema().deserialize(array)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    "value", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        None,
+        {},
+        {"xyz": 1.2},
+        colander.drop,
+    ]
+)
+def test_any_type(value):
+    result = ce.ExtendedSchemaNode(ce.AnyType()).deserialize(value)
+    assert result == value
+
+
+def test_any_type_default():
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.AnyType()).deserialize(colander.null)
+    result = ce.ExtendedSchemaNode(ce.AnyType(), default=None).deserialize(colander.null)
+    assert result is None
+    result = ce.ExtendedSchemaNode(ce.AnyType(), default=colander.drop).deserialize(colander.null)
+    assert result == colander.drop
+
+
+def test_any_type_schema():
+    node = ce.ExtendedSchemaNode(ce.AnyType(), title="test-null")
+    schema = ce.AnyTypeConverter(None).convert_type(node)
+    assert schema == {"title": "test-null"}
+
+
+@pytest.mark.parametrize(
+    "value", [
+        None,
+        colander.drop,
+    ]
+)
+def test_none_type_valid(value):
+    result = ce.ExtendedSchemaNode(ce.NoneType()).deserialize(value)
+    assert result == value
+
+
+@pytest.mark.parametrize(
+    "value", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        {},
+        {"xyz": 1.2},
+        colander.null,
+    ]
+)
+def test_none_type_invalid(value):
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.NoneType()).deserialize(value)
+
+
+def test_none_type_default():
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.NoneType()).deserialize(colander.null)
+    result = ce.ExtendedSchemaNode(ce.NoneType(), default=None).deserialize(colander.null)
+    assert result is None
+    result = ce.ExtendedSchemaNode(ce.NoneType(), default=colander.drop).deserialize(colander.null)
+    assert result == colander.drop
+
+
+def test_none_type_schema():
+    node = ce.ExtendedSchemaNode(ce.NoneType(), title="test-null")
+    schema = ce.NoneTypeConverter(None).convert_type(node)
+    assert schema == {"type": "null", "title": "test-null"}

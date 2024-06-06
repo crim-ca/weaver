@@ -294,7 +294,9 @@ Developments are continued in |ogc-tb16|_ to improve methodologies in order to p
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 Findings and recommendations are presented in the |ogc-tb16-data-access-proc-er|_.
 
-.. fixme: deploy from ipynb, add |ogc-tb16-ipynb-er| (https://github.com/crim-ca/weaver/issues/63)
+.. fixme:
+.. todo::
+   deploy from ipynb, add |ogc-tb16-ipynb-er| (https://github.com/crim-ca/weaver/issues/63)
 
 Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.

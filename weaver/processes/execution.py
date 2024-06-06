@@ -111,7 +111,7 @@ class JobProgress(object):
 
 @app.task(bind=True)
 def execute_process(task, job_id, wps_url, headers=None):
-    # type: (Task, UUID, str, Optional[HeadersType]) -> StatusType
+    # type: (Task, UUID, str, Optional[HeaderCookiesType]) -> StatusType
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
     """
@@ -575,6 +575,8 @@ def make_results_relative(results, settings):
     wps_url = get_wps_output_url(settings)
     wps_path = get_wps_output_path(settings)
     for res in results:
+        if not isinstance(res, dict):
+            continue
         ref = res.get("reference")
         if isinstance(ref, str) and ref:
             if ref.startswith(wps_url):
@@ -582,6 +584,9 @@ def make_results_relative(results, settings):
             if ref.startswith(wps_path):
                 ref = ref.replace(wps_path, "", 1)
             res["reference"] = ref
+        data = res.get("data")
+        if isinstance(data, list):
+            make_results_relative(data, settings)
     return results
 
 
