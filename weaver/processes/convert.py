@@ -498,6 +498,7 @@ def ows2json_output_data(output, process_description, container=None):
         json_array = _get_multi_json_references(output, container)
         if json_array and all(str(ref).startswith("http") for ref in json_array):
             json_output["data"] = json_array
+        json_output = any2json_output_data(output, json_output)  # normalize any missing definitions as necessary
 
     elif (
         output.dataType == WPS_COMPLEX_DATA and
@@ -546,11 +547,18 @@ def any2json_output_data(output_info, output_data):
     elif json_output["dataType"] == WPS_BOUNDINGBOX_DATA:
         json_data = ows2json_bbox_data(output_data)
         json_output["data"] = json_data
-    elif json_output["dataType"] == WPS_COMPLEX_DATA or io_type == WPS_REFERENCE:
+    elif json_output["dataType"] == WPS_COMPLEX_DATA or io_type == WPS_REFERENCE or WPS_REFERENCE in output_data:
         json_output["dataType"] = WPS_COMPLEX_DATA  # force in case not set
-        media_type = get_field(output_data, "mime_type", search_variations=True, default=None)
-        complex_data = get_any_value(output_data, file=False, data=True, default=None)
-        complex_href = get_any_value(output_data, file=True, data=False, default=None)
+        media_type = (
+            get_field(output_data, "mime_type", search_variations=True, default=None) or
+            get_field(output_info, "mime_type", search_variations=True, default=None)
+        )
+        if isinstance(output_data, dict):
+            complex_data = get_any_value(output_data, file=False, data=True, default=None)
+            complex_href = get_any_value(output_data, file=True, data=False, default=None)
+        else:
+            complex_data = output_data
+            complex_href = None
         if media_type:
             json_output.setdefault("mimeType", media_type)
             if media_type in ContentType.ANY_JSON and isinstance(complex_data, (list, dict)) and complex_data:
@@ -3205,6 +3213,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         io_wps = null
         if io_type in WPS_COMPLEX_TYPES:
             io_info.pop("supported_values", None)
+            io_info.pop("data_type", None)  # ComplexData explicitly indicated (e.g.: embedded multi-value JSON array)
             io_wps = ComplexOutput(**io_info)
         elif io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)

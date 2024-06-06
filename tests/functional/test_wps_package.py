@@ -3258,12 +3258,23 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][2]["formats"][2]["mediaType"] == ContentType.APP_ZIP
         assert "encoding" not in proc["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
-    # FIXME: implement,
-    #   need to find a existing WPS with some, or manually write XML
-    #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
-    #   (https://github.com/crim-ca/weaver/issues/25)
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_multi_outputs_file_from_wps_xml_reference(self):
+        """
+        Left for documentation purpose only.
+
+        While multi-value output under a same ID is supported by :term:`OGC API - Processes` and :term:`CWL`,
+        such definitions are not compliant with :term:`WPS` specification. A server responding with
+        a :term:`XML` ``ProcessDescription`` should never indicate a ``maxOccurs!=1`` value, or it would be
+        non-compliant and would actually represent undefined behavior. The test cannot be implemented for this reason.
+
+        .. note::
+            This does not impact multi-value output support for a :term:`OGC API - Processes` using the :term:`WPS`
+            interface. The multi-value output would be represented as an embedded :term:`JSON` array as single value
+            encoded with media-type :data:`ContentType.APP_RAW_JSON``. From the point of view of the :term:`WPS`
+            definition, the output would not be multi-value to respect the standard. However, there is no **official**
+            way to detect this embedded :term:`JSON` as multi-value support directly from the ``ProcessDescription``.
+        """
         raise NotImplementedError
 
     def test_execute_cwl_enum_schema_combined_type_single_array_from_cwl(self):

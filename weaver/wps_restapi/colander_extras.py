@@ -2878,6 +2878,12 @@ class OAS3DefinitionHandler(DefinitionHandler):
                 schema["$ref"] = schema_ref
         return schema_ret
 
+    def _ref_recursive(self, schema, depth, base_name=None):
+        # avoid key error if dealing with 'AnyType'
+        if not schema or not schema.get("type"):
+            return schema or {}
+        return super()._ref_recursive(schema, depth, base_name=base_name)
+
     def _process_items(self,
                        schema,      # type: Dict[str, Any]
                        list_type,   # type: Literal["oneOf", "allOf", "anyOf", "not"]
