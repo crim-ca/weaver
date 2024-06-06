@@ -1337,27 +1337,26 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     #   WPS payload must specify them
                     # "format": [type_json, type2, type3]
                 },
-                # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
-                # {
-                #    "id": "multi_value_single_format",
-                #    "type": {
-                #        "type": "array",
-                #        "items": "File",
-                #    },
-                #    "format": type3,
-                # },
-                # {
-                #     "id": "multi_value_multi_format",
-                #     "type": {
-                #         "type": "array",
-                #         "items": "File",
-                #     },
-                #     # NOTE:
-                #     #   not valid to have array of format for output as per:
-                #     #   https://github.com/common-workflow-language/common-workflow-language/issues/482
-                #     #   WPS payload must specify them
-                #     "format": [type3, type2, type_json],
-                # },
+                {
+                   "id": "multi_value_single_format",
+                   "type": {
+                       "type": "array",
+                       "items": "File",
+                   },
+                   "format": type_ncdf,
+                },
+                {
+                    "id": "multi_value_multi_format",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    # NOTE:
+                    #   not valid to have array of format for output as per:
+                    #   https://github.com/common-workflow-language/common-workflow-language/issues/482
+                    #   WPS payload must specify them
+                    # "format": [type3, type2, type_json],
+                },
             ],
             "$namespaces": namespaces
         }
@@ -1399,15 +1398,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                 {"mimeType": ContentType.APP_NETCDF},
                             ]
                         },
-                        # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
-                        # {
-                        #     "id": "multi_value_multi_format",
-                        #     "formats": [
-                        #         {"mimeType": ContentType.APP_NETCDF},
-                        #         {"mimeType": ContentType.TEXT_PLAIN},
-                        #         {"mimeType": ContentType.APP_JSON},
-                        #     ]
-                        # }
+                        {
+                            "id": "multi_value_multi_format",
+                            "formats": [
+                                {"mimeType": ContentType.APP_NETCDF},
+                                {"mimeType": ContentType.TEXT_PLAIN},
+                                {"mimeType": ContentType.APP_JSON},
+                            ]
+                        }
                     ]
                 },
             },
@@ -1485,7 +1483,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         # process description output validation
         assert isinstance(proc["outputs"], list)
-        assert len(proc["outputs"]) == 2  # FIXME: adjust output count when issue #25 is implemented
+        assert len(proc["outputs"]) == 4
         for output in proc["outputs"]:
             for field in ["minOccurs", "maxOccurs", "default"]:
                 assert field not in output
@@ -1509,15 +1507,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
-        # FIXME: enable when issue #25 is implemented
-        # assert proc["outputs"][2]["id"] == "multi_value_single_format"
-        # assert len(proc["outputs"][2]["formats"]) == 1
-        # assert proc["outputs"][2]["formats"][0] == ContentType.APP_NETCDF
-        # assert proc["outputs"][3]["id"] == "multi_value_multi_format"
-        # assert len(proc["outputs"][3]["formats"]) == 3
-        # assert proc["outputs"][3]["formats"][0] == ContentType.APP_NETCDF
-        # assert proc["outputs"][3]["formats"][1] == ContentType.TEXT_PLAIN
-        # assert proc["outputs"][3]["formats"][2] == ContentType.APP_JSON
+        assert proc["outputs"][2]["id"] == "multi_value_single_format"
+        assert len(proc["outputs"][2]["formats"]) == 1
+        assert proc["outputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][2]["formats"][0]["default"] is True
+        assert proc["outputs"][3]["id"] == "multi_value_multi_format"
+        assert len(proc["outputs"][3]["formats"]) == 3
+        assert proc["outputs"][3]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][3]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
+        assert proc["outputs"][3]["formats"][2]["mediaType"] == ContentType.APP_JSON
+        assert proc["outputs"][3]["formats"][0]["default"] is True   # mandatory
+        assert proc["outputs"][3]["formats"][1].get("default", False) is False  # omission is allowed
+        assert proc["outputs"][3]["formats"][2].get("default", False) is False  # omission is allowed
 
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
@@ -1566,15 +1567,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert pkg["outputs"][1]["id"] == "single_value_multi_format"
         assert pkg["outputs"][1]["type"] == "File"
         assert "format" not in pkg["outputs"][1], "CWL format array not allowed for outputs."
-        # FIXME: enable when issue #25 is implemented
-        # assert pkg["outputs"][2]["id"] == "multi_value_single_format"
-        # assert pkg["outputs"][2]["type"] == "array"
-        # assert pkg["outputs"][2]["items"] == "File"
-        # assert pkg["outputs"][2]["format"] == type_ncdf
-        # assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
-        # assert pkg["outputs"][3]["type"] == "array"
-        # assert pkg["outputs"][3]["items"] == "File"
-        # assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
+        assert pkg["outputs"][2]["id"] == "multi_value_single_format"
+        assert pkg["outputs"][2]["type"] == {"type": "array", "items": "File"}
+        assert pkg["outputs"][2]["format"] == type_ncdf
+        assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
+        assert pkg["outputs"][3]["type"] == {"type": "array", "items": "File"}
+        assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
 
     def test_deploy_merge_resolution_io_min_max_occurs(self):
         """
