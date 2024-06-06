@@ -1323,18 +1323,47 @@ Multiple Inputs
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Although :term:`CWL` allows output arrays, :term:`WPS` does not support it directly, as only single values are allowed
-for :term:`WPS` outputs according to original specification. To work around this, |metalink|_ files can be used to
-provide a single output reference that embeds other references. This approach is also employed and preferred as
-described in |pywps-multi-output|_.
+Although :term:`CWL` allows output ``type: array``, :term:`WPS` does not support it directly. According to :term:`WPS`
+specification, only a single value is allowed under each corresponding outputs ID. Adding more than one ``<wps:Data>``
+or ``<wps:ComplexData>`` definition causes undefined behavior.
+To work around this limitation, there are two potential solutions.
 
-.. todo:: fix doc when Multiple Output is supported with metalink (https://github.com/crim-ca/weaver/issues/25)
-.. todo:: add example of multi-output process definition
-.. todo:: and how CWL maps them with WPS
+1. Use a "*container*" format, such as |metalink|_ or ``application/zip``.
 
-.. warning::
-    This feature is being worked on (`Weaver Issue #25 <https://github.com/crim-ca/weaver/issues/25>`_).
-    Direct support between
+   This method essentially "*packages*" resulting files from a :term:`CWL` operation into a single ``type: File``,
+   therefore avoiding the ``array`` type entirely, and  making the resulting :term:`WPS` compliant with a
+   single ``ComplexData`` reference.
+
+   However, that approach requires that the :term:`Application Package` itself handles the creation of the
+   selected file "*container*" format. `Weaver` will not automatically perform this step. Also, this approach
+   can be limiting for cases where the underlying ``items`` in the ``array`` are literal values rather than ``File``,
+   since that would require embedding the literal data within a ``text/plain`` file before packaging them.
+   Furthermore, chaining this kind of output to another step input in a :ref:`Workflow` would also require that the
+   input respect the same media-type, and that the :term:`Application Package` receiving that input handles by itself
+   any necessary unpacking the relevant "*container*" format.
+   
+   Whether this approach is appropriate depends on user-specific requirements.
+   
+   .. seealso::
+       For more details regarding the |metalink|_ format and how to use it, see |pywps-multi-output|_.
+
+2. Let `Weaver` transparently embedded the :term:`CWL` ``array`` as a single value ``ComplexData``.
+
+   .. versionadded:: 5.5
+
+   This method relies on encoding the resulting :term:`CWL` ``array`` output into its corresponding ``string``
+   representation, and transforms the :term:`WPS` output into a ``ComplexData`` containing this :term:`JSON` string
+   instead of a ``File``. When obtaining the result from the :term:`WPS` interface, the output will therefore be
+   represented as a single value to respect the specification. Once this output is retrieved with
+   the :term:`OGC API - Processes` interface, it will be automatically unpacked into its original :term:`JSON` ``array``
+   form for the HTTP response. From the point of view of a user interacting only with :term:`OGC API - Processes`, 
+   transition from :term:`CWL` and :term:`WPS` will be transparent. Users of the :term:`WPS` would need to perform a
+   manual :term:`JSON` parsing (e.g.: :func:`json.loads`) of the string to obtain the ``array``.
+
+   To disambiguate from ``ComplexData`` that could be an actual single-value :term:`JSON` (i.e.: a `Process`
+   returning any :term:`JSON`-like media-type, such as ``application/geo+json``), `Weaver` will employ the special
+   media-type ``application/raw+json`` to detect an embedded :term:`JSON` strategy to represent a :term:`CWL` ``array``.
+   Other :term:`JSON`-like media-types will remain unmodified.
 
 .. seealso::
     - :ref:`Multiple and Optional Values`

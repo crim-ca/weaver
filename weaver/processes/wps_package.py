@@ -1702,7 +1702,8 @@ class WpsPackage(Process):
             - :func:`weaver.processes.convert.resolve_cwl_io_type_schema`
             - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
 
-        .. fixme::
+        .. fixme:
+        .. todo::
             Workaround for https://github.com/common-workflow-language/cwltool/issues/1908.
         """
         for io_select in ["inputs", "outputs"]:
