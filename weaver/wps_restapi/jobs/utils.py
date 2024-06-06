@@ -315,12 +315,13 @@ def make_result_link(result_id, result, job_id, settings):
     return links
 
 
-def get_results(job,                                # type: Job
-                container,                          # type: AnySettingsContainer
-                value_key=None,                     # type: Optional[str]
-                schema=JobInputsOutputsSchema.OLD,  # type: Optional[JobInputsOutputsSchemaType]
-                link_references=False,              # type: bool
-                ):                                  # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
+def get_results(  # pylint: disable=R1260
+    job,                                # type: Job
+    container,                          # type: AnySettingsContainer
+    value_key=None,                     # type: Optional[str]
+    schema=JobInputsOutputsSchema.OLD,  # type: Optional[JobInputsOutputsSchemaType]
+    link_references=False,              # type: bool
+):                                      # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 

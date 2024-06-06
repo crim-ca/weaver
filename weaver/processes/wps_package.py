@@ -61,7 +61,6 @@ from weaver.exceptions import (
 )
 from weaver.formats import (
     ContentType,
-    OutputFormat,
     clean_media_type_format,
     get_content_type,
     get_cwl_file_format,
@@ -107,7 +106,6 @@ from weaver.processes.convert import (
     normalize_ordered_io,
     ogcapi2cwl_process,
     resolve_cwl_namespaced_name,
-    set_field,
     wps2json_io,
     xml_wps2cwl
 )

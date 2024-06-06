@@ -1338,12 +1338,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     # "format": [type_json, type2, type3]
                 },
                 {
-                   "id": "multi_value_single_format",
-                   "type": {
-                       "type": "array",
-                       "items": "File",
-                   },
-                   "format": type_ncdf,
+                    "id": "multi_value_single_format",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    "format": type_ncdf,
                 },
                 {
                     "id": "multi_value_multi_format",

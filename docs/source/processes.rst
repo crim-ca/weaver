@@ -1341,9 +1341,9 @@ To work around this limitation, there are two potential solutions.
    Furthermore, chaining this kind of output to another step input in a :ref:`Workflow` would also require that the
    input respect the same media-type, and that the :term:`Application Package` receiving that input handles by itself
    any necessary unpacking the relevant "*container*" format.
-   
+
    Whether this approach is appropriate depends on user-specific requirements.
-   
+
    .. seealso::
        For more details regarding the |metalink|_ format and how to use it, see |pywps-multi-output|_.
 
@@ -1356,7 +1356,7 @@ To work around this limitation, there are two potential solutions.
    instead of a ``File``. When obtaining the result from the :term:`WPS` interface, the output will therefore be
    represented as a single value to respect the specification. Once this output is retrieved with
    the :term:`OGC API - Processes` interface, it will be automatically unpacked into its original :term:`JSON` ``array``
-   form for the HTTP response. From the point of view of a user interacting only with :term:`OGC API - Processes`, 
+   form for the HTTP response. From the point of view of a user interacting only with :term:`OGC API - Processes`,
    transition from :term:`CWL` and :term:`WPS` will be transparent. Users of the :term:`WPS` would need to perform a
    manual :term:`JSON` parsing (e.g.: :func:`json.loads`) of the string to obtain the ``array``.
 
