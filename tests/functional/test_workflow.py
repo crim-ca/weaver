@@ -1253,12 +1253,14 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             :meth:`test_workflow_mixed_rest_builtin_wps1_docker_scatter_requirements`.
         """
 
+        file_count = 3
+        file_name_template = "test-file-{i}.nc"
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'WorkflowRESTScatterCopyNetCDF/execute.yml'
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
             nc_refs = []
-            for i in range(3):
-                nc_name = f"test-file-{i}.nc"
+            for i in range(file_count):
+                nc_name = file_name_template.format(i=i)
                 nc_path = os.path.join(self.file_server.document_root, nc_name)
                 nc_href = os.path.join(self.file_server.uri, nc_name)
                 nc_refs.append(nc_href)
@@ -1271,10 +1273,19 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 mocked_file_server(tmp_dir, tmp_host, self.settings, requests_mock=requests_mock)
                 mocked_wps_output(self.settings, requests_mock=requests_mock)
 
-            self.workflow_runner(WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
-                                 [WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,  # no need to register its builtin ref
-                                  WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT],
-                                 log_full_trace=True, requests_mock_callback=mock_tmp_input)
+            result = self.workflow_runner(
+                WorkflowProcesses.WORKFLOW_REST_SCATTER_COPY_NETCDF,
+                [
+                    WorkflowProcesses.APP_WPS1_JSON_ARRAY_2_NETCDF,  # no need to register its builtin ref
+                    WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,
+                ],
+                log_full_trace=True,
+                requests_mock_callback=mock_tmp_input,
+            )
+            assert isinstance(result["output"], list)
+            assert len(result["output"]) == file_count
+            out_files = [os.path.split(file["href"])[-1] for file in result["output"]]
+            assert out_files == [file_name_template.format(i=i).replace(".nc", ".txt") for i in range(file_count)]
 
     def test_workflow_docker_applications(self):
         self.workflow_runner(WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,

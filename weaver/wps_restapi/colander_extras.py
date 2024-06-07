@@ -581,6 +581,42 @@ class ExtendedString(colander.String):
         return super(ExtendedString, self).deserialize(node, cstruct)
 
 
+class NoneType(colander.SchemaType):
+    """
+    Type representing an explicit :term:`JSON` ``null`` value.
+    """
+    def serialize(self, node, appstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Union[None, colander.null, colander.drop]
+        if appstruct in (colander.null, colander.drop):
+            return appstruct
+        if appstruct is None:
+            return None
+        raise colander.Invalid(
+            node,
+            colander._(
+                "${val} cannot be serialized: ${err}",
+                mapping={"val": appstruct, "err": "Not 'null'."},
+            ),
+        )
+
+    def deserialize(self, node, cstruct):
+        # type: (colander.SchemaNode, Any) -> Union[None, colander.null, colander.drop]
+        return self.serialize(node, cstruct)
+
+
+class AnyType(colander.SchemaType):
+    """
+    Type representing any :term:`JSON` structure.
+    """
+    def serialize(self, node, appstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Any
+        return appstruct
+
+    def deserialize(self, node, cstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Any
+        return cstruct
+
+
 class XMLObject(object):
     """
     Object that provides mapping to known XML extensions for OpenAPI schema definition.
@@ -1707,8 +1743,33 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         self.typ.unknown = "preserve"
 
 
-class PermissiveSequenceSchema(ExtendedMappingSchema):
-    item = PermissiveMappingSchema()
+class PermissiveSequenceSchema(ExtendedSequenceSchema):
+    """
+    Array schema that allows *any* item type.
+
+    This is equivalent to the any of the following :term:`JSON` schema definitions.
+
+    .. code-block:: json
+
+        {
+            "type": "array",
+            "items": {}
+        }
+
+    .. code-block:: json
+
+        {
+            "type": "array",
+            "items": true
+        }
+
+    .. code-block:: json
+
+        {
+            "type": "array"
+        }
+    """
+    item = ExtendedSchemaNode(AnyType(), default=colander.null, missing=colander.null)
 
 
 class KeywordMapper(ExtendedMappingSchema):
@@ -2612,6 +2673,17 @@ class MoneyTypeConverter(DecimalTypeConverter):
     )
 
 
+class NoneTypeConverter(TypeConverter):
+    type = "null"
+
+
+class AnyTypeConverter(TypeConverter):
+    def convert_type(self, schema_node):
+        converted = super().convert_type(schema_node)
+        converted.pop("type", None)
+        return converted
+
+
 # TODO: replace directly in original cornice_swagger
 #  (see: https://github.com/Cornices/cornice.ext.swagger/issues/133)
 class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
@@ -2638,6 +2710,8 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
             colander.Mapping: VariableObjectTypeConverter,
             colander.Decimal: DecimalTypeConverter,
             colander.Money: MoneyTypeConverter,
+            NoneType: NoneTypeConverter,
+            AnyType: AnyTypeConverter,
         }
         extended_converters.update(self.keyword_converters)
         if custom_converters:
@@ -2803,6 +2877,12 @@ class OAS3DefinitionHandler(DefinitionHandler):
                     schema.pop(param)
                 schema["$ref"] = schema_ref
         return schema_ret
+
+    def _ref_recursive(self, schema, depth, base_name=None):
+        # avoid key error if dealing with 'AnyType'
+        if not schema or not schema.get("type"):
+            return schema or {}
+        return super()._ref_recursive(schema, depth, base_name=base_name)
 
     def _process_items(self,
                        schema,      # type: Dict[str, Any]

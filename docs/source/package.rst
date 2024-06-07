@@ -872,15 +872,12 @@ preferable to provide the ``minOccurs`` and ``maxOccurs`` in the :term:`WPS` con
 ``array`` and/or ``"null"`` type requirements automatically. Also, because of all implied parameters in this situation
 to specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
 trouble guessing the intended result when merging specifications. If unambiguous guess can be made, :term:`CWL` will be
-employed as deciding definition to resolve erroneous mismatches (as for any other corresponding fields).
-
-.. todo:: update warning according to Weaver issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_
+employed as the overruling definition to resolve erroneous mismatches (as for any other corresponding fields).
 
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the :term:`WPS` context. Native
-    :term:`WPS` therefore does not permit multiple output reference files. This can be worked around using a
-    |metalink|_ file, but this use case is not covered by `Weaver` yet as it requires special mapping with :term:`CWL`
-    that does support ``array`` type as output (see issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+    :term:`WPS` therefore does not permit multiple output reference files or data values under a same output ID.
+    To see potential workarounds, refer to :ref:`Multiple Outputs` section.
 
 .. note::
     Although :term:`WPS` multi-value inputs are defined as a single entity during deployment, special care must be taken

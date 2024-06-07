@@ -89,6 +89,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
     ExtendedString as String,
+    NoneType,
     NotKeywordSchema,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
@@ -1402,6 +1403,11 @@ class AnyLiteralType(OneOfKeywordSchema):
             title="LiteralDataString",
             description="Literal data type representing a generic string.",
         ),
+        ExtendedSchemaNode(
+            NoneType(),
+            title="LiteralDataNoneType",
+            description="Literal data type representing a null value.",
+        )
     ]
 
 

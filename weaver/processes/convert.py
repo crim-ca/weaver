@@ -222,6 +222,7 @@ WPS_FIELD_MAPPING = {
     "supported_crs": ["SupportedCRS", "supportedCRS", "crss", "crs", "CRS"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
                               "Additional_Parameters"],
+    "data_type": ["data_type", "dataType", "DataType", "Data_Type"],
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
     "min_occurs": ["minOccurs", "MinOccurs", "Min_Occurs", "minoccurs"],
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
@@ -489,7 +490,6 @@ def ows2json_output_data(output, process_description, container=None):
     }
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
-    output_data = None
     if output.reference:
         json_output["reference"] = output.reference
 
@@ -498,24 +498,73 @@ def ows2json_output_data(output, process_description, container=None):
         json_array = _get_multi_json_references(output, container)
         if json_array and all(str(ref).startswith("http") for ref in json_array):
             json_output["data"] = json_array
+        json_output = any2json_output_data(output, json_output)  # normalize any missing definitions as necessary
+
+    elif (
+        output.dataType == WPS_COMPLEX_DATA and
+        output.mimeType == ContentType.APP_RAW_JSON and
+        output.data and isinstance(output.data[0], str)
+    ):
+        json_data = json.loads(output.data[0])
+        if isinstance(json_data, list):
+            list_data = []
+            for item in json_data:
+                item_data = item.get("data") or item  # literal or reference
+                item_data = any2json_output_data(item, item_data)  # normalize fields before lookup of contained data
+                item_data = item_data["data"] if item_data["dataType"] in WPS_LITERAL_DATA_TYPES else item_data
+                list_data.append(item_data)
+            json_output["data"] = list_data
+        else:
+            json_output["data"] = json_data
+        json_output["mimeType"] = ContentType.APP_JSON
 
     else:
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
         output_data = output.data[0] if output.data else None  # type: Union[BoundingBox, AnyValueType]
+        json_output = any2json_output_data(output, output_data)
+
+    return json_output
+
+
+def any2json_output_data(output_info, output_data):
+    # type: (Union[OWS_Output_Type, JSON], Union[JSON, BoundingBox, AnyValueType]) -> JSON
+    """
+    Converts :mod:`owslib` or :mod:`pywps` :term:`JSON` equivalent output data to normalized :term:`JSON` format.
+
+    Only processes a single item. Must be called iteratively for each data entry in a list.
+    """
+    json_output = {
+        "identifier": get_field(output_info, "identifier", search_variations=True),
+        "title": get_field(output_info, "title", default=None),
+        "dataType": get_field(output_info, "data_type", search_variations=True, default=None),
+        "data": None,
+    }
+    io_type = get_field(output_info, "type", search_variations=True)
 
     # convert data value as required since WPS XML uses raw strings or container objects
-    if json_output["dataType"] in WPS_LITERAL_DATA_TYPES:
+    if json_output["dataType"] in WPS_LITERAL_DATA_TYPES or json_output["dataType"] == WPS_LITERAL:
         json_output["data"] = any2json_literal_data(output_data, json_output["dataType"])
     elif json_output["dataType"] == WPS_BOUNDINGBOX_DATA:
         json_data = ows2json_bbox_data(output_data)
         json_output["data"] = json_data
-    elif json_output["dataType"] == WPS_COMPLEX_DATA or "reference" in json_output:
+    elif json_output["dataType"] == WPS_COMPLEX_DATA or io_type == WPS_REFERENCE or WPS_REFERENCE in output_data:
         json_output["dataType"] = WPS_COMPLEX_DATA  # force in case not set
-        if output.mimeType:
-            json_output["mimeType"] = output.mimeType
-            if output.mimeType in ContentType.ANY_JSON and isinstance(output.data, (list, dict)) and output.data:
-                json_output["data"] = output.data
-
+        media_type = (
+            get_field(output_data, "mime_type", search_variations=True, default=None) or
+            get_field(output_info, "mime_type", search_variations=True, default=None)
+        )
+        if isinstance(output_data, dict):
+            complex_data = get_any_value(output_data, file=False, data=True, default=None)
+            complex_href = get_any_value(output_data, file=True, data=False, default=None)
+        else:
+            complex_data = output_data
+            complex_href = None
+        if media_type:
+            json_output.setdefault("mimeType", media_type)
+            if media_type in ContentType.ANY_JSON and isinstance(complex_data, (list, dict)) and complex_data:
+                json_output["data"] = complex_data
+        if complex_href:
+            json_output["reference"] = complex_href
     return json_output
 
 
@@ -3164,6 +3213,7 @@ def json2wps_io(io_info, io_select):  # pylint: disable=R1260
         io_wps = null
         if io_type in WPS_COMPLEX_TYPES:
             io_info.pop("supported_values", None)
+            io_info.pop("data_type", None)  # ComplexData explicitly indicated (e.g.: embedded multi-value JSON array)
             io_wps = ComplexOutput(**io_info)
         elif io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)
