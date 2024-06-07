@@ -531,6 +531,8 @@ def load_pywps_config(container, config=None):
     pywps_config.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
     pywps_config.CONFIG.set("server", "url", get_wps_url(settings, load=False))
     pywps_config.CONFIG.set("server", "allowedinputpaths", os.pathsep.join(allowed_input_file_paths))
+    pywps_config.CONFIG.set("server", "maxrequestsize", settings.get("weaver.wps_max_request_size") or "30MB")
+    pywps_config.CONFIG.set("server", "maxsingleinputsize", settings.get("weaver.wps_max_single_input_size") or "3GB")
     settings["weaver.wps_configured"] = True
     return pywps_config.CONFIG
 

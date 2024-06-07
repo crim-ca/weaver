@@ -12,11 +12,17 @@ Changes
 
 Changes:
 --------
-- No change.
+- Increase default ``pywps`` configuration values using new settings
+  ``weaver.wps_max_request_size = 30MB`` and ``weaver.wps_max_single_input_size = 3GB``.
+  Defaults are selected to allow larger files that are more in line with common occurrences
+  when dealing with Earth Observation data.
 
 Fixes:
 ------
-- No change.
+- Fix resolution of the `CWL` ``outputBinding.glob`` for staging the output by ID within a ``Workflow`` that uses
+  recurring `Process` references across steps. To disambiguate between common output ID between steps, `CWL` uses the
+  step ID as prefix to the output long-name. This caused a mismatch with the output collection strategy for staging
+  the `Job` result, as the expected directory location does not contain the nested step ID.
 
 .. _changes_5.5.0:
 

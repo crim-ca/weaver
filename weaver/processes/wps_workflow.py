@@ -217,7 +217,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             glob = schema["outputBinding"]["glob"]
             glob_list = isinstance(glob, list)
             glob = glob if isinstance(glob, list) else [glob]
-            out_id = schema["id"].rsplit("#", 1)[-1]
+            out_id = shortname(schema["id"])
             glob_spec = []
             for glob_item in glob:
                 if glob_item.startswith(outdir):
