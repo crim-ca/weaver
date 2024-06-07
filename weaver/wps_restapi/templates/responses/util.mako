@@ -2,19 +2,28 @@
 Utilities for rendering elements in other pages.
 -->
 
-<%def name="get_processes_link(query='')">
-    ${weaver.wps_restapi_url}/processes${f"?{query}" if query else ""}
+
+<%def name="get_provider_link(provider_id, query='')">
+    ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}
 </%def>
 
 
-<%def name="get_process_link(process_id, query='')">
-    ${weaver.wps_restapi_url}/processes/${process_id}${f"?{query}" if query else ""}
+<%def name="get_processes_link(provider_id='', query='')">
+    <%
+        _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
+    %>
+    ${_prefix}/processes${f"?{query}" if query else ""}
+</%def>
+
+
+<%def name="get_process_link(process_id, provider_id='', query='')">
+    ${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
 <%def name="get_jobs_link(query='')">
-    ${weaver.wps_restapi_url}/jobs${f"?{query}&&detail=true" if query else ""}
+    ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}
 </%def>
 
 
@@ -86,6 +95,20 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <div class="code ${str(value).lower()}">
         ${str(value).lower()}
     </div>
+</%def>
+
+
+<%def name="render_status(status)">
+    <div class="label status-unknown status-${status}">${status}</div>
+</%def>
+
+
+<%def name="render_progress(job_progress, job_status)">
+    <progress
+        value="${job_progress * 10}"
+        max="1000"
+        class="progress-${job_status}"
+    >${job_progress}%</progress> ${job_progress}%
 </%def>
 
 

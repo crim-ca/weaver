@@ -839,7 +839,7 @@ class Job(Base):
         Obtain the type of the element associated to the creation of this job.
 
         .. seealso::
-            - Defined in http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
+            - Defined in https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:

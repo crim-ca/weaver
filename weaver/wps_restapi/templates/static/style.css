@@ -70,7 +70,7 @@ body {
 }
 
 .breadcrumbs li + li::before {
-    color: #DDDDDD;
+    color: black;
     content: "/";
     font-weight: bold;
     font-size: 0.9em;
@@ -78,12 +78,12 @@ body {
 }
 
 .breadcrumbs li a {
-    color: #DDDDDD;
+    color: black;
     text-decoration: none;
 }
 
 .breadcrumbs li a:hover {
-    color: white;
+    color: black;
     text-decoration: underline;
 }
 
@@ -180,6 +180,24 @@ body {
     font-size: 80%;
 }
 
+/* --- Table --- */
+
+.table-jobs,
+.table-jobs th,
+.table-jobs td {
+    border-style: solid;
+    border-width: 1px;
+    border-collapse: collapse;
+    padding: 1em;
+}
+
+.table-jobs-field {
+    font-size: 90%;
+    text-align: justify;
+}
+
+/* --- Tooltip --- */
+
 .tooltip {
     position: relative;
     display: inline-block;
@@ -267,6 +285,60 @@ body {
 
 .label.code {
     font-size: 100%;
+}
+
+/* --- Job Status and Progress --- */
+
+.status-unknown,
+.status-failed,
+.status-exception {
+    background-color: darkred;
+}
+.progress-unknown,
+.progress-failed,
+.progress-exception {
+    accent-color: darkred;
+}
+
+.status-dismissed {
+    background-color: #ee5f5b;
+}
+.progress-dismissed {
+    accent-color: #ee5f5b;
+}
+
+.status-paused {
+    background-color: darkorange;
+}
+.progress-paused {
+    accent-color: darkorange;
+}
+
+.status-accepted {
+    background-color: #808080;
+}
+.progress-accepted {
+    accent-color: #808080;
+}
+
+.status-started,
+.status-running {
+    background-color: mediumblue;
+}
+.progress-started,
+.progress-running {
+    accent-color: mediumblue;
+}
+
+.status-success,
+.status-succeeded,
+.status-successful {
+    background-color: darkgreen;
+}
+.progress-success,
+.progress-succeeded,
+.progress-successful {
+    accent-color: darkgreen;
 }
 
 /* --- Version Footer --- */
