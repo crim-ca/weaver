@@ -39,7 +39,6 @@ to be defined if *default* behaviour is desired. Refer to the relevant details t
 they are optional and which default value or operation is applied in each situation.
 
 .. note::
-
     Refer to `weaver.ini.example`_ for the extended list of applicable settings.
     Some advanced configuration settings are also described in other sections of this page.
 
@@ -63,8 +62,7 @@ they are optional and which default value or operation is applied in each situat
   | Defines the full URL (including HTTP protocol/scheme, hostname and optionally additional path suffix) that will
     be used as base URL for all other URL settings of `Weaver`.
 
-.. note::
-
+  .. note::
     This is the URL that you want displayed in responses (e.g.: ``processDescriptionURL`` or job ``location``).
     For the effective URL employed by the WSGI HTTP server, refer to ``[server:main]`` section of `weaver.ini.example`_.
 
@@ -77,31 +75,31 @@ they are optional and which default value or operation is applied in each situat
     schema ``definitions`` section. The configuration setting is available to override this endpoint by another
     static URL location where the corresponding schemas can be found if desired.
 
-.. versionadded:: 4.0
+  .. versionadded:: 4.0
 
 - | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
   | (default: ``None``, auto-resolved by :term:`CWL` with effective machine user)
   |
   | Define the effective machine user ID to be used for running the :term:`Application Package`.
 
-.. versionadded:: 1.9
+  .. versionadded:: 1.9
 
 - | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
   | (default: ``None``, auto-resolved by :term:`CWL` with the group of the effective user)
   |
   | Define the effective machine group ID to be used for running the :term:`Application Package`.
 
-.. versionadded:: 1.9
+  .. versionadded:: 1.9
 
 - | ``weaver.wps = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
   | Enables the WPS-1/2 endpoint.
 
-.. seealso::
+  .. seealso::
     :ref:`wps_endpoint`
 
-.. warning::
+  .. warning::
 
      At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
@@ -126,8 +124,8 @@ they are optional and which default value or operation is applied in each situat
     to that location. If no bucket is specified, the outputs fall back to using the location specified by
     ``weaver.wps_output_dir``.
 
-.. versionadded:: 1.13
-.. seealso::
+  .. versionadded:: 1.13
+  .. seealso::
     :ref:`conf_s3_buckets`
 
 - | ``weaver.wps_output_s3_region = <s3-region-name>``
@@ -139,8 +137,8 @@ they are optional and which default value or operation is applied in each situat
     to write output files to. If not defined but ``weaver.wps_output_s3_bucket`` is specified, `Weaver` attempt to
     retrieve the region from the profile defined in :term:`AWS` configuration files or environment variables.
 
-.. versionadded:: 1.13
-.. seealso::
+  .. versionadded:: 1.13
+  .. seealso::
     :ref:`conf_s3_buckets`
 
 - | ``weaver.wps_output_dir = <directory-path>``
@@ -153,7 +151,7 @@ they are optional and which default value or operation is applied in each situat
     with the :term:`Job` ID.
   | This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
 
-.. versionchanged:: 4.3
+  .. versionchanged:: 4.3
     The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
     See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
 
@@ -166,15 +164,15 @@ they are optional and which default value or operation is applied in each situat
     When not defined, ``X-WPS-Output-Context`` header can still take effect, but omitting it will store results
     directly under ``weaver.wps_output_dir`` instead of default *context* location.
 
-.. versionadded:: 4.3
+  .. versionadded:: 4.3
 
-.. versionchanged:: 4.27
+  .. versionchanged:: 4.27
     Nesting of the *context* directory from ``X-WPS-Output-Context`` or ``weaver.wps_output_dir`` will
     also take effect when storing :term:`Job` results under :term:`S3` when ``weaver.wps_output_s3_bucket``
     and ``weaver.wps_output_s3_region`` are also defined. Previous versions applied the *context* directory
     only for local storage using the other :term:`WPS` output settings.
 
-.. seealso::
+  .. seealso::
     See :ref:`exec_output_location` for more details about this feature and implications of this setting.
 
 - | ``weaver.wps_output_path = <url-path>``
@@ -188,7 +186,7 @@ they are optional and which default value or operation is applied in each situat
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
 
-.. note::
+  .. note::
     The resulting ``weaver.wps_output_url`` endpoint, whether directly provided or indirectly
     resolved by ``weaver.url`` and ``weaver.wps_output_path`` will not be served by `Weaver` itself.
     This location is returned for reference in API responses, but it is up to the infrastructure that
@@ -199,13 +197,39 @@ they are optional and which default value or operation is applied in each situat
   |
   | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
 
+- | ``weaver.wps_max_request_size = <number-bytes>``
+  | (default: ``30MB``)
+  |
+  | Indicates the maximum allowed size for the contents of a :term:`WPS` request.
+  |
+  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+  .. note::
+    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+
+  .. versionadded:: 5.6
+
+- | ``weaver.wps_max_single_input_size = <number-bytes>``
+  | (default: ``30MB``)
+  |
+  | Indicates the maximum allowed size for any given input's contents within a :term:`WPS` request.
+  |
+  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+  .. note::
+    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+
+  .. versionadded:: 5.6
+
 - | ``weaver.wps_client_headers_filter = <headers>``
   | (default: ``Host,``)
   |
   | List of comma-separated case-insensitive headers that will be removed from incoming requests before
   | passing them down to invoke an operation with the corresponding :term:`WPS` provider through the :term:`WPS` client.
 
-.. seealso::
+  .. seealso::
     - :func:`weaver.wps.utils.get_wps_client_filtered_headers`
     - :func:`weaver.wps.utils.get_wps_client`
 
@@ -214,7 +238,7 @@ they are optional and which default value or operation is applied in each situat
   |
   | Enable the WPS-REST endpoint.
 
-.. warning::
+  .. warning::
 
     `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
     it without REST endpoint, but it should technically be possible to run it as WPS-1/2 only if desired.
@@ -257,11 +281,11 @@ they are optional and which default value or operation is applied in each situat
     email(s) were provided in the :ref:`Execute <proc_op_execute>` request body. Emails will not be sent if
     the request body did not include a subscription to those notifications, even if the templates were configured.
 
-.. seealso::
+  .. seealso::
     See :ref:`Notification Subscribers <proc_op_execute_subscribers>` for more details.
 
-.. versionadded:: 4.15
-.. versionchanged:: 4.34
+  .. versionadded:: 4.15
+  .. versionchanged:: 4.34
 
 - | ``weaver.execute_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
@@ -271,8 +295,8 @@ they are optional and which default value or operation is applied in each situat
   | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
   | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
 
-.. versionadded:: 4.15
-.. versionchanged:: 4.30
+  .. versionadded:: 4.15
+  .. versionchanged:: 4.30
     Renamed from ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait``.
 
 .. _conf_celery:
@@ -420,7 +444,7 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
     simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
     The default value is employed if the setting is not defined at all.
 
-.. seealso::
+  .. seealso::
     - `weaver.ini.example`_
     - `wps_processes.yml.example`_
 
@@ -458,11 +482,11 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
     simply set setting ``weaver.cwl_processes_dir`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
     The default value is employed if the setting is not defined at all.
 
-.. note::
+  .. note::
     When registering processes using :term:`CWL`, it is mandatory for those definitions to provide an ``id`` within
     the file along other :term:`CWL` details to let `Weaver` know which :term:`Process` reference to use for deployment.
 
-.. warning::
+  .. warning::
     If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
     dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
     advantage of loading order to resolve such situations.
@@ -474,7 +498,7 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
     registration of :term:`CWL` files found within any sub-directory of ``weaver.cwl_processes_dir`` path, or
     immediately fail (when ``true``) when an issue is raised during :term:`Process` deployment.
 
-.. seealso::
+  .. seealso::
     - `weaver.ini.example`_
 
 .. _conf_request_options:
@@ -500,19 +524,17 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
 .. seealso::
     Please refer to :func:`weaver.utils.request_extra` documentation directly for supported parameters and capabilities.
 
-
 - | ``weaver.request_options = <file-path>``
   | (default: ``None``)
   |
   | Path of the :term:`Request Options` definitions to employ.
-
 
 - | ``weaver.ssl_verify = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
   | Toggle the SSL certificate verification across all requests.
 
-.. warning::
+  .. warning::
     It is **NOT** recommended to disable SSL verification across all requests for security reasons
     (avoid man-in-the-middle attacks). This is crucial for requests that involve any form of authentication, secured
     access or personal user data references. This should be employed only for quickly resolving issues during
@@ -537,7 +559,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_docker_image = <image-reference>`` [:class:`str`]
   |
@@ -548,7 +570,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quote_estimation` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_docker_username = <username>`` [:class:`str`]
   |
@@ -560,7 +582,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation_currency_conversion` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_docker_password = <username>`` [:class:`str`]
   |
@@ -572,7 +594,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation_currency_conversion` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_currency_default = <CURRENCY>`` [:class:`str`]
   | (default: ``USD``)
@@ -585,7 +607,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation_currency_conversion` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_currency_converter = <converter>`` [:class:`str`]
   |
@@ -611,7 +633,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_currency_custom_url = <URL>`` [:class:`str`]
   |
@@ -633,7 +655,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | See :ref:`quotation` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_currency_token = <API access token>`` [:class:`str`]
   |
@@ -644,7 +666,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
     Should be combined with ``weaver.quotation_docker_username``.
   | See :ref:`quotation` for more details on the feature.
 
-.. versionadded:: 4.30
+  .. versionadded:: 4.30
 
 - | ``weaver.quotation_sync_max_wait = <int>`` [:class:`int`, seconds]
   | (default: ``20``)
