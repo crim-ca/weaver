@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
@@ -41,16 +42,46 @@ LOGGER = get_task_logger(__name__)
 @sd.provider_jobs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobsEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_listing.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_prov_all_jobs_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderJobListing", description="Listing of jobs.")
+    ),
+)
+@sd.provider_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_prov_all_jobs_responses,
 )
 @sd.process_jobs_service.get(
-    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS],
+    tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobsEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_listing.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_all_jobs_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessJobListing", description="Listing of jobs.")
+    ),
+)
+@sd.process_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_all_jobs_responses,
+)
+@sd.jobs_service.get(
+    tags=[sd.TAG_JOBS],
+    schema=sd.GetJobsEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_listing.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_all_jobs_responses,
+        sd.GenericHTMLResponse(name="HTMLJobListing", description="Listing of jobs.")
+    ),
 )
 @sd.jobs_service.get(
     tags=[sd.TAG_JOBS],
@@ -136,7 +167,7 @@ def get_queried_jobs(request):
             "value": repr_json(paging, force_string=False)
         })
     body = sd.GetQueriedJobsSchema().deserialize(body)
-    return HTTPOk(json=body)
+    return Box(body)
 
 
 @sd.provider_job_service.get(

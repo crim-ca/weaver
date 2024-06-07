@@ -1,6 +1,11 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
+<%block name="breadcrumbs">
+<li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
+<li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
+</%block>
+
 <h2 id="processes" class="page-title">
     <a href="#processes">Processes</a>
 </h2>
@@ -15,7 +20,7 @@
         <ul>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
             ${util.get_paging_links()}
@@ -67,6 +72,5 @@
         </dd>
         %endfor
     </dl>
-    </div>
 
 </div>

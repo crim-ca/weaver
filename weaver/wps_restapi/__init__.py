@@ -70,9 +70,16 @@ def includeme(config):
         )
         config.add_subscriber(add_renderer_context, BeforeRender)
 
-        ico_path = os.path.join(os.path.dirname(__file__), "templates/static/favicon.ico")
-        with open(ico_path, mode="rb") as ico_file:
+        icon_path = os.path.join(os.path.dirname(__file__), "templates/static/favicon.ico")
+        with open(icon_path, mode="rb") as ico_file:
             icon = ico_file.read()
-        icon_response = Response(content_type='image/x-icon', body=icon)
-        config.add_route(name="favicon.ico", pattern="favicon.ico")
-        config.add_view(lambda *_, **__: icon_response, route_name="favicon.ico")
+        icon_response = Response(content_type="image/x-icon", body=icon)
+        config.add_route(name="icon", pattern="favicon.ico")
+        config.add_view(lambda *_, **__: icon_response, route_name="icon")
+
+        logo_path = os.path.join(os.path.dirname(__file__), "templates/static/crim.png")
+        with open(logo_path, mode="rb") as logo_file:
+            logo = logo_file.read()
+        logo_response = Response(content_type="image/png", body=logo)
+        config.add_route(name="logo", pattern="crim.png")
+        config.add_view(lambda *_, **__: logo_response, route_name="logo")

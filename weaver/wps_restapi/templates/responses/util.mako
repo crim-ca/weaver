@@ -7,8 +7,19 @@ Utilities for rendering elements in other pages.
 </%def>
 
 
-<%def name="get_process_link(process, query='')">
-    ${weaver.wps_restapi_url}/processes/${process}${f"?{query}" if query else ""}
+<%def name="get_process_link(process_id, query='')">
+    ${weaver.wps_restapi_url}/processes/${process_id}${f"?{query}" if query else ""}
+</%def>
+
+
+<!--always apply 'detail' query to populate the table in one request-->
+<%def name="get_jobs_link(query='')">
+    ${weaver.wps_restapi_url}/jobs${f"?{query}&&detail=true" if query else ""}
+</%def>
+
+
+<%def name="get_job_link(job_id, query='')">
+    ${weaver.wps_restapi_url}/jobs/${job_id}${f"?{query}" if query else ""}
 </%def>
 
 

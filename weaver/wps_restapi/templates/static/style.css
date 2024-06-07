@@ -1,7 +1,19 @@
 /* --- Top-Level Containers --- */
 
+body {
+    margin: 0;
+}
+
+.header {
+    padding: 0 0.25em 1.5em .5em;
+    background-color: #eceaea;
+}
+
+.header-title {
+}
+
 .content {
-    margin: 5em 2em 2em;
+    margin: 0 2em 2em;
 }
 
 .content-section {
@@ -23,6 +35,56 @@
 .format-link {
     font-size: 80%;
     margin-bottom: 0.5em;
+}
+
+/* --- Image --- */
+
+.logo {
+    width: 8em;
+    margin-right: 2em;
+}
+
+/* --- Header breadcrumbs --- */
+
+.breadcrumbs-container {
+    padding-top: 0.25em;
+    padding-bottom: 0.25em;
+    background-color: lightgrey;
+}
+
+.breadcrumbs {
+    margin: 0.25em;
+    list-style: none;
+}
+
+.breadcrumbs ul {
+    padding-left: 0.5em;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+}
+
+.breadcrumbs li {
+    display: inline;
+    font-size: 1em;
+}
+
+.breadcrumbs li + li::before {
+    color: #DDDDDD;
+    content: "/";
+    font-weight: bold;
+    font-size: 0.9em;
+    padding-right: 0.5em;
+}
+
+.breadcrumbs li a {
+    color: #DDDDDD;
+    text-decoration: none;
+}
+
+.breadcrumbs li a:hover {
+    color: white;
+    text-decoration: underline;
 }
 
 /* --- Generic Formats ---*/

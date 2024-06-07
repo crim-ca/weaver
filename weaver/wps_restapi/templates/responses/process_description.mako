@@ -1,6 +1,12 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
+<%block name="breadcrumbs">
+<li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
+<li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
+<li><a href="${util.get_process_link(id, query='f=html')}"><span class="code">${id}</span></a></li>
+</%block>
+
 <h2 id="id" class="page-title">
     <div class="process-title inline">
         <div>
@@ -24,12 +30,12 @@
     <ul>
         <li>
             <div class="nav-link">
-                Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+                Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
             </div>
         </li>
         <li>
             <div class="nav-link">
-                Return to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>.
+                Return to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>
             </div>
         </li>
         <li>

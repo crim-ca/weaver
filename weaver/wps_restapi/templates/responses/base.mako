@@ -5,6 +5,13 @@
     <div class="header">
         <%include file="weaver.wps_restapi:templates/responses/header.mako"/>
     </div>
+    <div class="breadcrumbs-container">
+        <div class="breadcrumbs">
+            <ul>
+                <%block name="breadcrumbs"/>
+            </ul>
+        </div>
+    </div>
     <div class="content">
         ${self.body()}
     </div>
