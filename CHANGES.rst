@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.6.0:
+
+`5.6.0 <https://github.com/crim-ca/weaver/tree/5.6.0>`_ (2024-06-11)
+========================================================================
+
+Changes:
+--------
 - Increase default ``pywps`` configuration values using new settings
   ``weaver.wps_max_request_size = 30MB`` and ``weaver.wps_max_single_input_size = 3GB``.
   Defaults are selected to allow larger files that are more in line with common occurrences
