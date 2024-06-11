@@ -314,23 +314,6 @@ class WpsWorkflowJob(CommandLineJob):
             inputs[name] = runtime_context.secret_store.retrieve(inputs[name])
         return inputs
 
-    def _filter_default_inputs(self, inputs):
-        # type: (CWL_RuntimeInputsMap) -> CWL_RuntimeInputsMap
-        """
-        Remove inputs that corresponds to the default ``null`` resolved by omission of an optional input.
-
-        When inputs are propagated between :term:`Workflow` steps, :mod:`cwltool` tends to fill the default values
-        for the job order. When an input is optional (typed with ``?`` or explicit ``"null"``), this causes the ``null``
-        value to be explicitly provided. When those inputs reach a remote :term:`WPS` or :term:`OGC API - Processes`
-        instance, they could be misinterpreted as explicitly submitted ``null``, which might not be accepted by some
-        servers. In some cases (e.g.: ``ComplexData``), the :term:`WPS` could also parse the value literally, as if it
-        was a ``"null"`` string, leading to invalid definitions, where the :mod:`pywps` parsing will generate a file
-        containing that ``"null"`` string. To avoid this issue, all optional and ``null`` values should be filtered out.
-        Since they are optional, they should be handled accordingly by the remote :term:`Process` even when the
-        value was omitted.
-        """
-        # FIXME: IMPLEMENT
-
     def collect_literal_outputs(self, results):
         # type: (JobResults) -> CWL_Results
         """
@@ -364,7 +347,6 @@ class WpsWorkflowJob(CommandLineJob):
         Execute the :term:`WPS` :term:`Process` defined as :term:`Workflow` step and chains their intermediate results.
         """
         cwl_inputs = self._retrieve_secret_inputs(runtime_context)
-        cwl_inputs = self._filter_default_inputs(cwl_inputs)
         results = self.wps_process.execute(cwl_inputs, self.outdir, self.expected_outputs)
         outputs = self.collect_literal_outputs(results)
 

@@ -1,0 +1,34 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  id: EchoOptional
+  title: Test Echo with optional value.
+  version: "1.0"  # must be string, avoid interpretation as float
+  keywords:
+    - test
+  inputs:
+    - id: message
+      description: "Message to echo."
+      minOccurs: 0
+      maxOccurs: 1
+    - id: null_value
+      description: "Message to echo."
+      minOccurs: 0
+      maxOccurs: 1
+    - id: null_file
+      minOccurs: 0
+      maxOccurs: 1
+  outputs:
+    - id: output
+      description: "Output file with echo message."
+      formats:
+        - mediaType: text/plain
+          default: true
+jobControlOptions:
+  - async-execute
+  - sync-execute
+outputTransmission:
+  - reference
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/EchoOptional/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

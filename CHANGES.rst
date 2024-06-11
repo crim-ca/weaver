@@ -19,6 +19,10 @@ Changes:
 
 Fixes:
 ------
+- Fix resolution of ``null`` value explicitly provided or implicitly resolved by `CWL` between ``Workflow`` steps
+  and the `Process` execution context transfer between `OGC API - Processes` and `WPS`, in the case of ``ComplexData``
+  and ``BoundingBoxData`` structures. Inputs will now be omitted from execution request to obtain the intended behavior
+  instead of submitting empty data structures, leading to inconsistent parsing results and behaviors.
 - Fix resolution of the `CWL` ``outputBinding.glob`` for staging the output by ID within a ``Workflow`` that uses
   recurring `Process` references across steps. To disambiguate between common output ID between steps, `CWL` uses the
   step ID as prefix to the output long-name. This caused a mismatch with the output collection strategy for staging
