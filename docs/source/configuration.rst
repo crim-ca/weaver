@@ -39,7 +39,6 @@ to be defined if *default* behaviour is desired. Refer to the relevant details t
 they are optional and which default value or operation is applied in each situation.
 
 .. note::
-
     Refer to `weaver.ini.example`_ for the extended list of applicable settings.
     Some advanced configuration settings are also described in other sections of this page.
 
@@ -224,6 +223,36 @@ they are optional and which default value or operation is applied in each situat
   | (default: uses automatically generated temporary directory if none specified)
   |
   | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
+
+.. _weaver-wps-max-request-size:
+
+- | ``weaver.wps_max_request_size = <number-bytes>``
+  | (default: ``30MB``)
+  |
+  | Indicates the maximum allowed size for the contents of a :term:`WPS` request.
+  |
+  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+  .. note::
+    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+
+  .. versionadded:: 5.6
+
+.. _weaver-wps-max-single-input-size:
+
+- | ``weaver.wps_max_single_input_size = <number-bytes>``
+  | (default: ``30MB``)
+  |
+  | Indicates the maximum allowed size for any given input's contents within a :term:`WPS` request.
+  |
+  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+  .. note::
+    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+
+  .. versionadded:: 5.6
 
 .. _weaver-wps-client-headers-filter:
 

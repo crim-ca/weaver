@@ -43,6 +43,29 @@ Fixes:
   were set to other prefix path values than the default root base URL.
 - Fix ``weaver.formats.OutputFormat`` to return ``JSON`` by default when an invalid format could not be resolved.
 
+.. _changes_5.6.0:
+
+`5.6.0 <https://github.com/crim-ca/weaver/tree/5.6.0>`_ (2024-06-11)
+========================================================================
+
+Changes:
+--------
+- Increase default ``pywps`` configuration values using new settings
+  ``weaver.wps_max_request_size = 30MB`` and ``weaver.wps_max_single_input_size = 3GB``.
+  Defaults are selected to allow larger files that are more in line with common occurrences
+  when dealing with Earth Observation data.
+
+Fixes:
+------
+- Fix resolution of ``null`` value explicitly provided or implicitly resolved by `CWL` between ``Workflow`` steps
+  and the `Process` execution context transfer between `OGC API - Processes` and `WPS`, in the case of ``ComplexData``
+  and ``BoundingBoxData`` structures. Inputs will now be omitted from execution request to obtain the intended behavior
+  instead of submitting empty data structures, leading to inconsistent parsing results and behaviors.
+- Fix resolution of the `CWL` ``outputBinding.glob`` for staging the output by ID within a ``Workflow`` that uses
+  recurring `Process` references across steps. To disambiguate between common output ID between steps, `CWL` uses the
+  step ID as prefix to the output long-name. This caused a mismatch with the output collection strategy for staging
+  the `Job` result, as the expected directory location does not contain the nested step ID.
+
 .. _changes_5.5.0:
 
 `5.5.0 <https://github.com/crim-ca/weaver/tree/5.5.0>`_ (2024-06-06)
