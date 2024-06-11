@@ -522,12 +522,21 @@ def parse_wps_inputs(wps_process, job):
                 input_details = [job_input]  # metadata directly in definition, not nested per array value
 
             for input_value, input_info in zip(input_values, input_details):
-                if input_id in complex_inputs:
-                    input_data = parse_wps_input_complex(input_value, input_info)
-                elif input_id in bbox_inputs:
-                    input_data = parse_wps_input_bbox(input_value, input_info)
+                # if already resolved, skip parsing
+                # it is important to omit explicitly provided 'null', otherwise the WPS object could be misleading
+                # for example, a 'ComplexData' with 'null' data will be auto-generated as text/plan with "null" string
+                if input_value is None:
+                    input_data = None
                 else:
-                    input_data = parse_wps_input_literal(input_value)
+                    # resolve according to relevant data type parsing
+                    # value could be an embedded or remote definition
+                    if input_id in complex_inputs:
+                        input_data = parse_wps_input_complex(input_value, input_info)
+                    elif input_id in bbox_inputs:
+                        input_data = parse_wps_input_bbox(input_value, input_info)
+                    else:
+                        input_data = parse_wps_input_literal(input_value)
+                # re-validate the resolved data as applicable
                 if input_data is None:
                     job.save_log(
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",

@@ -30,7 +30,7 @@ import cwltool.docker
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
-from cwltool.process import use_custom_schema
+from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
@@ -2608,7 +2608,7 @@ class WpsPackage(Process):
         # it means that either an atomic process was invoked, or that the top-most Workflow is called.
         # In such case, it is safe to return the self-reference for the tool job, as it will refer to the same log/job.
         # Also, this avoids duplicate setup of log handlers, which would result in inconsistant progress tracking.
-        process_id = toolpath_object["id"].rsplit("/", 1)[-1].rsplit("#", 1)[-1]
+        process_id = shortname(toolpath_object["id"])
         if self.package_id == process_id:
             return default_make_tool(toolpath_object, loading_context, self)
 

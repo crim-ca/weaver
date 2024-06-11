@@ -117,6 +117,7 @@ class WorkflowProcesses(enum.Enum):
 
     # local in 'tests/functional/application-packages'
     APP_ECHO = "Echo"
+    APP_ECHO_OPTIONAL = "EchoOptional"
     APP_ECHO_SECRETS = "EchoSecrets"
     APP_ICE_DAYS = "Finch_IceDays"
     APP_READ_FILE = "ReadFile"
@@ -136,6 +137,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
     WORKFLOW_ECHO = "WorkflowEcho"
+    WORKFLOW_ECHO_OPTIONAL = "WorkflowEchoOptional"
     WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
     WORKFLOW_PASSTHROUGH_EXPRESSIONS = "WorkflowPassthroughExpressions"
     WORKFLOW_STEP_MERGE = "WorkflowStepMerge"
@@ -1060,6 +1062,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
+        WorkflowProcesses.APP_ECHO_OPTIONAL,
         WorkflowProcesses.APP_ECHO_SECRETS,
         WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.APP_READ_FILE,
@@ -1071,6 +1074,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
         WorkflowProcesses.WORKFLOW_ECHO,
+        WorkflowProcesses.WORKFLOW_ECHO_OPTIONAL,
         WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
         WorkflowProcesses.WORKFLOW_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.WORKFLOW_STAGE_COPY_IMAGES,
@@ -1573,3 +1577,25 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read().strip()
         assert data == "Hello,World"
+
+    def test_workflow_optional_input_propagation(self):
+        wf_exec = self.test_processes_info[WorkflowProcesses.WORKFLOW_ECHO_OPTIONAL].execute_payload
+        assert not wf_exec, "inputs must be empty to evaluate this behavior properly"
+        details = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_ECHO_OPTIONAL,
+            [
+                WorkflowProcesses.APP_ECHO_OPTIONAL,
+            ],
+            log_full_trace=True,
+            detailed_results=True,
+        )
+        result = [
+            res for res in details.values()
+            if res["process"] == WorkflowProcesses.WORKFLOW_ECHO_OPTIONAL.value
+        ][0]["outputs"]
+        assert len(result) == 1
+        assert "output" in result
+        path = map_wps_output_location(result["output"]["href"], container=self.settings)
+        with open(path, mode="r", encoding="utf-8") as out_file:
+            data = out_file.read().strip()
+        assert data == "test-message", "output from workflow should match the default resolved from input omission"
