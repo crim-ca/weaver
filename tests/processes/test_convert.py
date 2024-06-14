@@ -25,6 +25,7 @@ from pywps.validator.mode import MODE
 
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
+from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
     EDAM_MAPPING,
@@ -71,6 +72,7 @@ from weaver.processes.convert import (
     json2oas_io,
     json2wps_allowed_values,
     json2wps_datatype,
+    json2wps_io,
     json2wps_supported_uoms,
     merge_io_formats,
     normalize_ordered_io,
@@ -2339,6 +2341,86 @@ def test_ows2json_io_convert_literal_uom(ows_io, json_io):
     for key in ows_io:  # avoid copying everything to make test definitions easier
         result.pop(key, None)
     assert result == json_io
+
+
+def test_ows_wps_json_default_complex_format():
+    xml_io = xml_util.parse(resources.WPS_COMPLEX_OPTIONAL_IO_XML).xpath("//DataInputs/Input")[0]
+    ows_io = OWSInput(xml_io)
+    res_io = ows2json_io(ows_io)
+    assert res_io == {
+        "id": "test",
+        "title": "test",
+        "min_occurs": 0,
+        "max_occurs": 100,
+        "any_value": False,
+        "type": WPS_COMPLEX_DATA,
+        "data_type": WPS_COMPLEX_DATA,
+        "data_format": {
+            "mimeType": ContentType.APP_NETCDF,
+            "encoding": "base64",
+            "maximumMegabytes": 200,
+            "schema": None,
+            "default": True,
+        },
+        "formats": [
+            {
+                "mimeType": ContentType.APP_NETCDF,
+                "encoding": "base64",
+                "maximumMegabytes": 200,
+                "schema": None,
+                "default": True,
+            },
+            {
+                "mimeType": ContentType.APP_JSON,
+                "encoding": None,
+                "maximumMegabytes": 200,
+                "schema": None,
+                "default": False,
+            },
+        ],
+    }
+
+    wps_io = json2wps_io(res_io, "input")
+    assert wps_io.identifier == "test"
+    assert wps_io.title == "test"
+    assert wps_io.min_occurs == 0
+    assert wps_io.max_occurs == 100
+    assert wps_io.data_format == Format(ContentType.APP_NETCDF, encoding="base64")
+    assert all(wps_fmt == val_fmt for wps_fmt, val_fmt in zip(
+        wps_io.supported_formats,
+        [
+            Format(ContentType.APP_NETCDF, encoding="base64"),
+            Format(ContentType.APP_JSON),
+        ],
+    ))
+
+    # ensure no defaults applied
+    assert wps_io.data is None
+    assert wps_io._default is None
+
+    res_io = wps2json_io(wps_io)
+    assert res_io == {
+        "id": "test",
+        "title": "test",
+        "description": "",
+        "keywords": [],
+        "metadata": [],
+        "translations": None,
+        "asreference": False,
+        "workdir": None,
+        "minOccurs": "0",
+        "maxOccurs": "100",
+        "mode": MODE.NONE,
+        "type": WPS_COMPLEX,
+        "data_format": {"mime_type": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": ""},
+        "formats": [
+            {"mediaType": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": "", "default": True},
+            {"mediaType": ContentType.APP_JSON, "encoding": "", "schema": "", "extension": "", "default": False}
+        ],
+        # from default data_format
+        "mimetype": ContentType.APP_NETCDF,
+        "encoding": "base64",
+    }
 
 
 @pytest.mark.parametrize(

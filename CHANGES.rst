@@ -16,7 +16,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix invalid ``default`` attribute resolution of an optional `WPS` ``ComplexData`` (i.e.: ``minOccurs: 0``) that also
+  provides a ``Default/Format`` in the `XML` process description. When that input was omitted (as permitted) from the
+  execution request, parsing of the `XML` would incorrectly inject the `JSON` representation of the ``Default/Format``
+  as a substitute for the ``default`` value. See ``weaver.processes.convert.ows2json_io`` implementation for details.
 
 .. _changes_5.6.0:
 
