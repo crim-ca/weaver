@@ -1873,9 +1873,10 @@ def add_shared_options(parser):
         "-H", "--header", action=ValidateHeaderAction, nargs=1, dest="headers", metavar="HEADER",
         help=(
             "Additional headers to apply for sending requests toward the service. "
-            "This option can be provided multiple times, each with a value formatted as:\n\n'Header-Name: value'\n\n"
+            "This option can be provided multiple times, each with a value formatted as:"
+            "\n\n``Header-Name: value``\n\n"
             "Header names are case-insensitive. "
-            "Quotes can be used in the <value> portion to delimit it. "
+            "Quotes can be used in the ``value`` portion to delimit it. "
             "Surrounding spaces are trimmed. "
             "Note that overridden headers expected by requests and the service could break some functionalities."
         )
@@ -1914,16 +1915,17 @@ def add_shared_options(parser):
         description="Parameters to obtain access to a protected service using a request authentication handler."
     )
     auth_handlers = "".join([
-        f"{fully_qualified_name(handler)}\n"
+        f"- `{fully_qualified_name(handler)}`\n\n"
         for handler in [BasicAuthHandler, BearerAuthHandler, CookieAuthHandler]
     ])
     auth_grp.add_argument(
         "-aC", "--auth-class", "--auth-handler", dest="auth_handler", metavar="AUTH_HANDLER_CLASS",
         action=ValidateAuthHandlerAction,
         help=(
-            "Script or module path reference to class implementation to handle inline request authentication. "
-            "Format [path/to/script.py:module.AuthHandlerClass] or [installed.module.AuthHandlerClass] is expected.\n\n"
-            f"Utility definitions are available as:\n\n{auth_handlers}\n\n"
+            "Script or module path reference to class implementation to handle inline request authentication.\n\n"
+            "Format ``path/to/script.py:module.AuthHandlerClass`` "
+            "or ``installed.module.AuthHandlerClass`` is expected.\n\n"
+            f"Utility definitions are available as:\n\n{auth_handlers}\n"
             "Custom implementations are allowed for more advanced use cases."
         )
     )
@@ -1952,9 +1954,10 @@ def add_shared_options(parser):
         "-aH", "--auth-header", action=ValidateHeaderAction, nargs=1, dest="auth_headers", metavar="HEADER",
         help=(
             "Additional headers to apply for sending requests when using the authentication handler. "
-            "This option can be provided multiple times, each with a value formatted as:\n\n'Header-Name: value'\n\n"
+            "This option can be provided multiple times, each with a value formatted as:"
+            "\n\n``Header-Name: value``\n\n"
             "Header names are case-insensitive. "
-            "Quotes can be used in the <value> portion to delimit it. "
+            "Quotes can be used in the ``value`` portion to delimit it. "
             "Surrounding spaces are trimmed."
         )
     )
@@ -2778,7 +2781,7 @@ def make_parser():
     op_execute_output_context.add_argument(
         "-oP", "--output-public", dest="output_context", const="public", action="store_const",
         help=(
-            "Set header 'X-WPS-Output-Context: public' to indicate preference of job output context to be "
+            "Set header ``X-WPS-Output-Context: public`` to indicate preference of job output context to be "
             "located under the public WPS output location of the server. The server is not mandated to fulfill this "
             "preference, but will apply it if supported and considered a valid value."
         )
@@ -2786,7 +2789,7 @@ def make_parser():
     op_execute_output_context.add_argument(
         "-oC", "--output-context", dest="output_context", type=str,
         help=(
-            "Set header 'X-WPS-Output-Context' with the specified value to indicate preference of job output context "
+            "Set header ``X-WPS-Output-Context`` with the specified value to indicate preference of job output context "
             "located under the requested WPS output location of the server. The server is not mandated to fulfill this "
             "preference, but will apply it if supported and considered a valid value."
         )
@@ -2853,7 +2856,7 @@ def make_parser():
         "status",
         description=(
             "Obtain the status of a job using a reference UUID or URL. "
-            "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
+            "This is equivalent to doing a single-shot ``monitor`` operation without any pooling or retries."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2866,7 +2869,7 @@ def make_parser():
         "logs",
         description=(
             "Obtain the logs of a job using a reference UUID or URL. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2880,7 +2883,7 @@ def make_parser():
         description=(
             "Obtain the exceptions and error details of a failed job using a reference UUID or URL. "
             "If the job is not marked with failed status, this will return an error. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2894,7 +2897,7 @@ def make_parser():
         description=(
             "Obtain the computation statistics details of a successful job using a reference UUID or URL. "
             "If the job is not marked with succeeded status, this will return an error. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2923,7 +2926,7 @@ def make_parser():
     op_results.add_argument(
         "-O", "--outdir", dest="out_dir",
         help="Output directory where to store downloaded files from job results if requested "
-             "(default: ${CURDIR}/{JobID}/<outputs.files>)."
+             "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
 
     op_upload = WeaverArgumentParser(
