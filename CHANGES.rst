@@ -43,6 +43,22 @@ Fixes:
   were set to other prefix path values than the default root base URL.
 - Fix ``weaver.formats.OutputFormat`` to return ``JSON`` by default when an invalid format could not be resolved.
 
+.. _changes_5.6.1:
+
+`5.6.1 <https://github.com/crim-ca/weaver/tree/5.6.1>`_ (2024-06-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix invalid ``default`` attribute resolution of an optional `WPS` ``ComplexData`` (i.e.: ``minOccurs: 0``) that also
+  provides a ``Default/Format`` in the `XML` process description. When that input was omitted (as permitted) from the
+  execution request, parsing of the `XML` would incorrectly inject the `JSON` representation of the ``Default/Format``
+  as a substitute for the ``default`` value. See ``weaver.processes.convert.ows2json_io`` implementation for details.
+
 .. _changes_5.6.0:
 
 `5.6.0 <https://github.com/crim-ca/weaver/tree/5.6.0>`_ (2024-06-11)

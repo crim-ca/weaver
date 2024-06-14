@@ -153,6 +153,8 @@
 
 .. API requests
 .. Full path displayed, otherwise use '-name' suffixed reference for same link with only the general name (no path)
+.. |oas-rtd| replace:: OpenAPI Documentation
+.. _oas-rtd: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. |deploy-req-name| replace:: Deploy
 .. _deploy-req-name: `deploy-req`_
 .. |deploy-req| replace:: ``POST {WEAVER_URL}/processes`` (Deploy)
