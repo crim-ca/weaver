@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_5.6.1:
+
+`5.6.1 <https://github.com/crim-ca/weaver/tree/5.6.1>`_ (2024-06-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix invalid ``default`` attribute resolution of an optional `WPS` ``ComplexData`` (i.e.: ``minOccurs: 0``) that also
   provides a ``Default/Format`` in the `XML` process description. When that input was omitted (as permitted) from the
   execution request, parsing of the `XML` would incorrectly inject the `JSON` representation of the ``Default/Format``
