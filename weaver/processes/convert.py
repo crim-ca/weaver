@@ -397,10 +397,22 @@ def ows2json_io(ows_io):
 
     # add 'format' if missing, derived from other variants
     if io_type == WPS_COMPLEX_DATA:
-        fmt_default = False
+        fmt_default_found = False
         if "default" in json_io and isinstance(json_io["default"], dict):
-            json_io["default"]["default"] = True  # provide for workflow extension (internal), schema drops it (API)
-            fmt_default = True
+            # NOTE:
+            #   When parsing between OWSLib and PyWPS for corresponding 'ComplexData' structures, there is an
+            #   ambiguity in the field names. The OWSLib 'defaultValue' attribute is employed as the "default format"
+            #   to resolve if the **format** was omitted (but only when the input reference/data must is provided!),
+            #   whereas PyWPS uses the attribute named 'data_format' for the applied (or default) format of the input
+            #   reference/data. However, both of these libraries also reuse the 'defaultValue' and 'default' attributes
+            #   respectively for the 'LiteralData' type, where the value is the **actual data** used by default.
+            #   The conversion between those libraries must therefore be careful about these specific field combinations
+            #   to avoid misbehavior when resolving some form of "default" by omission of data/reference/format.
+            #   To be sure, swap the ambiguous 'default' for explicit 'data_format' (where 'data=None' if I/O omitted).
+            fmt_default_value = json_io.pop("default")
+            fmt_default_value["default"] = True  # provide for workflow extension (internal), schema drops it (API)
+            json_io["data_format"] = fmt_default_value
+            fmt_default_found = True
 
         # retrieve alternate format definitions
         if "formats" not in json_io:
@@ -430,13 +442,15 @@ def ows2json_io(ows_io):
 
         # apply the default flag
         for fmt in json_io["formats"]:
-            fmt["default"] = fmt_default and is_equal_formats(json_io["default"], fmt)
+            fmt_default_value = get_field(json_io, "data_format", default={})
+            fmt["default"] = fmt_default_found and is_equal_formats(fmt_default_value, fmt)
             if fmt["default"]:
                 break
 
         # NOTE:
-        #   Don't apply 'minOccurs=0' as in below literal case because default 'format' does not imply that unspecified
+        #   Don't force 'minOccurs=0' as in below literal case because default 'format' does not imply that unspecified
         #   input is valid, but rather that given an input without explicit 'format' specified, that 'default' is used.
+        #   If the I/O is optional, it should have indicated explicitly the 'minOccurs=0' attribute for 'ComplexData'.
         return json_io
 
     # add value constraints in specifications
