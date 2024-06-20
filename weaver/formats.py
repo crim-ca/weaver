@@ -353,7 +353,7 @@ class OutputFormat(Constants):
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
-            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
+            format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
             default=None,           # type: Optional[AnyOutputFormat]
             allow_version=True,     # type: bool
             ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
@@ -381,7 +381,7 @@ class OutputFormat(Constants):
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[AnyOutputFormat, str, None], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, AnyContentType, None], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 

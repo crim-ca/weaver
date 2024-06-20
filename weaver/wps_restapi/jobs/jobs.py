@@ -449,21 +449,39 @@ def get_job_exceptions(request):
 @sd.provider_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS],
     schema=sd.ProviderLogsEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[
+        ContentType.APP_JSON,
+        ContentType.APP_YAML,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_PLAIN,
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_prov_logs_responses,
 )
 @sd.process_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES],
     schema=sd.ProcessLogsEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[
+        ContentType.APP_JSON,
+        ContentType.APP_YAML,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_PLAIN,
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_logs_responses,
 )
 @sd.job_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS],
     schema=sd.JobLogsEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[
+        ContentType.APP_JSON,
+        ContentType.APP_YAML,
+        ContentType.APP_XML,
+        ContentType.TEXT_XML,
+        ContentType.TEXT_PLAIN,
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_logs_responses,
 )

@@ -3,6 +3,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING
 
+from cornice.renderer import JSONError
 from pyramid.httpexceptions import (
     HTTPException,
     HTTPInternalServerError,
@@ -13,9 +14,9 @@ from pyramid.httpexceptions import (
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW, INGRESS, MAIN
 
-from weaver.formats import ContentType, guess_target_format
+from weaver.formats import ContentType, guess_target_format, repr_json
 from weaver.owsexceptions import OWSException, OWSNotImplemented
-from weaver.utils import clean_json_text_body, fully_qualified_name, get_settings
+from weaver.utils import bytes2str, clean_json_text_body, fully_qualified_name, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
@@ -31,36 +32,25 @@ LOGGER = logging.getLogger(__name__)
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
-# FIXME: Pre-validation of Accept/Format is invalid.
-#   Will not work for 'other' types allowed on some endpoints (eg: logs text or specific outputID negotiation).
-#   However, raised errors JSON is valid. Move those to a common HTTPException handler considering raised HTTP codes.
 def http_validate_response_format_tween_factory(handler, registry):    # noqa: F811
     # type: (ViewHandler, Registry) -> ViewHandler
     """
     Tween factory that validates that the specified request ``Accept`` header or format queries (if any) is supported.
 
-    Supported values are defined by :py:data:`SUPPORTED_ACCEPT_TYPES` and for the given context of API or UI.
+    .. note::
+        This tween limits itself to the validation of :term:`HTML` support according to ``weaver.wps_restapi_html``
+        configuration. Other endpoint-specific format or Content-Type support are handled and validated as per their
+        corresponding endpoint :mod:`cornice` service definitions, which are also represented in the generated `OpenAPI`
+        specification.
 
     :raises HTTPNotAcceptable: if desired ``Accept`` or ``format`` specifier of content-type is not supported.
     """
     def validate_format(request):
         # type: (PyramidRequest) -> AnyViewResponse
         """
-        Validates the specified request according to its ``Accept`` header or ``format`` query, ignoring UI related
-        routes that require more content-types than the ones supported by the API for displaying purposes of other
-        elements (styles, images, etc.).
+        Validates the specified request according to its ``Accept`` header or ``format`` query for :term:`HTML`.
         """
-        try:
-            content_type = guess_target_format(request)
-            sd.AcceptHeader().deserialize(content_type)  # raise on invalid/unacceptable
-        except colander.Invalid as invalid:
-            raise HTTPNotAcceptable(json={
-                "type": "NotAcceptable",
-                "title": "Response format is not acceptable.",
-                "detail": "Specified response format by query parameter or Accept header is not supported.",
-                "status": HTTPNotAcceptable.code,
-                "cause": invalid.value,
-            })
+        content_type = guess_target_format(request)
         if content_type == ContentType.TEXT_HTML:
             settings = get_settings(request)
             html_acceptable = asbool(settings.get("weaver.wps_restapi_html", True))
@@ -125,6 +115,8 @@ def error_repr(http_err):
     err_code = getattr(http_err, "code", getattr(http_err, "status_code", 500))
     err_repr = str(http_err)
     try:
+        if not err_repr:
+            err_repr = bytes2str(http_err.body or "")
         # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
         #        specific cleanup in case of string representation of colander.Invalid to help debug logged errors
         err_repr = clean_json_text_body(err_repr, remove_newlines=False, remove_indents=False)
@@ -152,6 +144,23 @@ def ows_response_tween(request, handler):
     #   Handle exceptions from most explicit definitions to least explicit.
     #   Exceptions in 'weaver.exceptions' sometimes derive from 'OWSException' to provide additional details.
     #   Furthermore, 'OWSException' have extensive details with references to 'HTTPException' and 'pywps.exceptions'.
+    except JSONError as err:
+        # FIXME: https://github.com/Cornices/cornice/issues/586
+        #   Workaround to handle missing 'detail' attribute  and invalid 'code' value under 'JSONError'
+        #   which derives from 'HTTPException', but doesn't actually initialize it properly.
+        raised_error = err
+        raised_error.code = err.status_code
+        raised_error.title = err.status.split(" ", 1)[-1]
+        raised_error.request = request
+        HTTPException.__init__(raised_error, json={
+            "type": raised_error.title.replace(" ", ""),
+            "title": raised_error.title,
+            "detail": bytes2str(request.errors[0]["description"]),
+            "status": raised_error.status_code,
+        })
+        return_error = raised_error
+        exc_info_err = False
+        exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
