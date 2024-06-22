@@ -34,12 +34,14 @@ for each process.
 
     * - dependencies
       - | |py_ver| |deps| |pyup|
+    * - license
+      - | |license| |license_scan|
     * - build status
       - | |readthedocs| |docker_build_mode| |docker_build_status|
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
-      - | |version| |commits-since| |license| |docker_image|
+      - | |version| |commits-since| |docker_image|
 
 .. |py_ver| image:: https://img.shields.io/badge/python-3.8%2B-blue.svg
     :alt: Requires Python 3.8+
@@ -98,6 +100,10 @@ for each process.
 .. |license| image:: https://img.shields.io/github/license/crim-ca/weaver.svg
     :target: https://github.com/crim-ca/weaver/blob/master/LICENSE.txt
     :alt: GitHub License
+
+.. |license_scan| image:: https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver.svg?type=shield&issueType=license
+    :target: https://app.fossa.com/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver?ref=badge_shield&issueType=license
+    :alt: FOSSA Status
 
 .. end-badges
 
