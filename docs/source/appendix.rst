@@ -21,6 +21,9 @@ Glossary
     API
         | Application Programming Interface
         | Most typically, referring to the use of HTTP(S) requests following an :term:`OpenAPI` specification.
+        |
+        | In the context of this project, it is also used in some occasion to refer to the RESTful interface
+          of :term:`OGC API - Processes`, in contrast to the :term:`OWS` :term:`WPS` interface.
 
     Application Package
         General term that refers to *"what and how to execute"* the :term:`Process`. Application Packages provide the
@@ -110,9 +113,18 @@ Glossary
         Ontology that regroups multiple definitions, amongst which `Weaver` looks up most of its known and supported
         :term:`MIME-types` (|iana-link|_) when resolving file formats.
 
+    HTML
+        | HyperText Markup Language
+        | Alternative representation of some endpoints provided by the application.
+          Requires appropriate ``Accept`` header or ``f``/``format`` query to return this format.
+
+        .. seealso::
+            See :ref:`OpenAPI Specification` for details.
+
     JSON
         | JavaScript Object Notation
-        | Default data representation of all objects contained in the application or for their creation.
+        | Default data representation of all objects contained in the application or for their creation
+          when using the :term:`API`, except for the :term:`OWS` :term:`WPS` endpoint.
 
     Job
         Definition of a :term:`Process` execution state with applicable operation metadata.
@@ -262,8 +274,12 @@ Glossary
 
     XML
         | Extensible Markup Language
-        | Alternative representation of some data object provided by the application. Requires appropriate ``Accept``
-          header to return this format. See :ref:`OpenAPI Specification` for details.
+        | Alternative representation of some data object provided by the application.
+          Requires appropriate ``Accept`` header or ``f``/``format`` query to return this format.
+          For the :term:`OWS` :term:`WPS` endpoint, this is the default representation instead of :term:`JSON`.
+
+        .. seealso::
+            See :ref:`OpenAPI Specification` for details.
 
     YAML
         | YAML Ain't Markup Language

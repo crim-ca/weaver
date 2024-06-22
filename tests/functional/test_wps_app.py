@@ -8,7 +8,6 @@ Based on tests from:
 """
 import contextlib
 
-import pyramid.testing
 import pytest
 import xmltodict
 
@@ -31,26 +30,24 @@ class WpsAppTest(WpsConfigBase):
         "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
         "weaver.wps_metadata_provider_name": "WpsAppTest"
     }
+    process_public = None   # type: WpsTestProcess
+    process_private = None  # type: WpsTestProcess
 
-    def setUp(self):
-        super(WpsAppTest, self).setUp()
-        self.process_store.clear_processes()
-        self.job_store.clear_jobs()
+    @classmethod
+    def setUpClass(cls):
+        super(WpsAppTest, cls).setUpClass()
 
         # add processes by database Process type
-        self.process_public = WpsTestProcess(identifier="process_public")
-        self.process_private = WpsTestProcess(identifier="process_private")
-        self.process_store.save_process(self.process_public)
-        self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
-        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
+        cls.process_public = WpsTestProcess(identifier="process_public")
+        cls.process_private = WpsTestProcess(identifier="process_private")
+        cls.process_store.save_process(cls.process_public)
+        cls.process_store.save_process(cls.process_private)
+        cls.process_store.set_visibility(cls.process_public.identifier, Visibility.PUBLIC)
+        cls.process_store.set_visibility(cls.process_private.identifier, Visibility.PRIVATE)
 
         # add processes by pywps Process type
-        self.process_store.save_process(HelloWPS())
-        self.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
-
-    def tearDown(self):
-        pyramid.testing.tearDown()
+        cls.process_store.save_process(HelloWPS())
+        cls.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
 
     def make_url(self, params):
         return f"{self.wps_path}?{params}"

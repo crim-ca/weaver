@@ -1,16 +1,53 @@
 """
 Helpers to work around some default view configurations that are not desired.
 """
+import contextlib
 from typing import TYPE_CHECKING
 
 from cornice import Service as ServiceAutoGetHead
 from pyramid.predicates import RequestMethodPredicate
+from pyramid.config import Configurator as PyramidConfigurator
 from pyramid.util import as_sorted_tuple
 
 if TYPE_CHECKING:
     from typing import Any, Tuple, Union
 
-    from pyramid.config import Configurator
+
+class Configurator(PyramidConfigurator):
+    @contextlib.contextmanager
+    def route_prefix_context(self, route_prefix):
+        """
+        Copy of the original configurator, with tweak for leaving the leading ``/`` of the supplied ``route_prefix``.
+
+        .. fixme::
+            Workaround for https://github.com/Pylons/pyramid/issues/3758
+        """
+        original_route_prefix = self.route_prefix
+
+        if route_prefix is None:
+            route_prefix = ''
+
+        old_route_prefix = self.route_prefix
+        if old_route_prefix is None:
+            old_route_prefix = ''
+
+        route_prefix = '{}/{}'.format(
+            old_route_prefix.rstrip('/'), route_prefix.lstrip('/')
+        )
+
+        route_prefix = route_prefix.rstrip('/')   # FIXME: this is the only change 'strip' -> 'rstrip'
+
+        if not route_prefix:
+            route_prefix = None
+
+        self.begin()
+        try:
+            self.route_prefix = route_prefix
+            yield
+
+        finally:
+            self.route_prefix = original_route_prefix
+            self.end()
 
 
 class NoAutoHeadList(list):

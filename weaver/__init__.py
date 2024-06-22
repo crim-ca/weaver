@@ -38,13 +38,11 @@ def main(global_config, **settings):
 def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding Weaver")
-    config.include("weaver.config")
-    config.include("weaver.database")
-    config.include("weaver.processes")
-    config.include("weaver.vault")
-    config.include("weaver.wps")
-    config.include("weaver.wps_restapi")
-    config.include("weaver.tweens")
+
+    # avoid cornice adding conflicting exception views
+    # which are provided by custom views in 'weaver.wps_restapi.api'
+    config.registry.settings["handle_exceptions"] = False
+
     # must be after views includes,
     # otherwise can cause sporadic conflicts
     config.include("cornice")
@@ -52,5 +50,13 @@ def includeme(config):
     config.include("pyramid_beaker")
     config.include("pyramid_mako")
     config.include("pyramid_rewrite")
+
+    config.include("weaver.config")
+    config.include("weaver.database")
+    config.include("weaver.processes")
+    config.include("weaver.vault")
+    config.include("weaver.wps")
+    config.include("weaver.wps_restapi")
+    config.include("weaver.tweens")
     # attempt finding a not found route using either an added or removed trailing slash according to situation
     config.add_rewrite_rule(r"/(?P<path>.*)/", r"/%(path)s")

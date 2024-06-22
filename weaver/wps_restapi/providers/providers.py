@@ -15,7 +15,7 @@ from pyramid.settings import asbool
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
-from weaver.formats import OutputFormat
+from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
@@ -26,13 +26,20 @@ from weaver.wps_restapi.providers.utils import check_provider_requirements, get_
 from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
 if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyViewResponse, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                          schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
+@sd.providers_service.get(
+    tags=[sd.TAG_PROVIDERS],
+    schema=sd.GetProviders(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_providers_list_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_providers(request):
@@ -53,8 +60,14 @@ def get_providers(request):
     return HTTPOk(json=sd.ProvidersBodySchema().deserialize(data))
 
 
-@sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                           schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
+@sd.providers_service.post(
+    tags=[sd.TAG_PROVIDERS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProvider(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_provider_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def add_provider(request):
@@ -114,8 +127,13 @@ def add_provider(request):
     return HTTPCreated(json=data)
 
 
-@sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                            schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
+@sd.provider_service.delete(
+    tags=[sd.TAG_PROVIDERS],
+    schema=sd.ProviderEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_provider_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def remove_provider(request):
@@ -133,8 +151,13 @@ def remove_provider(request):
     return HTTPNoContent(json={})
 
 
-@sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OutputFormat.JSON,
-                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_provider_responses)
+@sd.provider_service.get(
+    tags=[sd.TAG_PROVIDERS],
+    schema=sd.ProviderEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_provider_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider(request):
@@ -149,9 +172,14 @@ def get_provider(request):
     return HTTPOk(json=data)
 
 
-@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-                                   renderer=OutputFormat.JSON, schema=sd.ProviderProcessesEndpoint(),
-                                   response_schemas=sd.get_provider_processes_responses)
+# FIXME: Add HTML view??? (same as local process, but extra 'provider' field?)
+@sd.provider_processes_service.get(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.ProviderProcessesEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_provider_processes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider_processes(request):
@@ -190,9 +218,13 @@ def describe_provider_process(request):
     return Process.convert(process, service, get_settings(request))
 
 
-@sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
-                                 renderer=OutputFormat.JSON, schema=sd.ProviderProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_responses)
+@sd.provider_process_service.get(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    schema=sd.ProviderProcessEndpoint(),
+    response_schemas=sd.get_provider_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @handle_schema_validation()
 @check_provider_requirements
@@ -207,9 +239,13 @@ def get_provider_process(request):
     return HTTPOk(json=offering)
 
 
-@sd.provider_process_package_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
-                                         renderer=OutputFormat.JSON, schema=sd.ProviderProcessPackageEndpoint(),
-                                         response_schemas=sd.get_provider_process_package_responses)
+@sd.provider_process_package_service.get(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProviderProcessPackageEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_provider_process_package_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def get_provider_process_package(request):
@@ -221,12 +257,20 @@ def get_provider_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.provider_execution_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                    renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
-                                    response_schemas=sd.post_provider_process_job_responses)
-@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                               renderer=OutputFormat.JSON, schema=sd.PostProviderProcessJobRequest(),
-                               response_schemas=sd.post_provider_process_job_responses)
+@sd.provider_execution_service.post(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    schema=sd.PostProviderProcessJobRequest(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_provider_process_job_responses,
+)
+@sd.provider_jobs_service.post(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    schema=sd.PostProviderProcessJobRequest(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_provider_process_job_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 @check_provider_requirements
 def submit_provider_job(request):
@@ -240,3 +284,14 @@ def submit_provider_job(request):
     provider_id = request.matchdict.get("provider_id")
     service = store.fetch_by_name(provider_id)
     return submit_job(request, service, tags=["wps-rest"])
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API provider views...")
+    config.add_cornice_service(sd.providers_service)
+    config.add_cornice_service(sd.provider_service)
+    config.add_cornice_service(sd.provider_processes_service)
+    config.add_cornice_service(sd.provider_process_service)
+    config.add_cornice_service(sd.provider_process_package_service)
+    config.add_cornice_service(sd.provider_execution_service)

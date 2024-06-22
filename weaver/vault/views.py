@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     import cgi
     from typing import Optional
 
+    from pyramid.config import Configurator
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
 
@@ -165,3 +166,10 @@ def download_file(request):
     resp = FileResponse(out_path, request=request)
     resp.headers.update(headers)
     return resp
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding file vault views...")
+    config.add_cornice_service(sd.vault_service)
+    config.add_cornice_service(sd.vault_file_service)

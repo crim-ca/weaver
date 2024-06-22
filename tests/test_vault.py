@@ -50,7 +50,7 @@ VAULT_FAKE_UUID2 = str(uuid.uuid4())
     # perfectly well formatted tokens but with duplicate entries are not allowed
     (f"token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1},token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1}", False,
      {}),
-    # partially well formed tokens makes all of them invalid
+    # partially well-formed tokens makes all of them invalid
     # This is to ensure that requests that require many tokens don't partially succeed,
     # since the whole process will fail anyway. Also ensures that not only partial files get wiped after download.
     (f"token {VAULT_FAKE_TOKEN}; id={VAULT_FAKE_UUID1},token bad; id={VAULT_FAKE_UUID1}", False,

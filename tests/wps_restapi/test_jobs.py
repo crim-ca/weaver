@@ -73,10 +73,6 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         cls.datetime_interval = cls.generate_test_datetimes()
 
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
     def setUp(self):
         # rebuild clean db on each test
         self.job_store = setup_mongodb_jobstore(self.config)
@@ -1662,6 +1658,21 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert "Start" in lines[0]
         assert "Process" in lines[1]
         assert "Complete" in lines[2]
+
+    def test_job_logs_formats_unsupported(self):
+        path = f"/jobs/{self.job_info[0].id}/logs"
+        resp = self.app.get(path, headers={"Accept": ContentType.IMAGE_GEOTIFF}, expect_errors=True)
+        assert resp.status_code == 406
+        assert ContentType.APP_JSON in resp.content_type
+        assert "type" in resp.json
+        assert resp.json["type"] == "NotAcceptable"
+        assert "detail" in resp.json
+        assert "Accept header" in resp.json["detail"]
+        # expected that all acceptable media-types are listed
+        assert ContentType.TEXT_PLAIN in resp.json["detail"]
+        assert ContentType.APP_XML in resp.json["detail"]
+        assert ContentType.APP_JSON in resp.json["detail"]
+        assert ContentType.APP_YAML in resp.json["detail"]
 
     def test_job_statistics_missing(self):
         job = self.job_info[0]

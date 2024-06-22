@@ -10,13 +10,38 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+.. FIXME:
+    - Resolve `Configurator.add_cornice_service` vs `cornice-swagger` `route_prefix` resolution for listing OpenAPI
+      endpoints with the appropriate prefix (https://github.com/Cornices/cornice/pull/584#issuecomment-2089676743).
+    - Add test validating that `route_prefix` is applied for HTTP requests.
+    - Add test validating that `route_prefix` is applied in paths of the resulting OpenAPI JSON from CorniceSwagger.
+
 Changes:
 --------
-- No change.
+- Add support of `HTML` responses for `OGC API - Processes` endpoints
+  (fixes `#210 <https://github.com/crim-ca/weaver/issues/210>`_).
+- Add ``weaver.wps_restapi_html`` configuration setting to control support of `HTML` responses.
+- Refactor ``pyramid`` configuration to employ ``Configurator.add_cornice_service``
+  utility instead of ``Configurator.add_route`` and ``Configurator.add_view`` handlers that were causing a lot of
+  duplication between the ``cornice.Service`` parametrization and their corresponding view decorators. All metadata
+  is now embedded within the same decorator operation.
+- Add missing documentation for ``weaver.wps_restapi_doc`` and ``weaver.wps_restapi_ref`` configuration settings.
+- Modified the base path/URL resolution of the `OpenAPI` endpoint to be located at the application root instead of being
+  nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
+  are employed for representing supported requests and responses of both the `REST` and the `OWS` `WPS` interfaces.
+- Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
+- Add automatic redirect from ``/api?f=json`` to ``/json`` response to allow `OpenAPI` schema access directly
+  from the same endpoint as the `Swagger-UI` rendering of the schemas. The ``Accept`` header
+  for ``application/json`` or explicitly ``application/vnd.oai.openapi+json; version=3.0`` are also supported
+  (fixes `#623 <https://github.com/crim-ca/weaver/issues/623>`_)
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.wps_restapi_path`` incorrectly resolved when populating `Process` paging links.
+- Fix invalid resolution of reported API endpoints in the `OpenAPI` and frontpage response when
+  ``weaver.wps_restapi_path``, ``weaver.wps_restapi_url``, ``weaver.wps_path`` or ``weaver.wps_url``
+  were set to other prefix path values than the default root base URL.
+- Fix ``weaver.formats.OutputFormat`` to return ``JSON`` by default when an invalid format could not be resolved.
 
 .. _changes_5.6.1:
 

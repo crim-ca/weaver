@@ -55,6 +55,7 @@ class BuiltinAppTest(WpsConfigBase):
 
     @classmethod
     def tearDownClass(cls):
+        super(BuiltinAppTest, cls).tearDownClass()
         cls.file_server.teardown()
 
     def setUp(self):

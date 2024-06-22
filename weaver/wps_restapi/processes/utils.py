@@ -11,9 +11,10 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_path_kvp, get_settings, get_weaver_url
+from weaver.utils import get_path_kvp, get_settings
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
@@ -114,7 +115,7 @@ def get_process_list_links(request, paging, total, provider=None):
     """
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
-    base_url = get_weaver_url(request)
+    base_url = get_wps_restapi_base_url(request)
     links = []
     if provider:
         proc_path = sd.provider_processes_service.path.format(provider_id=provider.id)

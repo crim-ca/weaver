@@ -95,11 +95,11 @@ STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STA
 STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Type, Union
 
-    from weaver.typedefs import Literal
+    from weaver.typedefs import Literal, TypeAlias
 
-    StatusType = Literal[
+    StatusType: Status = Literal[
         Status.ACCEPTED,
         Status.STARTED,
         Status.PAUSED,
@@ -112,7 +112,7 @@ if TYPE_CHECKING:
     ]
     AnyStatusType = Union[Status, StatusType, int]
 
-    AnyStatusCategory = Union[
+    AnyStatusCategory: Type[StatusCategory] = Union[
         StatusCategory,
         Literal[
             StatusCategory.RUNNING,
@@ -121,9 +121,9 @@ if TYPE_CHECKING:
         ],
     ]
 
-    AnyStatusOrCategory = Union[AnyStatusType, AnyStatusCategory]
+    AnyStatusOrCategory: TypeAlias = Union[AnyStatusType, AnyStatusCategory]
 
-    AnyStatusSearch = [
+    AnyStatusSearch = Union[
         Status,  # not 'AnyStatusType' to disallow 'int'
         StatusType,
         StatusCategory,
