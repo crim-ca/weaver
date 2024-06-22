@@ -7,9 +7,9 @@ Weaver
 * |ogc-proc-long|
 * |wps-long|
 * |esgf| processes
-* |cwl| for |ogc-apppkg|_
-* |ems| for Workflows
-* |ades|
+* |cwl-long| for |ogc-apppkg|_
+* |ems-long| for dispatching distrubted workflow processing
+* |ades-long| for processing close to the data
 
 Weaver (the nest-builder)
   *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.
@@ -22,7 +22,7 @@ Weaver (the nest-builder)
 
 `Weaver` is an OGC-API flavored |ems| that allows the execution of workflows chaining various
 applications and |wps| inputs and outputs. Remote execution is deferred by the `EMS` to one or many
-|ades| or remote service providers, and employs |cwl| configurations to define an |ogc-apppkg|_ deployed
+|ades| or remote service providers, and employs |cwl-long| configurations to define an |ogc-apppkg|_ deployed
 for each process.
 
 
@@ -117,7 +117,7 @@ chain is dispatched by the *EMS* to one or many registered |ades| by
 ensuring the transfer of files accordingly between instances when located across multiple remote locations.
 
 `Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
-the application definition provided by |cwl| configuration. It can then directly execute
+the application definition provided by |cwl-long| configuration. It can then directly execute
 a registered process |ogc-apppkg|_ with received inputs from a WPS request to expose output results for a
 following `ADES` in a `EMS` workflow execution chain.
 
@@ -288,8 +288,9 @@ These are generated from corresponding information provided in `docs`_ source di
 Extra Details & Sponsors
 -------------------------
 
-The project was initially developed upon `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
-following improvements. It is also advanced with sponsorship from the `U.S. Department of Energy` to support common
+The project was initially developed upon *OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform* findings and
+improvements following from previous |ogc-tb13-cloud-er|_ architecture designs.
+It was also built upon sponsorship from the *U.S. Department of Energy* to support common
 API of the |esgf|. The findings are reported on the |ogc-tb14|_ thread, and more
 explicitly in the |ogc-tb14-platform-er|_.
 
@@ -308,23 +309,35 @@ Videos and more functionalities were introduced in `Weaver` following |ogc-eo-ap
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
-technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2| backed by
-validated test cases using |cwl| as the representation method for the deployment and execution of |ogc-apppkg|_ close
-to the data.
+technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2|_ backed by
+validated test cases using |cwl-long| as the representation method for the deployment and execution of |ogc-apppkg|_
+close to the data.
 
-The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
+`Weaver` is being employed in the |ogc-tb20-gdc|_ initiative to improve and work on the alignment of multiple
+community standards involved in workflow design, such as |cwl|_, `openEO`_ and |ogc-api-proc-part3|_, for
+processing of multidimensional data involved through GeoDataCube interactions.
+
+The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative
+and is employed by the ClimateData.ca_/DonneesClimatiques.ca_ portal.
 
 `Weaver` is implemented in Python with the `Pyramid`_ web framework.
 It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the `birdhouse-deploy`_ server stack.
 
 .. NOTE: all references in this file must remain local (instead of imported from 'references.rst')
 ..       to allow Github to directly referring to them from the repository HTML page.
-.. |cwl| replace:: `Common Workflow Language`_ (CWL)
+.. |cwl-long| replace:: `Common Workflow Language`_ (CWL)
 .. _`Common Workflow Language`: https://www.commonwl.org/
+.. |cwl| replace:: CWL
+.. _cwl: https://www.commonwl.org/
+.. _openEO: https://openeo.org/
 .. |esgf| replace:: `Earth System Grid Federation`_ (ESGF)
 .. _`Earth System Grid Federation`: https://esgf.llnl.gov/
-.. |ems| replace:: `Execution Management Service` (EMS)
-.. |ades| replace:: `Application, Deployment and Execution Service` (ADES)
+.. |ems| replace:: Execution Management Service
+.. _ems: https://docs.ogc.org/per/18-050r1.html#_crim
+.. |ems-long| replace:: |ems|_ (EMS)
+.. |ades| replace:: Application, Deployment and Execution Service
+.. _ades: https://docs.ogc.org/per/18-050r1.html#_application_deployment_and_execution_service
+.. |ades-long| replace:: |ades|_ (ADES)
 .. |wps| replace:: `Web Processing Services`
 .. _wps: https://www.ogc.org/standard/wps/
 .. |wps-long| replace:: |wps|_ (WPS)
@@ -333,6 +346,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |ogc-api-proc| replace:: `OGC API - Processes`
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
+.. |ogc-tb13-cloud-er| replace:: OGC Testbed-13 - Cloud Engineering Report
+.. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
 .. |ogc-tb14| replace:: OGC Testbed-14
 .. _ogc-tb14: https://www.ogc.org/initiatives/testbed-14/
 .. |ogc-tb14-platform-er| replace:: ADES & EMS Results and Best Practices Engineering Report
@@ -347,18 +362,24 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-tb16-data-access-proc-er: http://docs.opengeospatial.org/per/20-016.html
 .. |ogc-tb16-ipynb-er| replace:: OGC Testbed-16: Earth Observation Application Packages with Jupyter Notebooks Engineering Report
 .. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
+.. |ogc-tb20-gdc| replace:: OGC Testbed-20 - GeoDataCubes
+.. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
 .. |ogc-eo-apps-pilot| replace:: OGC Earth Observation Applications Pilot
 .. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
 .. |ogc-eo-apps-pilot-er| replace:: OGC Earth Observation Applications Pilot: CRIM Engineering Report
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
 .. |ogc-best-practices-eo-apppkg| replace:: OGC Best Practice for Earth Observation Application Package
 .. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
-.. |ogc-api-proc-part2| replace:: `OGC API - Processes - Part 2: Deploy, Replace, Undeploy`_ (DRU) extension
-.. _`OGC API - Processes - Part 2: Deploy, Replace, Undeploy`: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
+.. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy (DRU)
+.. _ogc-api-proc-part2: https://docs.ogc.org/DRAFTS/20-044.html
+.. |ogc-api-proc-part3| replace:: OGC API - Processes - Part 3: Workflows and Chaining
+.. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-apppkg| replace:: `OGC Application Package`
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
 .. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
+.. _ClimateData.ca: https://ClimateData.ca
+.. _DonneesClimatiques.ca: https://DonneesClimatiques.ca
 .. _Pyramid: http://www.pylonsproject.org
