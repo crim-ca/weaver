@@ -1,3 +1,5 @@
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver?ref=badge_shield)
+
 =============================================
 Weaver
 =============================================
@@ -356,3 +358,6 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
 .. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
 .. _Pyramid: http://www.pylonsproject.org
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver?ref=badge_large)
