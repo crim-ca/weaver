@@ -583,14 +583,14 @@ def api_frontpage_body(settings):
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 
-    weaver_api = asbool(settings.get("weaver.wps_restapi"))
-    weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
+    weaver_api = asbool(settings.get("weaver.wps_restapi", True))
+    weaver_api_url = get_wps_restapi_base_url(settings)
     weaver_api_oas_ui = weaver_url + sd.api_openapi_ui_service.path if weaver_api else None
     weaver_api_swagger = weaver_url + sd.api_swagger_ui_service.path if weaver_api else None
     weaver_api_spec = weaver_url + sd.openapi_json_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
-    weaver_api_html = asbool(settings.get("weaver.wps_restapi_html", True))
+    weaver_api_html = asbool(settings.get("weaver.wps_restapi_html", True)) and weaver_api
     weaver_api_html_url = f"{weaver_api_url}?f={OutputFormat.HTML}"
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
@@ -883,6 +883,38 @@ def swagger_ui_cached(request):
 )
 @sd.api_openapi_ui_service.get(
     tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_YAML,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_openapi_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.SwaggerUIEndpoint(),
+    renderer="templates/swagger_ui.mako",
+    response_schemas=sd.get_api_swagger_ui_responses,
+)
+@sd.api_swagger_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_swagger_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_OAS_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_swagger_ui_service.get(
+    tags=[sd.TAG_API],
+    schema=sd.OpenAPIFormatRedirect(),
+    accept=ContentType.APP_YAML,
+    response_schemas=sd.get_openapi_json_responses,
+)
+@sd.api_swagger_ui_service.get(
+    tags=[sd.TAG_API],
     schema=sd.SwaggerUIEndpoint(),
     renderer="templates/swagger_ui.mako",
     response_schemas=sd.get_api_swagger_ui_responses,
@@ -892,10 +924,13 @@ def api_swagger_ui(request):
     """
     Weaver OpenAPI schema definitions rendering using Swagger-UI viewer.
     """
-    if guess_target_format(request, default=ContentType.TEXT_HTML) in [ContentType.APP_JSON, ContentType.APP_OAS_JSON]:
-        url = get_weaver_url(request)
-        path = request.route_path(sd.openapi_json_service.name)
-        return HTTPFound(location=f"{url}{path}")
+    c_type = guess_target_format(request, default=ContentType.TEXT_HTML)
+    if c_type in [ContentType.APP_JSON, ContentType.APP_OAS_JSON]:
+        return openapi_json(request)
+    if c_type == ContentType.APP_YAML:
+        resp = openapi_json(request)
+        data = OutputFormat.convert(resp.json, ContentType.APP_YAML)
+        return HTTPOk(body=data, charset="UTF-8", content_type=ContentType.APP_YAML)
     return swagger_ui_cached(request)
 
 

@@ -10,12 +10,6 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
-.. FIXME:
-    - Resolve `Configurator.add_cornice_service` vs `cornice-swagger` `route_prefix` resolution for listing OpenAPI
-      endpoints with the appropriate prefix (https://github.com/Cornices/cornice/pull/584#issuecomment-2089676743).
-    - Add test validating that `route_prefix` is applied for HTTP requests.
-    - Add test validating that `route_prefix` is applied in paths of the resulting OpenAPI JSON from CorniceSwagger.
-
 Changes:
 --------
 - Add support of `HTML` responses for `OGC API - Processes` endpoints
@@ -34,6 +28,8 @@ Changes:
   from the same endpoint as the `Swagger-UI` rendering of the schemas. The ``Accept`` header
   for ``application/json`` or explicitly ``application/vnd.oai.openapi+json; version=3.0`` are also supported
   (fixes `#623 <https://github.com/crim-ca/weaver/issues/623>`_)
+- Add `OpenAPI` response rendering as `YAML` using ``/api?f=yaml`` or ``Accept: application/yaml``
+  (relates to `#456 <https://github.com/crim-ca/weaver/issues/456>`_).
 
 Fixes:
 ------

@@ -2,8 +2,8 @@ import itertools
 
 import json
 import unittest
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, cast
+from urllib.parse import urlsplit, urlunsplit
 
 import colander
 import mock
@@ -70,7 +70,8 @@ class GenericApiRoutesTestCase(WpsConfigBase):
 
             # request endpoint to validate it is accessible
             if "localhost" in path:
-                resp = self.app.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
+                path = cast(str, urlunsplit(("", "") + urlsplit(path)[2:]))  # remove scheme/hostname
+                resp = self.app.get(path, expect_errors=True)  # allow error for wps without queries
             else:
                 resp = request_extra("GET", path, retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
             user_agent = get_header("user-agent", resp.request.headers)
@@ -92,7 +93,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
                     if path.startswith(ref_link):
                         ctype = ctype_header_links[ref_link]
                         break
-            assert ctype in rtype, f"Reference link content does not match [{ctype}]!=[{rtype}] for {test}"
+            assert ctype in rtype, f"Reference link content does not match, [{ctype}] not in {rtype} for {test}"
 
     def test_version_format(self):
         resp = self.app.get(sd.api_versions_service.path, headers=self.json_headers)
@@ -140,8 +141,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
     @parameterized.expand(["f", "format"])
     def test_swagger_api_redirect_format_query(self, format_query):
         resp = self.app.get(sd.api_swagger_ui_service.path, params={format_query: OutputFormat.JSON})
-        assert resp.status_code == 302
-        resp = resp.follow()
+        resp = resp.maybe_follow()
         assert resp.status_code == 200
         assert "json" in resp.content_type
         assert "openapi" in resp.json
@@ -149,8 +149,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
     @parameterized.expand([ContentType.APP_JSON, ContentType.APP_OAS_JSON])
     def test_swagger_api_redirect_accept_header(self, accept_header):
         resp = self.app.get(sd.api_swagger_ui_service.path, headers={"Accept": accept_header})
-        assert resp.status_code == 302
-        resp = resp.follow()
+        resp = resp.maybe_follow()
         assert resp.status_code == 200
         assert "json" in resp.content_type
         assert "openapi" in resp.json
@@ -220,33 +219,34 @@ class GenericApiRoutesPrefixedTestCase(WpsConfigBase):
 
     @parameterized.expand(itertools.product(
         ["f", "format"],
+        [OutputFormat.JSON, OutputFormat.YAML],
         ["/api", "/ogcapi/api"],
     ))
-    def test_swagger_api_redirect_format_query(self, format_query, api_path):
-        resp = self.app.get(api_path, params={format_query: OutputFormat.JSON})
-        for i in range(5):
-            if resp.status_code == 200:
-                break
-            assert resp.status_code == 302
-            resp = resp.follow()
+    def test_swagger_api_redirect_format_query(self, format_query, format_value, api_path):
+        resp = self.app.get(api_path, params={format_query: format_value})
+        resp = resp.maybe_follow()
         assert resp.status_code == 200
-        assert "json" in resp.content_type
-        assert "openapi" in resp.json
+        if format_value == OutputFormat.JSON:
+            assert "json" in resp.content_type
+            assert "openapi" in resp.json
+        else:
+            assert "json" not in resp.content_type
+            assert "openapi" in resp.text
 
     @parameterized.expand(itertools.product(
-        [ContentType.APP_JSON, ContentType.APP_OAS_JSON],
+        [ContentType.APP_JSON, ContentType.APP_OAS_JSON, ContentType.APP_YAML],
         ["/api", "/ogcapi/api"],
     ))
     def test_swagger_api_redirect_accept_header(self, accept_header, api_path):
         resp = self.app.get(api_path, headers={"Accept": accept_header})
-        for i in range(5):
-            if resp.status_code == 200:
-                break
-            assert resp.status_code == 302
-            resp = resp.follow()
+        resp = resp.maybe_follow()
         assert resp.status_code == 200
-        assert "json" in resp.content_type
-        assert "openapi" in resp.json
+        if "json" in accept_header:
+            assert "json" in resp.content_type
+            assert "openapi" in resp.json
+        else:
+            assert resp.content_type == accept_header
+            assert "openapi" in resp.text
 
 
 @pytest.mark.functional
