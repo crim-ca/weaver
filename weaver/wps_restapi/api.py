@@ -114,7 +114,7 @@ def get_conformance(category, settings):
         # f"{ogcapi_common}/rec/core/etag",
     ] + ([
         f"{ogcapi_common}/rec/core/html",
-    ] if ogcapi_proc_html else[]) + [
+    ] if ogcapi_proc_html else []) + [
         f"{ogcapi_common}/rec/core/json",
         # ogcapi_common + "/rec/core/link-header",
         # FIXME: error details (for all below: https://github.com/crim-ca/weaver/issues/320)
@@ -172,7 +172,7 @@ def get_conformance(category, settings):
         f"{ogcapi_common}/req/html",
         f"{ogcapi_common}/req/html/content",
         f"{ogcapi_common}/req/html/definition",
-    ] if ogcapi_proc_html else[]) + [
+    ] if ogcapi_proc_html else []) + [
         f"{ogcapi_common}/req/json",
         f"{ogcapi_common}/req/json/content",
         f"{ogcapi_common}/req/json/definition",
