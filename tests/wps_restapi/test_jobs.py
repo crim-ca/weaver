@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 import colander
 import mock
-import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
 from parameterized import parameterized

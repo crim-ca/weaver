@@ -978,7 +978,8 @@ class TestWeaverCLI(TestWeaverClientBase):
         .. seealso::
             :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
 
-        .. fixme::
+        .. fixme:
+        .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when asserting
             the expected authentication credentials. Re-running this test by itself validates if this case happened.
         """

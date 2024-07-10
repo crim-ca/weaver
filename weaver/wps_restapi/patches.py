@@ -19,23 +19,24 @@ class Configurator(PyramidConfigurator):
         """
         Copy of the original configurator, with tweak for leaving the leading ``/`` of the supplied ``route_prefix``.
 
-        .. fixme::
+        .. fixme:
+        .. todo::
             Workaround for https://github.com/Pylons/pyramid/issues/3758
         """
         original_route_prefix = self.route_prefix
 
         if route_prefix is None:
-            route_prefix = ''
+            route_prefix = ""
 
         old_route_prefix = self.route_prefix
         if old_route_prefix is None:
-            old_route_prefix = ''
+            old_route_prefix = ""
 
-        route_prefix = '{}/{}'.format(
-            old_route_prefix.rstrip('/'), route_prefix.lstrip('/')
+        route_prefix = "{}/{}".format(  # pylint: disable=C0209  # format over f-string preserved from original code
+            old_route_prefix.rstrip("/"), route_prefix.lstrip("/")
         )
 
-        route_prefix = route_prefix.rstrip('/')   # FIXME: this is the only change 'strip' -> 'rstrip'
+        route_prefix = route_prefix.rstrip("/")   # FIXME: this is the only change 'strip' -> 'rstrip'
 
         if not route_prefix:
             route_prefix = None

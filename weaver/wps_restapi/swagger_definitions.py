@@ -13,7 +13,6 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
-import contextlib
 import datetime
 import inspect
 import os
@@ -6261,7 +6260,7 @@ class GenericHTMLResponse(ExtendedMappingSchema):
     header = HtmlHeader()
     body = ExtendedMappingSchema()
 
-    def __new__(cls, *, name, description, **kwargs):
+    def __new__(cls, *, name, description, **kwargs):  # pylint: disable=W0221
         # type: (Type[GenericHTMLResponse], *Any, str, str, **Any) -> GenericHTMLResponse
         """
         Generates a derived HTML response schema with direct forwarding of custom parameters to the body's schema.

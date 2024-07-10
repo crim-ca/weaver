@@ -1,8 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
 
-from weaver.wps_restapi.jobs import jobs as j
-
 if TYPE_CHECKING:
     from pyramid.config import Configurator
 

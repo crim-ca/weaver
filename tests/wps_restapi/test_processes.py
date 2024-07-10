@@ -3,7 +3,6 @@ import base64
 import contextlib
 import copy
 import json
-import mock
 import os
 import tempfile
 import uuid
@@ -11,6 +10,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
+import mock
 import pytest
 import stopit
 import webtest.app

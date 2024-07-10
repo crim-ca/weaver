@@ -1,7 +1,6 @@
 import unittest
 
 import owslib
-import pyramid.testing
 import pytest
 from pyramid.httpexceptions import HTTPNotFound
 

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     FormatSource = Literal["header", "query", "default"]
 
-    _ContentType = "ContentType"  # type: TypeAlias
+    _ContentType = "ContentType"  # type: TypeAlias  # pylint: disable=C0103
     AnyContentType = Union[str, _ContentType]
     AnyOutputFormat = Literal[
         "JSON", "json",

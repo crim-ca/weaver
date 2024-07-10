@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from pyramid.settings import asbool
 
 from weaver.utils import get_settings
-from weaver.vault import views as v
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator

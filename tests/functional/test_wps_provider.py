@@ -260,7 +260,7 @@ class WpsProviderTest(WpsConfigBase):
         resp = self.app.post_json(path, params=data, headers=self.json_headers)
         assert resp.status_code == 201
 
-        exec_path = f"{self.app_url}/providers/{remote_provider_name}/processes/ncdump/execution"
+        exec_path = f"{self.url}/providers/{remote_provider_name}/processes/ncdump/execution"
         exec_file = "http://localhost.com/dont/care.nc"
         exec_body = {
             "mode": ExecuteMode.ASYNC,

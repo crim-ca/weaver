@@ -2,7 +2,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from weaver.utils import get_settings
-from weaver.wps_restapi.quotation import bills as b, quotes as q
 from weaver.wps_restapi.quotation.utils import check_quotation_supported
 
 if TYPE_CHECKING:

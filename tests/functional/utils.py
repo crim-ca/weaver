@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
 import pyramid.testing
-import pytest
 import yaml
 from pyramid.httpexceptions import HTTPOk
 
