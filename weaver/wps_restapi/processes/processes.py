@@ -264,6 +264,12 @@ def patch_local_process(request):
 @sd.process_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessEndpoint(),
+    accept=ContentType.APP_XML,
+    response_schemas=sd.get_process_responses,
+)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_process_responses,
