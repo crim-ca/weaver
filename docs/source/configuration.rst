@@ -280,15 +280,55 @@ they are optional and which default value or operation is applied in each situat
     `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
     it without REST endpoint, but it should technically be possible to run it as :term:`WPS`-1/2 only if desired.
 
+.. |weaver-wps-restapi-html| replace:: ``weaver.wps_restapi_html``
 .. _weaver-wps-restapi-html:
 
 - | ``weaver.wps_restapi_html = true|false`` [:class:`bool`-like]
   | (default: ``true``)
   |
-  | Enable support of HTML responses for :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints.
+  | Enable support of :term:`HTML` responses for :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints.
   |
-  | When enabled, endpoints will support ``Accept: text/html`` header and ``?f=html`` query to return contents in HTML
-    instead of the default :term:`JSON` responses. Otherwise, HTTP ``406 Not Acceptable`` code will be returned instead.
+  | When enabled, endpoints will support ``Accept: text/html`` header and ``?f=html`` query to return contents
+    in :term:`HTML` instead of the default :term:`JSON` responses. Otherwise, HTTP ``406 Not Acceptable`` code
+    will be returned instead.
+
+  .. versionadded:: 5.7.0
+
+.. _weaver-wps-restapi-html-override-user-agent:
+
+- | ``weaver.wps_restapi_html_override_user_agent = true|false`` [:class:`bool`-like]
+  | (default: ``false``)
+  |
+  | Allows override of the ``Accept`` header with "*visualization formats*" (:term:`HTML`, CSS, images, etc.) when the
+    request is detected to originate from a web browser ``User-Agent``.
+  |
+  | When enabled, requests toward the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints that support :term:`HTML`
+    rendering will still return :term:`JSON` (effectively ignoring the ``Accept`` header) when the request corresponds
+    to a web browser ``User-Agent`` (e.g.: Chrome, Firefox, Safari). This feature is provided to allow the :term:`API`
+    to respond using the default :term:`JSON` even when the request is performed through web browsers (rather than
+    terminals, servers, or programmatic clients). Since web browsers typically specify an ``Accept`` header with
+    visualization media-types that combines :term:`HTML` and a fallback ``*/*`` media-type, the responses obtained by
+    the :term:`API` can seemingly vary between :term:`JSON` and :term:`HTML` depending on which types each endpoint
+    supports. Since not all endpoints support :term:`HTML`, but all support :term:`JSON` which is employed by default
+    when both the ``Accept``/``f`` are omitted, the results might appear inconsistent depending from where the request
+    was sent from.
+  |
+  | Note that, when the ``f`` format query parameter is provided, it takes precedence over the ``Accept`` header
+    regardless of the ``User-Agent`` value. Therefore, enabling this functionality can still obtain the :term:`HTML`
+    rendering by explicitly requesting ``f=html`` in the request. Similarly, another ``User-Agent`` than one
+    corresponding to a web browser can also be employed in combination to ``Accept: text/html`` to obtain the
+    :term:`HTML` representation when this option is enabled.
+  |
+  | When this option is disabled (default), no special handling of ``User-Agent`` will be performed. Therefore, a
+    request performed through a web browser will typically respond by default in :term:`HTML` for rendering (provided
+    that browser indicated the relevant ``Accept: text/html``), whereas other clients will respond in :term:`JSON` by
+    default. Explicit response media-types can be requested in both cases using either an explicit ``Accept`` header
+    of the desired media-type, or their corresponding ``f`` query format.
+  |
+  | This option is Only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
+    always employed by default.
+
+  .. versionadded:: 5.7.0
 
 .. _weaver-wps-restapi-path:
 .. _weaver-wps-restapi-url:

@@ -3,6 +3,7 @@ import base64
 import contextlib
 import copy
 import json
+import mock
 import os
 import tempfile
 import uuid
@@ -10,7 +11,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
-import pyramid.testing
 import pytest
 import stopit
 import webtest.app
@@ -565,6 +565,29 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "</body>" in resp.text
         assert "Process:" in resp.text
         assert self.process_public.identifier in resp.text
+
+    def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
+        path = "/processes"
+        headers = copy.deepcopy(self.html_headers)
+        headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_get_processes_html_accept_header_user_agent_browser_override(self):
+        path = "/processes"
+        headers = copy.deepcopy(self.html_headers)
+        headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+        settings = copy.deepcopy(self.config.registry.settings)
+        settings["weaver.wps_restapi_html_override_user_agent"] = True
+        with mock.patch("weaver.tweens.get_settings", return_value=settings):
+            resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert "processes" in resp.json
 
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"

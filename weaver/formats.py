@@ -968,14 +968,14 @@ def guess_target_format(request, default):
 
 
 @overload
-def guess_target_format(request, return_source):
-    # type: (AnyRequestType, Literal[True]) -> Tuple[ContentType, FormatSource]
+def guess_target_format(request, return_source, override_user_agent):
+    # type: (AnyRequestType, Literal[True], bool) -> Tuple[ContentType, FormatSource]
     ...
 
 
 @overload
-def guess_target_format(request, default, return_source):
-    # type: (AnyRequestType, Optional[Union[ContentType, str]], Literal[True]) -> Tuple[ContentType, FormatSource]
+def guess_target_format(request, default, return_source, override_user_agent):
+    # type: (AnyRequestType, Optional[Union[ContentType, str]], Literal[True], bool) -> Tuple[ContentType, FormatSource]
     ...
 
 
@@ -983,6 +983,7 @@ def guess_target_format(
     request,                        # type: AnyRequestType
     default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
     return_source=False,            # type: bool
+    override_user_agent=False,      # type: bool
 ):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
@@ -995,11 +996,11 @@ def guess_target_format(
     ``Accept` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
     format specifiers were not provided in the request.
 
-    Applies some specific logic to handle automatically added ``Accept`` headers by many browsers such that sending
-    requests to the :term:`API` using them will not automatically default back to :term:`XML` or similar :term:`HTML`
-    representations. If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the
-    URL, those will be applied since this is a very intuitive (and easier) approach to request different formats when
-    using browsers.
+    Can apply ``User-Agent`` specific logic to override automatically added ``Accept`` headers by many browsers such
+    that sending requests to the :term:`API` using them will not automatically default back to typical :term:`XML` or
+    :term:`HTML` representations. If browsers are used to send requests, but that ``format``/``f`` queries are used
+    directly in the URL, those will be applied since this is a very intuitive (and easier) approach to request different
+    formats when using browsers. Option :paramref:`override_user_agent` must be enabled to apply this behavior.
 
     When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
     both headers and query parameters are applied directly without question.
@@ -1021,7 +1022,7 @@ def guess_target_format(
         format_source = "header"
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
-            if ctype != default or not default:
+            if override_user_agent and (ctype != default or not default):
                 # Because most browsers enforce a 'visual rendering' list of accept header, revert to JSON if detected.
                 # Request set by another client (e.g.: using 'requests') will have full control over desired content.
                 # Since browsers add '*/*' as any content fallback, use it as extra detection of undetected user-agent.

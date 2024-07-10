@@ -1,4 +1,3 @@
-import colander
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -14,18 +13,17 @@ from pyramid.httpexceptions import (
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW, INGRESS, MAIN
 
-from weaver.formats import ContentType, guess_target_format, repr_json
+from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import bytes2str, clean_json_text_body, fully_qualified_name, get_settings
-from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Optional, Type, Union
+    from typing import Callable, Union
 
     from pyramid.config import Configurator
     from pyramid.registry import Registry
 
-    from weaver.typedefs import JSON, AnyViewResponse, PyramidRequest, ViewHandler
+    from weaver.typedefs import AnyViewResponse, PyramidRequest, ViewHandler
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,7 +75,9 @@ def http_apply_response_format_tween_factory(handler, registry):    # noqa: F811
     """
     def apply_format(request):
         # type: (PyramidRequest) -> HTTPException
-        content_type, format_source = guess_target_format(request, return_source=True)
+        settings = get_settings(request) or {}
+        browser_html = asbool(settings.get("weaver.wps_restapi_html_override_user_agent"))
+        content_type, format_source = guess_target_format(request, return_source=True, override_user_agent=browser_html)
         # NOTE:
         #   Enforce the accept header in case it was specified with format query, since some renderer implementations
         #   will afterward erroneously overwrite the 'content-type' value when converting the HTTPException response.
