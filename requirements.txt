@@ -57,7 +57,8 @@ mako
 # employed by cwltool -> schema-salad -> mistune
 mistune>=2.0.3,<2.1
 mypy_boto3_s3
-numpy>=1.22.2
+numpy>=1.22.2,<2; python_version < "3.10"
+numpy>=1.22.2; python_version >= "3.10"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.29.3
