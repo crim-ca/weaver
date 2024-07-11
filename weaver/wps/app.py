@@ -8,8 +8,8 @@ from cornice.service import Service
 from pyramid.wsgi import wsgiapp2
 
 from weaver.formats import ContentType, OutputFormat
-from weaver.wps.utils import get_wps_path
 from weaver.wps.service import get_pywps_service
+from weaver.wps.utils import get_wps_path
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:

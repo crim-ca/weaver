@@ -6,11 +6,7 @@ import pytest
 
 from tests import resources
 from tests.functional.utils import WpsConfigBase
-from tests.utils import (
-    mocked_execute_celery,
-    mocked_remote_server_requests_wps1,
-    mocked_sub_requests,
-)
+from tests.utils import mocked_execute_celery, mocked_remote_server_requests_wps1, mocked_sub_requests
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType

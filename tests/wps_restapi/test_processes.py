@@ -18,6 +18,7 @@ import yaml
 from pywps.inout import LiteralInput
 
 from tests import resources
+from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     get_links,
     mocked_execute_celery,
@@ -25,9 +26,8 @@ from tests.utils import (
     mocked_process_package,
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
-    mocked_wps_output,
+    mocked_wps_output
 )
-from tests.functional.utils import WpsConfigBase
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound

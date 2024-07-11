@@ -5,8 +5,8 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from cornice import Service as ServiceAutoGetHead
-from pyramid.predicates import RequestMethodPredicate
 from pyramid.config import Configurator as PyramidConfigurator
+from pyramid.predicates import RequestMethodPredicate
 from pyramid.util import as_sorted_tuple
 
 if TYPE_CHECKING:

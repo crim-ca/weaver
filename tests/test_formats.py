@@ -1,10 +1,9 @@
-import uuid
-
 import contextlib
 import datetime
 import inspect
 import itertools
 import os
+import uuid
 
 import mock
 import pytest

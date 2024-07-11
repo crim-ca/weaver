@@ -1,6 +1,5 @@
-import os.path
-
 import logging
+import os
 import uuid
 from typing import TYPE_CHECKING
 

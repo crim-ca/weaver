@@ -105,7 +105,7 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, NoReturn, Type, Union
+    from typing import Any, Dict, NoReturn, Optional, Type, Union
     from typing_extensions import TypedDict
 
     from pyramid.config import Configurator

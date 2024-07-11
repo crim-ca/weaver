@@ -1,5 +1,4 @@
 import itertools
-
 import json
 import unittest
 from typing import TYPE_CHECKING, cast
@@ -13,8 +12,8 @@ from parameterized import parameterized
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
-from tests.utils import get_test_weaver_app, get_test_weaver_config
 from tests.functional.utils import WpsConfigBase
+from tests.utils import get_test_weaver_app, get_test_weaver_config
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_header, request_extra
 from weaver.wps_restapi import swagger_definitions as sd
