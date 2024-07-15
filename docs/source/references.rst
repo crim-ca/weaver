@@ -72,6 +72,12 @@
 .. |ogc-api-proc| replace:: `OGC API - Processes`
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
+.. |ogc-api-proc-part1-spec-html| replace:: OGC API - Processes - Part 1: Core Specification
+.. _ogc-api-proc-part1-spec-html: https://docs.ogc.org/is/18-062r2/18-062r2.html
+.. |ogc-api-proc-part1-spec-pdf| replace:: OGC API - Processes - Part 1: Core Specification
+.. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
+.. |ogc-api-proc-part1-spec-json| replace:: OGC API - Processes - Part 1: Core JSON schema
+.. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
 .. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
@@ -137,6 +143,7 @@
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
+.. _docker-compose.yml.example: ../../../docker/docker-compose.yml.example
 .. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
 .. |default-notify-email-template| replace:: Default Notification Email Mako Template
 .. |opensearch-deploy| replace:: OpenSearch Deploy

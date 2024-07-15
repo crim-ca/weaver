@@ -333,6 +333,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        super().tearDownClass()
         cls.clean_test_processes()
         cls.file_server.teardown()
         testing.tearDown()

@@ -19,7 +19,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -29,17 +29,24 @@ if TYPE_CHECKING:
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
     DataStrT = TypeVar("DataStrT")
 
+    FormatSource = Literal["header", "query", "default"]
+
+    _ContentType = "ContentType"  # type: TypeAlias  # pylint: disable=C0103
+    AnyContentType = Union[str, _ContentType]
     AnyOutputFormat = Literal[
-        "json",
-        "json+str",
-        "json+raw",
-        "xml",
-        "xml+str",
-        "xml+raw",
-        "txt",
-        "text",
-        "yml",
-        "yaml",
+        "JSON", "json",
+        "JSON+RAW", "json+str",
+        "JSON+RAW", "json+raw",
+        "XML", "xml",
+        "XML+STR", "xml+str",
+        "XML+RAW", "xml+raw",
+        "HTML", "html",
+        "HTML+STR", "html+str",
+        "HTML+RAW", "html+raw",
+        "TXT", "txt",
+        "TEXT", "text",
+        "YML", "yml",
+        "YAML", "yaml",
     ]
 
 LOGGER = logging.getLogger(__name__)
@@ -138,11 +145,11 @@ class ContentEncoding(Constants):
         - https://github.com/json-schema-org/json-schema-spec/issues/803
         - https://github.com/json-schema-org/json-schema-spec/pull/862
     """
-    UTF_8 = "UTF-8"
-    BINARY = "binary"
-    BASE16 = "base16"
-    BASE32 = "base32"
-    BASE64 = "base64"
+    UTF_8 = "UTF-8"    # type: Literal["UTF-8"]
+    BINARY = "binary"  # type: Literal["BINARY"]
+    BASE16 = "base16"  # type: Literal["BASE16"]
+    BASE32 = "base32"  # type: Literal["BASE32"]
+    BASE64 = "base64"  # type: Literal["BASE64"]
 
     @staticmethod
     def is_text(encoding):
@@ -166,9 +173,10 @@ class ContentEncoding(Constants):
         """
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
-        is_text = ContentEncoding.is_text(encoding)
-        b_mode = cast("FileModeEncoding", f"{mode}b")  # type: FileModeEncoding
-        return (mode, ContentEncoding.UTF_8) if is_text else (b_mode, None)
+        if ContentEncoding.is_text(encoding):
+            mode = cast("FileModeEncoding", f"{mode}b")
+            return mode, None
+        return mode, ContentEncoding.UTF_8
 
     @staticmethod
     @overload
@@ -293,48 +301,60 @@ class OutputFormat(Constants):
     """
     JSON = classproperty(fget=lambda self: "json", doc="""
     Representation as :term:`JSON` (object), which can still be manipulated in code.
-    """)  # type: Literal["json"]  # noqa: F811  # false-positive redefinition of JSON typing
+    """)  # type: Literal["JSON", "json"]  # noqa: F811  # false-positive redefinition of JSON typing
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
     Representation as :term:`JSON` content formatted as string with indentation and newlines.
-    """)  # type: Literal["json+str"]
+    """)  # type: Literal["JSON+STR", "json+str"]
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
     Representation as :term:`JSON` content formatted as raw string without any indentation or newlines.
-    """)  # type: Literal["json+raw"]
+    """)  # type: Literal["JSON+RAW", "json+raw"]
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
     Representation as :term:`YAML` content formatted as string with indentation and newlines.
-    """)  # type: Literal["yaml"]
+    """)  # type: Literal["YAML", "yaml"]
 
     YML = classproperty(fget=lambda self: "yml", doc="""
     Alias to YAML.
-    """)  # type: Literal["yml"]
+    """)  # type: Literal["YML", "yml"]
 
     XML = classproperty(fget=lambda self: "xml", doc="""
     Representation as :term:`XML` content formatted as serialized string.
-    """)  # type: Literal["xml"]
+    """)  # type: Literal["XML", "xml"]
 
     XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
     Representation as :term:`XML` content formatted as string with indentation and newlines.
-    """)  # type: Literal["xml+str"]
+    """)  # type: Literal["XML+STR", "xml+str"]
 
     XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
     Representation as :term:`XML` content formatted as raw string without indentation or newlines.
-    """)  # type: Literal["xml+raw"]
+    """)  # type: Literal["XML+RAW", "xml+raw"]
 
     TXT = classproperty(fget=lambda self: "txt", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)  # type: Literal["txt"]
+    """)  # type: Literal["TXT", "txt"]
 
     TEXT = classproperty(fget=lambda self: "text", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)  # type: Literal["text"]
+    """)  # type: Literal["TEXT", "text"]
+
+    HTML = classproperty(fget=lambda self: "html", doc="""
+    Representation as HTML content formatted as serialized string.
+    """)  # type: Literal["HTML", "html"]
+
+    HTML_STR = classproperty(fget=lambda self: "html+str", doc="""
+    Representation as HTML content formatted as string with indentation and newlines.
+    """)  # type: Literal["HTML+STR", "html+str"]
+
+    HTML_RAW = classproperty(fget=lambda self: "html+raw", doc="""
+    Representation as HTML content formatted as raw string without indentation or newlines.
+    """)  # type: Literal["HTML+RAW", "html+raw"]
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
-            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
-            default=JSON,           # type: Optional[AnyOutputFormat]
+            format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
+            default=None,           # type: Optional[AnyOutputFormat]
             allow_version=True,     # type: bool
             ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
@@ -343,7 +363,9 @@ class OutputFormat(Constants):
         :param format_or_version:
             Either a :term:`WPS` version, a known value for a ``f``/``format`` query parameter, or an ``Accept`` header
             that can be mapped to one of the supported output formats.
-        :param default: Default output format if none could be resolved.
+        :param default:
+            Default output format if none could be resolved.
+            If no explicit default is specified as default in case of unresolved format, ``JSON`` is used by default.
         :param allow_version: Enable :term:`WPS` version specifiers to infer the corresponding output representation.
         :return: Resolved output format.
         """
@@ -351,13 +373,15 @@ class OutputFormat(Constants):
             return OutputFormat.XML
         if allow_version and format_or_version == "2.0.0":
             return OutputFormat.JSON
+        if not isinstance(format_or_version, str):
+            return default or OutputFormat.JSON
         if "/" in format_or_version:  # Media-Type to output format renderer
             format_or_version = get_extension(format_or_version, dot=False)
-        return super(OutputFormat, cls).get(str(format_or_version), default=default)
+        return super(OutputFormat, cls).get(str(format_or_version), default=default) or OutputFormat.JSON
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[AnyOutputFormat, str], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, AnyContentType, None], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 
@@ -368,7 +392,8 @@ class OutputFormat(Constants):
             requested format to ensure the contents are properly represented as intended. In the case of :term:`JSON`
             as target format or unknown format, the original object is returned directly.
         :param item_root:
-            When using :term:`XML` representations, defines the top-most item name. Unused for other representations.
+            When using :term:`XML` or HTML representations, defines the top-most item name.
+            Unused for other representations.
         :return: Formatted output.
         """
         from weaver.utils import bytes2str
@@ -380,10 +405,13 @@ class OutputFormat(Constants):
             return repr_json(data, indent=2, ensure_ascii=False)
         if fmt in [OutputFormat.JSON_RAW, OutputFormat.TEXT, OutputFormat.TXT]:
             return repr_json(data, indent=None, ensure_ascii=False)
-        if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
-            pretty = fmt == OutputFormat.XML_STR
+        if fmt in [
+            OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR,
+            OutputFormat.HTML, OutputFormat.HTML_RAW, OutputFormat.HTML_STR,
+        ]:
+            pretty = fmt in [OutputFormat.XML_STR, OutputFormat.HTML_STR]
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
-            if fmt == OutputFormat.XML_RAW:
+            if fmt in [OutputFormat.XML_RAW, OutputFormat.HTML_RAW]:
                 xml = bytes2str(xml)
             if isinstance(xml, str):
                 xml = xml.strip()
@@ -422,7 +450,8 @@ _CONTENT_TYPE_EXCLUDE = [
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": ContentType.APP_YAML,  # common alternative to .yml
+    ".yaml": ContentType.APP_YAML,    # common alternative to .yml
+    ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -926,8 +955,36 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
     return media_type
 
 
-def guess_target_format(request, default=ContentType.APP_JSON):
-    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> Union[ContentType, str]
+@overload
+def guess_target_format(request):
+    # type: (AnyRequestType) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, default):
+    # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, return_source, override_user_agent):
+    # type: (AnyRequestType, Literal[True], bool) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+@overload
+def guess_target_format(request, default, return_source, override_user_agent):
+    # type: (AnyRequestType, Optional[Union[ContentType, str]], Literal[True], bool) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+def guess_target_format(
+    request,                        # type: AnyRequestType
+    default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
+    return_source=False,            # type: bool
+    override_user_agent=False,      # type: bool
+):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -939,37 +996,50 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     ``Accept` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
     format specifiers were not provided in the request.
 
-    Applies some specific logic to handle automatically added ``Accept`` headers by many browsers such that sending
-    requests to the :term:`API` using them will not automatically default back to :term:`XML` or similar `HTML`
-    representations. If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the
-    URL, those will be applied since this is a very intuitive (and easier) approach to request different formats when
-    using browsers.
+    Can apply ``User-Agent`` specific logic to override automatically added ``Accept`` headers by many browsers such
+    that sending requests to the :term:`API` using them will not automatically default back to typical :term:`XML` or
+    :term:`HTML` representations. If browsers are used to send requests, but that ``format``/``f`` queries are used
+    directly in the URL, those will be applied since this is a very intuitive (and easier) approach to request different
+    formats when using browsers. Option :paramref:`override_user_agent` must be enabled to apply this behavior.
 
     When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
     both headers and query parameters are applied directly without question.
 
-    :returns: Matched media-type or default.
+    :returns: Matched media-type or default, and optionally, the source of resolution.
     """
     from weaver.utils import get_header
 
     format_query = request.params.get("format") or request.params.get("f")
+    format_source = "default"  # type: FormatSource
     content_type = None  # type: Optional[str]
     if format_query:
         content_type = OutputFormat.get(format_query, default=None, allow_version=False)
         if content_type:
             content_type = get_content_type(content_type)
+            format_source = "query"
     if not content_type:
         content_type = get_header("accept", request.headers, default=default or "")
+        format_source = "header"
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
-            if ctype != default or not default:
-                # because most browsers enforce some 'visual' list of accept header, revert to JSON if detected
-                # explicit request set by client (e.g.: using 'requests') will have full control over desired content
+            if override_user_agent and (ctype != default or not default):
+                # Because most browsers enforce a 'visual rendering' list of accept header, revert to JSON if detected.
+                # Request set by another client (e.g.: using 'requests') will have full control over desired content.
+                # Since browsers add '*/*' as any content fallback, use it as extra detection of undetected user-agent.
                 user_agent = get_header("user-agent", request.headers)
-                if user_agent and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"]):
+                if (
+                    user_agent
+                    and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"])
+                    or "*/*" in content_type
+                ):
                     content_type = default or ContentType.APP_JSON
+                    format_source = "default"
+                    break
     if not content_type or content_type == ContentType.ANY:
         content_type = default or ContentType.APP_JSON
+        format_source = "default"
+    if return_source:
+        return content_type, format_source
     return content_type
 
 

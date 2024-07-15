@@ -147,6 +147,12 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
+# Allow OGC API - Processes endpoints to render
+# contents in HTML as alternate responses to JSON.
+weaver.wps_restapi_html = true
+# Special handling of rendering default HTML vs JSON by web browsers.
+# See documentation for details.
+weaver.wps_restapi_html_override_user_agent = false
 
 # --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email

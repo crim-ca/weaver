@@ -342,13 +342,14 @@ if TYPE_CHECKING:
     AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
-    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException]
+    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException, JSON]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
+    ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]

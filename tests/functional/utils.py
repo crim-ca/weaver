@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
 import pyramid.testing
-import pytest
 import yaml
 from pyramid.httpexceptions import HTTPOk
 
@@ -32,7 +31,7 @@ from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, load_file
+from weaver.utils import fully_qualified_name, get_weaver_url, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from webtest import TestApp
 
+    from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
     from weaver.typedefs import (
         AnyRequestMethod,
         AnyResponseType,
@@ -315,9 +315,9 @@ class JobUtils(object):
         )
 
 
-@pytest.mark.functional
 class WpsConfigBase(unittest.TestCase):
     json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+    html_headers = {"Accept": ContentType.TEXT_HTML}
     xml_headers = {"Content-Type": ContentType.TEXT_XML}
     monitor_timeout = 30
     monitor_interval = 1
@@ -325,6 +325,10 @@ class WpsConfigBase(unittest.TestCase):
     config = None   # type: Configurator
     app = None      # type: TestApp
     url = None      # type: str
+
+    service_store = None    # type: MongodbServiceStore
+    process_store = None    # type: MongodbProcessStore
+    job_store = None        # type: MongodbJobStore
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
@@ -341,6 +345,7 @@ class WpsConfigBase(unittest.TestCase):
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
+        cls.url = get_weaver_url(cls.app.app.registry)
         cls.db = get_db(config)
         cls.config = config
         cls.settings.update(cls.config.registry.settings)  # back propagate changes
@@ -509,20 +514,3 @@ class WpsConfigBase(unittest.TestCase):
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"
         return body
-
-
-@pytest.mark.functional
-class AuthTokenApp(WpsConfigBase):
-    @classmethod
-    def setUpClass(cls):
-        config = get_test_weaver_config(settings=cls.settings)
-        config = setup_config_with_mongodb(config)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        cls.service_store = setup_mongodb_servicestore(config)  # force reset
-        cls.process_store = setup_mongodb_processstore(config)  # force reset
-        cls.job_store = setup_mongodb_jobstore(config)
-        cls.app = get_test_weaver_app(config=config, settings=cls.settings)
-        cls.db = get_db(config)
-        cls.config = config
-        cls.settings.update(cls.config.registry.settings)  # back propagate changes

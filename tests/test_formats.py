@@ -3,6 +3,7 @@ import datetime
 import inspect
 import itertools
 import os
+import uuid
 
 import mock
 import pytest
@@ -462,3 +463,18 @@ def test_repr_json_handle_datetime():
     """)
     result = f.repr_json(values)
     assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["unknown_format", "default_format", "expect_format"],
+    [
+        (None, None, f.OutputFormat.JSON),
+        ("random", None, f.OutputFormat.JSON),
+        (uuid.uuid4(), None, f.OutputFormat.JSON),
+        (None, f.OutputFormat.XML, f.OutputFormat.XML),
+        ("random", f.OutputFormat.XML, f.OutputFormat.XML),
+        (uuid.uuid4(), f.OutputFormat.XML, f.OutputFormat.XML),
+    ]
+)
+def test_output_format_default(unknown_format, default_format, expect_format):
+    assert f.OutputFormat.get(unknown_format, default=default_format) == expect_format

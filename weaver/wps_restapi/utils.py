@@ -1,11 +1,14 @@
 import functools
 import inspect
+import json
 import logging
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
 import yaml
+from box import Box
+from pyramid.events import BeforeRender, subscriber
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPInternalServerError,
@@ -15,6 +18,7 @@ from pyramid.httpexceptions import (
     status_map
 )
 
+from weaver import __meta__
 from weaver.formats import repr_json
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -31,7 +35,8 @@ if TYPE_CHECKING:
         HeadersType,
         JSON,
         Params,
-        Return
+        Return,
+        SettingsType
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -86,13 +91,17 @@ class HTTPHeadFileResponse(HTTPSuccessful):
         )
 
     def prepare(self, environ):
+        # type: (SettingsType) -> None
         """
         No contents for HEAD request.
         """
 
 
-def wps_restapi_base_path(container):
+def get_wps_restapi_base_path(container):
     # type: (AnySettingsContainer) -> str
+    """
+    Obtain the REST :term:`API` base path.
+    """
     settings = get_settings(container)
     restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip("/").strip()
     return restapi_path
@@ -100,11 +109,14 @@ def wps_restapi_base_path(container):
 
 def get_wps_restapi_base_url(container):
     # type: (AnySettingsContainer) -> str
+    """
+    Obtain the REST :term:`API` base URL.
+    """
     settings = get_settings(container)
     weaver_rest_url = settings.get("weaver.wps_restapi_url")
     if not weaver_rest_url:
         weaver_url = get_weaver_url(settings)
-        restapi_path = wps_restapi_base_path(settings)
+        restapi_path = get_wps_restapi_base_path(settings)
         weaver_rest_url = weaver_url + restapi_path
     return weaver_rest_url.rstrip("/").strip()
 
@@ -231,3 +243,18 @@ def parse_content(request=None,                                         # type: 
             "value": repr_json(exc.value, force_string=False),
         })
     return content
+
+
+@subscriber(BeforeRender)
+def add_renderer_context(event):
+    # type: (BeforeRender) -> None
+    """
+    Adds an event subscriber that provides additional metadata for renderers.
+    """
+    event["weaver"] = Box({
+        "__meta__": __meta__,
+        "url": get_weaver_url(event["request"]),
+        "wps_restapi_url": get_wps_restapi_base_url(event["request"]),
+    })
+    event["body"] = event.rendering_val  # shortcut name
+    event["json"] = json  # reference for 'json.dumps' use in rendered HTML

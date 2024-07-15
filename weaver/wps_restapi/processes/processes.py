@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import colander
+from box import Box
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
@@ -47,13 +48,36 @@ from weaver.wps_restapi.processes.utils import get_process_list_links, get_proce
 from weaver.wps_restapi.providers.utils import get_provider_services
 
 if TYPE_CHECKING:
+    from pyramid.config import Configurator
+
     from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
-                          response_schemas=sd.get_processes_responses)
+@sd.processes_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/process_listing.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_processes_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessListing", description="Listing of processes.")
+    ),
+)
+@sd.processes_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
+    accept=ContentType.TEXT_XML,
+    response_schemas=sd.get_processes_responses,
+)
+@sd.processes_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
+    schema=sd.GetProcessesEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_processes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_processes(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -76,6 +100,8 @@ def get_processes(request):
     links = asbool(params.get("links", True))
     detail = asbool(params.get("detail", True))
     ignore = asbool(params.get("ignore", True))
+    if request.accept == ContentType.TEXT_HTML:
+        detail = ignore = True
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
@@ -140,7 +166,7 @@ def get_processes(request):
         body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
-        return HTTPOk(json=body)
+        return Box(body)
 
     except ServiceException as exc:
         LOGGER.debug("Error when listing provider processes using query parameter raised: [%s]", exc, exc_info=exc)
@@ -163,8 +189,13 @@ def get_processes(request):
         })
 
 
-@sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                           schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+@sd.processes_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PostProcessesEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_processes_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def add_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -174,8 +205,13 @@ def add_local_process(request):
     return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
 
 
-@sd.process_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                        schema=sd.PutProcessEndpoint(), response_schemas=sd.put_process_responses)
+@sd.process_service.put(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PutProcessEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.put_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def put_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -189,8 +225,12 @@ def put_local_process(request):
     return deploy_process_from_payload(request.text, request, overwrite=process)
 
 
-@sd.process_service.patch(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                          schema=sd.PatchProcessEndpoint(), response_schemas=sd.patch_process_responses)
+@sd.process_service.patch(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PatchProcessEndpoint(),
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def patch_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -205,8 +245,35 @@ def patch_local_process(request):
     return update_process_metadata(request)
 
 
-@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
-                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/process_description.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_process_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessDescription", description="Process description.")
+    ),
+)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
+    accept=ContentType.TEXT_XML,
+    response_schemas=sd.get_process_responses,
+)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
+    accept=ContentType.APP_XML,
+    response_schemas=sd.get_process_responses,
+)
+@sd.process_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -219,26 +286,37 @@ def get_local_process(request):
         schema = request.params.get("schema")
         ctype = guess_target_format(request)
         ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+        ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
         ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
         proc_url = process.href(request)
         if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
             offering = process.offering(ProcessSchema.WPS, request=request)
             headers = [
                 ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
+                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
                 ("Content-Type", ctype_xml),
             ]
             return Response(offering, headerlist=headers)
         else:
             offering = process.offering(schema)
-            headers = [("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}")]
-            return HTTPOk(json=offering, headers=headers)
+            fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
+            request.response.headers.extend([
+                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+                ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
+            ])
+            return Box(offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest(f"Invalid schema: [{ex!s}]\nValue: [{ex.value!s}]")
 
 
-@sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
-                                schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
+@sd.process_package_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessPackageEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_package_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_package(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -249,8 +327,13 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OutputFormat.JSON,
-                                schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+@sd.process_payload_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProcessPayloadEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_payload_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_local_process_payload(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -261,9 +344,13 @@ def get_local_process_payload(request):
     return HTTPOk(json=process.payload or {})
 
 
-@sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OutputFormat.JSON,
-                                   schema=sd.ProcessVisibilityGetEndpoint(),
-                                   response_schemas=sd.get_process_visibility_responses)
+@sd.process_visibility_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY],
+    schema=sd.ProcessVisibilityGetEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_visibility_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_process_visibility(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -274,9 +361,14 @@ def get_process_visibility(request):
     return HTTPOk(json={"value": process.visibility})
 
 
-@sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OutputFormat.JSON,
-                                   schema=sd.ProcessVisibilityPutEndpoint(),
-                                   response_schemas=sd.put_process_visibility_responses)
+@sd.process_visibility_service.put(
+    tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY],
+    content_type=ContentType.APP_JSON,
+    schema=sd.ProcessVisibilityPutEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.put_process_visibility_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def set_process_visibility(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -311,8 +403,13 @@ def set_process_visibility(request):
         raise HTTPNotFound(str(ex))
 
 
-@sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OutputFormat.JSON,
-                           schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
+@sd.process_service.delete(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.ProcessEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.delete_process_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def delete_local_process(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -351,26 +448,38 @@ def delete_local_process(request):
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 
 
-@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                   content_type=ContentType.APP_XML,
-                                   renderer=OutputFormat.JSON,
-                                   schema=sd.PostProcessJobsEndpointXML(),
-                                   response_schemas=sd.post_process_jobs_responses)
-@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                              content_type=ContentType.APP_XML,
-                              renderer=OutputFormat.JSON,
-                              schema=sd.PostProcessJobsEndpointXML(),
-                              response_schemas=sd.post_process_jobs_responses)
-@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                                   content_type=ContentType.APP_JSON,
-                                   renderer=OutputFormat.JSON,
-                                   schema=sd.PostProcessJobsEndpointJSON(),
-                                   response_schemas=sd.post_process_jobs_responses)
-@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                              content_type=ContentType.APP_JSON,
-                              renderer=OutputFormat.JSON,
-                              schema=sd.PostProcessJobsEndpointJSON(),
-                              response_schemas=sd.post_process_jobs_responses)
+@sd.process_execution_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=list(ContentType.ANY_XML),
+    schema=sd.PostProcessJobsEndpointXML(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_jobs_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=list(ContentType.ANY_XML),
+    schema=sd.PostProcessJobsEndpointXML(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_execution_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessJobsEndpointJSON(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
+@sd.process_jobs_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessJobsEndpointJSON(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job(request):
     # type: (PyramidRequest) -> AnyViewResponse
@@ -394,3 +503,17 @@ def submit_local_job(request):
         http_request.shallow = False
         return service.call(http_request)
     return submit_job(request, process, tags=["wps-rest"])
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding WPS REST API processes views...")
+    config.add_cornice_service(sd.processes_service)
+    config.add_cornice_service(sd.process_service)
+    config.add_cornice_service(sd.process_package_service)
+    config.add_cornice_service(sd.process_payload_service)
+    config.add_cornice_service(sd.process_visibility_service)
+    # added within jobs (conflict)
+    # config.add_cornice_service(sd.process_jobs_service)
+    # config.add_cornice_service(sd.jobs_full_service)
+    config.add_cornice_service(sd.process_execution_service)

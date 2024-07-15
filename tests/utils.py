@@ -69,7 +69,7 @@ except ImportError:  # pragma: no cover
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
-    from typing_extensions import Literal
+    from typing_extensions import Annotated, Literal
 
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
@@ -97,7 +97,10 @@ if TYPE_CHECKING:
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
     MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
-    MockConfigWPS1 = Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]]
+    MockConfigWPS1 = Union[
+        Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]],
+        Annotated[Sequence[str], 3]
+    ]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -252,8 +255,6 @@ def get_test_weaver_config(config=None, settings=None):
     config.registry.settings["weaver.wps_processes"] = ""
     if settings:
         config.registry.settings.update(settings)
-    # create the test application
-    config.include("weaver")
     return config
 
 
@@ -1200,7 +1201,7 @@ def mocked_execute_celery(
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> contextlib.AbstractContextManager[mock.MagicMock]
+    # type: () -> Union[contextlib.ContextDecorator, contextlib.AbstractContextManager[mock.MagicMock]]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 

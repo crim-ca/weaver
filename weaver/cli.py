@@ -509,7 +509,8 @@ class WeaverClient(object):
             else:
                 _success = True
             msg = message or getattr(response, "message", None) or msg or "undefined"
-            text = text or OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
+            fmt = output_format or OutputFormat.JSON_STR
+            text = text or OutputFormat.convert(body, fmt, item_root="result")
         except Exception as exc:  # noqa  # pragma: no cover  # ignore safeguard against error in implementation
             msg = "Could not parse body."
             text = body = response.text
