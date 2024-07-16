@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.7.0:
+
+`5.7.0 <https://github.com/crim-ca/weaver/tree/5.7.0>`_ (2024-07-16)
+========================================================================
+
+Changes:
+--------
 - Add support of `HTML` responses for `OGC API - Processes` endpoints
   (fixes `#210 <https://github.com/crim-ca/weaver/issues/210>`_).
 - Add ``weaver.wps_restapi_html`` configuration setting to control support of `HTML` responses.
