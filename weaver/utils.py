@@ -328,6 +328,68 @@ class CaseInsensitive(str):
         return self.__str.casefold() == str(other).casefold()
 
 
+def json_hashable(func):
+    # type: (AnyCallableAnyArgs) -> Callable[[AnyCallableAnyArgs], Return]
+    """
+    Decorator that will transform :term:`JSON`-like dictionary and list arguments to an hashable variant.
+
+    By making the structure hashable, it can safely be cached with :func:`functools.lru_cache`
+    or :func:`functools.cache`. The decorator ignores other argument types expected to be already hashable.
+
+    .. code-block:: python
+
+        @json_hashable
+        @functools.cache
+        def function(json_data): ...
+
+    .. seealso::
+        Original inspiration: https://stackoverflow.com/a/44776960
+        The code is extended to allow recursively supporting JSON-like structures.
+
+    """
+    class HashJSON:
+        def __hash__(self):
+            # type: () -> int
+            return hash(frozenset([
+                HashDict(item.items()).__hash__() if isinstance(item, dict) else
+                HashList(item).__hash__() if isinstance(item, list) else
+                item
+                for item in self
+            ]))
+
+    class HashList(HashJSON, list):
+        ...
+
+    class HashDict(HashJSON, dict):
+        ...
+
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        args = tuple([
+            HashDict(arg) if isinstance(arg, dict) else
+            HashList(arg) if isinstance(arg, list) else
+            arg
+            for arg in args
+        ])
+        kwargs = {
+            k: (
+                HashDict(v) if isinstance(v, dict) else
+                HashList(v) if isinstance(v, list) else
+                v
+            )
+            for k, v in kwargs.items()
+        }
+        return func(*args, **kwargs)
+
+    # forward caching handles
+    if hasattr(func, "cache_info"):
+        wrapped.cache_info = func.cache_info
+    if hasattr(func, "cache_clear"):
+        wrapped.cache_clear = func.cache_clear
+    return wrapped
+
+
 NUMBER_PATTERN = re.compile(r"^(?P<number>[+-]?[0-9]+[.]?[0-9]*(e[+-]?[0-9]+)?)\s*(?P<unit>.*)$")
 UNIT_SI_POWER_UP = [CaseInsensitive("k"), "M", "G", "T", "P", "E", "Z", "Y"]  # allow upper 'K' often used
 UNIT_SI_POWER_DOWN = ["m", "µ", "n", "p", "f", "a", "z", "y"]

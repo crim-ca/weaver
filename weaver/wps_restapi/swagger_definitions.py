@@ -76,7 +76,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -1386,8 +1386,8 @@ class AnyCRS(OneOfKeywordSchema):
 class AnyFilterExpression(AnyOfKeywordSchema):
     _any_of = [
         PermissiveMappingSchema(),
-        PermissiveSequenceSchema(),
-        ExtendedSchemaNode(String()),
+        PermissiveSequenceSchema(validator=Length(min=1)),
+        ExtendedSchemaNode(String(), validator=Length(min=1)),
     ]
 
 
@@ -1406,11 +1406,11 @@ class AnyFilterLanguage(ExtendedSchemaNode):
         "fes",
         "jfe"
     ])
+    summary = "Filter expression language to use for parsing."
     description = (
         "Filter expression language to use for parsing. "
-        "A variant of OGC Common Query Language (CQL), "
-        "Filter Expression Standard (FES), "
-        "or JSON Filter Expression (JFE)."
+        "Supports multiple variants of OGC Common Query Language (CQL), "
+        "Filter Expression Standard (FES), or JSON Filter Expression (JFE)."
     )
 
 
@@ -1431,8 +1431,15 @@ class FilterSchema(ExtendedMappingSchema):
     filter_lang = AnyFilterLanguage(
         name="filter-lang",
         missing=drop,
+        description=AnyFilterLanguage.description + (
+            " If unspecified, the filter language will default to CQL2-Text if a string was provided,"
+            " or CQL2-JSON if a JSON object or array structure is detected as the filter."
+            " For any other language, or to resolve ambiguous cases such as a CQL2-JSON encoded as literal string,"
+            " the filter language must be specified explicitly."
+        )
     )
 
+    @json_hashable
     @functools.cache
     def validate(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> FilterAstType
@@ -1464,6 +1471,7 @@ class FilterSchema(ExtendedMappingSchema):
                 value={"filter": filter_expr, "filter-lang": filter_lang},
             ) from exc
 
+    @json_hashable
     @functools.cache
     def convert(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> JSON
@@ -1484,11 +1492,13 @@ class FilterSchema(ExtendedMappingSchema):
             return result
         filter_expr = cstruct.get("filter")
         filter_lang = cstruct.get("filter-lang")
-        if not filter_expr:
+        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised after as invalid
             cstruct.pop("filter", None)
             cstruct.pop("filter-crs", None)
             cstruct.pop("filter-lang", None)
             return cstruct
+        if not filter_lang:
+            filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
         # perform conversion to validate
         # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
         # conversion can be done as needed to obtain a uniform representation locally
@@ -1526,7 +1536,7 @@ class SortBySchema(ExtendedMappingSchema):
             # keep only 'official' "sortBy" from OGC API Processes
             # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
             del cstruct["sortby"]
-        return colander.null
+        return result
 
 
 class SupportedCRS(ExtendedMappingSchema):

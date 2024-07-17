@@ -11,7 +11,7 @@ from weaver.utils import load_file
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
+    from weaver.typedefs import CWL, JSON
 
 TEST_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -196,3 +196,98 @@ def test_cwl_package(cwl_path):
     cwl_check = sd.CWL().deserialize(cwl)
     cwl_check.pop("$schema", None)  # our definition injects this reference
     assert cwl_check == cwl
+
+
+@pytest.mark.parametrize(
+    "input_data",
+    [
+        {
+            "collection": "https://example.com/collections/test"
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": {"op": "gt", "args": [{"property": "eo:cloud_cover"}, 0.1]},
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "properties.eo:cloud_cover > 0.1",
+            "filter-lang": "cql2-text",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "INTERSECTS(geom, POINT (1 2))",
+            "filter-lang": "simple-cql",
+            "sortBy": "-eo:cloud_cover,+title",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            # examples: https://docs.ogc.org/is/09-026r2/09-026r2.html#107
+            "filter-lang": "fes",
+            "filter": """
+                <?xml version="1.0"?>
+                <fes:Filter
+                   xmlns:fes="http://www.opengis.net/fes/2.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.opengis.net/fes/2.0
+                   http://schemas.opengis.net/filter/2.0.02.0/filterAll.xsd">
+                  <fes:PropertyIsEqualTo>
+                    <fes:ValueReference>SomeProperty</fes:ValueReference>
+                    <fes:Literal>100</fes:Literal>
+                  </fes:PropertyIsEqualTo>
+                </fes:Filter>
+            """,
+        }
+    ]
+)
+def test_collection_input_parsing(input_data):
+    # type: (JSON) -> None
+    """
+    Validate that the schema definition for a ``collection`` input resolves as expected.
+    """
+    result = sd.ExecuteCollectionInput().deserialize(input_data)
+    assert result == input_data
+
+
+@pytest.mark.parametrize(
+    "input_data",
+    [
+        # other 'valid' input types, to ensure the schema can distinguish them
+        {
+            "value": "https://example.com/collections/test"
+        },
+        {
+            "href": "https://example.com/collections/test",
+            "type": ContentType.APP_GEOJSON,
+        },
+        # malformed collection properties
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": [],
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": {},
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "PROPERTY = 123",
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "sortBy": ["name"],
+        },
+    ]
+)
+def test_collection_input_invalid(input_data):
+    # type: (JSON) -> None
+    """
+    Validate that the invalid definition for a ``collection`` input raises against the schema and filter language.
+    """
+    with pytest.raises(colander.Invalid):
+        sd.ExecuteCollectionInput().deserialize(input_data)
