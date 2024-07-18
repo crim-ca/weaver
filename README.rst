@@ -244,13 +244,13 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
     * - Description
       - Version
       - Entrypoint
-    * - CRIM Services Portal
+    * - `CRIM`_ Services Portal
       - |crim-services-weaver-version|
       - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
     * - `PAVICS`_ Ouranos Server
       - |pavics-ouranos-weaver-version|
       - `https://pavics.ouranos.ca/weaver/ <https://pavics.ouranos.ca/weaver/>`_
-    * - `DACCS Project <https://github.com/DACCS-Climate>`_ - CRIM Development Instance
+    * - `DACCS Project <https://github.com/DACCS-Climate>`_ - `CRIM`_ Development Instance
       - |hirondelle-weaver-version|
       - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
 
@@ -380,6 +380,7 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-apppkg| replace:: `OGC Application Package`
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
+.. _CRIM: https://crim.ca/en/
 .. _PAVICS: https://pavics.ouranos.ca/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
