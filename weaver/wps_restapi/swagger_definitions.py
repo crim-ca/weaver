@@ -1367,8 +1367,9 @@ class AnyCRS(OneOfKeywordSchema):
     #   however, only support EPSG (short form, normative from, or URI) that are supported by 'owslib.crs'
     #   handle equivalent representations of EPSG:4326 that are also supported by 'owslib.crs'
     _one_of = [
-        ExtendedSchemaNode(String(), pattern=re.compile("^(urn:ogc:def:crs:)?EPSG::?[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), pattern=re.compile("^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
         ExtendedSchemaNode(String(), validator=OneOf([
             # equivalent forms of EPSG:4326, 2D or 3D
             "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
