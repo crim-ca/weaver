@@ -245,14 +245,18 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
       - Version
       - Entrypoint
     * - CRIM Services Portal
-      - |crim-services-version|
+      - |crim-services-weaver-version|
       - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
+    * - `PAVICS`_ Ouranos Server
+      - |pavics-ouranos-weaver-version|
+      - `https://pavics.ouranos.ca/weaver/ <https://pavics.ouranos.ca/weaver/>`_
     * - `DACCS Project <https://github.com/DACCS-Climate>`_ - CRIM Development Instance
-      - |hirondelle-version|
+      - |hirondelle-weaver-version|
       - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
 
-.. |crim-services-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
-.. |hirondelle-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |crim-services-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |pavics-ouranos-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpavics.ouranos.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |hirondelle-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
@@ -376,7 +380,7 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-apppkg| replace:: `OGC Application Package`
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
-.. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
+.. _PAVICS: https://pavics.ouranos.ca/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
 .. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
