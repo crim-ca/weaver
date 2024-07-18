@@ -40,16 +40,43 @@ Theses processes typically correspond to utility operations. They are specifical
 ``step`` within a `Workflow`_ process that requires data-type conversion between input/output of similar, but not
 perfectly, compatible definitions.
 
-For example, process :py:mod:`weaver.processes.builtin.jsonarray2netcdf` takes a single input JSON file which its
-content contains an array-list of NetCDF file references, and returns them directly as the corresponding list of output
-files. These two different file formats (single JSON to multiple NetCDF) can then be used to map two processes with
-these respective output and inputs.
-
 As of the latest release, following `builtin` processes are available:
 
+- :py:mod:`weaver.processes.builtin.collection_processor`
+
+    Implements parsing capabilities to support |ogc-api-proc-part3-collection-input|_ as defined by
+    the |ogc-api-proc-part3|_ extension. This allows :ref:`Process Execution <proc_op_execute>`
+    to employ :ref:`proc_col_inputs` in certain cases when conditions are met.
+
+- :py:mod:`weaver.processes.builtin.echo_process`
+
+    Corresponds to the |ogc-api-proc-echo|_ definition. This :term:`Process` is used to evaluate the :term:`API`
+    against the `OGC Execution Test Suite (ETS)` for the `Weaver Product Implementation <ogc-ets-impl-ref>`_. It
+    also is employed to test the implementation against a wide range of input and output formats.
+
 - :py:mod:`weaver.processes.builtin.file2string_array`
+
+    Transforms a :ref:`File Reference <file_ref_types>` input into :term:`JSON` file containing an array of file
+    references as value.
+    This is typically employed to resolve a :term:`JSON` array containing multiple sub-file references, allowing
+    to "*unpack*" a single item into multiple references.
+
+- :py:mod:`weaver.processes.builtin.file_index_selector`
+
+    Selects the single :ref:`File Reference <file_ref_types>` at the provided index within an array of
+    file :term:`URL`.
+
 - :py:mod:`weaver.processes.builtin.jsonarray2netcdf`
+
+    Takes a single input :term:`JSON` file which its content contains an array-list of NetCDF file references,
+    and returns them directly as the corresponding list of output files. These two different file formats
+    (single :term:`JSON` to multiple NetCDF) can then be used to map two processes with these respective
+    output and inputs.
+
 - :py:mod:`weaver.processes.builtin.metalink2netcdf`
+
+    Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given
+    index of the list.
 
 
 All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the
@@ -1312,6 +1339,97 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
     Definitions in |opensearch-examples|_ providing different combinations of inputs, notably for using distinct
     :term:`AOI`, term:`TOI` and collections, with or without ``UniqueAOI`` and ``UniqueTOI`` specifiers.
 
+.. _proc_bbox_inputs:
+
+BoundingBox Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: provide example and details, (crs, dimensions, etc.)
+.. todo:: cross-reference :ref:`cwl-io-types` for more details/examples
+
+.. _proc_col_inputs:
+
+Collection Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The |ogc-api-proc-part3-collection-input|_ is defined by the |ogc-api-proc-part3|_ extension. This allows to submit a
+:term:`Process Execution <proc_op_exec>` using the following :term:`JSON` structure when the targeted :term:`Process`
+can make use of the resulting data sources returned by the referred :term:`Collection` and filtering conditions.
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "features-input": {
+          "collection": "https://example.com/collections/dataset-features",
+          "filter": {
+            "op": "s_intersects",
+            "args": [
+              {"property": "geometry"},
+              {
+                "type": "Polygon",
+                "coordinates": [ [30, 10], [40, 40], [20, 40], [10, 20], [30, 10] ]
+              }
+            ]
+          },
+          "filter-crs": "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
+          "filter-lang": "cql2-json",
+          "sortBy": "-id"
+        }
+      }
+    }
+
+.. note::
+    More capabilities beside ``filter``, ``sortBy``, etc. might be supported over time according to requirements
+    established by multiple :term:`OGC` Testbed iterations. The |ogc-api-proc-part3|_ is still under development,
+    and interactions with the various access points of |ogc-api-standards|_ remains to be evaluated.
+
+To determine which *items* should be retrieved from the :term:`Collection`, whether they are obtained by
+|ogc-api-coverages|_, |ogc-api-features|_, |ogc-api-maps|_, |ogc-api-tiles|_, |stac-api-spec|_,
+or any other relevant data access mechanisms defined by the |ogc-api-standards|_,
+depends on the negotiated :term:`Media-Types` required by the corresponding input
+in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
+and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
+
+For example, if a :term:`Process` indicated that it expects a ``format: geojson-feature-collection``,
+the referenced ``collection`` would most probably be accessed using |ogc-api-features|_ (i.e.: using
+``GET /collections/dataset-features/items``), to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``.
+However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
+the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
+
+Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process`` while targeting
+the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
+potentially be retrieved as input for the :term:`Process Execution <proc_op_exec>`.
+
+In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
+the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
+specified. However, its capability to auto-resolve multiple :term:`Media-Types` negotiations, formats, data structures,
+data cardinality and :term:`API` protocols simultaneously can make its behavior hard to predict.
+
+.. hint::
+    In order to evaluate the expected resolution of a :term:`Collection`
+    prior to including it into a complex :term:`Process` or :ref:`Workflow` execution, the :ref:`proc_builtin`
+    :py:mod:`weaver.processes.builtin.collection_processor` can be employed to test its result.
+    This function will be used under-the-hood whenever a |ogc-api-proc-part3-collection-input|_ is specified.
+
+    Since the :term:`Builtin Process` only performs the resolution of the ``collection`` into the corresponding
+    data sources for the target :term:`Process`, using it can potentially help identify and avoid unintended
+    large processing, or validate that the defined ``filter`` produces the appropriate data retrieval for the
+    desired execution purpose.
+
+.. note::
+    Do not hesitate to |submit-issue|_ if the |ogc-api-proc-part3-collection-input|_ resolution does not seem
+    to behave according to your specific use cases.
+
+.. _proc_col_outputs:
+
+Collection Outputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: Not implemented. See `crim-ca/weaver#683 <https://github.com/crim-ca/weaver/issues/683>`_.
+
+.. _proc_multi_inputs:
+
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1319,6 +1437,8 @@ Multiple Inputs
 
 .. seealso::
     - :ref:`Multiple and Optional Values`
+
+.. _proc_multi_outputs:
 
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

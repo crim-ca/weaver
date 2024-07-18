@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Transforms a file input into JSON file containing an array of file references as value.
+Retrieves relevant data or files resolved from a collection reference using its metadata, queries and desired outputs.
 """
 import argparse
 import json
@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
 from weaver.processes.builtin.utils import get_package_details, validate_reference  # isort:skip # noqa: E402
+from weaver.utils import Lazify, repr_json  # isort:skip # noqa: E402
 
 PACKAGE_NAME, PACKAGE_BASE, PACKAGE_MODULE = get_package_details(__file__)
 
@@ -32,11 +33,30 @@ __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to
 OUTPUT_CWL_JSON = "cwl.output.json"
 
 
-def process(input_file, output_dir):
-    # type: (str, str) -> None
-    LOGGER.info("Got arguments: input_file=%s output_dir=%s", input_file, output_dir)
-    validate_reference(input_file, is_file=True)
-    output_data = {"output": [input_file]}
+def process(collection_input, output_dir):
+    # type: (JSON, str) -> None
+    """
+    Processor of the collection.
+
+    This function is intended to be employed either as a standalone ``builtin``
+
+    :param collection_input:
+        Collection Input definition with minimally the URI to the collection used as reference.
+        Can contain additional filtering or hint format parameters.
+    :param output_dir: Directory to write the output (provided by the :term:`CWL` definition).
+    :return: Resolved data references.
+    """
+    LOGGER.info(
+        "Got arguments: collection_input=%s output_dir=%s",
+        Lazify(lambda: repr_json(collection_input, indent=2)),
+        output_dir,
+    )
+    if not collection_input.endswith("/"):
+        collection_input += "/"
+    validate_reference(collection_input, is_file=False)
+
+    # FIXME: implement!
+
     with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
         return json.dump(output_data, file)
 
@@ -45,12 +65,12 @@ def main(*args):
     # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", help="Input File URI")
+    parser.add_argument("-c", help="Collection Input definition")
     parser.add_argument(
         "-o",
         metavar="outdir",
         required=True,
-        help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.",
+        help="Output directory of the retrieved data.",
     )
     ns = parser.parse_args(*args)
     sys.exit(process(ns.i, ns.o))

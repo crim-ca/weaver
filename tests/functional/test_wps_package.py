@@ -2266,6 +2266,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
         )
 
+    def test_execute_job_with_collection_input(self):
+        raise NotImplementedError  # FIXME: implement! (see above bbox case for inspiration)
+
     def test_execute_job_with_context_output_dir(self):
         cwl = {
             "cwlVersion": "v1.0",

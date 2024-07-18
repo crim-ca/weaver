@@ -63,30 +63,52 @@
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
+.. |geojson| replace:: GeoJSON
+.. _geojson: https://geojson.org/
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-api-proc| replace:: `OGC API - Processes`
+.. _ogc-collection: https://docs.ogc.org/DRAFTS/20-024.html#collections-introduction
+.. |ogc-api-standards| replace:: *OGC Web API* standards
+.. _ogc-api-standards: https://ogcapi.ogc.org/
+.. |ogc-api-common| replace:: *OGC API - Common*
+.. _ogc-api-common: https://ogcapi.ogc.org/common/
+.. |ogc-api-coverages| replace:: *OGC API - Coverages*
+.. _ogc-api-coverages: https://ogcapi.ogc.org/coverages/
+.. |ogc-api-features| replace:: *OGC API - Features*
+.. _ogc-api-features: https://ogcapi.ogc.org/features/
+.. |ogc-api-maps| replace:: *OGC API - Maps*
+.. _ogc-api-maps: https://ogcapi.ogc.org/maps/
+.. |ogc-api-tiles| replace:: *OGC API - Tiles*
+.. _ogc-api-tiles: https://ogcapi.ogc.org/tiles/
+.. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
-.. |ogc-api-proc-part1-spec-html| replace:: OGC API - Processes - Part 1: Core Specification
+.. |ogc-api-proc-part1-spec-html| replace:: *OGC API - Processes* - Part 1: Core Specification
 .. _ogc-api-proc-part1-spec-html: https://docs.ogc.org/is/18-062r2/18-062r2.html
-.. |ogc-api-proc-part1-spec-pdf| replace:: OGC API - Processes - Part 1: Core Specification
+.. |ogc-api-proc-part1-spec-pdf| replace:: *OGC API - Processes* - Part 1: Core Specification
 .. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
-.. |ogc-api-proc-part1-spec-json| replace:: OGC API - Processes - Part 1: Core JSON schema
+.. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
 .. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
-.. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
+.. |ogc-exec-sync-responses| replace:: *OGC API - Processes*, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-.. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
+.. |ogc-exec-async-responses| replace:: *OGC API - Processes*, Responses (async)
 .. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
-.. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy
+.. _ogc-ets-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
+.. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
+.. |ogc-api-proc-part2| replace:: *OGC API - Processes* - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
-.. |ogc-proc-ext-billing| replace:: OGC API - Processes - Billing extension
+.. |ogc-api-proc-part3| replace:: *OGC API - Processes* - Part 3: Workflows
+.. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
+.. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
+.. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
-.. |ogc-proc-ext-quotation| replace:: OGC API - Processes - Quotation extension
+.. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
 .. _ogc-proc-ext-quotation: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 .. |quote-estimator| replace:: *Quote Estimator*
 .. _quote-estimator: :ref:`quotation_quote_estimator`
@@ -115,6 +137,18 @@
 .. inter-reference to 'process->Deploy' section, but cannot be a link since not included
 .. _process-deploy-op: :ref:`proc_op_deploy`
 .. |process-deploy-op| replace:: Process deployment operation
+
+.. STAC
+.. |stac-spec| replace:: STAC Specification
+.. _stac-spec: https://stacspec.org/en/about/stac-spec/
+.. |stac-api-spec| replace:: STAC API Specification
+.. _stac-api-spec: https://github.com/radiantearth/stac-api-spec
+.. |stac-collections| replace:: STAC Collections
+.. _stac-collections: https://github.com/radiantearth/stac-spec/blob/master/collection-spec/collection-spec.md
+.. |stac-items| replace:: STAC Items
+.. _stac-items: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
+.. |stac-assets| replace:: STAC Assets
+.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md#asset-object
 
 .. Example references
 .. |examples| replace:: Examples
