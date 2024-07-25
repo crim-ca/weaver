@@ -18,7 +18,7 @@ billiard>3.2,<3.4; sys_platform == "win32"
 #   celery >=4.4.3 breaks on 'future.utils' import
 #   celery's CLI interface changed
 #   https://github.com/celery/celery/blob/master/docs/whatsnew-5.2.rst#upgrading-from-celery-4x
-celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
+celery<5.2.2  # pyup: ignore
 celery[mongodb]>=5.2.2,<6; sys_platform != "win32"
 cffi
 colander<2
@@ -106,3 +106,4 @@ webob
 werkzeug>=3.0.3,<3.1
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
 
+fiona>=1.10b2 # not directly required, pinned by Snyk to avoid a vulnerability
