@@ -14,7 +14,7 @@ Weaver
 Weaver (the nest-builder)
   *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.
   Some of these nests are the largest structures to be built by birds.*
-  [`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_].
+  [`Eden <http://web.archive.org/web/20240416100924/https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_].
 
   *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic
   nesting habits instead.*
