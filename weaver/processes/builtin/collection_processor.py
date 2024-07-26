@@ -70,7 +70,14 @@ def process(collection_input, input_definition, output_dir):
     validate_reference(col_ref, is_file=False)
 
     # if "formats" in input_definition:  # FIXME: handle different formats/schema combinations, APIs to call...
-    c_type = ContentType.IMAGE_GEOTIFF  # FIXME: extract
+    c_type = ContentType.IMAGE_GEOTIFF  # FIXME: extract from STAC Assets
+
+    # FIXME: use maintained libraries?
+    import owslib.ogcapi.coverages
+    import owslib.ogcapi.features
+    import owslib.ogcapi.records
+    import owslib.ogcapi.maps
+    import pystac_client
 
     col_url = urljoin(col_ref, "/items")  # STAC / OGC API Features
     col_resp = request_extra(
@@ -106,7 +113,7 @@ def main(*args):
         help="Collection Input parameters as JSON file path.",
     )
     parser.add_argument(
-        "-i",
+        "-p",
         metavar="PROCESS_INPUT",
         required=True,
         help="Process Input definition as JSON file path.",
@@ -120,8 +127,8 @@ def main(*args):
     ns = parser.parse_args(*args)
     LOGGER.info("Process [%s] Loading collection input '%s'.", PACKAGE_NAME, ns.c)
     col_in = load_file(ns.c)
-    LOGGER.info("Process [%s] Loading process input definition '%s'.", PACKAGE_NAME, ns.i)
-    proc_in = load_file(ns.i)
+    LOGGER.info("Process [%s] Loading process input definition '%s'.", PACKAGE_NAME, ns.p)
+    proc_in = load_file(ns.p)
     sys.exit(process(col_in, proc_in, ns.o))
 
 
