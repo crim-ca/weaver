@@ -2,6 +2,13 @@
 Weaver
 =============================================
 
+\| `Summary <#summary>`_
+\| `Features <#features>`_
+\| `Links <#links>`_
+\| `Configuration <#configuration>`_
+\| `Extra Details & Sponsors <#extra-details--sponsors>`_
+\|
+
 **Implementations**
 
 * |ogc-api-proc-long|
@@ -132,7 +139,7 @@ requirements and provide feedback to |ogc-long|_ (OGC) in this effect.
 For more details, see `Configuration`_ and `Documentation`_ sections.
 
 ----------------
-Features Preview
+Features
 ----------------
 
 Following videos present some of the features and potential capabilities of servicing and executing processes
@@ -239,7 +246,7 @@ For convenience, following tags are also available:
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
 .. list-table::
-    :widths: 15,25,10,50
+    :widths: 15,35,10,50
     :header-rows: 1
 
     * - Institution & Partners
