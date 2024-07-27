@@ -239,6 +239,7 @@ For convenience, following tags are also available:
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
 .. list-table::
+    :widths: 20 30 10 40
     :header-rows: 1
 
     * - Institution & Partners
