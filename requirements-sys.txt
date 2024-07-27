@@ -1,2 +1,2 @@
 pip>=22.0.4  # pyup: ignore
-setuptools>=65.5.1
+setuptools>=71.0.3

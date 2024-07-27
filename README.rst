@@ -2,9 +2,17 @@
 Weaver
 =============================================
 
+\| `Summary <#summary>`_
+\| `Features <#features>`_
+\| `Links <#links>`_
+\| `Configuration <#configuration>`_
+\| `Documentation <#documentation>`_
+\| `Extra Details & Sponsors <#extra-details--sponsors>`_
+\|
+
 **Implementations**
 
-* |ogc-proc-long|
+* |ogc-api-proc-long|
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
@@ -14,7 +22,7 @@ Weaver
 Weaver (the nest-builder)
   *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.
   Some of these nests are the largest structures to be built by birds.*
-  [`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_].
+  [`Eden <http://web.archive.org/web/20240416100924/https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_].
 
   *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic
   nesting habits instead.*
@@ -126,13 +134,13 @@ endpoints, adding more process management and search request options than requir
 *remote providers* registration for dynamic process definitions, to name a few.
 Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
 behaving `ADES` and/or `EMS` instances. The reference specification is tracked to preserve the minimal conformance
-requirements and provide feedback to |ogc|_ (OGC) in this effect.
+requirements and provide feedback to |ogc-long|_ (OGC) in this effect.
 
 `Weaver` can be launched either as an `EMS`, an `ADES` or an `HYBRID` of both according to its configuration.
 For more details, see `Configuration`_ and `Documentation`_ sections.
 
 ----------------
-Features Preview
+Features
 ----------------
 
 Following videos present some of the features and potential capabilities of servicing and executing processes
@@ -236,23 +244,42 @@ For convenience, following tags are also available:
 - ``weaver:5.7.0-manager``: `Weaver` image that will run the API for WPS process and job management.
 - ``weaver:5.7.0-worker``: `Weaver` image that will run the process job runner application.
 
-Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
+Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
 .. list-table::
+    :widths: 15,35,10,50
     :header-rows: 1
 
-    * - Description
+    * - Institution & Partners
+      - Project & Description
       - Version
       - Entrypoint
-    * - CRIM Services Portal
-      - |crim-services-version|
-      - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
-    * - `DACCS Project <https://github.com/DACCS-Climate>`_ - CRIM Development Instance
-      - |hirondelle-version|
+    * - `CRIM`_
+      - `DACCS`_ / |ogc|_ - *Hirondelle* Development Instance
+      - |crim-hirondelle-weaver-version|
       - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
+    * - `CRIM`_
+      - Demonstration Services Portal
+      - |crim-services-weaver-version|
+      - `https://services.crim.ca/weaver <https://services.crim.ca/weaver>`_
+    * - `Ouranos`_
+      - `PAVICS`_ Server
+      - |ouranos-pavics-weaver-version|
+      - `https://pavics.ouranos.ca/weaver/ <https://pavics.ouranos.ca/weaver/>`_
+    * - |UofT|_
+      - |marble|_ - `RedOak`_ Instance
+      - |UofT-RedOak-weaver-version|
+      - `https://redoak.cs.toronto.edu/weaver/ <https://redoak.cs.toronto.edu/weaver/>`_
+    * - `CRIM`_, `ECCC`_, `CLIMAtlantic`_, `Ouranos`_, `PCIC`_, `PCC`_
+      - `ClimateData.ca`_ / `DonneesClimatiques.ca`_ Portal
+      - |climate-data-weaver-version|
+      - `https://pavics.climatedata.ca/ <https://pavics.climatedata.ca/>`_
 
-.. |crim-services-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
-.. |hirondelle-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |crim-hirondelle-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhirondelle.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |crim-services-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fservices.crim.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |ouranos-pavics-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpavics.ouranos.ca%2Fweaver%2Fversions&query=%24.versions%5B0%5D.version&label=version
+.. |UofT-RedOak-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fredoak.cs.toronto.edu%2Fweaver%2Fversions&query=%24.versions[0].version&label=version
+.. |climate-data-weaver-version| image:: https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpavics.climatedata.ca%2Fversions&query=%24.versions[0].version&label=version
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
@@ -313,12 +340,17 @@ technical report. This resulted, along with previous efforts, in the definition 
 validated test cases using |cwl-long| as the representation method for the deployment and execution of |ogc-apppkg|_
 close to the data.
 
-`Weaver` is being employed in the |ogc-tb20-gdc|_ initiative to improve and work on the alignment of multiple
+`Weaver` is employed in the |ogc-ospd|_ initiative to demonstrate reusability, portability, and transparency
+in the context of open science in Earth Observation, using |ogc-apppkg|_ encoded as |cwl|_ for interoperability
+and distributed processing workflows. Its related developments and demonstrations were presented at
+the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_.
+
+`Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the alignment of multiple
 community standards involved in workflow design, such as |cwl|_, `openEO`_ and |ogc-api-proc-part3|_, for
 processing of multidimensional data involved through GeoDataCube interactions.
 
-The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative
-and is employed by the ClimateData.ca_/DonneesClimatiques.ca_ portal.
+The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
+initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
 
 `Weaver` is implemented in Python with the `Pyramid`_ web framework.
 It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the `birdhouse-deploy`_ server stack.
@@ -341,45 +373,73 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |wps| replace:: `Web Processing Services`
 .. _wps: https://www.ogc.org/standard/wps/
 .. |wps-long| replace:: |wps|_ (WPS)
-.. |ogc| replace:: Open Geospatial Consortium
+.. |ogc| replace:: OGC
 .. _ogc: https://www.ogc.org/
-.. |ogc-api-proc| replace:: `OGC API - Processes`
+.. |ogc-long| replace:: *Open Geospatial Consortium*
+.. _ogc-long: https://www.ogc.org/
+.. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
-.. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
-.. |ogc-tb13-cloud-er| replace:: OGC Testbed-13 - Cloud Engineering Report
-.. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
-.. |ogc-tb14| replace:: OGC Testbed-14
-.. _ogc-tb14: https://www.ogc.org/initiatives/testbed-14/
-.. |ogc-tb14-platform-er| replace:: ADES & EMS Results and Best Practices Engineering Report
-.. _ogc-tb14-platform-er: http://docs.opengeospatial.org/per/18-050r1.html
-.. |ogc-tb15-ml| replace:: OGC Testbed-15 - ML Thread
-.. _ogc-tb15-ml: https://www.ogc.org/initiatives/testbed-15/#MachineLearning
-.. |ogc-tb15-ml-er| replace:: OGC Testbed-15: Machine Learning Engineering Report
-.. _ogc-tb15-ml-er: http://docs.opengeospatial.org/per/19-027r2.html
-.. |ogc-tb16| replace:: OGC Testbed-16
-.. _ogc-tb16: https://www.ogc.org/initiatives/t-16/
-.. |ogc-tb16-data-access-proc-er| replace:: OGC Testbed-16: Data Access and Processing Engineering Report
-.. _ogc-tb16-data-access-proc-er: http://docs.opengeospatial.org/per/20-016.html
-.. |ogc-tb16-ipynb-er| replace:: OGC Testbed-16: Earth Observation Application Packages with Jupyter Notebooks Engineering Report
-.. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
-.. |ogc-tb20-gdc| replace:: OGC Testbed-20 - GeoDataCubes
-.. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
-.. |ogc-eo-apps-pilot| replace:: OGC Earth Observation Applications Pilot
-.. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
-.. |ogc-eo-apps-pilot-er| replace:: OGC Earth Observation Applications Pilot: CRIM Engineering Report
-.. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
-.. |ogc-best-practices-eo-apppkg| replace:: OGC Best Practice for Earth Observation Application Package
-.. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
-.. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy (DRU)
+.. |ogc-api-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
+.. |ogc-api-proc-part2| replace:: *OGC API - Processes - Part 2: Deploy, Replace, Undeploy (DRU)*
 .. _ogc-api-proc-part2: https://docs.ogc.org/DRAFTS/20-044.html
-.. |ogc-api-proc-part3| replace:: OGC API - Processes - Part 3: Workflows and Chaining
+.. |ogc-api-proc-part3| replace:: *OGC API - Processes - Part 3: Workflows and Chaining*
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
-.. |ogc-apppkg| replace:: `OGC Application Package`
+.. |ogc-tb13-cloud-er| replace:: *OGC Testbed-13 - Cloud Engineering Report*
+.. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
+.. |ogc-tb14| replace:: *OGC Testbed-14*
+.. _ogc-tb14: https://www.ogc.org/initiatives/testbed-14/
+.. |ogc-tb14-platform-er| replace:: *ADES & EMS Results and Best Practices Engineering Report*
+.. _ogc-tb14-platform-er: http://docs.opengeospatial.org/per/18-050r1.html
+.. |ogc-tb15-ml| replace:: *OGC Testbed-15 - Machine Learning Thread*
+.. _ogc-tb15-ml: https://www.ogc.org/initiatives/testbed-15/#MachineLearning
+.. |ogc-tb15-ml-er| replace:: *OGC Testbed-15: Machine Learning Engineering Report*
+.. _ogc-tb15-ml-er: http://docs.opengeospatial.org/per/19-027r2.html
+.. |ogc-tb16| replace:: *OGC Testbed-16*
+.. _ogc-tb16: https://www.ogc.org/initiatives/t-16/
+.. |ogc-tb16-data-access-proc-er| replace:: *OGC Testbed-16: Data Access and Processing Engineering Report*
+.. _ogc-tb16-data-access-proc-er: http://docs.opengeospatial.org/per/20-016.html
+.. |ogc-tb16-ipynb-er| replace:: *OGC Testbed-16: Earth Observation Application Packages with Jupyter Notebooks Engineering Report*
+.. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
+.. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
+.. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-ospd| replace:: *OGC Open Science Persistent Demonstrator*
+.. _ogc-ospd: https://www.ogc.org/initiatives/open-science/
+.. |ogc-eo-apps-pilot| replace:: *OGC Earth Observation Applications Pilot*
+.. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
+.. |ogc-eo-apps-pilot-er| replace:: *OGC Earth Observation Applications Pilot: CRIM Engineering Report*
+.. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
+.. |ogc-best-practices-eo-apppkg| replace:: *OGC Best Practice for Earth Observation Application Package*
+.. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
+.. |ogc-129th| replace:: *OGC 129th Member's Meeting*
+.. _ogc-129th: https://www.ogc.org/ogc-events/129th-ogc-member-meeting-montreal/
+.. |ogc-apppkg| replace:: *OGC Application Package*
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
-.. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
+.. |ESIP| replace:: *Earth Science Information Partners*
+.. _ESIP: https://www.esipfed.org/
+.. |ESIP-2024| replace:: *Earth Science Information Partners* (ESIP) 2024 Meeting
+.. _ESIP-2024: https://2024julyesipmeeting.sched.com/
+.. _CRIM: https://crim.ca/
+.. _Ouranos: https://www.ouranos.ca/
+.. _PAVICS: https://pavics.ouranos.ca/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
-.. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
+.. |DACCS-long| replace:: *Data Analytics for Canadian Climate Services*
+.. _DACCS: https://github.com/DACCS-Climate
+.. |DACCS-grant| replace:: DACCS
+.. _DACCS-grant: https://app.dimensions.ai/details/grant/grant.8105745
 .. _ClimateData.ca: https://ClimateData.ca
 .. _DonneesClimatiques.ca: https://DonneesClimatiques.ca
+.. |UofT| replace:: University of Toronto
+.. _UofT: https://utoronto.ca
+.. _RedOak: https://redoak.cs.toronto.edu/
+.. |marble| replace:: Marble Climate
+.. _marble: https://marbleclimate.com/
+.. |CLIMAtlantic| replace:: CLIMAtlantic
+.. _CLIMAtlantic: https://climatlantic.ca/
+.. |ECCC| replace:: Environment and Climate Change Canada (ECCC)
+.. _ECCC: https://www.canada.ca/en/environment-climate-change.html
+.. |PCIC| replace:: Pacific Climate Impacts Consortium (PCIC)
+.. _PCIC: https://www.pacificclimate.org/
+.. |PCC| replace:: Prairie Climate Centre (PCC)
+.. _PCC: https://prairieclimatecentre.ca/
 .. _Pyramid: http://www.pylonsproject.org

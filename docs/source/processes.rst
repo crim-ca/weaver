@@ -51,8 +51,8 @@ As of the latest release, following `builtin` processes are available:
 - :py:mod:`weaver.processes.builtin.echo_process`
 
     Corresponds to the |ogc-api-proc-echo|_ definition. This :term:`Process` is used to evaluate the :term:`API`
-    against the `OGC Execution Test Suite (ETS)` for the `Weaver Product Implementation <ogc-ets-impl-ref>`_. It
-    also is employed to test the implementation against a wide range of input and output formats.
+    against the `OGC Execution Test Suite (ETS)` for the |ogc-ets-weaver-impl-ref|_.
+    It also is employed to test the implementation against a wide range of input and output formats.
 
 - :py:mod:`weaver.processes.builtin.file2string_array`
 
