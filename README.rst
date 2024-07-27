@@ -255,7 +255,7 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
       - Version
       - Entrypoint
     * - `CRIM`_
-      - `DACCS <https://github.com/DACCS-Climate>`_ / |ogc|_ - *Hirondelle* Development Instance
+      - `DACCS`_ / |ogc|_ - *Hirondelle* Development Instance
       - |crim-hirondelle-weaver-version|
       - `https://hirondelle.crim.ca/weaver <https://hirondelle.crim.ca/weaver>`_
     * - `CRIM`_
@@ -349,7 +349,7 @@ the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_.
 community standards involved in workflow design, such as |cwl|_, `openEO`_ and |ogc-api-proc-part3|_, for
 processing of multidimensional data involved through GeoDataCube interactions.
 
-The project is furthermore developed through the |DACCS| (`DACCS <DACCS-grant>`_)
+The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
 initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
 
 `Weaver` is implemented in Python with the `Pyramid`_ web framework.
@@ -423,8 +423,9 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _PAVICS: https://pavics.ouranos.ca/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _birdhouse-deploy: https://github.com/bird-house/birdhouse-deploy
-.. |DACCS| replace:: *Data Analytics for Canadian Climate Services*
+.. |DACCS-long| replace:: *Data Analytics for Canadian Climate Services*
 .. _DACCS: https://github.com/DACCS-Climate
+.. |DACCS-grant| replace:: DACCS
 .. _DACCS-grant: https://app.dimensions.ai/details/grant/grant.8105745
 .. _ClimateData.ca: https://ClimateData.ca
 .. _DonneesClimatiques.ca: https://DonneesClimatiques.ca
