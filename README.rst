@@ -241,8 +241,8 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
 .. list-table::
     :header-rows: 1
 
-    * - Institution
-      - Description
+    * - Institution & Partners
+      - Project & Description
       - Version
       - Entrypoint
     * - `CRIM`_
