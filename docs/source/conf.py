@@ -459,6 +459,11 @@ linkcheck_anchors_ignore = [
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
 ]
+linkcheck_request_headers = {
+    "https://github.com/": {
+        "Accept": "text/html,application/xhtml+xml,application/xml,image/avif,image/webp,image/png,image/svg+xml,*/*"
+    }
+}
 
 linkcheck_timeout = 30
 linkcheck_retries = 5
