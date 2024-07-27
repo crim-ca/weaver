@@ -1,0 +1,20 @@
+inputs:
+  features:
+    format:
+      mediaType: "application/geo+json"
+      schema: "https://geojson.org/schema/FeatureCollection.json"
+    value:
+      type: "FeatureCollection"
+      bbox: [ -90.0, -180.0, 90.0, 180.0 ]
+      features:
+        - type: "Feature"
+          geometry:
+            type: Polygon
+            coordinates:
+              - [ -90, -180 ]
+              - [ -90, 180 ]
+              - [ 90, 180 ]
+              - [ 90, -180 ]
+              - [ -90, -180 ]
+          properties:
+            name: "test"

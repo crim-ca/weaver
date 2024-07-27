@@ -1,0 +1,37 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  process:
+    id: EchoFeatures
+    title: Test Echo Features
+    version: "1.0"  # must be string, avoid interpretation as float
+    description: Dummy process that simply echo's back the input bbox for testing purposes.
+    keywords:
+      - test
+    inputs:
+      features:
+        description: "Collection of features, either provided directly as FeatureCollection or an array of geometries."
+        schema:
+          - oneOf:
+              - allOf:
+                  - format: geojson-feature-collection
+                  - $ref: "https://geojson.org/schema/FeatureCollection.json"
+              - type: array
+                items:
+                  allOf:
+                    - format: geojson-geometry
+                    - $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+    outputs:
+      features:
+        schema:
+          - allOf:
+              - format: geojson-feature-collection
+              - $ref: "https://geojson.org/schema/FeatureCollection.json"
+  jobControlOptions:
+    - async-execute
+    - sync-execute
+  outputTransmission:
+    - reference
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/EchoBoundingBox/echo_bbox.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

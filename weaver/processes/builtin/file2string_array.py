@@ -45,7 +45,7 @@ def main(*args):
     # type: (*str) -> None
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", help="CWL File")
+    parser.add_argument("-i", help="Input File URI")
     parser.add_argument(
         "-o",
         metavar="outdir",

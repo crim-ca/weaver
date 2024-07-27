@@ -44,10 +44,26 @@ Glossary
             - :ref:`quotation`
             - :ref:`conf_quotation`
 
+    Builtin Process
+        An immutable :term:`Process` that comes pre-packaged with `Weaver`, without need to be deployed.
+        This is usually an "utility" or "converter" :term:`Process` that is often reused across :term:`Workflow`
+        definitions.
+
+        .. seealso::
+            Refer to the :ref:`proc_builtin` section for more details about available processes.
+
     CLI
         | Command Line Interface
         | Script that offers interactions through shell commands or Python scripts to execute any described operations.
           Details of the provided `Weaver` commands are described in :ref:`cli` chapter.
+
+    Collection
+        A geospatial resource that may be available as one or more sub-resource distributions
+        that conform to one or more |ogc-api-standards|_. Additionally, |stac-collections|_ can
+        be included in this group.
+
+        Please refer to the :term:`OGC` official :ref:`Collection Definition <ogc-collection>` for more details
+        and complementary terminology.
 
     CWL
         | |cwl|_
@@ -93,6 +109,20 @@ Glossary
 
     ESGF-CWT
         |esgf-cwt-git|_
+
+    GeoJSON
+        | Geospatial :term:`JSON`
+        | A specific :term:`JSON` format representation for encoding a variety of geographic data structures,
+          such as ``Point``, ``LineString``, ``Polygon``, ``MultiPoint``, ``MultiLineString``, and ``MultiPolygon``,
+          ``Feature``, and ``FeatureCollection``.
+
+        .. seealso::
+            Refer to the official |geojson|_ specification for more details.
+
+        .. note::
+            Multiple extended or derived variants exist. Notably, the |ogc-api-features|_ and |stac-spec|_ define
+            additional ``properties`` or additional ``type`` values for particular use cases, but remain generally
+            interoperable and compatible.
 
     HREF
         | Hyperlink Reference
@@ -206,6 +236,14 @@ Glossary
 
     S3
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
+
+    STAC
+        | SpatioTemporal Asset Catalog
+        | Language used to describe geospatial information, using extended definitions of :term:`GeoJSON`,
+          and which can usually be searched using a |stac-api-spec|_ compliant with |ogc-api-features|_.
+
+        .. seealso::
+            Please refer to the |stac-spec|_ for more details.
 
     TOI
         | Time of Interest

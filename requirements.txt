@@ -68,6 +68,14 @@ owslib==0.29.3
 PasteDeploy>=3.1.0; python_version >= "3.12"
 pint
 psutil
+# notes: https://github.com/geopython/pygeofilter
+# - FES: OGC Filter Expression Standard (https://docs.ogc.org/is/09-026r2/09-026r2.html#107)
+#   uses https://github.com/geopython/pygml
+# - JFE: JSON Filter Expressions
+#   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
+# - extra 'backend-native' uses shapely for Python objects
+# - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
+pygeofilter[fes,backend-native]
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -105,4 +113,3 @@ xmltodict
 webob
 werkzeug>=3.0.3,<3.1
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
-

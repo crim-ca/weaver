@@ -545,7 +545,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | ``uri``, ``url``,      |                                            |
 |                      |                         | etc.) :sup:`(5)`       |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| |na|                 | ``BoundingBox``         | :term:`JSON`           | Only partial support available. |br|       |
+| ``File``             | ``BoundingBox``         | :term:`JSON`           | Partial support available. |br|            |
 |                      |                         | :sup:`(6)`             | See :ref:`note <bbox-note>`.               |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``File``             | ``Complex``             | :term:`JSON`           | :ref:`File Reference <file_ref_types>`     |
@@ -567,21 +567,23 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
   More specific types with these items can help apply additional validation, although not strictly enforced.
 | :sup:`(6)` Specific schema required as described in :ref:`oas_json_types`.
 
+.. _bbox-note:
+.. note::
+    The :term:`WPS` data type ``BoundingBox`` has a schema definition in :term:`WPS` and :term:`OAS` contexts,
+    but is not handled natively by :term:`CWL` types. When the conversion to a :term:`CWL` job occurs, an equivalent
+    ``Complex`` type using a :term:`CWL` ``File`` with ``format: ogc-bbox`` and the contents stored as :term:`JSON` is
+    employed. It is up to the :term:`Application Package` to parse this :term:`JSON` content as necessary.
+    Alternatively, it is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ if it
+    is deemed preferable that the :term:`CWL` script receives the data directly without intermediate interpretation.
+
+.. [#] |wkt-example|_
+
 .. _cwl-type:
 
 Type Resolution
 ~~~~~~~~~~~~~~~
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
-
-.. _bbox-note:
-.. note::
-    As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
-    The schema definition exists in :term:`WPS` and :term:`OAS` contexts but is not handled by any :term:`CWL` type
-    conversion yet. This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
-    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ in the meantime.
-
-.. [#] |wkt-example|_
 
 As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
 which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be
@@ -639,8 +641,8 @@ it gets parsed as intended type.
 
 .. versionadded:: 4.16
 
-With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema definitions provided in
-the :term:`WPS` I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
+With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema (:term:`OAS`) definitions
+provided in the I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
 data types. When :term:`OpenAPI` schema are detected, they are also considered in the merging strategy along with
 other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
 provided in :ref:`oas_io_schema` section.
