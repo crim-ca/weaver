@@ -6,6 +6,7 @@ Weaver
 \| `Features <#features>`_
 \| `Links <#links>`_
 \| `Configuration <#configuration>`_
+\| `Documentation <#documentation>`_
 \| `Extra Details & Sponsors <#extra-details--sponsors>`_
 \|
 
