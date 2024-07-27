@@ -82,7 +82,11 @@
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
 .. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
 .. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
-.. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy
+.. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
+.. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
+.. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
+.. |ogc-api-proc-part2| replace:: *OGC API - Processes* - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-proc-ext-billing| replace:: OGC API - Processes - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
