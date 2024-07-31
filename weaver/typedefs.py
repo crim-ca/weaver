@@ -220,6 +220,14 @@ if TYPE_CHECKING:
         "$namespaces": NotRequired[CWL_Namespace],
         "$schemas": NotRequired[Dict[str, str]],
         "$graph": NotRequired[CWL_Graph],
+        "s:author": NotRequired[List[Dict[str, JSON]]],
+        "s:citation": NotRequired[List[Dict[str, str]]],
+        "s:codeRepository": NotRequired[Link],
+        "s:contributor": NotRequired[List[Dict[str, JSON]]],
+        "s:dateCreated": NotRequired[datetime],
+        "s:license": NotRequired[Optional[Union[Dict[str, JSON], Link]]],
+        "s:releaseNotes": NotRequired[Optional[Union[str, Link]]],
+        "s:version": NotRequired[Optional[Union[str, Number]]],
     }, total=False)
     CWL_WorkflowStepPackage = TypedDict("CWL_WorkflowStepPackage", {
         "id": str,          # reference ID of the package
