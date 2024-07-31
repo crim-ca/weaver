@@ -220,6 +220,16 @@ PACKAGE_PROGRESS_DONE = 100
 
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
 
+SUPPORTED_METADATA_MAPPING = [
+    "s:author"
+    "s:citation",
+    "s:codeRepository",
+    "s:contributor",
+    "s:dateCreated",
+    "s:license",
+    "s:releaseNotes",
+    "s:version"
+]
 
 def get_status_location_log_path(status_location, out_dir=None):
     # type: (str, Optional[str]) -> str
@@ -707,6 +717,30 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         wps_package_metadata["keywords"] = list(
             set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
         )
+
+    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
+        # example s:author #TODO regroup similar parsing together
+        if metadata_mapping in cwl_package_package and isinstance(cwl_package_package["s:author"], list):
+
+            metadata = wps_package_metadata.get("metadata", [])
+            for objects in cwl_package_package[metadata_mapping]:
+                class_name = objects["class"].strip("s:")
+                value = {
+                    "$schema": f"https://schema.org/{class_name}"
+                }
+                for key, val in objects.items():
+                    if key.startswith("s:"):
+                        value[key.strip("s:")] = val
+                metadata.append({
+                    "role": metadata_mapping.strip("s;"),
+                    "value": value
+                })
+        # specific use case with a different mapping 
+        if metadata_mapping in cwl_package_package and isinstance(cwl_package_package["s:version"], list):
+            wps_package_metadata["s:version"] = list(
+                set(wps_package_metadata.get("version", [])) | set(cwl_package_package.get("s:version", []))
+            )
+
 
 
 def _patch_wps_process_description_url(reference, process_hint):
