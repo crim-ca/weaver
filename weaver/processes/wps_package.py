@@ -735,12 +735,12 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                     "role": metadata_mapping.strip("s:"),
                     "value": value
                 })
+            wps_package_metadata["metadata"] = metadata
         # specific use case with a different mapping 
         if metadata_mapping in cwl_package_package and metadata_mapping == "s:version":
             wps_package_metadata["version"] = (
                 set(wps_package_metadata.get("version", [])) | set(cwl_package_package.get("s:version", []))
             )
-        wps_package_metadata["metadata"] = metadata
 
 
 def _patch_wps_process_description_url(reference, process_hint):
