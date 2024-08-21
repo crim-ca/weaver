@@ -221,7 +221,7 @@ PACKAGE_PROGRESS_DONE = 100
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
 
 SUPPORTED_METADATA_MAPPING = [
-    "s:author"
+    "s:author",
     "s:citation",
     "s:codeRepository",
     "s:contributor",
@@ -720,7 +720,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
     for metadata_mapping in SUPPORTED_METADATA_MAPPING:
         # example s:author #TODO regroup similar parsing together
-        if metadata_mapping in cwl_package_package and isinstance(cwl_package_package["s:author"], list):
+        if metadata_mapping in cwl_package_package and metadata_mapping == "s:author":
 
             metadata = wps_package_metadata.get("metadata", [])
             for objects in cwl_package_package[metadata_mapping]:
@@ -732,15 +732,15 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                     if key.startswith("s:"):
                         value[key.strip("s:")] = val
                 metadata.append({
-                    "role": metadata_mapping.strip("s;"),
+                    "role": metadata_mapping.strip("s:"),
                     "value": value
                 })
         # specific use case with a different mapping 
-        if metadata_mapping in cwl_package_package and isinstance(cwl_package_package["s:version"], list):
-            wps_package_metadata["s:version"] = list(
+        if metadata_mapping in cwl_package_package and metadata_mapping == "s:version":
+            wps_package_metadata["version"] = (
                 set(wps_package_metadata.get("version", [])) | set(cwl_package_package.get("s:version", []))
             )
-
+        wps_package_metadata["metadata"] = metadata
 
 
 def _patch_wps_process_description_url(reference, process_hint):

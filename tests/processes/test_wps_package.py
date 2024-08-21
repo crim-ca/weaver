@@ -48,7 +48,8 @@ from weaver.processes.wps_package import (
     _update_package_compatibility,
     format_extension_validator,
     get_application_requirement,
-    mask_process_inputs
+    mask_process_inputs,
+    _update_package_metadata
 )
 from weaver.wps.service import WorkerRequest
 
@@ -667,3 +668,40 @@ def test_mask_process_inputs(inputs, expect):
 def test_format_extension_validator_basic(data_input, mode, expect):
     # type: (Any, int, bool) -> None
     assert format_extension_validator(data_input, mode) == expect
+
+@pytest.mark.parametrize("original, expected", [
+    (
+        # Test author metadata with empty wps_package
+        {
+            "cwl_package_package": {
+                "s:author": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
+    
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "metadata": [
+                {
+                    "role": "author",
+                    "value": {
+                        "$schema": "https://schema.org/Person",
+                        "name": "John Doe",
+                        "affiliation": "Example Inc."
+                    }
+                }
+            ]
+        }
+    ),
+    
+])
+def test_process_metadata(original, expected):
+    # type: (CWL, CWL) -> None
+    cwl_package_package = original["cwl_package_package"]
+    wps_package_metadata = original["wps_package_metadata"]
+    _update_package_metadata(wps_package_metadata, cwl_package_package)
+    # Assertions
+    for key in expected:
+        assert key in wps_package_metadata
+        assert sorted(wps_package_metadata[key]) == sorted(expected[key])
