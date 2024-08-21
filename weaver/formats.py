@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
-    from weaver.typedefs import AnyRequestType, JSON
+    from weaver.typedefs import AnyRequestType, JSON, ProcessInputOutputItem
 
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
@@ -1041,6 +1041,29 @@ def guess_target_format(
     if return_source:
         return content_type, format_source
     return content_type
+
+
+def find_supported_media_types(io_definition):
+    # type: (ProcessInputOutputItem) -> Optional[List[str]]
+    """
+    Finds all supported media-types indicated by an :term:`I/O`.
+
+    .. note::
+        Assumes that media-types are indicated under ``formats``, which should have been obtained either by direct
+        submission when using :term:`WPS` deployment, generated from ``schema`` using :term:`OGC` deployment, or using
+        the nested ``format`` of ``File`` types from :term:`CWL` deployment.
+
+    :param io_definition:
+    :return: supported media-types
+    """
+    io_formats = io_definition.get("formats")
+    if not io_formats:
+        return None
+    media_types = set()
+    for fmt in io_formats:  # type: Dict[str, str]
+        if "type" in fmt:
+            media_types.add(fmt["type"])
+    return list(media_types)
 
 
 def json_default_handler(obj):

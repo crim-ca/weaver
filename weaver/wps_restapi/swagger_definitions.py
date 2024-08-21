@@ -37,7 +37,13 @@ from pygeofilter.parsers.fes.parser import (
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
 from weaver.config import WeaverFeature
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteCollectionFormat,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteTransmissionMode
+)
 from weaver.formats import AcceptLanguage, ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
@@ -3735,16 +3741,41 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
     value = ArrayReference()
 
 
+class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
+    schema_type = String
+    default = ExecuteCollectionFormat.GEOJSON
+    example = ExecuteCollectionFormat.STAC
+    validator = OneOf(ExecuteCollectionFormat.values())
+
+
 class ExecuteCollectionInput(FilterSchema, SortBySchema):
     description = inspect.cleandoc("""
-        Reference to a GeoJSON 'collection' that can optionally be filtered, sorted, or parametrized.
+        Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
         
-        If only the 'collection' is provided to read the contents as a static GeoJSON document,
-        any scheme can be employed (s3, file, http, etc.). If additional capabilities are
-        specified (filter, sortBy, etc.), the scheme can only be 'http(s)' since an OGC API data
-        access mechanism is expected to perform the requested operations.
+        If only the 'collection' is provided to read the contents as a static GeoJSON FeatureCollection document,
+        any scheme can be employed (s3, file, http, etc.) to request the contents.
+        Note that in this context, each of the respective Feature contained in the collection will be extracted
+        to form an array of Features. If the entire 'FeatureCollection' should be provided as a whole to the process
+        input, consider using the usual 'href' or 'value' input instead of 'collection'.
+        
+        If additional 'collection' capabilities are specified (filter, sortBy, subsetting, scaling, etc.),
+        the scheme must be 'http(s)' since an OGC API or STAC API data access mechanism is expected
+        to perform the requested operations. The appropriate API to employ should be indicated by 'format'
+        along the 'collection'.
     """)
     collection = ExecuteReferenceURL(description="Endpoint of the collection reference.")
+    format = ExecuteCollectionFormatEnum(
+        missing=drop,
+        description="Collection API to employ for filtering and extracting relevant data for the execution.",
+    )
+    type = MediaType(
+        missing=drop,
+        title="CollectionMediaType",
+        description=(
+            "IANA identifier of content-type to extract from the link. "
+            "If none specified, default from the collection is employed. "
+        )
+    )
 
 
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
