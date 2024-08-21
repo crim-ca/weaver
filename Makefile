@@ -802,22 +802,22 @@ DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
-	docker-compose $(DOCKER_TEST_COMPOSES) up -d
+	docker compose $(DOCKER_TEST_COMPOSES) up -d
 	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
 	@curl localhost:4001 | grep "Weaver Information" || \
-		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
-		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
-	docker-compose $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
-	docker-compose $(DOCKER_TEST_COMPOSES) stop
+		( docker compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
+		  docker compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	docker compose $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
+	docker compose $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat
-docker-stat:  ## query docker-compose images status (from 'docker-test')
-	docker-compose $(DOCKER_TEST_COMPOSES) ps
+docker-stat:  ## query docker compose images status (from 'docker-test')
+	docker compose $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
 docker-clean:  ## remove all built docker images (only matching current/latest versions)
-	docker-compose $(DOCKER_TEST_COMPOSES) down || true
+	docker compose $(DOCKER_TEST_COMPOSES) down || true
 	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)-manager" || true
 	docker rmi -f "$(DOCKER_REPO):latest-manager" || true
 	docker rmi -f "$(APP_NAME):$(APP_VERSION)-manager" || true
