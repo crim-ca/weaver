@@ -1417,8 +1417,15 @@ class AnyFilterLanguage(ExtendedSchemaNode):
     description = (
         "Filter expression language to use for parsing. "
         "Supports multiple variants of OGC Common Query Language (CQL), "
-        "Filter Expression Standard (FES), or JSON Filter Expression (JFE)."
+        "Filter Expression Standard (FES), or JSON Filter Expression (JFE). "
+        "Values are case-insensitive."
     )
+
+    def deserialize(self, cstruct):
+        # type: (Any) -> Union[str, colander.null]
+        if isinstance(cstruct, str):
+            cstruct = cstruct.lower()
+        return super().deserialize(cstruct)
 
 
 class FilterSchema(ExtendedMappingSchema):
@@ -1497,20 +1504,20 @@ class FilterSchema(ExtendedMappingSchema):
         result = super().deserialize(cstruct)
         if not result:
             return result
-        filter_expr = cstruct.get("filter")
-        filter_lang = cstruct.get("filter-lang")
+        filter_expr = result.get("filter")
+        filter_lang = result.get("filter-lang")
         if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised after as invalid
-            cstruct.pop("filter", None)
-            cstruct.pop("filter-crs", None)
-            cstruct.pop("filter-lang", None)
-            return cstruct
+            result.pop("filter", None)
+            result.pop("filter-crs", None)
+            result.pop("filter-lang", None)
+            return result
         if not filter_lang:
             filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
         # perform conversion to validate
         # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
         # conversion can be done as needed to obtain a uniform representation locally
         self.convert(filter_expr, filter_lang)
-        return cstruct
+        return result
 
 
 class SortByExpression(ExpandStringList, ExtendedSchemaNode):
@@ -3748,7 +3755,7 @@ class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
     validator = OneOf(ExecuteCollectionFormat.values())
 
 
-class ExecuteCollectionInput(FilterSchema, SortBySchema):
+class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
     description = inspect.cleandoc("""
         Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
         
@@ -3758,10 +3765,15 @@ class ExecuteCollectionInput(FilterSchema, SortBySchema):
         to form an array of Features. If the entire 'FeatureCollection' should be provided as a whole to the process
         input, consider using the usual 'href' or 'value' input instead of 'collection'.
         
-        If additional 'collection' capabilities are specified (filter, sortBy, subsetting, scaling, etc.),
+        When more 'collection' capabilities are specified with 
+        additional parameters (filter, sortBy, subsetting, scaling, etc.),
         the scheme must be 'http(s)' since an OGC API or STAC API data access mechanism is expected
         to perform the requested operations. The appropriate API to employ should be indicated by 'format'
-        along the 'collection'.
+        to ensure appropriate interpretation of the 'collection' reference.
+        
+        Supported additional parameters depend on each API implementation.
+        Not all parameters are listed in this definition. Refer to respective APIs
+        for supported parameters and their expected value formats.
     """)
     collection = ExecuteReferenceURL(description="Endpoint of the collection reference.")
     format = ExecuteCollectionFormatEnum(

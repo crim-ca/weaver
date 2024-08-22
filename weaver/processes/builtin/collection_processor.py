@@ -3,12 +3,19 @@
 Retrieves relevant data or files resolved from a collection reference using its metadata, queries and desired outputs.
 """
 import argparse
+import inspect
+import io
 import json
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from typing import TYPE_CHECKING, cast
+
+from pystac_client import ItemSearch
+from pystac_client.stac_api_io import StacApiIO
+from owslib.ogcapi.coverages import Coverages
+from owslib.ogcapi.features import Features
+from owslib.ogcapi.maps import Maps
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -18,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
 from weaver.execute import ExecuteCollectionFormat  # isort:skip # noqa: E402
-from weaver.formats import ContentType, find_supported_media_types  # isort:skip # noqa: E402
+from weaver.formats import ContentType, get_extension, find_supported_media_types  # isort:skip # noqa: E402
 from weaver.processes.builtin.utils import (  # isort:skip # noqa: E402
     get_package_details,
     is_geojson_url,
@@ -30,7 +37,7 @@ from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E
 if TYPE_CHECKING:
     from pystac import Asset
 
-    from weaver.typedefs import JobValueCollection, ProcessInputOutputItem
+    from weaver.typedefs import JSON, JobValueCollection, ProcessInputOutputItem
 
 PACKAGE_NAME, PACKAGE_BASE, PACKAGE_MODULE = get_package_details(__file__)
 
@@ -93,6 +100,16 @@ def process(collection_input, input_definition, output_dir):
     if col_media_type and not isinstance(col_media_type, list):
         col_media_type = [col_media_type]
 
+    api_url, col_id = col_ref.rsplit("/collections/", 1)
+
+    # convert all parameters to their corresponding name of the query utility
+    # all OWSLib utilities use (**kwargs) allowing additional parameters that will be ignored
+    # others must parse/exclude unknown parameters to avoid errors
+    for arg in list(col_args):
+        if "-" in arg:
+            col_args[arg.replace("-", "_")] = col_args.pop(arg)
+    col_args.setdefault("timeout", 10)
+
     resolved_files = []
     if col_fmt == ExecuteCollectionFormat.GEOJSON:
         col_resp = request_extra(
@@ -114,12 +131,16 @@ def process(collection_input, input_definition, output_dir):
             resolved_files.append(f"file://{path}")
 
     elif col_fmt == ExecuteCollectionFormat.STAC:
-        import pystac_client
+        known_params = set(inspect.signature(ItemSearch).parameters)
+        known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "modifier"}
+        for param in set(col_args) - known_params:
+            col_args.pop(param)
 
-        api_url, col_id = col_ref.rsplit("/collections/", 1)
-        search = pystac_client.ItemSearch(
+        timeout = col_args.pop("timeout", 10)
+        search = ItemSearch(
             url=api_url,
             method="POST",
+            stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add auth via 'headers'?
             collections=col_id,
             **col_args
         )
@@ -128,28 +149,58 @@ def process(collection_input, input_definition, output_dir):
                 for _, asset in item.get_assets(media_type=ctype):  # type: (..., Asset)
                     resolved_files.append(asset.href)
 
-    elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
-        # FIXME: implement
-        import owslib.ogcapi.coverages
-
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
-        # FIXME: implement
-        import owslib.ogcapi.features
-        col_url = urljoin(col_ref, "/items")  # STAC / OGC API Features
+        if str(col_args.get("filter_lang")) == "cql2-json":
+            col_args["cql"] = col_args["filter"]
+        search = Features(
+            url=api_url,
+            # FIXME: add 'auth' or 'headers'?
+        )
+        for i, feat in enumerate(search.collection_items(col_id, **col_args)):
+            # NOTE:
+            #   since STAC is technically OGC API - Features compliant, both can be used interchangeably
+            #   if media-types are non-GeoJSON and happen to contain STAC Assets, handle it as STAC transparently
+            if "assets" in feat and col_media_type != [ContentType.APP_GEOJSON]:
+                for name, asset in feat["assets"].items():  # type: (str, JSON)
+                    if asset["type"] in col_media_type:
+                        resolved_files.append(asset["href"])
+            else:
+                path = os.path.join(output_dir, f"feature-{i}.geojson")
+                with open(path, mode="w", encoding="utf-8") as file:
+                    json.dump(feat, file)
+                resolved_files.append(f"file://{path}")
 
-    elif col_fmt == ExecuteCollectionFormat.OGC_MAP:
-        # FIXME: implement
-        import owslib.ogcapi.maps
+    elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
+        cov = Coverages(
+            url=api_url,
+            # FIXME: add 'auth' or 'headers'?
+        )
+        ctype = col_media_type or [ContentType.IMAGE_GEOTIFF]
+        ext = get_extension(ctype[0], dot=False)
+        path = os.path.join(output_dir, f"map.{ext}")
+        with open(path, mode="wb") as file:
+            data = cast(io.BytesIO, cov.coverage(col_id)).getbuffer()
+            file.write(data)  # type: ignore
+        resolved_files.append(path)
 
-    # FIXME: handle responses according to formats/schema
-    for feat in col_resp.json["features"]:
-        if "assets" in feat:
-            for name, asset in feat["assets"].items():
-                if asset["href"] == c_type:
-                    resolved_files.append(asset)
+    elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
+        maps = Maps(
+            url=api_url,
+            # FIXME: add 'auth' or 'headers'?
+        )
+        ctype = col_media_type or [ContentType.IMAGE_GEOTIFF]
+        ext = get_extension(ctype[0], dot=False)
+        path = os.path.join(output_dir, f"map.{ext}")
+        with open(path, mode="wb") as file:
+            data = cast(io.BytesIO, maps.map(col_id)).getbuffer()
+            file.write(data)  # type: ignore
+        resolved_files.append(path)
 
+    outputs = {
+        "outputs": [{"class": "File", "location": path} for path in resolved_files],
+    }
     with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
-        return json.dump(resolved_files, file)
+        return json.dump(outputs, file)
 
 
 def main(*args):

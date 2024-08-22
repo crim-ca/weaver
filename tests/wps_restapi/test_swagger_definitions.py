@@ -1,3 +1,4 @@
+import copy
 import glob
 import os
 import uuid
@@ -245,8 +246,22 @@ def test_collection_input_parsing(input_data):
     """
     Validate that the schema definition for a ``collection`` input resolves as expected.
     """
+    expect = copy.deepcopy(input_data)
+    if "filter" in expect:
+        expect.setdefault("filter-crs", "EPSG:4326")
     result = sd.ExecuteCollectionInput().deserialize(input_data)
-    assert result == input_data
+    result.pop("format", None)
+    assert result == expect
+
+
+def test_collection_input_filter_lang_case_insensitive():
+    col = {
+        "collection": "https://example.com/collections/test",
+        "filter": {"op": "gt", "args": [{"property": "eo:cloud_cover"}, 0.1]},
+        "filter-lang": "CQL2-JSON",  # case-insensitive
+    }
+    result = sd.ExecuteCollectionInput().deserialize(col)
+    assert result["filter-lang"] == "cql2-json"
 
 
 @pytest.mark.parametrize(
