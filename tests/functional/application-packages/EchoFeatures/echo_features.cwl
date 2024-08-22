@@ -8,12 +8,16 @@ requirements:
 inputs:
   features:
     type:
-      - type: File
-        format: "oap:geojson-feature-collection"
+      - "File"
       - type: array
-        items:
-          type: File
-          format: "oap:geojson-feature"
+        items: File
+    format: |
+      ${
+        if (Array.isArray(inputs.features)) {
+          return "iana:application/geo+json";
+        }
+        return "http://www.opengis.net/def/glossary/term/FeatureCollection";
+      }
     inputBinding:
       valueFrom: |
         ${
@@ -29,10 +33,9 @@ inputs:
 outputs:
   features:
     type: File
-    format: "oap:geojson-feature-collection"
+    format: "http://www.opengis.net/def/glossary/term/FeatureCollection"
     outputBinding:
       glob: "features.json"
 stdout: "features.json"
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
-  oap: "http://www.opengis.net/def/format/ogcapi-processes/0/"

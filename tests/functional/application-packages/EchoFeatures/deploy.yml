@@ -4,28 +4,34 @@ processDescription:
     id: EchoFeatures
     title: Test Echo Features
     version: "1.0"  # must be string, avoid interpretation as float
-    description: Dummy process that simply echo's back the input bbox for testing purposes.
+    description: Dummy process that simply echo's back the input features for testing purposes.
     keywords:
       - test
     inputs:
       features:
         description: "Collection of features, either provided directly as FeatureCollection or an array of geometries."
         schema:
-          - oneOf:
-              - allOf:
-                  - format: geojson-feature-collection
-                  - $ref: "https://geojson.org/schema/FeatureCollection.json"
-              - type: array
-                items:
-                  allOf:
-                    - format: geojson-geometry
-                    - $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+          oneOf:
+            - allOf:
+                - type: string
+                  format: geojson-feature-collection
+                  contentMediaType: application/geo+json
+                - $ref: "https://geojson.org/schema/FeatureCollection.json"
+            - type: array
+              items:
+                allOf:
+                  - type: string
+                    format: geojson-geometry
+                    contentMediaType: application/geo+json
+                  - $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
     outputs:
       features:
         schema:
-          - allOf:
-              - format: geojson-feature-collection
-              - $ref: "https://geojson.org/schema/FeatureCollection.json"
+          allOf:
+            - type: string
+              format: geojson-feature-collection
+              contentMediaType: application/geo+json
+            - $ref: "https://geojson.org/schema/FeatureCollection.json"
   jobControlOptions:
     - async-execute
     - sync-execute
@@ -33,5 +39,5 @@ processDescription:
     - reference
 executionUnit:
   # note: This does not work by itself! The test suite injects the file dynamically.
-  - href: "tests/functional/application-packages/EchoBoundingBox/echo_bbox.cwl"
+  - href: "tests/functional/application-packages/EchoFeatures/echo_features.cwl"
 deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

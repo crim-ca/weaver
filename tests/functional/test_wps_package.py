@@ -43,7 +43,7 @@ from tests.utils import (
     mocked_wps_output,
     setup_aws_s3_bucket
 )
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteCollectionFormat, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -2267,14 +2267,17 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         )
 
     def test_execute_job_with_collection_input(self):
-        proc = "EchoFeatures"
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         with contextlib.ExitStack() as stack:
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
             tmp_feature_collection_geojson = stack.enter_context(
                 tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732
             )
-            exec_body_val = self.retrieve_payload(proc, "execute", local=True)
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
             json.dump(
                 exec_body_val["inputs"]["features"]["value"],
                 tmp_feature_collection_geojson,
@@ -2288,6 +2291,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 "inputs": {
                     "features": {
                         "collection": "https://mocked-file-server.com/collections/test",
+                        "format": ExecuteCollectionFormat.GEOJSON,
+                        "type": ContentType.APP_GEOJSON,
                         "filter-lang": "cql2-text",
                         "filter": "properties.name = test"
                     }
@@ -2296,7 +2301,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            proc_url = f"/processes/{proc}/jobs"
+            proc_url = f"/processes/{proc}/execution"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body_col, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"

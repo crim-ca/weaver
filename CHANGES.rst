@@ -16,7 +16,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CWL` I/O with ``format`` defined as a `JavaScript Expression` to be incorrectly parsed by the convertion
+  operations to extract applicable media-types. These cases will be ignored, since media-types cannot be inferred
+  from them. The `WPS` or `OAS` I/O definitions should instead provide the applicable media-types
+  (relates to `common-workflow-language/cwl-v1.3#52 <https://github.com/common-workflow-language/cwl-v1.3/issues/52>`_).
 
 .. _changes_5.7.0:
 

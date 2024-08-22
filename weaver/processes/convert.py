@@ -1726,13 +1726,22 @@ def cwl2wps_io(io_info, io_select):
             "title": io_info.get("label", io_def.name),
             "abstract": io_info.get("doc", ""),
         }
-        # format can represent either a Media-Type or a schema reference
+        # format can represent either a Media-Type, a schema reference, or a CWL expression
         # - format as Media-Type is useful for WPS Complex
         # - format as schema is useful for WPS BoundingBox JSON/YAML structure
+        # - format as CWL expression is ignored since it cannot be easily interpreted
+        io_formats = []
         if "format" in io_info:
             io_fmt = io_info["format"]
             io_formats = [io_fmt] if isinstance(io_fmt, str) else io_fmt
-            io_formats = [get_format(fmt) for fmt in io_formats]
+            io_formats = [
+                get_format(fmt) for fmt in io_formats
+                if (
+                    fmt and isinstance(fmt, str)
+                    and not any(fmt.strip().startswith(fmt_s) for fmt_s in ["$", "{", "("])
+                    and not any(fmt.strip().endswith(fmt_e) for fmt_e in ["}", ")"])
+                )
+            ]
             for i, io_format in enumerate(list(io_formats)):
                 # when CWL namespaced format are not resolved, full path URI to schema is expected
                 # because of full URI, should have lots of '/' (including protocol separator),
@@ -1740,8 +1749,11 @@ def cwl2wps_io(io_info, io_select):
                 if io_format and len(io_format.mime_type.split("/")) > 2:
                     io_ext = os.path.splitext(io_format.mime_type)[-1]
                     io_typ = get_content_type(io_ext)
+                    if not io_typ:  # could not resolve (eg: schema reference or unknown type)
+                        continue
                     io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
                     io_formats[i] = io_format
+        if io_formats:
             kw["supported_formats"] = io_formats
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
