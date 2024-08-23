@@ -11,10 +11,14 @@ inputs:
       - "File"
       - type: array
         items: File
+    # warning:
+    #   When using an expression for 'format', the full URI must be specified.
+    #   Using 'iana:application/geo+json' results in an error by cwltool
+    #   (see https://github.com/common-workflow-language/cwltool/issues/2033).
     format: |
       ${
         if (Array.isArray(inputs.features)) {
-          return "iana:application/geo+json";
+          return "https://www.iana.org/assignments/media-types/application/geo+json";
         }
         return "http://www.opengis.net/def/glossary/term/FeatureCollection";
       }
