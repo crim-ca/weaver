@@ -276,7 +276,9 @@ def execute_process(task, job_id, wps_url, headers=None):
         job.save_log(errors=errors, logger=task_logger)
         job = store.update_job(job)
     finally:
-        # note:
+        # WARNING: important to clean before re-fetching, otherwise we loose internal references needing cleanup
+        job.cleanup()
+        # NOTE:
         #   don't update the progress and status here except for 'success' to preserve last error that was set
         #   it is more relevant to return the latest step that worked properly to understand where it failed
         job = store.fetch_by_id(job.id)
@@ -285,7 +287,6 @@ def execute_process(task, job_id, wps_url, headers=None):
             job.status = Status.DISMISSED
         task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
         collect_statistics(task_process, settings, job, rss_start)
-        job.cleanup()
         if task_success:
             job.progress = JobProgress.EXECUTE_MONITOR_END
         job.status_message = f"Job {job.status}."
@@ -422,6 +423,8 @@ def parse_wps_input_complex(input_value, input_info):
     schema_vars = ["reference", "$schema"]
     input_field = get_any_value(input_info, key=True)
     if isinstance(input_value, dict):
+        if input_field is None:
+            input_field = get_any_value(input_value, key=True)
         ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
         if not ctype:
             ctype, c_enc = parse_wps_input_format(input_value)
@@ -527,22 +530,34 @@ def parse_wps_inputs(wps_process, job):
                 input_values = [input_val]
                 input_details = [job_input]  # metadata directly in definition, not nested per array value
 
+            # Pre-check collection for resolution of the referenced data.
+            # Because each collection input can result in either '1->1' or '1->N' file reference(s) mapping,
+            # resolution must be performed before iterating through input value/definitions to parse them.
+            # Whether sink input receiving this data can map to 1 or N is up to be validated by the execution later.
+            resolved_inputs = []
             for input_value, input_info in zip(input_values, input_details):
+                if isinstance(input_info, dict):
+                    input_info["id"] = input_id
+                if isinstance(input_value, dict) and "collection" in input_value:
+                    col_path = os.path.join(job.tmpdir, "inputs", input_id)
+                    col_files = process_collection(input_value, input_info, col_path, logger=job)
+                    resolved_inputs.extend([
+                        (
+                            {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])},
+                            input_info
+                        )
+                        for col_file in col_files
+                    ])
+                else:
+                    resolved_inputs.append((input_value, input_info))
+
+            for input_value, input_info in resolved_inputs:
                 # if already resolved, skip parsing
                 # it is important to omit explicitly provided 'null', otherwise the WPS object could be misleading
                 # for example, a 'ComplexData' with 'null' data will be auto-generated as text/plan with "null" string
                 if input_value is None:
                     input_data = None
                 else:
-                    # pre-check collection for resolution of the referenced data
-                    if isinstance(input_value, dict) and "collection" in input_value:
-                        col_path = os.path.join(job.tmpdir, "inputs", input_id)
-                        col_out = process_collection(input_value, input_info, col_path, logger=job)
-                        input_value = [
-                            {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])}
-                            for col_file in col_out["outputs"]
-                        ]
-
                     # resolve according to relevant data type parsing
                     # value could be an embedded or remote definition
                     if input_id in complex_inputs:

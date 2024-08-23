@@ -2266,32 +2266,79 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
         )
 
-    def test_execute_job_with_collection_input(self):
+    def test_execute_job_with_collection_input_geojson_feature_collection(self):
         name = "EchoFeatures"
         body = self.retrieve_payload(name, "deploy", local=True)
         proc = self.fully_qualified_test_process_name(self._testMethodName)
         self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
-            tmp_feature_collection_geojson = stack.enter_context(
-                tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732
-            )
-            exec_body_val = self.retrieve_payload(name, "execute", local=True)
-            json.dump(
-                exec_body_val["inputs"]["features"]["value"],
-                tmp_feature_collection_geojson,
-            )
-            tmp_feature_collection_geojson.flush()
-            tmp_feature_collection_geojson.seek(0)
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
 
-            exec_body_col = {
+            col_file = os.path.join(tmp_dir, "test.geojson")
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            with open(col_file, mode="w", encoding="utf-8") as tmp_feature_collection_geojson:
+                json.dump(
+                    exec_body_val["inputs"]["features"]["value"],
+                    tmp_feature_collection_geojson,
+                )
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "features": {
+                        # accessed directly as a static GeoJSON FeatureCollection
+                        "collection": "https://mocked-file-server.com/test.geojson",
+                        "format": ExecuteCollectionFormat.GEOJSON,
+                        "type": ContentType.APP_GEOJSON,
+                    },
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "outputs" in results
+
+        raise NotImplementedError  # FIXME: implement! (see above bbox case for inspiration)
+
+    def test_execute_job_with_collection_input_ogc_features(self):
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+
+            col_dir = os.path.join(tmp_dir, "collections/test")
+            col_file = os.path.join(col_dir, "items")
+            os.makedirs(col_dir)
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            with open(col_file, mode="w", encoding="utf-8") as tmp_feature_collection_geojson:
+                json.dump(
+                    exec_body_val["inputs"]["features"]["value"],
+                    tmp_feature_collection_geojson,
+                )
+
+            col_exec_body = {
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
                 "inputs": {
                     "features": {
                         "collection": "https://mocked-file-server.com/collections/test",
-                        "format": ExecuteCollectionFormat.GEOJSON,
+                        "format": ExecuteCollectionFormat.OGC_FEATURES,
                         "type": ContentType.APP_GEOJSON,
                         "filter-lang": "cql2-text",
                         "filter": "properties.name = test"
@@ -2303,7 +2350,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 stack.enter_context(mock_exec)
             proc_url = f"/processes/{proc}/execution"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
-                                       data=exec_body_col, headers=self.json_headers, only_local=True)
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
             status_url = resp.json["location"]

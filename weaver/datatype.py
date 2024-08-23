@@ -637,9 +637,18 @@ class Job(Base, LoggerHandler):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
         self["__tmpdir"] = None
 
+    def update_from(self, job):
+        # type: (Job) -> None
+        """
+        Forwards any internal or control properties from the specified :class:`Job` to this one.
+        """
+        self["__tmpdir"] = job.get("__tmpdir")
+
     def cleanup(self):
-        if self["__tmpdir"] and os.path.isdir(self["__tmpdir"]):
-            shutil.rmtree(self["__tmpdir"], ignore_errors=True)
+        # type: () -> None
+        _tmpdir = self.get("__tmpdir")
+        if isinstance(_tmpdir, str) and os.path.isdir(_tmpdir):
+            shutil.rmtree(_tmpdir, ignore_errors=True)
 
     @property
     def tmpdir(self):

@@ -25,7 +25,6 @@ inputs:
             return {
               "type": "FeatureCollection",
               "features": inputs.features.every(item => item.contents)
-              )
             };
           }
           return inputs.features.contents;

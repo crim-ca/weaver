@@ -40,9 +40,12 @@ from weaver.utils import Lazify, get_any_id, load_file, repr_json, request_extra
 from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
+    from typing import List
+
     from pystac import Asset
 
     from weaver.typedefs import (
+        CWL_IO_FileValue,
         CWL_IO_ValueMap,
         JSON,
         JobValueCollection,
@@ -67,7 +70,7 @@ OUTPUT_CWL_JSON = "cwl.output.json"
 
 
 def process_collection(collection_input, input_definition, output_dir, logger=LOGGER):
-    # type: (JobValueCollection, ProcessInputOutputItem, Path, LoggerHandler) -> CWL_IO_ValueMap
+    # type: (JobValueCollection, ProcessInputOutputItem, Path, LoggerHandler) -> List[CWL_IO_FileValue]
     """
     Processor of a :term:`Collection`.
 
@@ -86,12 +89,14 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     input_id = get_any_id(input_definition)
     logger.log(
         logging.INFO,
-        "Process [{}] Got arguments: collection_input=[{}] output_dir=[{}], for input=[{}]",
+        "Process [{}] Got arguments: collection_input={} output_dir=[{}], for input=[{}]",
         PACKAGE_NAME,
         Lazify(lambda: repr_json(collection_input, indent=2)),
         output_dir,
         input_id,
     )
+    os.makedirs(output_dir, exist_ok=True)
+
     col_input = sd.ExecuteCollectionInput().deserialize(collection_input)  # type: JobValueCollection
     col_args = dict(col_input)
     col_href = col_href_valid = col_args.pop("collection")
@@ -116,7 +121,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     if col_media_type and not isinstance(col_media_type, list):
         col_media_type = [col_media_type]
 
-    api_url, col_id = col_href.rsplit("/collections/", 1)
+    col_parts = col_href.rsplit("/collections/", 1)
+    api_url, col_id = col_parts if len(col_parts) == 2 else (None, col_parts[0])
 
     # convert all parameters to their corresponding name of the query utility
     # all OWSLib utilities use (**kwargs) allowing additional parameters that will be ignored
@@ -129,24 +135,26 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     logger.log(logging.INFO, "Attempting resolution of collection [{}] as format [{}]", col_href, col_fmt)
     resolved_files = []
     if col_fmt == ExecuteCollectionFormat.GEOJSON:
+        # static GeoJSON FeatureCollection document
         col_resp = request_extra(
             "GET",
             col_href,
             queries=col_args,
             headers={"Accept": f"{ContentType.APP_GEOJSON},{ContentType.APP_JSON}"},
-            timeout=10,
+            timeout=col_args["timeout"],
             retries=3,
             only_server_errors=False,
         )
-        if not (col_resp.status_code == 200 and "features" in col_resp.json):
+        col_json = col_resp.json()
+        if not (col_resp.status_code == 200 and "features" in col_json):
             raise ValueError(f"Could not parse [{col_href}] as a GeoJSON FeatureCollection.")
 
-        for i, feat in enumerate(col_resp.json["features"]):
+        for i, feat in enumerate(col_json["features"]):
             path = os.path.join(output_dir, f"feature-{i}.geojson")
             with open(path, mode="w", encoding="utf-8") as file:
                 json.dump(feat, file)
-            file_typ = get_cwl_file_format(ContentType.APP_GEOJSON)
-            file_obj = {"class": "File", "path": f"file://{path}", "format": file_typ}
+            _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+            file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
             resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.STAC:
@@ -166,8 +174,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         for item in search.items():
             for ctype in col_media_type:
                 for _, asset in item.get_assets(media_type=ctype):  # type: (..., Asset)
-                    file_typ = get_cwl_file_format(ctype)
-                    file_obj = {"class": "File", "path": asset.href, "format": file_typ}
+                    _, file_fmt = get_cwl_file_format(ctype)
+                    file_obj = {"class": "File", "path": asset.href, "format": file_fmt}
                     resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
@@ -184,15 +192,15 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             if "assets" in feat and col_media_type != [ContentType.APP_GEOJSON]:
                 for name, asset in feat["assets"].items():  # type: (str, JSON)
                     if asset["type"] in col_media_type:
-                        file_typ = get_cwl_file_format(asset["type"])
-                        file_obj = {"class": "File", "path": asset["href"], "format": file_typ}
+                        _, file_fmt = get_cwl_file_format(asset["type"])
+                        file_obj = {"class": "File", "path": asset["href"], "format": file_fmt}
                         resolved_files.append(file_obj)
             else:
                 path = os.path.join(output_dir, f"feature-{i}.geojson")
                 with open(path, mode="w", encoding="utf-8") as file:
                     json.dump(feat, file)
-                file_typ = get_cwl_file_format(ContentType.APP_GEOJSON)
-                file_obj = {"class": "File", "path": f"file://{path}", "format": file_typ}
+                _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+                file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
                 resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
@@ -206,8 +214,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         with open(path, mode="wb") as file:
             data = cast(io.BytesIO, cov.coverage(col_id)).getbuffer()
             file.write(data)  # type: ignore
-        file_typ = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_typ}
+        _, file_fmt = get_cwl_file_format(ctype)
+        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
 
     elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
@@ -221,8 +229,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         with open(path, mode="wb") as file:
             data = cast(io.BytesIO, maps.map(col_id)).getbuffer()
             file.write(data)  # type: ignore
-        file_typ = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_typ}
+        _, file_fmt = get_cwl_file_format(ctype)
+        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
 
     else:
@@ -231,14 +239,20 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     if not resolved_files:
         raise ValueError(f"Could not extract any data or reference from input collection [{col_href}].")
 
-    outputs = {"outputs": resolved_files}  # 'outputs' must match ID used in CWL definition
-    logger.log(logging.INFO, "Resolved collection [{}] returned {} references.", col_href, len(resolved_files))
+    logger.log(logging.INFO, "Resolved collection [{}] returned {} reference(s).", col_href, len(resolved_files))
     logger.log(
         logging.DEBUG,
-        "Resolved collection [{}] files:\n",
+        "Resolved collection [{}] files:\n{}",
         col_href,
         Lazify(lambda: repr_json(resolved_files, indent=2)),
     )
+    return resolved_files
+
+
+def process_cwl(collection_input, input_definition, output_dir):
+    # type: (JobValueCollection, ProcessInputOutputItem, Path) -> CWL_IO_ValueMap
+    files = process_collection(collection_input, input_definition, output_dir)
+    outputs = {"outputs": files}  # 'outputs' must match ID used in CWL definition
     with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
         json.dump(outputs, file)
     return outputs
@@ -271,7 +285,7 @@ def main(*args):
     col_in = load_file(ns.c)
     LOGGER.info("Process [%s] Loading process input definition '%s'.", PACKAGE_NAME, ns.p)
     proc_in = load_file(ns.p)
-    sys.exit(process_collection(col_in, proc_in, ns.o) is not None)
+    sys.exit(process_cwl(col_in, proc_in, ns.o) is not None)
 
 
 if __name__ == "__main__":

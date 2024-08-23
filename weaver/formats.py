@@ -747,6 +747,24 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
+@overload
+def get_cwl_file_format(media_type):
+    # type: (str) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False):
+    # type: (str, Literal[True]) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False):
+    # type: (str, Literal[False]) -> Optional[str]
+    ...
+
+
 @functools.cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
