@@ -89,6 +89,7 @@ pyramid_celery @ git+https://github.com/crim-ca/pyramid_celery.git@5.0.0a
 pyramid_mako
 pyramid_rewrite
 pyramid_storage
+pystac
 pystac_client
 python-box
 python-dateutil

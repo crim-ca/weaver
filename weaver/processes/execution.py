@@ -16,10 +16,11 @@ from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, repr_json
+from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
+from weaver.processes.builtin.collection_processor import process_collection
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -284,6 +285,7 @@ def execute_process(task, job_id, wps_url, headers=None):
             job.status = Status.DISMISSED
         task_success = map_status(job.status) not in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]
         collect_statistics(task_process, settings, job, rss_start)
+        job.cleanup()
         if task_success:
             job.progress = JobProgress.EXECUTE_MONITOR_END
         job.status_message = f"Job {job.status}."
@@ -485,7 +487,11 @@ def parse_wps_input_literal(input_value):
 def parse_wps_inputs(wps_process, job):
     # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
     """
-    Parses expected WPS process inputs against submitted job input values considering supported process definitions.
+    Parses expected :term:`WPS` process inputs against submitted job input values considering supported definitions.
+
+    According to the structure of the job inputs, and notably their key arguments, perform the relevant parsing and
+    data retrieval to prepare inputs in a native format that can be understood and employed by a :term:`WPS` worker
+    (i.e.: :class:`weaver.wps.service.WorkerService` and its underlying :mod:`pywps` implementation).
     """
     complex_inputs = {}  # type: Dict[str, ComplexInput]
     bbox_inputs = {}  # type: Dict[str, BoundingBoxInput]
@@ -528,6 +534,15 @@ def parse_wps_inputs(wps_process, job):
                 if input_value is None:
                     input_data = None
                 else:
+                    # pre-check collection for resolution of the referenced data
+                    if isinstance(input_value, dict) and "collection" in input_value:
+                        col_path = os.path.join(job.tmpdir, "inputs", input_id)
+                        col_out = process_collection(input_value, input_info, col_path, logger=job)
+                        input_value = [
+                            {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])}
+                            for col_file in col_out["outputs"]
+                        ]
+
                     # resolve according to relevant data type parsing
                     # value could be an embedded or remote definition
                     if input_id in complex_inputs:
@@ -536,6 +551,7 @@ def parse_wps_inputs(wps_process, job):
                         input_data = parse_wps_input_bbox(input_value, input_info)
                     else:
                         input_data = parse_wps_input_literal(input_value)
+
                 # re-validate the resolved data as applicable
                 if input_data is None:
                     job.save_log(

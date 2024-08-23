@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
-    Path = Union[os.PathLike, str, bytes]
+    Path = Union[os.PathLike[str], str, bytes]
 
     Default = TypeVar("Default")  # used for return value that is employed from a provided default value
     Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'

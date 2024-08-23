@@ -20,7 +20,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -198,6 +198,17 @@ if TYPE_CHECKING:
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+class LoggerHandler(Protocol):
+    """
+    Minimalistic logger interface (typically :class:`logging.Logger`) intended to be used only with ``log`` method.
+    """
+
+    def log(self, level, message, *args, **kwargs):
+        # type: (int, str, *Any, **Any) -> None
+        ...
+
 
 SUPPORTED_FILE_SCHEMES = frozenset([
     "file",
