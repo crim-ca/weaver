@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from pyramid.config import Configurator
 
-    from weaver.typedefs import AnyResponseType, JSON, PyramidRequest
+    from weaver.typedefs import AnyResponseType, AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
 
@@ -92,7 +92,7 @@ LOGGER = get_task_logger(__name__)
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_queried_jobs(request):
-    # type: (PyramidRequest) -> HTTPOk
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve the list of jobs which can be filtered, sorted, paged and categorized using query parameters.
     """

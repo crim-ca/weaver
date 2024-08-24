@@ -36,9 +36,10 @@ inputs:
 outputs:
   features:
     type: File
-    format: "http://www.opengis.net/def/glossary/term/FeatureCollection"
+    format: "ogc-term:FeatureCollection"
     outputBinding:
       glob: "features.json"
 stdout: "features.json"
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
+  ogc-term: "http://www.opengis.net/def/glossary/term/"
