@@ -12,7 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
+  (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
+- Update ``cwltool`` with fork
+  `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
+  until ``loadContents`` behavior is resolved for ``type: File[]``
+  (relates to `common-workflow-language/cwltool#2036 <https://github.com/common-workflow-language/cwltool/pull/2036>`_).
 
 Fixes:
 ------

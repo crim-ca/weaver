@@ -35,7 +35,8 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-cwltool==3.1.20230906142556
+##cwltool==3.1.20230906142556
+cwltool @ git+https://github.com/fmigneault/cwltool.git@fix-load-contents-array
 docker>=7.1
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
@@ -58,7 +59,7 @@ lxml
 mako
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
-mistune>=2.0.3,<2.1
+#mistune>=2.0.3,<2.1
 mypy_boto3_s3
 numpy>=1.22.2,<2; python_version < "3.10"
 numpy>=1.22.2; python_version >= "3.10"

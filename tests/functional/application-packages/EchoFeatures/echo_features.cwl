@@ -22,14 +22,15 @@ inputs:
         }
         return "http://www.opengis.net/def/glossary/term/FeatureCollection";
       }
+    loadContents: true
     inputBinding:
       valueFrom: |
         ${
           if (Array.isArray(inputs.features)) {
-            return {
+            return JSON.stringify({
               "type": "FeatureCollection",
-              "features": inputs.features.every(item => item.contents)
-            };
+              "features": inputs.features.map(item => JSON.parse(item.contents))
+            });
           }
           return inputs.features.contents;
         }
@@ -38,8 +39,8 @@ outputs:
     type: File
     format: "ogc-term:FeatureCollection"
     outputBinding:
-      glob: "features.json"
-stdout: "features.json"
+      glob: "features.geojson"
+stdout: "features.geojson"
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
   ogc-term: "http://www.opengis.net/def/glossary/term/"

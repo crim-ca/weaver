@@ -2277,13 +2277,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
             stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
 
-            col_file = os.path.join(tmp_dir, "test.geojson")
             exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            col_file = os.path.join(tmp_dir, "test.json")
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
             with open(col_file, mode="w", encoding="utf-8") as tmp_feature_collection_geojson:
-                json.dump(
-                    exec_body_val["inputs"]["features"]["value"],
-                    tmp_feature_collection_geojson,
-                )
+                json.dump(col_feats, tmp_feature_collection_geojson)
 
             col_exec_body = {
                 "mode": ExecuteMode.ASYNC,
@@ -2291,9 +2289,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 "inputs": {
                     "features": {
                         # accessed directly as a static GeoJSON FeatureCollection
-                        "collection": "https://mocked-file-server.com/test.geojson",
+                        "collection": "https://mocked-file-server.com/test.json",
                         "format": ExecuteCollectionFormat.GEOJSON,
-                        "type": ContentType.APP_GEOJSON,
+                        "schema": "http://www.opengis.net/def/glossary/term/FeatureCollection",
                     },
                 }
             }
@@ -2307,9 +2305,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             results = self.monitor_job(status_url)
-            assert "outputs" in results
+            assert "features" in results
 
-        raise NotImplementedError  # FIXME: implement! (see above bbox case for inspiration)
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+        assert out_data["features"] == col_feats["features"]
 
     def test_execute_job_with_collection_input_ogc_features(self):
         name = "EchoFeatures"
