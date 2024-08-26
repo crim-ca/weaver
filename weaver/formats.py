@@ -669,7 +669,10 @@ def get_format(media_type, default=None):
     if not ctype:
         return None
     ext = get_extension(ctype)
-    fmt = Format(ctype, extension=ext)
+    if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
+        fmt = Format(ContentType.APP_JSON, extension=".json", schema=ctype)
+    else:
+        fmt = Format(ctype, extension=ext)
     return fmt
 
 
@@ -966,14 +969,20 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
         media_type = f"{typ}/{sub}{parts[1]}"
     for v in FORMAT_NAMESPACE_DEFINITIONS.values():
         if v in media_type:
-            media_type = media_type.replace(v, "")
-            break
+            maybe_type = media_type.replace(v, "").strip("/")
+            # ignore if URI was partial prefix match, not sufficiently specific
+            # allow 1 '/' for '<type>/<subtype>', or 0 for an explicit named schema reference
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     for v in FORMAT_NAMESPACE_DEFINITIONS:
         if media_type.startswith(f"{v}:"):
-            media_type = media_type.replace(f"{v}:", "")
-            break
+            maybe_type = media_type.replace(f"{v}:", "")
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     search = True
-    for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
+    for _map in FORMAT_NAMESPACE_MAPPINGS.values():
         if not search:
             break
         for v in _map.values():

@@ -20,6 +20,10 @@ Fixes:
   operations to extract applicable media-types. These cases will be ignored, since media-types cannot be inferred
   from them. The `WPS` or `OAS` I/O definitions should instead provide the applicable media-types
   (relates to `common-workflow-language/cwl-v1.3#52 <https://github.com/common-workflow-language/cwl-v1.3/issues/52>`_).
+- Fix ``format`` parsing when trying to infer media-types from various I/O definition representations using a
+  reference provided as an URI schema from an ontology. Parsing caused the URI to be split, causing an invalid
+  resolution. If no appropriate media-type is provided, JSON will be used by default, while preserving the submitted
+  schema URI.
 
 .. _changes_5.7.0:
 

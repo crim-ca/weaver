@@ -156,6 +156,21 @@ def test_get_format_media_type_no_extension(test_extension):
     fmt = f.get_format(test_extension)
     assert fmt == Format(test_extension, extension=None)
     assert fmt.extension == ""
+    assert fmt.schema == ""
+
+
+@pytest.mark.parametrize(
+    "test_format",
+    [
+        "http://www.opengis.net/def/glossary/term/FeatureCollection",
+        "https://geojson.org/schema/FeatureCollection.json",
+    ]
+)
+def test_get_format_media_type_no_extension_with_schema(test_format):
+    fmt = f.get_format(test_format)
+    assert fmt.extension == ".json"
+    assert fmt.mime_type == f.ContentType.APP_JSON
+    assert fmt.schema == test_format
 
 
 @pytest.mark.parametrize(
