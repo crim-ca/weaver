@@ -2325,17 +2325,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
-            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
-
-            col_dir = os.path.join(tmp_dir, "collections/test")
-            col_file = os.path.join(col_dir, "items")
-            os.makedirs(col_dir)
+            tmp_svr = stack.enter_context(
+                mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True)
+            )
             exec_body_val = self.retrieve_payload(name, "execute", local=True)
-            with open(col_file, mode="w", encoding="utf-8") as tmp_feature_collection_geojson:
-                json.dump(
-                    exec_body_val["inputs"]["features"]["value"],
-                    tmp_feature_collection_geojson,
-                )
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+            tmp_svr.add("GET", "/collections/test/items", json=col_feats)
 
             col_exec_body = {
                 "mode": ExecuteMode.ASYNC,
@@ -2345,8 +2340,8 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                         "collection": "https://mocked-file-server.com/collections/test",
                         "format": ExecuteCollectionFormat.OGC_FEATURES,
                         "type": ContentType.APP_GEOJSON,
-                        "filter-lang": "cql2-text",
-                        "filter": "properties.name = test"
+                        "filter-lang": "cql2-json",
+                        "filter": {"op": "=", "args": [{"property": "name"}, "test"]}
                     }
                 }
             }
@@ -2360,8 +2355,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             results = self.monitor_job(status_url)
+            assert "features" in results
 
-        raise NotImplementedError  # FIXME: implement! (see above bbox case for inspiration)
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+        assert out_data["features"] == col_feats["features"]
 
     def test_execute_job_with_context_output_dir(self):
         cwl = {

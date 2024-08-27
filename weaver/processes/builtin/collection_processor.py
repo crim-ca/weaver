@@ -183,7 +183,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             col_args["cql"] = col_args["filter"]
         search = Features(
             url=api_url,
-            # FIXME: add 'auth' or 'headers'?
+            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
         )
         for i, feat in enumerate(search.collection_items(col_id, **col_args)):
             # NOTE:
@@ -206,7 +206,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
         cov = Coverages(
             url=api_url,
-            # FIXME: add 'auth' or 'headers'?
+            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype, dot=False)
@@ -221,7 +221,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
         maps = Maps(
             url=api_url,
-            # FIXME: add 'auth' or 'headers'?
+            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype[0], dot=False)
