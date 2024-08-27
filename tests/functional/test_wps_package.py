@@ -22,6 +22,7 @@ import boto3
 import colander
 import mock
 import pytest
+import responses
 import yaml
 from parameterized import parameterized
 
@@ -2316,7 +2317,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             out_data = json.load(out_fd)
         assert out_data["features"] == col_feats["features"]
 
-    def test_execute_job_with_collection_input_ogc_features(self):
+    @parameterized.expand([
+        # note: the following are not *actually* filtering, but just validating formats are respected across code paths
+        ("POST", "cql2-json", {"op": "=", "args": [{"property": "name"}, "test"]}),
+        ("GET", "cql2-text", "property.name == test"),
+    ])
+    def test_execute_job_with_collection_input_ogc_features(self, filter_method, filter_lang, filter_value):
         name = "EchoFeatures"
         body = self.retrieve_payload(name, "deploy", local=True)
         proc = self.fully_qualified_test_process_name(self._testMethodName)
@@ -2330,18 +2336,26 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             )
             exec_body_val = self.retrieve_payload(name, "execute", local=True)
             col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
-            tmp_svr.add("GET", "/collections/test/items", json=col_feats)
+            if filter_method == "GET":
+                filter_match = responses.matchers.query_param_matcher({
+                    "filter": filter_value,
+                    "filter-lang": filter_lang,
+                    "timeout": "10",  # added internally by collection processor
+                })
+            else:
+                filter_match = responses.matchers.json_params_matcher(filter_value)
+            tmp_svr.add(filter_method, f"{tmp_host}/collections/test/items", json=col_feats, match=[filter_match])
 
             col_exec_body = {
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
                 "inputs": {
                     "features": {
-                        "collection": "https://mocked-file-server.com/collections/test",
+                        "collection": f"{tmp_host}/collections/test",
                         "format": ExecuteCollectionFormat.OGC_FEATURES,
                         "type": ContentType.APP_GEOJSON,
-                        "filter-lang": "cql2-json",
-                        "filter": {"op": "=", "args": [{"property": "name"}, "test"]}
+                        "filter-lang": filter_lang,
+                        "filter": filter_value,
                     }
                 }
             }

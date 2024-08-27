@@ -121,15 +121,12 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     if col_media_type and not isinstance(col_media_type, list):
         col_media_type = [col_media_type]
 
+    # extract collection ID, either directly from URI or supplied by alternate identifier
     col_parts = col_href.rsplit("/collections/", 1)
     api_url, col_id = col_parts if len(col_parts) == 2 else (None, col_parts[0])
+    col_id_alt = get_any_id(col_input, pop=True)
+    col_id = col_id or col_id_alt
 
-    # convert all parameters to their corresponding name of the query utility
-    # all OWSLib utilities use (**kwargs) allowing additional parameters that will be ignored
-    # others must parse/exclude unknown parameters to avoid errors
-    for arg in list(col_args):
-        if "-" in arg:
-            col_args[arg.replace("-", "_")] = col_args.pop(arg)
     col_args.setdefault("timeout", 10)
 
     logger.log(logging.INFO, "Attempting resolution of collection [{}] as format [{}]", col_href, col_fmt)
@@ -158,6 +155,10 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.STAC:
+        # convert all parameters to their corresponding name of the query utility, and ignore unknown ones
+        for arg in list(col_args):
+            if "-" in arg:
+                col_args[arg.replace("-", "_")] = col_args.pop(arg)
         known_params = set(inspect.signature(ItemSearch).parameters)
         known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "modifier"}
         for param in set(col_args) - known_params:
@@ -167,7 +168,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         search = ItemSearch(
             url=api_url,
             method="POST",
-            stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add auth via 'headers'?
+            stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add 'headers' with authorization/cookies?
             collections=col_id,
             **col_args
         )
@@ -179,13 +180,19 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
                     resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
-        if str(col_args.get("filter_lang")) == "cql2-json":
-            col_args["cql"] = col_args["filter"]
+        if str(col_args.get("filter-lang")) == "cql2-json":
+            col_args["cql"] = col_args.pop("filter")
         search = Features(
             url=api_url,
-            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
+            # FIXME: add 'auth' or 'headers' authorization/cookies?
+            headers={"Accept": f"{ContentType.APP_GEOJSON}, {ContentType.APP_VDN_GEOJSON}, {ContentType.APP_JSON}"},
         )
-        for i, feat in enumerate(search.collection_items(col_id, **col_args)):
+        items = search.collection_items(col_id, **col_args)
+        if items.get("type") != "FeatureCollection" or "features" not in items:
+            raise ValueError(
+                f"Collection [{col_href}] using format [{col_fmt}] did not return a GeoJSON FeatureCollection."
+            )
+        for i, feat in enumerate(items["features"]):
             # NOTE:
             #   since STAC is technically OGC API - Features compliant, both can be used interchangeably
             #   if media-types are non-GeoJSON and happen to contain STAC Assets, handle it as STAC transparently
@@ -206,7 +213,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
         cov = Coverages(
             url=api_url,
-            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
+            # FIXME: add 'auth' or 'headers' authorization/cookies?
+            headers={"Accept": ContentType.APP_JSON},
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype, dot=False)
@@ -221,7 +229,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
         maps = Maps(
             url=api_url,
-            headers={"Accept": ContentType.APP_JSON},  # FIXME: add 'auth' or 'headers'?
+            # FIXME: add 'auth' or 'headers' authorization/cookies?
+            headers={"Accept": ContentType.APP_JSON},
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype[0], dot=False)

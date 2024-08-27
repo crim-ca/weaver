@@ -537,6 +537,9 @@ def parse_wps_inputs(wps_process, job):
             resolved_inputs = []
             for input_value, input_info in zip(input_values, input_details):
                 if isinstance(input_info, dict):
+                    # copy to avoid overriding 'input_value' with an ID
+                    # this could refer to the desired collection ID rather than the input ID being mapped
+                    input_info = dict(input_info)  # not 'deepcopy' to avoid 'data' or 'value' copy that could be large
                     input_info["id"] = input_id
                 if isinstance(input_value, dict) and "collection" in input_value:
                     col_path = os.path.join(job.tmpdir, "inputs", input_id)
