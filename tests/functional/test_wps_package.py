@@ -2320,7 +2320,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     @parameterized.expand([
         # note: the following are not *actually* filtering, but just validating formats are respected across code paths
         ("POST", "cql2-json", {"op": "=", "args": [{"property": "name"}, "test"]}),
-        ("GET", "cql2-text", "property.name == test"),
+        ("GET", "cql2-text", "property.name = 'test'"),
     ])
     def test_execute_job_with_collection_input_ogc_features(self, filter_method, filter_lang, filter_value):
         name = "EchoFeatures"
