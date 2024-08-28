@@ -71,6 +71,7 @@
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
+.. |ogc-collection| replace:: Collection Definition
 .. _ogc-collection: https://docs.ogc.org/DRAFTS/20-024.html#collections-introduction
 .. |ogc-api-standards| replace:: *OGC Web API* standards
 .. _ogc-api-standards: https://ogcapi.ogc.org/

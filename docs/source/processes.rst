@@ -1353,7 +1353,7 @@ Collection Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The |ogc-api-proc-part3-collection-input|_ is defined by the |ogc-api-proc-part3|_ extension. This allows to submit a
-:term:`Process Execution <proc_op_exec>` using the following :term:`JSON` structure when the targeted :term:`Process`
+:term:`Process Execution <proc_op_execute>` using the following :term:`JSON` structure when the targeted :term:`Process`
 can make use of the resulting data sources returned by the referred :term:`Collection` and filtering conditions.
 
 .. code-block:: json
@@ -1381,8 +1381,10 @@ can make use of the resulting data sources returned by the referred :term:`Colle
 
 .. note::
     More capabilities beside ``filter``, ``sortBy``, etc. might be supported over time according to requirements
-    established by multiple :term:`OGC` Testbed iterations. The |ogc-api-proc-part3|_ is still under development,
-    and interactions with the various access points of |ogc-api-standards|_ remains to be evaluated.
+    established by multiple :term:`OGC` Testbed iterations. Also, different parameters will be supported depending
+    on which remote :term:`API` gets interrogated to resolve the :term:`Collection` contents. The |ogc-api-proc-part3|_
+    is still under development, and interactions with the various access points of |ogc-api-standards|_ remains to
+    be evaluated in detail to further explore interoperability concerns between all  :term:`API`implementations.
 
 To determine which *items* should be retrieved from the :term:`Collection`, whether they are obtained by
 |ogc-api-coverages|_, |ogc-api-features|_, |ogc-api-maps|_, |ogc-api-tiles|_, |stac-api-spec|_,
@@ -1391,15 +1393,16 @@ depends on the negotiated :term:`Media-Types` required by the corresponding inpu
 in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
 and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
 
-For example, if a :term:`Process` indicated that it expects a ``format: geojson-feature-collection``,
-the referenced ``collection`` would most probably be accessed using |ogc-api-features|_ (i.e.: using
-``GET /collections/dataset-features/items``), to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``.
+For example, if a :term:`Process` indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
+or ``format: geojson-feature-collection``, the referenced ``collection`` would most probably be accessed
+using |ogc-api-features|_ (i.e.: with request ``GET /collections/dataset-features/items``),
+to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``.
 However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
 the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
 
-Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process`` while targeting
+Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process` while targeting
 the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
-potentially be retrieved as input for the :term:`Process Execution <proc_op_exec>`.
+potentially be retrieved as input for the :term:`Process Execution <proc_op_execute>`.
 
 In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
 the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
@@ -1413,13 +1416,37 @@ data cardinality and :term:`API` protocols simultaneously can make its behavior 
     This function will be used under-the-hood whenever a |ogc-api-proc-part3-collection-input|_ is specified.
 
     Since the :term:`Builtin Process` only performs the resolution of the ``collection`` into the corresponding
-    data sources for the target :term:`Process`, using it can potentially help identify and avoid unintended
-    large processing, or validate that the defined ``filter`` produces the appropriate data retrieval for the
+    data sources for the target :term:`Process`, without actually downloading the resolved :term:`URL` references,
+    using it can potentially help identify and avoid unintended large processing, or allow users to validate that
+    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval for the
     desired execution purpose.
 
 .. note::
     Do not hesitate to |submit-issue|_ if the |ogc-api-proc-part3-collection-input|_ resolution does not seem
     to behave according to your specific use cases.
+
+In cases where the resolution does not automatically resolve with the intended behavior,
+submitted |ogc-api-proc-part3-collection-input|_ can include the following additional parameters.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,40,40
+
+    * - Parameter
+      - Description
+    * - ``type``
+      - The desired :term:`Media-Type` to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+        This can be used in situations where the target :term:`Process` receiving the :term:`Collection` as input
+        supports multiple compatible :term:`Media-Types`, and that the user wants to explicitly indicate which
+        one would be preferred, or to limit combinations to a certain :term:`Media-Type` when multiple matches
+        are resolved simultaneously.
+    * - ``schema``
+      - The desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+        This can be used similarly to ``type``, but can provide further resolution indications in cases where
+        the ``type`` alone remains ambiguous, such as distinguishing between many different :term:`GeoJSON`
+        *feature types* which are all represented by the same ``application/geo+json`` media-type.
+    * - ``format``
+      -
 
 .. _proc_col_outputs:
 

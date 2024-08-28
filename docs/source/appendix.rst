@@ -62,7 +62,7 @@ Glossary
         that conform to one or more |ogc-api-standards|_. Additionally, |stac-collections|_ can
         be included in this group.
 
-        Please refer to the :term:`OGC` official :ref:`Collection Definition <ogc-collection>` for more details
+        Please refer to the :term:`OGC` official |ogc-collection|_ for more details
         and complementary terminology.
 
     CWL
@@ -166,6 +166,7 @@ Glossary
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
           escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
 
+    Media-Type
     Media-Types
     MIME-types
         | Multipurpose Internet Mail Extensions
