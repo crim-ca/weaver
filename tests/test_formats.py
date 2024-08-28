@@ -311,6 +311,7 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_urlopen(*_, **__):
         yield HTTPOk()
 
+    f.get_cwl_file_format.cache_clear()
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
             with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
@@ -494,3 +495,29 @@ def test_repr_json_handle_datetime():
 )
 def test_output_format_default(unknown_format, default_format, expect_format):
     assert f.OutputFormat.get(unknown_format, default=default_format) == expect_format
+
+
+@pytest.mark.parametrize(
+    ["io_definition", "expected_media_type"],
+    [
+        ({}, None),
+        (
+            {"formats": [{"type": f.ContentType.APP_GEOJSON}]},
+            [f.ContentType.APP_GEOJSON],
+        ),
+        (
+            {"formats": [{"type": f.ContentType.IMAGE_JPEG}, {"type": f.ContentType.IMAGE_COG}]},
+            [f.ContentType.IMAGE_JPEG, f.ContentType.IMAGE_COG],
+        ),
+        (
+            {"formats": [{"type": f.ContentType.IMAGE_JPEG}, {"random": "ignore"}]},
+            [f.ContentType.IMAGE_JPEG],
+        ),
+    ]
+)
+def test_find_supported_media_types(io_definition, expected_media_type):
+    found_media_type = f.find_supported_media_types(io_definition)
+    if isinstance(found_media_type, list):
+        assert sorted(found_media_type) == sorted(expected_media_type)
+    else:
+        assert found_media_type == expected_media_type
