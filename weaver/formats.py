@@ -1,6 +1,5 @@
 import base64
 import datetime
-import functools
 import json
 import logging
 import os
@@ -18,6 +17,7 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
+from weaver.compat import cache
 
 if TYPE_CHECKING:
     from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
@@ -626,7 +626,7 @@ FORMAT_NAMESPACE_PREFIXES = [
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
 
-@functools.cache
+@cache
 def get_allowed_extensions():
     # type: () -> List[str]
     """
@@ -653,7 +653,7 @@ def get_allowed_extensions():
     return list(base | extra)
 
 
-@functools.cache
+@cache
 def get_format(media_type, default=None):
     # type: (str, Optional[str]) -> Optional[Format]
     """
@@ -676,7 +676,7 @@ def get_format(media_type, default=None):
     return fmt
 
 
-@functools.cache
+@cache
 def get_extension(media_type, dot=True):
     # type: (str, bool) -> str
     """
@@ -706,7 +706,7 @@ def get_extension(media_type, dot=True):
     return _handle_dot(ext)
 
 
-@functools.cache
+@cache
 def get_content_type(extension, charset=None, default=None):
     # type: (str, Optional[str], Optional[str]) -> Optional[str]
     """
@@ -731,7 +731,7 @@ def get_content_type(extension, charset=None, default=None):
     return add_content_type_charset(ctype, charset)
 
 
-@functools.cache
+@cache
 def add_content_type_charset(content_type, charset):
     # type: (Union[str, ContentType], Optional[str]) -> str
     """
@@ -768,7 +768,7 @@ def get_cwl_file_format(media_type, make_reference=False, **__):
     ...
 
 
-@functools.cache
+@cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
@@ -890,7 +890,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
     return None if make_reference else (None, None)
 
 
-@functools.cache
+@cache
 def map_cwl_media_type(cwl_format):
     # type: (Optional[str]) -> Optional[str]
     """
@@ -924,7 +924,7 @@ def map_cwl_media_type(cwl_format):
     return ctype
 
 
-@functools.cache
+@cache
 def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """

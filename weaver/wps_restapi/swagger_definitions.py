@@ -14,7 +14,6 @@ on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
 import datetime
-import functools
 import inspect
 import os
 import re
@@ -36,6 +35,7 @@ from pygeofilter.parsers.fes.parser import (
 )
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver.compat import cache
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteControlOption,
@@ -1454,7 +1454,7 @@ class FilterSchema(ExtendedMappingSchema):
     )
 
     @json_hashable
-    @functools.cache
+    @cache
     def validate(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> FilterAstType
         try:
@@ -1486,7 +1486,7 @@ class FilterSchema(ExtendedMappingSchema):
             ) from exc
 
     @json_hashable
-    @functools.cache
+    @cache
     def convert(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> JSON
         try:
