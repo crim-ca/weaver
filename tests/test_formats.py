@@ -126,9 +126,10 @@ def test_content_encoding_get(test_encoding, expected_encoding):
     ]
 )
 def test_content_encoding_encode_decode(data, encoding, binary, result):
-    assert f.ContentEncoding.encode(data, encoding, binary) == result
+    # type: (str | bytes, f.ContentEncoding, bool, str | bytes) -> None
+    assert f.ContentEncoding.encode(data, encoding, binary) == result  # type: ignore
     b_data = isinstance(data, bytes)
-    assert f.ContentEncoding.decode(result, encoding, b_data) == data
+    assert f.ContentEncoding.decode(result, encoding, b_data) == data  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -344,7 +345,7 @@ def test_clean_media_type_format_iana():
     res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON
     iana_url = list(f.IANA_NAMESPACE_DEFINITION.values())[0]
-    iana_fmt = os.path.join(iana_url, f.ContentType.APP_JSON)
+    iana_fmt = str(os.path.join(iana_url, f.ContentType.APP_JSON))
     res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON  # application/json
 
@@ -354,7 +355,7 @@ def test_clean_media_type_format_edam():
     edam_fmt = f"{f.EDAM_NAMESPACE}:{fmt}"  # "edam:format_####"
     res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type
-    edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
+    edam_fmt = str(os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt))  # "edam-url/format_####"
     res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type  # application/x-type
 
@@ -365,7 +366,7 @@ def test_clean_media_type_format_opengis():
     gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "opengis:####"
     res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type
-    gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)
+    gis_fmt = str(os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt))
     res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type  # application/x-type
 
@@ -375,7 +376,7 @@ def test_clean_media_type_format_ogc():
     ogc_fmt = f"{f.OGC_NAMESPACE}:{fmt}"  # "ogc:####"
     res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type
-    ogc_fmt = os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt)
+    ogc_fmt = str(os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt))
     res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type  # application/x-type
 

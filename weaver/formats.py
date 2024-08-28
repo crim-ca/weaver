@@ -609,10 +609,10 @@ OGC_MAPPING = {
     ContentType.APP_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {
-    IANA_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in IANA_MAPPING.items()},
-    EDAM_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in EDAM_MAPPING.items()},
-    OGC_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OGC_MAPPING.items()},
-    OPENGIS_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OPENGIS_MAPPING.items()},
+    IANA_NAMESPACE: IANA_MAPPING,
+    EDAM_NAMESPACE: EDAM_MAPPING,
+    OGC_NAMESPACE: OGC_MAPPING,
+    OPENGIS_NAMESPACE: OPENGIS_MAPPING,
 }
 FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
@@ -757,14 +757,14 @@ def get_cwl_file_format(media_type):
 
 
 @overload
-def get_cwl_file_format(media_type, make_reference=False):
-    # type: (str, Literal[True]) -> Tuple[Optional[JSON], Optional[str]]
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
     ...
 
 
 @overload
-def get_cwl_file_format(media_type, make_reference=False):
-    # type: (str, Literal[False]) -> Optional[str]
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[True], **bool) -> Optional[str]
     ...
 
 
@@ -907,7 +907,7 @@ def map_cwl_media_type(cwl_format):
         ns_fmt = cwl_format
     ns_name = list(ns)[0]
     ns_fmt = ns_fmt.split(":", 1)[-1] if "://" not in ns_fmt else ns_fmt
-    ctype = FORMAT_NAMESPACE_MAPPINGS[ns_name].get(ns_fmt)
+    ctype = [_ctype for _ctype, _fmt in FORMAT_NAMESPACE_MAPPINGS[ns_name].items() if _fmt == ns_fmt]
     if not ctype:
         fmt = get_format(ns_fmt)
         ctype = fmt.mime_type if fmt else None
@@ -919,6 +919,8 @@ def map_cwl_media_type(cwl_format):
                 break
         if "/" not in ctype:
             return None
+    if ctype and isinstance(ctype, list):
+        ctype = ctype[0]
     return ctype
 
 
@@ -985,9 +987,9 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
     for _map in FORMAT_NAMESPACE_MAPPINGS.values():
         if not search:
             break
-        for v in _map.values():
-            if v.endswith(media_type):
-                media_type = [k for k in _map if v.endswith(_map[k])][0]
+        for ctype, fmt in _map.items():
+            if fmt.endswith(media_type):
+                media_type = ctype
                 search = False
                 break
     return media_type
