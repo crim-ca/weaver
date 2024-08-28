@@ -19,6 +19,12 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |crs| replace:: Coordinate Reference System
+.. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
+.. |crs-def| replace:: Coordinate Reference System (CRS)
+.. _crs-def: https://www.w3.org/TR/sdw-bp/#dfn-crs
+.. |datum-def| replace:: Datum
+.. _datum-def: https://www.w3.org/TR/sdw-bp/#dfn-datum
 .. |currency-converter| replace:: *Currency Converter*
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
@@ -61,6 +67,24 @@
 .. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
+.. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
+.. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
+.. |filter-simple-cql| replace:: Simple CQL
+.. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. |filter-cql-json| replace:: CQL-JSON
+.. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. |filter-cql-text| replace:: CQL-Text
+.. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. |filter-cql2-json| replace:: CQL2-JSON
+.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065.html#cql2-json
+.. |filter-cql2-text| replace:: CQL2-Text
+.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
+.. |filter-ecql| replace:: ECQL (Extended CQL)
+.. _filter_ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
+.. |filter-fes| replace:: Filter Encoding Standard 2.0
+.. _filter-fes: http://docs.opengeospatial.org/is/09-026r2/09-026r2.html
+.. |filter-jfe| replace:: JSON Filter Expressions
+.. _filter-jfe: https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
 .. |geojson| replace:: GeoJSON

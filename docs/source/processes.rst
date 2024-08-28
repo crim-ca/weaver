@@ -438,7 +438,7 @@ the |getcap-req|_ request.
 .. _proc_op_undeploy:
 .. _proc_op_update:
 
-Update, replace or remove an existing process (Update, Replace, Undeploy)
+Modify an existing process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
 Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
@@ -1354,37 +1354,24 @@ Collection Inputs
 
 The |ogc-api-proc-part3-collection-input|_ is defined by the |ogc-api-proc-part3|_ extension. This allows to submit a
 :term:`Process Execution <proc_op_execute>` using the following :term:`JSON` structure when the targeted :term:`Process`
-can make use of the resulting data sources returned by the referred :term:`Collection` and filtering conditions.
+can make use of the resulting data sources retrieved from the referred :term:`Collection` and processing conditions.
+The ``collection`` keyword is employed to identify this type of input, in contrast to literal data and complex file
+inputs respectively using ``value`` and ``href``, as presented in the :ref:`Process Execution <proc_op_execute>`
+section.
 
-.. code-block:: json
-
-    {
-      "inputs": {
-        "features-input": {
-          "collection": "https://example.com/collections/dataset-features",
-          "filter": {
-            "op": "s_intersects",
-            "args": [
-              {"property": "geometry"},
-              {
-                "type": "Polygon",
-                "coordinates": [ [30, 10], [40, 40], [20, 40], [10, 20], [30, 10] ]
-              }
-            ]
-          },
-          "filter-crs": "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
-          "filter-lang": "cql2-json",
-          "sortBy": "-id"
-        }
-      }
-    }
+.. literalinclude::  ../examples/collection-input-basic.json
+    :language: json
+    :caption: Process Execution with a Collection Input
 
 .. note::
-    More capabilities beside ``filter``, ``sortBy``, etc. might be supported over time according to requirements
-    established by multiple :term:`OGC` Testbed iterations. Also, different parameters will be supported depending
-    on which remote :term:`API` gets interrogated to resolve the :term:`Collection` contents. The |ogc-api-proc-part3|_
-    is still under development, and interactions with the various access points of |ogc-api-standards|_ remains to
-    be evaluated in detail to further explore interoperability concerns between all  :term:`API`implementations.
+    More properties can be provided with the ``collection``, such as ``filter``, ``sortBy``, etc.
+    The :term:`OpenAPI` definition in `Weaver` is defined with a minimal set of properties, since specific requirements
+    to be supported might need multiple :term:`OGC` Testbed iterations to be established.
+    Also, different combinations of parameters will be supported depending on which remote :term:`API` gets
+    interrogated to resolve the :term:`Collection` contents. The |ogc-api-proc-part3|_ is still under development,
+    and interactions with the various access points of |ogc-api-standards|_ remains to
+    be evaluated in detail to further explore interoperability concerns between all :term:`API`implementations.
+    Refer to :ref:`proc_col_inputs_examples` for potential combinations and additional samples.
 
 To determine which *items* should be retrieved from the :term:`Collection`, whether they are obtained by
 |ogc-api-coverages|_, |ogc-api-features|_, |ogc-api-maps|_, |ogc-api-tiles|_, |stac-api-spec|_,
@@ -1393,10 +1380,12 @@ depends on the negotiated :term:`Media-Types` required by the corresponding inpu
 in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
 and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
 
-For example, if a :term:`Process` indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
-or ``format: geojson-feature-collection``, the referenced ``collection`` would most probably be accessed
+For example, if a :term:`Process` input indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
+or contained a ``format: geojson-feature-collection`` indicate in its ``schema``, the referenced ``collection``
+would most probably be accessed
 using |ogc-api-features|_ (i.e.: with request ``GET /collections/dataset-features/items``),
-to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``.
+to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be passed to the corresponding
+input of the :term:`Process`.
 However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
 the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
 
@@ -1425,8 +1414,9 @@ data cardinality and :term:`API` protocols simultaneously can make its behavior 
     Do not hesitate to |submit-issue|_ if the |ogc-api-proc-part3-collection-input|_ resolution does not seem
     to behave according to your specific use cases.
 
-In cases where the resolution does not automatically resolve with the intended behavior,
-submitted |ogc-api-proc-part3-collection-input|_ can include the following additional parameters.
+For cases where the resolution does not automatically resolve with the intended behavior,
+any submitted |ogc-api-proc-part3-collection-input|_ can include the following additional parameters
+to hint the resolution toward certain outcomes.
 
 .. list-table::
     :header-rows: 1
@@ -1435,18 +1425,99 @@ submitted |ogc-api-proc-part3-collection-input|_ can include the following addit
     * - Parameter
       - Description
     * - ``type``
-      - The desired :term:`Media-Type` to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+      - Indicates the desired :term:`Media-Type` to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
         This can be used in situations where the target :term:`Process` receiving the :term:`Collection` as input
         supports multiple compatible :term:`Media-Types`, and that the user wants to explicitly indicate which
         one would be preferred, or to limit combinations to a certain :term:`Media-Type` when multiple matches
         are resolved simultaneously.
     * - ``schema``
-      - The desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+      - Indicates the desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
         This can be used similarly to ``type``, but can provide further resolution indications in cases where
         the ``type`` alone remains ambiguous, such as distinguishing between many different :term:`GeoJSON`
         *feature types* which are all represented by the same ``application/geo+json`` media-type.
     * - ``format``
-      -
+      - Indicates the preferred data access mechanism to employ amongst
+        :py:class:`weaver.execute.ExecuteCollectionFormat` supported values.
+        This can be used to explicitly override the selected :term:`API` or strategy to resolve
+        the |ogc-api-proc-part3-collection-input|_. Because many of the supported :term:`Collection` processors
+        share similar endpoints, query parameters and :term:`Media-Types` content negotiation strategies,
+        automatic resolution might not always result in the desired behavior. Omitting this parameter leaves it
+        up to available parameters to attempt an educated guess, which might not always be possible.
+
+.. _proc_col_inputs_filter:
+
+Filtering
+^^^^^^^^^
+
+When adding a ``filter`` parameter along the ``collection`` reference, it is possible to provide filtering conditions
+to limit the items to be extracted from the :term:`Collection`. See the :ref:`proc_col_inputs_examples` for samples.
+
+In the event that a ``filter`` contains coordinates that do not employ the
+commonly employed default :term:`CRS` of ``EPSG:4326`` (or ``CRS84``/``CRS84h`` equivalents),
+the ``filter-crs`` parameter can be specified to provide the applicable :term:`CRS`.
+
+.. note::
+    `Weaver` will not itself interpret the ``filter-crs`` beside transforming between :term:`URI` and
+    common short name representations to ensure the remote :term:`API` can properly resolve the intended reference.
+    If a ``filter-crs`` is provided, it is up to the remote :term:`API` receiving it to interpret it and the
+    referenced coordinates within ``filter`` correctly.
+    If the targeted server by the ``collection`` :term:`URL` cannot resolve the :term:`CRS`, the user will need
+    to convert it themselves to make it appropriate according to the target server capabilities.
+
+The ``filter-lang`` parameter can be employed to indicate which language encoding is specified in ``filter``.
+At the moment, the following languages (case-insensitive) are handled in `Weaver` using :mod:`pygeofilter`.
+
+.. list-table::
+    :header-rows: 1
+
+    * - Name and Reference
+      - Value for ``filter-lang``
+    * - |filter-cql2-json|_
+      - ``cql2-json``
+    * - |filter-cql2-text|_
+      - ``cql2-text``
+    * - |filter-cql-csw|_
+      - ``cql``
+    * - |filter-simple-cql|_
+      - ``simple-cql``
+    * - |filter-cql-json|_
+      - ``cql-json``
+    * - |filter-cql-text|_
+      - ``cql-text``
+    * - |filter-ecql|_
+      - ``ecql``
+    * - |filter-fes|_
+      - ``fes``
+    * - |filter-jfe|_
+      - ``jfe``
+
+.. note::
+    Although there are a lot of "*Common Query Language*" (CQL) variations, most of them only imply minimal
+    variations between some operations, sometimes allowing alternate or additional systax and/or operators.
+
+    Because most |ogc-api-standards|_ rely extensively on |cql2-json|_ or |cql2-text|_ encodings,
+    and that most of them have common bases that can be easily translated, all language variants
+    will be converted to an appropriate and equivalent CQL2-based definition, before submitting
+    it to the :term:`Collection` resolution operation.
+
+.. _proc_col_inputs_examples:
+
+Examples
+^^^^^^^^
+
+The following section presents some examples of potential |ogc-api-proc-part3-collection-input|_ definitions
+and some explanation about their resolution.
+
+The following example presents the use of a ``filter`` encoded with |cql2-json|_, used to limit the retrieved
+geometries only to the features that intersect the specified polygon. Futhermore,
+
+.. literalinclude::  ../examples/collection-input-filter-cql2-json.json
+    :language: json
+    :caption: Collection Input with a CQL2-JSON Filter
+
+
+
+
 
 .. _proc_col_outputs:
 

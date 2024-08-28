@@ -65,13 +65,26 @@ Glossary
         Please refer to the :term:`OGC` official |ogc-collection|_ for more details
         and complementary terminology.
 
+    CRS
+    Coordinate Reference System
+        Geospatial data encoding of the representation parameters, describing the structure to locate entities,
+        in terms of axis order (latitude, longitude, altitude, etc.), dimension (2D, 3D, etc.), in respect to a
+        specific celestial object, a position of origin, scale and orientation (i.e: |datum-def|_).
+
+        .. seealso::
+            - Reference :term:`W3C`/:term:`OGC` documentation about |crs|_.
+            - Reference definition of |crs-def|_.
+
     CWL
-        | |cwl|_
-        | Representation of the internal :term:`Application Package` of the :term:`Process` to provide execution
-          methodology of the referenced :term:`Docker` image or other supported definitions.
-          A |cwl|_ file can be represented both in :term:`JSON` or :term:`YAML` format, but is often represented
-          in :term:`JSON` in the context of `Weaver` for its easier inclusion within HTTP request contents.
-          See :ref:`application-package` section for further details.
+    Common Workflow Language
+        Representation of the internal :term:`Application Package` of the :term:`Process` to provide execution
+        methodology of the referenced :term:`Docker` image or other supported definitions.
+        A |cwl|_ file can be represented both in :term:`JSON` or :term:`YAML` format, but is often represented
+        in :term:`JSON` in the context of `Weaver` for its easier inclusion within HTTP request contents.
+
+        .. seealso::
+            - Official |cwl|_ documentation.
+            - :ref:`application-package` section for further details.
 
     Data Source
         Known locations of remote servers where an :term:`ADES` or :term:`EMS`
@@ -92,6 +105,7 @@ Glossary
         types by providing additional formats that are more specifics to some data domains.
 
     EMS
+    Execution Management Service
         | |ems|
         | See :ref:`processes` section for details.
           Alternative operation modes are described in :ref:`Configuration Settings`.
@@ -105,10 +119,18 @@ Glossary
             :ref:`opensearch_data_source` section.
 
     ESGF
-        |esgf|_
+    Earth System Grid Federation
+        An open source effort providing a robust, distributed data and computation platform,
+        enabling world wide access to large-scale scientific data.
+
+        .. seealso::
+            |esgf|_ official website.
 
     ESGF-CWT
         |esgf-cwt-git|_
+
+        .. seealso::
+            :ref:`proc_esgf_cwt` for more details about the :term:`Process` type.
 
     GeoJSON
         | Geospatial :term:`JSON`
@@ -184,7 +206,12 @@ Glossary
             |OpenAPI-spec|_
 
     OGC
-        |ogc|_
+    Open Geospatial Consortium
+        International standards organization for geospatial data and processing best practices
+        that establishes most of the :term:`API` definition implied under `Weaver`.
+
+        .. seealso::
+            |ogc|_
 
     OAP
     OGC API - Processes
@@ -284,6 +311,12 @@ Glossary
         .. seealso::
             - :ref:`vault_upload`
             - :ref:`file_vault_inputs`
+
+    W3C
+    World Wide Web Consortium
+        Main international standards organization for the World Wide Web.
+        Since |ogc-api-standards|_ are based on HTTP and web communications, this consortium establishes the
+        common foundation definitions used by the :term:`API` specifications.
 
     WKT
         Well-Known Text geometry representation.
