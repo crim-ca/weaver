@@ -82,7 +82,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -1509,10 +1509,20 @@ class FilterSchema(ExtendedMappingSchema):
             return result
         filter_expr = result.get("filter")
         filter_lang = result.get("filter-lang")
-        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised after as invalid
-            result.pop("filter", None)
-            result.pop("filter-crs", None)
-            result.pop("filter-lang", None)
+        filter_crs = result.get("filter-crs")
+        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised as invalid since dropped
+            if "filter" in cstruct:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Invalid filter expression could not be interpreted.",
+                    value={"filter": repr_json(cstruct["filter"]), "filter-lang": filter_lang},
+                )
+            if filter_crs or filter_lang:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Missing filter expression provided with CRS and/or language parameters.",
+                    value={"filter-crs": filter_crs, "filter-lang": filter_lang},
+                )
             return result
         if not filter_lang:
             filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
