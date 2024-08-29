@@ -85,6 +85,8 @@
 .. _filter-fes: http://docs.opengeospatial.org/is/09-026r2/09-026r2.html
 .. |filter-jfe| replace:: JSON Filter Expressions
 .. _filter-jfe: https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
+.. |geotiff-cog| replace:: Cloud Optimized GeoTIFF (COG)
+.. _geotiff-cog: https://www.cogeo.org/
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
 .. |geojson| replace:: GeoJSON
