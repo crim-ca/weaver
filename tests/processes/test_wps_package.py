@@ -736,7 +736,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 },
 
             ],
-            "version": "1.s0"
+            "version": "1.0"
         }
     ),
 ])
