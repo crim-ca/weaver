@@ -669,6 +669,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
     # type: (Any, int, bool) -> None
     assert format_extension_validator(data_input, mode) == expect
 
+
 @pytest.mark.parametrize("original, expected", [
     (
         # Test author metadata with empty wps_package
@@ -699,7 +700,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "cwl_package_package": {
                 "s:codeRepository": "https://gitlab.com/",
-
             },
             "wps_package_metadata": {}
         },
@@ -716,10 +716,10 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         # Test Version with existing metadata
         {
             "cwl_package_package": {
-                "s:version": "1.0",
+                "s:version": "1.0"
 
             },
-            "wps_package_metadata": { 
+            "wps_package_metadata": {
                 "metadata": [
                 {
                     "rel": "codeRepository",

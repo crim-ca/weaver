@@ -726,9 +726,9 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     for metadata_mapping in SUPPORTED_METADATA_MAPPING:
         if metadata_mapping in cwl_package_package:
             metadata = wps_package_metadata.get("metadata", [])
-            if (isinstance((cwl_package_package[metadata_mapping]),str)
+            if (isinstance((cwl_package_package[metadata_mapping]), str)
                 and urlparse(cwl_package_package[metadata_mapping]) != ""
-                ):
+            ):
                 metadata.append({
                     "rel": metadata_mapping.strip("s:"),
                     "href": cwl_package_package[metadata_mapping]
