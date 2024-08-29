@@ -721,11 +721,11 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             },
             "wps_package_metadata": {
                 "metadata": [
-                {
-                    "rel": "codeRepository",
-                    "href": "https://gitlab.com/"
-                }
-            ]
+                    {
+                        "rel": "codeRepository",
+                        "href": "https://gitlab.com/"
+                    }
+                ]
             }
         },
         {
@@ -736,7 +736,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 },
 
             ],
-            "version":"1.0"
+            "version": "1.s0"
         }
     ),
 ])

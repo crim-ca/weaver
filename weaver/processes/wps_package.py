@@ -230,6 +230,7 @@ SUPPORTED_METADATA_MAPPING = [
     "s:releaseNotes",
 ]
 
+
 def get_status_location_log_path(status_location, out_dir=None):
     # type: (str, Optional[str]) -> str
     log_path = f"{os.path.splitext(status_location)[0]}.log"
@@ -727,8 +728,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         if metadata_mapping in cwl_package_package:
             metadata = wps_package_metadata.get("metadata", [])
             if (isinstance((cwl_package_package[metadata_mapping]), str)
-                and urlparse(cwl_package_package[metadata_mapping]) != ""
-            ):
+                    and urlparse(cwl_package_package[metadata_mapping]) != ""):
                 metadata.append({
                     "rel": metadata_mapping.strip("s:"),
                     "href": cwl_package_package[metadata_mapping]

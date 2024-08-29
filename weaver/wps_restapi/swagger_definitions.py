@@ -804,6 +804,7 @@ class Link(LinkRelationship, LinkBase):
     _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/link.json"
     _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 
+
 class MetadataValueField(OneOfKeywordSchema):
     _one_of = [
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
@@ -811,6 +812,7 @@ class MetadataValueField(OneOfKeywordSchema):
         # literal JSON schema, permissive since it can be anything
         PermissiveMappingSchema(description="Flexible schema definition for the metadata value.")
     ]
+
 
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     _not = [
