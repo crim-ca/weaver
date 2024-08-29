@@ -1509,7 +1509,6 @@ class FilterSchema(ExtendedMappingSchema):
             return result
         filter_expr = result.get("filter")
         filter_lang = result.get("filter-lang")
-        filter_crs = result.get("filter-crs")
         if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised as invalid since dropped
             if "filter" in cstruct:
                 raise colander.Invalid(
@@ -1517,6 +1516,8 @@ class FilterSchema(ExtendedMappingSchema):
                     msg="Invalid filter expression could not be interpreted.",
                     value={"filter": repr_json(cstruct["filter"]), "filter-lang": filter_lang},
                 )
+            filter_crs = cstruct.get("filter-crs")
+            filter_lang = cstruct.get("filter-lang")
             if filter_crs or filter_lang:
                 raise colander.Invalid(
                     node=self,

@@ -247,8 +247,8 @@ def test_collection_input_parsing(input_data):
     Validate that the schema definition for a ``collection`` input resolves as expected.
     """
     expect = copy.deepcopy(input_data)
-    if "filter" in expect:
-        expect.setdefault("filter-crs", "EPSG:4326")
+    expect.setdefault("filter-crs", "EPSG:4326")
+    expect.setdefault("filter-lang", "cql2-json")
     result = sd.ExecuteCollectionInput().deserialize(input_data)
     result.pop("format", None)
     assert result == expect
@@ -292,6 +292,14 @@ def test_collection_input_filter_lang_case_insensitive():
             "collection": "https://example.com/collections/test",
             "filter": "PROPERTY = 123",
             "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter-crs": "EPSG:4326",
         },
         {
             "collection": "https://example.com/collections/test",
