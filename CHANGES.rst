@@ -14,6 +14,9 @@ Changes:
 --------
 - Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
   (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
+- Add ``AnyCRS`` schema definition with improved validation of allowed values.
+- Use ``AnyCRS`` schema for ``SupportedCRS``, ``XMLStringCRS``, ``BoundingBoxValue`` and ``ExecuteCollectionInput``
+  instead of a generic ``URL`` schema definition for better reference validation, while allowing alternate short forms.
 - Update ``cwltool`` with fork
   `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
   until ``loadContents`` behavior is resolved for ``type: File[]``

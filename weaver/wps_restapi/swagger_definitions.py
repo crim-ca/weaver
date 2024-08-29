@@ -1367,12 +1367,12 @@ class DeployComplexInputType(DeployWithFormats):
     pass
 
 
-class AnyCRS(OneOfKeywordSchema):
+class AnyCRS(AnyOfKeywordSchema):
     # note:
     #   other CRS exist (EGM, NAVD, NAD, etc.)
     #   however, only support EPSG (short form, normative from, or URI) that are supported by 'owslib.crs'
     #   handle equivalent representations of EPSG:4326 that are also supported by 'owslib.crs'
-    _one_of = [
+    _any_of = [
         ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
