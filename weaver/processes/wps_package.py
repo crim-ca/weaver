@@ -228,7 +228,6 @@ SUPPORTED_METADATA_MAPPING = [
     "s:dateCreated",
     "s:license",
     "s:releaseNotes",
-    "s:version"
 ]
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -718,29 +717,37 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
             set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
         )
 
-    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
-        # example s:author #TODO regroup similar parsing together
-        if metadata_mapping in cwl_package_package and metadata_mapping == "s:author":
+    # specific use case with a different mapping
+    if "s:version" in cwl_package_package:
+        wps_package_metadata["version"] = str(
+             str(cwl_package_package.get("s:version", "")) or str(wps_package_metadata.get("version"))
+        )
 
+    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
+        if metadata_mapping in cwl_package_package:
             metadata = wps_package_metadata.get("metadata", [])
-            for objects in cwl_package_package[metadata_mapping]:
-                class_name = objects["class"].strip("s:")
-                value = {
-                    "$schema": f"https://schema.org/{class_name}"
-                }
-                for key, val in objects.items():
-                    if key.startswith("s:"):
-                        value[key.strip("s:")] = val
+            if (isinstance((cwl_package_package[metadata_mapping]),str)
+                and urlparse(cwl_package_package[metadata_mapping]) != ""
+                ):
                 metadata.append({
-                    "role": metadata_mapping.strip("s:"),
-                    "value": value
+                    "rel": metadata_mapping.strip("s:"),
+                    "href": cwl_package_package[metadata_mapping]
                 })
+            else:
+                for objects in cwl_package_package[metadata_mapping]:
+                    class_name = objects["class"].strip("s:")
+                    value = {
+                        "$schema": f"https://schema.org/{class_name}"
+                    }
+                    for key, val in objects.items():
+                        if key.startswith("s:"):
+                            value[key.strip("s:")] = val
+                    metadata.append({
+                        "role": metadata_mapping.strip("s:"),
+                        "value": value
+                    })
+
             wps_package_metadata["metadata"] = metadata
-        # specific use case with a different mapping 
-        if metadata_mapping in cwl_package_package and metadata_mapping == "s:version":
-            wps_package_metadata["version"] = (
-                set(wps_package_metadata.get("version", [])) | set(cwl_package_package.get("s:version", []))
-            )
 
 
 def _patch_wps_process_description_url(reference, process_hint):

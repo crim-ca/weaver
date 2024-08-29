@@ -677,7 +677,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "s:author": [
                     {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
                 ],
-    
+
             },
             "wps_package_metadata": {}
         },
@@ -694,7 +694,51 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             ]
         }
     ),
-    
+    (
+        # Test codeRepository
+        {
+            "cwl_package_package": {
+                "s:codeRepository": "https://gitlab.com/",
+
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "metadata": [
+                {
+                    "rel": "codeRepository",
+                    "href": "https://gitlab.com/"
+                }
+            ]
+        }
+    ),
+    (
+        # Test Version with existing metadata
+        {
+            "cwl_package_package": {
+                "s:version": "1.0",
+
+            },
+            "wps_package_metadata": { 
+                "metadata": [
+                {
+                    "rel": "codeRepository",
+                    "href": "https://gitlab.com/"
+                }
+            ]
+            }
+        },
+        {
+            "metadata": [
+                {
+                    "rel": "codeRepository",
+                    "href": "https://gitlab.com/"
+                },
+
+            ],
+            "version":"1.0"
+        }
+    ),
 ])
 def test_process_metadata(original, expected):
     # type: (CWL, CWL) -> None
