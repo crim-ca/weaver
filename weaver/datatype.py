@@ -17,7 +17,7 @@ import warnings
 from datetime import datetime, timedelta
 from decimal import ConversionSyntax, Decimal
 from io import BytesIO
-from logging import ERROR, INFO, Logger, getLevelName, getLogger
+from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
@@ -67,6 +67,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
     from typing_extensions import TypeAlias
 

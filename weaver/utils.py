@@ -20,7 +20,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
-from typing import TYPE_CHECKING, Protocol, overload
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -79,12 +79,10 @@ if TYPE_CHECKING:
     import importlib.abc
     from types import FrameType, ModuleType
     from typing import (
-        Any,
         AnyStr,
         Callable,
         Dict,
         IO,
-        Iterable,
         Iterator,
         List,
         MutableMapping,
@@ -358,7 +356,7 @@ def json_hashable(func):
         The code is extended to allow recursively supporting JSON-like structures.
 
     """
-    class HashJSON:
+    class HashJSON(Iterable[Any]):
         def __hash__(self):
             # type: () -> int
             return hash(frozenset([
@@ -367,6 +365,9 @@ def json_hashable(func):
                 item
                 for item in self
             ]))
+
+        def __iter__(self):
+            return super().__iter__()
 
     class HashList(HashJSON, list):
         ...
@@ -377,12 +378,12 @@ def json_hashable(func):
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        args = tuple([
+        args = tuple(
             HashDict(arg) if isinstance(arg, dict) else
             HashList(arg) if isinstance(arg, list) else
             arg
             for arg in args
-        ])
+        )
         kwargs = {
             k: (
                 HashDict(v) if isinstance(v, dict) else

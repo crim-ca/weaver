@@ -1453,31 +1453,36 @@ class FilterSchema(ExtendedMappingSchema):
         )
     )
 
+    @staticmethod
     @json_hashable
     @cache
+    def parse(filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> FilterAstType
+        parsed_expr = None
+        if filter_lang == "cql2-json":
+            parsed_expr = cql2_json.parse(filter_expr)
+        elif filter_lang == "cql2-text":
+            parsed_expr = cql2_text.parse(filter_expr)
+        elif filter_lang == "cql-json":
+            parsed_expr = cql_json.parse(filter_expr)
+        elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
+            parsed_expr = ecql.parse(filter_expr)
+        elif filter_lang == "fes":
+            parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
+        elif filter_lang == "jfe":
+            parsed_expr = jfe.parse(filter_expr)
+        if not parsed_expr:
+            raise colander.Invalid(
+                node=AnyFilterLanguage(),
+                msg="Unresolved filter expression language.",
+                value={"filter-lang": filter_lang},
+            )
+        return parsed_expr
+
     def validate(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> FilterAstType
         try:
-            parsed_expr = None
-            if filter_lang == "cql2-json":
-                parsed_expr = cql2_json.parse(filter_expr)
-            elif filter_lang == "cql2-text":
-                parsed_expr = cql2_text.parse(filter_expr)
-            elif filter_lang == "cql-json":
-                parsed_expr = cql_json.parse(filter_expr)
-            elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
-                parsed_expr = ecql.parse(filter_expr)
-            elif filter_lang == "fes":
-                parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
-            elif filter_lang == "jfe":
-                parsed_expr = jfe.parse(filter_expr)
-            if not parsed_expr:
-                raise colander.Invalid(
-                    node=AnyFilterLanguage(),
-                    msg="Unresolved filter expression language.",
-                    value={"filter-lang": filter_lang},
-                )
-            return parsed_expr
+            return self.parse(filter_expr, filter_lang)
         except (TypeError, ValueError) as exc:
             raise colander.Invalid(
                 node=self,
@@ -1485,8 +1490,6 @@ class FilterSchema(ExtendedMappingSchema):
                 value={"filter": filter_expr, "filter-lang": filter_lang},
             ) from exc
 
-    @json_hashable
-    @cache
     def convert(self, filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> JSON
         try:
@@ -3758,19 +3761,19 @@ class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
 class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
     description = inspect.cleandoc("""
         Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
-        
+
         If only the 'collection' is provided to read the contents as a static GeoJSON FeatureCollection document,
         any scheme can be employed (s3, file, http, etc.) to request the contents.
         Note that in this context, each of the respective Feature contained in the collection will be extracted
         to form an array of Features. If the entire 'FeatureCollection' should be provided as a whole to the process
         input, consider using the usual 'href' or 'value' input instead of 'collection'.
-        
-        When more 'collection' capabilities are specified with 
+
+        When more 'collection' capabilities are specified with
         additional parameters (filter, sortBy, subsetting, scaling, etc.),
         the scheme must be 'http(s)' since an OGC API or STAC API data access mechanism is expected
         to perform the requested operations. The appropriate API to employ should be indicated by 'format'
         to ensure appropriate interpretation of the 'collection' reference.
-        
+
         Supported additional parameters depend on each API implementation.
         Not all parameters are listed in this definition. Refer to respective APIs
         for supported parameters and their expected value formats.

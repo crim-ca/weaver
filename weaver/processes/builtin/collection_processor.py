@@ -69,7 +69,7 @@ __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to
 OUTPUT_CWL_JSON = "cwl.output.json"
 
 
-def process_collection(collection_input, input_definition, output_dir, logger=LOGGER):
+def process_collection(collection_input, input_definition, output_dir, logger=LOGGER):  # pylint: disable=R1260
     # type: (JobValueCollection, ProcessInputOutputItem, Path, LoggerHandler) -> List[CWL_IO_FileValue]
     """
     Processor of a :term:`Collection`.
@@ -87,7 +87,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     :return: Resolved data references.
     """
     input_id = get_any_id(input_definition)
-    logger.log(
+    logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
         "Process [{}] Got arguments: collection_input={} output_dir=[{}], for input=[{}]",
         PACKAGE_NAME,
@@ -129,7 +129,12 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
 
     col_args.setdefault("timeout", 10)
 
-    logger.log(logging.INFO, "Attempting resolution of collection [{}] as format [{}]", col_href, col_fmt)
+    logger.log(  # pylint: disable=E1205 # false positive
+        logging.INFO,
+        "Attempting resolution of collection [{}] as format [{}]",
+        col_href,
+        col_fmt,
+    )
     resolved_files = []
     if col_fmt == ExecuteCollectionFormat.GEOJSON:
         # static GeoJSON FeatureCollection document
@@ -197,7 +202,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             #   since STAC is technically OGC API - Features compliant, both can be used interchangeably
             #   if media-types are non-GeoJSON and happen to contain STAC Assets, handle it as STAC transparently
             if "assets" in feat and col_media_type != [ContentType.APP_GEOJSON]:
-                for name, asset in feat["assets"].items():  # type: (str, JSON)
+                for _, asset in feat["assets"].items():  # type: (str, JSON)
                     if asset["type"] in col_media_type:
                         _, file_fmt = get_cwl_file_format(asset["type"])
                         file_obj = {"class": "File", "path": asset["href"], "format": file_fmt}
@@ -249,7 +254,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         raise ValueError(f"Could not extract any data or reference from input collection [{col_href}].")
 
     logger.log(logging.INFO, "Resolved collection [{}] returned {} reference(s).", col_href, len(resolved_files))
-    logger.log(
+    logger.log(  # pylint: disable=E1205 # false positive
         logging.DEBUG,
         "Resolved collection [{}] files:\n{}",
         col_href,
