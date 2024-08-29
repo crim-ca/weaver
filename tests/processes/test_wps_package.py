@@ -49,7 +49,7 @@ from weaver.processes.wps_package import (
     _update_package_metadata,
     format_extension_validator,
     get_application_requirement,
-    mask_process_inputs,
+    mask_process_inputs
 )
 from weaver.wps.service import WorkerRequest
 
