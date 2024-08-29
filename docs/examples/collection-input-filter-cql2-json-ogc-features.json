@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "features-input": {
+    "features": {
       "collection": "https://example.com/collections/dataset-features",
       "format": "ogc-feature-collection",
       "filter": {

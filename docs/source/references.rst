@@ -67,6 +67,12 @@
 .. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
+.. |feature-ogc-def| replace:: Feature
+.. _feature-ogc-def: https://docs.ogc.org/DRAFTS/20-024.html#feature-definition
+.. |feature-w3c-def| replace:: Feature
+.. _feature-w3c-def: https://www.w3.org/TR/sdw-bp/#dfn-feature
+.. |feature-w3c-desc| replace:: Feature
+.. _feature-w3c-desc: https://www.w3.org/TR/sdw-bp/#spatial-things-features-and-geometry
 .. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
 .. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
 .. |filter-simple-cql| replace:: Simple CQL
@@ -80,7 +86,7 @@
 .. |filter-cql2-text| replace:: CQL2-Text
 .. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
 .. |filter-ecql| replace:: ECQL (Extended CQL)
-.. _filter_ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
+.. _filter-ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
 .. |filter-fes| replace:: Filter Encoding Standard 2.0
 .. _filter-fes: http://docs.opengeospatial.org/is/09-026r2/09-026r2.html
 .. |filter-jfe| replace:: JSON Filter Expressions
@@ -176,7 +182,7 @@
 .. |stac-items| replace:: STAC Items
 .. _stac-items: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
 .. |stac-assets| replace:: STAC Assets
-.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md#asset-object
+.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md#assets
 
 .. Example references
 .. |examples| replace:: Examples

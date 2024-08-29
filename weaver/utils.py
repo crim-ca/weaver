@@ -354,7 +354,6 @@ def json_hashable(func):
     .. seealso::
         Original inspiration: https://stackoverflow.com/a/44776960
         The code is extended to allow recursively supporting JSON-like structures.
-
     """
     class HashJSON(Iterable[Any]):
         def __hash__(self):

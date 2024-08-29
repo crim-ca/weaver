@@ -132,6 +132,15 @@ Glossary
         .. seealso::
             :ref:`proc_esgf_cwt` for more details about the :term:`Process` type.
 
+    Feature
+        An abstraction of real-world phenomena into a digital entity representation, which includes
+        information detailing its *extent* (i.e.: how it is placed and located in time and space).
+
+        .. seealso::
+            - :term:`OGC` |feature-ogc-def|_ definition.
+            - :term:`W3C` |feature-w3c-def|_ definition.
+            - :term:`W3C` |feature-w3c-desc|_ examples and extended description.
+
     GeoJSON
         | Geospatial :term:`JSON`
         | A specific :term:`JSON` format representation for encoding a variety of geographic data structures,

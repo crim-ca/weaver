@@ -1427,7 +1427,7 @@ to hint the resolution toward certain outcomes.
 
 .. list-table::
     :header-rows: 1
-    :widths: 20,40,40
+    :widths: 20,80
 
     * - Parameter
       - Description
@@ -1502,7 +1502,7 @@ At the moment, the following languages (case-insensitive) are handled in `Weaver
     Although there are a lot of "*Common Query Language*" (CQL) variations, most of them only imply minimal
     variations between some operations, sometimes allowing alternate or additional systax and/or operators.
 
-    Because most |ogc-api-standards|_ rely extensively on |cql2-json|_ or |cql2-text|_ encodings,
+    Because most |ogc-api-standards|_ rely extensively on |filter-cql2-json|_ or |filter-cql2-text|_ encodings,
     and that most of them have common bases that can be easily translated, all language variants
     will be converted to an appropriate and equivalent CQL2-based definition, before submitting
     it to the :term:`Collection` resolution operation.
@@ -1515,33 +1515,33 @@ Examples
 The following section presents some examples of potential |ogc-api-proc-part3-collection-input|_ definitions that could
 be used for :ref:`Process Execution <proc_op_execute>`, and some explanation about their expected resolution.
 
-The following example presents the use of a ``filter`` encoded with |cql2-json|_, used to limit the retrieved
-geometries only to the features that intersect the specified polygon. Matching features should also be sorted
-in descending order of their respective ``id`` property, according to the ``sortBy`` parameter.
+The following example presents the use of a ``filter`` encoded with |filter-cql2-json|_, used to limit the retrieved
+geometries only to :term:`Feature` instances that intersect the specified polygon. Any :term:`Feature` that was matched
+should also be sorted in descending order of their respective ``id`` property, according to the ``sortBy`` parameter.
 Furthermore, the |ogc-api-features|_ resolution is requested using the ``format`` parameter. Because it is
 expected from this :term:`API` that a :term:`GeoJSON` ``FeatureCollection`` document would be returned,
-the ``features-input`` of the :term:`Process` receiving this result should support ``application/geo+json``
+the ``features`` input of the :term:`Process` receiving this result should support ``application/geo+json``
 or a similar ``schema`` definition for this execution request to be successful. Since this :term:`Media-Type`
 is the default value returned by |ogc-api-features|_, the ``type`` does not need to be set explicitly.
 
 .. literalinclude::  ../examples/collection-input-filter-cql2-json-ogc-features.json
     :language: json
-    :caption: Collection Input with a CQL2-JSON Filter using |ogc-api-features|_
+    :caption: |ogc-api-proc-part3-collection-input|_ with |filter-cql2-json|_ Filter using |ogc-api-features|_
 
-The following example presents a ``filter`` encoded with |cql2-text|_, which aims to return only elements
+The following example presents a ``filter`` encoded with |filter-cql2-text|_, which aims to return only elements
 that contain a property matching the ``eo:cloud_cover < 0.1`` criteria from the :term:`Collection`
-named ``sentinel-2``. In this case, the |stac-api-spec|_ is specified by the ``format``. Therefore,
+named ``sentinel-2``. In this case, the |stac-api-spec|_ is indicated by the ``format``. Therefore,
 |stac-items|_ defined under that :term:`Collection` are expected to be considered if their properties respect
 the ``eo:cloud_cover`` filter. However, the :term:`Media-Type` defined by ``type`` corresponding to |geotiff-cog|_
 is also specified, meaning that the result from the |ogc-api-proc-part3-collection-input|_ resolution is not
 the :term:`GeoJSON` |stac-items|_ themselves, but the |stac-assets|_ they respectively contain, and that match
 this GeoTIFF ``type``.
-Therefore, the definition of the :term:`Process` input ``image`` should support either a single GeoTIFF, or an
-array of GeoTIFF images, for this resolution to succeed, and proceed to execute the :term:`Process` using them.
+Therefore, the definition of the :term:`Process` input ``images`` should support an array of GeoTIFF images,
+for this resolution to succeed, and proceed to execute the :term:`Process` using them.
 
 .. literalinclude::  ../examples/collection-input-filter-cql2-text-stac.json
     :language: json
-    :caption: Collection Input with a CQL2-Text Filter
+    :caption: |ogc-api-proc-part3-collection-input|_ with |filter-cql2-text|_ Filter and |stac-api-spec|_
 
 .. _proc_col_outputs:
 
