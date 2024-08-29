@@ -29,17 +29,17 @@ from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
-from pygeofilter.parsers import cql_json, cql2_json, cql2_text, ecql, jfe
-from pygeofilter.parsers.fes.parser import (
-    parse as fes_parse  # FIXME: https://github.com/geopython/pygeofilter/pull/102
-)
+from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, jfe
+
+# FIXME: https://github.com/geopython/pygeofilter/pull/102
+from pygeofilter.parsers.fes.parser import parse as fes_parse
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
 from weaver.compat import cache
 from weaver.config import WeaverFeature
 from weaver.execute import (
-    ExecuteControlOption,
     ExecuteCollectionFormat,
+    ExecuteControlOption,
     ExecuteMode,
     ExecuteResponse,
     ExecuteTransmissionMode

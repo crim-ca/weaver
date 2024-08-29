@@ -11,11 +11,11 @@ import os
 import sys
 from typing import TYPE_CHECKING, cast
 
-from pystac_client import ItemSearch
-from pystac_client.stac_api_io import StacApiIO
 from owslib.ogcapi.coverages import Coverages
 from owslib.ogcapi.features import Features
 from owslib.ogcapi.maps import Maps
+from pystac_client import ItemSearch
+from pystac_client.stac_api_io import StacApiIO
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -47,8 +47,8 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         CWL_IO_FileValue,
         CWL_IO_ValueMap,
-        JSON,
         JobValueCollection,
+        JSON,
         Path,
         ProcessInputOutputItem
     )

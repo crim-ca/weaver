@@ -78,7 +78,6 @@ if TYPE_CHECKING:
 
     from docker.client import DockerClient
 
-    from weaver.utils import LoggerHandler
     from weaver.typedefs import (
         AnyHeadersContainer,
         AnyRegistryContainer,
@@ -96,6 +95,7 @@ if TYPE_CHECKING:
         SettingsType,
         TypedDict
     )
+    from weaver.utils import LoggerHandler
 
     UpdateFieldListMethod = Literal["append", "override"]
     UpdateFieldListSpec = TypedDict("UpdateFieldListSpec", {
