@@ -182,7 +182,7 @@
 .. |stac-items| replace:: STAC Items
 .. _stac-items: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
 .. |stac-assets| replace:: STAC Assets
-.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md#assets
+.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/commons/assets.md
 
 .. Example references
 .. |examples| replace:: Examples
