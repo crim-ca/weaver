@@ -46,10 +46,10 @@ from weaver.processes.wps_package import (
     WpsPackage,
     _load_package_content,
     _update_package_compatibility,
+    _update_package_metadata,
     format_extension_validator,
     get_application_requirement,
     mask_process_inputs,
-    _update_package_metadata
 )
 from weaver.wps.service import WorkerRequest
 
