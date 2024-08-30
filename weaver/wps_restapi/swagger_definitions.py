@@ -1388,6 +1388,7 @@ class AnyCRS(AnyOfKeywordSchema):
             "WGS84",
         ])),
     ]
+    default = OGC_API_BBOX_EPSG
 
 
 class AnyFilterExpression(AnyOfKeywordSchema):
@@ -1439,12 +1440,13 @@ class FilterSchema(ExtendedMappingSchema):
     filter_crs = AnyCRS(
         name="filter-crs",
         missing=drop,
-        default=OGC_API_BBOX_EPSG,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
         description="Coordinate Reference System for provided spatial properties.",
     )
     filter_lang = AnyFilterLanguage(
         name="filter-lang",
         missing=drop,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
         description=AnyFilterLanguage.description + (
             " If unspecified, the filter language will default to CQL2-Text if a string was provided,"
             " or CQL2-JSON if a JSON object or array structure is detected as the filter."

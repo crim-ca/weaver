@@ -247,8 +247,6 @@ def test_collection_input_parsing(input_data):
     Validate that the schema definition for a ``collection`` input resolves as expected.
     """
     expect = copy.deepcopy(input_data)
-    expect.setdefault("filter-crs", "EPSG:4326")
-    expect.setdefault("filter-lang", "cql2-json")
     result = sd.ExecuteCollectionInput().deserialize(input_data)
     result.pop("format", None)
     assert result == expect
