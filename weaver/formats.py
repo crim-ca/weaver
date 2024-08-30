@@ -454,6 +454,12 @@ _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
     ".yaml": ContentType.APP_YAML,    # common alternative to .yml
     ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
+    ".xsd": ContentType.APP_XML,
+}
+# well-known schema URI that should resolve to an alternate media-type than the auto-resolution
+_CONTENT_TYPE_SCHEMA_OVERRIDES = {
+    re.compile(r"https://geojson\.org/schema/.*\.json"): ContentType.APP_GEOJSON,
+    re.compile(r"https?://(www.)?opengis\.net/def/glossary/term/FeatureCollection"): ContentType.APP_GEOJSON,
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -625,6 +631,11 @@ FORMAT_NAMESPACE_PREFIXES = [
 ] + list(FORMAT_NAMESPACE_DEFINITIONS.values())
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
+# default format if missing (minimal requirement of one)
+DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
+DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
+setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
+
 
 @cache
 def get_allowed_extensions():
@@ -670,7 +681,14 @@ def get_format(media_type, default=None):
         return None
     ext = get_extension(ctype)
     if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
-        fmt = Format(ContentType.APP_JSON, extension=".json", schema=ctype)
+        for uri, typ in _CONTENT_TYPE_SCHEMA_OVERRIDES.items():
+            if re.match(uri, ctype):
+                schema_ctype = typ
+                break
+        else:
+            schema_ctype = get_content_type(os.path.splitext(ctype)[-1], default=DEFAULT_FORMAT.mime_type)
+        schema_ext = get_extension(schema_ctype)
+        fmt = Format(schema_ctype, extension=schema_ext, schema=ctype)
     else:
         fmt = Format(ctype, extension=ext)
     return fmt

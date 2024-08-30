@@ -17,6 +17,8 @@ Changes:
 - Add ``AnyCRS`` schema definition with improved validation of allowed values.
 - Use ``AnyCRS`` schema for ``SupportedCRS``, ``XMLStringCRS``, ``BoundingBoxValue`` and ``ExecuteCollectionInput``
   instead of a generic ``URL`` schema definition for better reference validation, while allowing alternate short forms.
+- Add auto-resolution of media-type for cases where it can reasonably be inferred from a ``schema`` reference,
+  such as an URI referring to a ``.json`` or ``.xsd`` respectively representing `JSON` and `XML` data.
 - Update ``cwltool`` with fork
   `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
   until ``loadContents`` behavior is resolved for ``type: File[]``

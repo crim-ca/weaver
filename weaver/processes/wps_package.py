@@ -60,6 +60,7 @@ from weaver.exceptions import (
     PayloadNotFound
 )
 from weaver.formats import (
+    DEFAULT_FORMAT,
     ContentType,
     clean_media_type_format,
     get_content_type,
@@ -96,7 +97,6 @@ from weaver.processes.constants import (
     PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
-    DEFAULT_FORMAT,
     any2json_literal_data,
     cwl2wps_io,
     get_cwl_io_type,

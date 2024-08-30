@@ -30,6 +30,8 @@ from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
+    DEFAULT_FORMAT,
+    DEFAULT_FORMAT_MISSING,
     ContentType,
     SchemaRole,
     get_content_type,
@@ -90,6 +92,7 @@ from weaver.processes.constants import (
     WPS_CategoryType
 )
 from weaver.utils import (
+    HashDict,
     SchemaRefResolver,
     bytes2str,
     fetch_file,
@@ -245,11 +248,6 @@ WPS_FIELD_MAPPING = {
 #   - keys must match `WPS_FIELD_MAPPING` keys
 #   - fields are placed in order of relevance (prefer explicit format, then supported, and defaults as last resort)
 WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
-
-# default format if missing (minimal requirement of one)
-DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
-DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
-setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
 INPUT_VALUE_TYPE_MAPPING = {
     "bool": bool,
@@ -1742,17 +1740,8 @@ def cwl2wps_io(io_info, io_select):
                     and not any(fmt.strip().endswith(fmt_e) for fmt_e in ["}", ")"])
                 )
             ]
-            for i, io_format in enumerate(list(io_formats)):
-                # when CWL namespaced format are not resolved, full path URI to schema is expected
-                # because of full URI, should have lots of '/' (including protocol separator),
-                # use this to detect content schema reference vs content media-type reference
-                if io_format and len(io_format.mime_type.split("/")) > 2:
-                    io_ext = os.path.splitext(io_format.mime_type)[-1]
-                    io_typ = get_content_type(io_ext)
-                    if not io_typ:  # could not resolve (eg: schema reference or unknown type)
-                        continue
-                    io_format = Format(io_typ, extension=io_ext, schema=io_format.mime_type)
-                    io_formats[i] = io_format
+            # filter out duplicates
+            io_formats = list({HashDict(fmt.json): fmt for fmt in io_formats}.values())
         if io_formats:
             kw["supported_formats"] = io_formats
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)

@@ -28,6 +28,7 @@ from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_se
 from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
+    DEFAULT_FORMAT,
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
@@ -57,7 +58,6 @@ from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
-    DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
     CWLIODefinition,
     any2cwl_io,
@@ -834,6 +834,64 @@ def test_cwl2wps_io_record_format():
     assert len(wps_io.supported_formats) == 1
     assert isinstance(wps_io.supported_formats[0], Format)
     assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
+
+
+@pytest.mark.parametrize(
+    ["test_formats", "expected_types"],
+    [
+        (
+            "${ return \"iana:application/json\"; }",
+            [DEFAULT_FORMAT.mime_type],
+        ),
+        (
+            [
+                "${ return \"iana:application/json\"; }",
+                "iana:application/json"
+            ],
+            [ContentType.APP_JSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/json\"; }",
+                "https://www.iana.org/assignments/media-types/application/json",
+            ],
+            [ContentType.APP_JSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/geo+json\"; }",
+                "https://geojson.org/schema/FeatureCollection.json",
+            ],
+            [ContentType.APP_GEOJSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/geo+json\"; }",
+                "https://example.com/unknown/reference.abc",
+                "https://example.com/unresolved",
+            ],
+            [ContentType.TEXT_PLAIN, ContentType.TEXT_PLAIN],
+        ),
+        (
+            [
+                "https://example.com/unknown/reference.abc",
+                "${ return \"iana:application/geo+json\"; }",
+                "https://example.com/unique/resolved.xsd",
+                "https://example.com/unresolved",
+            ],
+            [ContentType.TEXT_PLAIN, ContentType.APP_XML, ContentType.TEXT_PLAIN],
+        ),
+    ]
+)
+def test_cwl2wps_io_expression_format(test_formats, expected_types):
+    input_def = {
+        "name": "data",
+        "type": "File",
+        "format": test_formats,
+    }
+    input_wps = cwl2wps_io(input_def, IO_INPUT)
+    media_types = [fmt.mime_type for fmt in input_wps.supported_formats]
+    assert media_types == expected_types
 
 
 @pytest.mark.parametrize(

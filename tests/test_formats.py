@@ -169,9 +169,35 @@ def test_get_format_media_type_no_extension(test_extension):
 )
 def test_get_format_media_type_no_extension_with_schema(test_format):
     fmt = f.get_format(test_format)
-    assert fmt.extension == ".json"
-    assert fmt.mime_type == f.ContentType.APP_JSON
+    assert fmt.extension == ".geojson"
+    assert fmt.mime_type == f.ContentType.APP_GEOJSON
     assert fmt.schema == test_format
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_media_type"],
+    [
+        (
+            "https://geojson.org/schema/FeatureCollection.json",
+            f.ContentType.APP_GEOJSON,
+        ),
+        (
+            "https://schemas.opengis.net/gmlcov/1.0/coverage.xsd",
+            f.ContentType.APP_XML,
+        ),
+        (
+            "https://example.com/unknown/reference.abc",
+            f.ContentType.TEXT_PLAIN,
+        ),
+        (
+            "https://example.com/unknown",
+            f.ContentType.TEXT_PLAIN,
+        )
+    ]
+)
+def test_get_format_media_type_from_schema(test_format, expect_media_type):
+    fmt = f.get_format(test_format)
+    assert fmt.mime_type == expect_media_type
 
 
 @pytest.mark.parametrize(

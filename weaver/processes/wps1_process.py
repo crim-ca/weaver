@@ -7,10 +7,10 @@ from requests.exceptions import HTTPError
 
 from weaver import xml_util
 from weaver.execute import ExecuteMode
-from weaver.formats import get_format
+from weaver.formats import DEFAULT_FORMAT, get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import DEFAULT_FORMAT, ows2json_output_data
+from weaver.processes.convert import ows2json_output_data
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import RemoteJobProgress, WpsProcessInterface
 from weaver.status import Status, map_status

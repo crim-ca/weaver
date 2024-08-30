@@ -337,6 +337,28 @@ class CaseInsensitive(str):
         return self.__str.casefold() == str(other).casefold()
 
 
+class HashJSON(Iterable[Any]):
+    def __hash__(self):
+        # type: () -> int
+        return hash(frozenset([
+            HashDict(item.items()).__hash__() if isinstance(item, dict) else
+            HashList(item).__hash__() if isinstance(item, list) else
+            item
+            for item in self
+        ]))
+
+    def __iter__(self):
+        return super().__iter__()
+
+
+class HashList(HashJSON, list):
+    ...
+
+
+class HashDict(HashJSON, dict):
+    ...
+
+
 def json_hashable(func):
     # type: (AnyCallableAnyArgs) -> Callable[[AnyCallableAnyArgs], Return]
     """
@@ -355,24 +377,6 @@ def json_hashable(func):
         Original inspiration: https://stackoverflow.com/a/44776960
         The code is extended to allow recursively supporting JSON-like structures.
     """
-    class HashJSON(Iterable[Any]):
-        def __hash__(self):
-            # type: () -> int
-            return hash(frozenset([
-                HashDict(item.items()).__hash__() if isinstance(item, dict) else
-                HashList(item).__hash__() if isinstance(item, list) else
-                item
-                for item in self
-            ]))
-
-        def __iter__(self):
-            return super().__iter__()
-
-    class HashList(HashJSON, list):
-        ...
-
-    class HashDict(HashJSON, dict):
-        ...
 
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
