@@ -5050,6 +5050,7 @@ class CWLRequirementsMapSupported(StrictMappingSchema):
     description = "Schema that ensures only supported CWL requirements are permitted."
 
     def __init__(self, *_, **__):
+        # type: (*Any, **Any) -> None
         """
         Initialize the mapping to allow only supported CWL requirements.
 
