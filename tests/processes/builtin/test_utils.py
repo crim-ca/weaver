@@ -46,7 +46,7 @@ def test_is_netcdf_url_invalid(invalid_url):
 @pytest.mark.parametrize(
     "invalid_url",
     [
-        "https://example.com/test.json",
+        "https://example.com/netcdf.nc",
         "https://example.com/nested/dir/netcdf.nc",
     ],
 )
