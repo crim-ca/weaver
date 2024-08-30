@@ -1497,7 +1497,7 @@ class FilterSchema(ExtendedMappingSchema):
         try:
             parsed_expr = self.validate(filter_expr, filter_lang)
             return to_cql2(parsed_expr)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, NotImplementedError) as exc:
             raise colander.Invalid(
                 node=self,
                 msg="Invalid filter expression could not be interpreted.",

@@ -5,6 +5,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 import colander
+import mock
 import pytest
 
 from weaver.formats import ContentType
@@ -312,3 +313,46 @@ def test_collection_input_invalid(input_data):
     """
     with pytest.raises(colander.Invalid):
         sd.ExecuteCollectionInput().deserialize(input_data)
+
+
+@pytest.mark.parametrize(
+    ["filter_data", "filter_lang"],
+    [
+        ("test = bad", "cql2-json"),
+        ("test = bad", "cql-json"),
+        ("test = bad", "jfe"),
+        ({"test": "bad"}, "cql-text"),
+        ({"test": "bad"}, "cql2-text"),
+        ({"test": "bad"}, "ecql"),
+        ({"test": "bad"}, "cql"),
+        ({"test": "bad"}, "simple-cql"),
+        ({"test": "bad"}, "fes"),
+    ]
+)
+def test_collection_input_filter_parsing_error(filter_data, filter_lang):
+    input_data = {
+        "collection": "https://example.com/collections/test",
+        "filter": filter_data,
+        "filter-lang": filter_lang,
+    }
+    with pytest.raises(colander.Invalid) as exc:
+        sd.FilterSchema.parse.__wrapped__.cache_clear()  # noqa
+        sd.ExecuteCollectionInput().deserialize(input_data)
+    assert exc.value.msg == "Invalid filter expression could not be parsed against specified language."
+
+
+def test_collection_input_filter_interpreter_error():
+    input_data = {
+        "collection": "https://example.com/collections/test",
+        "filter": {},
+    }
+    with mock.patch("weaver.wps_restapi.swagger_definitions.FilterSchema.validate", return_value=None):
+        with pytest.raises(colander.Invalid) as exc:
+            sd.ExecuteCollectionInput().deserialize(input_data)
+    assert exc.value.msg == "Invalid filter expression could not be interpreted."
+
+
+def test_collection_input_filter_unresolved_error():
+    with pytest.raises(colander.Invalid) as exc:
+        sd.FilterSchema().parse({}, "unknown-language")  # noqa
+    assert exc.value.msg == "Unresolved filter expression language."
