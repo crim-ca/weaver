@@ -1562,10 +1562,12 @@ class SortBySchema(ExtendedMappingSchema):
         result = super().deserialize(cstruct)
         if not result:
             return result
-        if cstruct.get("sortBy") and cstruct.get("sortby"):
+        if result.get("sortby"):
             # keep only 'official' "sortBy" from OGC API Processes
             # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
-            del cstruct["sortby"]
+            if not result.get("sortBy"):
+                result["sortBy"] = result["sortby"]
+            del result["sortby"]
         return result
 
 

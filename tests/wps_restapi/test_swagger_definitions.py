@@ -253,6 +253,30 @@ def test_collection_input_parsing(input_data):
     assert result == expect
 
 
+@pytest.mark.parametrize(
+    ["sort_by", "expect"],
+    [
+        ({}, {}),
+        ({"sortBy": "-eo:cloud_cover"}, {"sortBy": "-eo:cloud_cover"}),
+        ({"sortby": "-eo:cloud_cover"}, {"sortBy": "-eo:cloud_cover"}),
+        ({"sortby": "+name,-eo:cloud_cover"}, {"sortBy": "+name,-eo:cloud_cover"}),
+        ({"sortBy": "+name", "sortby": "-name"}, {"sortBy": "+name"}),
+    ]
+)
+def test_collection_input_sortby(sort_by, expect):
+    # type: (JSON, JSON) -> None
+    input_data = {"collection": "https://example.com/collections/test"}
+    expect.update(copy.deepcopy(input_data))
+    input_data.update(sort_by)
+    result = sd.ExecuteCollectionInput().deserialize(input_data)
+    result.pop("format")
+    assert result == expect
+
+
+def test_collection_input_sortby_missing():
+    assert sd.SortBySchema().deserialize({}) in [colander.drop, {}]
+
+
 def test_collection_input_filter_lang_case_insensitive():
     col = {
         "collection": "https://example.com/collections/test",
@@ -356,3 +380,7 @@ def test_collection_input_filter_unresolved_error():
     with pytest.raises(colander.Invalid) as exc:
         sd.FilterSchema().parse({}, "unknown-language")  # noqa
     assert exc.value.msg == "Unresolved filter expression language."
+
+
+def test_collection_input_filter_missing():
+    assert sd.FilterSchema().deserialize({}) in [colander.drop, {}]
