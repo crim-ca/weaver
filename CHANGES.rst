@@ -34,6 +34,8 @@ Fixes:
   reference provided as an URI schema from an ontology. Parsing caused the URI to be split, causing an invalid
   resolution. If no appropriate media-type is provided, JSON will be used by default, while preserving the submitted
   schema URI.
+- Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
+- Fix minor resolution combinations or redundant checks for multiple ``weaver.formats`` utilities.
 
 .. _changes_5.7.0:
 
