@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
 
 .. _changes_5.7.0:
 

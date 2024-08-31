@@ -173,7 +173,7 @@ class ContentEncoding(Constants):
         """
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
-        if ContentEncoding.is_text(encoding):
+        if ContentEncoding.is_binary(encoding):
             mode = cast("FileModeEncoding", f"{mode}b")
             return mode, None
         return mode, ContentEncoding.UTF_8

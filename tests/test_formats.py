@@ -128,7 +128,67 @@ def test_content_encoding_get(test_encoding, expected_encoding):
 def test_content_encoding_encode_decode(data, encoding, binary, result):
     assert f.ContentEncoding.encode(data, encoding, binary) == result
     b_data = isinstance(data, bytes)
-    assert f.ContentEncoding.decode(result, encoding, b_data) == data
+    assert f.ContentEncoding.decode(result, encoding, b_data) == data  # type: ignore
+
+
+def test_content_encoding_values():
+    assert set(f.ContentEncoding.values()) == {
+        f.ContentEncoding.UTF_8,
+        f.ContentEncoding.BINARY,
+        f.ContentEncoding.BASE16,
+        f.ContentEncoding.BASE32,
+        f.ContentEncoding.BASE64,
+    }
+
+
+@pytest.mark.parametrize(
+    ["encoding", "expect"],
+    itertools.chain(
+        itertools.product(
+            set(f.ContentEncoding.values()) - {f.ContentEncoding.UTF_8},
+            [False],
+        ),
+        [
+            (f.ContentEncoding.UTF_8, True)
+        ]
+    )
+)
+def test_content_encoding_is_text(encoding, expect):
+    assert f.ContentEncoding.is_text(encoding) == expect
+
+
+@pytest.mark.parametrize(
+    ["encoding", "expect"],
+    itertools.chain(
+        itertools.product(
+            set(f.ContentEncoding.values()) - {f.ContentEncoding.UTF_8},
+            [True],
+        ),
+        [
+            (f.ContentEncoding.UTF_8, False)
+        ]
+    )
+)
+def test_content_encoding_is_binary(encoding, expect):
+    assert f.ContentEncoding.is_binary(encoding) == expect
+
+
+@pytest.mark.parametrize(
+    ["encoding", "mode"],
+    itertools.product(
+        f.ContentEncoding.values(),
+        ["r", "w", "a", "r+", "w+"],
+    )
+)
+def test_content_encoding_open_parameters(encoding, mode):
+    result = f.ContentEncoding.open_parameters(encoding, mode)
+    if encoding == f.ContentEncoding.UTF_8:
+        assert result[0] == mode
+        assert result[1] == f.ContentEncoding.UTF_8
+    else:
+        assert result[0][-1] == "b"
+        assert result[0][:-1] == mode
+        assert result[1] is None
 
 
 @pytest.mark.parametrize(
