@@ -1015,8 +1015,11 @@ def guess_target_format(
             content_type = get_content_type(content_type)
             format_source = "query"
     if not content_type:
-        content_type = get_header("accept", request.headers, default=default or "")
-        format_source = "header"
+        content_type = get_header("accept", request.headers, default=None)
+        if content_type:
+            format_source = "header"
+        else:
+            content_type = default or ""
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
             if override_user_agent and (ctype != default or not default):

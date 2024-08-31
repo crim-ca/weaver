@@ -12,6 +12,7 @@ from pyramid.response import Response
 from pywps.inout.formats import Format
 from requests.exceptions import ConnectionError
 
+from tests.utils import MockedRequest
 from weaver import formats as f
 from weaver.utils import null
 
@@ -61,8 +62,8 @@ def test_valid_media_type_categories(media_type):
         (f.ContentType.APP_DIR, {"dot": True}, "/"),
         (f.ContentType.APP_DIR, {"dot": False}, "/"),
         (f.ContentType.APP_JSON, {"dot": False}, "json"),
-        # ("x", {"dot": True}, ".x"),
-        # ("x", {"dot": False}, "x"),
+        ("x", {"dot": True}, ".x"),
+        ("x", {"dot": False}, "x"),
         ("x/y", {"dot": True}, ".y"),
         ("x/.y", {"dot": False}, "y"),
         (f.ContentType.ANY, {}, ".*"),
@@ -496,6 +497,37 @@ def test_clean_media_type_format_io_strip_base_and_remove_parameters(expected_co
 )
 def test_clean_media_type_format_default(suffix_subtype, strip_parameters):
     assert f.clean_media_type_format("", suffix_subtype=suffix_subtype, strip_parameters=strip_parameters) is None
+
+
+@pytest.mark.parametrize(
+    ["accept", "query", "default", "user_agent", "source", "expect"],
+    [
+        (None, None, None, None, "default", f.ContentType.APP_JSON),
+        (None, None, None, "Mozilla/5.0", "default", f.ContentType.APP_JSON),
+        (None, None, None, "python-requests/1.2.3", "default", f.ContentType.APP_JSON),
+        (None, None, f.ContentType.APP_XML, None, "default", f.ContentType.APP_XML),
+        (None, None, f.ContentType.APP_XML, "Mozilla/5.0", "default", f.ContentType.APP_XML),
+        (None, None, f.ContentType.APP_XML, "python-requests/1.2.3", "default", f.ContentType.APP_XML),
+        (None, "unknown", None, None, "query", f.ContentType.APP_JSON),
+        (None, f.OutputFormat.JSON, None, None, "query", f.ContentType.APP_JSON),
+        (None, f.OutputFormat.HTML, None, None, "query", f.ContentType.TEXT_HTML),
+        (f.ContentType.ANY, None, None, None, "default", f.ContentType.APP_JSON),
+        (f.ContentType.ANY, None, f.ContentType.APP_XML, None, "default", f.ContentType.APP_XML),
+        (f.ContentType.APP_JSON, None, None, None, "header", f.ContentType.APP_JSON),
+        (f.ContentType.TEXT_HTML, None, None, None, "header", f.ContentType.TEXT_HTML),
+    ]
+)
+def test_guess_target_format(accept, query, default, user_agent, source, expect):
+    req = MockedRequest()
+    if user_agent:
+        req.headers["User-Agent"] = user_agent
+    if accept:
+        req.headers["Accept"] = accept
+    if query:
+        req.params["format"] = query
+    fmt, src = f.guess_target_format(req, default=default, return_source=True, override_user_agent=True)
+    assert src == source
+    assert fmt == expect
 
 
 def test_repr_json_default_string():
