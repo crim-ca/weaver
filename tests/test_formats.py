@@ -50,6 +50,7 @@ def test_valid_media_type_categories(media_type):
 @pytest.mark.parametrize(
     ["test_extension", "extra_params", "expected_content_type"],
     [
+        ("", {"dot": False}, ""),
         (f.ContentType.APP_JSON, {}, ".json"),  # basic
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", {}, ".json"),  # ignore extra parameters
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
@@ -59,6 +60,11 @@ def test_valid_media_type_categories(media_type):
         ("application/unknown", {}, ".unknown"),
         (f.ContentType.APP_DIR, {"dot": True}, "/"),
         (f.ContentType.APP_DIR, {"dot": False}, "/"),
+        (f.ContentType.APP_JSON, {"dot": False}, "json"),
+        # ("x", {"dot": True}, ".x"),
+        # ("x", {"dot": False}, "x"),
+        ("x/y", {"dot": True}, ".y"),
+        ("x/.y", {"dot": False}, "y"),
         (f.ContentType.ANY, {}, ".*"),
     ]
 )

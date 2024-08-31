@@ -686,13 +686,10 @@ def get_extension(media_type, dot=True):
         if not fmt.extension.startswith("."):
             return fmt.extension
         return _handle_dot(fmt.extension)
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(media_type)
-    if ext:
-        return _handle_dot(ext)
     ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return ""
-    ext_default = f".{ctype.split('/')[-1].replace('x-', '')}"
+    ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
     return _handle_dot(ext)
 
