@@ -538,3 +538,95 @@ def test_repr_json_handle_datetime():
 )
 def test_output_format_default(unknown_format, default_format, expect_format):
     assert f.OutputFormat.get(unknown_format, default=default_format) == expect_format
+
+
+@pytest.mark.parametrize(
+    "test_format",
+    f.OutputFormat.values()
+)
+def test_output_format_values(test_format):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, default="DEFAULT")  # type: ignore
+    assert output == test_format
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_type"],
+    [
+        (f.ContentType.APP_JSON, f.OutputFormat.JSON),
+        (f.ContentType.APP_XML, f.OutputFormat.XML),
+        (f.ContentType.TEXT_XML, f.OutputFormat.XML),
+        (f.ContentType.TEXT_HTML, f.OutputFormat.HTML),
+        (f.ContentType.TEXT_PLAIN, f.OutputFormat.TXT),
+        (f.ContentType.APP_YAML, f.OutputFormat.YML),
+    ]
+)
+def test_output_format_media_type(test_format, expect_type):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, default="DEFAULT")  # type: ignore
+    assert output == expect_type
+
+
+@pytest.mark.parametrize(
+    ["test_format", "allow_version", "expect_type"],
+    [
+        ("1.0.0", True, f.OutputFormat.XML),
+        ("1.0.0", False, "DEFAULT"),
+        ("2.0.0", True, f.OutputFormat.JSON),
+        ("2.0.0", False, "DEFAULT"),
+        ("other", True, "DEFAULT"),
+        ("other", False, "DEFAULT"),
+    ]
+)
+def test_output_format_version(test_format, allow_version, expect_type):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, allow_version=allow_version, default="DEFAULT")  # type: ignore
+    assert output == expect_type
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_data"],
+    [
+        # (
+        #     "DEFAULT",
+        #     {"data": [123]}
+        # ),
+        # (
+        #     f.OutputFormat.JSON,
+        #     {"data": [123]}
+        # ),
+        # (
+        #     f.OutputFormat.YAML,
+        #     inspect.cleandoc("""
+        #     data:
+        #     - 123
+        #     """) + "\n"
+        # ),
+        (
+            f.OutputFormat.XML,
+            inspect.cleandoc("""
+            <?xml version="1.0" encoding="UTF-8" ?>
+            <item>
+            <data type="list">
+            <item type="int">123</item>
+            </data>
+            </item>
+            """).replace("\n", "").encode()
+        ),
+        (
+            f.OutputFormat.XML_STR,
+            # FIXME: 'encoding="UTF-8"' missing (https://github.com/vinitkumar/json2xml/pull/213)
+            inspect.cleandoc("""
+            <?xml version="1.0" ?>
+            <item>
+                <data type="list">
+                    <item type="int">123</item>
+                </data>
+            </item>
+            """).replace("    ", "\t")
+        ),
+    ]
+)
+def test_output_format_convert(test_format, expect_data):
+    data = f.OutputFormat.convert({"data": [123]}, test_format)
+    assert data == expect_data
