@@ -587,21 +587,21 @@ def test_output_format_version(test_format, allow_version, expect_type):
 @pytest.mark.parametrize(
     ["test_format", "expect_data"],
     [
-        # (
-        #     "DEFAULT",
-        #     {"data": [123]}
-        # ),
-        # (
-        #     f.OutputFormat.JSON,
-        #     {"data": [123]}
-        # ),
-        # (
-        #     f.OutputFormat.YAML,
-        #     inspect.cleandoc("""
-        #     data:
-        #     - 123
-        #     """) + "\n"
-        # ),
+        (
+            "DEFAULT",
+            {"data": [123]}
+        ),
+        (
+            f.OutputFormat.JSON,
+            {"data": [123]}
+        ),
+        (
+            f.OutputFormat.YAML,
+            inspect.cleandoc("""
+            data:
+            - 123
+            """) + "\n"
+        ),
         (
             f.OutputFormat.XML,
             inspect.cleandoc("""

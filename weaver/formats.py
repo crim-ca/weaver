@@ -421,7 +421,7 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
-        return data
+        return data  # pragma: no cover  # last resort if new output format unhandled
 
 
 class SchemaRole(Constants):
