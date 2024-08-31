@@ -92,6 +92,19 @@ def test_get_content_type(test_extension, extra_params, expected_content_type):
 
 
 @pytest.mark.parametrize(
+    ["content_type", "charset", "expected_content_type"],
+    [
+        (f.ContentType.APP_JSON, "UTF-8", f"{f.ContentType.APP_JSON}; charset=UTF-8"),
+        (f.ContentType.APP_JSON, "ISO-8859-1", f"{f.ContentType.APP_JSON}; charset=ISO-8859-1"),
+        (f"{f.ContentType.APP_XML}; profile=test", "UTF-8", f"{f.ContentType.APP_XML}; profile=test; charset=UTF-8"),
+        (f"{f.ContentType.APP_XML}; charset=UTF-8", "UTF-8", f"{f.ContentType.APP_XML}; charset=UTF-8"),
+    ]
+)
+def test_add_content_type_charset(content_type, charset, expected_content_type):
+    assert f.add_content_type_charset(content_type, charset) == expected_content_type
+
+
+@pytest.mark.parametrize(
     ["test_encoding", "expected_encoding"],
     [
         (f.ContentEncoding.UTF_8.upper(), f.ContentEncoding.UTF_8),
