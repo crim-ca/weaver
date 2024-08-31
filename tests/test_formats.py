@@ -12,6 +12,7 @@ from pyramid.response import Response
 from pywps.inout.formats import Format
 from requests.exceptions import ConnectionError
 
+from tests.utils import MockedRequest
 from weaver import formats as f
 from weaver.utils import null
 
@@ -50,6 +51,7 @@ def test_valid_media_type_categories(media_type):
 @pytest.mark.parametrize(
     ["test_extension", "extra_params", "expected_content_type"],
     [
+        ("", {"dot": False}, ""),
         (f.ContentType.APP_JSON, {}, ".json"),  # basic
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", {}, ".json"),  # ignore extra parameters
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
@@ -59,6 +61,11 @@ def test_valid_media_type_categories(media_type):
         ("application/unknown", {}, ".unknown"),
         (f.ContentType.APP_DIR, {"dot": True}, "/"),
         (f.ContentType.APP_DIR, {"dot": False}, "/"),
+        (f.ContentType.APP_JSON, {"dot": False}, "json"),
+        ("x", {"dot": True}, ".x"),
+        ("x", {"dot": False}, "x"),
+        ("x/y", {"dot": True}, ".y"),
+        ("x/.y", {"dot": False}, "y"),
         (f.ContentType.ANY, {}, ".*"),
     ]
 )
@@ -83,6 +90,19 @@ def test_get_extension(test_extension, extra_params, expected_content_type):
 )
 def test_get_content_type(test_extension, extra_params, expected_content_type):
     assert f.get_content_type(test_extension, **extra_params) == expected_content_type
+
+
+@pytest.mark.parametrize(
+    ["content_type", "charset", "expected_content_type"],
+    [
+        (f.ContentType.APP_JSON, "UTF-8", f"{f.ContentType.APP_JSON}; charset=UTF-8"),
+        (f.ContentType.APP_JSON, "ISO-8859-1", f"{f.ContentType.APP_JSON}; charset=ISO-8859-1"),
+        (f"{f.ContentType.APP_XML}; profile=test", "UTF-8", f"{f.ContentType.APP_XML}; profile=test; charset=UTF-8"),
+        (f"{f.ContentType.APP_XML}; charset=UTF-8", "UTF-8", f"{f.ContentType.APP_XML}; charset=UTF-8"),
+    ]
+)
+def test_add_content_type_charset(content_type, charset, expected_content_type):
+    assert f.add_content_type_charset(content_type, charset) == expected_content_type
 
 
 @pytest.mark.parametrize(
@@ -128,7 +148,67 @@ def test_content_encoding_get(test_encoding, expected_encoding):
 def test_content_encoding_encode_decode(data, encoding, binary, result):
     assert f.ContentEncoding.encode(data, encoding, binary) == result
     b_data = isinstance(data, bytes)
-    assert f.ContentEncoding.decode(result, encoding, b_data) == data
+    assert f.ContentEncoding.decode(result, encoding, b_data) == data  # type: ignore
+
+
+def test_content_encoding_values():
+    assert set(f.ContentEncoding.values()) == {
+        f.ContentEncoding.UTF_8,
+        f.ContentEncoding.BINARY,
+        f.ContentEncoding.BASE16,
+        f.ContentEncoding.BASE32,
+        f.ContentEncoding.BASE64,
+    }
+
+
+@pytest.mark.parametrize(
+    ["encoding", "expect"],
+    itertools.chain(
+        itertools.product(
+            set(f.ContentEncoding.values()) - {f.ContentEncoding.UTF_8},
+            [False],
+        ),
+        [
+            (f.ContentEncoding.UTF_8, True)
+        ]
+    )
+)
+def test_content_encoding_is_text(encoding, expect):
+    assert f.ContentEncoding.is_text(encoding) == expect
+
+
+@pytest.mark.parametrize(
+    ["encoding", "expect"],
+    itertools.chain(
+        itertools.product(
+            set(f.ContentEncoding.values()) - {f.ContentEncoding.UTF_8},
+            [True],
+        ),
+        [
+            (f.ContentEncoding.UTF_8, False)
+        ]
+    )
+)
+def test_content_encoding_is_binary(encoding, expect):
+    assert f.ContentEncoding.is_binary(encoding) == expect
+
+
+@pytest.mark.parametrize(
+    ["encoding", "mode"],
+    itertools.product(
+        f.ContentEncoding.values(),
+        ["r", "w", "a", "r+", "w+"],
+    )
+)
+def test_content_encoding_open_parameters(encoding, mode):
+    result = f.ContentEncoding.open_parameters(encoding, mode)
+    if encoding == f.ContentEncoding.UTF_8:
+        assert result[0] == mode
+        assert result[1] == f.ContentEncoding.UTF_8
+    else:
+        assert result[0][-1] == "b"
+        assert result[0][:-1] == mode
+        assert result[1] is None
 
 
 @pytest.mark.parametrize(
@@ -419,6 +499,37 @@ def test_clean_media_type_format_default(suffix_subtype, strip_parameters):
     assert f.clean_media_type_format("", suffix_subtype=suffix_subtype, strip_parameters=strip_parameters) is None
 
 
+@pytest.mark.parametrize(
+    ["accept", "query", "default", "user_agent", "source", "expect"],
+    [
+        (None, None, None, None, "default", f.ContentType.APP_JSON),
+        (None, None, None, "Mozilla/5.0", "default", f.ContentType.APP_JSON),
+        (None, None, None, "python-requests/1.2.3", "default", f.ContentType.APP_JSON),
+        (None, None, f.ContentType.APP_XML, None, "default", f.ContentType.APP_XML),
+        (None, None, f.ContentType.APP_XML, "Mozilla/5.0", "default", f.ContentType.APP_XML),
+        (None, None, f.ContentType.APP_XML, "python-requests/1.2.3", "default", f.ContentType.APP_XML),
+        (None, "unknown", None, None, "query", f.ContentType.APP_JSON),
+        (None, f.OutputFormat.JSON, None, None, "query", f.ContentType.APP_JSON),
+        (None, f.OutputFormat.HTML, None, None, "query", f.ContentType.TEXT_HTML),
+        (f.ContentType.ANY, None, None, None, "default", f.ContentType.APP_JSON),
+        (f.ContentType.ANY, None, f.ContentType.APP_XML, None, "default", f.ContentType.APP_XML),
+        (f.ContentType.APP_JSON, None, None, None, "header", f.ContentType.APP_JSON),
+        (f.ContentType.TEXT_HTML, None, None, None, "header", f.ContentType.TEXT_HTML),
+    ]
+)
+def test_guess_target_format(accept, query, default, user_agent, source, expect):
+    req = MockedRequest()
+    if user_agent:
+        req.headers["User-Agent"] = user_agent
+    if accept:
+        req.headers["Accept"] = accept
+    if query:
+        req.params["format"] = query
+    fmt, src = f.guess_target_format(req, default=default, return_source=True, override_user_agent=True)
+    assert src == source
+    assert fmt == expect
+
+
 def test_repr_json_default_string():
     obj_ref = object()
     values = {"test": obj_ref}
@@ -478,3 +589,95 @@ def test_repr_json_handle_datetime():
 )
 def test_output_format_default(unknown_format, default_format, expect_format):
     assert f.OutputFormat.get(unknown_format, default=default_format) == expect_format
+
+
+@pytest.mark.parametrize(
+    "test_format",
+    f.OutputFormat.values()
+)
+def test_output_format_values(test_format):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, default="DEFAULT")  # type: ignore
+    assert output == test_format
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_type"],
+    [
+        (f.ContentType.APP_JSON, f.OutputFormat.JSON),
+        (f.ContentType.APP_XML, f.OutputFormat.XML),
+        (f.ContentType.TEXT_XML, f.OutputFormat.XML),
+        (f.ContentType.TEXT_HTML, f.OutputFormat.HTML),
+        (f.ContentType.TEXT_PLAIN, f.OutputFormat.TXT),
+        (f.ContentType.APP_YAML, f.OutputFormat.YML),
+    ]
+)
+def test_output_format_media_type(test_format, expect_type):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, default="DEFAULT")  # type: ignore
+    assert output == expect_type
+
+
+@pytest.mark.parametrize(
+    ["test_format", "allow_version", "expect_type"],
+    [
+        ("1.0.0", True, f.OutputFormat.XML),
+        ("1.0.0", False, "DEFAULT"),
+        ("2.0.0", True, f.OutputFormat.JSON),
+        ("2.0.0", False, "DEFAULT"),
+        ("other", True, "DEFAULT"),
+        ("other", False, "DEFAULT"),
+    ]
+)
+def test_output_format_version(test_format, allow_version, expect_type):
+    # use a different/impossible 'default' just to make sure the actual default is not matched 'just by chance'
+    output = f.OutputFormat.get(test_format, allow_version=allow_version, default="DEFAULT")  # type: ignore
+    assert output == expect_type
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_data"],
+    [
+        (
+            "DEFAULT",
+            {"data": [123]}
+        ),
+        (
+            f.OutputFormat.JSON,
+            {"data": [123]}
+        ),
+        (
+            f.OutputFormat.YAML,
+            inspect.cleandoc("""
+            data:
+            - 123
+            """) + "\n"
+        ),
+        (
+            f.OutputFormat.XML,
+            inspect.cleandoc("""
+            <?xml version="1.0" encoding="UTF-8" ?>
+            <item>
+            <data type="list">
+            <item type="int">123</item>
+            </data>
+            </item>
+            """).replace("\n", "").encode()
+        ),
+        (
+            f.OutputFormat.XML_STR,
+            # FIXME: 'encoding="UTF-8"' missing (https://github.com/vinitkumar/json2xml/pull/213)
+            inspect.cleandoc("""
+            <?xml version="1.0" ?>
+            <item>
+                <data type="list">
+                    <item type="int">123</item>
+                </data>
+            </item>
+            """).replace("    ", "\t")
+        ),
+    ]
+)
+def test_output_format_convert(test_format, expect_data):
+    data = f.OutputFormat.convert({"data": [123]}, test_format)
+    assert data == expect_data

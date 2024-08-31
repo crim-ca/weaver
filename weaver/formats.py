@@ -173,7 +173,7 @@ class ContentEncoding(Constants):
         """
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
-        if ContentEncoding.is_text(encoding):
+        if ContentEncoding.is_binary(encoding):
             mode = cast("FileModeEncoding", f"{mode}b")
             return mode, None
         return mode, ContentEncoding.UTF_8
@@ -421,7 +421,7 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
-        return data
+        return data  # pragma: no cover  # last resort if new output format unhandled
 
 
 class SchemaRole(Constants):
@@ -686,13 +686,10 @@ def get_extension(media_type, dot=True):
         if not fmt.extension.startswith("."):
             return fmt.extension
         return _handle_dot(fmt.extension)
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(media_type)
-    if ext:
-        return _handle_dot(ext)
     ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return ""
-    ext_default = f".{ctype.split('/')[-1].replace('x-', '')}"
+    ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
     return _handle_dot(ext)
 
@@ -1018,8 +1015,11 @@ def guess_target_format(
             content_type = get_content_type(content_type)
             format_source = "query"
     if not content_type:
-        content_type = get_header("accept", request.headers, default=default or "")
-        format_source = "header"
+        content_type = get_header("accept", request.headers, default=None)
+        if content_type:
+            format_source = "header"
+        else:
+            content_type = default or ""
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
             if override_user_agent and (ctype != default or not default):
