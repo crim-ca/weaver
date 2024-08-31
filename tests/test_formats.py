@@ -725,6 +725,8 @@ def test_output_format_convert(test_format, expect_data):
     data = f.OutputFormat.convert({"data": [123]}, test_format)
     assert data == expect_data
 
+
+@pytest.mark.parametrize(
     ["io_definition", "expected_media_type"],
     [
         ({}, None),
@@ -742,8 +744,6 @@ def test_output_format_convert(test_format, expect_data):
         ),
     ]
 )
-
-
 def test_find_supported_media_types(io_definition, expected_media_type):
     found_media_type = f.find_supported_media_types(io_definition)
     if isinstance(found_media_type, list):
