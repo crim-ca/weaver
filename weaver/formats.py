@@ -839,7 +839,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
             # allow temporary HTTP resolution given IANA is a well-known URI
             # however, ensure the cause is in fact related to SSL, and still a resolvable referenced
             http_err = str(exc.args[0]).lower()
-            http_url = "http://" + _media_type_url.split("://", 1)[-1]
+            http_url = f"http://{_media_type_url.split('://', 1)[-1]}"
             if (
                 _media_type_url.startswith(IANA_NAMESPACE_URL) and
                 any(err in http_err for err in ["ssl", "handshake"]) and
