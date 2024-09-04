@@ -6,6 +6,8 @@ from typing_extensions import Literal, get_args
 from weaver.base import Constants
 
 if TYPE_CHECKING:
+    from typing import Dict
+
     from weaver.typedefs import CWL_Namespace
 
 IO_SelectInput_Type = Literal["input"]
@@ -98,7 +100,7 @@ CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
 })  # type: CWL_Namespace
 
 # weaver-specific requirements, but non-namespaced for backward support
-CWL_NAMESPACES = {}
+CWL_NAMESPACES = {}  # type: Dict[str, str]
 CWL_NAMESPACES.update(CWL_NAMESPACE_SPEC_DEFINITION)
 CWL_NAMESPACES.update(CWL_NAMESPACE_CWLTOOL_DEFINITION)
 CWL_NAMESPACES = MappingProxyType(CWL_NAMESPACES)  # type: CWL_Namespace

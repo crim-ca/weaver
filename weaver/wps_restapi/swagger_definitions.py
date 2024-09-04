@@ -59,9 +59,12 @@ from weaver.formats import (
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
+    CWL_NAMESPACE_CWLTOOL_ID,
     CWL_NAMESPACE_CWLTOOL_URL,
     CWL_NAMESPACE_SCHEMA_ID,
     CWL_NAMESPACE_SCHEMA_URL,
+    CWL_NAMESPACE_SPEC_ID,
+    CWL_NAMESPACE_SPEC_URL,
     CWL_NAMESPACE_WEAVER,
     CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -5446,12 +5449,12 @@ class CWLNamespaces(StrictMappingSchema):
     var = URI(variable="{namespace}", missing=drop)
     cwl = URI(
         missing=drop,
-        name=CWL_NAMESPACE,
-        validator=OneOf([CWL_NAMESPACE_URL, CWL_NAMESPACE_URL.rstrip("#")]),
+        name=CWL_NAMESPACE_SPEC_ID,
+        validator=OneOf([CWL_NAMESPACE_SPEC_URL, CWL_NAMESPACE_SPEC_URL.rstrip("#")]),
     )
     cwltool = URI(
         missing=drop,
-        name=CWL_NAMESPACE_CWLTOOL,
+        name=CWL_NAMESPACE_CWLTOOL_ID,
         validator=OneOf([CWL_NAMESPACE_CWLTOOL_URL, CWL_NAMESPACE_CWLTOOL_URL.rstrip("#")]),
     )
     edam = URI(
