@@ -6,7 +6,7 @@ import os
 import re
 import socket
 from typing import TYPE_CHECKING, cast, overload
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 import yaml
@@ -829,11 +829,30 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
                     with urlopen(_media_type_url, timeout=2) as resp:  # nosec: B310  # IANA scheme guaranteed HTTP
                         if resp.code == HTTPOk.code:
                             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
-                except socket.timeout:
+                except socket.timeout:  # pragma: no cover
                     continue
-                break
-        except HTTPError:
+                break      # pragma: no cover  # don't keep retrying if the cause is not timeout/ssl, but not resolved
+        except HTTPError:  # pragma: no cover  # same as above, but for cases where the HTTP code raised directly
             pass
+        except URLError as exc:
+            # if error is caused by a sporadic SSL error
+            # allow temporary HTTP resolution given IANA is a well-known URI
+            # however, ensure the cause is in fact related to SSL, and still a resolvable referenced
+            http_err = str(exc.args[0]).lower()
+            http_url = "http://" + _media_type_url.split("://", 1)[-1]
+            if (
+                _media_type_url.startswith(IANA_NAMESPACE_URL) and
+                any(err in http_err for err in ["ssl", "handshake"]) and
+                any(err in http_err for err in ["timeout", "timed out"])
+            ):
+                try:
+                    resp = request_extra("head", http_url, retries=0, timeout=2,
+                                         allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
+                    if resp.status_code == HTTPOk.code:
+                        return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
+                except ConnectionError:  # pragma: no cover
+                    LOGGER.debug("Format request [%s] connection error: [%s] (last resort no-SSL check)", http_url, exc)
+                    return None
         return None
 
     if not media_type:

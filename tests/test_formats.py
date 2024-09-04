@@ -4,6 +4,8 @@ import inspect
 import itertools
 import os
 import uuid
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import mock
 import pytest
@@ -14,7 +16,7 @@ from requests.exceptions import ConnectionError
 
 from tests.utils import MockedRequest
 from weaver import formats as f
-from weaver.utils import null
+from weaver.utils import null, request_extra
 
 _ALLOWED_MEDIA_TYPE_CATEGORIES = [
     "application",
@@ -382,6 +384,30 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
                 assert fmt == f"{f.IANA_NAMESPACE}:{f.ContentType.IMAGE_PNG}"
                 assert mocked_request.call_count == 4, "Expected internally attempted 4 times (1 attempt + 3 retries)"
                 assert mocked_urlopen.call_count == 1, "Expected internal fallback request calls"
+
+
+def test_get_cwl_file_format_retry_fallback_ssl_error():
+    def http_only_request_extra(method, url, *_, **__):
+        if url.startswith("https://"):
+            raise ConnectionError("fake SSL error")
+        return request_extra(method, url, *_, **__)
+
+    def http_only_urlopen(url, *_, **__):
+        if url.startswith("https://"):
+            raise URLError("urlopen fake SSL error: The handshake operation timed out")
+        return urlopen(url, *_, **__)
+
+    with mock.patch("weaver.utils.request_extra", side_effect=http_only_request_extra) as mocked_request_extra:
+        with mock.patch("weaver.formats.urlopen", side_effect=http_only_urlopen) as mocked_urlopen:
+            test_type = f"{f.IANA_NAMESPACE}:text/javascript"
+            url_ctype = f"{f.IANA_NAMESPACE_URL}text/javascript"
+            ns, ctype = f.get_cwl_file_format(test_type)
+            assert ns == f.IANA_NAMESPACE_DEFINITION
+            assert ctype == test_type
+            assert mocked_urlopen.call_count == 1, "1 call for urllib approach as first attempt failing HTTPS SSL check"
+            assert mocked_request_extra.call_count == 2, "2 calls should occur, 1 for HTTPS, 1 for HTTP fallback"
+            assert mocked_request_extra.call_args_list[0].args == ("head", url_ctype)
+            assert mocked_request_extra.call_args_list[1].args == ("head", url_ctype.replace("https://", "http://"))
 
 
 def test_get_cwl_file_format_synonym():
