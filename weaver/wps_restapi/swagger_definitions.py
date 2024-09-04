@@ -28,10 +28,22 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
+from pygeofilter.backends.cql2_json import to_cql2
+from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, jfe
+
+# FIXME: https://github.com/geopython/pygeofilter/pull/102
+from pygeofilter.parsers.fes.parser import parse as fes_parse
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver.compat import cache
 from weaver.config import WeaverFeature
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteCollectionFormat,
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteTransmissionMode
+)
 from weaver.formats import (
     EDAM_NAMESPACE,
     EDAM_NAMESPACE_URL,
@@ -47,12 +59,9 @@ from weaver.formats import (
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
-    CWL_NAMESPACE,
-    CWL_NAMESPACE_CWLTOOL,
     CWL_NAMESPACE_CWLTOOL_URL,
-    CWL_NAMESPACE_SCHEMA,
+    CWL_NAMESPACE_SCHEMA_ID,
     CWL_NAMESPACE_SCHEMA_URL,
-    CWL_NAMESPACE_URL,
     CWL_NAMESPACE_WEAVER,
     CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -66,11 +75,16 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_INPLACE_UPDATE,
     CWL_REQUIREMENT_LOAD_LISTING,
+    CWL_REQUIREMENT_MULTIPLE_INPUT,
     CWL_REQUIREMENT_NETWORK_ACCESS,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SCATTER,
+    CWL_REQUIREMENT_SECRETS,
+    CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+    CWL_REQUIREMENT_SUBWORKFLOW,
     CWL_REQUIREMENT_TIME_LIMIT,
     CWL_REQUIREMENT_WORK_REUSE,
+    CWL_REQUIREMENTS_SUPPORTED,
     OAS_COMPLEX_TYPES,
     OAS_DATA_TYPES,
     PACKAGE_ARRAY_BASE,
@@ -85,7 +99,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -102,6 +116,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
     ExtendedString as String,
+    NoneType,
     NotKeywordSchema,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
@@ -118,10 +133,12 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Dict, Type, Union
     from typing_extensions import TypedDict
 
-    from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType
+    from pygeofilter.ast import AstType as FilterAstType
+
+    from weaver.typedefs import DatetimeIntervalType, JSON
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -260,14 +277,14 @@ QUOTES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 # load examples by file names as keys
 SCHEMA_EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), "examples")
 EXAMPLES = {}
-for name in os.listdir(SCHEMA_EXAMPLE_DIR):
-    path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
-    ext = os.path.splitext(name)[-1]
-    with open(path, "r", encoding="utf-8") as f:
-        if ext in [".json", ".yaml", ".yml"]:
-            EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
+for _name in os.listdir(SCHEMA_EXAMPLE_DIR):
+    _path = os.path.join(SCHEMA_EXAMPLE_DIR, _name)
+    _ext = os.path.splitext(_name)[-1]
+    with open(_path, "r", encoding="utf-8") as f:
+        if _ext in [".json", ".yaml", ".yml"]:
+            EXAMPLES[_name] = yaml.safe_load(f)  # both JSON/YAML
         else:
-            EXAMPLES[name] = f.read()
+            EXAMPLES[_name] = f.read()
 
 
 #########################################################
@@ -525,6 +542,15 @@ class AnyIdentifier(SLUG):
     pass
 
 
+class CWLFileName(SLUG):
+    schema_type = String
+    description = "File with a CWL extension."
+    pattern = re.compile(
+        f"{SLUG.pattern.pattern[:-1]}"  # remove '$'
+        r"\.cwl$"
+    )
+
+
 class ProcessIdentifier(AnyOfKeywordSchema):
     description = "Process identifier."
     _any_of = [
@@ -596,10 +622,10 @@ class AcceptHeader(ExtendedSchemaNode):
     # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
         ContentType.APP_JSON,
+        ContentType.APP_YAML,
         ContentType.APP_XML,
         ContentType.TEXT_XML,
         ContentType.TEXT_HTML,
-        ContentType.TEXT_PLAIN,
         ContentType.ANY,
     ])
     missing = drop
@@ -709,6 +735,21 @@ class FormatQuery(ExtendedMappingSchema):
     format = FormatQueryValue(
         missing=drop,
         description="Output format selector. Equivalent to 'f' query or 'Accept' header."
+    )
+
+
+class FormatQueryJSON(ExtendedMappingSchema):
+    f = OutputFormatQuery(
+        title="OutputFormatShortQueryJSON",
+        missing=drop,
+        description="Output format selector. Equivalent to 'format' query or 'Accept' header.",
+        validator=OneOf([OutputFormat.JSON]),
+    )
+    format = OutputFormatQuery(
+        title="OutputFormatLongQueryJSON",
+        missing=drop,
+        description="Output format selector. Equivalent to 'f' query or 'Accept' header.",
+        validator=OneOf([OutputFormat.JSON]),
     )
 
 
@@ -1362,8 +1403,212 @@ class DeployComplexInputType(DeployWithFormats):
     pass
 
 
+class AnyCRS(AnyOfKeywordSchema):
+    # note:
+    #   other CRS exist (EGM, NAVD, NAD, etc.)
+    #   however, only support EPSG (short form, normative from, or URI) that are supported by 'owslib.crs'
+    #   handle equivalent representations of EPSG:4326 that are also supported by 'owslib.crs'
+    _any_of = [
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), validator=OneOf([
+            # equivalent forms of EPSG:4326, 2D or 3D
+            "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            "https://www.opengis.net/def/crs/OGC/0/CRS84h",
+            "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+            "https://www.opengis.net/def/crs/OGC/0/CRS84",
+            "http://www.opengis.net/def/crs/OGC/0/CRS84",
+            "urn:ogc:def:crs:OGC:2:84",
+            "WGS84",
+        ])),
+    ]
+    default = OGC_API_BBOX_EPSG
+
+
+class AnyFilterExpression(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(),
+        PermissiveSequenceSchema(validator=Length(min=1)),
+        ExtendedSchemaNode(String(), validator=Length(min=1)),
+    ]
+
+
+class AnyFilterLanguage(ExtendedSchemaNode):
+    schema_type = String
+    name = "filter-lang"
+    default = "cql2-json"
+    validator = OneOfCaseInsensitive([
+        "cql2-json",
+        "cql2-text",
+        "cql",
+        "cql-text",
+        "cql-json",
+        "ecql",
+        "simple-cql",
+        "fes",
+        "jfe"
+    ])
+    summary = "Filter expression language to use for parsing."
+    description = (
+        "Filter expression language to use for parsing. "
+        "Supports multiple variants of OGC Common Query Language (CQL), "
+        "Filter Expression Standard (FES), or JSON Filter Expression (JFE). "
+        "Values are case-insensitive."
+    )
+
+    def deserialize(self, cstruct):
+        # type: (Any) -> Union[str, colander.null]
+        if isinstance(cstruct, str):
+            cstruct = cstruct.lower()
+        return super().deserialize(cstruct)
+
+
+class FilterSchema(ExtendedMappingSchema):
+    # note:
+    #   defer format and parsing to 'pygeofilter'
+    #   to accommodate all filter expression representations, string, array and object must be allowed
+    filter = AnyFilterExpression(
+        description="Filter expression according to the specified parsing language.",
+        missing=drop,  # optional since combined within other JSON schema definitions
+    )
+    filter_crs = AnyCRS(
+        name="filter-crs",
+        missing=drop,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
+        description="Coordinate Reference System for provided spatial properties.",
+    )
+    filter_lang = AnyFilterLanguage(
+        name="filter-lang",
+        missing=drop,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
+        description=AnyFilterLanguage.description + (
+            " If unspecified, the filter language will default to CQL2-Text if a string was provided,"
+            " or CQL2-JSON if a JSON object or array structure is detected as the filter."
+            " For any other language, or to resolve ambiguous cases such as a CQL2-JSON encoded as literal string,"
+            " the filter language must be specified explicitly."
+        )
+    )
+
+    @staticmethod
+    @json_hashable
+    @cache
+    def parse(filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> FilterAstType
+        parsed_expr = None
+        if filter_lang == "cql2-json":
+            parsed_expr = cql2_json.parse(filter_expr)
+        elif filter_lang == "cql2-text":
+            parsed_expr = cql2_text.parse(filter_expr)
+        elif filter_lang == "cql-json":
+            parsed_expr = cql_json.parse(filter_expr)
+        elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
+            parsed_expr = ecql.parse(filter_expr)
+        elif filter_lang == "fes":
+            parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
+        elif filter_lang == "jfe":
+            parsed_expr = jfe.parse(filter_expr)
+        if not parsed_expr:
+            raise colander.Invalid(
+                node=AnyFilterLanguage(),
+                msg="Unresolved filter expression language.",
+                value={"filter-lang": filter_lang},
+            )
+        return parsed_expr
+
+    def validate(self, filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> FilterAstType
+        try:
+            return self.parse(filter_expr, filter_lang)
+        except (TypeError, ValueError) as exc:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid filter expression could not be parsed against specified language.",
+                value={"filter": filter_expr, "filter-lang": filter_lang},
+            ) from exc
+
+    def convert(self, filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> JSON
+        try:
+            parsed_expr = self.validate(filter_expr, filter_lang)
+            return to_cql2(parsed_expr)
+        except (TypeError, ValueError, NotImplementedError) as exc:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid filter expression could not be interpreted.",
+                value={"filter": filter_expr, "filter-lang": filter_lang},
+            ) from exc
+
+    def deserialize(self, cstruct):
+        # type: (JSON) -> Union[JSON, colander.null]
+        result = super().deserialize(cstruct)
+        if not result:
+            return result
+        filter_expr = result.get("filter")
+        filter_lang = result.get("filter-lang")
+        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised as invalid since dropped
+            if "filter" in cstruct:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Invalid filter expression could not be interpreted.",
+                    value={"filter": repr_json(cstruct["filter"]), "filter-lang": filter_lang},
+                )
+            filter_crs = cstruct.get("filter-crs")
+            filter_lang = cstruct.get("filter-lang")
+            if filter_crs or filter_lang:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Missing filter expression provided with CRS and/or language parameters.",
+                    value={"filter-crs": filter_crs, "filter-lang": filter_lang},
+                )
+            return result
+        if not filter_lang:
+            filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
+        # perform conversion to validate
+        # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
+        # conversion can be done as needed to obtain a uniform representation locally
+        self.convert(filter_expr, filter_lang)
+        return result
+
+
+class SortByExpression(ExpandStringList, ExtendedSchemaNode):
+    schema_type = String
+    default = None
+    example = "arg1,prop2,+asc,-desc"
+    missing = drop
+    description = (
+        "Comma-separated list of sorting fields. "
+        "Each field can be prefixed by +/- for ascending or descending sort order."
+    )
+
+
+class SortBySchema(ExtendedMappingSchema):
+    sort_by_lower = SortByExpression(name="sortby", missing=drop)
+    sort_by_upper = SortByExpression(name="sortBy", missing=drop)
+
+    def deserialize(self, cstruct):
+        # type: (JSON) -> Union[JSON, colander.null]
+        """
+        Resolve the upper/lower variant representation.
+
+        Consider that this schema could be integrated with another.
+        Therefore, additional fields must be left untouched.
+        """
+        result = super().deserialize(cstruct)
+        if not result:
+            return result
+        if result.get("sortby"):
+            # keep only 'official' "sortBy" from OGC API Processes
+            # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
+            if not result.get("sortBy"):
+                result["sortBy"] = result["sortby"]
+            del result["sortby"]
+        return result
+
+
 class SupportedCRS(ExtendedMappingSchema):
-    crs = URL(title="CRS", description="Coordinate Reference System")
+    crs = AnyCRS(title="CRS", description="Coordinate Reference System")
     default = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
@@ -1409,6 +1654,11 @@ class AnyLiteralType(OneOfKeywordSchema):
             title="LiteralDataString",
             description="Literal data type representing a generic string.",
         ),
+        ExtendedSchemaNode(
+            NoneType(),
+            title="LiteralDataNoneType",
+            description="Literal data type representing a null value.",
+        )
     ]
 
 
@@ -2134,6 +2384,11 @@ class OpenAPIEndpoint(ExtendedMappingSchema):
     header = OpenAPIRequestHeaders()
 
 
+class OpenAPIFormatRedirect(OpenAPIEndpoint):
+    header = OpenAPIAcceptHeader()
+    querystring = FormatQueryJSON()
+
+
 class SwaggerUIEndpoint(ExtendedMappingSchema):
     pass
 
@@ -2559,8 +2814,12 @@ class WPSLiteralData(WPSLiteralInputType):
     name = "LiteralData"
 
 
+class XMLStringCRS(AnyCRS, XMLObject):
+    pass
+
+
 class WPSCRSsType(ExtendedMappingSchema, WPSNamespace):
-    crs = XMLString(name="CRS", description="Coordinate Reference System")
+    crs = XMLStringCRS(name="CRS", description="Coordinate Reference System")
 
 
 class WPSSupportedCRS(ExtendedSequenceSchema):
@@ -2989,7 +3248,7 @@ class JobInputsEndpoint(JobPath):
     querystring = JobInputsOutputsQuery()
 
 
-class JobResultsQuery(ExtendedMappingSchema):
+class JobResultsQuery(FormatQuery):
     schema = ExtendedSchemaNode(
         String(),
         title="JobOutputResultsSchema",
@@ -3543,6 +3802,48 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
     value = ArrayReference()
 
 
+class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
+    schema_type = String
+    default = ExecuteCollectionFormat.GEOJSON
+    example = ExecuteCollectionFormat.STAC
+    validator = OneOf(ExecuteCollectionFormat.values())
+
+
+class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
+    description = inspect.cleandoc("""
+        Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
+
+        If only the 'collection' is provided to read the contents as a static GeoJSON FeatureCollection document,
+        any scheme can be employed (s3, file, http, etc.) to request the contents.
+        Note that in this context, each of the respective Feature contained in the collection will be extracted
+        to form an array of Features. If the entire 'FeatureCollection' should be provided as a whole to the process
+        input, consider using the usual 'href' or 'value' input instead of 'collection'.
+
+        When more 'collection' capabilities are specified with
+        additional parameters (filter, sortBy, subsetting, scaling, etc.),
+        the scheme must be 'http(s)' since an OGC API or STAC API data access mechanism is expected
+        to perform the requested operations. The appropriate API to employ should be indicated by 'format'
+        to ensure appropriate interpretation of the 'collection' reference.
+
+        Supported additional parameters depend on each API implementation.
+        Not all parameters are listed in this definition. Refer to respective APIs
+        for supported parameters and their expected value formats.
+    """)
+    collection = ExecuteReferenceURL(description="Endpoint of the collection reference.")
+    format = ExecuteCollectionFormatEnum(
+        missing=drop,
+        description="Collection API to employ for filtering and extracting relevant data for the execution.",
+    )
+    type = MediaType(
+        missing=drop,
+        title="CollectionMediaType",
+        description=(
+            "IANA identifier of content-type to extract from the link. "
+            "If none specified, default from the collection is employed. "
+        )
+    )
+
+
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
 # both for literal values and link references, for inputs submitted as list-items.
 # Also allows the explicit 'href' (+ optional format) reference for a link.
@@ -3567,7 +3868,9 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        ExecuteReference()
+        ExecuteReference(),
+        # HTTP reference to a 'collection' with optional processing arguments
+        ExecuteCollectionInput(),
     ]
 
 
@@ -3662,7 +3965,7 @@ class BoundingBoxObject(StrictMappingSchema):
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )
-    crs = URL(
+    crs = AnyCRS(
         default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
         description="Coordinate Reference System of the Bounding Box points.",
     )
@@ -3754,7 +4057,8 @@ class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
         ExecuteInputInlineValue(),          # <inline-value> (literal, bbox, measurement)
         ExecuteInputQualifiedValue(),       # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
         ExecuteInputFile(),                 # 'href' with either 'type' (OGC) or 'format' (OLD)
-        # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
+        ExecuteCollectionInput(),           # 'collection' with optional processing operations
+        # FIXME: 'nested process' (https://github.com/crim-ca/weaver/issues/412)
     ]
 
 
@@ -4458,6 +4762,12 @@ class InplaceUpdateRequirementClass(InplaceUpdateRequirementSpecification):
                               validator=OneOf([CWL_REQUIREMENT_INPLACE_UPDATE]))
 
 
+class LoadContents(ExtendedSchemaNode):
+    schema_type = Boolean
+    title = "LoadContents"
+    description = "Indicates if  a 'File' type reference should be loaded under the 'contents' property."
+
+
 class LoadListingEnum(ExtendedSchemaNode):
     schema_type = String
     title = "LoadListingEnum"
@@ -4485,6 +4795,21 @@ class IdentifierArray(ExtendedSequenceSchema):
     item = AnyIdentifier()
 
 
+class MultipleInputRequirementSpecification(PermissiveMappingSchema):
+    description = inspect.cleandoc(f"""
+        Indicates that a Workflow Step Input must support multiple 'source' simultaneously
+        (see also: {CWL_WORKFLOW_URL}#WorkflowStepInput).
+    """)
+
+
+class MultipleInputRequirementMap(ExtendedMappingSchema):
+    req = MultipleInputRequirementSpecification(name=CWL_REQUIREMENT_MULTIPLE_INPUT)
+
+
+class MultipleInputRequirementClass(MultipleInputRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_MULTIPLE_INPUT, validator=OneOf([CWL_REQUIREMENT_MULTIPLE_INPUT]))
+
+
 class ScatterIdentifiersSchema(OneOfKeywordSchema):
     title = "Scatter"
     description = inspect.cleandoc("""
@@ -4506,17 +4831,11 @@ class ScatterIdentifiersSchema(OneOfKeywordSchema):
     ]
 
 
-class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
-    description = inspect.cleandoc(f"""
-        A 'scatter' operation specifies that the associated Workflow step should execute separately over a list of
-        input elements. Each job making up a scatter operation is independent and may be executed concurrently
-        (see also: {CWL_WORKFLOW_URL}#WorkflowStep).
-    """)
-    scatter = ScatterIdentifiersSchema()
+class ScatterFeatureReference(PermissiveMappingSchema):
+    scatter = ScatterIdentifiersSchema(missing=drop)
     scatterMethod = ExtendedSchemaNode(
         String(),
         validator=OneOf(["dotproduct", "nested_crossproduct", "flat_crossproduct"]),
-        default="dotproduct",
         missing=drop,
         description=inspect.cleandoc("""
             If 'scatter' declares more than one input parameter, 'scatterMethod' describes how to decompose the
@@ -4536,12 +4855,66 @@ class ScatterFeatureRequirementSpecification(PermissiveMappingSchema):
     )
 
 
+class ScatterFeatureRequirementSpecification(StrictMappingSchema):
+    description = inspect.cleandoc(f"""
+        A 'scatter' operation specifies that the associated Workflow step should execute separately over a list of
+        input elements. Each job making up a scatter operation is independent and may be executed concurrently
+        (see also: {CWL_WORKFLOW_URL}#WorkflowStep).
+    """)
+
+
 class ScatterFeatureRequirementMap(ExtendedMappingSchema):
     req = ScatterFeatureRequirementSpecification(name=CWL_REQUIREMENT_SCATTER)
 
 
 class ScatterFeatureRequirementClass(ScatterFeatureRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_SCATTER, validator=OneOf([CWL_REQUIREMENT_SCATTER]))
+
+
+class SecretsRequirementSpecification(StrictMappingSchema):
+    description = "Lists input parameters containing sensitive information to be masked."
+    secrets = IdentifierArray(
+        title="Secrets",
+        description="Input parameter identifiers to consider as secrets.",
+        validator=Length(min=1),
+    )
+
+
+class SecretsRequirementMap(ExtendedMappingSchema):
+    req = SecretsRequirementSpecification(name=CWL_REQUIREMENT_SECRETS)
+
+
+class SecretsRequirementClass(SecretsRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_SECRETS, validator=OneOf([CWL_REQUIREMENT_SECRETS]))
+
+
+class StepInputExpressionSpecification(StrictMappingSchema):
+    description = inspect.cleandoc(f"""
+        Indicate that the workflow platform must support the 'valueFrom' field of {CWL_WORKFLOW_URL}#WorkflowStepInput.
+    """)
+
+
+class StepInputExpressionRequirementMap(ExtendedMappingSchema):
+    req = StepInputExpressionSpecification(name=CWL_REQUIREMENT_STEP_INPUT_EXPRESSION)
+
+
+class StepInputExpressionRequirementClass(StepInputExpressionSpecification):
+    _class = RequirementClass(
+        example=CWL_REQUIREMENT_STEP_INPUT_EXPRESSION,
+        validator=OneOf([CWL_REQUIREMENT_STEP_INPUT_EXPRESSION]),
+    )
+
+
+class SubworkflowRequirementSpecification(StrictMappingSchema):
+    description = "Indicates that a Workflow employs another Workflow as one of its steps."
+
+
+class SubworkflowRequirementMap(ExtendedMappingSchema):
+    req = SubworkflowRequirementSpecification(name=CWL_REQUIREMENT_SUBWORKFLOW)
+
+
+class SubworkflowRequirementClass(SubworkflowRequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_SUBWORKFLOW, validator=OneOf([CWL_REQUIREMENT_SUBWORKFLOW]))
 
 
 class TimeLimitValue(OneOfKeywordSchema):
@@ -4692,7 +5065,7 @@ class UnknownRequirementClass(PermissiveMappingSchema):
     _class = RequirementClass(example="UnknownRequirement")
 
 
-class CWLRequirementsMap(AnyOfKeywordSchema):
+class CWLRequirementsMapDefinitions(AnyOfKeywordSchema):
     _any_of = [
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
@@ -4700,18 +5073,57 @@ class CWLRequirementsMap(AnyOfKeywordSchema):
         InlineJavascriptRequirementMap(missing=drop),
         InplaceUpdateRequirementMap(missing=drop),
         LoadListingRequirementMap(missing=drop),
+        MultipleInputRequirementMap(missing=drop),
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
+        StepInputExpressionRequirementMap(missing=drop),
+        SubworkflowRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
-        UnknownRequirementMap(missing=drop),  # allows anything, must be last
+    ]
+
+
+class CWLRequirementsMapSupported(StrictMappingSchema):
+    description = "Schema that ensures only supported CWL requirements are permitted."
+
+    def __init__(self, *_, **__):
+        # type: (*Any, **Any) -> None
+        """
+        Initialize the mapping to allow only supported CWL requirements.
+
+        Because :class:`StrictMappingSchema` is used, initialized sub-nodes are equivalent
+        the following :term:`JSON` schema definition, with a key of every known requirement name.
+
+        .. code-block::
+
+            {
+              "<supported-requirement>": {},
+              "additionalProperties: false
+            }
+
+        The actual validation of nested fields under each requirement will be
+        handled by their respective schema in :class:`CWLRequirementsMapDefinitions`.
+        """
+        super().__init__(*_, **__)
+        self.children = [
+            PermissiveMappingSchema(name=req, missing=drop)
+            for req in CWL_REQUIREMENTS_SUPPORTED
+        ]
+
+
+class CWLRequirementsMap(AllOfKeywordSchema):
+    _all_of = [
+        CWLRequirementsMapDefinitions(),
+        CWLRequirementsMapSupported(),
     ]
 
 
 class CWLRequirementsItem(OneOfKeywordSchema):
     # in case there is any conflict between definitions,
-    # the class field can be used to discriminate which one is expected.
+    # the 'class' field can be used to discriminate which one is expected.
+    # however, this **requires** that every mapping defined in '_one_of' should
+    # provide a 'class' definition that can perform discrimination using a validator
     discriminator = "class"
     _one_of = [
         DockerRequirementClass(missing=drop),
@@ -4720,12 +5132,14 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         InlineJavascriptRequirementClass(missing=drop),
         InplaceUpdateRequirementClass(missing=drop),
         LoadListingRequirementClass(missing=drop),
+        MultipleInputRequirementClass(missing=drop),
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
+        StepInputExpressionRequirementClass(missing=drop),
+        SubworkflowRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
-        UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -4753,6 +5167,8 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementMap(missing=drop),
         ResourceRequirementMap(missing=drop),
         ScatterFeatureRequirementMap(missing=drop),
+        SecretsRequirementMap(missing=drop),
+        StepInputExpressionRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
         ESGF_CWT_RequirementMap(missing=drop),
@@ -4762,11 +5178,8 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     ]
 
 
-class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
-    # validators of individual requirements define which one applies
-    # in case of ambiguity, 'discriminator' distinguish between them using their 'example' values in 'class' field
-    discriminator = "class"
-    _one_of = [
+class CWLHintsItem(AnyOfKeywordSchema, PermissiveMappingSchema):
+    _any_of = [
         BuiltinRequirementClass(missing=drop),
         CUDARequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
@@ -4778,6 +5191,8 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         NetworkAccessRequirementClass(missing=drop),
         ResourceRequirementClass(missing=drop),
         ScatterFeatureRequirementClass(missing=drop),
+        SecretsRequirementClass(missing=drop),
+        StepInputExpressionRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
         ESGF_CWT_RequirementClass(missing=drop),
@@ -4884,6 +5299,7 @@ class CWLInputObject(PermissiveMappingSchema):
     default = CWLDefault(missing=drop, description="Default value of input if not provided for task execution.")
     inputBinding = PermissiveMappingSchema(missing=drop, title="Input Binding",
                                            description="Defines how to specify the input for the command.")
+    loadContents = LoadContents(missing=drop)
 
 
 class CWLTypeStringList(ExtendedSequenceSchema):
@@ -4927,18 +5343,20 @@ class CWLInputsDefinition(OneOfKeywordSchema):
 
 
 class OutputBinding(PermissiveMappingSchema):
-    glob = ExtendedSchemaNode(String(), missing=drop,
-                              description="Glob pattern to find the output on disk or mounted docker volume.")
+    description = "Defines how to retrieve the output result from the command."
+    glob = ExtendedSchemaNode(
+        String(),
+        missing=drop,
+        description="Glob pattern to find the output on disk or mounted docker volume.",
+    )
 
 
 class CWLOutputObject(PermissiveMappingSchema):
     type = CWLType()
     # 'outputBinding' should usually be there most of the time (if not always) to retrieve file,
     # but can technically be omitted in some very specific use-cases such as output literal or output is std logs
-    outputBinding = OutputBinding(
-        missing=drop,
-        description="Defines how to retrieve the output result from the command."
-    )
+    outputBinding = OutputBinding(missing=drop)
+    loadContents = LoadContents(missing=drop)
 
 
 class CWLOutputType(OneOfKeywordSchema):
@@ -5058,7 +5476,7 @@ class CWLNamespaces(StrictMappingSchema):
     )
     s = URI(
         missing=drop,
-        name=CWL_NAMESPACE_SCHEMA,
+        name=CWL_NAMESPACE_SCHEMA_ID,
         validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
     )
     weaver = URI(
@@ -5082,8 +5500,8 @@ class CWLMetadata(ExtendedMappingSchema):
         "label",
         "doc",
         "intent",
-        f"{CWL_NAMESPACE_SCHEMA}:author",
-        f"{CWL_NAMESPACE_SCHEMA}:keywords",
+        f"{CWL_NAMESPACE_SCHEMA_ID}:author",
+        f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
     ]
     _sort_after = ["$namespaces", "$schemas"]
 
@@ -5093,12 +5511,12 @@ class CWLMetadata(ExtendedMappingSchema):
     intent = ExtendedSchemaNode(String(), missing=drop)
     author = ExtendedSchemaNode(
         String(),
-        name=f"{CWL_NAMESPACE_SCHEMA}:author",
+        name=f"{CWL_NAMESPACE_SCHEMA_ID}:author",
         missing=drop,
         description="Author of the Application Package.",
     )
     keywords = KeywordList(
-        name=f"{CWL_NAMESPACE_SCHEMA}:keywords",
+        name=f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
         missing=drop,
         description="Keywords applied to the Application Package.",
     )
@@ -5133,8 +5551,158 @@ class CWLScatterMethod(ExtendedSchemaNode):
     validator = OneOf(["dotproduct", "nested_crossproduct", "flat_crossproduct"])
 
 
-class CWLApp(PermissiveMappingSchema):
+class CWLScatterDefinition(PermissiveMappingSchema):
+    scatter = CWLScatter(missing=drop, description=(
+        "One or more input identifier of an application step within a Workflow were an array-based input to that "
+        "Workflow should be scattered across multiple instances of the step application."
+    ))
+    scatterMethod = CWLScatterMethod(missing=drop)
+
+
+class CWLTool(PermissiveMappingSchema):
+    description = "Base definition of the type of CWL tool represented by the object."
     _class = CWLClass()
+
+
+class CWLWorkflowStepRunDefinition(AnyOfKeywordSchema):
+    _any_of = [
+        AnyIdentifier(
+            title="CWLWorkflowStepRunID",
+            description="Reference to local process ID, with or without '.cwl' extension."
+        ),
+        CWLFileName(),
+        ProcessURL(),
+        # do not perform deeper validation other than checking there is a CWL 'class'
+        # cwltool should perform any relevant cross-reference check of other files when resolving the workflow
+        # Weaver runtime requirements (application package type) should be checked when reaching that step
+        CWLTool(),
+    ]
+
+
+class CWLWorkflowStepInputSourceValue(ExtendedSchemaNode):
+    description = "Specifies the workflow parameter that will provide input to the underlying step parameter."
+    schema_type = String
+
+
+class CWLWorkflowStepInputSourceList(ExtendedSequenceSchema):
+    item = CWLWorkflowStepInputSourceValue()
+    validator = Length(min=1)
+
+
+class CWLWorkflowStepInputSource(OneOfKeywordSchema):
+    _one_of = [
+        CWLWorkflowStepInputSourceValue(),
+        CWLWorkflowStepInputSourceList(),
+    ]
+
+
+class LinkMergeMethod(ExtendedSchemaNode):
+    schema_type = String
+    title = "LinkMergeMethod"
+    validator = OneOf(["merge_nested", "merge_flattened"])
+
+
+class PickValueMethod(ExtendedSchemaNode):
+    schema_type = String
+    title = "PickValueMethod"
+    validator = OneOf(["first_non_null", "the_only_non_null", "all_non_null"])
+
+
+class CWLWorkflowStepInputObject(ScatterFeatureReference):
+    id = AnyIdentifier(description="Identifier of the step input.", missing=drop)
+    source = CWLWorkflowStepInputSource(missing=drop)
+    linkMerge = LinkMergeMethod(missing=drop)
+    pickValue = PickValueMethod(missing=drop)
+    loadListing = LoadListingEnum(missing=drop)
+    loadContents = LoadContents(missing=drop)
+    valueFrom = CWLExpression(missing=drop)
+
+
+class CWLWorkflowStepInputItem(CWLWorkflowStepInputObject):
+    id = AnyIdentifier(description="Identifier of the step input.")
+
+
+class CWLWorkflowStepInput(OneOfKeywordSchema):
+    _one_of = [
+        CWLWorkflowStepInputSourceValue(),
+        CWLWorkflowStepInputObject()
+    ]
+
+
+class CWLWorkflowStepInputMap(ExtendedMappingSchema):
+    step_in = CWLWorkflowStepInput(variable="{step-in}", title="CWLWorkflowStepInput")
+
+
+class CWLWorkflowStepInputList(ExtendedSequenceSchema):
+    step_in = CWLWorkflowStepInputItem()
+    validator = Length(min=1)
+
+
+class CWLWorkflowStepInputDefinition(OneOfKeywordSchema):
+    description = "Defines the input parameters of the workflow step."
+    _one_of = [
+        CWLWorkflowStepInputMap(),
+        CWLWorkflowStepInputList(),
+    ]
+
+
+class CWLWorkflowStepOutputID(ExtendedSchemaNode):
+    schema_type = String()
+    description = "Identifier of the tool's output to use as the step output."
+
+
+class CWLWorkflowStepOutputObject(PermissiveMappingSchema):
+    id = CWLWorkflowStepOutputID()
+
+
+class CWLWorkflowStepOutputItem(OneOfKeywordSchema):
+    _one_of = [
+        CWLWorkflowStepOutputID(),
+        CWLWorkflowStepOutputObject(),
+    ]
+
+
+class CWLWorkflowStepOutputList(ExtendedSequenceSchema):
+    out = CWLWorkflowStepOutputItem()
+    validator = Length(min=1)
+
+
+class CWLWorkflowStepOutputDefinition(OneOfKeywordSchema):
+    description = "Defines the parameters representing the output of the process."
+    _one_of = [
+        CWLWorkflowStepOutputList(),  # only list allowed
+    ]
+
+
+class CWLWorkflowStepObject(CWLScatterDefinition, PermissiveMappingSchema):
+    id = AnyIdentifier(description="Identifier of the step.", missing=drop)
+    _in = CWLWorkflowStepInputDefinition(name="in")
+    out = CWLWorkflowStepOutputDefinition()
+    run = CWLWorkflowStepRunDefinition()
+    requirements = CWLRequirements(missing=drop)
+    hints = CWLHints(missing=drop)
+
+
+class CWLWorkflowStepItem(CWLWorkflowStepObject):
+    id = AnyIdentifier(description="Identifier of the step.")
+
+
+class CWLWorkflowStepsMap(ExtendedMappingSchema):
+    step_id = CWLWorkflowStepObject(variable="{step-id}", title="CWLWorkflowStep")
+
+
+class CWLWorkflowStepsList(ExtendedSequenceSchema):
+    step = CWLWorkflowStepItem()
+
+
+class CWLWorkflowStepsDefinition(OneOfKeywordSchema):
+    _one_of = [
+        CWLWorkflowStepsMap(),
+        CWLWorkflowStepsList(),
+    ]
+
+
+class CWLApp(CWLTool, CWLScatterDefinition, PermissiveMappingSchema):
     id = CWLIdentifier(missing=drop)  # can be omitted only if within a process deployment that also includes it
     intent = CWLIntent(missing=drop)
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
@@ -5145,11 +5713,7 @@ class CWLApp(PermissiveMappingSchema):
     arguments = CWLArguments(description="Base arguments passed to the command.", missing=drop)
     inputs = CWLInputsDefinition(description="All inputs available to the Application Package.")
     outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
-    scatter = CWLScatter(missing=drop, description=(
-        "One or more input identifier of an application step within a Workflow were an array-based input to that "
-        "Workflow should be scattered across multiple instances of the step application."
-    ))
-    scatterMethod = CWLScatterMethod(missing=drop)
+    steps = CWLWorkflowStepsDefinition(missing=drop)
 
 
 class CWL(CWLBase, CWLMetadata, CWLApp):
@@ -5674,6 +6238,7 @@ class DeployHeaders(RequestHeaders):
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
     header = DeployHeaders(description="Headers employed for process deployment.")
+    querystring = FormatQuery()
     body = Deploy(title="Deploy", examples={
         "DeployCWL": {
             "summary": "Deploy a process from a CWL definition.",
@@ -5823,14 +6388,12 @@ class ExecuteHeadersXML(ExecuteHeadersBase):
 
 
 class PostProcessJobsEndpointJSON(LocalProcessPath):
-    content_type = ContentType.APP_JSON
     header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
 
 
 class PostProcessJobsEndpointXML(LocalProcessPath):
-    content_type = ContentType.APP_XML
     header = ExecuteHeadersXML()
     querystring = LocalProcessQuery()
     body = WPSExecutePost(
@@ -6088,6 +6651,48 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
 # Responses schemas
 # ################################################################
 
+
+class GenericHTMLResponse(ExtendedMappingSchema):
+    """
+    Generic HTML response.
+    """
+    header = HtmlHeader()
+    body = ExtendedMappingSchema()
+
+    def __new__(cls, *, name, description, **kwargs):  # pylint: disable=W0221
+        # type: (Type[GenericHTMLResponse], *Any, str, str, **Any) -> GenericHTMLResponse
+        """
+        Generates a derived HTML response schema with direct forwarding of custom parameters to the body's schema.
+
+        This strategy allows the quicker definition of schema variants without duplicating class definitions only
+        providing alternate documentation parameters.
+
+        .. note::
+            Method ``__new__`` is used instead of ``__init__`` because some :mod:`cornice_swagger` operations will
+            look explicitly for ``schema_node.__class__.__name__``. If using ``__init__``, the first instance would
+            set the name value for all following instances instead of the intended reusable meta-schema class.
+        """
+        if not isinstance(name, str) or not re.match(r"^[A-Z][A-Z0-9_-]*$", name, re.I):
+            raise ValueError(
+                "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
+                f"Name '{name}' is invalid."
+            )
+        obj = super().__new__(cls)
+        obj.__init__(name=name, description=description)
+        obj.__class__.__name__ = name
+        obj.children = [
+            child
+            if child.name != "body" else
+            ExtendedMappingSchema(name="body", **kwargs)
+            for child in obj.children
+        ]
+        return obj
+
+    def __deepcopy__(self, *args, **kwargs):
+        # type: (*Any, *Any) -> GenericHTMLResponse
+        return GenericHTMLResponse(name=self.name, description=self.description, children=self.children)
+
+
 class ErrorDetail(ExtendedMappingSchema):
     code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
     status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
@@ -6164,6 +6769,13 @@ class UnsupportedMediaTypeResponseSchema(ServerErrorBaseResponseSchema):
 class MethodNotAllowedErrorResponseSchema(ServerErrorBaseResponseSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotAllowed.yaml"
     description = "HTTP method not allowed for requested path."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class NotAcceptableErrorResponseSchema(ServerErrorBaseResponseSchema):
+    _schema = f"{OGC_API_PROC_PART1_RESPONSES}/NotSupported.yaml"
+    description = "Requested media-types are not supported at the path."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -6331,6 +6943,7 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/ProcessList.yaml"
     description = "Listing of available processes successful."
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = MultiProcessesListing()
 
 
@@ -6379,11 +6992,13 @@ class NotFoundProcessResponse(NotFoundResponseSchema):
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = ProcessDescription()
 
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = CWL()
 
 
@@ -6500,6 +7115,7 @@ class OkDeleteProcessJobResponse(ExtendedMappingSchema):
 
 class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
+    querystring = FormatQuery()
     body = GetQueriedJobsSchema()
 
 
@@ -6787,31 +7403,37 @@ class GoneVaultFileDownloadResponse(ExtendedMappingSchema):
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_redoc_ui_responses = {
     "200": OkGetRedocUIResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_versions_responses = {
     "200": OkGetVersionsResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_api_conformance_responses = {
     "200": OkGetConformanceResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
@@ -6835,6 +7457,7 @@ get_processes_responses = {
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
@@ -6846,6 +7469,7 @@ post_processes_responses = {
     }),
     "400": BadRequestResponseSchema(description="Unable to parse process definition"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID already exists."),
     "415": UnsupportedMediaTypeResponseSchema(description="Unsupported Media-Type for process deployment."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
@@ -6855,6 +7479,7 @@ put_process_responses = copy(post_processes_responses)
 put_process_responses.update({
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
 })
 patch_process_responses = {
@@ -6862,6 +7487,7 @@ patch_process_responses = {
     "400": BadRequestGetProcessInfoResponse(description="Unable to parse process definition"),
     "404": NotFoundProcessResponse(description="Process to update could not be found."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "409": ConflictRequestResponseSchema(description="Process with same ID or version already exists."),
     "422": UnprocessableEntityResponseSchema(description="Invalid schema for process definition."),
     "500": InternalServerErrorResponseSchema(),
@@ -6886,6 +7512,7 @@ get_process_responses = {
     "400": BadRequestGetProcessInfoResponse(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {
@@ -6898,6 +7525,7 @@ get_process_package_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_payload_responses = {
@@ -6910,12 +7538,14 @@ get_process_payload_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
     "403": ForbiddenProcessAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_visibility_responses = {
@@ -6923,6 +7553,7 @@ put_process_visibility_responses = {
     "403": ForbiddenVisibilityUpdateResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
@@ -6935,6 +7566,7 @@ delete_process_responses = {
     "403": ForbiddenProcessAccessResponseSchema(),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_providers_list_responses = {
@@ -6950,6 +7582,7 @@ get_providers_list_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_responses = {
@@ -6961,12 +7594,14 @@ get_provider_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedDeleteProviderResponse(),
 }
@@ -6974,6 +7609,7 @@ get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_responses = {
@@ -6985,6 +7621,7 @@ get_provider_process_responses = {
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_package_responses = copy(get_process_package_responses)
@@ -6996,6 +7633,7 @@ post_provider_responses = {
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedPostProviderResponse(),
 }
@@ -7006,6 +7644,7 @@ post_provider_process_job_responses = {
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
@@ -7015,6 +7654,7 @@ post_process_jobs_responses = {
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_all_jobs_responses = {
@@ -7026,6 +7666,7 @@ get_all_jobs_responses = {
     }),
     "400": BadRequestResponseSchema(description="Error in case of invalid search query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7033,6 +7674,7 @@ delete_jobs_responses = {
     "200": OkBatchDismissJobsResponseSchema(description="success"),
     "400": BadRequestResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
 }
 get_prov_all_jobs_responses = copy(get_all_jobs_responses)
@@ -7053,6 +7695,7 @@ get_single_job_status_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_single_job_status_responses = copy(get_single_job_status_responses)
@@ -7069,6 +7712,7 @@ delete_job_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7086,6 +7730,7 @@ get_job_inputs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_prov_inputs_responses = copy(get_job_inputs_responses)
@@ -7102,6 +7747,7 @@ get_job_outputs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7123,6 +7769,7 @@ get_job_results_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7140,6 +7787,7 @@ get_exceptions_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7157,6 +7805,7 @@ get_logs_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7174,6 +7823,7 @@ get_stats_responses = {
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7184,12 +7834,14 @@ get_prov_stats_responses.update({
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_quote_responses = {
     "200": OkGetQuoteInfoResponse(description="success"),
     "404": NotFoundQuoteResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
@@ -7197,6 +7849,7 @@ post_quotes_responses = {
     "202": AcceptedQuoteResponse(),
     "400": InvalidJobParametersResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
@@ -7204,34 +7857,40 @@ post_quote_responses = {
     "400": InvalidJobParametersResponse(),
     "402": QuotePaymentRequiredResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_process_quote_estimator_responses = {
     "200": OkGetEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 put_process_quote_estimator_responses = {
     "200": OkPutEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_quote_estimator_responses = {
     "204": OkDeleteEstimatorResponse(description="success"),
     "404": NotFoundProcessResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_vault_responses = {
@@ -7243,6 +7902,7 @@ post_vault_responses = {
     }),
     "400": BadRequestVaultFileUploadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityVaultFileUploadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7256,6 +7916,7 @@ head_vault_file_responses = {
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7264,6 +7925,7 @@ get_vault_file_responses = {
     "400": BadRequestVaultFileAccessResponse(),
     "403": ForbiddenVaultFileDownloadResponse(),
     "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
     "410": GoneVaultFileDownloadResponse(),
     "500": InternalServerErrorResponseSchema(),
 }
@@ -7297,6 +7959,7 @@ wps_responses = {
         }
     }),
     "405": ErrorWPSResponse(),
+    "406": ErrorWPSResponse(),
     "500": ErrorWPSResponse(),
 }
 
@@ -7306,19 +7969,19 @@ wps_responses = {
 #################################################################
 
 
-def service_api_route_info(service_api, settings):
-    # type: (Service, SettingsType) -> ViewInfo
+def derive_responses(responses, response_schema, status_code=200):
+    # type: (Dict[str, ExtendedSchemaNode], ExtendedSchemaNode, int) -> Dict[str, ExtendedSchemaNode]
     """
-    Automatically generates the view configuration parameters from the :mod:`cornice` service definition.
+    Generates a derived definition of the responses mapping using the specified schema and status code.
 
-    :param service_api: cornice service with name and path definition.
-    :param settings: settings to obtain the base path of the application.
-    :return: view configuration parameters that can be passed directly to ``config.add_route`` call.
+    :param responses: Mapping of status codes to response schemas.
+    :param response_schema: Desired response schema to apply.
+    :param status_code: Desired status code for which to apply the response schema.
+    :return: Derived responses mapping.
     """
-    from weaver.wps_restapi.utils import wps_restapi_base_path  # import here to avoid circular import errors
-
-    api_base = wps_restapi_base_path(settings)
-    return {"name": service_api.name, "pattern": f"{api_base}{service_api.path}"}
+    responses = copy(responses)
+    responses[str(status_code)] = response_schema
+    return responses
 
 
 def datetime_interval_parser(datetime_interval):

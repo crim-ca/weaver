@@ -97,9 +97,16 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 #   configuration for the purpose of parsing the source to generate the OpenAPI
 config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
+config.commit()
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
 # must disable references when using redoc (alpha version note rendering them correctly)
-api_spec_json = get_openapi_json(http_host="example", http_scheme="https", use_docstring_summary=True, use_refs=False)
+api_spec_json = get_openapi_json(
+    http_host="example",
+    http_scheme="https",
+    use_docstring_summary=True,
+    use_refs=False,
+    container=config,
+)
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, "w") as f:
@@ -452,6 +459,11 @@ linkcheck_anchors_ignore = [
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
 ]
+linkcheck_request_headers = {
+    "https://github.com/": {
+        "Accept": "text/html,application/xhtml+xml,application/xml,image/avif,image/webp,image/png,image/svg+xml,*/*"
+    }
+}
 
 linkcheck_timeout = 30
 linkcheck_retries = 5

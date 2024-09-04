@@ -436,6 +436,24 @@ def test_oneof_dropable():
     ])
 
 
+def test_oneof_discriminator():
+    class Cat(ce.PermissiveMappingSchema):
+        animal_type = ce.ExtendedSchemaNode(colander.String(), validator=colander.OneOf(["cat"]))
+
+    class Dog(ce.PermissiveMappingSchema):
+        animal_type = ce.ExtendedSchemaNode(colander.String(), validator=colander.OneOf(["dog"]))
+
+    class Animal(ce.OneOfKeywordSchema):
+        discriminator = "animal_type"
+        _one_of = [Cat(), Dog()]
+
+    schema = Animal()
+    schema.deserialize({"animal_type": "cat"})
+    schema.deserialize({"animal_type": "dog"})
+    with pytest.raises(colander.Invalid):
+        schema.deserialize({"animal_type": "bird"})
+
+
 def test_oneof_optional_default_with_nested_required():
     """
     Using ``oneOf`` keyword that is optional with default, its required subnodes must resolve to the provided default.
@@ -1198,7 +1216,7 @@ def test_invalid_multi_child_variable():
         VarMap().deserialize({"random": "abc"})
 
 
-def test_variable_not_additional_properties():
+def test_variable_no_additional_properties():
     class VarMap(ce.StrictMappingSchema):
         var_1 = ce.ExtendedSchemaNode(colander.String(), variable="<var-1>")
 
@@ -1209,6 +1227,26 @@ def test_variable_not_additional_properties():
     ).replace(" ", r"[\s\"']+")  # must add some extra handling because of colander formatting by max-width
     with pytest.raises(colander.Invalid, match=err):
         VarMap().deserialize({"random": "abc", "other": 1})
+
+    VarMap().deserialize({"random": "abc"})
+
+
+def test_mapping_no_additional_properties():
+    class Map(ce.StrictMappingSchema):
+        field = ce.ExtendedSchemaNode(colander.String())
+
+    class Derived(Map):
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    with pytest.raises(colander.Invalid):
+        Map().deserialize({"random": "abc"})
+    with pytest.raises(colander.Invalid):
+        Map().deserialize({"field": "abc", "other": "bad"})
+    Map().deserialize({"field": "abc"})
+
+    with pytest.raises(colander.Invalid):
+        Derived().deserialize({"field": "abc", "random": "bad"})
+    Derived().deserialize({"field": "abc", "other": "bad"})
 
 
 def test_media_type_pattern():
@@ -1385,3 +1423,103 @@ def test_schema_ref_resolution(
             },
             "additionalProperties": {}
         }, err_msg
+
+
+@pytest.mark.parametrize(
+    "item", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        None,
+        {},
+        {"xyz": 1.2},
+        colander.null,
+        colander.drop,
+    ]
+)
+def test_any_array(item):
+    array = [item]
+    expect = array if item not in (colander.drop, colander.null) else []
+    result = ce.PermissiveSequenceSchema().deserialize(array)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    "value", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        None,
+        {},
+        {"xyz": 1.2},
+        colander.drop,
+    ]
+)
+def test_any_type(value):
+    result = ce.ExtendedSchemaNode(ce.AnyType()).deserialize(value)
+    assert result == value
+
+
+def test_any_type_default():
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.AnyType()).deserialize(colander.null)
+    result = ce.ExtendedSchemaNode(ce.AnyType(), default=None).deserialize(colander.null)
+    assert result is None
+    result = ce.ExtendedSchemaNode(ce.AnyType(), default=colander.drop).deserialize(colander.null)
+    assert result == colander.drop
+
+
+def test_any_type_schema():
+    node = ce.ExtendedSchemaNode(ce.AnyType(), title="test-null")
+    schema = ce.AnyTypeConverter(None).convert_type(node)
+    assert schema == {"title": "test-null"}
+
+
+@pytest.mark.parametrize(
+    "value", [
+        None,
+        colander.drop,
+    ]
+)
+def test_none_type_valid(value):
+    result = ce.ExtendedSchemaNode(ce.NoneType()).deserialize(value)
+    assert result == value
+
+
+@pytest.mark.parametrize(
+    "value", [
+        1,
+        2.4,
+        "",
+        "abc",
+        True,
+        False,
+        {},
+        {"xyz": 1.2},
+        colander.null,
+    ]
+)
+def test_none_type_invalid(value):
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.NoneType()).deserialize(value)
+
+
+def test_none_type_default():
+    with pytest.raises(colander.Invalid):
+        ce.ExtendedSchemaNode(ce.NoneType()).deserialize(colander.null)
+    result = ce.ExtendedSchemaNode(ce.NoneType(), default=None).deserialize(colander.null)
+    assert result is None
+    result = ce.ExtendedSchemaNode(ce.NoneType(), default=colander.drop).deserialize(colander.null)
+    assert result == colander.drop
+
+
+def test_none_type_schema():
+    node = ce.ExtendedSchemaNode(ce.NoneType(), title="test-null")
+    schema = ce.NoneTypeConverter(None).convert_type(node)
+    assert schema == {"type": "null", "title": "test-null"}

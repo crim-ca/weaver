@@ -22,6 +22,9 @@ celery[mongodb]<4; sys_platform == "win32"  # rq.filter: <4  # pyup: ignore
 celery[mongodb]>=5.2.2,<6; sys_platform != "win32"
 cffi
 colander<2
+# FIXME: patch fix of the cornice service prefixed route path resolution (https://github.com/Cornices/cornice/pull/584)
+# FIXME: issue during tests (see https://github.com/Cornices/cornice/pull/584#issuecomment-2089676743)
+### cornice @ git+https://github.com/fmigneault/cornice.git@fix-service-route-prefix
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
@@ -32,8 +35,9 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-cwltool==3.1.20230906142556
-docker
+##cwltool==3.1.20230906142556
+cwltool @ git+https://github.com/fmigneault/cwltool.git@fix-load-contents-array
+docker>=7.1
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
@@ -44,7 +48,7 @@ geotiff>=0.2.8
 gunicorn>=22
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
-json2xml>=4.1.0
+json2xml==4.1.0
 jsonschema>=3.0.1
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
@@ -55,15 +59,24 @@ lxml
 mako
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
-mistune>=2.0.3,<2.1
+#mistune>=2.0.3,<2.1
 mypy_boto3_s3
-numpy>=1.22.2
+numpy>=1.22.2,<2; python_version < "3.10"
+numpy>=1.22.2; python_version >= "3.10"
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.29.3
 PasteDeploy>=3.1.0; python_version >= "3.12"
 pint
 psutil
+# notes: https://github.com/geopython/pygeofilter
+# - FES: OGC Filter Expression Standard (https://docs.ogc.org/is/09-026r2/09-026r2.html#107)
+#   uses https://github.com/geopython/pygml
+# - JFE: JSON Filter Expressions
+#   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
+# - extra 'backend-native' uses shapely for Python objects
+# - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
+pygeofilter[fes,backend-native]
 # FIXME: pymongo>=4 breaks with kombu corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -75,14 +88,17 @@ pyramid_beaker>=0.8
 #pyramid_celery>=4.0.0   # required for celery>=5
 pyramid_celery @ git+https://github.com/crim-ca/pyramid_celery.git@5.0.0a
 pyramid_mako
-python-dateutil
 pyramid_rewrite
 pyramid_storage
+pystac
+pystac_client
+python-box
+python-dateutil
 pytz
 pywps==4.6.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
-requests
+requests>=2.32
 requests_file
 ruamel.yaml>=0.16
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
@@ -90,7 +106,13 @@ ruamel.yaml>=0.16
 schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
+# urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
+# Python<3.10 error via pip, avoid endless package install lookup error with botocore
+# (https://github.com/pypa/pip/issues/12827#issuecomment-2211291150)
+urllib3>=2.2.2 ; python_version >= "3.10"  
+urllib3==1.26.19 ; python_version < "3.10"  # pyup: ignore
 urlmatch
 xmltodict
 webob
-werkzeug>=3.0.1,<3.1
+werkzeug>=3.0.3,<3.1
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

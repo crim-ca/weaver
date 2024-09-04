@@ -7,14 +7,17 @@ import copy
 import enum
 import inspect
 import json
+import os
 import re
+import shutil
+import tempfile
 import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
 from decimal import ConversionSyntax, Decimal
 from io import BytesIO
-from logging import ERROR, INFO, Logger, getLevelName, getLogger
+from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
@@ -51,6 +54,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreProcesses
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
+    LoggerHandler,
     VersionFormat,
     apply_number_with_unit,
     as_version_major_minor_patch,
@@ -70,6 +74,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
     from typing_extensions import TypeAlias
 
@@ -97,6 +102,7 @@ if TYPE_CHECKING:
         Link,
         Metadata,
         Number,
+        Path,
         Price,
         QuoteProcessParameters,
         QuoteProcessResults,
@@ -623,7 +629,7 @@ class Service(Base):
         return False
 
 
-class Job(Base):
+class Job(Base, LoggerHandler):
     """
     Dictionary that contains :term:`Job` details for local :term:`Process` or remote :term:`OWS` execution.
 
@@ -637,6 +643,33 @@ class Job(Base):
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
         if not isinstance(self.id, (str, uuid.UUID)):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
+        self["__tmpdir"] = None
+
+    def update_from(self, job):
+        # type: (Job) -> None
+        """
+        Forwards any internal or control properties from the specified :class:`Job` to this one.
+        """
+        self["__tmpdir"] = job.get("__tmpdir")
+
+    def cleanup(self):
+        # type: () -> None
+        _tmpdir = self.get("__tmpdir")
+        if isinstance(_tmpdir, str) and os.path.isdir(_tmpdir):
+            shutil.rmtree(_tmpdir, ignore_errors=True)
+
+    @property
+    def tmpdir(self):
+        # type: () -> Path
+        """
+        Optional temporary directory available for the :term:`Job` to store files needed for its operation.
+
+        It is up to the caller to remove the contents by calling :meth:`cleanup`.
+        """
+        _tmpdir = self.get("__tmpdir")
+        if not _tmpdir:
+            _tmpdir = self["__tmpdir"] = tempfile.mkdtemp()
+        return _tmpdir
 
     @staticmethod
     def _get_message(message, size_limit=None):
@@ -661,7 +694,18 @@ class Job(Base):
         error_msg = Job._get_message(error.text, size_limit=size_limit)
         return f"{error_msg} - code={error.code} - locator={error.locator}"
 
+    def log(self, level, message, *args, **kwargs):
+        # type: (AnyLogLevel, str, *str, **Any) -> None
+        """
+        Provides the :class:`LoggerHandler` interface, allowing to pass the :term:`Job` directly as a logger reference.
+
+        The same parameters as :meth:`save_log` can be provided.
+        """
+        message = message.format(*args, **kwargs)
+        return self.save_log(level=level, message=message, **kwargs)
+
     def save_log(self,
+                 *,
                  errors=None,           # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,           # type: Optional[Logger]
                  message=None,          # type: Optional[str]
@@ -846,7 +890,7 @@ class Job(Base):
         Obtain the type of the element associated to the creation of this job.
 
         .. seealso::
-            - Defined in http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
+            - Defined in https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:
@@ -2421,6 +2465,13 @@ class Process(Base):
             {"href": proc_self, "rel": "self", "title": "Current process description."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
+        ]
+        if self.service:
+            links.append(
+                {"href": f"{proc_desc}?f=html", "rel": "alternate",
+                 "title": "Alternate process description.", "type": ContentType.TEXT_HTML}
+            )
+        links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
@@ -2429,7 +2480,7 @@ class Process(Base):
             {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
-        ]
+        ])
         if self.version:
             proc_tag = f"{proc_list}/{self.tag}"
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
@@ -2614,7 +2665,7 @@ class Process(Base):
             svc_name = service.get("name")  # can be a custom ID or identical to provider name
             remote_service_url = service.url
             local_provider_url = f"{wps_api_url}/providers/{svc_name}"
-            svc_provider_name = service.wps().provider.name
+            svc_provider_name = service.wps(container).provider.name
         describe_process_url = f"{local_provider_url}/processes/{process.identifier}"
         execute_process_url = f"{describe_process_url}/jobs"
         package, info = ows2json(process, svc_name, remote_service_url, svc_provider_name)
@@ -2676,13 +2727,13 @@ class Process(Base):
         wps_request = WPSRequest()
         wps_request.language = http_request.accept_language.header_value or AcceptLanguage.EN_CA
         wps_request.http_request = http_request  # set instead of init param to bypass extra setup arguments
-        processes = {self.id: self.wps()}
+        processes = {self.id: self.wps(request)}
         describer = DescribeResponse(wps_request, uuid=None, processes=processes, identifiers=list(processes))
         offering, _ = describer.get_response_doc()
         return offering
 
-    def wps(self):
-        # type: () -> ProcessWPS
+    def wps(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> ProcessWPS
         """
         Converts this :class:`Process` to a corresponding format understood by :mod:`pywps`.
         """
@@ -2705,7 +2756,8 @@ class Process(Base):
             process_key = self.identifier
         if process_key not in process_map:
             raise ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
-        return process_map[process_key](**self.params_wps)
+        settings = get_settings(container)
+        return process_map[process_key](**self.params_wps, settings=settings)
 
 
 class PriceMixin(Base, abc.ABC):

@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "images": {
+      "collection": "https://example.com/collections/sentinel-2",
+      "format": "stac-collection",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "filter": "properties.eo:cloud_cover < 0.1",
+      "filter-lang": "cql2-text"
+    }
+  }
+}

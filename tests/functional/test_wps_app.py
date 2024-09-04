@@ -7,22 +7,12 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 import contextlib
-import unittest
 
-import pyramid.testing
 import pytest
 import xmltodict
 
-from tests.utils import (
-    get_test_weaver_app,
-    get_test_weaver_config,
-    mocked_execute_celery,
-    setup_config_with_celery,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore
-)
+from tests.functional.utils import WpsConfigBase
+from tests.utils import mocked_execute_celery
 from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
@@ -31,38 +21,33 @@ from weaver.visibility import Visibility
 
 
 @pytest.mark.functional
-class WpsAppTest(unittest.TestCase):
-    def setUp(self):
-        self.wps_path = "/ows/wps"
-        settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps": True,
-            "weaver.wps_path": self.wps_path,
-            "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
-            "weaver.wps_metadata_provider_name": WpsAppTest.__name__
-        }
-        config = get_test_weaver_config(settings=settings)
-        config = setup_config_with_mongodb(config)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        self.process_store = setup_mongodb_processstore(config)
-        self.job_store = setup_mongodb_jobstore(config)
-        self.app = get_test_weaver_app(config=config, settings=settings)
+class WpsAppTest(WpsConfigBase):
+    wps_path = "/ows/wps"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps": True,
+        "weaver.wps_path": wps_path,
+        "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+        "weaver.wps_metadata_provider_name": "WpsAppTest"
+    }
+    process_public = None   # type: WpsTestProcess
+    process_private = None  # type: WpsTestProcess
+
+    @classmethod
+    def setUpClass(cls):
+        super(WpsAppTest, cls).setUpClass()
 
         # add processes by database Process type
-        self.process_public = WpsTestProcess(identifier="process_public")
-        self.process_private = WpsTestProcess(identifier="process_private")
-        self.process_store.save_process(self.process_public)
-        self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
-        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
+        cls.process_public = WpsTestProcess(identifier="process_public")
+        cls.process_private = WpsTestProcess(identifier="process_private")
+        cls.process_store.save_process(cls.process_public)
+        cls.process_store.save_process(cls.process_private)
+        cls.process_store.set_visibility(cls.process_public.identifier, Visibility.PUBLIC)
+        cls.process_store.set_visibility(cls.process_private.identifier, Visibility.PRIVATE)
 
         # add processes by pywps Process type
-        self.process_store.save_process(HelloWPS())
-        self.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
-
-    def tearDown(self):
-        pyramid.testing.tearDown()
+        cls.process_store.save_process(HelloWPS())
+        cls.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
 
     def make_url(self, params):
         return f"{self.wps_path}?{params}"

@@ -884,7 +884,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             job.updated = now()
             result = self.collection.update_one({"id": job.id}, {"$set": job.params()})
             if result.acknowledged and result.matched_count == 1:
-                return self.fetch_by_id(job.id)
+                updated_job = self.fetch_by_id(job.id)
+                updated_job.update_from(job)
+                return updated_job
         except Exception as ex:
             raise JobUpdateError(f"Error occurred during job update: [{ex!r}]")
         raise JobUpdateError(f"Failed to update specified job: '{job!s}'")

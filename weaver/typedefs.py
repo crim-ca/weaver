@@ -6,7 +6,20 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Mapping,
+        MutableMapping,
+        Optional,
+        Sequence,
+        Tuple,
+        Type,
+        TypeVar,
+        Union
+    )
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
@@ -60,6 +73,7 @@ if TYPE_CHECKING:
     from webob.multidict import MultiDict as PyramidMultiDict
     from webob.response import Response as WebobResponse
     from webtest.response import TestResponse
+    from werkzeug.datastructures import Headers as WerkzeugHeaders
     from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
@@ -70,7 +84,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
-    Path = Union[os.PathLike, str, bytes]
+    Path = Union[os.PathLike[str], str, bytes]
 
     Default = TypeVar("Default")  # used for return value that is employed from a provided default value
     Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
@@ -127,7 +141,9 @@ if TYPE_CHECKING:
         "path": str,
         "format": NotRequired[Optional[str]],
     }, total=True)
-    CWL_IO_Value = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueObject = Union[AnyValueType, List[AnyValueType], CWL_IO_FileValue, List[CWL_IO_FileValue]]
+    CWL_IO_ValueMap = Dict[str, CWL_IO_ValueObject]
+
     CWL_IO_LiteralType = Literal["string", "boolean", "float", "int", "integer", "long", "double"]
     CWL_IO_ComplexType = Literal["File", "Directory"]
     CWL_IO_SpecialType = Literal["null", "Any"]
@@ -179,14 +195,12 @@ if TYPE_CHECKING:
         "provider": NotRequired[str],
         "process": NotRequired[str],
     }, total=False)
-    CWL_RequirementsDict = Dict[  # {'<req>': {<param>: <val>}}
-        CWL_RequirementNames,
-        Dict[str, JSON],
-    ]
-    CWL_RequirementsList = List[CWL_Requirement]  # [{'class': <req>, <param>: <val>}]
+    CWL_AnyRequirementObject = Union[CWL_Requirement, Dict[str, JSON]]
+    CWL_RequirementsDict = Dict[CWL_RequirementNames, CWL_AnyRequirementObject]   # {'<req>': {<param>: <val>}}
+    CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
-    CWL_Namespace = Dict[str, str]
+    CWL_Namespace = Mapping[str, str]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
         "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
@@ -295,7 +309,12 @@ if TYPE_CHECKING:
 
     # CWL loading
     CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
-    CWL_ExpectedOutputs = Dict[str, str]        # mapping of ID:glob-pattern (File/Directory only)
+    # mapping of ID:glob-pattern (File/Directory or string with loadContents)
+    CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
+        "type": Literal["File", "Directory", "string"],
+        "glob": str,
+    }, total=True)
+    CWL_ExpectedOutputs = Dict[str, CWL_ExpectedOutputDef]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
     # OWSLib Execution
@@ -326,21 +345,24 @@ if TYPE_CHECKING:
     HeadersType = Dict[str, str]
     CookiesTupleType = List[Tuple[str, str]]
     HeadersTupleType = List[Tuple[str, str]]
+    HeaderCookiesList = Union[HeadersTupleType, CookiesTupleType]
     CookiesBaseType = Union[CookiesType, CookiesTupleType]
     HeadersBaseType = Union[HeadersType, HeadersTupleType]
     HeaderCookiesType = Union[HeadersBaseType, CookiesBaseType]
     HeaderCookiesTuple = Union[Tuple[None, None], Tuple[HeadersBaseType, CookiesBaseType]]
-    AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
+    AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict, WerkzeugHeaders]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
+    AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
-    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException]
+    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException, JSON]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
+    ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
@@ -401,6 +423,13 @@ if TYPE_CHECKING:
         "encoding": NotRequired[str],
         "schema": NotRequired[str],
     }, total=False)
+    JobValueCollection = TypedDict("JobValueCollection", {
+        "collection": Required[str],
+        "filter": Optional[JSON],
+        "filter-crs": Optional[str],
+        "filter-lang": Optional[str],
+        "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
+    }, total=False)
     JobValueData = TypedDict("JobValueData", {
         "data": Required[AnyValueType],
     }, total=False)
@@ -408,7 +437,13 @@ if TYPE_CHECKING:
         # qualified value allow any object (not list directly though)
         "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueValue, JobValueBbox, JobValueFile]
+    JobValueObject = Union[
+        JobValueData,
+        JobValueValue,
+        JobValueBbox,
+        JobValueFile,
+        JobValueCollection,
+    ]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
@@ -429,14 +464,39 @@ if TYPE_CHECKING:
         "id": Required[str],
         "value": Required[JobValueBbox],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueValueItem, JobValueBboxItem, JobValueFileItem]
+    JobValueCollectionItem = TypedDict("JobValueCollectionItem", {
+        "id": Required[str],
+        "collection": Required[str],
+        "filter": Optional[JSON],
+        "filter-crs": Optional[str],
+        "filter-lang": Optional[str],
+        "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
+    }, total=False)
+    JobValueItem = Union[
+        JobValueDataItem,
+        JobValueValueItem,
+        JobValueBboxItem,
+        JobValueFileItem,
+        JobValueCollectionItem,
+    ]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
     JobInputs = List[JobInputItem]
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobMonitorReference = Any  # typically a URI of the remote job status or an execution object/handler
+    JobCustomInputs = TypeVar(
+        "JobCustomInputs",
+        bound=Any,
+    )
+    JobCustomOutputs = TypeVar(
+        "JobCustomOutputs",
+        bound=Any,
+    )
+    JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
+        "JobMonitorReference",
+        bound=Any,
+    )
     JobSubscribers = TypedDict("JobSubscribers", {
         "failedUri": NotRequired[str],
         "successUri": NotRequired[str],
@@ -447,7 +507,7 @@ if TYPE_CHECKING:
     }, total=True)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
-    ExecutionInputsMap = Dict[str, Union[JobValueObject, List[JobValueObject]]]
+    ExecutionInputsMap = Dict[str, Union[AnyValueType, JobValueObject, List[JobValueObject]]]
     # when schema='weaver.processes.constants.ProcessSchema.OLD'
     ExecutionInputsList = List[JobValueItem]
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]

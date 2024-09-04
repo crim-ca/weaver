@@ -70,13 +70,14 @@ except ImportError:  # pragma: no cover
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
-    from typing_extensions import Literal
+    from typing_extensions import Annotated, Literal
 
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
+    from requests.models import PreparedRequest, Response as RequestsResponse
     from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
@@ -96,7 +97,11 @@ if TYPE_CHECKING:
     MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Union[Sequence[str], Dict[str, str]]]
+    MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
+    MockConfigWPS1 = Union[
+        Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]],
+        Annotated[Sequence[str], 3]
+    ]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -251,8 +256,6 @@ def get_test_weaver_config(config=None, settings=None):
     config.registry.settings["weaver.wps_processes"] = ""
     if settings:
         config.registry.settings.update(settings)
-    # create the test application
-    config.include("weaver")
     return config
 
 
@@ -500,7 +503,7 @@ def mocked_sub_requests(app,                # type: TestApp
         url = req_kwargs.pop("base_url", url)
         body = req_kwargs.pop("data", None)
         _json = req_kwargs.pop("json", None)
-        query = req_kwargs.pop("query", None)
+        query = req_kwargs.pop("query", None) or ""
         params = req_kwargs.pop("params", {})
         if query:
             url += ("" if query.startswith("?") else "?") + query
@@ -542,7 +545,7 @@ def mocked_sub_requests(app,                # type: TestApp
             if key in req_kwargs:
                 LOGGER.warning("Dropping unsupported '%s' parameter for mocked test request.", key)
             req_kwargs.pop(key, None)
-        cookies = req_kwargs.pop("cookies", None)
+        cookies = req_kwargs.pop("cookies", None) or {}
         if cookies:
             cookies = dict(cookies)  # in case list of tuples
             for name, value in cookies.items():
@@ -669,10 +672,11 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wps1(server_configs,          # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
-                                       mock_responses=None,     # type: Optional[responses.RequestsMock]
-                                       data=False,              # type: bool
-                                       ):                       # type: (...) -> Optional[MockPatch]
+def mocked_remote_server_requests_wps1(
+    server_configs,         # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
+    mock_responses=None,    # type: Optional[responses.RequestsMock]
+    data=False,             # type: bool
+):                          # type: (...) -> Optional[MockPatch]
     """
     Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
 
@@ -758,30 +762,36 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     if not isinstance(server_configs[0], (tuple, list)):
         server_configs = [server_configs]
 
-    for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
-        assert isinstance(resource_xml_getcap, str)
+    for svr_config in server_configs:
+        test_server_wps, resource_xml_getcap, resource_xml_describe = svr_config
+        assert isinstance(resource_xml_getcap, str) or callable(resource_xml_getcap)
         assert isinstance(resource_xml_describe, (set, list, tuple, dict))
         if not data:
-            assert os.path.isfile(resource_xml_getcap)
+            if isinstance(resource_xml_getcap, str):
+                assert os.path.isfile(resource_xml_getcap)
             if isinstance(resource_xml_describe, dict):
-                assert all(os.path.isfile(file) for file in resource_xml_describe.values())
+                desc_values = resource_xml_describe.values()
             else:
-                assert all(os.path.isfile(file) for file in resource_xml_describe)
+                desc_values = resource_xml_describe
+            assert all(
+                os.path.isfile(file_or_call) if isinstance(file_or_call, str) else callable(file_or_call)
+                for file_or_call in desc_values
+            )
         if isinstance(resource_xml_describe, dict):
             map_describe = list(resource_xml_describe.items())
         else:
             map_describe = [(None, desc) for desc in resource_xml_describe]
 
-        get_cap_xml = get_xml(resource_xml_getcap)
+        get_cap_xml = get_xml(resource_xml_getcap) if isinstance(resource_xml_getcap, str) else resource_xml_getcap
         version_query = "&version=1.0.0"
         get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
         for map_desc_id, proc_desc_xml in map_describe:
-            describe_xml = get_xml(proc_desc_xml)
+            describe_xml = get_xml(proc_desc_xml) if isinstance(proc_desc_xml, str) else proc_desc_xml
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
-            if map_desc_id is not None and map_desc_id != proc_desc_id:
+            if map_desc_id is not None and map_desc_id != proc_desc_id and isinstance(describe_xml, str):
                 describe_xml = describe_xml.replace(
                     f"<ows:Identifier>{proc_desc_id}</ows:Identifier>",
                     f"<ows:Identifier>{map_desc_id}</ows:Identifier>",
@@ -796,10 +806,19 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
-        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, str]]) -> None
+        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, Union[str, MockConfigCall]]]) -> None
         xml_header = {"Content-Type": ContentType.APP_XML}
-        for meth, url, body in _requests:
-            _mock_resp.add(meth, url, body=body, headers=xml_header)
+        for meth, url, _body_or_call in _requests:
+            if isinstance(_body_or_call, str):
+                _mock_resp.add(meth, url, body=_body_or_call, headers=xml_header)
+            else:
+                _mock_resp.add_callback(
+                    meth,
+                    url,
+                    callback=_body_or_call,
+                    match_querystring=True,
+                    content_type=xml_header["Content-Type"],
+                )
 
     def mocked_remote_server_wrapper(test):
         # type: (Callable[[..., Any], Any]) -> Callable[[..., Any], Any]
@@ -826,15 +845,28 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
+@overload
+def mocked_dir_listing(local_directory, directory_path, **__):
+    # type: (str, str, **bool) -> str
+    ...
+
+
+@overload
+def mocked_dir_listing(local_directory, directory_path, only_references):
+    # type: (str, str, Literal[True]) -> List[str]
+    ...
+
+
 def mocked_dir_listing(local_directory,             # type: str
                        directory_path,              # type: str
                        *,                           # force named keyword arguments after
+                       only_references=False,       # type: bool
                        include_dir_heading=True,    # type: bool
                        include_separators=True,     # type: bool
                        include_code_format=True,    # type: bool
                        include_table_format=True,   # type: bool
                        include_modified_date=True,  # type: bool
-                       ):                           # type: (...) -> str
+                       ):                           # type: (...) -> Union[str, List[str]]
     """
     Generate the requested HTML directory listing.
 
@@ -846,6 +878,7 @@ def mocked_dir_listing(local_directory,             # type: str
 
     :param local_directory: Real directory location to emulate HTML listing.
     :param directory_path: Relative base directory to be represented by the served HTML listing.
+    :param only_references: Return the listing of directory and files directly without HTML formatting.
     :param include_dir_heading: Add HTML tags with the relative directory displayed as page heading.
     :param include_separators: Add HTML tags to place visual separators between various elements.
     :param include_code_format: Add HTML tags wrapping the listing in a code-formatted text.
@@ -856,6 +889,8 @@ def mocked_dir_listing(local_directory,             # type: str
     dir_files = os.listdir(local_directory)
     dir_files = [".."] + sorted(dir_files)  # most indexes provide the parent relative link to allow browsing upward
     dir_files = [f"{path}/" if os.path.isdir(os.path.join(local_directory, path)) else path for path in dir_files]
+    if only_references:
+        return dir_files
     ref_files = [
         ("<tr><td>" if include_table_format else "") +
         ("<pre>" if include_table_format and include_code_format else "") +
@@ -1012,6 +1047,11 @@ def mocked_file_server(directory,                   # type: str
             if dir_path.endswith("index.html"):
                 dir_path = dir_path.rsplit("/", 1)[0]
             dir_list = os.path.join(directory, dir_path.lstrip("/"))
+            if ContentType.APP_JSON in str(request.headers.get("Accept")):
+                dir_refs = mocked_dir_listing(dir_list, dir_path, only_references=True)
+                dir_data = json.dumps({"links": [{"href": dir_refs} for ref in dir_refs]})
+                headers = {"Content-Type": ContentType.APP_JSON, "Content-Length": str(len(dir_data))}
+                return 200, headers, dir_data
             dir_html = mocked_dir_listing(dir_list, dir_path, **directory_listing_kwargs)
             headers = {"Content-Type": ContentType.TEXT_HTML, "Content-Length": str(len(dir_html))}
             return 200, headers, dir_html
@@ -1183,7 +1223,7 @@ def mocked_execute_celery(
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> contextlib.AbstractContextManager[mock.MagicMock]
+    # type: () -> Union[contextlib.ContextDecorator, contextlib.AbstractContextManager[mock.MagicMock]]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 
@@ -1307,14 +1347,14 @@ def mocked_aws_s3(test_func):
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
     ...
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
     ...
 
 

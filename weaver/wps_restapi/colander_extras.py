@@ -582,6 +582,42 @@ class ExtendedString(colander.String):
         return super(ExtendedString, self).deserialize(node, cstruct)
 
 
+class NoneType(colander.SchemaType):
+    """
+    Type representing an explicit :term:`JSON` ``null`` value.
+    """
+    def serialize(self, node, appstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Union[None, colander.null, colander.drop]
+        if appstruct in (colander.null, colander.drop):
+            return appstruct
+        if appstruct is None:
+            return None
+        raise colander.Invalid(
+            node,
+            colander._(
+                "${val} cannot be serialized: ${err}",
+                mapping={"val": appstruct, "err": "Not 'null'."},
+            ),
+        )
+
+    def deserialize(self, node, cstruct):
+        # type: (colander.SchemaNode, Any) -> Union[None, colander.null, colander.drop]
+        return self.serialize(node, cstruct)
+
+
+class AnyType(colander.SchemaType):
+    """
+    Type representing any :term:`JSON` structure.
+    """
+    def serialize(self, node, appstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Any
+        return appstruct
+
+    def deserialize(self, node, cstruct):  # noqa
+        # type: (colander.SchemaNode, Any) -> Any
+        return cstruct
+
+
 class XMLObject(object):
     """
     Object that provides mapping to known XML extensions for OpenAPI schema definition.
@@ -1747,8 +1783,33 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         self.typ.unknown = "preserve"
 
 
-class PermissiveSequenceSchema(ExtendedMappingSchema):
-    item = PermissiveMappingSchema()
+class PermissiveSequenceSchema(ExtendedSequenceSchema):
+    """
+    Array schema that allows *any* item type.
+
+    This is equivalent to the any of the following :term:`JSON` schema definitions.
+
+    .. code-block:: json
+
+        {
+            "type": "array",
+            "items": {}
+        }
+
+    .. code-block:: json
+
+        {
+            "type": "array",
+            "items": true
+        }
+
+    .. code-block:: json
+
+        {
+            "type": "array"
+        }
+    """
+    item = ExtendedSchemaNode(AnyType(), default=colander.null, missing=colander.null)
 
 
 class KeywordMapper(ExtendedMappingSchema):
@@ -2052,22 +2113,43 @@ class OneOfKeywordSchema(KeywordMapper):
             if isinstance(discriminator_spec, dict) and "mapping" not in discriminator_spec:
                 mapping = {}
                 for node in self.get_keyword_items():
-                    node_fields = [getattr(field, "example", colander.null) for field in node.children
-                                   if field.name == discriminator_spec["propertyName"]]
+                    node_fields = [
+                        field for field in node.children
+                        if field.name == discriminator_spec["propertyName"]
+                    ]
                     if len(node_fields) != 1:
                         continue
-                    example = node_fields[0]
+                    example = getattr(node_fields[0], "example", colander.null)
+                    values = getattr(node_fields[0], "validator", StringOneOf([colander.null]))
+                    discriminator_value = colander.null
                     if example is not colander.null:
-                        if example in mapping:
-                            raise SchemaNodeTypeError(
-                                "Keyword schema '{}' of type '{}' specification with 'discriminator' attempts "
-                                "to refer to duplicate example values '{}' between '{}' and '{}'".format(
-                                    schema_name, keyword, example,
-                                    _get_node_name(mapping[example], schema_name=True),
-                                    _get_node_name(node, schema_name=True),
-                                )
+                        discriminator_value = example
+                    elif (
+                        isinstance(values, colander.OneOf)
+                        and len(values.choices) == 1
+                        and isinstance(values.choices[0], str)
+                    ):
+                        discriminator_value = values.choices[0]
+                    if not discriminator_value:
+                        raise SchemaNodeTypeError(
+                            "Keyword schema '{}' of type '{}' specification with 'discriminator' "
+                            "could not resolve any value defining the discriminator for nested "
+                            "field '{}' in schema '{}'.".format(
+                                schema_name, keyword,
+                                discriminator_spec["propertyName"],
+                                _get_node_name(node_fields[0], schema_name=True),
                             )
-                        mapping[example] = node
+                        )
+                    if discriminator_value in mapping:
+                        raise SchemaNodeTypeError(
+                            "Keyword schema '{}' of type '{}' specification with 'discriminator' attempts "
+                            "to refer to duplicate example values '{}' between '{}' and '{}'".format(
+                                schema_name, keyword, discriminator_value,
+                                _get_node_name(mapping[discriminator_value], schema_name=True),
+                                _get_node_name(node, schema_name=True),
+                            )
+                        )
+                    mapping[discriminator_value] = node
                 discriminator_spec["mapping"] = mapping
             if not (
                 isinstance(discriminator_spec, dict)
@@ -2299,7 +2381,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         - :class:`NotKeywordSchema`
     """
     _keyword_schemas_only_object = False
-    _keyword_schemas_same_struct = True
+    _keyword_schemas_same_struct = False
     _keyword = "_any_of"
 
     @classmethod
@@ -2631,6 +2713,17 @@ class MoneyTypeConverter(DecimalTypeConverter):
     )
 
 
+class NoneTypeConverter(TypeConverter):
+    type = "null"
+
+
+class AnyTypeConverter(TypeConverter):
+    def convert_type(self, schema_node):
+        converted = super().convert_type(schema_node)
+        converted.pop("type", None)
+        return converted
+
+
 # TODO: replace directly in original cornice_swagger
 #  (see: https://github.com/Cornices/cornice.ext.swagger/issues/133)
 class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
@@ -2657,6 +2750,8 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
             colander.Mapping: VariableObjectTypeConverter,
             colander.Decimal: DecimalTypeConverter,
             colander.Money: MoneyTypeConverter,
+            NoneType: NoneTypeConverter,
+            AnyType: AnyTypeConverter,
         }
         extended_converters.update(self.keyword_converters)
         if custom_converters:
@@ -2822,6 +2917,12 @@ class OAS3DefinitionHandler(DefinitionHandler):
                     schema.pop(param)
                 schema["$ref"] = schema_ref
         return schema_ret
+
+    def _ref_recursive(self, schema, depth, base_name=None):
+        # avoid key error if dealing with 'AnyType'
+        if not schema or not schema.get("type"):
+            return schema or {}
+        return super()._ref_recursive(schema, depth, base_name=base_name)
 
     def _process_items(self,
                        schema,      # type: Dict[str, Any]

@@ -25,8 +25,10 @@ from pywps.validator.mode import MODE
 
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
+from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
+    DEFAULT_FORMAT,
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
@@ -39,6 +41,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
+    CWL_REQUIREMENT_SECRETS,
+    CWL_TOOL_NAMESPACE_URL,
     IO_INPUT,
     IO_OUTPUT,
     WPS_BOUNDINGBOX,
@@ -54,7 +58,6 @@ from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
-    DEFAULT_FORMAT,
     PACKAGE_ARRAY_MAX_SIZE,
     CWLIODefinition,
     any2cwl_io,
@@ -69,6 +72,7 @@ from weaver.processes.convert import (
     json2oas_io,
     json2wps_allowed_values,
     json2wps_datatype,
+    json2wps_io,
     json2wps_supported_uoms,
     merge_io_formats,
     normalize_ordered_io,
@@ -79,6 +83,7 @@ from weaver.processes.convert import (
     parse_cwl_array_type,
     parse_cwl_enum_type,
     repr2json_input_values,
+    resolve_cwl_namespaced_name,
     set_field,
     wps2json_io,
     xml_wps2cwl
@@ -829,6 +834,64 @@ def test_cwl2wps_io_record_format():
     assert len(wps_io.supported_formats) == 1
     assert isinstance(wps_io.supported_formats[0], Format)
     assert wps_io.supported_formats[0].mime_type == ContentType.APP_JSON
+
+
+@pytest.mark.parametrize(
+    ["test_formats", "expected_types"],
+    [
+        (
+            "${ return \"iana:application/json\"; }",
+            [DEFAULT_FORMAT.mime_type],
+        ),
+        (
+            [
+                "${ return \"iana:application/json\"; }",
+                "iana:application/json"
+            ],
+            [ContentType.APP_JSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/json\"; }",
+                "https://www.iana.org/assignments/media-types/application/json",
+            ],
+            [ContentType.APP_JSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/geo+json\"; }",
+                "https://geojson.org/schema/FeatureCollection.json",
+            ],
+            [ContentType.APP_GEOJSON],
+        ),
+        (
+            [
+                "${ return \"iana:application/geo+json\"; }",
+                "https://example.com/unknown/reference.abc",
+                "https://example.com/unresolved",
+            ],
+            [ContentType.TEXT_PLAIN, ContentType.TEXT_PLAIN],
+        ),
+        (
+            [
+                "https://example.com/unknown/reference.abc",
+                "${ return \"iana:application/geo+json\"; }",
+                "https://example.com/unique/resolved.xsd",
+                "https://example.com/unresolved",
+            ],
+            [ContentType.TEXT_PLAIN, ContentType.APP_XML, ContentType.TEXT_PLAIN],
+        ),
+    ]
+)
+def test_cwl2wps_io_expression_format(test_formats, expected_types):
+    input_def = {
+        "name": "data",
+        "type": "File",
+        "format": test_formats,
+    }
+    input_wps = cwl2wps_io(input_def, IO_INPUT)
+    media_types = [fmt.mime_type for fmt in input_wps.supported_formats]
+    assert media_types == expected_types
 
 
 @pytest.mark.parametrize(
@@ -1740,6 +1803,21 @@ def test_repr2json_input_values():
     assert result == expect
 
 
+@pytest.mark.parametrize(
+    ["name", "expect"],
+    [
+        ("test", "test"),
+        (CWL_REQUIREMENT_SECRETS, CWL_REQUIREMENT_SECRETS),
+        (f"{CWL_TOOL_NAMESPACE_URL}Secrets", CWL_REQUIREMENT_SECRETS),
+        ("file:///tmp/random/package#message", "message"),
+        (f"file:///tmp/random/{CWL_REQUIREMENT_APP_WPS1}", CWL_REQUIREMENT_APP_WPS1),
+    ]
+)
+def test_resolve_cwl_namespaced_name(name, expect):
+    result = resolve_cwl_namespaced_name(name)
+    assert result == expect
+
+
 def test_set_field():
     data = {"x": 1}
     set_field(data, "y", 2)
@@ -2323,6 +2401,86 @@ def test_ows2json_io_convert_literal_uom(ows_io, json_io):
     assert result == json_io
 
 
+def test_ows_wps_json_default_complex_format():
+    xml_io = xml_util.parse(resources.WPS_COMPLEX_OPTIONAL_IO_XML).xpath("//DataInputs/Input")[0]
+    ows_io = OWSInput(xml_io)
+    res_io = ows2json_io(ows_io)
+    assert res_io == {
+        "id": "test",
+        "title": "test",
+        "min_occurs": 0,
+        "max_occurs": 100,
+        "any_value": False,
+        "type": WPS_COMPLEX_DATA,
+        "data_type": WPS_COMPLEX_DATA,
+        "data_format": {
+            "mimeType": ContentType.APP_NETCDF,
+            "encoding": "base64",
+            "maximumMegabytes": 200,
+            "schema": None,
+            "default": True,
+        },
+        "formats": [
+            {
+                "mimeType": ContentType.APP_NETCDF,
+                "encoding": "base64",
+                "maximumMegabytes": 200,
+                "schema": None,
+                "default": True,
+            },
+            {
+                "mimeType": ContentType.APP_JSON,
+                "encoding": None,
+                "maximumMegabytes": 200,
+                "schema": None,
+                "default": False,
+            },
+        ],
+    }
+
+    wps_io = json2wps_io(res_io, "input")
+    assert wps_io.identifier == "test"
+    assert wps_io.title == "test"
+    assert wps_io.min_occurs == 0
+    assert wps_io.max_occurs == 100
+    assert wps_io.data_format == Format(ContentType.APP_NETCDF, encoding="base64")
+    assert all(wps_fmt == val_fmt for wps_fmt, val_fmt in zip(
+        wps_io.supported_formats,
+        [
+            Format(ContentType.APP_NETCDF, encoding="base64"),
+            Format(ContentType.APP_JSON),
+        ],
+    ))
+
+    # ensure no defaults applied
+    assert wps_io.data is None
+    assert wps_io._default is None
+
+    res_io = wps2json_io(wps_io)
+    assert res_io == {
+        "id": "test",
+        "title": "test",
+        "description": "",
+        "keywords": [],
+        "metadata": [],
+        "translations": None,
+        "asreference": False,
+        "workdir": None,
+        "minOccurs": "0",
+        "maxOccurs": "100",
+        "mode": MODE.NONE,
+        "type": WPS_COMPLEX,
+        "data_format": {"mime_type": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": ""},
+        "formats": [
+            {"mediaType": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": "", "default": True},
+            {"mediaType": ContentType.APP_JSON, "encoding": "", "schema": "", "extension": "", "default": False}
+        ],
+        # from default data_format
+        "mimetype": ContentType.APP_NETCDF,
+        "encoding": "base64",
+    }
+
+
 @pytest.mark.parametrize(
     ["value", "dtype", "ctype", "expect"],
     [
@@ -2368,14 +2526,20 @@ def test_ows2json_io_convert_literal_uom(ows_io, json_io):
         (
             ["random"],
             WPS_COMPLEX_DATA,
-            "text/plain",
-            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": "text/plain"},
+            ContentType.TEXT_PLAIN,
+            {"data": None, "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.TEXT_PLAIN},
         ),
         (
-            [1, 2, 3],
+            [[1, 2, 3]],
             WPS_COMPLEX_DATA,
-            "application/json",
-            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": "application/json"},
+            ContentType.APP_JSON,
+            {"data": [1, 2, 3], "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.APP_JSON},
+        ),
+        (
+            [[{"data": 123}, {"xyz": "ok"}]],
+            WPS_COMPLEX_DATA,
+            ContentType.APP_JSON,
+            {"data": [{"data": 123}, {"xyz": "ok"}], "dataType": WPS_COMPLEX_DATA, "mimeType": ContentType.APP_JSON},
         ),
     ]
 )

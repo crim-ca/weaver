@@ -1,6 +1,8 @@
 import collections.abc
+import json
 import logging
 import os
+import pathlib
 import tempfile
 from functools import partial
 from typing import TYPE_CHECKING, cast  # these are actually used in the code
@@ -21,7 +23,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1
 )
 from weaver.processes.convert import is_cwl_complex_type
-from weaver.utils import get_settings
+from weaver.utils import get_any_id, get_any_value
 from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
@@ -32,13 +34,16 @@ if TYPE_CHECKING:
     from cwltool.pathmapper import PathMapper
     from cwltool.utils import CWLObjectType, CWLOutputType, JobsGeneratorType
 
+    from weaver.processes.wps_package import WpsPackage
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.typedefs import (
         CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_RequirementsList,
+        CWL_Results,
+        CWL_RuntimeInputsMap,
         CWL_ToolPathObject,
-        JobProcessDefinitionCallback
+        JobResults
     )
 
     MonitorFunction = Optional[Callable[[Popen[str]], None]]
@@ -54,10 +59,10 @@ supportedProcessRequirements += [
 ]
 
 
-def default_make_tool(toolpath_object,              # type: CWL_ToolPathObject
-                      loading_context,              # type: LoadingContext
-                      get_job_process_definition,   # type: JobProcessDefinitionCallback
-                      ):                            # type: (...) -> ProcessCWL
+def default_make_tool(toolpath_object,  # type: CWL_ToolPathObject
+                      loading_context,  # type: LoadingContext
+                      package_process,  # type: WpsPackage
+                      ):                # type: (...) -> ProcessCWL
     """
     Generate the tool class object from the :term:`CWL` definition to handle its execution.
 
@@ -71,11 +76,13 @@ def default_make_tool(toolpath_object,              # type: CWL_ToolPathObject
         raise WorkflowException(f"Not a dict: '{toolpath_object}'")
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
-            builtin_process_hints = [h.get("process") for h in toolpath_object.get("hints")
-                                     if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)]
+            builtin_process_hints = [
+                h.get("process") for h in toolpath_object.get("hints") or []
+                if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)
+            ]
             if len(builtin_process_hints) == 1:
                 return cast(BuiltinProcess, BuiltinProcess(toolpath_object, loading_context))
-            return cast(WpsWorkflow, WpsWorkflow(toolpath_object, loading_context, get_job_process_definition))
+            return cast(WpsWorkflow, WpsWorkflow(toolpath_object, loading_context, package_process))
         if toolpath_object["class"] == "ExpressionTool":
             return command_line_tool.ExpressionTool(toolpath_object, loading_context)
         if toolpath_object["class"] == "Workflow":
@@ -95,25 +102,26 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
     """
 
     # imposed by original CWL implementation
-    # pylint: disable=C0103,invalid-name
     # pylint: disable=W0201,attribute-defined-outside-init
 
-    def __init__(self, toolpath_object, loading_context, get_job_process_definition):
-        # type: (CWL_ToolPathObject, LoadingContext, JobProcessDefinitionCallback) -> None
+    def __init__(self, toolpath_object, loading_context, package_process):
+        # type: (CWL_ToolPathObject, LoadingContext, WpsPackage) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)
         self.prov_obj = loading_context.prov_obj
-        self.get_job_process_definition = get_job_process_definition
+        self.package_process = package_process
+        self.get_job_process_definition = self.package_process.get_job_process_definition
 
         # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
         self.requirements = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.requirements))
         self.hints = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.hints))
 
     # pylint: disable=W0221,W0237 # naming using python like arguments
-    def job(self,
-            job_order,          # type: CWLObjectType
-            output_callbacks,   # type: Callable[[Any, Any], Any]
-            runtime_context,    # type: RuntimeContext
-            ):                  # type: (...) -> JobsGeneratorType
+    def job(
+        self,
+        job_order,          # type: CWLObjectType
+        output_callbacks,   # type: Callable[[Any, Any], Any]
+        runtime_context,    # type: RuntimeContext
+    ):                      # type: (...) -> JobsGeneratorType
         """
         Workflow job generator.
 
@@ -125,7 +133,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
         job_name = uniquename(runtime_context.name or shortname(self.tool.get("id", "job")))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
-        weaver_out_dir = get_wps_output_dir(get_settings())
+        weaver_out_dir = get_wps_output_dir(self.package_process.settings)
         runtime_context.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtime_context.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_out_dir
@@ -140,7 +148,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             self.requirements,
             self.hints,
             job_name,
-            self.get_job_process_definition(job_name, job_order, self.tool),
+            self.get_job_process_definition(job_name, job_order),
             self.tool["outputs"]
         )
         wps_workflow_job.prov_obj = self.prov_obj
@@ -150,9 +158,20 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
         wps_workflow_job.outdir = builder.outdir
         wps_workflow_job.tmpdir = builder.tmpdir
         wps_workflow_job.stagedir = builder.stagedir
+
+        # NOTE:
+        #   Filter outputs to collect by leaving only 'complex' types, since the underlying step implemented by
+        #   a "normal" 'CommandLineTool' doesn't know how to collect literals obtained from the remote process response.
+        #   The literals will be collected by 'WpsWorkflowJob.collect_literal_outputs' to fill missing
+        #   data values before resolving 'WpsWorkflowJob.collect_outputs' operations for File/Directory types.
+        collectable_outputs = [
+            out for out in self.tool["outputs"]
+            if shortname(out["id"]) in wps_workflow_job.expected_outputs
+        ]
+
         wps_workflow_job.collect_outputs = partial(
             self.collect_output_ports,
-            self.tool["outputs"],
+            collectable_outputs,
             builder,
             compute_checksum=getdefault(runtime_context.compute_checksum, True),
             jobname=job_name,
@@ -198,7 +217,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
             glob = schema["outputBinding"]["glob"]
             glob_list = isinstance(glob, list)
             glob = glob if isinstance(glob, list) else [glob]
-            out_id = schema["id"].rsplit("#", 1)[-1]
+            out_id = shortname(schema["id"])
             glob_spec = []
             for glob_item in glob:
                 if glob_item.startswith(outdir):
@@ -239,8 +258,24 @@ class WpsWorkflowJob(CommandLineJob):
         builder.pathmapper = self.pathmapper
 
         self.wps_process = wps_process  # type: WpsProcessInterface
-        self.expected_outputs = {}      # type: CWL_ExpectedOutputs  # {id: glob-pattern}
+        self.expected_outputs = {}      # type: CWL_ExpectedOutputs  # {id: glob-pattern}  # only File/Directory
+        self._resolve_expected_output_files(expected_outputs)
+
+    def _resolve_expected_output_files(self, expected_outputs):
+        # type: (List[CWL_Output_Type]) -> None
+        """
+        Finds the ``{id: glob-pattern}`` for any eventual output files to collect from the :term:`Workflow` step.
+
+        :param expected_outputs: All potential output definitions the step defines.
+        :return: Resolved output locations to look for result files, considering the nested `Output-ID` path.
+        """
         for output in expected_outputs:
+            # There are 2 cases where an output must be collected from a path reference
+            # 1. the output is itself a complex type (ie: CWL 'type: File|Directory')
+            # 2. the output is a literal string with 'loadContents' and some evaluation from a file
+            #    (e.g.: 'outputEval: $(self[0].contents)' or '$(inputs.<input_id>.contents')
+            # In this 2nd case, the underlying "normal" 'CommandLineTool' step will have done the job for us.
+            # Therefore, only need to worry about "real" File/Directory references to remap to WPS output dir.
             if is_cwl_complex_type(output):
                 output_id = shortname(output["id"])
                 glob_spec = output["outputBinding"]["glob"]
@@ -256,18 +291,78 @@ class WpsWorkflowJob(CommandLineJob):
                     out_glob = glob.split("/")[-1] or "."
                     out_glob = f"{output_id}/{out_glob}"
                     out_globs.add(out_glob)
-                self.expected_outputs[output_id] = out_globs if glob_list else list(out_globs)[0]
+                self.expected_outputs[output_id] = {
+                    "type": output["type"],
+                    "glob": out_globs if glob_list else list(out_globs)[0],
+                }
+
+    def _retrieve_secret_inputs(self, runtime_context):
+        # type: (RuntimeContext) -> CWL_RuntimeInputsMap
+        """
+        Retrieve the job inputs with reverse resolution of any secrets defined in the store.
+
+        Because the remote :term:`Process` (of any type) will not have the local runtime store definition,
+        they cannot themselves resolve the original values.
+
+        .. warning::
+            Any following steps after this call must be mindful of what they log to avoid leaking secrets.
+        """
+        inputs = self.builder.job
+        if not runtime_context.secret_store:
+            return inputs
+        for name in list(inputs):
+            inputs[name] = runtime_context.secret_store.retrieve(inputs[name])
+        return inputs
+
+    def collect_literal_outputs(self, results):
+        # type: (JobResults) -> CWL_Results
+        """
+        Collects the literal values provided as output.
+
+        Typical :term:`CWL` applications (i.e: the ones not implemented by derived :class:`WpsProcessInterface`)
+        will only return outputs from ``File``/``Directory``, or a *literal* inferred by some JavaScript expression
+        or loaded by contents from another source. Because of this, *literal* never needs to be collected in these
+        cases. Since a :term:`Process` derived from :class:`WpsProcessInterface` can directly return literal data,
+        their values must be explicit chained for following :term:`Workflow` steps.
+
+        :param results: The original :term:`Job` results obtained from the remote :term:`Process`.
+        :return: Collected literal outputs.
+        """
+        outputs = {}  # type: CWL_Results
+        for res in results:
+            res_id = get_any_id(res)
+            if res_id not in self.expected_outputs:
+                outputs[res_id] = get_any_value(res)
+        return outputs
 
     # pylint: disable=W0221,W0237 # naming using python like arguments
-    def _execute(self,
-                 runtime,                   # type: List[str]
-                 env,                       # type: MutableMapping[str, str]
-                 runtime_context,           # type: RuntimeContext
-                 monitor_function=None,     # type: MonitorFunction
-                 ):                         # type: (...) -> None
+    def _execute(
+        self,
+        runtime,                # type: List[str]
+        env,                    # type: MutableMapping[str, str]
+        runtime_context,        # type: RuntimeContext
+        monitor_function=None,  # type: MonitorFunction
+    ):                          # type: (...) -> None
         """
         Execute the :term:`WPS` :term:`Process` defined as :term:`Workflow` step and chains their intermediate results.
         """
-        self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
-        outputs = self.collect_outputs(self.outdir, 0)
+        cwl_inputs = self._retrieve_secret_inputs(runtime_context)
+        results = self.wps_process.execute(cwl_inputs, self.outdir, self.expected_outputs)
+        outputs = self.collect_literal_outputs(results)
+
+        # NOTE:
+        #   Use the 'cwl.output.json' for custom outputs to pass the literal data.
+        #   Since 'collect_outputs -> partial(collect_output_ports, ...)' will raise if required outputs are missing
+        #   after collecting all 'expected_outputs' of 'File/Directory' type, they must be injected before calling it.
+        #   However, we cannot pass the literal data directly as input because of the partial definition implemented
+        #   by the other class.
+        cwl_output_file = pathlib.Path(self.outdir, "cwl.output.json")
+        try:
+            if outputs:
+                with open(cwl_output_file, mode="w", encoding="utf-8") as out_file:
+                    json.dump(outputs, out_file)
+            outputs = self.collect_outputs(self.outdir, 0)
+        finally:
+            cwl_output_file.unlink(missing_ok=True)
+
         self.output_callback(outputs, "success")

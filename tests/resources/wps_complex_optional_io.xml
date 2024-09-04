@@ -1,0 +1,23 @@
+<DataInputs xmlns:ows="http://www.opengis.net/ows/1.1">
+    <Input minOccurs="0" maxOccurs="100">
+        <ows:Identifier>test</ows:Identifier>
+        <ows:Title>test</ows:Title>
+        <ComplexData maximumMegabytes="200">
+            <Default>
+                <Format>
+                    <MimeType>application/x-netcdf</MimeType>
+                    <Encoding>base64</Encoding>
+                </Format>
+            </Default>
+            <Supported>
+                <Format>
+                    <MimeType>application/x-netcdf</MimeType>
+                    <Encoding>base64</Encoding>
+                </Format>
+                <Format>
+                    <MimeType>application/json</MimeType>
+                </Format>
+            </Supported>
+        </ComplexData>
+    </Input>
+</DataInputs>

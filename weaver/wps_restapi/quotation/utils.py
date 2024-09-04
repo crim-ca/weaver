@@ -30,11 +30,11 @@ def check_quotation_supported(container):
     settings = get_settings(container)
     weaver_quotes = asbool(settings.get("weaver.quotation", True))
     if not weaver_quotes:
-        LOGGER.info("Unsupported quotation requests disabled for this instance.")
+        LOGGER.warning("Unsupported quotation requests disabled for this instance.")
         return False
     weaver_config = get_weaver_configuration(settings)
     if weaver_config not in WeaverFeature.QUOTING:
-        LOGGER.info("Unsupported quotation requests for configuration '%s'.", weaver_config)
+        LOGGER.warning("Unsupported quotation requests for configuration '%s'.", weaver_config)
         return False
     return True
 

@@ -5,8 +5,8 @@ import logging
 import os
 import re
 import socket
-from typing import TYPE_CHECKING, overload
-from urllib.error import HTTPError
+from typing import TYPE_CHECKING, cast, overload
+from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 import yaml
@@ -17,17 +17,38 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
+from weaver.compat import cache
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
-    from weaver.typedefs import AnyRequestType, JSON
+    from weaver.typedefs import AnyRequestType, JSON, ProcessInputOutputItem
 
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
     DataStrT = TypeVar("DataStrT")
+
+    FormatSource = Literal["header", "query", "default"]
+
+    _ContentType = "ContentType"  # type: TypeAlias  # pylint: disable=C0103
+    AnyContentType = Union[str, _ContentType]
+    AnyOutputFormat = Literal[
+        "JSON", "json",
+        "JSON+RAW", "json+str",
+        "JSON+RAW", "json+raw",
+        "XML", "xml",
+        "XML+STR", "xml+str",
+        "XML+RAW", "xml+raw",
+        "HTML", "html",
+        "HTML+STR", "html+str",
+        "HTML+RAW", "html+raw",
+        "TXT", "txt",
+        "TEXT", "text",
+        "YML", "yml",
+        "YAML", "yaml",
+    ]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -70,6 +91,7 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_RAW_JSON = "application/raw+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
@@ -84,6 +106,7 @@ class ContentType(Constants):
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
+    IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
@@ -124,11 +147,11 @@ class ContentEncoding(Constants):
         - https://github.com/json-schema-org/json-schema-spec/issues/803
         - https://github.com/json-schema-org/json-schema-spec/pull/862
     """
-    UTF_8 = "UTF-8"
-    BINARY = "binary"
-    BASE16 = "base16"
-    BASE32 = "base32"
-    BASE64 = "base64"
+    UTF_8 = "UTF-8"    # type: Literal["UTF-8"]
+    BINARY = "binary"  # type: Literal["BINARY"]
+    BASE16 = "base16"  # type: Literal["BASE16"]
+    BASE32 = "base32"  # type: Literal["BASE32"]
+    BASE64 = "base64"  # type: Literal["BASE64"]
 
     @staticmethod
     def is_text(encoding):
@@ -152,8 +175,10 @@ class ContentEncoding(Constants):
         """
         Obtains relevant ``mode`` and ``encoding`` parameters for :func:`open` using the specified ``Content-Encoding``.
         """
-        is_text = ContentEncoding.is_text(encoding)
-        return (mode, ContentEncoding.UTF_8) if is_text else (f"{mode}b", None)
+        if ContentEncoding.is_binary(encoding):
+            mode = cast("FileModeEncoding", f"{mode}b")
+            return mode, None
+        return mode, ContentEncoding.UTF_8
 
     @staticmethod
     @overload
@@ -278,48 +303,60 @@ class OutputFormat(Constants):
     """
     JSON = classproperty(fget=lambda self: "json", doc="""
     Representation as :term:`JSON` (object), which can still be manipulated in code.
-    """)  # noqa: F811  # false-positive redefinition of JSON typing
+    """)  # type: Literal["JSON", "json"]  # noqa: F811  # false-positive redefinition of JSON typing
 
     JSON_STR = classproperty(fget=lambda self: "json+str", doc="""
     Representation as :term:`JSON` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["JSON+STR", "json+str"]
 
     JSON_RAW = classproperty(fget=lambda self: "json+raw", doc="""
     Representation as :term:`JSON` content formatted as raw string without any indentation or newlines.
-    """)
+    """)  # type: Literal["JSON+RAW", "json+raw"]
 
     YAML = classproperty(fget=lambda self: "yaml", doc="""
     Representation as :term:`YAML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["YAML", "yaml"]
 
     YML = classproperty(fget=lambda self: "yml", doc="""
     Alias to YAML.
-    """)
+    """)  # type: Literal["YML", "yml"]
 
     XML = classproperty(fget=lambda self: "xml", doc="""
     Representation as :term:`XML` content formatted as serialized string.
-    """)
+    """)  # type: Literal["XML", "xml"]
 
     XML_STR = classproperty(fget=lambda self: "xml+str", doc="""
     Representation as :term:`XML` content formatted as string with indentation and newlines.
-    """)
+    """)  # type: Literal["XML+STR", "xml+str"]
 
     XML_RAW = classproperty(fget=lambda self: "xml+raw", doc="""
     Representation as :term:`XML` content formatted as raw string without indentation or newlines.
-    """)
+    """)  # type: Literal["XML+RAW", "xml+raw"]
 
     TXT = classproperty(fget=lambda self: "txt", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["TXT", "txt"]
 
     TEXT = classproperty(fget=lambda self: "text", doc="""
     Representation as plain text content without any specific reformatting or validation.
-    """)
+    """)  # type: Literal["TEXT", "text"]
+
+    HTML = classproperty(fget=lambda self: "html", doc="""
+    Representation as HTML content formatted as serialized string.
+    """)  # type: Literal["HTML", "html"]
+
+    HTML_STR = classproperty(fget=lambda self: "html+str", doc="""
+    Representation as HTML content formatted as string with indentation and newlines.
+    """)  # type: Literal["HTML+STR", "html+str"]
+
+    HTML_RAW = classproperty(fget=lambda self: "html+raw", doc="""
+    Representation as HTML content formatted as raw string without indentation or newlines.
+    """)  # type: Literal["HTML+RAW", "html+raw"]
 
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
-            format_or_version,      # type: Union[str, AnyOutputFormat, PropertyDataTypeT]
-            default=JSON,           # type: AnyOutputFormat
+            format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
+            default=None,           # type: Optional[AnyOutputFormat]
             allow_version=True,     # type: bool
             ):                      # type: (...) ->  Union[AnyOutputFormat, PropertyDataTypeT]
         """
@@ -328,7 +365,9 @@ class OutputFormat(Constants):
         :param format_or_version:
             Either a :term:`WPS` version, a known value for a ``f``/``format`` query parameter, or an ``Accept`` header
             that can be mapped to one of the supported output formats.
-        :param default: Default output format if none could be resolved.
+        :param default:
+            Default output format if none could be resolved.
+            If no explicit default is specified as default in case of unresolved format, ``JSON`` is used by default.
         :param allow_version: Enable :term:`WPS` version specifiers to infer the corresponding output representation.
         :return: Resolved output format.
         """
@@ -336,13 +375,15 @@ class OutputFormat(Constants):
             return OutputFormat.XML
         if allow_version and format_or_version == "2.0.0":
             return OutputFormat.JSON
+        if not isinstance(format_or_version, str):
+            return default or OutputFormat.JSON
         if "/" in format_or_version:  # Media-Type to output format renderer
             format_or_version = get_extension(format_or_version, dot=False)
-        return super(OutputFormat, cls).get(str(format_or_version), default=default)
+        return super(OutputFormat, cls).get(str(format_or_version), default=default) or OutputFormat.JSON
 
     @classmethod
     def convert(cls, data, to, item_root="item"):
-        # type: (JSON, Union[AnyOutputFormat, str], str) -> Union[str, JSON]
+        # type: (JSON, Union[AnyOutputFormat, AnyContentType, None], str) -> Union[str, JSON]
         """
         Converts the input data from :term:`JSON` to another known format.
 
@@ -353,7 +394,8 @@ class OutputFormat(Constants):
             requested format to ensure the contents are properly represented as intended. In the case of :term:`JSON`
             as target format or unknown format, the original object is returned directly.
         :param item_root:
-            When using :term:`XML` representations, defines the top-most item name. Unused for other representations.
+            When using :term:`XML` or HTML representations, defines the top-most item name.
+            Unused for other representations.
         :return: Formatted output.
         """
         from weaver.utils import bytes2str
@@ -365,10 +407,13 @@ class OutputFormat(Constants):
             return repr_json(data, indent=2, ensure_ascii=False)
         if fmt in [OutputFormat.JSON_RAW, OutputFormat.TEXT, OutputFormat.TXT]:
             return repr_json(data, indent=None, ensure_ascii=False)
-        if fmt in [OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR]:
-            pretty = fmt == OutputFormat.XML_STR
+        if fmt in [
+            OutputFormat.XML, OutputFormat.XML_RAW, OutputFormat.XML_STR,
+            OutputFormat.HTML, OutputFormat.HTML_RAW, OutputFormat.HTML_STR,
+        ]:
+            pretty = fmt in [OutputFormat.XML_STR, OutputFormat.HTML_STR]
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
-            if fmt == OutputFormat.XML_RAW:
+            if fmt in [OutputFormat.XML_RAW, OutputFormat.HTML_RAW]:
                 xml = bytes2str(xml)
             if isinstance(xml, str):
                 xml = xml.strip()
@@ -378,7 +423,7 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
-        return data
+        return data  # pragma: no cover  # last resort if new output format unhandled
 
 
 class SchemaRole(Constants):
@@ -407,7 +452,14 @@ _CONTENT_TYPE_EXCLUDE = [
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": ContentType.APP_YAML,  # common alternative to .yml
+    ".yaml": ContentType.APP_YAML,    # common alternative to .yml
+    ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
+    ".xsd": ContentType.APP_XML,
+}
+# well-known schema URI that should resolve to an alternate media-type than the auto-resolution
+_CONTENT_TYPE_SCHEMA_OVERRIDES = {
+    re.compile(r"https://geojson\.org/schema/.*\.json"): ContentType.APP_GEOJSON,
+    re.compile(r"https?://(www.)?opengis\.net/def/glossary/term/FeatureCollection"): ContentType.APP_GEOJSON,
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -559,13 +611,14 @@ OGC_NAMESPACE_DEFINITION = {OGC_NAMESPACE: OGC_NAMESPACE_URL}
 OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
+    ContentType.IMAGE_COG: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {
-    IANA_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in IANA_MAPPING.items()},
-    EDAM_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in EDAM_MAPPING.items()},
-    OGC_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OGC_MAPPING.items()},
-    OPENGIS_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OPENGIS_MAPPING.items()},
+    IANA_NAMESPACE: IANA_MAPPING,
+    EDAM_NAMESPACE: EDAM_MAPPING,
+    OGC_NAMESPACE: OGC_MAPPING,
+    OPENGIS_NAMESPACE: OPENGIS_MAPPING,
 }
 FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
@@ -578,7 +631,13 @@ FORMAT_NAMESPACE_PREFIXES = [
 ] + list(FORMAT_NAMESPACE_DEFINITIONS.values())
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
+# default format if missing (minimal requirement of one)
+DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
+DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
+setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
+
+@cache
 def get_allowed_extensions():
     # type: () -> List[str]
     """
@@ -605,6 +664,7 @@ def get_allowed_extensions():
     return list(base | extra)
 
 
+@cache
 def get_format(media_type, default=None):
     # type: (str, Optional[str]) -> Optional[Format]
     """
@@ -620,10 +680,21 @@ def get_format(media_type, default=None):
     if not ctype:
         return None
     ext = get_extension(ctype)
-    fmt = Format(ctype, extension=ext)
+    if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
+        for uri, typ in _CONTENT_TYPE_SCHEMA_OVERRIDES.items():
+            if re.match(uri, ctype):
+                schema_ctype = typ
+                break
+        else:
+            schema_ctype = get_content_type(os.path.splitext(ctype)[-1], default=DEFAULT_FORMAT.mime_type)
+        schema_ext = get_extension(schema_ctype)
+        fmt = Format(schema_ctype, extension=schema_ext, schema=ctype)
+    else:
+        fmt = Format(ctype, extension=ext)
     return fmt
 
 
+@cache
 def get_extension(media_type, dot=True):
     # type: (str, bool) -> str
     """
@@ -642,17 +713,15 @@ def get_extension(media_type, dot=True):
         if not fmt.extension.startswith("."):
             return fmt.extension
         return _handle_dot(fmt.extension)
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(media_type)
-    if ext:
-        return _handle_dot(ext)
     ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return ""
-    ext_default = f".{ctype.split('/')[-1].replace('x-', '')}"
+    ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
     ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
     return _handle_dot(ext)
 
 
+@cache
 def get_content_type(extension, charset=None, default=None):
     # type: (str, Optional[str], Optional[str]) -> Optional[str]
     """
@@ -677,6 +746,7 @@ def get_content_type(extension, charset=None, default=None):
     return add_content_type_charset(ctype, charset)
 
 
+@cache
 def add_content_type_charset(content_type, charset):
     # type: (Union[str, ContentType], Optional[str]) -> str
     """
@@ -695,6 +765,25 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
+@overload
+def get_cwl_file_format(media_type):
+    # type: (str) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[True], **bool) -> Optional[str]
+    ...
+
+
+@cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
@@ -788,11 +877,30 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
                     with urlopen(_media_type_url, timeout=2) as resp:  # nosec: B310  # IANA scheme guaranteed HTTP
                         if resp.code == HTTPOk.code:
                             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
-                except socket.timeout:
+                except socket.timeout:  # pragma: no cover
                     continue
-                break
-        except HTTPError:
+                break      # pragma: no cover  # don't keep retrying if the cause is not timeout/ssl, but not resolved
+        except HTTPError:  # pragma: no cover  # same as above, but for cases where the HTTP code raised directly
             pass
+        except URLError as exc:
+            # if error is caused by a sporadic SSL error
+            # allow temporary HTTP resolution given IANA is a well-known URI
+            # however, ensure the cause is in fact related to SSL, and still a resolvable referenced
+            http_err = str(exc.args[0]).lower()
+            http_url = f"http://{_media_type_url.split('://', 1)[-1]}"
+            if (
+                _media_type_url.startswith(IANA_NAMESPACE_URL) and
+                any(err in http_err for err in ["ssl", "handshake"]) and
+                any(err in http_err for err in ["timeout", "timed out"])
+            ):
+                try:
+                    resp = request_extra("head", http_url, retries=0, timeout=2,
+                                         allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
+                    if resp.status_code == HTTPOk.code:
+                        return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _media_type)
+                except ConnectionError:  # pragma: no cover
+                    LOGGER.debug("Format request [%s] connection error: [%s] (last resort no-SSL check)", http_url, exc)
+                    return None
         return None
 
     if not media_type:
@@ -816,6 +924,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
     return None if make_reference else (None, None)
 
 
+@cache
 def map_cwl_media_type(cwl_format):
     # type: (Optional[str]) -> Optional[str]
     """
@@ -832,7 +941,7 @@ def map_cwl_media_type(cwl_format):
         ns_fmt = cwl_format
     ns_name = list(ns)[0]
     ns_fmt = ns_fmt.split(":", 1)[-1] if "://" not in ns_fmt else ns_fmt
-    ctype = FORMAT_NAMESPACE_MAPPINGS[ns_name].get(ns_fmt)
+    ctype = [_ctype for _ctype, _fmt in FORMAT_NAMESPACE_MAPPINGS[ns_name].items() if _fmt == ns_fmt]
     if not ctype:
         fmt = get_format(ns_fmt)
         ctype = fmt.mime_type if fmt else None
@@ -844,9 +953,12 @@ def map_cwl_media_type(cwl_format):
                 break
         if "/" not in ctype:
             return None
+    if ctype and isinstance(ctype, list):
+        ctype = ctype[0]
     return ctype
 
 
+@cache
 def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """
@@ -893,26 +1005,60 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
         media_type = f"{typ}/{sub}{parts[1]}"
     for v in FORMAT_NAMESPACE_DEFINITIONS.values():
         if v in media_type:
-            media_type = media_type.replace(v, "")
-            break
+            maybe_type = media_type.replace(v, "").strip("/")
+            # ignore if URI was partial prefix match, not sufficiently specific
+            # allow 1 '/' for '<type>/<subtype>', or 0 for an explicit named schema reference
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     for v in FORMAT_NAMESPACE_DEFINITIONS:
         if media_type.startswith(f"{v}:"):
-            media_type = media_type.replace(f"{v}:", "")
-            break
+            maybe_type = media_type.replace(f"{v}:", "")
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     search = True
-    for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
+    for _map in FORMAT_NAMESPACE_MAPPINGS.values():
         if not search:
             break
-        for v in _map.values():
-            if v.endswith(media_type):
-                media_type = [k for k in _map if v.endswith(_map[k])][0]
+        for ctype, fmt in _map.items():
+            if fmt.endswith(media_type):
+                media_type = ctype
                 search = False
                 break
     return media_type
 
 
-def guess_target_format(request, default=ContentType.APP_JSON):
+@overload
+def guess_target_format(request):
+    # type: (AnyRequestType) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, default):
     # type: (AnyRequestType, Optional[Union[ContentType, str]]) -> ContentType
+    ...
+
+
+@overload
+def guess_target_format(request, return_source, override_user_agent):
+    # type: (AnyRequestType, Literal[True], bool) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+@overload
+def guess_target_format(request, default, return_source, override_user_agent):
+    # type: (AnyRequestType, Optional[Union[ContentType, str]], Literal[True], bool) -> Tuple[ContentType, FormatSource]
+    ...
+
+
+def guess_target_format(
+    request,                        # type: AnyRequestType
+    default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
+    return_source=False,            # type: bool
+    override_user_agent=False,      # type: bool
+):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -924,38 +1070,77 @@ def guess_target_format(request, default=ContentType.APP_JSON):
     ``Accept` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
     format specifiers were not provided in the request.
 
-    Applies some specific logic to handle automatically added ``Accept`` headers by many browsers such that sending
-    requests to the :term:`API` using them will not automatically default back to :term:`XML` or similar `HTML`
-    representations. If browsers are used to send requests, but that ``format``/``f`` queries are used directly in the
-    URL, those will be applied since this is a very intuitive (and easier) approach to request different formats when
-    using browsers.
+    Can apply ``User-Agent`` specific logic to override automatically added ``Accept`` headers by many browsers such
+    that sending requests to the :term:`API` using them will not automatically default back to typical :term:`XML` or
+    :term:`HTML` representations. If browsers are used to send requests, but that ``format``/``f`` queries are used
+    directly in the URL, those will be applied since this is a very intuitive (and easier) approach to request different
+    formats when using browsers. Option :paramref:`override_user_agent` must be enabled to apply this behavior.
 
     When ``User-Agent`` clients are identified as another source, such as sending requests from a server or from code,
     both headers and query parameters are applied directly without question.
 
-    :returns: Matched media-type or default.
+    :returns: Matched media-type or default, and optionally, the source of resolution.
     """
     from weaver.utils import get_header
 
     format_query = request.params.get("format") or request.params.get("f")
-    content_type = None
+    format_source = "default"  # type: FormatSource
+    content_type = None  # type: Optional[str]
     if format_query:
         content_type = OutputFormat.get(format_query, default=None, allow_version=False)
         if content_type:
             content_type = get_content_type(content_type)
+            format_source = "query"
     if not content_type:
-        content_type = get_header("accept", request.headers, default=default or "")
+        content_type = get_header("accept", request.headers, default=None)
+        if content_type:
+            format_source = "header"
+        else:
+            content_type = default or ""
         for ctype in content_type.split(","):
             ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
-            if ctype != default or not default:
-                # because most browsers enforce some 'visual' list of accept header, revert to JSON if detected
-                # explicit request set by client (e.g.: using 'requests') will have full control over desired content
+            if override_user_agent and (ctype != default or not default):
+                # Because most browsers enforce a 'visual rendering' list of accept header, revert to JSON if detected.
+                # Request set by another client (e.g.: using 'requests') will have full control over desired content.
+                # Since browsers add '*/*' as any content fallback, use it as extra detection of undetected user-agent.
                 user_agent = get_header("user-agent", request.headers)
-                if user_agent and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"]):
+                if (
+                    user_agent
+                    and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"])
+                    or "*/*" in content_type
+                ):
                     content_type = default or ContentType.APP_JSON
+                    format_source = "default"
+                    break
     if not content_type or content_type == ContentType.ANY:
         content_type = default or ContentType.APP_JSON
+        format_source = "default"
+    if return_source:
+        return content_type, format_source
     return content_type
+
+
+def find_supported_media_types(io_definition):
+    # type: (ProcessInputOutputItem) -> Optional[List[str]]
+    """
+    Finds all supported media-types indicated by an :term:`I/O`.
+
+    .. note::
+        Assumes that media-types are indicated under ``formats``, which should have been obtained either by direct
+        submission when using :term:`WPS` deployment, generated from ``schema`` using :term:`OGC` deployment, or using
+        the nested ``format`` of ``File`` types from :term:`CWL` deployment.
+
+    :param io_definition:
+    :return: supported media-types
+    """
+    io_formats = io_definition.get("formats")
+    if not io_formats:
+        return None
+    media_types = set()
+    for fmt in io_formats:  # type: Dict[str, str]
+        if "type" in fmt:
+            media_types.add(fmt["type"])
+    return list(media_types)
 
 
 def json_default_handler(obj):
@@ -984,14 +1169,3 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
         return data_str if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)
-
-
-if TYPE_CHECKING:
-    from weaver.typedefs import Literal
-
-    AnyOutputFormat = Literal[
-        OutputFormat.JSON,
-        OutputFormat.XML,
-        OutputFormat.YAML,
-        OutputFormat.YML,
-    ]

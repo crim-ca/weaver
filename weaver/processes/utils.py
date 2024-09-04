@@ -74,7 +74,6 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from logging import Logger
     from typing import Any, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
@@ -96,6 +95,7 @@ if TYPE_CHECKING:
         SettingsType,
         TypedDict
     )
+    from weaver.utils import LoggerHandler
 
     UpdateFieldListMethod = Literal["append", "override"]
     UpdateFieldListSpec = TypedDict("UpdateFieldListSpec", {
@@ -1235,12 +1235,15 @@ def register_cwl_processes_from_config(container):
 
 
 def pull_docker(docker_auth, logger=LOGGER):
-    # type: (DockerAuthentication, Logger) -> Optional[DockerClient]
+    # type: (DockerAuthentication, LoggerHandler) -> Optional[DockerClient]
     """
     Pulls the referenced Docker image to local cache from an optionally secured registry.
 
     If the Docker image is already available locally, simply validates it.
     Authentication are applied as necessary using the provided parameters.
+
+    .. warning::
+        Logging calls must employ the
 
     :param docker_auth: Docker reference with optional authentication parameters.
     :param logger: Alternative logger reference to log status messages about the operation.
@@ -1262,14 +1265,18 @@ def pull_docker(docker_auth, logger=LOGGER):
         #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
         #   With re-auth, body *could* contain an identity token depending on auth method.
         if docker_auth.credentials:
-            logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+            logger.log(logging.DEBUG, "Retrieving image [%s] from Docker registry or cache.", ref)
             body = client.login(reauth=True, **docker_auth.credentials)
             if body.get("Status") != "Login Succeeded":
-                logger.debug("Failed authentication to Docker private registry [%s].", docker_auth.registry)
+                logger.log(
+                    logging.DEBUG,
+                    "Failed authentication to Docker private registry [%s].",
+                    docker_auth.registry,
+                )
                 return None
         else:
-            logger.warning("Expecting public access for image [%s] in Docker registry.", ref)
-        logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+            logger.log(logging.WARNING, "Expecting public access for image [%s] in Docker registry.", ref)
+        logger.log(logging.DEBUG, "Retrieving image [%s] from Docker registry or cache.", ref)
         # docker client pulls all available images when no tag, provide the default to limit
         try:
             tag = docker_auth.tag or "latest"
@@ -1278,10 +1285,17 @@ def pull_docker(docker_auth, logger=LOGGER):
             image = client.images.get(ref)  # resolved from cache or raise ImageNotFound
             LOGGER.warning("Failed pull of image [%s] from Docker registry, but found it in cache.", ref)
     except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
-        logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
-                     exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
+        logger.log(
+            logging.DEBUG,
+            "Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+            exc.__class__.__name__, exc_info=False,  # only class name to help debug, but no contents
+        )
     if not image or docker_auth.docker not in image.tags:
-        logger.debug("Failed authorization or could not retrieve Docker image [%s] from private registry.", ref)
+        logger.log(
+            logging.DEBUG,
+            "Failed authorization or could not retrieve Docker image [%s] from private registry.",
+            ref,
+        )
         return None
-    logger.debug("Docker image [%s] retrieved.", ref)
+    logger.log(logging.DEBUG, "Docker image [%s] retrieved.", ref)
     return client

@@ -20,7 +20,9 @@ from typing import TYPE_CHECKING
 
 import boto3
 import colander
+import mock
 import pytest
+import responses
 import yaml
 from parameterized import parameterized
 
@@ -42,7 +44,7 @@ from tests.utils import (
     mocked_wps_output,
     setup_aws_s3_bucket
 )
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteCollectionFormat, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -59,6 +61,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INIT_WORKDIR,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_RESOURCE,
+    CWL_REQUIREMENT_SECRETS,
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
@@ -998,6 +1001,20 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert desc["outputs"]["wps_format_mimeType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert desc["outputs"]["wps_format_mediaType"]["formats"][0]["mediaType"] == ContentType.APP_JSON
 
+    def test_deploy_cwl_with_secrets(self):
+        """
+        Ensure that a process deployed with secrets as :term:`CWL` hints remains defined in the result.
+        """
+        cwl = self.retrieve_payload("EchoSecrets", "package", local=True)
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        _, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        assert "hints" in pkg
+        assert pkg["hints"] == {CWL_REQUIREMENT_SECRETS: {"secrets": ["message"]}}
+
     def test_execute_file_type_io_format_references(self):
         """
         Test to validate :term:`OGC` compliant ``type`` directly provided as ``mediaType`` for execution file reference.
@@ -1053,6 +1070,61 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert resp.status_code in [200, 201], resp.text
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
+
+    def test_execute_output_file_format_validator(self):
+        """
+        Test with custom :mod:`pywps` file format extension validator involved in output resolution.
+        """
+        from weaver.processes.wps_package import format_extension_validator as real_validator
+
+        cwl = self.retrieve_payload("PseudoOutputGenerator", "package", local=True)
+        body = {
+            "processDescription": {
+                "id": self._testMethodName,
+                "inputs": {
+                    "image_tif": {
+                        "formats": [{"mediaType": ContentType.IMAGE_GEOTIFF}]
+                    }
+                }
+            },
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+        data = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {"data": "0123456789"},
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+
+            mock_validator = stack_exec.enter_context(
+                mock.patch("weaver.processes.wps_package.format_extension_validator", side_effect=real_validator)
+            )
+
+            proc_url = f"/processes/{self._testMethodName}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 201, resp.text
+            status_url = resp.json.get("location")
+            results = self.monitor_job(status_url)  # successful (if validator did not apply correctly, execution fails)
+
+            assert mock_validator.called
+            validator_call_types = [call.args[0].data_format.mime_type for call in mock_validator.call_args_list]
+            expected_media_types = [
+                "image/jp2",
+                ContentType.IMAGE_TIFF,
+                ContentType.IMAGE_PNG,
+                ContentType.TEXT_XML,
+            ]
+            assert validator_call_types == expected_media_types
+
+            assert len(results) != len(expected_media_types), (
+                "some outputs are expected to not be validated by the extension validator"
+            )
+            assert list(results) == list(cwl["outputs"]), "all outputs should be collected in the results"
 
     def test_deploy_block_builtin_processes_from_api(self):
         """
@@ -1266,27 +1338,26 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     #   WPS payload must specify them
                     # "format": [type_json, type2, type3]
                 },
-                # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
-                # {
-                #    "id": "multi_value_single_format",
-                #    "type": {
-                #        "type": "array",
-                #        "items": "File",
-                #    },
-                #    "format": type3,
-                # },
-                # {
-                #     "id": "multi_value_multi_format",
-                #     "type": {
-                #         "type": "array",
-                #         "items": "File",
-                #     },
-                #     # NOTE:
-                #     #   not valid to have array of format for output as per:
-                #     #   https://github.com/common-workflow-language/common-workflow-language/issues/482
-                #     #   WPS payload must specify them
-                #     "format": [type3, type2, type_json],
-                # },
+                {
+                    "id": "multi_value_single_format",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    "format": type_ncdf,
+                },
+                {
+                    "id": "multi_value_multi_format",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    # NOTE:
+                    #   not valid to have array of format for output as per:
+                    #   https://github.com/common-workflow-language/common-workflow-language/issues/482
+                    #   WPS payload must specify them
+                    # "format": [type3, type2, type_json],
+                },
             ],
             "$namespaces": namespaces
         }
@@ -1328,15 +1399,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                                 {"mimeType": ContentType.APP_NETCDF},
                             ]
                         },
-                        # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
-                        # {
-                        #     "id": "multi_value_multi_format",
-                        #     "formats": [
-                        #         {"mimeType": ContentType.APP_NETCDF},
-                        #         {"mimeType": ContentType.TEXT_PLAIN},
-                        #         {"mimeType": ContentType.APP_JSON},
-                        #     ]
-                        # }
+                        {
+                            "id": "multi_value_multi_format",
+                            "formats": [
+                                {"mimeType": ContentType.APP_NETCDF},
+                                {"mimeType": ContentType.TEXT_PLAIN},
+                                {"mimeType": ContentType.APP_JSON},
+                            ]
+                        }
                     ]
                 },
             },
@@ -1414,7 +1484,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         # process description output validation
         assert isinstance(proc["outputs"], list)
-        assert len(proc["outputs"]) == 2  # FIXME: adjust output count when issue #25 is implemented
+        assert len(proc["outputs"]) == 4
         for output in proc["outputs"]:
             for field in ["minOccurs", "maxOccurs", "default"]:
                 assert field not in output
@@ -1438,15 +1508,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
-        # FIXME: enable when issue #25 is implemented
-        # assert proc["outputs"][2]["id"] == "multi_value_single_format"
-        # assert len(proc["outputs"][2]["formats"]) == 1
-        # assert proc["outputs"][2]["formats"][0] == ContentType.APP_NETCDF
-        # assert proc["outputs"][3]["id"] == "multi_value_multi_format"
-        # assert len(proc["outputs"][3]["formats"]) == 3
-        # assert proc["outputs"][3]["formats"][0] == ContentType.APP_NETCDF
-        # assert proc["outputs"][3]["formats"][1] == ContentType.TEXT_PLAIN
-        # assert proc["outputs"][3]["formats"][2] == ContentType.APP_JSON
+        assert proc["outputs"][2]["id"] == "multi_value_single_format"
+        assert len(proc["outputs"][2]["formats"]) == 1
+        assert proc["outputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][2]["formats"][0]["default"] is True
+        assert proc["outputs"][3]["id"] == "multi_value_multi_format"
+        assert len(proc["outputs"][3]["formats"]) == 3
+        assert proc["outputs"][3]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][3]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
+        assert proc["outputs"][3]["formats"][2]["mediaType"] == ContentType.APP_JSON
+        assert proc["outputs"][3]["formats"][0]["default"] is True   # mandatory
+        assert proc["outputs"][3]["formats"][1].get("default", False) is False  # omission is allowed
+        assert proc["outputs"][3]["formats"][2].get("default", False) is False  # omission is allowed
 
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
@@ -1495,15 +1568,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert pkg["outputs"][1]["id"] == "single_value_multi_format"
         assert pkg["outputs"][1]["type"] == "File"
         assert "format" not in pkg["outputs"][1], "CWL format array not allowed for outputs."
-        # FIXME: enable when issue #25 is implemented
-        # assert pkg["outputs"][2]["id"] == "multi_value_single_format"
-        # assert pkg["outputs"][2]["type"] == "array"
-        # assert pkg["outputs"][2]["items"] == "File"
-        # assert pkg["outputs"][2]["format"] == type_ncdf
-        # assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
-        # assert pkg["outputs"][3]["type"] == "array"
-        # assert pkg["outputs"][3]["items"] == "File"
-        # assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
+        assert pkg["outputs"][2]["id"] == "multi_value_single_format"
+        assert pkg["outputs"][2]["type"] == {"type": "array", "items": "File"}
+        assert pkg["outputs"][2]["format"] == type_ncdf
+        assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
+        assert pkg["outputs"][3]["type"] == {"type": "array", "items": "File"}
+        assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
 
     def test_deploy_merge_resolution_io_min_max_occurs(self):
         """
@@ -2197,6 +2267,119 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
         )
 
+    def test_execute_job_with_collection_input_geojson_feature_collection(self):
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
+            stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            col_file = os.path.join(tmp_dir, "test.json")
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+            with open(col_file, mode="w", encoding="utf-8") as tmp_feature_collection_geojson:
+                json.dump(col_feats, tmp_feature_collection_geojson)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "features": {
+                        # accessed directly as a static GeoJSON FeatureCollection
+                        "collection": "https://mocked-file-server.com/test.json",
+                        "format": ExecuteCollectionFormat.GEOJSON,
+                        "schema": "http://www.opengis.net/def/glossary/term/FeatureCollection",
+                    },
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "features" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+        assert out_data["features"] == col_feats["features"]
+
+    @parameterized.expand([
+        # note: the following are not *actually* filtering, but just validating formats are respected across code paths
+        ("POST", "cql2-json", {"op": "=", "args": [{"property": "name"}, "test"]}),
+        ("GET", "cql2-text", "property.name = 'test'"),
+    ])
+    def test_execute_job_with_collection_input_ogc_features(self, filter_method, filter_lang, filter_value):
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
+            tmp_svr = stack.enter_context(
+                mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True)
+            )
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+            if filter_method == "GET":
+                filter_match = responses.matchers.query_param_matcher({
+                    "filter": filter_value,
+                    "filter-lang": filter_lang,
+                    "timeout": "10",  # added internally by collection processor
+                })
+            else:
+                filter_match = responses.matchers.json_params_matcher(filter_value)
+            tmp_svr.add(filter_method, f"{tmp_host}/collections/test/items", json=col_feats, match=[filter_match])
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "features": {
+                        "collection": f"{tmp_host}/collections/test",
+                        "format": ExecuteCollectionFormat.OGC_FEATURES,
+                        "type": ContentType.APP_GEOJSON,
+                        "filter-lang": filter_lang,
+                        "filter": filter_value,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "features" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+        assert out_data["features"] == col_feats["features"]
+
     def test_execute_job_with_context_output_dir(self):
         cwl = {
             "cwlVersion": "v1.0",
@@ -2384,6 +2567,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
 
+        .. fixme:
         .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when asserting
             the expected output listing size and paths. Re-running this test by itself validates if this case happened.
@@ -3188,12 +3372,23 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][2]["formats"][2]["mediaType"] == ContentType.APP_ZIP
         assert "encoding" not in proc["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
-    # FIXME: implement,
-    #   need to find a existing WPS with some, or manually write XML
-    #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
-    #   (https://github.com/crim-ca/weaver/issues/25)
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_multi_outputs_file_from_wps_xml_reference(self):
+        """
+        Left for documentation purpose only.
+
+        While multi-value output under a same ID is supported by :term:`OGC API - Processes` and :term:`CWL`,
+        such definitions are not compliant with :term:`WPS` specification. A server responding with
+        a :term:`XML` ``ProcessDescription`` should never indicate a ``maxOccurs!=1`` value, or it would be
+        non-compliant and would actually represent undefined behavior. The test cannot be implemented for this reason.
+
+        .. note::
+            This does not impact multi-value output support for a :term:`OGC API - Processes` using the :term:`WPS`
+            interface. The multi-value output would be represented as an embedded :term:`JSON` array as single value
+            encoded with media-type :data:`ContentType.APP_RAW_JSON``. From the point of view of the :term:`WPS`
+            definition, the output would not be multi-value to respect the standard. However, there is no **official**
+            way to detect this embedded :term:`JSON` as multi-value support directly from the ``ProcessDescription``.
+        """
         raise NotImplementedError
 
     def test_execute_cwl_enum_schema_combined_type_single_array_from_cwl(self):

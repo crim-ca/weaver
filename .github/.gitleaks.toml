@@ -54,10 +54,22 @@ title = "gitleaks config"
 	regex = '''(?i)(api_key|apikey|secret)(.{0,20})?['|"][0-9a-zA-Z]{16,45}['|"]'''
 	tags = ["key", "API", "generic"]
 	[rules.allowlist]
-        description = "ignore old commit secret (v0.1.0)"
-        commits = ["11cdaf9bb4ffa9eb060ae58dd81268012fd60c28"]
-        paths = ['''magpie/security.py''']
-        regexes = ['''randomsecretstring''']
+		description = "ignore process ID containing secret as plain word"
+		commits = [
+			'6927799b84fac00ec582dbd946031d6547c5a898',
+			'ca1e0b0ac5ee9e0a676f7f29a14648688fcce9de',
+			'b49611bca182a952b7a91c0f56f73433ce444a24',
+			'6927799b84fac00ec582dbd946031d6547c5a898',
+			'ca1e0b0ac5ee9e0a676f7f29a14648688fcce9de',
+			'b49611bca182a952b7a91c0f56f73433ce444a24',
+		]
+		paths = [
+			'''tests/functional/test_workflow.py''',
+		]
+		regexes = [
+			'''EchoSecrets''',
+			'''WorkflowEchoSecrets''',
+		]
 [[rules]]
 	description = "Google API key"
 	regex = '''AIza[0-9A-Za-z\\-_]{35}'''
@@ -107,12 +119,13 @@ title = "gitleaks config"
 	regex = '''(?i)twilio(.{0,20})?['\"][0-9a-f]{32}['\"]'''
 	tags = ["key", "twilio"]
 [allowlist]
-    description = "Allowlisted files"
-    files = [
-    # original contents
-    '''^\.?gitleaks.toml$''',
-    '''(.*?)(jpg|gif|doc|pdf|bin)$''',
-    '''(go.mod|go.sum)$''',
-    # extra ignores
-    '''weaver/wps_restapi/examples/vault_file_uploaded.json''',
-    '''.+(.js.map)$''']
+	description = "Allowlisted files"
+	files = [
+	# original contents
+	'''^\.?gitleaks.toml$''',
+	'''(.*?)(jpg|gif|doc|pdf|bin)$''',
+	'''(go.mod|go.sum)$''',
+	# extra ignores
+	'''weaver/wps_restapi/examples/vault_file_uploaded.json''',
+	'''.+(.js.map)$'''
+	]

@@ -21,6 +21,9 @@ Glossary
     API
         | Application Programming Interface
         | Most typically, referring to the use of HTTP(S) requests following an :term:`OpenAPI` specification.
+        |
+        | In the context of this project, it is also used in some occasion to refer to the RESTful interface
+          of :term:`OGC API - Processes`, in contrast to the :term:`OWS` :term:`WPS` interface.
 
     Application Package
         General term that refers to *"what and how to execute"* the :term:`Process`. Application Packages provide the
@@ -41,18 +44,47 @@ Glossary
             - :ref:`quotation`
             - :ref:`conf_quotation`
 
+    Builtin Process
+        An immutable :term:`Process` that comes pre-packaged with `Weaver`, without need to be deployed.
+        This is usually an "utility" or "converter" :term:`Process` that is often reused across :term:`Workflow`
+        definitions.
+
+        .. seealso::
+            Refer to the :ref:`proc_builtin` section for more details about available processes.
+
     CLI
         | Command Line Interface
         | Script that offers interactions through shell commands or Python scripts to execute any described operations.
           Details of the provided `Weaver` commands are described in :ref:`cli` chapter.
 
+    Collection
+        A geospatial resource that may be available as one or more sub-resource distributions
+        that conform to one or more |ogc-api-standards|_. Additionally, |stac-collections|_ can
+        be included in this group.
+
+        Please refer to the :term:`OGC` official |ogc-collection|_ for more details
+        and complementary terminology.
+
+    CRS
+    Coordinate Reference System
+        Geospatial data encoding of the representation parameters, describing the structure to locate entities,
+        in terms of axis order (latitude, longitude, altitude, etc.), dimension (2D, 3D, etc.), in respect to a
+        specific celestial object, a position of origin, scale and orientation (i.e: |datum-def|_).
+
+        .. seealso::
+            - Reference :term:`W3C`/:term:`OGC` documentation about |crs|_.
+            - Reference definition of |crs-def|_.
+
     CWL
-        | |cwl|_
-        | Representation of the internal :term:`Application Package` of the :term:`Process` to provide execution
-          methodology of the referenced :term:`Docker` image or other supported definitions.
-          A |cwl|_ file can be represented both in :term:`JSON` or :term:`YAML` format, but is often represented
-          in :term:`JSON` in the context of `Weaver` for its easier inclusion within HTTP request contents.
-          See :ref:`application-package` section for further details.
+    Common Workflow Language
+        Representation of the internal :term:`Application Package` of the :term:`Process` to provide execution
+        methodology of the referenced :term:`Docker` image or other supported definitions.
+        A |cwl|_ file can be represented both in :term:`JSON` or :term:`YAML` format, but is often represented
+        in :term:`JSON` in the context of `Weaver` for its easier inclusion within HTTP request contents.
+
+        .. seealso::
+            - Official |cwl|_ documentation.
+            - :ref:`application-package` section for further details.
 
     Data Source
         Known locations of remote servers where an :term:`ADES` or :term:`EMS`
@@ -73,6 +105,7 @@ Glossary
         types by providing additional formats that are more specifics to some data domains.
 
     EMS
+    Execution Management Service
         | |ems|
         | See :ref:`processes` section for details.
           Alternative operation modes are described in :ref:`Configuration Settings`.
@@ -86,10 +119,41 @@ Glossary
             :ref:`opensearch_data_source` section.
 
     ESGF
-        |esgf|_
+    Earth System Grid Federation
+        An open source effort providing a robust, distributed data and computation platform,
+        enabling world wide access to large-scale scientific data.
+
+        .. seealso::
+            |esgf|_ official website.
 
     ESGF-CWT
         |esgf-cwt-git|_
+
+        .. seealso::
+            :ref:`proc_esgf_cwt` for more details about the :term:`Process` type.
+
+    Feature
+        An abstraction of real-world phenomena into a digital entity representation, which includes
+        information detailing its *extent* (i.e.: how it is placed and located in time and space).
+
+        .. seealso::
+            - :term:`OGC` |feature-ogc-def|_ definition.
+            - :term:`W3C` |feature-w3c-def|_ definition.
+            - :term:`W3C` |feature-w3c-desc|_ examples and extended description.
+
+    GeoJSON
+        | Geospatial :term:`JSON`
+        | A specific :term:`JSON` format representation for encoding a variety of geographic data structures,
+          such as ``Point``, ``LineString``, ``Polygon``, ``MultiPoint``, ``MultiLineString``, and ``MultiPolygon``,
+          ``Feature``, and ``FeatureCollection``.
+
+        .. seealso::
+            Refer to the official |geojson|_ specification for more details.
+
+        .. note::
+            Multiple extended or derived variants exist. Notably, the |ogc-api-features|_ and |stac-spec|_ define
+            additional ``properties`` or additional ``type`` values for particular use cases, but remain generally
+            interoperable and compatible.
 
     HREF
         | Hyperlink Reference
@@ -110,9 +174,18 @@ Glossary
         Ontology that regroups multiple definitions, amongst which `Weaver` looks up most of its known and supported
         :term:`MIME-types` (|iana-link|_) when resolving file formats.
 
+    HTML
+        | HyperText Markup Language
+        | Alternative representation of some endpoints provided by the application.
+          Requires appropriate ``Accept`` header or ``f``/``format`` query to return this format.
+
+        .. seealso::
+            See :ref:`OpenAPI Specification` for details.
+
     JSON
         | JavaScript Object Notation
-        | Default data representation of all objects contained in the application or for their creation.
+        | Default data representation of all objects contained in the application or for their creation
+          when using the :term:`API`, except for the :term:`OWS` :term:`WPS` endpoint.
 
     Job
         Definition of a :term:`Process` execution state with applicable operation metadata.
@@ -124,6 +197,7 @@ Glossary
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
           escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
 
+    Media-Type
     Media-Types
     MIME-types
         | Multipurpose Internet Mail Extensions
@@ -141,7 +215,12 @@ Glossary
             |OpenAPI-spec|_
 
     OGC
-        |ogc|_
+    Open Geospatial Consortium
+        International standards organization for geospatial data and processing best practices
+        that establishes most of the :term:`API` definition implied under `Weaver`.
+
+        .. seealso::
+            |ogc|_
 
     OAP
     OGC API - Processes
@@ -195,6 +274,14 @@ Glossary
     S3
         Simple Storage Service (:term:`AWS` S3), bucket file storage.
 
+    STAC
+        | SpatioTemporal Asset Catalog
+        | Language used to describe geospatial information, using extended definitions of :term:`GeoJSON`,
+          and which can usually be searched using a |stac-api-spec|_ compliant with |ogc-api-features|_.
+
+        .. seealso::
+            Please refer to the |stac-spec|_ for more details.
+
     TOI
         | Time of Interest
         | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
@@ -234,6 +321,12 @@ Glossary
             - :ref:`vault_upload`
             - :ref:`file_vault_inputs`
 
+    W3C
+    World Wide Web Consortium
+        Main international standards organization for the World Wide Web.
+        Since |ogc-api-standards|_ are based on HTTP and web communications, this consortium establishes the
+        common foundation definitions used by the :term:`API` specifications.
+
     WKT
         Well-Known Text geometry representation.
 
@@ -262,8 +355,12 @@ Glossary
 
     XML
         | Extensible Markup Language
-        | Alternative representation of some data object provided by the application. Requires appropriate ``Accept``
-          header to return this format. See :ref:`OpenAPI Specification` for details.
+        | Alternative representation of some data object provided by the application.
+          Requires appropriate ``Accept`` header or ``f``/``format`` query to return this format.
+          For the :term:`OWS` :term:`WPS` endpoint, this is the default representation instead of :term:`JSON`.
+
+        .. seealso::
+            See :ref:`OpenAPI Specification` for details.
 
     YAML
         | YAML Ain't Markup Language

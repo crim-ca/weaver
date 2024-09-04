@@ -1,8 +1,8 @@
 import unittest
 
 import owslib
-import pyramid.testing
 import pytest
+from pyramid.httpexceptions import HTTPNotFound
 
 from tests import resources
 from tests.utils import (
@@ -48,10 +48,6 @@ class WpsProviderBase(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def setUp(self):
         # rebuild clean db on each test
@@ -107,7 +103,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ServiceIdentification>",
                 "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
             )
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
         # must store directly otherwise it raises during registration check
         # (simulate original service was ok, but was restarted at some point and now has invalid XML)
         self.service_store.save_service(Service(name=invalid_id, url=invalid_url))
@@ -122,7 +118,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ProcessOffering>",
                 "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
             )
-        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((recover_url, recover_data, []), mock_responses, data=True)
         # must store directly otherwise it raises during registration check
         # (simulate original service was ok, but was restarted at some point and now has invalid XML)
         self.service_store.save_service(Service(name=recover_id, url=recover_url))
@@ -184,7 +180,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ServiceIdentification>",
                 "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
             )
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
 
         resp = self.register_provider(clear=True, error=True, data={"id": invalid_id, "url": invalid_url})
         assert resp.status_code == 422
@@ -193,6 +189,11 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
 
     @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")
+    @mocked_remote_server_requests_wps1([  # register mock-server to avoid real requests to the remote URL
+        resources.TEST_REMOTE_SERVER_URL,
+        lambda _: HTTPNotFound(),
+        [],
+    ])
     def test_register_provider_unresponsive(self):
         """
         Test registration of a service that is unreachable (cannot obtain XML GetCapabilities because no response).
@@ -234,7 +235,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ProcessOffering>",
                 "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
             )
-        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((recover_url, recover_data, []), mock_responses, data=True)
 
         resp = self.register_provider(clear=True, error=False, data={"id": recover_id, "url": recover_url})
         assert resp.json["id"] == recover_id

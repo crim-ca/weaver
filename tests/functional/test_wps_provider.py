@@ -2,19 +2,11 @@ import contextlib
 from typing import TYPE_CHECKING
 
 import mock
-import pyramid.testing
 import pytest
 
 from tests import resources
 from tests.functional.utils import WpsConfigBase
-from tests.utils import (
-    mocked_execute_celery,
-    mocked_remote_server_requests_wps1,
-    mocked_sub_requests,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore,
-    setup_mongodb_servicestore
-)
+from tests.utils import mocked_execute_celery, mocked_remote_server_requests_wps1, mocked_sub_requests
 from weaver.config import WeaverConfiguration
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
@@ -37,16 +29,11 @@ class WpsProviderTest(WpsConfigBase):
         "weaver.wps_output_url": f"{resources.TEST_REMOTE_SERVER_URL}/wps-outputs"
     }
 
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
     def setUp(self):
         # rebuild clean db on each test
-        self.service_store = setup_mongodb_servicestore(self.config)
-        self.process_store = setup_mongodb_processstore(self.config)
-        self.job_store = setup_mongodb_jobstore(self.config)
-        self.app_url = self.settings["weaver.url"]
+        self.service_store.clear_services()
+        self.process_store.clear_processes()
+        self.job_store.clear_jobs()
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
@@ -65,8 +52,6 @@ class WpsProviderTest(WpsConfigBase):
               override :meth:`weaver.xml_util.fromstring` employed by :mod:`OWSLib` during WPS-XML requests.
             - Comments in :data:`resources.TEST_INVALID_ESCAPE_CHARS_GETCAP_WPS1_XML` file describe bad characters.
         """
-        self.service_store.clear_services()
-
         # register the provider
         remote_provider_name = "test-wps-remote-provider-finch"
         path = "/providers"
@@ -101,8 +86,6 @@ class WpsProviderTest(WpsConfigBase):
               https://github.com/Ouranosinc/pavics-sdi/blob/master/docs/source/notebook-components/weaver_example.ipynb
             - Evaluate format of submitted Execute body (see `#340 <https://github.com/crim-ca/weaver/issues/340>`_).
         """
-        self.service_store.clear_services()
-
         # register the provider
         remote_provider_name = "test-wps-remote-provider-hummingbird"
         path = "/providers"
@@ -138,8 +121,8 @@ class WpsProviderTest(WpsConfigBase):
         proc_wps1_url = processes["ncdump"]["processEndpointWPS1"]
         proc_exec_url = processes["ncdump"]["executeEndpoint"]
         assert proc_wps1_url.startswith(resources.TEST_REMOTE_SERVER_URL)
-        assert proc_desc_url == f"{self.app_url + path}/ncdump"
-        assert proc_exec_url == f"{self.app_url + path}/ncdump/jobs"
+        assert proc_desc_url == f"{self.url + path}/ncdump"
+        assert proc_exec_url == f"{self.url + path}/ncdump/jobs"
 
         # validate process description
         resp = self.app.get(proc_desc_url, headers=self.json_headers)
@@ -246,3 +229,80 @@ class WpsProviderTest(WpsConfigBase):
             with open(output_path, mode="r", encoding="utf-8") as out_file:
                 data = out_file.read()
             assert data == ncdump_data
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_HUMMINGBIRD_WPS1_GETCAP_XML,
+        [resources.TEST_HUMMINGBIRD_DESCRIBE_WPS1_XML],
+    ])
+    def test_register_describe_execute_ncdump_no_default_format(self, mock_responses):
+        """
+        Test a remote :term:`WPS` provider that defines an optional input of ``ComplexData`` type with a default format.
+
+        When the ``ComplexData`` input is omitted (allowed by ``minOccurs=0``), the execution parsing must **NOT**
+        inject an input due to the detection of the default **format** (rather than default data/reference). If an
+        input is erroneously injected, :mod:`pywps` tends to auto-generate an empty file (from the storage linked to
+        the input), which yields an explicitly provided empty string value as ``ComplexData`` input.
+
+        An example of such process is the ``ncdump`` that
+        takes [0-100] ``ComplexData`` AND/OR [0-100] NetCDF OpenDAP URL strings as ``LiteralData``.
+        """
+        self.service_store.clear_services()
+
+        # register the provider
+        remote_provider_name = "test-wps-remote-provider-hummingbird"
+        path = "/providers"
+        data = {"id": remote_provider_name, "url": resources.TEST_REMOTE_SERVER_URL}
+        resp = self.app.post_json(path, params=data, headers=self.json_headers)
+        assert resp.status_code == 201
+
+        exec_path = f"{self.url}/providers/{remote_provider_name}/processes/ncdump/execution"
+        exec_file = "http://localhost.com/dont/care.nc"
+        exec_body = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": [{"id": "dataset_opendap", "data": exec_file}],
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+        }
+        status_url = f"{resources.TEST_REMOTE_SERVER_URL}/status.xml"
+        output_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.txt"
+        with open(resources.TEST_HUMMINGBIRD_STATUS_WPS1_XML, mode="r", encoding="utf-8") as status_file:
+            status = status_file.read().format(
+                TEST_SERVER_URL=resources.TEST_REMOTE_SERVER_URL,
+                LOCATION_XML=status_url,
+                OUTPUT_FILE=output_url,
+            )
+
+        ncdump_data = "Fake NetCDF Data"
+        with contextlib.ExitStack() as stack_exec:
+            # mock direct execution bypassing celery
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            # mock responses expected by "remote" WPS-1 Execute request and relevant documents
+            mock_responses.add("GET", exec_file, body=ncdump_data, headers={"Content-Type": ContentType.APP_NETCDF})
+            mock_responses.add("POST", resources.TEST_REMOTE_SERVER_URL, body=status, headers=self.xml_headers)
+            mock_responses.add("GET", status_url, body=status, headers=self.xml_headers)
+            mock_responses.add("GET", output_url, body=ncdump_data, headers={"Content-Type": ContentType.TEXT_PLAIN})
+
+            # add reference to specific provider class 'dispatch' to validate it was called with expected inputs
+            # (whole procedure must run even though a lot of parts are mocked)
+            # use the last possible method before sendoff to WPS, since filtering of omitted defaults can happen
+            # at the very last moment to accommodate for CWL needing 'null' inputs explicitly in jobs submission
+            real_wps1_process_dispatch = Wps1Process.dispatch
+            handle_wps1_process_dispatch = stack_exec.enter_context(
+                mock.patch.object(Wps1Process, "dispatch", side_effect=real_wps1_process_dispatch, autospec=True)
+            )  # type: MockPatch
+
+            # launch job execution and validate
+            resp = mocked_sub_requests(self.app, "post_json", exec_path, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert handle_wps1_process_dispatch.called, "WPS-1 handler should have been called by CWL runner context"
+
+            wps_exec_params = handle_wps1_process_dispatch.call_args_list[0].args
+            wps_exec_inputs = wps_exec_params[1]
+            assert isinstance(wps_exec_inputs, list), "WPS Inputs should have been passed for dispatch as 1st argument."
+            wps_exec_inputs = dict(wps_exec_inputs)
+            assert "dataset_opendap" in wps_exec_inputs, "Explicitly provided WPS inputs should be present."
+            assert "dataset" not in wps_exec_inputs, "Omitted WPS input should not be injected in the request."
+            assert wps_exec_inputs["dataset_opendap"] == exec_file

@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 5.1.1
+APP_VERSION ?= 5.7.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -553,7 +553,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 	@echo "Checking PEP8 doc formatting problems..."
 	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --check --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --check --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
 # FIXME: no configuration file support
@@ -674,7 +674,7 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --in-place --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --in-place --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only
@@ -797,27 +797,28 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
+DOCKER_COMPOSE_CMD ?= docker compose
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
-	docker-compose $(DOCKER_TEST_COMPOSES) up -d
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
 	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
 	@curl localhost:4001 | grep "Weaver Information" || \
-		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
-		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
-	docker-compose $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
-	docker-compose $(DOCKER_TEST_COMPOSES) stop
+		( $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
+		  $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat
 docker-stat:  ## query docker-compose images status (from 'docker-test')
-	docker-compose $(DOCKER_TEST_COMPOSES) ps
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
 docker-clean:  ## remove all built docker images (only matching current/latest versions)
-	docker-compose $(DOCKER_TEST_COMPOSES) down || true
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) down || true
 	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)-manager" || true
 	docker rmi -f "$(DOCKER_REPO):latest-manager" || true
 	docker rmi -f "$(APP_NAME):$(APP_VERSION)-manager" || true

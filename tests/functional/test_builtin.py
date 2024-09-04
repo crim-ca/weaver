@@ -55,6 +55,7 @@ class BuiltinAppTest(WpsConfigBase):
 
     @classmethod
     def tearDownClass(cls):
+        super(BuiltinAppTest, cls).tearDownClass()
         cls.file_server.teardown()
 
     def setUp(self):
@@ -622,14 +623,11 @@ class BuiltinAppTest(WpsConfigBase):
             "stringOutput",
             "dateOutput",
             "doubleOutput",
-            # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
-            # "arrayOutput",
+            "arrayOutput",
         ]:
             in_id = out_id.replace("Output", "Input")
             out_val = results[out_id].get("value", results[out_id])
             assert out_val == inputs[in_id]
-        # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
-        assert results["arrayOutput"]["value"] == inputs["arrayInput"][0]
 
         # special literal/bbox object handling
         for out_id, out_fields_map in [
@@ -672,12 +670,7 @@ class BuiltinAppTest(WpsConfigBase):
             out_items = copy.deepcopy(results[out_id])
             in_items = [in_items] if isinstance(in_items, dict) else in_items
             out_items = [out_items] if isinstance(out_items, dict) else out_items
-            # FIXME: unsupported multi-output cardinality (https://github.com/crim-ca/weaver/issues/25)
-            if len(in_items) > 1:
-                assert len(out_items) == 1
-                in_items = in_items[:1]
-            else:
-                assert len(in_items) == len(out_items)
+            assert len(in_items) == len(out_items)
             for in_def, out_def in zip(in_items, out_items):
                 assert "href" in out_def
                 # inputs use local paths (mocked by test for "remote" locations) or literal JSON

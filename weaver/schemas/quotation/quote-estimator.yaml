@@ -41,7 +41,7 @@ description: |
   Example:
   ========
   
-    Assumes a process that takes a single file with an estimated running cost that depends only on the duration.
+    Assuming a process that takes a single file with an estimated running cost that depends only on the duration.
     The first operation is computed before the execution to obtain an estimated quote to run the process. After,
     the quote was agreed and its execution was completed, the real cost of operation can be computed using the 
     corresponding formulation.
@@ -52,12 +52,12 @@ description: |
       config:
         flat_rate: 10 ($)
         duration_rate: 0.01 ($/s)
-        duration_estimator: LinearRegression(<duration> = -1E-6 * <input-size> ^ -2 + 3E-6 * <input-size> + 125)
+        duration_estimator: LinearRegression(<duration> = -1E-6 × <input-size> ^ -2 + 3E-6 × <input-size> + 125)
       inputs:
         data:  # input ID
           size: 209715200 (200 MiB)
       
-      DURATION_ESTIMATE (s) = 5E-4 * [ (1E-5 * (200 * 2^20) ^ 2 + 3E-4 * (200 * 2^20) + 125) ] = 754.1456 s
+      DURATION_ESTIMATE (s) = -1E-6 × (200 × 2^20) ^ 2 + 3E-6 × (200 × 2^20) + 125) ] = 754.1456 s
       QUOTE_COST = 10 + 0.01 * 754.1456 = 17.54 $
   
     Real Execution Cost:

@@ -6,12 +6,12 @@ import json
 import os
 import re
 import tempfile
-import unittest
 import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
+import mock
 import pyramid.testing
 import pytest
 import stopit
@@ -20,6 +20,7 @@ import yaml
 from pywps.inout import LiteralInput
 
 from tests import resources
+from tests.functional.utils import WpsConfigBase
 from tests.utils import (
     get_links,
     get_test_weaver_app,
@@ -38,7 +39,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, get_cwl_file_format
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER,
@@ -63,7 +64,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
 
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution
 
 
 @pytest.yield_fixture(name="assert_cwl_no_warn_unknown_hint")
@@ -116,7 +117,8 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
 
 
 # pylint: disable=C0103,invalid-name
-class WpsRestApiProcessesTest(unittest.TestCase):
+@pytest.mark.functional
+class WpsRestApiProcessesTest(WpsConfigBase):
     remote_server = None    # type: str
     settings = {}           # type: SettingsType
     config = None           # type: Configurator
@@ -137,16 +139,12 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def tearDownClass(cls):
         pyramid.testing.tearDown()
 
-    def fully_qualified_test_process_name(self):
-        return f"{fully_qualified_name(self)}-{self._testMethodName}".replace(".", "-")
-
     def setUp(self):
         # rebuild clean db on each test
-        self.service_store = setup_mongodb_servicestore(self.config)
-        self.process_store = setup_mongodb_processstore(self.config)
-        self.job_store = setup_mongodb_jobstore(self.config)
+        self.service_store.clear_services()
+        self.process_store.clear_processes()
+        self.job_store.clear_jobs()
 
-        self.remote_server = "local"
         self.process_remote_WPS1 = "process_remote_wps1"
         self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
@@ -495,8 +493,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.json["total"] == total + 2, "Grand total of local+remote processes should be reported."
 
     @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")  # unresponsive services
-    # register valid server here, and another invalid within test
-    @mocked_remote_server_requests_wps1([
+    @mocked_remote_server_requests_wps1([  # register valid server here, and another invalid within test
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
@@ -506,7 +503,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         invalid_id = "test-provider-process-listing-invalid"
         invalid_url = f"{resources.TEST_REMOTE_SERVER_URL}/invalid"
         invalid_data = "<xml> not a wps </xml>"
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
 
         # register a provider that doesn't have any responding server
         missing_id = "test-provider-process-listing-missing"
@@ -609,6 +606,67 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 503
         assert resp.content_type == ContentType.APP_JSON
         assert process_name in resp.json.get("description")
+
+    def test_get_processes_html_accept_header(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_get_processes_html_format_query(self):
+        path = "/processes"
+        resp = self.app.get(path, params={"f": OutputFormat.HTML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_describe_process_html_accept_header(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Process:" in resp.text
+        assert self.process_public.identifier in resp.text
+
+    def test_describe_process_html_format_query(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, params={"f": OutputFormat.HTML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Process:" in resp.text
+        assert self.process_public.identifier in resp.text
+
+    def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
+        path = "/processes"
+        headers = copy.deepcopy(self.html_headers)
+        headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "</body>" in resp.text
+        assert "Processes" in resp.text
+
+    def test_get_processes_html_accept_header_user_agent_browser_override(self):
+        path = "/processes"
+        headers = copy.deepcopy(self.html_headers)
+        headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+        settings = copy.deepcopy(self.config.registry.settings)
+        settings["weaver.wps_restapi_html_override_user_agent"] = True
+        with mock.patch("weaver.tweens.get_settings", return_value=settings):
+            resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert "processes" in resp.json
 
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"
@@ -918,7 +976,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
-        expect_cwl = copy.deepcopy(cwl_base)
+        expect_cwl = copy.deepcopy(cwl_base)  # type: CWL
         expect_cwl.update(cwl_core)
         expect_cwl["inputs"] = []
         cwl_out = cwl_core["outputs"]["output"]
@@ -2439,3 +2497,20 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 pass
             else:
                 self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")
+
+
+# pylint: disable=C0103,invalid-name
+@pytest.mark.functional
+class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_restapi_html": False,
+    }
+
+    def test_not_acceptable_html_format_query(self):
+        resp = self.app.get("/processes", params={"f": "html"}, expect_errors=True)
+        assert resp.status_code == 406
+
+    def test_not_acceptable_html_accept_header(self):
+        resp = self.app.get("/processes", headers={"Accept": ContentType.TEXT_HTML}, expect_errors=True)
+        assert resp.status_code == 406

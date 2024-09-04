@@ -112,6 +112,8 @@ weaver.wps_output_path = /wpsoutputs
 weaver.wps_output_s3_bucket =
 weaver.wps_output_s3_region =
 weaver.wps_workdir =
+weaver.wps_max_request_size = 30MB
+weaver.wps_max_single_input_size = 3GB
 
 # List of comma-separated case-insensitive headers that will be removed from incoming requests before
 # passing them down to invoke an operation with the corresponding WPS provider through the WPS client.
@@ -145,6 +147,12 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
+# Allow OGC API - Processes endpoints to render
+# contents in HTML as alternate responses to JSON.
+weaver.wps_restapi_html = true
+# Special handling of rendering default HTML vs JSON by web browsers.
+# See documentation for details.
+weaver.wps_restapi_html_override_user_agent = false
 
 # --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email

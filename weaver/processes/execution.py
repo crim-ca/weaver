@@ -16,10 +16,11 @@ from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode
-from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, repr_json
+from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
+from weaver.processes.builtin.collection_processor import process_collection
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -111,7 +112,7 @@ class JobProgress(object):
 
 @app.task(bind=True)
 def execute_process(task, job_id, wps_url, headers=None):
-    # type: (Task, UUID, str, Optional[HeadersType]) -> StatusType
+    # type: (Task, UUID, str, Optional[HeaderCookiesType]) -> StatusType
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
     """
@@ -275,7 +276,9 @@ def execute_process(task, job_id, wps_url, headers=None):
         job.save_log(errors=errors, logger=task_logger)
         job = store.update_job(job)
     finally:
-        # note:
+        # WARNING: important to clean before re-fetching, otherwise we loose internal references needing cleanup
+        job.cleanup()
+        # NOTE:
         #   don't update the progress and status here except for 'success' to preserve last error that was set
         #   it is more relevant to return the latest step that worked properly to understand where it failed
         job = store.fetch_by_id(job.id)
@@ -420,6 +423,8 @@ def parse_wps_input_complex(input_value, input_info):
     schema_vars = ["reference", "$schema"]
     input_field = get_any_value(input_info, key=True)
     if isinstance(input_value, dict):
+        if input_field is None:
+            input_field = get_any_value(input_value, key=True)
         ctype, c_enc = parse_wps_input_format(input_value, "type", search_variations=False)
         if not ctype:
             ctype, c_enc = parse_wps_input_format(input_value)
@@ -485,7 +490,11 @@ def parse_wps_input_literal(input_value):
 def parse_wps_inputs(wps_process, job):
     # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
     """
-    Parses expected WPS process inputs against submitted job input values considering supported process definitions.
+    Parses expected :term:`WPS` process inputs against submitted job input values considering supported definitions.
+
+    According to the structure of the job inputs, and notably their key arguments, perform the relevant parsing and
+    data retrieval to prepare inputs in a native format that can be understood and employed by a :term:`WPS` worker
+    (i.e.: :class:`weaver.wps.service.WorkerService` and its underlying :mod:`pywps` implementation).
     """
     complex_inputs = {}  # type: Dict[str, ComplexInput]
     bbox_inputs = {}  # type: Dict[str, BoundingBoxInput]
@@ -521,13 +530,47 @@ def parse_wps_inputs(wps_process, job):
                 input_values = [input_val]
                 input_details = [job_input]  # metadata directly in definition, not nested per array value
 
+            # Pre-check collection for resolution of the referenced data.
+            # Because each collection input can result in either '1->1' or '1->N' file reference(s) mapping,
+            # resolution must be performed before iterating through input value/definitions to parse them.
+            # Whether sink input receiving this data can map to 1 or N is up to be validated by the execution later.
+            resolved_inputs = []
             for input_value, input_info in zip(input_values, input_details):
-                if input_id in complex_inputs:
-                    input_data = parse_wps_input_complex(input_value, input_info)
-                elif input_id in bbox_inputs:
-                    input_data = parse_wps_input_bbox(input_value, input_info)
+                if isinstance(input_info, dict):
+                    # copy to avoid overriding 'input_value' with an ID
+                    # this could refer to the desired collection ID rather than the input ID being mapped
+                    input_info = dict(input_info)  # not 'deepcopy' to avoid 'data' or 'value' copy that could be large
+                    input_info["id"] = input_id
+                if isinstance(input_value, dict) and "collection" in input_value:
+                    col_path = os.path.join(job.tmpdir, "inputs", input_id)
+                    col_files = process_collection(input_value, input_info, col_path, logger=job)
+                    resolved_inputs.extend([
+                        (
+                            {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])},
+                            input_info
+                        )
+                        for col_file in col_files
+                    ])
                 else:
-                    input_data = parse_wps_input_literal(input_value)
+                    resolved_inputs.append((input_value, input_info))
+
+            for input_value, input_info in resolved_inputs:
+                # if already resolved, skip parsing
+                # it is important to omit explicitly provided 'null', otherwise the WPS object could be misleading
+                # for example, a 'ComplexData' with 'null' data will be auto-generated as text/plan with "null" string
+                if input_value is None:
+                    input_data = None
+                else:
+                    # resolve according to relevant data type parsing
+                    # value could be an embedded or remote definition
+                    if input_id in complex_inputs:
+                        input_data = parse_wps_input_complex(input_value, input_info)
+                    elif input_id in bbox_inputs:
+                        input_data = parse_wps_input_bbox(input_value, input_info)
+                    else:
+                        input_data = parse_wps_input_literal(input_value)
+
+                # re-validate the resolved data as applicable
                 if input_data is None:
                     job.save_log(
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
@@ -575,6 +618,8 @@ def make_results_relative(results, settings):
     wps_url = get_wps_output_url(settings)
     wps_path = get_wps_output_path(settings)
     for res in results:
+        if not isinstance(res, dict):
+            continue
         ref = res.get("reference")
         if isinstance(ref, str) and ref:
             if ref.startswith(wps_url):
@@ -582,6 +627,9 @@ def make_results_relative(results, settings):
             if ref.startswith(wps_path):
                 ref = ref.replace(wps_path, "", 1)
             res["reference"] = ref
+        data = res.get("data")
+        if isinstance(data, list):
+            make_results_relative(data, settings)
     return results
 
 

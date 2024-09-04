@@ -545,7 +545,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | ``uri``, ``url``,      |                                            |
 |                      |                         | etc.) :sup:`(5)`       |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| |na|                 | ``BoundingBox``         | :term:`JSON`           | Only partial support available. |br|       |
+| ``File``             | ``BoundingBox``         | :term:`JSON`           | Partial support available. |br|            |
 |                      |                         | :sup:`(6)`             | See :ref:`note <bbox-note>`.               |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``File``             | ``Complex``             | :term:`JSON`           | :ref:`File Reference <file_ref_types>`     |
@@ -567,21 +567,23 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
   More specific types with these items can help apply additional validation, although not strictly enforced.
 | :sup:`(6)` Specific schema required as described in :ref:`oas_json_types`.
 
+.. _bbox-note:
+.. note::
+    The :term:`WPS` data type ``BoundingBox`` has a schema definition in :term:`WPS` and :term:`OAS` contexts,
+    but is not handled natively by :term:`CWL` types. When the conversion to a :term:`CWL` job occurs, an equivalent
+    ``Complex`` type using a :term:`CWL` ``File`` with ``format: ogc-bbox`` and the contents stored as :term:`JSON` is
+    employed. It is up to the :term:`Application Package` to parse this :term:`JSON` content as necessary.
+    Alternatively, it is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ if it
+    is deemed preferable that the :term:`CWL` script receives the data directly without intermediate interpretation.
+
+.. [#] |wkt-example|_
+
 .. _cwl-type:
 
 Type Resolution
 ~~~~~~~~~~~~~~~
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
-
-.. _bbox-note:
-.. note::
-    As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
-    The schema definition exists in :term:`WPS` and :term:`OAS` contexts but is not handled by any :term:`CWL` type
-    conversion yet. This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
-    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ in the meantime.
-
-.. [#] |wkt-example|_
 
 As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
 which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be
@@ -639,8 +641,8 @@ it gets parsed as intended type.
 
 .. versionadded:: 4.16
 
-With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema definitions provided in
-the :term:`WPS` I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
+With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema (:term:`OAS`) definitions
+provided in the I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
 data types. When :term:`OpenAPI` schema are detected, they are also considered in the merging strategy along with
 other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
 provided in :ref:`oas_io_schema` section.
@@ -872,15 +874,12 @@ preferable to provide the ``minOccurs`` and ``maxOccurs`` in the :term:`WPS` con
 ``array`` and/or ``"null"`` type requirements automatically. Also, because of all implied parameters in this situation
 to specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
 trouble guessing the intended result when merging specifications. If unambiguous guess can be made, :term:`CWL` will be
-employed as deciding definition to resolve erroneous mismatches (as for any other corresponding fields).
-
-.. todo:: update warning according to Weaver issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_
+employed as the overruling definition to resolve erroneous mismatches (as for any other corresponding fields).
 
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the :term:`WPS` context. Native
-    :term:`WPS` therefore does not permit multiple output reference files. This can be worked around using a
-    |metalink|_ file, but this use case is not covered by `Weaver` yet as it requires special mapping with :term:`CWL`
-    that does support ``array`` type as output (see issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+    :term:`WPS` therefore does not permit multiple output reference files or data values under a same output ID.
+    To see potential workarounds, refer to :ref:`Multiple Outputs` section.
 
 .. note::
     Although :term:`WPS` multi-value inputs are defined as a single entity during deployment, special care must be taken
@@ -1199,3 +1198,98 @@ Below is a list of compatible elements.
    :trim:
 
 .. |<=>| unicode:: 0x21D4
+
+.. _app_pkg_secret_parameters:
+
+Using Secret Parameters
+=======================
+
+Under some circumstances, input parameters to a :term:`Job` must be hidden, whether to avoid leaking credentials
+required by the underlying application, or for using sensible information that should not be easily accessible.
+In such cases, typical :term:`CWL` ``string`` inputs should not be directly employed.
+
+There are 2 strategies available to employ *secrets* when working with `Weaver`:
+
+1. Using the :term:`Vault` feature
+2. Using ``cwltool:Secrets`` hint
+
+.. _app_pkg_secret_vault:
+
+Secrets using the File Vault
+----------------------------
+
+Using :ref:`file_vault_inputs` essentially consists of wrapping any sensible data within an input of type ``File``,
+which will be :ref:`Uploaded to the Vault <vault_upload>` for :term:`Job` execution. Once the file is accessed and
+staged by the relevant :term:`Job`, its contents are automatically deleted from the :term:`Vault`. This offers a
+secured single access endpoint only available by the client that uploaded the file, for a short period of time,
+which decides for which :term:`Process` it should be summited to with the corresponding authentication token and
+:term:`Vault` ID. Since the sensible data is contained within a file, its contents are only available by the targeted
+:term:`Job` for the selected :term:`Process`, while logs will only display a temporary path.
+
+However, the :term:`Vault` approach as potential drawbacks.
+
+1. It is a feature specific to `Weaver`, which will not be available an easily interoperable when involving
+   other :term:`OGC API - Processes` servers.
+
+2. It forces the :term:`CWL` to be implemented using a ``File`` input. While this is not necessarily an issue
+   in some cases, it becomes the responsibility of the :term:`Application Package` developer to figure out how
+   to propagate the contained data to the relevant piece of code if a plain string is needed. To do so, the
+   developer must also avoid outputting any information to ``stdout``. Otherwise, the data would be captured
+   in :term:`Job` logs and defeating the purpose of using the :term:`Vault`.
+
+.. note::
+    For more details about the :term:`Vault`, refer to sections :ref:`file_vault_inputs`, :ref:`vault_upload`,
+    and the corresponding capabilities in :term:`cli_example_upload`.
+
+.. _app_pkg_secret_cwltool:
+
+Secrets using the CWL Hints
+---------------------------
+
+An alternative approach is to use the :term:`CWL` hints as follows:
+
+.. code-block:: json
+    :caption: CWL Secrets Definition
+
+    {
+        "cwlVersion": "v1.2",
+        "inputs": {
+            "<input-name>": {
+                "type": "string"
+            }
+        },
+        "hints": {
+            "cwltool:Secrets": {
+                "secrets": [
+                    "<input-name>"
+                ]
+            }
+        },
+        "$namespaces": {
+            "cwltool": "http://commonwl.org/cwltool#"
+        }
+    }
+
+Using this definition either in a ``class: CommandLineTool`` (see :ref:`app_pkg_cmd`)
+or a ``class: Workflow`` (see :ref:`app_pkg_workflow`) will instruct the underlying :term:`Job` execution
+to replace all specified inputs (i.e.: ``<input-name>`` in the above example) to be masked in commands and logs.
+Looking at :term:`Job` logs, all sensible inputs will be replaced by a representation similar to ``(secret-<UUID>)``
+The original data identified by this masked definition will be substituted back only at the last possible moment,
+when the underlying operation accessed it to perform its processing.
+
+A few notable considerations must be taken when using the ``cwltool:Secrets`` definition.
+
+1. It is limited to ``string`` inputs. Any other literal data type and intermediate conversions would need
+   to be handled explicitly by the :term:`Application Package` maintainer.
+
+2. The secrets definition can only be provided in the ``hints`` section of the :term:`CWL` document, meaning
+   that any remote server supporting :term:`CWL` are not required to support this feature.
+   If the :term:`Application Package` is expected to be deployed remotely, it is up to the client to
+   determine whether the remote server will perform the necessary actions to mask sensible data.
+   If unsupported, secrets could become visible in the :term:`Job` logs as if they were submitted using
+   typical ``string`` inputs.
+
+3. The feature does not avoid any misuse of underlying commands that could expose the sensible data due
+   to manipulation errors or the use of operations that are redirected to ``stdout``. For example, if the
+   shell ``echo`` command is used within the :term:`CWL` with an input listed in ``cwltool:Secrets``, its
+   value will still be displayed in plain text in the :term:`Job` logs.
