@@ -18,6 +18,8 @@ Fixes:
 ------
 - Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
 - Fix minor resolution combinations or redundant checks for multiple ``weaver.formats`` utilities.
+- FIx `CWL` ``format`` resolution check against `IANA` media-types if the reference ontology happens to be
+  temporarily/sporadically unresponsive to SSL handshake check, allowing temporary HTTP resolution of media-type.
 
 .. _changes_5.7.0:
 
