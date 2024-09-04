@@ -452,9 +452,9 @@ def get_conformance(category, settings):
         # FIXME: support part 3: workflows (https://github.com/crim-ca/weaver/issues/412)
         # f"{ogcapi_proc_part3}/conf/nested-processes",
         # f"{ogcapi_proc_part3}/conf/remote-core-processes",
-        # f"{ogcapi_proc_part3}/conf/collection-input",
-        # f"{ogcapi_proc_part3}/conf/remote-collections",
-        # f"{ogcapi_proc_part3}/conf/input-fields-modifiers",
+        f"{ogcapi_proc_part3}/conf/collection-input",
+        f"{ogcapi_proc_part3}/conf/remote-collections",
+        f"{ogcapi_proc_part3}/conf/input-fields-modifiers",
         # f"{ogcapi_proc_part3}/conf/output-fields-modifiers",
         # f"{ogcapi_proc_part3}/conf/deployable-workflows",
         # f"{ogcapi_proc_part3}/conf/collection-output",

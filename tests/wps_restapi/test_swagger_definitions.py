@@ -1,9 +1,11 @@
+import copy
 import glob
 import os
 import uuid
 from typing import TYPE_CHECKING
 
 import colander
+import mock
 import pytest
 
 from weaver.formats import ContentType
@@ -11,7 +13,7 @@ from weaver.utils import load_file
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
+    from weaver.typedefs import CWL, JSON
 
 TEST_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -196,3 +198,189 @@ def test_cwl_package(cwl_path):
     cwl_check = sd.CWL().deserialize(cwl)
     cwl_check.pop("$schema", None)  # our definition injects this reference
     assert cwl_check == cwl
+
+
+@pytest.mark.parametrize(
+    "input_data",
+    [
+        {
+            "collection": "https://example.com/collections/test"
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": {"op": "gt", "args": [{"property": "eo:cloud_cover"}, 0.1]},
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "properties.eo:cloud_cover > 0.1",
+            "filter-lang": "cql2-text",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "INTERSECTS(geom, POINT (1 2))",
+            "filter-lang": "simple-cql",
+            "sortBy": "-eo:cloud_cover,+title",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            # examples: https://docs.ogc.org/is/09-026r2/09-026r2.html#107
+            "filter-lang": "fes",
+            "filter": """
+                <?xml version="1.0"?>
+                <fes:Filter
+                   xmlns:fes="http://www.opengis.net/fes/2.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.opengis.net/fes/2.0
+                   http://schemas.opengis.net/filter/2.0.02.0/filterAll.xsd">
+                  <fes:PropertyIsEqualTo>
+                    <fes:ValueReference>SomeProperty</fes:ValueReference>
+                    <fes:Literal>100</fes:Literal>
+                  </fes:PropertyIsEqualTo>
+                </fes:Filter>
+            """,
+        }
+    ]
+)
+def test_collection_input_parsing(input_data):
+    # type: (JSON) -> None
+    """
+    Validate that the schema definition for a ``collection`` input resolves as expected.
+    """
+    expect = copy.deepcopy(input_data)
+    result = sd.ExecuteCollectionInput().deserialize(input_data)
+    result.pop("format", None)
+    assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["sort_by", "expect"],
+    [
+        ({}, {}),
+        ({"sortBy": "-eo:cloud_cover"}, {"sortBy": "-eo:cloud_cover"}),
+        ({"sortby": "-eo:cloud_cover"}, {"sortBy": "-eo:cloud_cover"}),
+        ({"sortby": "+name,-eo:cloud_cover"}, {"sortBy": "+name,-eo:cloud_cover"}),
+        ({"sortBy": "+name", "sortby": "-name"}, {"sortBy": "+name"}),
+    ]
+)
+def test_collection_input_sortby(sort_by, expect):
+    # type: (JSON, JSON) -> None
+    input_data = {"collection": "https://example.com/collections/test"}
+    expect.update(copy.deepcopy(input_data))
+    input_data.update(sort_by)
+    result = sd.ExecuteCollectionInput().deserialize(input_data)
+    result.pop("format")
+    assert result == expect
+
+
+def test_collection_input_sortby_missing():
+    assert sd.SortBySchema().deserialize({}) in [colander.drop, {}]
+
+
+def test_collection_input_filter_lang_case_insensitive():
+    col = {
+        "collection": "https://example.com/collections/test",
+        "filter": {"op": "gt", "args": [{"property": "eo:cloud_cover"}, 0.1]},
+        "filter-lang": "CQL2-JSON",  # case-insensitive
+    }
+    result = sd.ExecuteCollectionInput().deserialize(col)
+    assert result["filter-lang"] == "cql2-json"
+
+
+@pytest.mark.parametrize(
+    "input_data",
+    [
+        # other 'valid' input types, to ensure the schema can distinguish them
+        {
+            "value": "https://example.com/collections/test"
+        },
+        {
+            "href": "https://example.com/collections/test",
+            "type": ContentType.APP_GEOJSON,
+        },
+        # malformed collection properties
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": [],
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": {},
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter": "PROPERTY = 123",
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter-lang": "cql2-json",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "filter-crs": "EPSG:4326",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "sortBy": ["name"],
+        },
+    ]
+)
+def test_collection_input_invalid(input_data):
+    # type: (JSON) -> None
+    """
+    Validate that the invalid definition for a ``collection`` input raises against the schema and filter language.
+    """
+    with pytest.raises(colander.Invalid):
+        sd.ExecuteCollectionInput().deserialize(input_data)
+
+
+@pytest.mark.parametrize(
+    ["filter_data", "filter_lang"],
+    [
+        ("test = bad", "cql2-json"),
+        ("test = bad", "cql-json"),
+        ("test = bad", "jfe"),
+        ({"test": "bad"}, "cql-text"),
+        ({"test": "bad"}, "cql2-text"),
+        ({"test": "bad"}, "ecql"),
+        ({"test": "bad"}, "cql"),
+        ({"test": "bad"}, "simple-cql"),
+        ({"test": "bad"}, "fes"),
+    ]
+)
+def test_collection_input_filter_parsing_error(filter_data, filter_lang):
+    input_data = {
+        "collection": "https://example.com/collections/test",
+        "filter": filter_data,
+        "filter-lang": filter_lang,
+    }
+    with pytest.raises(colander.Invalid) as exc:
+        sd.FilterSchema.parse.__wrapped__.cache_clear()  # noqa
+        sd.ExecuteCollectionInput().deserialize(input_data)
+    assert exc.value.msg == "Invalid filter expression could not be parsed against specified language."
+
+
+def test_collection_input_filter_interpreter_error():
+    input_data = {
+        "collection": "https://example.com/collections/test",
+        "filter": {},
+    }
+    with mock.patch("weaver.wps_restapi.swagger_definitions.FilterSchema.validate", return_value=None):
+        with pytest.raises(colander.Invalid) as exc:
+            sd.ExecuteCollectionInput().deserialize(input_data)
+    assert exc.value.msg == "Invalid filter expression could not be interpreted."
+
+
+def test_collection_input_filter_unresolved_error():
+    with pytest.raises(colander.Invalid) as exc:
+        sd.FilterSchema().parse({}, "unknown-language")  # noqa
+    assert exc.value.msg == "Unresolved filter expression language."
+
+
+def test_collection_input_filter_missing():
+    assert sd.FilterSchema().deserialize({}) in [colander.drop, {}]

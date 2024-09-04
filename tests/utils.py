@@ -844,15 +844,28 @@ def mocked_remote_server_requests_wps1(
     return mocked_remote_server_wrapper
 
 
+@overload
+def mocked_dir_listing(local_directory, directory_path, **__):
+    # type: (str, str, **bool) -> str
+    ...
+
+
+@overload
+def mocked_dir_listing(local_directory, directory_path, only_references):
+    # type: (str, str, Literal[True]) -> List[str]
+    ...
+
+
 def mocked_dir_listing(local_directory,             # type: str
                        directory_path,              # type: str
                        *,                           # force named keyword arguments after
+                       only_references=False,       # type: bool
                        include_dir_heading=True,    # type: bool
                        include_separators=True,     # type: bool
                        include_code_format=True,    # type: bool
                        include_table_format=True,   # type: bool
                        include_modified_date=True,  # type: bool
-                       ):                           # type: (...) -> str
+                       ):                           # type: (...) -> Union[str, List[str]]
     """
     Generate the requested HTML directory listing.
 
@@ -864,6 +877,7 @@ def mocked_dir_listing(local_directory,             # type: str
 
     :param local_directory: Real directory location to emulate HTML listing.
     :param directory_path: Relative base directory to be represented by the served HTML listing.
+    :param only_references: Return the listing of directory and files directly without HTML formatting.
     :param include_dir_heading: Add HTML tags with the relative directory displayed as page heading.
     :param include_separators: Add HTML tags to place visual separators between various elements.
     :param include_code_format: Add HTML tags wrapping the listing in a code-formatted text.
@@ -874,6 +888,8 @@ def mocked_dir_listing(local_directory,             # type: str
     dir_files = os.listdir(local_directory)
     dir_files = [".."] + sorted(dir_files)  # most indexes provide the parent relative link to allow browsing upward
     dir_files = [f"{path}/" if os.path.isdir(os.path.join(local_directory, path)) else path for path in dir_files]
+    if only_references:
+        return dir_files
     ref_files = [
         ("<tr><td>" if include_table_format else "") +
         ("<pre>" if include_table_format and include_code_format else "") +
@@ -1030,6 +1046,11 @@ def mocked_file_server(directory,                   # type: str
             if dir_path.endswith("index.html"):
                 dir_path = dir_path.rsplit("/", 1)[0]
             dir_list = os.path.join(directory, dir_path.lstrip("/"))
+            if ContentType.APP_JSON in str(request.headers.get("Accept")):
+                dir_refs = mocked_dir_listing(dir_list, dir_path, only_references=True)
+                dir_data = json.dumps({"links": [{"href": dir_refs} for ref in dir_refs]})
+                headers = {"Content-Type": ContentType.APP_JSON, "Content-Length": str(len(dir_data))}
+                return 200, headers, dir_data
             dir_html = mocked_dir_listing(dir_list, dir_path, **directory_listing_kwargs)
             headers = {"Content-Type": ContentType.TEXT_HTML, "Content-Length": str(len(dir_html))}
             return 200, headers, dir_html

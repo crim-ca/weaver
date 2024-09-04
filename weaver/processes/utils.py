@@ -74,7 +74,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Protocol, Tuple, Union
+    from typing import Any, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
 
@@ -95,11 +95,7 @@ if TYPE_CHECKING:
         SettingsType,
         TypedDict
     )
-
-    class LoggerHandler(Protocol):
-        def log(self, level, message, *args, **kwargs):
-            # type: (int, str, *str, **Any) -> None
-            ...
+    from weaver.utils import LoggerHandler
 
     UpdateFieldListMethod = Literal["append", "override"]
     UpdateFieldListSpec = TypedDict("UpdateFieldListSpec", {

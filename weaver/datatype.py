@@ -7,14 +7,17 @@ import copy
 import enum
 import inspect
 import json
+import os
 import re
+import shutil
+import tempfile
 import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
 from decimal import ConversionSyntax, Decimal
 from io import BytesIO
-from logging import ERROR, INFO, Logger, getLevelName, getLogger
+from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
@@ -44,6 +47,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreProcesses
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
+    LoggerHandler,
     VersionFormat,
     apply_number_with_unit,
     as_version_major_minor_patch,
@@ -63,6 +67,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
     from typing_extensions import TypeAlias
 
@@ -90,6 +95,7 @@ if TYPE_CHECKING:
         Link,
         Metadata,
         Number,
+        Path,
         Price,
         QuoteProcessParameters,
         QuoteProcessResults,
@@ -616,7 +622,7 @@ class Service(Base):
         return False
 
 
-class Job(Base):
+class Job(Base, LoggerHandler):
     """
     Dictionary that contains :term:`Job` details for local :term:`Process` or remote :term:`OWS` execution.
 
@@ -630,6 +636,33 @@ class Job(Base):
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
         if not isinstance(self.id, (str, uuid.UUID)):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
+        self["__tmpdir"] = None
+
+    def update_from(self, job):
+        # type: (Job) -> None
+        """
+        Forwards any internal or control properties from the specified :class:`Job` to this one.
+        """
+        self["__tmpdir"] = job.get("__tmpdir")
+
+    def cleanup(self):
+        # type: () -> None
+        _tmpdir = self.get("__tmpdir")
+        if isinstance(_tmpdir, str) and os.path.isdir(_tmpdir):
+            shutil.rmtree(_tmpdir, ignore_errors=True)
+
+    @property
+    def tmpdir(self):
+        # type: () -> Path
+        """
+        Optional temporary directory available for the :term:`Job` to store files needed for its operation.
+
+        It is up to the caller to remove the contents by calling :meth:`cleanup`.
+        """
+        _tmpdir = self.get("__tmpdir")
+        if not _tmpdir:
+            _tmpdir = self["__tmpdir"] = tempfile.mkdtemp()
+        return _tmpdir
 
     @staticmethod
     def _get_message(message, size_limit=None):
@@ -654,7 +687,18 @@ class Job(Base):
         error_msg = Job._get_message(error.text, size_limit=size_limit)
         return f"{error_msg} - code={error.code} - locator={error.locator}"
 
+    def log(self, level, message, *args, **kwargs):
+        # type: (AnyLogLevel, str, *str, **Any) -> None
+        """
+        Provides the :class:`LoggerHandler` interface, allowing to pass the :term:`Job` directly as a logger reference.
+
+        The same parameters as :meth:`save_log` can be provided.
+        """
+        message = message.format(*args, **kwargs)
+        return self.save_log(level=level, message=message, **kwargs)
+
     def save_log(self,
+                 *,
                  errors=None,           # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,           # type: Optional[Logger]
                  message=None,          # type: Optional[str]

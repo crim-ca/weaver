@@ -28,10 +28,22 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
+from pygeofilter.backends.cql2_json import to_cql2
+from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, jfe
+
+# FIXME: https://github.com/geopython/pygeofilter/pull/102
+from pygeofilter.parsers.fes.parser import parse as fes_parse
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver.compat import cache
 from weaver.config import WeaverFeature
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteCollectionFormat,
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteTransmissionMode
+)
 from weaver.formats import AcceptLanguage, ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
@@ -70,7 +82,7 @@ from weaver.processes.constants import (
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -105,12 +117,12 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, NoReturn, Optional, Type, Union
+    from typing import Any, Dict, Type, Union
     from typing_extensions import TypedDict
 
-    from pyramid.config import Configurator
+    from pygeofilter.ast import AstType as FilterAstType
 
-    from weaver.typedefs import DatetimeIntervalType, JSON, SettingsType
+    from weaver.typedefs import DatetimeIntervalType, JSON
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
@@ -1355,8 +1367,212 @@ class DeployComplexInputType(DeployWithFormats):
     pass
 
 
+class AnyCRS(AnyOfKeywordSchema):
+    # note:
+    #   other CRS exist (EGM, NAVD, NAD, etc.)
+    #   however, only support EPSG (short form, normative from, or URI) that are supported by 'owslib.crs'
+    #   handle equivalent representations of EPSG:4326 that are also supported by 'owslib.crs'
+    _any_of = [
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
+        ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
+        ExtendedSchemaNode(String(), validator=OneOf([
+            # equivalent forms of EPSG:4326, 2D or 3D
+            "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            "https://www.opengis.net/def/crs/OGC/0/CRS84h",
+            "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+            "https://www.opengis.net/def/crs/OGC/0/CRS84",
+            "http://www.opengis.net/def/crs/OGC/0/CRS84",
+            "urn:ogc:def:crs:OGC:2:84",
+            "WGS84",
+        ])),
+    ]
+    default = OGC_API_BBOX_EPSG
+
+
+class AnyFilterExpression(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(),
+        PermissiveSequenceSchema(validator=Length(min=1)),
+        ExtendedSchemaNode(String(), validator=Length(min=1)),
+    ]
+
+
+class AnyFilterLanguage(ExtendedSchemaNode):
+    schema_type = String
+    name = "filter-lang"
+    default = "cql2-json"
+    validator = OneOfCaseInsensitive([
+        "cql2-json",
+        "cql2-text",
+        "cql",
+        "cql-text",
+        "cql-json",
+        "ecql",
+        "simple-cql",
+        "fes",
+        "jfe"
+    ])
+    summary = "Filter expression language to use for parsing."
+    description = (
+        "Filter expression language to use for parsing. "
+        "Supports multiple variants of OGC Common Query Language (CQL), "
+        "Filter Expression Standard (FES), or JSON Filter Expression (JFE). "
+        "Values are case-insensitive."
+    )
+
+    def deserialize(self, cstruct):
+        # type: (Any) -> Union[str, colander.null]
+        if isinstance(cstruct, str):
+            cstruct = cstruct.lower()
+        return super().deserialize(cstruct)
+
+
+class FilterSchema(ExtendedMappingSchema):
+    # note:
+    #   defer format and parsing to 'pygeofilter'
+    #   to accommodate all filter expression representations, string, array and object must be allowed
+    filter = AnyFilterExpression(
+        description="Filter expression according to the specified parsing language.",
+        missing=drop,  # optional since combined within other JSON schema definitions
+    )
+    filter_crs = AnyCRS(
+        name="filter-crs",
+        missing=drop,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
+        description="Coordinate Reference System for provided spatial properties.",
+    )
+    filter_lang = AnyFilterLanguage(
+        name="filter-lang",
+        missing=drop,
+        default=drop,  # override to avoid injecting it by default, remote server could use a different default
+        description=AnyFilterLanguage.description + (
+            " If unspecified, the filter language will default to CQL2-Text if a string was provided,"
+            " or CQL2-JSON if a JSON object or array structure is detected as the filter."
+            " For any other language, or to resolve ambiguous cases such as a CQL2-JSON encoded as literal string,"
+            " the filter language must be specified explicitly."
+        )
+    )
+
+    @staticmethod
+    @json_hashable
+    @cache
+    def parse(filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> FilterAstType
+        parsed_expr = None
+        if filter_lang == "cql2-json":
+            parsed_expr = cql2_json.parse(filter_expr)
+        elif filter_lang == "cql2-text":
+            parsed_expr = cql2_text.parse(filter_expr)
+        elif filter_lang == "cql-json":
+            parsed_expr = cql_json.parse(filter_expr)
+        elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
+            parsed_expr = ecql.parse(filter_expr)
+        elif filter_lang == "fes":
+            parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
+        elif filter_lang == "jfe":
+            parsed_expr = jfe.parse(filter_expr)
+        if not parsed_expr:
+            raise colander.Invalid(
+                node=AnyFilterLanguage(),
+                msg="Unresolved filter expression language.",
+                value={"filter-lang": filter_lang},
+            )
+        return parsed_expr
+
+    def validate(self, filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> FilterAstType
+        try:
+            return self.parse(filter_expr, filter_lang)
+        except (TypeError, ValueError) as exc:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid filter expression could not be parsed against specified language.",
+                value={"filter": filter_expr, "filter-lang": filter_lang},
+            ) from exc
+
+    def convert(self, filter_expr, filter_lang):
+        # type: (Union[JSON, str], str) -> JSON
+        try:
+            parsed_expr = self.validate(filter_expr, filter_lang)
+            return to_cql2(parsed_expr)
+        except (TypeError, ValueError, NotImplementedError) as exc:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid filter expression could not be interpreted.",
+                value={"filter": filter_expr, "filter-lang": filter_lang},
+            ) from exc
+
+    def deserialize(self, cstruct):
+        # type: (JSON) -> Union[JSON, colander.null]
+        result = super().deserialize(cstruct)
+        if not result:
+            return result
+        filter_expr = result.get("filter")
+        filter_lang = result.get("filter-lang")
+        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised as invalid since dropped
+            if "filter" in cstruct:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Invalid filter expression could not be interpreted.",
+                    value={"filter": repr_json(cstruct["filter"]), "filter-lang": filter_lang},
+                )
+            filter_crs = cstruct.get("filter-crs")
+            filter_lang = cstruct.get("filter-lang")
+            if filter_crs or filter_lang:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Missing filter expression provided with CRS and/or language parameters.",
+                    value={"filter-crs": filter_crs, "filter-lang": filter_lang},
+                )
+            return result
+        if not filter_lang:
+            filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
+        # perform conversion to validate
+        # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
+        # conversion can be done as needed to obtain a uniform representation locally
+        self.convert(filter_expr, filter_lang)
+        return result
+
+
+class SortByExpression(ExpandStringList, ExtendedSchemaNode):
+    schema_type = String
+    default = None
+    example = "arg1,prop2,+asc,-desc"
+    missing = drop
+    description = (
+        "Comma-separated list of sorting fields. "
+        "Each field can be prefixed by +/- for ascending or descending sort order."
+    )
+
+
+class SortBySchema(ExtendedMappingSchema):
+    sort_by_lower = SortByExpression(name="sortby", missing=drop)
+    sort_by_upper = SortByExpression(name="sortBy", missing=drop)
+
+    def deserialize(self, cstruct):
+        # type: (JSON) -> Union[JSON, colander.null]
+        """
+        Resolve the upper/lower variant representation.
+
+        Consider that this schema could be integrated with another.
+        Therefore, additional fields must be left untouched.
+        """
+        result = super().deserialize(cstruct)
+        if not result:
+            return result
+        if result.get("sortby"):
+            # keep only 'official' "sortBy" from OGC API Processes
+            # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
+            if not result.get("sortBy"):
+                result["sortBy"] = result["sortby"]
+            del result["sortby"]
+        return result
+
+
 class SupportedCRS(ExtendedMappingSchema):
-    crs = URL(title="CRS", description="Coordinate Reference System")
+    crs = AnyCRS(title="CRS", description="Coordinate Reference System")
     default = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
@@ -2562,8 +2778,12 @@ class WPSLiteralData(WPSLiteralInputType):
     name = "LiteralData"
 
 
+class XMLStringCRS(AnyCRS, XMLObject):
+    pass
+
+
 class WPSCRSsType(ExtendedMappingSchema, WPSNamespace):
-    crs = XMLString(name="CRS", description="Coordinate Reference System")
+    crs = XMLStringCRS(name="CRS", description="Coordinate Reference System")
 
 
 class WPSSupportedCRS(ExtendedSequenceSchema):
@@ -3546,6 +3766,48 @@ class ArrayReferenceValueType(ExtendedMappingSchema):
     value = ArrayReference()
 
 
+class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
+    schema_type = String
+    default = ExecuteCollectionFormat.GEOJSON
+    example = ExecuteCollectionFormat.STAC
+    validator = OneOf(ExecuteCollectionFormat.values())
+
+
+class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
+    description = inspect.cleandoc("""
+        Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
+
+        If only the 'collection' is provided to read the contents as a static GeoJSON FeatureCollection document,
+        any scheme can be employed (s3, file, http, etc.) to request the contents.
+        Note that in this context, each of the respective Feature contained in the collection will be extracted
+        to form an array of Features. If the entire 'FeatureCollection' should be provided as a whole to the process
+        input, consider using the usual 'href' or 'value' input instead of 'collection'.
+
+        When more 'collection' capabilities are specified with
+        additional parameters (filter, sortBy, subsetting, scaling, etc.),
+        the scheme must be 'http(s)' since an OGC API or STAC API data access mechanism is expected
+        to perform the requested operations. The appropriate API to employ should be indicated by 'format'
+        to ensure appropriate interpretation of the 'collection' reference.
+
+        Supported additional parameters depend on each API implementation.
+        Not all parameters are listed in this definition. Refer to respective APIs
+        for supported parameters and their expected value formats.
+    """)
+    collection = ExecuteReferenceURL(description="Endpoint of the collection reference.")
+    format = ExecuteCollectionFormatEnum(
+        missing=drop,
+        description="Collection API to employ for filtering and extracting relevant data for the execution.",
+    )
+    type = MediaType(
+        missing=drop,
+        title="CollectionMediaType",
+        description=(
+            "IANA identifier of content-type to extract from the link. "
+            "If none specified, default from the collection is employed. "
+        )
+    )
+
+
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
 # both for literal values and link references, for inputs submitted as list-items.
 # Also allows the explicit 'href' (+ optional format) reference for a link.
@@ -3570,7 +3832,9 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
         AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
-        ExecuteReference()
+        ExecuteReference(),
+        # HTTP reference to a 'collection' with optional processing arguments
+        ExecuteCollectionInput(),
     ]
 
 
@@ -3665,7 +3929,7 @@ class BoundingBoxObject(StrictMappingSchema):
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )
-    crs = URL(
+    crs = AnyCRS(
         default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
         description="Coordinate Reference System of the Bounding Box points.",
     )
@@ -3757,7 +4021,8 @@ class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
         ExecuteInputInlineValue(),          # <inline-value> (literal, bbox, measurement)
         ExecuteInputQualifiedValue(),       # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
         ExecuteInputFile(),                 # 'href' with either 'type' (OGC) or 'format' (OLD)
-        # FIXME: other types here, 'bbox+crs', 'collection', 'nested process', etc.
+        ExecuteCollectionInput(),           # 'collection' with optional processing operations
+        # FIXME: 'nested process' (https://github.com/crim-ca/weaver/issues/412)
     ]
 
 
@@ -4787,6 +5052,7 @@ class CWLRequirementsMapSupported(StrictMappingSchema):
     description = "Schema that ensures only supported CWL requirements are permitted."
 
     def __init__(self, *_, **__):
+        # type: (*Any, **Any) -> None
         """
         Initialize the mapping to allow only supported CWL requirements.
 

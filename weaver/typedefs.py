@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
-    Path = Union[os.PathLike, str, bytes]
+    Path = Union[os.PathLike[str], str, bytes]
 
     Default = TypeVar("Default")  # used for return value that is employed from a provided default value
     Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
@@ -410,6 +410,13 @@ if TYPE_CHECKING:
         "encoding": NotRequired[str],
         "schema": NotRequired[str],
     }, total=False)
+    JobValueCollection = TypedDict("JobValueCollection", {
+        "collection": Required[str],
+        "filter": Optional[JSON],
+        "filter-crs": Optional[str],
+        "filter-lang": Optional[str],
+        "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
+    }, total=False)
     JobValueData = TypedDict("JobValueData", {
         "data": Required[AnyValueType],
     }, total=False)
@@ -417,7 +424,13 @@ if TYPE_CHECKING:
         # qualified value allow any object (not list directly though)
         "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
     }, total=False)
-    JobValueObject = Union[JobValueData, JobValueValue, JobValueBbox, JobValueFile]
+    JobValueObject = Union[
+        JobValueData,
+        JobValueValue,
+        JobValueBbox,
+        JobValueFile,
+        JobValueCollection,
+    ]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
         "href": Required[str],
@@ -438,7 +451,21 @@ if TYPE_CHECKING:
         "id": Required[str],
         "value": Required[JobValueBbox],
     }, total=False)
-    JobValueItem = Union[JobValueDataItem, JobValueValueItem, JobValueBboxItem, JobValueFileItem]
+    JobValueCollectionItem = TypedDict("JobValueCollectionItem", {
+        "id": Required[str],
+        "collection": Required[str],
+        "filter": Optional[JSON],
+        "filter-crs": Optional[str],
+        "filter-lang": Optional[str],
+        "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
+    }, total=False)
+    JobValueItem = Union[
+        JobValueDataItem,
+        JobValueValueItem,
+        JobValueBboxItem,
+        JobValueFileItem,
+        JobValueCollectionItem,
+    ]
     JobExpectItem = TypedDict("JobExpectItem", {"id": str}, total=True)
     JobInputItem = Union[JobValueItem, Dict[str, AnyValueType]]
     JobInputs = List[JobInputItem]

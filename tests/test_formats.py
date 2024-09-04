@@ -148,7 +148,8 @@ def test_content_encoding_get(test_encoding, expected_encoding):
     ]
 )
 def test_content_encoding_encode_decode(data, encoding, binary, result):
-    assert f.ContentEncoding.encode(data, encoding, binary) == result
+    # type: (str | bytes, f.ContentEncoding, bool, str | bytes) -> None
+    assert f.ContentEncoding.encode(data, encoding, binary) == result  # type: ignore
     b_data = isinstance(data, bytes)
     assert f.ContentEncoding.decode(result, encoding, b_data) == data  # type: ignore
 
@@ -238,6 +239,47 @@ def test_get_format_media_type_no_extension(test_extension):
     fmt = f.get_format(test_extension)
     assert fmt == Format(test_extension, extension=None)
     assert fmt.extension == ""
+    assert fmt.schema == ""
+
+
+@pytest.mark.parametrize(
+    "test_format",
+    [
+        "http://www.opengis.net/def/glossary/term/FeatureCollection",
+        "https://geojson.org/schema/FeatureCollection.json",
+    ]
+)
+def test_get_format_media_type_no_extension_with_schema(test_format):
+    fmt = f.get_format(test_format)
+    assert fmt.extension == ".geojson"
+    assert fmt.mime_type == f.ContentType.APP_GEOJSON
+    assert fmt.schema == test_format
+
+
+@pytest.mark.parametrize(
+    ["test_format", "expect_media_type"],
+    [
+        (
+            "https://geojson.org/schema/FeatureCollection.json",
+            f.ContentType.APP_GEOJSON,
+        ),
+        (
+            "https://schemas.opengis.net/gmlcov/1.0/coverage.xsd",
+            f.ContentType.APP_XML,
+        ),
+        (
+            "https://example.com/unknown/reference.abc",
+            f.ContentType.TEXT_PLAIN,
+        ),
+        (
+            "https://example.com/unknown",
+            f.ContentType.TEXT_PLAIN,
+        )
+    ]
+)
+def test_get_format_media_type_from_schema(test_format, expect_media_type):
+    fmt = f.get_format(test_format)
+    assert fmt.mime_type == expect_media_type
 
 
 @pytest.mark.parametrize(
@@ -377,6 +419,7 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_urlopen(*_, **__):
         yield HTTPOk()
 
+    f.get_cwl_file_format.cache_clear()
     with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
         with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
             with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
@@ -435,7 +478,7 @@ def test_clean_media_type_format_iana():
     res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON
     iana_url = list(f.IANA_NAMESPACE_DEFINITION.values())[0]
-    iana_fmt = os.path.join(iana_url, f.ContentType.APP_JSON)
+    iana_fmt = str(os.path.join(iana_url, f.ContentType.APP_JSON))
     res_type = f.clean_media_type_format(iana_fmt)
     assert res_type == f.ContentType.APP_JSON  # application/json
 
@@ -445,7 +488,7 @@ def test_clean_media_type_format_edam():
     edam_fmt = f"{f.EDAM_NAMESPACE}:{fmt}"  # "edam:format_####"
     res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type
-    edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
+    edam_fmt = str(os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt))  # "edam-url/format_####"
     res_type = f.clean_media_type_format(edam_fmt)
     assert res_type == mime_type  # application/x-type
 
@@ -456,7 +499,7 @@ def test_clean_media_type_format_opengis():
     gis_fmt = f"{f.OPENGIS_NAMESPACE}:{fmt}"  # "opengis:####"
     res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type
-    gis_fmt = os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt)
+    gis_fmt = str(os.path.join(list(f.OPENGIS_NAMESPACE_DEFINITION.values())[0], fmt))
     res_type = f.clean_media_type_format(gis_fmt)
     assert res_type == mime_type  # application/x-type
 
@@ -466,7 +509,7 @@ def test_clean_media_type_format_ogc():
     ogc_fmt = f"{f.OGC_NAMESPACE}:{fmt}"  # "ogc:####"
     res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type
-    ogc_fmt = os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt)
+    ogc_fmt = str(os.path.join(list(f.OGC_NAMESPACE_DEFINITION.values())[0], fmt))
     res_type = f.clean_media_type_format(ogc_fmt)
     assert res_type == mime_type  # application/x-type
 
@@ -707,3 +750,29 @@ def test_output_format_version(test_format, allow_version, expect_type):
 def test_output_format_convert(test_format, expect_data):
     data = f.OutputFormat.convert({"data": [123]}, test_format)
     assert data == expect_data
+
+
+@pytest.mark.parametrize(
+    ["io_definition", "expected_media_type"],
+    [
+        ({}, None),
+        (
+            {"formats": [{"type": f.ContentType.APP_GEOJSON}]},
+            [f.ContentType.APP_GEOJSON],
+        ),
+        (
+            {"formats": [{"type": f.ContentType.IMAGE_JPEG}, {"type": f.ContentType.IMAGE_COG}]},
+            [f.ContentType.IMAGE_JPEG, f.ContentType.IMAGE_COG],
+        ),
+        (
+            {"formats": [{"type": f.ContentType.IMAGE_JPEG}, {"random": "ignore"}]},
+            [f.ContentType.IMAGE_JPEG],
+        ),
+    ]
+)
+def test_find_supported_media_types(io_definition, expected_media_type):
+    found_media_type = f.find_supported_media_types(io_definition)
+    if isinstance(found_media_type, list):
+        assert sorted(found_media_type) == sorted(expected_media_type)
+    else:
+        assert found_media_type == expected_media_type

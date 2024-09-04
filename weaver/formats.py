@@ -17,13 +17,14 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
+from weaver.compat import cache
 
 if TYPE_CHECKING:
     from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
-    from weaver.typedefs import AnyRequestType, JSON
+    from weaver.typedefs import AnyRequestType, JSON, ProcessInputOutputItem
 
     FileModeSteamType = Literal["r", "w", "a", "r+", "w+"]
     FileModeEncoding = Literal["r", "w", "a", "rb", "wb", "ab", "r+", "w+", "a+", "r+b", "w+b", "a+b"]
@@ -105,6 +106,7 @@ class ContentType(Constants):
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
+    IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
@@ -452,6 +454,12 @@ _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
     ".yaml": ContentType.APP_YAML,    # common alternative to .yml
     ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
+    ".xsd": ContentType.APP_XML,
+}
+# well-known schema URI that should resolve to an alternate media-type than the auto-resolution
+_CONTENT_TYPE_SCHEMA_OVERRIDES = {
+    re.compile(r"https://geojson\.org/schema/.*\.json"): ContentType.APP_GEOJSON,
+    re.compile(r"https?://(www.)?opengis\.net/def/glossary/term/FeatureCollection"): ContentType.APP_GEOJSON,
 }
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {}  # type: Dict[str, str]
@@ -603,13 +611,14 @@ OGC_NAMESPACE_DEFINITION = {OGC_NAMESPACE: OGC_NAMESPACE_URL}
 OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
+    ContentType.IMAGE_COG: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {
-    IANA_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in IANA_MAPPING.items()},
-    EDAM_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in EDAM_MAPPING.items()},
-    OGC_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OGC_MAPPING.items()},
-    OPENGIS_NAMESPACE: {_fmt: _ctype for _ctype, _fmt in OPENGIS_MAPPING.items()},
+    IANA_NAMESPACE: IANA_MAPPING,
+    EDAM_NAMESPACE: EDAM_MAPPING,
+    OGC_NAMESPACE: OGC_MAPPING,
+    OPENGIS_NAMESPACE: OPENGIS_MAPPING,
 }
 FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
@@ -622,7 +631,13 @@ FORMAT_NAMESPACE_PREFIXES = [
 ] + list(FORMAT_NAMESPACE_DEFINITIONS.values())
 FORMAT_NAMESPACES = frozenset(FORMAT_NAMESPACE_DEFINITIONS)
 
+# default format if missing (minimal requirement of one)
+DEFAULT_FORMAT = Format(mime_type=ContentType.TEXT_PLAIN)
+DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
+setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
+
+@cache
 def get_allowed_extensions():
     # type: () -> List[str]
     """
@@ -649,6 +664,7 @@ def get_allowed_extensions():
     return list(base | extra)
 
 
+@cache
 def get_format(media_type, default=None):
     # type: (str, Optional[str]) -> Optional[Format]
     """
@@ -664,10 +680,21 @@ def get_format(media_type, default=None):
     if not ctype:
         return None
     ext = get_extension(ctype)
-    fmt = Format(ctype, extension=ext)
+    if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
+        for uri, typ in _CONTENT_TYPE_SCHEMA_OVERRIDES.items():
+            if re.match(uri, ctype):
+                schema_ctype = typ
+                break
+        else:
+            schema_ctype = get_content_type(os.path.splitext(ctype)[-1], default=DEFAULT_FORMAT.mime_type)
+        schema_ext = get_extension(schema_ctype)
+        fmt = Format(schema_ctype, extension=schema_ext, schema=ctype)
+    else:
+        fmt = Format(ctype, extension=ext)
     return fmt
 
 
+@cache
 def get_extension(media_type, dot=True):
     # type: (str, bool) -> str
     """
@@ -694,6 +721,7 @@ def get_extension(media_type, dot=True):
     return _handle_dot(ext)
 
 
+@cache
 def get_content_type(extension, charset=None, default=None):
     # type: (str, Optional[str], Optional[str]) -> Optional[str]
     """
@@ -718,6 +746,7 @@ def get_content_type(extension, charset=None, default=None):
     return add_content_type_charset(ctype, charset)
 
 
+@cache
 def add_content_type_charset(content_type, charset):
     # type: (Union[str, ContentType], Optional[str]) -> str
     """
@@ -736,6 +765,25 @@ def add_content_type_charset(content_type, charset):
     return content_type
 
 
+@overload
+def get_cwl_file_format(media_type):
+    # type: (str) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
+    ...
+
+
+@overload
+def get_cwl_file_format(media_type, make_reference=False, **__):
+    # type: (str, Literal[True], **bool) -> Optional[str]
+    ...
+
+
+@cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
     # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
@@ -876,6 +924,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
     return None if make_reference else (None, None)
 
 
+@cache
 def map_cwl_media_type(cwl_format):
     # type: (Optional[str]) -> Optional[str]
     """
@@ -892,7 +941,7 @@ def map_cwl_media_type(cwl_format):
         ns_fmt = cwl_format
     ns_name = list(ns)[0]
     ns_fmt = ns_fmt.split(":", 1)[-1] if "://" not in ns_fmt else ns_fmt
-    ctype = FORMAT_NAMESPACE_MAPPINGS[ns_name].get(ns_fmt)
+    ctype = [_ctype for _ctype, _fmt in FORMAT_NAMESPACE_MAPPINGS[ns_name].items() if _fmt == ns_fmt]
     if not ctype:
         fmt = get_format(ns_fmt)
         ctype = fmt.mime_type if fmt else None
@@ -904,9 +953,12 @@ def map_cwl_media_type(cwl_format):
                 break
         if "/" not in ctype:
             return None
+    if ctype and isinstance(ctype, list):
+        ctype = ctype[0]
     return ctype
 
 
+@cache
 def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """
@@ -953,19 +1005,25 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
         media_type = f"{typ}/{sub}{parts[1]}"
     for v in FORMAT_NAMESPACE_DEFINITIONS.values():
         if v in media_type:
-            media_type = media_type.replace(v, "")
-            break
+            maybe_type = media_type.replace(v, "").strip("/")
+            # ignore if URI was partial prefix match, not sufficiently specific
+            # allow 1 '/' for '<type>/<subtype>', or 0 for an explicit named schema reference
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     for v in FORMAT_NAMESPACE_DEFINITIONS:
         if media_type.startswith(f"{v}:"):
-            media_type = media_type.replace(f"{v}:", "")
-            break
+            maybe_type = media_type.replace(f"{v}:", "")
+            if maybe_type.count("/") < 2:
+                media_type = maybe_type
+                break
     search = True
-    for _map in [EDAM_MAPPING, OGC_MAPPING, OPENGIS_MAPPING]:
+    for _map in FORMAT_NAMESPACE_MAPPINGS.values():
         if not search:
             break
-        for v in _map.values():
-            if v.endswith(media_type):
-                media_type = [k for k in _map if v.endswith(_map[k])][0]
+        for ctype, fmt in _map.items():
+            if fmt.endswith(media_type):
+                media_type = ctype
                 search = False
                 break
     return media_type
@@ -1060,6 +1118,29 @@ def guess_target_format(
     if return_source:
         return content_type, format_source
     return content_type
+
+
+def find_supported_media_types(io_definition):
+    # type: (ProcessInputOutputItem) -> Optional[List[str]]
+    """
+    Finds all supported media-types indicated by an :term:`I/O`.
+
+    .. note::
+        Assumes that media-types are indicated under ``formats``, which should have been obtained either by direct
+        submission when using :term:`WPS` deployment, generated from ``schema`` using :term:`OGC` deployment, or using
+        the nested ``format`` of ``File`` types from :term:`CWL` deployment.
+
+    :param io_definition:
+    :return: supported media-types
+    """
+    io_formats = io_definition.get("formats")
+    if not io_formats:
+        return None
+    media_types = set()
+    for fmt in io_formats:  # type: Dict[str, str]
+        if "type" in fmt:
+            media_types.add(fmt["type"])
+    return list(media_types)
 
 
 def json_default_handler(obj):

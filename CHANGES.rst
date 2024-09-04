@@ -12,10 +12,28 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
+  (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
+- Add ``AnyCRS`` schema definition with improved validation of allowed values.
+- Use ``AnyCRS`` schema for ``SupportedCRS``, ``XMLStringCRS``, ``BoundingBoxValue`` and ``ExecuteCollectionInput``
+  instead of a generic ``URL`` schema definition for better reference validation, while allowing alternate short forms.
+- Add auto-resolution of media-type for cases where it can reasonably be inferred from a ``schema`` reference,
+  such as an URI referring to a ``.json`` or ``.xsd`` respectively representing `JSON` and `XML` data.
+- Update ``cwltool`` with fork
+  `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
+  until ``loadContents`` behavior is resolved for ``type: File[]``
+  (relates to `common-workflow-language/cwltool#2036 <https://github.com/common-workflow-language/cwltool/pull/2036>`_).
 
 Fixes:
 ------
+- Fix `CWL` I/O with ``format`` defined as a `JavaScript Expression` to be incorrectly parsed by the convertion
+  operations to extract applicable media-types. These cases will be ignored, since media-types cannot be inferred
+  from them. The `WPS` or `OAS` I/O definitions should instead provide the applicable media-types
+  (relates to `common-workflow-language/cwl-v1.3#52 <https://github.com/common-workflow-language/cwl-v1.3/issues/52>`_).
+- Fix ``format`` parsing when trying to infer media-types from various I/O definition representations using a
+  reference provided as an URI schema from an ontology. Parsing caused the URI to be split, causing an invalid
+  resolution. If no appropriate media-type is provided, JSON will be used by default, while preserving the submitted
+  schema URI.
 - Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
 - Fix minor resolution combinations or redundant checks for multiple ``weaver.formats`` utilities.
 - FIx `CWL` ``format`` resolution check against `IANA` media-types if the reference ontology happens to be
