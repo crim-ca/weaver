@@ -16,7 +16,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.exceptions import PackageRegistrationError
-from weaver.processes.constants import CWL_NAMESPACE_WEAVER, CWL_REQUIREMENT_APP_WPS1, CWL_RequirementWeaverWPS1Type
+from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_APP_WPS1, CWL_RequirementWeaverWPS1Type
 from weaver.processes.utils import _check_package_file  # noqa: W0212
 from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
 
@@ -215,7 +215,7 @@ def test_register_wps_processes_from_config_valid():
     # static processes inferred names are a concatenation of the URL sanitized/slug + process-ID
     proc1_id = f"{infer_name1}_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
     proc1 = p_store.fetch_by_id(proc1_id)
-    wps_req = cast(CWL_RequirementWeaverWPS1Type, f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_WPS1}")
+    wps_req = cast(CWL_RequirementWeaverWPS1Type, f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}")
     assert proc1.package["hints"][wps_req]["provider"] == f"{WPS1_URL1}/"
     assert proc1.package["hints"][wps_req]["process"] == resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
     proc2_id = f"{infer_name2}_{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"

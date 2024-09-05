@@ -4,7 +4,7 @@
 
 $namespaces:
   iana: "https://www.iana.org/assignments/media-types/"
-  ogc: "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/d52579/core/openapi/schemas/"
+  ogcapi-processes-1: "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/"
 
 cwlVersion: "v1.0"
 class: CommandLineTool
@@ -18,7 +18,7 @@ inputs:
     type: int[]
   boundingBoxInput:
     type: File
-    format: "ogc:bbox.yaml"
+    format: "ogcapi-processes:schemas/bbox.yaml"
   complexObjectInput:
     type: File
     format: iana:application/json
@@ -66,7 +66,7 @@ outputs:
       items: int
   boundingBoxOutput:
     type: File
-    format: "ogc:bbox.yaml"
+    format: "ogcapi-processes:schemas/bbox.yaml"
     outputBinding:
       glob: bbox.json
   complexObjectOutput:

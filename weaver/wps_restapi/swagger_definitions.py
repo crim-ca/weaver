@@ -63,9 +63,11 @@ from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
     CWL_NAMESPACE_SCHEMA_ID,
     CWL_NAMESPACE_SCHEMA_URL,
-    CWL_NAMESPACE_SPEC_ID,
-    CWL_NAMESPACE_SPEC_URL,
-    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_CWL_SPEC_ID,
+    CWL_NAMESPACE_CWL_SPEC_URL,
+    CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
+    CWL_NAMESPACE_OGC_API_PROC_PART1_URL,
+    CWL_NAMESPACE_WEAVER_ID,
     CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -5449,8 +5451,8 @@ class CWLNamespaces(StrictMappingSchema):
     var = URI(variable="{namespace}", missing=drop)
     cwl = URI(
         missing=drop,
-        name=CWL_NAMESPACE_SPEC_ID,
-        validator=OneOf([CWL_NAMESPACE_SPEC_URL, CWL_NAMESPACE_SPEC_URL.rstrip("#")]),
+        name=CWL_NAMESPACE_CWL_SPEC_ID,
+        validator=OneOf([CWL_NAMESPACE_CWL_SPEC_URL, CWL_NAMESPACE_CWL_SPEC_URL.rstrip("#")]),
     )
     cwltool = URI(
         missing=drop,
@@ -5472,6 +5474,11 @@ class CWLNamespaces(StrictMappingSchema):
         name=OGC_NAMESPACE,
         validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
     )
+    ogc_api_proc_part1 = URI(
+        missing=drop,
+        name=CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
+        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL])
+    )
     opengis = URI(
         missing=drop,
         name=OPENGIS_NAMESPACE,
@@ -5484,7 +5491,7 @@ class CWLNamespaces(StrictMappingSchema):
     )
     weaver = URI(
         missing=drop,
-        name=CWL_NAMESPACE_WEAVER,
+        name=CWL_NAMESPACE_WEAVER_ID,
         validator=OneOf([CWL_NAMESPACE_WEAVER_URL, CWL_NAMESPACE_WEAVER_URL.rstrip("#")]),
     )
 

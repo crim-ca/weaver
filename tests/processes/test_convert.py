@@ -38,11 +38,11 @@ from weaver.formats import (
     ContentType
 )
 from weaver.processes.constants import (
+    CWL_NAMESPACE_CWLTOOL_URL,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_SECRETS,
-    CWL_TOOL_NAMESPACE_URL,
     IO_INPUT,
     IO_OUTPUT,
     WPS_BOUNDINGBOX,
@@ -1808,7 +1808,7 @@ def test_repr2json_input_values():
     [
         ("test", "test"),
         (CWL_REQUIREMENT_SECRETS, CWL_REQUIREMENT_SECRETS),
-        (f"{CWL_TOOL_NAMESPACE_URL}Secrets", CWL_REQUIREMENT_SECRETS),
+        (f"{CWL_NAMESPACE_CWLTOOL_URL}Secrets", CWL_REQUIREMENT_SECRETS),
         ("file:///tmp/random/package#message", "message"),
         (f"file:///tmp/random/{CWL_REQUIREMENT_APP_WPS1}", CWL_REQUIREMENT_APP_WPS1),
     ]

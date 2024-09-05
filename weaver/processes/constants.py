@@ -75,10 +75,10 @@ class OpenSearchField(Constants):
     LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
 
 
-CWL_NAMESPACE_SPEC_ID = "cwl"
-CWL_NAMESPACE_SPEC_URL = "https://w3id.org/cwl/cwl#"
-CWL_NAMESPACE_SPEC_DEFINITION = MappingProxyType({
-    CWL_NAMESPACE_SPEC_ID: CWL_NAMESPACE_SPEC_URL
+CWL_NAMESPACE_CWL_SPEC_ID = "cwl"
+CWL_NAMESPACE_CWL_SPEC_URL = "https://w3id.org/cwl/cwl#"
+CWL_NAMESPACE_CWL_SPEC_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL
 })  # type: CWL_Namespace
 """
 Namespace used to reference :term:`CWL` definitions provided the common specification.
@@ -98,11 +98,28 @@ CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
 CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_SCHEMA_ID: CWL_NAMESPACE_SCHEMA_URL
 })  # type: CWL_Namespace
+"""
+Namespace used to reference :term:`CWL` definitions provided by ``schema.org`` typically used for additional metadata.
+"""
+
+CWL_NAMESPACE_OGC_API_PROC_PART1_ID = "ogcapi-processes-1"
+CWL_NAMESPACE_OGC_API_PROC_PART1_URL = "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/"
+# CWL_NAMESPACE_OGC_API_PROC_PART2_ID = "ogcapi-processes-2"
+# CWL_NAMESPACE_OGC_API_PROC_PART2_URL = "https://schemas.opengis.net/ogcapi/processes/part2/1.0/openapi/"
+CWL_NAMESPACE_OGC_API_PROC_DEFINITION = MappingProxyType({
+    CWL_NAMESPACE_OGC_API_PROC_PART1_ID: CWL_NAMESPACE_OGC_API_PROC_PART1_URL,
+    # CWL_NAMESPACE_OGC_API_PROC_PART2_ID: CWL_NAMESPACE_OGC_API_PROC_PART2_URL,
+})  # type: CWL_Namespace
+"""
+Namespaces used to reference :term:`OGC API - Processes` schema definitions.
+"""
 
 # weaver-specific requirements, but non-namespaced for backward support
 CWL_NAMESPACES = {}  # type: Dict[str, str]
-CWL_NAMESPACES.update(CWL_NAMESPACE_SPEC_DEFINITION)
+CWL_NAMESPACES.update(CWL_NAMESPACE_CWL_SPEC_DEFINITION)
 CWL_NAMESPACES.update(CWL_NAMESPACE_CWLTOOL_DEFINITION)
+CWL_NAMESPACES.update(CWL_NAMESPACE_SCHEMA_DEFINITION)
+CWL_NAMESPACES.update(CWL_NAMESPACE_OGC_API_PROC_DEFINITION)
 CWL_NAMESPACES = MappingProxyType(CWL_NAMESPACES)  # type: CWL_Namespace
 CWL_NAMESPACES_REVERSED = MappingProxyType({_urn: _ns for _ns, _urn in CWL_NAMESPACES.items()})  # type: CWL_Namespace
 
@@ -158,9 +175,9 @@ CWL_REQUIREMENT_APP_WEAVER = frozenset([
 Set of :term:`CWL` requirements defined by `Weaver` for an :term:`Application Package` implementation.
 """
 
-CWL_NAMESPACE_WEAVER = "weaver"
+CWL_NAMESPACE_WEAVER_ID = "weaver"
 CWL_NAMESPACE_WEAVER_URL = "https://schemas.crim.ca/cwl/weaver#"
-CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER: CWL_NAMESPACE_WEAVER_URL})
+CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER_ID: CWL_NAMESPACE_WEAVER_URL})
 """
 Namespace used to reference :term:`CWL` definitions provided by `Weaver`.
 """
@@ -175,7 +192,7 @@ CWL_RequirementAppTypes = Literal[
 ]
 CWL_REQUIREMENT_APP_TYPES = frozenset(
     list(get_args(CWL_RequirementAppTypes))
-    + [f"{CWL_NAMESPACE_WEAVER}:{_req}" for _req in CWL_REQUIREMENT_APP_WEAVER]
+    + [f"{CWL_NAMESPACE_WEAVER_ID}:{_req}" for _req in CWL_REQUIREMENT_APP_WEAVER]
 )
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.

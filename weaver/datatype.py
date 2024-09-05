@@ -40,7 +40,7 @@ from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
 from weaver.processes.constants import (
-    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
@@ -2237,12 +2237,12 @@ class Process(Base):
             profile = f"{base}workflow"
         elif ProcessType.is_wps(typ) or req in [
             CWL_REQUIREMENT_APP_WPS1,
-            f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_WPS1}",
+            f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}",
         ]:
             profile = f"{base}wpsApplication"
         elif typ == ProcessType.OGC_API or req in [
             CWL_REQUIREMENT_APP_OGC_API,
-            f"{CWL_NAMESPACE_WEAVER}:{CWL_REQUIREMENT_APP_OGC_API}",
+            f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_OGC_API}",
         ]:
             profile = f"{base}ogcapiApplication"
         elif typ == ProcessType.APPLICATION or req in [

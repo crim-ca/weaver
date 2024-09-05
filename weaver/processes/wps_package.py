@@ -72,7 +72,7 @@ from weaver.formats import (
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
-    CWL_NAMESPACE_WEAVER,
+    CWL_NAMESPACE_WEAVER_ID,
     CWL_NAMESPACE_WEAVER_DEFINITION,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -468,11 +468,11 @@ def _update_package_compatibility(package):
             )
         # weaver-specific requirements extensions with namespaced specification
         elif (
-            not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER}:")
+            not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER_ID}:")
             and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER)
         ):
             weaver_hint = app_pkg_req["class"]
-            weaver_req = f"{CWL_NAMESPACE_WEAVER}:{weaver_hint}"  # type: CWL_RequirementNames  # noqa
+            weaver_req = f"{CWL_NAMESPACE_WEAVER_ID}:{weaver_hint}"  # type: CWL_RequirementNames  # noqa
             app_pkg_hints = package.get("hints", [])  # don't need to check requirements (would not have worked anyway)
             if isinstance(app_pkg_hints, dict):
                 hint = app_pkg_hints.pop(weaver_hint)
