@@ -30,10 +30,7 @@ from tests.utils import (
     mocked_remote_server_requests_wps1,
     mocked_sub_requests,
     mocked_wps_output,
-    setup_config_with_mongodb,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore,
-    setup_mongodb_servicestore
+    setup_config_with_mongodb
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
@@ -64,9 +61,10 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
 
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
 
 
+# noinspection PyTypeHints
 @pytest.yield_fixture(name="assert_cwl_no_warn_unknown_hint")
 def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     # type: (pytest.LogCaptureFixture, pytest.FixtureRequest) -> None
@@ -120,20 +118,11 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
 @pytest.mark.functional
 class WpsRestApiProcessesTest(WpsConfigBase):
     remote_server = None    # type: str
-    settings = {}           # type: SettingsType
-    config = None           # type: Configurator
-
-    @classmethod
-    def setUpClass(cls):
-        cls.settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps_path": "/ows/wps",
-            "weaver.wps_output_url": "http://localhost/wpsoutputs",
-        }
-        cls.config = setup_config_with_mongodb(settings=cls.settings)
-        cls.app = get_test_weaver_app(config=cls.config)
-        cls.url = get_weaver_url(cls.app.app.registry)
-        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.wps_output_url": "http://localhost/wpsoutputs",
+    }  # type: SettingsType
 
     @classmethod
     def tearDownClass(cls):
@@ -647,7 +636,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
         path = "/processes"
-        headers = copy.deepcopy(self.html_headers)
+        headers = copy.deepcopy(dict(self.html_headers))
         headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
@@ -658,7 +647,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_get_processes_html_accept_header_user_agent_browser_override(self):
         path = "/processes"
-        headers = copy.deepcopy(self.html_headers)
+        headers = copy.deepcopy(dict(self.html_headers))
         headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
         settings = copy.deepcopy(self.config.registry.settings)
         settings["weaver.wps_restapi_html_override_user_agent"] = True
@@ -852,7 +841,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         .. note::
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
-        deploy_headers = copy.deepcopy(self.json_headers)
+        deploy_headers = copy.deepcopy(dict(self.json_headers))
         deploy_headers.update(headers or {})
         resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
                                    data=deploy_payload, headers=deploy_headers, only_local=True)
@@ -909,7 +898,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         docker = "fake.repo/org/private-image:latest"
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
-        headers = copy.deepcopy(self.json_headers)
+        headers = copy.deepcopy(dict(self.json_headers))
 
         for bad_token in ["0123456789", "Basic:0123456789", "Bearer fake:0123456789"]:  # nosec
             headers.update({"X-Auth-Docker": bad_token})

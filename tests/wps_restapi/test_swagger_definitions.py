@@ -96,7 +96,8 @@ def test_cwl_namespaces_valid(test_value):
 @pytest.mark.parametrize("test_value", [
     {CWL_NAMESPACE_CWL_SPEC_ID: "bad"},
     {CWL_NAMESPACE_CWL_SPEC_ID: EDAM_NAMESPACE_URL},
-    {CWL_NAMESPACE_WEAVER_ID: "https://random.com"},  # disallow conflict with well-known namespaces, even if URI is valid
+    # disallow conflict with well-known namespaces, even if URI is valid
+    {CWL_NAMESPACE_WEAVER_ID: "https://random.com"},
     {"random": "bad"},
     {"random": 12345},
     {"bad": "bad", "good": "https://random.com"},  # disallow partial mapping even if other URI are valid

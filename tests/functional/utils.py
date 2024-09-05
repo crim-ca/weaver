@@ -4,6 +4,7 @@ import time
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
+from types import MappingProxyType
 from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
@@ -315,9 +316,9 @@ class JobUtils(object):
 
 
 class WpsConfigBase(unittest.TestCase):
-    json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
-    html_headers = {"Accept": ContentType.TEXT_HTML}
-    xml_headers = {"Content-Type": ContentType.TEXT_XML}
+    json_headers = MappingProxyType({"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON})
+    html_headers = MappingProxyType({"Accept": ContentType.TEXT_HTML})
+    xml_headers = MappingProxyType({"Content-Type": ContentType.TEXT_XML})
     monitor_timeout = 30
     monitor_interval = 1
     settings = {}   # type: SettingsType
