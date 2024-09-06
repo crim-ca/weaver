@@ -34,6 +34,11 @@ if TYPE_CHECKING:
 
     _ContentType = "ContentType"  # type: TypeAlias  # pylint: disable=C0103
     AnyContentType = Union[str, _ContentType]
+    _ContentEncoding = "ContentEncoding"  # type: TypeAlias  # pylint: disable=C0103
+    AnyContentEncoding = Union[
+        Literal["UTF-8", "binary", "base16", "base32", "base64"],
+        _ContentEncoding,
+    ]
     AnyOutputFormat = Literal[
         "JSON", "json",
         "JSON+RAW", "json+str",
@@ -148,10 +153,10 @@ class ContentEncoding(Constants):
         - https://github.com/json-schema-org/json-schema-spec/pull/862
     """
     UTF_8 = "UTF-8"    # type: Literal["UTF-8"]
-    BINARY = "binary"  # type: Literal["BINARY"]
-    BASE16 = "base16"  # type: Literal["BASE16"]
-    BASE32 = "base32"  # type: Literal["BASE32"]
-    BASE64 = "base64"  # type: Literal["BASE64"]
+    BINARY = "binary"  # type: Literal["binary"]
+    BASE16 = "base16"  # type: Literal["base16"]
+    BASE32 = "base32"  # type: Literal["base32"]
+    BASE64 = "base64"  # type: Literal["base64"]
 
     @staticmethod
     def is_text(encoding):
@@ -183,24 +188,24 @@ class ContentEncoding(Constants):
     @staticmethod
     @overload
     def encode(data, encoding=BASE64, binary=True):
-        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        # type: (AnyStr, AnyContentEncoding, Literal[True]) -> bytes
         ...
 
     @staticmethod
     @overload
     def encode(data, encoding=BASE64, binary=False):
-        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        # type: (AnyStr, AnyContentEncoding, Literal[False]) -> str
         ...
 
     @staticmethod
     @overload
     def encode(data, encoding=BASE64, binary=None):
-        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
+        # type: (DataStrT, AnyContentEncoding, Literal[None]) -> DataStrT
         ...
 
     @staticmethod
     def encode(data, encoding=BASE64, binary=None):
-        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        # type: (AnyStr, AnyContentEncoding, Optional[bool]) -> AnyStr
         """
         Encodes the data to the requested encoding and convert it to the string-like data type representation.
 
@@ -241,24 +246,24 @@ class ContentEncoding(Constants):
     @staticmethod
     @overload
     def decode(data, encoding=BASE64, binary=True):
-        # type: (AnyStr, ContentEncoding, Literal[True]) -> bytes
+        # type: (AnyStr, AnyContentEncoding, Literal[True]) -> bytes
         ...
 
     @staticmethod
     @overload
     def decode(data, encoding=BASE64, binary=False):
-        # type: (AnyStr, ContentEncoding, Literal[False]) -> str
+        # type: (AnyStr, AnyContentEncoding, Literal[False]) -> str
         ...
 
     @staticmethod
     @overload
     def decode(data, encoding=BASE64, binary=None):
-        # type: (DataStrT, ContentEncoding, Literal[None]) -> DataStrT
+        # type: (DataStrT, AnyContentEncoding, Literal[None]) -> DataStrT
         ...
 
     @staticmethod
     def decode(data, encoding=BASE64, binary=None):
-        # type: (AnyStr, ContentEncoding, Optional[bool]) -> AnyStr
+        # type: (AnyStr, AnyContentEncoding, Optional[bool]) -> AnyStr
         """
         Decodes the data from the specified encoding and convert it to the string-like data type representation.
 

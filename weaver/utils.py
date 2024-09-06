@@ -20,6 +20,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
@@ -634,7 +635,7 @@ def get_header(header_name,         # type: str
     if header_container is None:
         return default
     headers = header_container
-    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
+    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict, MappingProxyType)):
         headers = dict(headers)
     if isinstance(headers, dict):
         headers = header_container.items()

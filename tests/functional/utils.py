@@ -353,7 +353,7 @@ class WpsConfigBase(unittest.TestCase):
     @classmethod
     def describe_process(cls, process_id, describe_schema=ProcessSchema.OGC):
         path = f"/processes/{process_id}?schema={describe_schema}"
-        resp = cls.app.get(path, headers=cls.json_headers)
+        resp = cls.app.get(path, headers=dict(cls.json_headers))
         assert resp.status_code == 200
         return deepcopy(resp.json)
 

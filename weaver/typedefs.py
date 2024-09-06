@@ -79,6 +79,7 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
+    from weaver.formats import AnyContentEncoding, AnyContentType
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.status import AnyStatusType, StatusType
@@ -219,6 +220,7 @@ if TYPE_CHECKING:
         "label": NotRequired[str],
         "doc": NotRequired[str],
         "id": NotRequired[str],
+        "version": NotRequired[str],
         "intent": NotRequired[str],
         "s:keywords": List[str],
         "baseCommand": NotRequired[Optional[Union[str, List[str]]]],
@@ -408,19 +410,19 @@ if TYPE_CHECKING:
         "crs": NotRequired[str],
     })
     JobValueFormat = TypedDict("JobValueFormat", {
-        "mime_type": NotRequired[str],
-        "media_type": NotRequired[str],
-        "mimeType": NotRequired[str],
-        "mediaType": NotRequired[str],
-        "encoding": NotRequired[str],
+        "mime_type": NotRequired[Union[str, AnyContentType]],
+        "media_type": NotRequired[Union[str, AnyContentType]],
+        "mimeType": NotRequired[Union[str, AnyContentType]],
+        "mediaType": NotRequired[Union[str, AnyContentType]],
+        "encoding": NotRequired[Union[str, AnyContentEncoding]],
         "schema": NotRequired[str],
         "extension": NotRequired[str],
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
         "href": str,
-        "format": NotRequired[JobValueFormat],  # old method
-        "type": NotRequired[str],               # ogc method
-        "encoding": NotRequired[str],
+        "format": NotRequired[JobValueFormat],              # old method
+        "type": NotRequired[Union[str, AnyContentType]],    # ogc method
+        "encoding": NotRequired[Union[str, AnyContentEncoding]],
         "schema": NotRequired[str],
     }, total=False)
     JobValueCollection = TypedDict("JobValueCollection", {

@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 
 
 # noinspection PyTypeHints
-@pytest.yield_fixture(name="assert_cwl_no_warn_unknown_hint")
+@pytest.fixture(name="assert_cwl_no_warn_unknown_hint")
 def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     # type: (pytest.LogCaptureFixture, pytest.FixtureRequest) -> None
     """
@@ -983,7 +983,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "schema": {"type": "string", "contentMediaType": "text/plain"},
             "formats": [{"default": True, "mediaType": "text/plain"}]
         }]
-        return cwl, desc
+        return cwl, desc  # type: ignore
 
     def test_deploy_process_CWL_direct_JSON(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON)
