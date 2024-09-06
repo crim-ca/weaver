@@ -16,6 +16,18 @@ Changes:
   requirement classes for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
   and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
   due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.8.0:
+
+`5.8.0 <https://github.com/crim-ca/weaver/tree/5.8.0>`_ (2024-09-05)
+========================================================================
+
+Changes:
+--------
 - Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
   (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
 - Add ``AnyCRS`` schema definition with improved validation of allowed values.
