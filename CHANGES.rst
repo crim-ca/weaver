@@ -12,10 +12,17 @@ Changes
 
 Changes:
 --------
-- Add `CWL` schema definitions with ``weaver`` namespace (see ``weaver/schemas/cwl`` files) that provide explicit
-  requirement classes for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+- Add `CWL` schema definitions with ``weaver`` namespace
+  (see `weaver/schemas/cwl <https://github.com/crim-ca/weaver/tree/master/weaver/schemas/cwl>`_)
+  that provide explicit requirement classes
+  for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
   and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
-  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``.
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``. These new `CWL`
+  definitions can be reported directly in the ``requirements`` section, better describing the required dependencies
+  of the referenced `Process` and/or `Provider` in the workflow steps.
+- Add better validation off well-known `CWL` namespaces as reserved keywords when deploying a `Process` to ensure
+  better interoperability between implementations and adequate metadata resolution
+  (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
 
 Fixes:
 ------
