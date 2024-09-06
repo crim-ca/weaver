@@ -20,7 +20,9 @@ Changes:
   due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``. These new `CWL`
   definitions can be reported directly in the ``requirements`` section, better describing the required dependencies
   of the referenced `Process` and/or `Provider` in the workflow steps.
-- Add better validation off well-known `CWL` namespaces as reserved keywords when deploying a `Process` to ensure
+- Add hosted `CWL` schema definitions for ``weaver`` accessible at the ``https://schemas.crim.ca/cwl/weaver#`` endpoint.
+- Add support of ``weaver`` namespaced ``requirements`` to the ``cwltool`` runner.
+- Add better validation off well-known `CWL` ``$namespaces`` as reserved keywords when deploying a `Process` to ensure
   better interoperability between implementations and adequate metadata resolution
   (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
 

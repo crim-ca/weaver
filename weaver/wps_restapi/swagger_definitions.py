@@ -5021,8 +5021,15 @@ class ESGF_CWT_RequirementMap(ExtendedMappingSchema):  # noqa: N802
     req = ESGF_CWT_RequirementSpecification(name=CWL_REQUIREMENT_APP_ESGF_CWT)
 
 
+class WeaverESGF_CWT_RequirementMap(ExtendedMappingSchema):
+    req = ESGF_CWT_RequirementSpecification(name=f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_ESGF_CWT}")
+
+
 class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):  # noqa: N802
-    _class = RequirementClass(example=CWL_REQUIREMENT_APP_ESGF_CWT, validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT]))
+    _class = RequirementClass(
+        example=CWL_REQUIREMENT_APP_ESGF_CWT,
+        validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT, f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_ESGF_CWT}"]),
+    )
 
 
 class OGCAPIRequirementSpecification(PermissiveMappingSchema):
@@ -5039,8 +5046,15 @@ class OGCAPIRequirementMap(ExtendedMappingSchema):
     req = OGCAPIRequirementSpecification(name=CWL_REQUIREMENT_APP_OGC_API)
 
 
+class WeaverOGCAPIRequirementMap(ExtendedMappingSchema):
+    req = OGCAPIRequirementSpecification(name=f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_OGC_API}")
+
+
 class OGCAPIRequirementClass(OGCAPIRequirementSpecification):
-    _class = RequirementClass(example=CWL_REQUIREMENT_APP_OGC_API, validator=OneOf([CWL_REQUIREMENT_APP_OGC_API]))
+    _class = RequirementClass(
+        example=CWL_REQUIREMENT_APP_OGC_API,
+        validator=OneOf([CWL_REQUIREMENT_APP_OGC_API, f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_OGC_API}"]),
+    )
 
 
 class WPS1RequirementSpecification(PermissiveMappingSchema):
@@ -5058,8 +5072,15 @@ class WPS1RequirementMap(ExtendedMappingSchema):
     req = WPS1RequirementSpecification(name=CWL_REQUIREMENT_APP_WPS1)
 
 
+class WeaverWPS1RequirementMap(ExtendedMappingSchema):
+    req = WPS1RequirementSpecification(name=f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}")
+
+
 class WPS1RequirementClass(WPS1RequirementSpecification):
-    _class = RequirementClass(example=CWL_REQUIREMENT_APP_WPS1, validator=OneOf([CWL_REQUIREMENT_APP_WPS1]))
+    _class = RequirementClass(
+        example=CWL_REQUIREMENT_APP_WPS1,
+        validator=OneOf([CWL_REQUIREMENT_APP_WPS1, f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}"]),
+    )
 
 
 class UnknownRequirementMap(PermissiveMappingSchema):
@@ -5086,6 +5107,13 @@ class CWLRequirementsMapDefinitions(AnyOfKeywordSchema):
         SubworkflowRequirementMap(missing=drop),
         ToolTimeLimitRequirementMap(missing=drop),
         WorkReuseRequirementMap(missing=drop),
+        # specific weaver-namespaced definitions
+        # note:
+        #   Do not allow 'builtin', since it is only an internal 'hint', not 'required' for CWL execution.
+        #   Also, disallow its used explicitly from deployment.
+        WeaverESGF_CWT_RequirementMap(missing=drop),
+        WeaverOGCAPIRequirementMap(missing=drop),
+        WeaverWPS1RequirementMap(missing=drop),
     ]
 
 
@@ -5145,6 +5173,13 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         SubworkflowRequirementClass(missing=drop),
         ToolTimeLimitRequirementClass(missing=drop),
         WorkReuseRequirementClass(missing=drop),
+        # specific weaver-namespaced definitions
+        # note:
+        #   Do not allow 'builtin', since it is only an internal 'hint', not 'required' for CWL execution.
+        #   Also, disallow its used explicitly from deployment.
+        WeaverESGF_CWT_RequirementMap(missing=drop),
+        WeaverOGCAPIRequirementMap(missing=drop),
+        WeaverWPS1RequirementMap(missing=drop),
     ]
 
 

@@ -27,6 +27,7 @@ from urllib.parse import parse_qsl, urlparse
 import colander
 import cwltool
 import cwltool.docker
+import cwltool.process
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
@@ -46,6 +47,7 @@ from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
+from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
@@ -82,7 +84,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
-    CWL_REQUIREMENT_APP_WEAVER,
+    CWL_REQUIREMENT_APP_WEAVER_CLASSES,
+    CWL_REQUIREMENT_APP_WEAVER_DEFINITION,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
@@ -469,7 +472,7 @@ def _update_package_compatibility(package):
         # weaver-specific requirements extensions with namespaced specification
         elif (
             not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER_ID}:")
-            and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER)
+            and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER_CLASSES)
         ):
             weaver_hint = app_pkg_req["class"]
             weaver_req = f"{CWL_NAMESPACE_WEAVER_ID}:{weaver_hint}"  # type: CWL_RequirementNames  # noqa
@@ -493,6 +496,14 @@ def _update_package_compatibility(package):
     return package
 
 
+@cache
+def _load_weaver_extensions_schema():
+    LOGGER.debug("Loading Weaver schema extensions...")
+    with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
+        weaver_schema = yaml.safe_load(r_file)
+    return weaver_schema
+
+
 def _load_supported_schemas():
     # type: () -> None
     """
@@ -510,7 +521,6 @@ def _load_supported_schemas():
         "v1.1": "extensions-v1.1.yml",
         "v1.2": "extensions-v1.2.yml",
     }
-    extensions_weaver = []
     for version, ext_version_file in extension_resources.items():
         # use our own cache on top of cwltool cache to distinguish between 'v1.x' names
         # pointing at "CWL standard", "cwltool-flavored extensions" or "weaver-flavored extensions"
@@ -521,15 +531,10 @@ def _load_supported_schemas():
         with open_module_resource_file(cwltool, ext_version_file) as r_file:
             schema = yaml.safe_load(r_file)
 
-        if extensions_weaver:
-            LOGGER.debug("Reusing cached Weaver schema extensions.")
-        else:
-            LOGGER.debug("Loading Weaver schema extensions...")
-            with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
-                weaver_schema = yaml.safe_load(r_file)
-            extensions_weaver = weaver_schema["$graph"]
-            schema.setdefault("$namespaces", {})
-            schema["$namespaces"].update(weaver_schema.get("$namespaces", {}))
+        weaver_ext_schema = _load_weaver_extensions_schema()
+        extensions_weaver = weaver_ext_schema["$graph"]
+        schema.setdefault("$namespaces", {})
+        schema["$namespaces"].update(weaver_ext_schema.get("$namespaces", {}))
 
         extensions_cwl = schema["$graph"]
         extensions_supported = []
@@ -558,6 +563,9 @@ def _load_supported_schemas():
         schema_base = CWL_NAMESPACE_CWLTOOL_URL.split("#", 1)[0]
         use_custom_schema(version, schema_base, schema_data)
         PACKAGE_SCHEMA_CACHE[version] = (schema_base, schema_data)
+
+    # ensure that any weaver-namespaced requirement can be loaded by cwltool
+    cwltool.process.supportedProcessRequirements.extend(set(CWL_REQUIREMENT_APP_WEAVER_DEFINITION.values()))
 
 
 @overload

@@ -165,7 +165,7 @@ CWL_REQUIREMENT_APP_ESGF_CWT = get_args(CWL_RequirementESGFCWTType)[0]
 CWL_REQUIREMENT_APP_OGC_API = get_args(CWL_RequirementOGCAPIType)[0]
 CWL_REQUIREMENT_APP_WPS1 = get_args(CWL_RequirementWPS1Type)[0]
 
-CWL_REQUIREMENT_APP_WEAVER = frozenset([
+CWL_REQUIREMENT_APP_WEAVER_CLASSES = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_OGC_API,
@@ -182,6 +182,11 @@ CWL_NAMESPACE_WEAVER_DEFINITION = MappingProxyType({CWL_NAMESPACE_WEAVER_ID: CWL
 Namespace used to reference :term:`CWL` definitions provided by `Weaver`.
 """
 
+CWL_REQUIREMENT_APP_WEAVER_DEFINITION = MappingProxyType({
+    f"{CWL_NAMESPACE_WEAVER_ID}:{_req}": f"{CWL_NAMESPACE_WEAVER_URL}{_req}"
+    for _req in CWL_REQUIREMENT_APP_WEAVER_CLASSES
+})
+
 CWL_RequirementAppTypes = Literal[
     CWL_RequirementBuiltinType,
     CWL_RequirementDockerType,
@@ -192,7 +197,7 @@ CWL_RequirementAppTypes = Literal[
 ]
 CWL_REQUIREMENT_APP_TYPES = frozenset(
     list(get_args(CWL_RequirementAppTypes))
-    + [f"{CWL_NAMESPACE_WEAVER_ID}:{_req}" for _req in CWL_REQUIREMENT_APP_WEAVER]
+    + list(CWL_REQUIREMENT_APP_WEAVER_DEFINITION)
 )
 """
 Set of :term:`CWL` requirements consisting of known :term:`Application Package` by this `Weaver` instance.
