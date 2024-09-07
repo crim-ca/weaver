@@ -1,3 +1,4 @@
+import itertools
 import sys
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Union
@@ -212,11 +213,17 @@ CWL_REQUIREMENT_APP_LOCAL = frozenset([
 Set of :term:`CWL` requirements that correspond to local execution of an :term:`Application Package`.
 """
 
-CWL_REQUIREMENT_APP_REMOTE = frozenset([
-    CWL_REQUIREMENT_APP_ESGF_CWT,
-    CWL_REQUIREMENT_APP_OGC_API,
-    CWL_REQUIREMENT_APP_WPS1,
-])
+CWL_REQUIREMENT_APP_REMOTE = frozenset(
+    f"{_prefix}{_req}"
+    for _prefix, _req in itertools.product(
+        ["", f"{CWL_NAMESPACE_WEAVER_ID}:", CWL_NAMESPACE_WEAVER_URL],
+        [
+            CWL_REQUIREMENT_APP_ESGF_CWT,
+            CWL_REQUIREMENT_APP_OGC_API,
+            CWL_REQUIREMENT_APP_WPS1,
+        ]
+    )
+)
 """
 Set of :term:`CWL` requirements that correspond to remote execution of an :term:`Application Package`.
 """
