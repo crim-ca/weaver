@@ -185,6 +185,7 @@ if TYPE_CHECKING:
         CWL_RequirementsList,
         CWL_Results,
         CWL_SchemaNames,
+        CWL_SchemaSalad,
         CWL_ToolPathObject,
         CWL_WorkflowInputs,
         CWL_WorkflowStepPackage,
@@ -433,7 +434,7 @@ def _patch_cuda_requirement(package, app_pkg_req, patch_requirement):
     if h_list:
         package["hints"] = h_list
     package.setdefault("$namespaces", {})
-    package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
+    package["$namespaces"].update(dict(CWL_REQUIREMENT_CUDA_NAMESPACE))
     return package
 
 
@@ -474,7 +475,7 @@ def _update_package_compatibility(package):
             not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER_ID}:")
             and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER_CLASSES)
         ):
-            weaver_hint = app_pkg_req["class"]
+            weaver_hint = app_pkg_req["class"]  # type: CWL_RequirementNames  # noqa
             weaver_req = f"{CWL_NAMESPACE_WEAVER_ID}:{weaver_hint}"  # type: CWL_RequirementNames  # noqa
             app_pkg_hints = package.get("hints", [])  # don't need to check requirements (would not have worked anyway)
             if isinstance(app_pkg_hints, dict):
@@ -498,6 +499,7 @@ def _update_package_compatibility(package):
 
 @cache
 def _load_weaver_extensions_schema():
+    # type: () -> CWL_SchemaSalad
     LOGGER.debug("Loading Weaver schema extensions...")
     with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
         weaver_schema = yaml.safe_load(r_file)
@@ -935,7 +937,7 @@ def get_application_requirement(package,        # type: CWL
                                 default=null,   # type: Optional[Union[CWL_Requirement, Default]]
                                 validate=True,  # type: bool
                                 required=True,  # type: bool
-                                ):              # type: (...) -> Union[CWL_AnyRequirementObject, Default]
+                                ):              # type: (...) -> Union[CWL_Requirement, Default]
     """
     Retrieves a requirement or hint from the :term:`CWL` package definition.
 

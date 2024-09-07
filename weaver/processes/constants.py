@@ -9,7 +9,7 @@ from weaver.base import Constants
 if TYPE_CHECKING:
     from typing import Dict
 
-    from weaver.typedefs import CWL_Namespace
+    from weaver.typedefs import CWL_NamespaceDefinition
 
 IO_SelectInput_Type = Literal["input"]
 IO_SelectOutput_Type = Literal["output"]
@@ -80,7 +80,7 @@ CWL_NAMESPACE_CWL_SPEC_ID = "cwl"
 CWL_NAMESPACE_CWL_SPEC_URL = "https://w3id.org/cwl/cwl#"
 CWL_NAMESPACE_CWL_SPEC_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL
-})  # type: CWL_Namespace
+})  # type: CWL_NamespaceDefinition
 """
 Namespace used to reference :term:`CWL` definitions provided the common specification.
 """
@@ -89,7 +89,7 @@ CWL_NAMESPACE_CWLTOOL_ID = "cwltool"
 CWL_NAMESPACE_CWLTOOL_URL = "http://commonwl.org/cwltool#"
 CWL_NAMESPACE_CWLTOOL_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_CWLTOOL_ID: CWL_NAMESPACE_CWLTOOL_URL
-})  # type: CWL_Namespace
+})  # type: CWL_NamespaceDefinition
 """
 Namespace used to reference :term:`CWL` definitions provided by mod:`cwltool`.
 """
@@ -98,7 +98,7 @@ CWL_NAMESPACE_SCHEMA_ID = "s"
 CWL_NAMESPACE_SCHEMA_URL = "https://schema.org/"
 CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_SCHEMA_ID: CWL_NAMESPACE_SCHEMA_URL
-})  # type: CWL_Namespace
+})  # type: CWL_NamespaceDefinition
 """
 Namespace used to reference :term:`CWL` definitions provided by ``schema.org`` typically used for additional metadata.
 """
@@ -110,7 +110,7 @@ CWL_NAMESPACE_OGC_API_PROC_PART1_URL = "https://schemas.opengis.net/ogcapi/proce
 CWL_NAMESPACE_OGC_API_PROC_DEFINITION = MappingProxyType({
     CWL_NAMESPACE_OGC_API_PROC_PART1_ID: CWL_NAMESPACE_OGC_API_PROC_PART1_URL,
     # CWL_NAMESPACE_OGC_API_PROC_PART2_ID: CWL_NAMESPACE_OGC_API_PROC_PART2_URL,
-})  # type: CWL_Namespace
+})  # type: CWL_NamespaceDefinition
 """
 Namespaces used to reference :term:`OGC API - Processes` schema definitions.
 """
@@ -121,8 +121,10 @@ CWL_NAMESPACES.update(CWL_NAMESPACE_CWL_SPEC_DEFINITION)
 CWL_NAMESPACES.update(CWL_NAMESPACE_CWLTOOL_DEFINITION)
 CWL_NAMESPACES.update(CWL_NAMESPACE_SCHEMA_DEFINITION)
 CWL_NAMESPACES.update(CWL_NAMESPACE_OGC_API_PROC_DEFINITION)
-CWL_NAMESPACES = MappingProxyType(CWL_NAMESPACES)  # type: CWL_Namespace
-CWL_NAMESPACES_REVERSED = MappingProxyType({_urn: _ns for _ns, _urn in CWL_NAMESPACES.items()})  # type: CWL_Namespace
+CWL_NAMESPACES = MappingProxyType(CWL_NAMESPACES)  # type: CWL_NamespaceDefinition
+CWL_NAMESPACES_REVERSED = MappingProxyType({
+    _urn: _ns for _ns, _urn in CWL_NAMESPACES.items()
+})  # type: CWL_NamespaceDefinition
 
 CWL_RequirementBuiltinType = Literal["BuiltinRequirement"]
 CWL_RequirementESGFCWTType = Literal["ESGF-CWTRequirement"]

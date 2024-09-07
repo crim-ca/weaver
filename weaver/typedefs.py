@@ -189,6 +189,12 @@ if TYPE_CHECKING:
         _props: CWL_IO_Type
 
     CWL_SchemaNames = Dict[str, CWL_SchemaName]
+    CWL_SchemaSalad = TypedDict("CWL_SchemaSalad", {
+        "name": str,
+        "$base": NotRequired[str],
+        "$namespaces": List[str],
+        "$graph": List[CWL_SchemaName],
+    }, total=True)
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {
@@ -201,7 +207,8 @@ if TYPE_CHECKING:
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
-    CWL_Namespace = Mapping[str, str]
+    CWL_Namespace = MutableMapping[str, str]
+    CWL_NamespaceDefinition = Mapping[str, str]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
         "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
@@ -515,11 +522,11 @@ if TYPE_CHECKING:
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
-        "transmissionMode": str
+        "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
-        "transmissionMode": AnyExecuteTransmissionMode,
+        "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
         "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputsList = List[ExecutionOutputItem]
