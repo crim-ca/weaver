@@ -28,7 +28,11 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``VariableSchemaNode`` resolution of child nodes with complex mixture of ``StrictMappingSchema`` or when
+  using the equivalent ``unknown = "raise"`` parameter for a ``colander.Mapping`` schema type to
+  disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
+- Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
+  different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
 
 .. _changes_5.8.0:
 

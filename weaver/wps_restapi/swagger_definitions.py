@@ -5570,7 +5570,7 @@ class CWLMetadata(ExtendedMappingSchema):
 
 
 class CWLScatterMulti(ExtendedSequenceSchema):
-    id = CWLIdentifier("")
+    id = CWLIdentifier()
 
 
 class CWLScatter(OneOfKeywordSchema):

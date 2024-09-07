@@ -1120,7 +1120,7 @@ def test_variable_with_const(value, expect):
 
 @pytest.mark.parametrize("value, expect", [
     ({"other": "123", "value": 123, "number": 456}, {"other": "123", "value": 123, "number": 456}),
-    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),  # since raise, unmapped 'bad' is invalid
+    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),  # because of 'raise', unmapped 'bad' is invalid
     ({"value": 123, "bad": "456"}, colander.Invalid),  # missing required 'other' (const)
 ])
 def test_variable_with_const_strict(value, expect):

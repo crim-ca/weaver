@@ -1015,7 +1015,8 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             Because of the above reversed-processing method, all *mapping* nodes must derive from
             :class:`VariableSchemaNode` to ensure they pre-process potential *variable* candidates.
         """
-        if self.schema_type is colander.Mapping:
+        typ = type(_get_schema_type(self))
+        if typ is colander.Mapping:
             # FIXME: handle 'patternProperties' along 'additionalProperties' (detect 'variable' + 'pattern' arguments?)
             #   This would allow mapping to more than only one list-item in 'var_full_search'
             #   (ie: 1 for 'additionalProperties' + N * patterns nested in 'patternProperties')
@@ -1704,6 +1705,9 @@ class ExtendedMappingSchema(
     def __init__(self, *args, **kwargs):
         super(ExtendedMappingSchema, self).__init__(*args, **kwargs)
         self._validate_nodes()
+        unknown = getattr(self, "unknown", None)
+        if unknown and isinstance(unknown, str):
+            self.typ.unknown = unknown
 
     def _validate_nodes(self):
         for node in self.children:
@@ -1728,8 +1732,6 @@ class StrictMappingSchema(ExtendedMappingSchema):
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "raise"
         super(StrictMappingSchema, self).__init__(*args, **kwargs)
-        # sub-type mapping itself must also have 'raise' such that its own 'deserialize' copies the fields over
-        self.typ.unknown = "raise"
 
 
 class EmptyMappingSchema(StrictMappingSchema):
@@ -1779,8 +1781,6 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         # type: (Any, Any) -> None
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
-        # sub-type mapping itself must also have 'preserve' such that its own 'deserialize' copies the fields over
-        self.typ.unknown = "preserve"
 
 
 class PermissiveSequenceSchema(ExtendedSequenceSchema):
