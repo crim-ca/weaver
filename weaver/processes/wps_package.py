@@ -74,8 +74,8 @@ from weaver.formats import (
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
-    CWL_NAMESPACE_WEAVER_ID,
     CWL_NAMESPACE_WEAVER_DEFINITION,
+    CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,

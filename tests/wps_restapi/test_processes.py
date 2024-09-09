@@ -38,11 +38,12 @@ from weaver.formats import AcceptLanguage, ContentType, OutputFormat, get_cwl_fi
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
+    CWL_NAMESPACE_WEAVER_URL,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA_NAME,
-    ProcessSchema, CWL_NAMESPACE_WEAVER_URL
+    ProcessSchema
 )
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_testing import WpsTestProcess
