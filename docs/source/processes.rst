@@ -80,18 +80,19 @@ As of the latest release, following `builtin` processes are available:
 
 
 All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the
-:term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`.
+:term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`. For explicit schema
+validation using the :term:`CWL` ``requirements``, the ``weaver:BuiltinRequirement`` can also be used.
 
 .. _proc_wps_12:
 
 WPS-1/2
 -------
 
-This kind of process corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
+This kind of :term:`Process` corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
 (depending of supported version) prior to :ref:`proc_wps_rest` specification. When an |ogc-api-proc|_ description is
 deployed in `Weaver` using an URL reference to an WPS-1/2 process through the use of a :ref:`app_pkg_wps1` requirement,
 `Weaver` parses and converts the :term:`XML` or :term:`JSON` body of the :term:`WPS` response and registers the process
-locally. This allows a remote server offering limited functionalities (e.g.: no REST bindings supported)
+locally. This allows a remote server offering limited functionalities (e.g.: no REST or `OGC API` bindings supported)
 to provide them through `Weaver`.
 
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
@@ -114,7 +115,8 @@ A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process c
 
 This would tell `Weaver` to locally :ref:`Deploy <proc_op_deploy>` the ``my-process-reference`` process using the WPS-1
 URL reference that is expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be
-resolved and parsed according to typical WPS specification, this should result into a successful process registration.
+resolved and parsed according to typical :term:`WPS` specification, this should result into a successful :term:`Process`
+registration.
 The deployed :term:`Process` would then be accessible with :ref:`DescribeProcess <proc_op_describe>`  requests.
 
 The above deployment procedure can be automated on startup using `Weaver`'s ``wps_processes.yml`` configuration file.
@@ -126,8 +128,12 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
     definition could become out-of-sync with the remote reference where the :ref:`Execute <proc_op_execute>` request
     will be sent. Refer to `Remote Provider`_ section for more details to work around this issue.
 
+Any :term:`Process` deployed from a :term:`WPS` reference should have a resulting :term:`CWL` definition that either
+contains ``WPS1Requirement`` in the ``hints`` section, or ``weaver:WPS1Requirement`` in the ``requirements`` section.
+
 .. seealso::
     - `Remote Provider`_
+    - `WPS-1/2 XML schemas <http://schemas.opengis.net/wps/>`_
 
 .. _proc_ogc_api:
 .. _proc_wps_rest:
@@ -144,8 +150,12 @@ When deploying one such :term:`Process` directly, it is expected to have a defin
 with a :term:`CWL` `Application Package`_, which provides resources about one of the described :ref:`app_pkg_types`.
 
 This is most of the time employed to wrap operations packaged in a reference :term:`Docker` image, but it can also
-wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`).
-The reference package can be provided in multiple ways as presented below.
+wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`). When the :term:`Process` should be
+deployed using a remote URL reference pointing at an existing |ogc-api-proc|_ description, the :term:`CWL` should
+contain either ``OGCAPIRequirement`` in the ``hints`` section, or ``weaver:OGCAPIRequirement`` in the ``requirements``
+section.
+
+The referenced :term:`Application Package` can be provided in multiple ways as presented below.
 
 .. note::
 
@@ -228,7 +238,15 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
 ESGF-CWT
 ----------
 
-For :term:`ESGF-CWT` processes, the ``ESGF-CWTRequirement`` hint must be used.
+For :term:`ESGF-CWT` processes, the ``ESGF-CWTRequirement`` must be used in the :term:`CWL` ``hints`` section.
+Using ``hints`` allows the :term:`CWL` content to be parsed even if the schema reference is missing.
+This can be useful for deploying the :term:`Process` on other instances not implemented with `Weaver`.
+Note however that executing the :term:`Process` in such case will most potentially fail unless the other implementation
+handles it with custom logic.
+
+To define the :term:`Process` with explicit :term:`CWL` schema validation, the ``requirements`` section must be used
+instead. To resolve the schema, the value ``weaver:ESGF-CWTRequirement`` should be used instead.
+
 For an example :term:`CWL` using this definition, see :ref:`app_pkg_esgf_cwt` section.
 
 This kind of :term:`Process` allows for remote :ref:`Execution <proc_op_execute>` and

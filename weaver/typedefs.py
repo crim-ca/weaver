@@ -6,7 +6,20 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, Callable, Dict, List, MutableMapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Mapping,
+        MutableMapping,
+        Optional,
+        Sequence,
+        Tuple,
+        Type,
+        TypeVar,
+        Union
+    )
     from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
@@ -66,6 +79,7 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
+    from weaver.formats import AnyContentEncoding, AnyContentType
     from weaver.processes.constants import CWL_RequirementNames
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.status import AnyStatusType, StatusType
@@ -175,6 +189,12 @@ if TYPE_CHECKING:
         _props: CWL_IO_Type
 
     CWL_SchemaNames = Dict[str, CWL_SchemaName]
+    CWL_SchemaSalad = TypedDict("CWL_SchemaSalad", {
+        "name": str,
+        "$base": NotRequired[str],
+        "$namespaces": List[str],
+        "$graph": List[CWL_SchemaName],
+    }, total=True)
 
     # 'requirements' includes 'hints'
     CWL_Requirement = TypedDict("CWL_Requirement", {
@@ -187,7 +207,8 @@ if TYPE_CHECKING:
     CWL_RequirementsList = List[CWL_Requirement]       # [{'class': <req>, <param>: <val>}]
     CWL_AnyRequirements = Union[CWL_RequirementsDict, CWL_RequirementsList]
     CWL_Class = Literal["CommandLineTool", "ExpressionTool", "Workflow"]
-    CWL_Namespace = Dict[str, str]
+    CWL_Namespace = MutableMapping[str, str]
+    CWL_NamespaceDefinition = Mapping[str, str]
     CWL_WorkflowStep = TypedDict("CWL_WorkflowStep", {
         "run": str,
         "in": Dict[str, str],   # mapping of <step input: workflow input | other-step output>
@@ -203,9 +224,10 @@ if TYPE_CHECKING:
     CWL = TypedDict("CWL", {
         "cwlVersion": Required[str],
         "class": Required[CWL_Class],
-        "label": str,
-        "doc": str,
+        "label": NotRequired[str],
+        "doc": NotRequired[str],
         "id": NotRequired[str],
+        "version": NotRequired[str],
         "intent": NotRequired[str],
         "s:keywords": List[str],
         "baseCommand": NotRequired[Optional[Union[str, List[str]]]],
@@ -395,19 +417,19 @@ if TYPE_CHECKING:
         "crs": NotRequired[str],
     })
     JobValueFormat = TypedDict("JobValueFormat", {
-        "mime_type": NotRequired[str],
-        "media_type": NotRequired[str],
-        "mimeType": NotRequired[str],
-        "mediaType": NotRequired[str],
-        "encoding": NotRequired[str],
+        "mime_type": NotRequired[Union[str, AnyContentType]],
+        "media_type": NotRequired[Union[str, AnyContentType]],
+        "mimeType": NotRequired[Union[str, AnyContentType]],
+        "mediaType": NotRequired[Union[str, AnyContentType]],
+        "encoding": NotRequired[Union[str, AnyContentEncoding]],
         "schema": NotRequired[str],
         "extension": NotRequired[str],
     }, total=False)
     JobValueFile = TypedDict("JobValueFile", {
         "href": str,
-        "format": NotRequired[JobValueFormat],  # old method
-        "type": NotRequired[str],               # ogc method
-        "encoding": NotRequired[str],
+        "format": NotRequired[JobValueFormat],              # old method
+        "type": NotRequired[Union[str, AnyContentType]],    # ogc method
+        "encoding": NotRequired[Union[str, AnyContentEncoding]],
         "schema": NotRequired[str],
     }, total=False)
     JobValueCollection = TypedDict("JobValueCollection", {
@@ -500,11 +522,11 @@ if TYPE_CHECKING:
     ExecutionInputs = Union[ExecutionInputsList, ExecutionInputsMap]
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
-        "transmissionMode": str
+        "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
-        "transmissionMode": AnyExecuteTransmissionMode,
+        "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
         "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputsList = List[ExecutionOutputItem]

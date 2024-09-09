@@ -8,7 +8,13 @@ import colander
 import mock
 import pytest
 
-from weaver.formats import ContentType
+from weaver.formats import EDAM_NAMESPACE, EDAM_NAMESPACE_URL, IANA_NAMESPACE, IANA_NAMESPACE_URL, ContentType
+from weaver.processes.constants import (
+    CWL_NAMESPACE_CWL_SPEC_ID,
+    CWL_NAMESPACE_CWL_SPEC_URL,
+    CWL_NAMESPACE_WEAVER_ID,
+    CWL_NAMESPACE_WEAVER_URL
+)
 from weaver.utils import load_file
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -65,6 +71,60 @@ def test_process_id_with_version_tag_get_valid():
             sd.ProcessIdentifierTag().deserialize(test_id)
     for test_id in test_id_version_valid:
         assert sd.ProcessIdentifierTag().deserialize(test_id) == test_id
+
+
+@pytest.mark.parametrize("test_value", [
+    {},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL, EDAM_NAMESPACE: EDAM_NAMESPACE_URL},
+    {IANA_NAMESPACE: IANA_NAMESPACE_URL, CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL},
+    {CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL, CWL_NAMESPACE_WEAVER_ID: CWL_NAMESPACE_WEAVER_URL},
+    {CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL, "random": "https://random.com"},
+    {
+        CWL_NAMESPACE_CWL_SPEC_ID: CWL_NAMESPACE_CWL_SPEC_URL,
+        "random": "https://random.com",
+        "another": "https://another.com#",  # ensure no '/' does not cause an error (fails with URL regex, needs '/#')
+        "slashed": "https://another.com/#",
+        "object": "https://another.com/schema#object",
+    },
+])
+def test_cwl_namespaces_valid(test_value):
+    result = sd.CWLNamespaces().deserialize(test_value)
+    assert result == test_value
+
+
+@pytest.mark.parametrize("test_value", [
+    {CWL_NAMESPACE_CWL_SPEC_ID: "bad"},
+    {CWL_NAMESPACE_CWL_SPEC_ID: EDAM_NAMESPACE_URL},
+    # disallow conflict with well-known namespaces, even if URI is valid
+    {CWL_NAMESPACE_WEAVER_ID: "https://random.com"},
+    {"random": "bad"},
+    {"random": 12345},
+    {"bad": "bad", "good": "https://random.com"},  # disallow partial mapping even if other URI are valid
+])
+def test_cwl_namespaces_invalid_uri(test_value):
+    with pytest.raises(colander.Invalid):
+        sd.CWLNamespaces().deserialize(test_value)
+
+
+@pytest.mark.parametrize(["test_value", "expect_result"], [
+    # literal property name under class definition
+    ({"var": "bad"}, colander.Invalid),
+    ({"var": "https://random.com"}, {"var": "https://random.com"}),  # valid
+    # name under 'variable' keyword passed as argument
+    ({"{namespace}": "bad"}, colander.Invalid),
+    ({"{namespace}": "https://random.com"}, {"{namespace}": "https://random.com"}),  # valid
+])
+def test_cwl_namespaces_var_not_conflict_namespace_name(test_value, expect_result):
+    assert any(getattr(field, "variable", None) is not None for field in sd.CWLNamespaces().children), (
+        "Requirement not met for test. Field 'variable' expected to be defined in schema definition."
+    )
+    if expect_result is colander.Invalid:
+        with pytest.raises(colander.Invalid):
+            sd.CWLNamespaces().deserialize(test_value)
+    else:
+        result = sd.CWLNamespaces().deserialize(test_value)
+        assert result == expect_result
 
 
 @pytest.mark.parametrize(

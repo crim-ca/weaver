@@ -12,11 +12,27 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CWL` schema definitions with ``weaver`` namespace
+  (see `weaver/schemas/cwl <https://github.com/crim-ca/weaver/tree/master/weaver/schemas/cwl>`_)
+  that provide explicit requirement classes
+  for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+  and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``. These new `CWL`
+  definitions can be reported directly in the ``requirements`` section, better describing the required dependencies
+  of the referenced `Process` and/or `Provider` in the workflow steps.
+- Add hosted `CWL` schema definitions for ``weaver`` accessible at the ``https://schemas.crim.ca/cwl/weaver#`` endpoint.
+- Add support of ``weaver`` namespaced ``requirements`` to the ``cwltool`` runner.
+- Add better validation off well-known `CWL` ``$namespaces`` as reserved keywords when deploying a `Process` to ensure
+  better interoperability between implementations and adequate metadata resolution
+  (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
 
 Fixes:
 ------
-- No change.
+- Fix ``VariableSchemaNode`` resolution of child nodes with complex mixture of ``StrictMappingSchema`` or when
+  using the equivalent ``unknown = "raise"`` parameter for a ``colander.Mapping`` schema type to
+  disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
+- Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
+  different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
 
 .. _changes_5.8.0:
 

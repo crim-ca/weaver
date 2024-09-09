@@ -27,7 +27,7 @@ from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from weaver.typedefs import ExecutionInputs, ExecutionResults, JSON
+    from weaver.typedefs import ExecutionInputs, ExecutionOutputs, ExecutionResults, JSON, ProcessExecution
 
 
 @pytest.mark.functional
@@ -47,7 +47,6 @@ class BuiltinAppTest(WpsConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         super(BuiltinAppTest, cls).setUpClass()
 
         cls.file_server = FileServer()
@@ -450,6 +449,7 @@ class BuiltinAppTest(WpsConfigBase):
         ]
 
     def setup_echo_process_execution_body(self, stack):
+        # type: (contextlib.ExitStack) -> ProcessExecution
         tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
         tmp_feature_collection_geojson = stack.enter_context(
             tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732

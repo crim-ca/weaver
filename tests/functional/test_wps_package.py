@@ -14,7 +14,6 @@ import logging
 import os
 import shutil
 import tempfile
-from copy import deepcopy
 from inspect import cleandoc
 from typing import TYPE_CHECKING
 
@@ -1882,7 +1881,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "inputs": [{"id": "message", "value": "test"}],
             "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
-        headers = deepcopy(self.json_headers)
+        headers = dict(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
@@ -2400,7 +2399,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "inputs": [{"id": "message", "value": "test"}],
             "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
         }
-        headers = deepcopy(self.json_headers)
+        headers = dict(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
@@ -2446,7 +2445,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
-        headers = deepcopy(self.json_headers)
+        headers = dict(self.json_headers)
 
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
@@ -2571,6 +2570,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when asserting
             the expected output listing size and paths. Re-running this test by itself validates if this case happened.
+            Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
 
         .. versionadded:: 4.27
         """

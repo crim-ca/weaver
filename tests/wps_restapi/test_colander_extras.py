@@ -4,6 +4,7 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
+import copy
 import inspect
 import json
 from typing import TYPE_CHECKING
@@ -20,11 +21,11 @@ if TYPE_CHECKING:
 
     TestSchema = Union[colander.SchemaNode, Type[colander.SchemaNode]]
     TestValue = JSON
-    TestExpect = Union[JSON, colander.Invalid]
+    TestExpect = Union[JSON, Type[colander.Invalid]]
 
 
 def evaluate_test_cases(test_cases):
-    # type: (List[Tuple[TestSchema, TestValue, TestExpect]]) -> None
+    # type: (Union[List[Tuple[TestSchema, TestValue, TestExpect]], Tuple[TestSchema, TestValue, TestExpect]]) -> None
     """
     Evaluate a list of tuple of (SchemaType, Test-Value, Expected-Result).
 
@@ -32,7 +33,11 @@ def evaluate_test_cases(test_cases):
     evaluating ``Test-Value``. Otherwise, the result from deserialization should equal exactly ``Expected-Result``.
     """
 
+    nested = isinstance(test_cases[0], (list, tuple))
+    single = (len(test_cases) == 1 and len(test_cases[0]) == 3) or (not nested and len(test_cases) == 3)
+    test_cases = [test_cases] if not nested else test_cases
     for i, (test_schema_ref, test_value, test_expect) in enumerate(test_cases):
+        test_name = "" if single else f"Test [{i}]: "
         if inspect.isclass(test_schema_ref):
             test_schema = test_schema_ref()
             test_schema_name = test_schema_ref.__name__
@@ -40,16 +45,17 @@ def evaluate_test_cases(test_cases):
             test_schema = test_schema_ref
             test_schema_name = type(test_schema_ref).__name__
         try:
-            result = test_schema.deserialize(test_value)
+            test_sample = copy.deepcopy(test_value)  # in case deserialize modifies, don't break other tests reusing it
+            result = test_schema.deserialize(test_sample)
             if test_expect is colander.Invalid:
-                pytest.fail(f"Test [{i}]: Expected invalid format from [{test_schema_name}] "
+                pytest.fail(f"{test_name}Expected invalid format from [{test_schema_name}] "
                             f"with: {test_value}, but received: {result}")
-            assert result == test_expect, f"Test [{i}]: Bad result from [{test_schema_name}] with: {test_value}"
+            assert result == test_expect, f"{test_name}Bad result from [{test_schema_name}] with: {test_value}"
         except colander.Invalid:
             if test_expect is colander.Invalid:
                 pass
             else:
-                pytest.fail(f"Test [{i}]: Expected valid format from [{test_schema_name}] "
+                pytest.fail(f"{test_name}Expected valid format from [{test_schema_name}] "
                             f"with: {test_value}, but invalid instead of: {test_expect}")
 
 
@@ -391,7 +397,7 @@ def test_oneof_dropable():
         (schema, "ok", "ok"),
         (schema, {}, {}),   # since mapping is permissive, empty is valid
         (schema, {"any": 123}, {"any": 123}),  # unknown field is also valid
-        # since OneOf[str,map], it is not possible to combine them
+        # since OneOf[str, map], it is not possible to combine them
     ])
 
     class Map1(ce.ExtendedMappingSchema):
@@ -698,7 +704,7 @@ def test_strict_bool():
 
 def test_strict_literal_convert():
     """
-    Test that literals are adequately interpreted and validated with respective representations..
+    Test that literals are adequately interpreted and validated with respective representations.
 
     Given a schema that allows multiple similar types that could be implicitly or explicitly converted from one to
     another with proper format, validate that such conversion do not occur to ensure explicit schema definitions.
@@ -1093,6 +1099,112 @@ def test_dropable_variable_mapping():
         (VarMapMapReq, invalid_var_map, colander.Invalid),
     ]
     evaluate_test_cases(test_schemas)
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"other": "123", "value": 123, "number": 456},
+     {"other": "123", "value": 123, "number": 456}),
+    ({"other": "123", "value": 123, "bad": "456"},
+     {"other": "123", "value": 123}),  # by default, unmapped are 'unknown=ignore'
+    ({"value": 123, "bad": "456"}, colander.Invalid),  # missing required 'other' (const)
+])
+def test_variable_with_const(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMapping(ce.ExtendedMappingSchema):
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    evaluate_test_cases((VariableMapping, value, expect))
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"other": "123", "value": 123, "number": 456}, {"other": "123", "value": 123, "number": 456}),
+    ({"other": "123", "value": 123, "bad": "456"}, colander.Invalid),  # because of 'raise', unmapped 'bad' is invalid
+    ({"value": 123, "bad": "456"}, colander.Invalid),  # missing required 'other' (const)
+])
+def test_variable_with_const_strict(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    # all below definitions are equivalent, but with different references/shortcuts
+
+    class VariableMappingRaise(ce.ExtendedMappingSchema):
+        schema_type = colander.Mapping(unknown="raise")
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    class VariableMappingAttr(ce.ExtendedMappingSchema):
+        unknown = "raise"
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    class VariableMappingStrict(ce.StrictMappingSchema):
+        var = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{int}")
+        other = ce.ExtendedSchemaNode(colander.String())
+
+    evaluate_test_cases([
+        (VariableMappingRaise, value, expect),
+        (VariableMappingAttr, value, expect),
+        (VariableMappingStrict, value, expect),
+    ])
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"value-1": 123, "value-2": 1.2, "value-3": "3"}, {"value-1": 123, "value-2": 1.2, "value-3": "3"}),
+])
+def test_variable_multiple_valid(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMappingMulti(ce.ExtendedMappingSchema):
+        var1 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var1}")
+        var2 = ce.ExtendedSchemaNode(ce.ExtendedFloat(strict=True, allow_string=False), variable="{var2}")
+        var3 = ce.ExtendedSchemaNode(ce.ExtendedString(), variable="{var3}")
+
+    evaluate_test_cases((VariableMappingMulti, value, expect))
+
+
+@pytest.mark.parametrize("value, expect", [
+    ({"value-1": "123", "value-2": "456"}, colander.Invalid),
+])
+def test_variable_multiple_ambiguous(value, expect):
+    # type: (TestValue, TestExpect) -> None
+
+    class VariableMappingMulti(ce.ExtendedMappingSchema):
+        var1 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var1}")
+        var2 = ce.ExtendedSchemaNode(ce.ExtendedInteger(strict=True, allow_string=False), variable="{var2}")
+
+    evaluate_test_cases((VariableMappingMulti, value, expect))
+
+
+@pytest.mark.parametrize("test_value", [
+    "application/atom+xml",
+    "application/EDI-X12",
+    "application/xml-dtd",
+    "application/zip",
+    "application/vnd.api+json",
+    "application/json; indent=4",
+    "video/mp4",
+    "plain/text;charset=UTF-8",
+    "plain/text; charset=UTF-8",
+    "plain/text;    charset=UTF-8",
+    "plain/text; charset=UTF-8; boundary=10"
+])
+def test_media_type_pattern_valid(test_value):
+    assert sd.MediaType().deserialize(test_value) == test_value
+
+
+@pytest.mark.parametrize("test_value", [
+    "random",
+    "bad\\value",
+    "; missing=type"
+])
+def test_media_type_pattern_invalid(test_value):
+    try:
+        sd.MediaType().deserialize(test_value)
+    except colander.Invalid:
+        pass
+    else:
+        pytest.fail(f"Expected valid format from [{sd.MediaType.__name__}] with: '{test_value}'")
 
 
 def test_invalid_multi_child_variable():

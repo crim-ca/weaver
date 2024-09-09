@@ -4,10 +4,10 @@ import time
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
+from types import MappingProxyType
 from typing import TYPE_CHECKING, overload
 from urllib.parse import urlparse
 
-import pyramid.testing
 import yaml
 from pyramid.httpexceptions import HTTPOk
 
@@ -316,9 +316,9 @@ class JobUtils(object):
 
 
 class WpsConfigBase(unittest.TestCase):
-    json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
-    html_headers = {"Accept": ContentType.TEXT_HTML}
-    xml_headers = {"Content-Type": ContentType.TEXT_XML}
+    json_headers = MappingProxyType({"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON})
+    html_headers = MappingProxyType({"Accept": ContentType.TEXT_HTML})
+    xml_headers = MappingProxyType({"Content-Type": ContentType.TEXT_XML})
     monitor_timeout = 30
     monitor_interval = 1
     settings = {}   # type: SettingsType
@@ -351,13 +351,9 @@ class WpsConfigBase(unittest.TestCase):
         cls.settings.update(cls.config.registry.settings)  # back propagate changes
 
     @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
-
-    @classmethod
     def describe_process(cls, process_id, describe_schema=ProcessSchema.OGC):
         path = f"/processes/{process_id}?schema={describe_schema}"
-        resp = cls.app.get(path, headers=cls.json_headers)
+        resp = cls.app.get(path, headers=dict(cls.json_headers))
         assert resp.status_code == 200
         return deepcopy(resp.json)
 

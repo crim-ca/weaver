@@ -4,6 +4,7 @@ import contextlib
 import copy
 import json
 import os
+import re
 import tempfile
 import uuid
 from copy import deepcopy
@@ -11,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import colander
 import mock
+import pyramid.testing
 import pytest
 import stopit
 import webtest.app
@@ -34,7 +36,15 @@ from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, OutputFormat, get_cwl_file_format
 from weaver.processes.builtin import register_builtin_processes
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, ProcessSchema
+from weaver.processes.constants import (
+    CWL_NAMESPACE_WEAVER_ID,
+    CWL_NAMESPACE_WEAVER_URL,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_CUDA_NAME,
+    ProcessSchema
+)
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
@@ -45,9 +55,62 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
+    from typing_extensions import Literal
+
+    import _pytest  # noqa: W0212
 
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution
+    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+
+
+# noinspection PyTypeHints
+@pytest.fixture(name="assert_cwl_no_warn_unknown_hint")
+def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
+    # type: (pytest.LogCaptureFixture, pytest.FixtureRequest) -> None
+    """
+    Looks for a warning related to unknown :term:`CWL` requirement thrown by :mod:`cwltool`.
+
+    If the `Weaver`-specific requirement was properly registered in the :term:`CWL` schema extensions,
+    this warning should not occur as it would be validated against a known definition.
+
+    .. seealso::
+        - Registered `Weaver` extensions schemas defined in
+          `weaver-extensions.yml`<weaver/schemas/weaver-extensions.yml>`_.
+        - Registered `Weaver` extensions schemas correspond to:
+          - :data:`CWL_REQUIREMENT_APP_BUILTIN`
+          - :data:`CWL_REQUIREMENT_APP_ESGF_CWT`
+          - :data:`CWL_REQUIREMENT_APP_OGC_API`
+          - :data:`CWL_REQUIREMENT_APP_WPS1`
+
+    Usage:
+
+    .. code-block:: python
+
+        @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+        @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [<CWL_HINT_TO_CHECK>], indirect=True)
+        def test_to_mark(): ...
+
+    .. note::
+        Because the fixture evaluates the warning logs after the test executed,
+        a failing condition will be indicated as "teardown" of the marked test.
+    """
+    yield caplog  # run the test and collect logs from it
+
+    marker = list(filter(
+        lambda _marker:
+            _marker.name == "parametrize"
+            and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,
+        request.keywords.get("pytestmark", [])
+    ))[0]  # type: "_pytest.mark.structures.Mark"
+    cwl_hint = marker.args[1][0]
+
+    log_records = caplog.get_records(when="call")
+    warn_hint = re.compile(rf".*unknown hint .*{cwl_hint}.*", re.IGNORECASE)
+    warn_records = list(filter(lambda _rec: isinstance(_rec.msg, str) and warn_hint.match(_rec.msg), log_records))
+    warn_message = "\n".join([_rec.msg for _rec in warn_records])
+    assert not warn_records, (
+        f"Expected no warning from resolved Weaver-specific Application Package requirement, got:\n{warn_message}",
+    )
 
 
 # pylint: disable=C0103,invalid-name
@@ -58,7 +121,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         "weaver.url": "https://localhost",
         "weaver.wps_path": "/ows/wps",
         "weaver.wps_output_url": "http://localhost/wpsoutputs",
-    }
+    }  # type: SettingsType
+
+    @classmethod
+    def tearDownClass(cls):
+        pyramid.testing.tearDown()
 
     def setUp(self):
         # rebuild clean db on each test
@@ -568,7 +635,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
         path = "/processes"
-        headers = copy.deepcopy(self.html_headers)
+        headers = copy.deepcopy(dict(self.html_headers))
         headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
@@ -579,7 +646,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_get_processes_html_accept_header_user_agent_browser_override(self):
         path = "/processes"
-        headers = copy.deepcopy(self.html_headers)
+        headers = copy.deepcopy(dict(self.html_headers))
         headers["User-Agent"] = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
         settings = copy.deepcopy(self.config.registry.settings)
         settings["weaver.wps_restapi_html_override_user_agent"] = True
@@ -773,7 +840,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         .. note::
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
-        deploy_headers = copy.deepcopy(self.json_headers)
+        deploy_headers = copy.deepcopy(dict(self.json_headers))
         deploy_headers.update(headers or {})
         resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
                                    data=deploy_payload, headers=deploy_headers, only_local=True)
@@ -806,17 +873,27 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 200
         return resp.json
 
-    def validate_wps1_package(self, process_id, provider_url):
+    def validate_wps1_package(
+            self,
+            process_id,                     # type: str
+            provider_url,                   # type: str
+            requirement_location="hints",   # type: Literal["hints", "requirements"]
+    ):                                      # type: (...) -> None
         cwl = self.get_application_package(process_id)
-        assert "hints" in cwl and CWL_REQUIREMENT_APP_WPS1 in cwl["hints"]
-        assert "process" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert "provider" in cwl["hints"][CWL_REQUIREMENT_APP_WPS1]
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["process"] == process_id
+        assert requirement_location in cwl
+        assert any(hint.endswith(CWL_REQUIREMENT_APP_WPS1) for hint in cwl[requirement_location])
+        req_hint = (
+            cwl[requirement_location].get(CWL_REQUIREMENT_APP_WPS1) or
+            cwl[requirement_location].get(f"weaver:{CWL_REQUIREMENT_APP_WPS1}")
+        )
+        assert "process" in req_hint
+        assert "provider" in req_hint
+        assert req_hint["process"] == process_id
         if provider_url.endswith("/"):
             valid_urls = [provider_url, provider_url[:-1]]
         else:
             valid_urls = [provider_url, f"{provider_url}/"]
-        assert cwl["hints"][CWL_REQUIREMENT_APP_WPS1]["provider"] in valid_urls
+        assert req_hint["provider"] in valid_urls
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
@@ -829,7 +906,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         docker = "fake.repo/org/private-image:latest"
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
-        headers = copy.deepcopy(self.json_headers)
+        headers = copy.deepcopy(dict(self.json_headers))
 
         for bad_token in ["0123456789", "Basic:0123456789", "Bearer fake:0123456789"]:  # nosec
             headers.update({"X-Auth-Docker": bad_token})
@@ -914,7 +991,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "schema": {"type": "string", "contentMediaType": "text/plain"},
             "formats": [{"default": True, "mediaType": "text/plain"}]
         }]
-        return cwl, desc
+        return cwl, desc  # type: ignore
 
     def test_deploy_process_CWL_direct_JSON(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON)
@@ -1161,6 +1238,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "formats": [{"default": True, "mediaType": "text/plain"}]
             }]
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_CUDA_NAME], indirect=True)
     def test_deploy_process_CWL_CudaRequirement_executionUnit(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
@@ -1210,7 +1289,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             stack.enter_context(mocked_wps_output(self.settings))
             network_access_requirement = {"networkAccess": True}
             docker_requirement = {"dockerPull": "python:3.7-alpine"}
-            for req_type in ["hints", "requirements"]:
+            for req_type in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
                 cwl = {
                     "class": "CommandLineTool",
                     "cwlVersion": "v1.2",
@@ -1242,12 +1321,100 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert pkg[req_type]["NetworkAccess"] == network_access_requirement
                 assert pkg[req_type]["DockerRequirement"] == docker_requirement
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit_requirements(self):
+        """
+        Ensures that :term:`CWL` ``requirements`` directly resolves with a namespaced ``weaver`` requirement schema.
+        """
+        ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
+        ns.update({CWL_NAMESPACE_WEAVER_ID: CWL_NAMESPACE_WEAVER_URL})
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            # note: this is the main difference from other 'hints' cases
+            "requirements": {
+                f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}": {
+                    "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
+                    "provider": resources.TEST_REMOTE_SERVER_URL
+                }
+            },
+            # FIXME: must provide inputs/outputs since CWL provided explicitly.
+            #   Update from CWL->WPS complementary details is supported.
+            #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
+            # following are based on expected results for I/O defined in XML
+            "inputs": {
+                "input-1": {
+                    "type": "string"
+                },
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "format": fmt,
+                    "outputBinding": {
+                        "glob": "*.json"
+                    },
+                }
+            },
+            "$namespaces": ns
+        }
+        body = {
+            "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
+            "executionUnit": [{"unit": cwl}],
+            # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
+        self.validate_wps1_package(
+            resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
+            resources.TEST_REMOTE_SERVER_URL,
+            requirement_location="requirements",
+        )
+
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
     def test_deploy_process_CWL_WPS1Requirement_href(self):
+        ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "hints": {
+                CWL_REQUIREMENT_APP_WPS1: {
+                    "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
+                    "provider": resources.TEST_REMOTE_SERVER_URL
+                }
+            },
+            # FIXME: must provide inputs/outputs since CWL provided explicitly.
+            #   Update from CWL->WPS complementary details is supported.
+            #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
+            # following are based on expected results for I/O defined in XML
+            "inputs": {
+                "input-1": {
+                    "type": "string"
+                },
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "format": fmt,
+                    "outputBinding": {
+                        "glob": "*.json"
+                    },
+                }
+            },
+            "$namespaces": ns
+        }
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
@@ -1256,37 +1423,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
             tmp_file = os.path.join(tmp_dir, "wps1.cwl")
             tmp_href = tmp_file.replace(out_dir, out_url, 1)
-            ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
             with open(tmp_file, mode="w", encoding="utf-8") as cwl_file:
-                json.dump({
-                    "cwlVersion": "v1.0",
-                    "class": "CommandLineTool",
-                    "hints": {
-                        CWL_REQUIREMENT_APP_WPS1: {
-                            "process": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
-                            "provider": resources.TEST_REMOTE_SERVER_URL
-                        }
-                    },
-                    # FIXME: must provide inputs/outputs since CWL provided explicitly.
-                    #   Update from CWL->WPS complementary details is supported.
-                    #   Inverse update WPS->CWL is not supported (https://github.com/crim-ca/weaver/issues/50).
-                    # following are based on expected results for I/O defined in XML
-                    "inputs": {
-                        "input-1": {
-                            "type": "string"
-                        },
-                    },
-                    "outputs": {
-                        "output": {
-                            "type": "File",
-                            "format": fmt,
-                            "outputBinding": {
-                                "glob": "*.json"
-                            },
-                        }
-                    },
-                    "$namespaces": ns
-                }, cwl_file)
+                json.dump(cwl, cwl_file)
 
             body = {
                 "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
@@ -1300,6 +1438,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 resources.TEST_REMOTE_SERVER_URL
             )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1363,6 +1503,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 resources.TEST_REMOTE_SERVER_URL
             )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1413,6 +1555,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             resources.TEST_REMOTE_SERVER_URL
         )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1431,6 +1575,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             resources.TEST_REMOTE_SERVER_URL
         )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1445,6 +1591,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body["processDescription"]["process"].update(desc_url)
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1465,6 +1613,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             resources.TEST_REMOTE_SERVER_URL
         )
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1483,6 +1633,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1499,6 +1651,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body["processDescription"]["process"].update(ows_context_href(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL))
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_WPS1], indirect=True)
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -1515,8 +1669,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
-    def validate_ogcapi_process_description(self, process_description, process_id, remote_process):
-        # type: (JSON, str, str) -> None
+    def validate_ogcapi_process_description(
+            self,
+            process_description,            # type: JSON
+            process_id,                     # type: str
+            remote_process,                 # type: str
+            requirement_location="hints",   # type: Literal["hints", "requirements"]
+    ):                                      # type: (...) -> None
         assert process_id != remote_process
         assert process_description["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/ogcapiApplication"
 
@@ -1532,8 +1691,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         # package should have been generated with corresponding I/O from "remote process"
         ref = self.get_application_package(remote_process)
         pkg = self.get_application_package(process_id)
-        assert pkg["hints"] == {
-            "OGCAPIRequirement": {
+        assert pkg[requirement_location] == {
+            f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_OGC_API}": {
                 "process": ref_url
             }
         }
@@ -1543,6 +1702,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert io_pkg["id"] == io_ref["id"]
                 assert io_pkg["format"] == io_ref["format"]
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
     def test_deploy_process_OGC_API_DescribeProcess_href(self):
         """
         Use the basic :term:`Process` URL format for referencing remote OGC API definition.
@@ -1569,6 +1730,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
         self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
     def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
@@ -1582,6 +1745,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
         self.validate_ogcapi_process_description(desc, p_id, remote_process)
 
+    @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
+    @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
     def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
