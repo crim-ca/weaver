@@ -678,11 +678,13 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "s:author": [
                     {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
                 ],
-
             },
             "wps_package_metadata": {}
         },
         {
+            "abstract": "",
+            "title": "",
+            "version": "",
             "metadata": [
                 {
                     "role": "author",
@@ -704,8 +706,12 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             "wps_package_metadata": {}
         },
         {
+            "abstract": "",
+            "title": "",
+            "version": "",
             "metadata": [
                 {
+                    "type": "text/html",
                     "rel": "codeRepository",
                     "href": "https://gitlab.com/"
                 }
@@ -717,11 +723,11 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "cwl_package_package": {
                 "s:version": "1.0"
-
             },
             "wps_package_metadata": {
                 "metadata": [
                     {
+                        "type": "text/html",
                         "rel": "codeRepository",
                         "href": "https://gitlab.com/"
                     }
@@ -729,14 +735,30 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             }
         },
         {
+            "abstract": "",
+            "title": "",
             "metadata": [
                 {
+                    "type": "text/html",
                     "rel": "codeRepository",
                     "href": "https://gitlab.com/"
                 },
-
             ],
             "version": "1.0"
+        }
+    ),
+    (
+        # Test softwareVersion
+        {
+            "cwl_package_package": {
+                "s:softwareVersion": "1.0.0"
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "1.0.0"
         }
     ),
 ])
@@ -746,6 +768,4 @@ def test_process_metadata(original, expected):
     wps_package_metadata = original["wps_package_metadata"]
     _update_package_metadata(wps_package_metadata, cwl_package_package)
     # Assertions
-    for key in expected:
-        assert key in wps_package_metadata
-        assert sorted(wps_package_metadata[key]) == sorted(expected[key])
+    assert wps_package_metadata == expected

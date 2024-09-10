@@ -719,17 +719,30 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         )
 
     # specific use case with a different mapping
-    if "s:version" in cwl_package_package:
+    # https://docs.ogc.org/bp/20-089r1.html#toc31
+    if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
         wps_package_metadata["version"] = str(
-             str(cwl_package_package.get("s:version", "")) or str(wps_package_metadata.get("version"))
+            str(wps_package_metadata.get("version", ""))
+            or cwl_package_package.get("s:version")
+            or cwl_package_package.get("s:softwareVersion")
         )
+    else:
+        wps_package_metadata["version"] = str(wps_package_metadata.get("version", ""))
 
     for metadata_mapping in SUPPORTED_METADATA_MAPPING:
         if metadata_mapping in cwl_package_package:
             metadata = wps_package_metadata.get("metadata", [])
-            if (isinstance((cwl_package_package[metadata_mapping]), str)
-                    and urlparse(cwl_package_package[metadata_mapping]) != ""):
+            if (
+                isinstance((cwl_package_package[metadata_mapping]), str)
+                and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
+            ):
+                url = cwl_package_package[metadata_mapping]
+                if metadata_mapping == "s:codeRepository":
+                    type = "text/html"
+                else:
+                    type = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
                 metadata.append({
+                    "type": type,
                     "rel": metadata_mapping.strip("s:"),
                     "href": cwl_package_package[metadata_mapping]
                 })
