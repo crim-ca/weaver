@@ -456,6 +456,7 @@ linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
+    "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
 ]
 linkcheck_request_headers = {
     "https://github.com/": {
