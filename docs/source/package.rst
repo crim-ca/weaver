@@ -190,7 +190,7 @@ For a more concrete example of a |jupyter-notebook|_ convertion to :term:`CWL`, 
 repository, which contains a sample |ncml2stac-notebook|_.
 This script, as indicated by its name, converts *NCML XML metadata with CMIP6 attributes* into the
 corresponding *SpatioTemporal Asset Catalog* (STAC) definition and extensions.
-It uses the same `IPython2CWL <jupyter-repo2cwl>`_ type annotation strategy as presented
+It uses the same |jupyter-ipython2cwl|_ type annotation strategy as presented
 :ref:`above <example_app_pkg_jupyter_repo2cwl_python>` to indicate which NCML ``File`` variable is to be employed as
 as the :term:`CWL` input reference, and the expected STAC ``File`` as output to be collected by :term:`CWL`.
 
