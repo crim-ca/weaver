@@ -20,7 +20,8 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from pkgutil import get_loader
-from typing import TYPE_CHECKING, overload
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -79,12 +80,10 @@ if TYPE_CHECKING:
     import importlib.abc
     from types import FrameType, ModuleType
     from typing import (
-        Any,
         AnyStr,
         Callable,
         Dict,
         IO,
-        Iterable,
         Iterator,
         List,
         MutableMapping,
@@ -198,6 +197,17 @@ if TYPE_CHECKING:
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+class LoggerHandler(Protocol):
+    """
+    Minimalistic logger interface (typically :class:`logging.Logger`) intended to be used only with ``log`` method.
+    """
+
+    def log(self, level, message, *args, **kwargs):
+        # type: (int, str, *Any, **Any) -> None
+        ...
+
 
 SUPPORTED_FILE_SCHEMES = frozenset([
     "file",
@@ -326,6 +336,74 @@ class CaseInsensitive(str):
     def __eq__(self, other):
         # type: (Any) -> bool
         return self.__str.casefold() == str(other).casefold()
+
+
+class HashJSON(Iterable[Any]):
+    def __hash__(self):
+        # type: () -> int
+        return hash(frozenset([
+            HashDict(item.items()).__hash__() if isinstance(item, dict) else
+            HashList(item).__hash__() if isinstance(item, list) else
+            item
+            for item in self
+        ]))
+
+    def __iter__(self):
+        return super().__iter__()
+
+
+class HashList(HashJSON, list):
+    ...
+
+
+class HashDict(HashJSON, dict):
+    ...
+
+
+def json_hashable(func):
+    # type: (AnyCallableAnyArgs) -> Callable[[AnyCallableAnyArgs], Return]
+    """
+    Decorator that will transform :term:`JSON`-like dictionary and list arguments to an hashable variant.
+
+    By making the structure hashable, it can safely be cached with :func:`functools.lru_cache`
+    or :func:`functools.cache`. The decorator ignores other argument types expected to be already hashable.
+
+    .. code-block:: python
+
+        @json_hashable
+        @functools.cache
+        def function(json_data): ...
+
+    .. seealso::
+        Original inspiration: https://stackoverflow.com/a/44776960
+        The code is extended to allow recursively supporting JSON-like structures.
+    """
+
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        args = tuple(
+            HashDict(arg) if isinstance(arg, dict) else
+            HashList(arg) if isinstance(arg, list) else
+            arg
+            for arg in args
+        )
+        kwargs = {
+            k: (
+                HashDict(v) if isinstance(v, dict) else
+                HashList(v) if isinstance(v, list) else
+                v
+            )
+            for k, v in kwargs.items()
+        }
+        return func(*args, **kwargs)
+
+    # forward caching handles
+    if hasattr(func, "cache_info"):
+        wrapped.cache_info = func.cache_info
+    if hasattr(func, "cache_clear"):
+        wrapped.cache_clear = func.cache_clear
+    return wrapped
 
 
 NUMBER_PATTERN = re.compile(r"^(?P<number>[+-]?[0-9]+[.]?[0-9]*(e[+-]?[0-9]+)?)\s*(?P<unit>.*)$")
@@ -557,7 +635,7 @@ def get_header(header_name,         # type: str
     if header_container is None:
         return default
     headers = header_container
-    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
+    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict, MappingProxyType)):
         headers = dict(headers)
     if isinstance(headers, dict):
         headers = header_container.items()
@@ -3617,7 +3695,7 @@ def create_metalink(
 
 
 def load_file(file_path, text=False):
-    # type: (str, bool) -> Union[JSON, str]
+    # type: (Path, bool) -> Union[JSON, str]
     """
     Load :term:`JSON` or :term:`YAML` file contents from local path or remote URL.
 

@@ -51,6 +51,7 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
+import copy
 import inspect
 import re
 import uuid
@@ -134,7 +135,7 @@ URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTER
 URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
 FILE_URL_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
 FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
-URI_REGEX = rf"{colander.URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
+URI_REGEX = rf"{URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
 URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
     "uri": {"converter": BaseStringTypeConverter, "validator": URI},
@@ -930,10 +931,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 var = RequiredDict(variable="const")  # 'const' could clash with other below
                 const = RequiredDict(String())
 
-        Using ``<const>`` instead would ensure that no override occurs as it is a syntax error
-        to write ``<const> = RequiredDict(String())`` in the class definition, but this value
+        Using ``{const}`` instead would ensure that no override occurs as it is a syntax error
+        to write ``{const} = RequiredDict(String())`` in the class definition, but this value
         can still be used to create the internal mapping to evaluate sub-schemas without name
-        clashes. As a plus, it also helps giving an indication that *any key* is accepted.
+        clashes. As a plus, it also helps indicating that *any key* is accepted.
 
     .. seealso::
         - :class:`ExtendedSchemaNode`
@@ -1014,7 +1015,8 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             Because of the above reversed-processing method, all *mapping* nodes must derive from
             :class:`VariableSchemaNode` to ensure they pre-process potential *variable* candidates.
         """
-        if self.schema_type is colander.Mapping:
+        typ = type(_get_schema_type(self))
+        if typ is colander.Mapping:
             # FIXME: handle 'patternProperties' along 'additionalProperties' (detect 'variable' + 'pattern' arguments?)
             #   This would allow mapping to more than only one list-item in 'var_full_search'
             #   (ie: 1 for 'additionalProperties' + N * patterns nested in 'patternProperties')
@@ -1061,6 +1063,9 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _deserialize_remap(node, cstruct, var_map, var_name, has_const_child):
         invalid_var = colander.Invalid(node, value=var_map)
         try:
+            # ensure to use a copy to avoid modifying a structure passed down to here since we pop variable-mapped keys
+            cstruct = copy.deepcopy(cstruct)
+
             # Substitute real keys with matched variables to run full deserialize so
             # that mapping can find nodes name against attribute names, then re-apply originals.
             # We must do this as non-variable sub-schemas could be present, and we must also
@@ -1068,19 +1073,55 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             if not has_const_child:
                 result = node.default or {}
             else:
+                remapped = {}
+                var_value = None
                 for mapped in var_map.values():
-                    # if multiple objects corresponding to a variable sub-schema where provided,
-                    # we only give one as this is what is expected for normal-mapping deserialize
-                    cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
-                result = super(VariableSchemaNode, node).deserialize(cstruct)  # noqa
+                    if not mapped:
+                        continue  # ignore missing for now, raise after as needed if required
+                    # Temporarily remove pre-validated/mapped variable schema nodes to validate constants.
+                    # If we happen to remove the same property twice, it means two variable schema node were
+                    # in use at the same time (valid), but they were not sufficiently strict to distinguish to
+                    # which one the property should be mapped (e.g.: two generic strings with no validators).
+                    for var_mapped in mapped:
+                        var_prop = var_mapped["name"]
+                        var_node = var_mapped["node"]
+                        try:
+                            var_value = cstruct.pop(var_prop)
+                            remapped[var_prop] = {"node": var_node, "value": var_value}
+                        except KeyError:
+                            var_prev = remapped[var_prop]["node"]
+                            raise colander.Invalid(
+                                node,
+                                msg=(
+                                    f"Two distinct variable schema nodes named ['{var_prev}', '{var_node}'] "
+                                    f"under '{_get_node_name(node)}' were simultaneously mapped as valid matches "
+                                    f"for field '{var_prop}' resolution. "
+                                    "Ambiguous children schema definitions cannot be resolved. "
+                                    "Consider defining more strict schema types, validators, keywords, "
+                                    "or by modifying the parent variable schema to resolve the ambiguity."
+                                ),
+                                value={var_prop: var_value},
+                            )
+                # temporarily bypass variable to avoid recursively calling this extension deserialization
+                # perform the 'normal' mapping deserialization to obtain explicit properties
+                mapping = ExtendedMappingSchema(name=node.name, missing=node.missing, default=node.default)
+                var_children = node._get_sub_variable(node.children)
+                mapping.children = [child for child in node.children if child not in var_children]
+                result = mapping.deserialize(cstruct)  # noqa
             for mapped in var_map.values():
                 # invalid if no variable match was found, unless optional
                 if mapped is None and node.missing is colander.required:
-                    raise KeyError
+                    raise colander.Invalid(node, value=cstruct)
                 for var_mapped in mapped:
-                    result[var_mapped["name"]] = var_mapped["cstruct"]
+                    # variable schema validation failed, but it is not marked as 'required'
+                    if var_mapped["cstruct"] not in [colander.drop, colander.null]:
+                        result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but no match found."
+            if invalid.msg:
+                invalid_var.msg = invalid.msg
+                invalid_var.value = invalid.value
+            else:
+                invalid_var.msg = f"Tried matching variable '{var_name}' sub-schemas but no match found."
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:
@@ -1102,7 +1143,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         var_map_invalid = {}  # type: Dict[str, colander.Invalid]
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
-            var_map[var] = []
+            var_map.setdefault(var, [])
             var_msg = f"Requirement not met under variable: {var}."
             var_map_invalid[var] = colander.Invalid(node=self, msg=var_msg, value=cstruct)
             # attempt to find any sub-node matching the sub-schema under variable
@@ -1137,10 +1178,10 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                         # use position as tested child field name for later reference by invalid schema
                         var_map_invalid[var].add(invalid, pos=child_key)
 
-            var_val = var_map.get(var, colander.null)
-            if var_val is colander.null:
-                # allow unmatched variable item under mapping if it is not required
-                if var_child.missing is colander.drop:
+            var_mapped = var_map.get(var, [])
+            if not var_mapped:
+                # allow unmatched/unprovided variable item under mapping if it is not required
+                if var_child.missing in [colander.drop, colander.null]:
                     continue
                 # if required, don't waste more time doing lookup
                 # fail immediately since this variable schema is missing
@@ -1664,6 +1705,9 @@ class ExtendedMappingSchema(
     def __init__(self, *args, **kwargs):
         super(ExtendedMappingSchema, self).__init__(*args, **kwargs)
         self._validate_nodes()
+        unknown = getattr(self, "unknown", None)
+        if unknown and isinstance(unknown, str):
+            self.typ.unknown = unknown
 
     def _validate_nodes(self):
         for node in self.children:
@@ -1688,8 +1732,6 @@ class StrictMappingSchema(ExtendedMappingSchema):
     def __init__(self, *args, **kwargs):
         kwargs["unknown"] = "raise"
         super(StrictMappingSchema, self).__init__(*args, **kwargs)
-        # sub-type mapping itself must also have 'raise' such that its own 'deserialize' copies the fields over
-        self.typ.unknown = "raise"
 
 
 class EmptyMappingSchema(StrictMappingSchema):
@@ -1739,8 +1781,6 @@ class PermissiveMappingSchema(ExtendedMappingSchema):
         # type: (Any, Any) -> None
         kwargs["unknown"] = "preserve"
         super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
-        # sub-type mapping itself must also have 'preserve' such that its own 'deserialize' copies the fields over
-        self.typ.unknown = "preserve"
 
 
 class PermissiveSequenceSchema(ExtendedSequenceSchema):

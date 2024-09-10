@@ -546,6 +546,7 @@ class TestWeaverClient(TestWeaverClientBase):
         .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when
             looking for the expected job by ID. Re-running this test by itself validates if this case happened.
+            Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
         """
         result = self.run_execute_inputs_schema_variant("Execute_Echo_cwl_schema.yml", mock_exec=False)
         job_id = result.body["jobID"]
@@ -982,6 +983,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         .. todo::
             In some circonstances when running the complete test suite, this test fails sporadically when asserting
             the expected authentication credentials. Re-running this test by itself validates if this case happened.
+            Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
         """
         p_id = self.fully_qualified_test_process_name()
         docker_reg = "fake.repo"

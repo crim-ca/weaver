@@ -22,6 +22,18 @@ def is_netcdf_url(url):
     return os.path.splitext(url)[-1] == get_extension(ContentType.APP_NETCDF)
 
 
+def is_geojson_url(url):
+    # type: (Any) -> bool
+    """
+    Validates that the reference is a remote GeoJSON file reference.
+    """
+    try:
+        validate_reference(url, is_file=True)
+    except (TypeError, ValueError):
+        return False
+    return os.path.splitext(url)[-1] in [get_extension(ContentType.APP_GEOJSON), get_extension(ContentType.APP_JSON)]
+
+
 def validate_reference(url, is_file):
     # type: (str, bool) -> None
     """

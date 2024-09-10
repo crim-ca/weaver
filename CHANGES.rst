@@ -12,11 +12,66 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `CWL` schema definitions with ``weaver`` namespace
+  (see `weaver/schemas/cwl <https://github.com/crim-ca/weaver/tree/master/weaver/schemas/cwl>`_)
+  that provide explicit requirement classes
+  for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+  and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``. These new `CWL`
+  definitions can be reported directly in the ``requirements`` section, better describing the required dependencies
+  of the referenced `Process` and/or `Provider` in the workflow steps.
+- Add hosted `CWL` schema definitions for ``weaver`` accessible at the ``https://schemas.crim.ca/cwl/weaver#`` endpoint.
+- Add support of ``weaver`` namespaced ``requirements`` to the ``cwltool`` runner.
+- Add better validation off well-known `CWL` ``$namespaces`` as reserved keywords when deploying a `Process` to ensure
+  better interoperability between implementations and adequate metadata resolution
+  (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
+- Add documentation about *Jupyter Notebook* to `CWL` conversion
+  utility `ipython2cwl <https://github.com/common-workflow-lab/ipython2cwl>`_
+  and a sample `crim-ca/ncml2stac <https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac>`_ repository
+  making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
+  (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
 
 Fixes:
 ------
-- No change.
+- Fix ``VariableSchemaNode`` resolution of child nodes with complex mixture of ``StrictMappingSchema`` or when
+  using the equivalent ``unknown = "raise"`` parameter for a ``colander.Mapping`` schema type to
+  disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
+- Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
+  different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
+
+.. _changes_5.8.0:
+
+`5.8.0 <https://github.com/crim-ca/weaver/tree/5.8.0>`_ (2024-09-05)
+========================================================================
+
+Changes:
+--------
+- Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
+  (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
+- Add ``AnyCRS`` schema definition with improved validation of allowed values.
+- Use ``AnyCRS`` schema for ``SupportedCRS``, ``XMLStringCRS``, ``BoundingBoxValue`` and ``ExecuteCollectionInput``
+  instead of a generic ``URL`` schema definition for better reference validation, while allowing alternate short forms.
+- Add auto-resolution of media-type for cases where it can reasonably be inferred from a ``schema`` reference,
+  such as an URI referring to a ``.json`` or ``.xsd`` respectively representing `JSON` and `XML` data.
+- Update ``cwltool`` with fork
+  `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
+  until ``loadContents`` behavior is resolved for ``type: File[]``
+  (relates to `common-workflow-language/cwltool#2036 <https://github.com/common-workflow-language/cwltool/pull/2036>`_).
+
+Fixes:
+------
+- Fix `CWL` I/O with ``format`` defined as a `JavaScript Expression` to be incorrectly parsed by the convertion
+  operations to extract applicable media-types. These cases will be ignored, since media-types cannot be inferred
+  from them. The `WPS` or `OAS` I/O definitions should instead provide the applicable media-types
+  (relates to `common-workflow-language/cwl-v1.3#52 <https://github.com/common-workflow-language/cwl-v1.3/issues/52>`_).
+- Fix ``format`` parsing when trying to infer media-types from various I/O definition representations using a
+  reference provided as an URI schema from an ontology. Parsing caused the URI to be split, causing an invalid
+  resolution. If no appropriate media-type is provided, JSON will be used by default, while preserving the submitted
+  schema URI.
+- Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
+- Fix minor resolution combinations or redundant checks for multiple ``weaver.formats`` utilities.
+- Fix `CWL` ``format`` resolution check against `IANA` media-types if the reference ontology happens to be
+  temporarily/sporadically unresponsive to SSL handshake check, allowing temporary HTTP resolution of media-type.
 
 .. _changes_5.7.0:
 

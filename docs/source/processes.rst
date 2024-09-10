@@ -40,12 +40,13 @@ Theses processes typically correspond to utility operations. They are specifical
 ``step`` within a `Workflow`_ process that requires data-type conversion between input/output of similar, but not
 perfectly, compatible definitions.
 
-For example, process :py:mod:`weaver.processes.builtin.jsonarray2netcdf` takes a single input JSON file which its
-content contains an array-list of NetCDF file references, and returns them directly as the corresponding list of output
-files. These two different file formats (single JSON to multiple NetCDF) can then be used to map two processes with
-these respective output and inputs.
-
 As of the latest release, following `builtin` processes are available:
+
+- :py:mod:`weaver.processes.builtin.collection_processor`
+
+    Implements parsing capabilities to support |ogc-api-proc-part3-collection-input|_ as defined by
+    the |ogc-api-proc-part3|_ extension. This allows :ref:`Process Execution <proc_op_execute>`
+    to employ :ref:`proc_col_inputs` in certain cases when conditions are met.
 
 - :py:mod:`weaver.processes.builtin.echo_process`
 
@@ -54,23 +55,44 @@ As of the latest release, following `builtin` processes are available:
     It also is employed to test the implementation against a wide range of input and output formats.
 
 - :py:mod:`weaver.processes.builtin.file2string_array`
+
+    Transforms a :ref:`File Reference <file_ref_types>` input into :term:`JSON` file containing an array of file
+    references as value.
+    This is typically employed to resolve a :term:`JSON` array containing multiple sub-file references, allowing
+    to "*unpack*" a single item into multiple references.
+
+- :py:mod:`weaver.processes.builtin.file_index_selector`
+
+    Selects the single :ref:`File Reference <file_ref_types>` at the provided index within an array of
+    file :term:`URL`.
+
 - :py:mod:`weaver.processes.builtin.jsonarray2netcdf`
+
+    Takes a single input :term:`JSON` file which its content contains an array-list of NetCDF file references,
+    and returns them directly as the corresponding list of output files. These two different file formats
+    (single :term:`JSON` to multiple NetCDF) can then be used to map two processes with these respective
+    output and inputs.
+
 - :py:mod:`weaver.processes.builtin.metalink2netcdf`
+
+    Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given
+    index of the list.
 
 
 All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the
-:term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`.
+:term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`. For explicit schema
+validation using the :term:`CWL` ``requirements``, the ``weaver:BuiltinRequirement`` can also be used.
 
 .. _proc_wps_12:
 
 WPS-1/2
 -------
 
-This kind of process corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
+This kind of :term:`Process` corresponds to a *traditional* :term:`WPS` :term:`XML` or :term:`JSON` endpoint
 (depending of supported version) prior to :ref:`proc_wps_rest` specification. When an |ogc-api-proc|_ description is
 deployed in `Weaver` using an URL reference to an WPS-1/2 process through the use of a :ref:`app_pkg_wps1` requirement,
 `Weaver` parses and converts the :term:`XML` or :term:`JSON` body of the :term:`WPS` response and registers the process
-locally. This allows a remote server offering limited functionalities (e.g.: no REST bindings supported)
+locally. This allows a remote server offering limited functionalities (e.g.: no REST or `OGC API` bindings supported)
 to provide them through `Weaver`.
 
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
@@ -93,7 +115,8 @@ A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process c
 
 This would tell `Weaver` to locally :ref:`Deploy <proc_op_deploy>` the ``my-process-reference`` process using the WPS-1
 URL reference that is expected to return a ``DescribeProcess`` :term:`XML` schema. Provided that this endpoint can be
-resolved and parsed according to typical WPS specification, this should result into a successful process registration.
+resolved and parsed according to typical :term:`WPS` specification, this should result into a successful :term:`Process`
+registration.
 The deployed :term:`Process` would then be accessible with :ref:`DescribeProcess <proc_op_describe>`  requests.
 
 The above deployment procedure can be automated on startup using `Weaver`'s ``wps_processes.yml`` configuration file.
@@ -105,8 +128,12 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
     definition could become out-of-sync with the remote reference where the :ref:`Execute <proc_op_execute>` request
     will be sent. Refer to `Remote Provider`_ section for more details to work around this issue.
 
+Any :term:`Process` deployed from a :term:`WPS` reference should have a resulting :term:`CWL` definition that either
+contains ``WPS1Requirement`` in the ``hints`` section, or ``weaver:WPS1Requirement`` in the ``requirements`` section.
+
 .. seealso::
     - `Remote Provider`_
+    - `WPS-1/2 XML schemas <http://schemas.opengis.net/wps/>`_
 
 .. _proc_ogc_api:
 .. _proc_wps_rest:
@@ -123,8 +150,12 @@ When deploying one such :term:`Process` directly, it is expected to have a defin
 with a :term:`CWL` `Application Package`_, which provides resources about one of the described :ref:`app_pkg_types`.
 
 This is most of the time employed to wrap operations packaged in a reference :term:`Docker` image, but it can also
-wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`).
-The reference package can be provided in multiple ways as presented below.
+wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`). When the :term:`Process` should be
+deployed using a remote URL reference pointing at an existing |ogc-api-proc|_ description, the :term:`CWL` should
+contain either ``OGCAPIRequirement`` in the ``hints`` section, or ``weaver:OGCAPIRequirement`` in the ``requirements``
+section.
+
+The referenced :term:`Application Package` can be provided in multiple ways as presented below.
 
 .. note::
 
@@ -207,7 +238,15 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
 ESGF-CWT
 ----------
 
-For :term:`ESGF-CWT` processes, the ``ESGF-CWTRequirement`` hint must be used.
+For :term:`ESGF-CWT` processes, the ``ESGF-CWTRequirement`` must be used in the :term:`CWL` ``hints`` section.
+Using ``hints`` allows the :term:`CWL` content to be parsed even if the schema reference is missing.
+This can be useful for deploying the :term:`Process` on other instances not implemented with `Weaver`.
+Note however that executing the :term:`Process` in such case will most potentially fail unless the other implementation
+handles it with custom logic.
+
+To define the :term:`Process` with explicit :term:`CWL` schema validation, the ``requirements`` section must be used
+instead. To resolve the schema, the value ``weaver:ESGF-CWTRequirement`` should be used instead.
+
 For an example :term:`CWL` using this definition, see :ref:`app_pkg_esgf_cwt` section.
 
 This kind of :term:`Process` allows for remote :ref:`Execution <proc_op_execute>` and
@@ -417,7 +456,7 @@ the |getcap-req|_ request.
 .. _proc_op_undeploy:
 .. _proc_op_update:
 
-Update, replace or remove an existing process (Update, Replace, Undeploy)
+Modify an existing process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
 Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
@@ -1318,6 +1357,219 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
     Definitions in |opensearch-examples|_ providing different combinations of inputs, notably for using distinct
     :term:`AOI`, term:`TOI` and collections, with or without ``UniqueAOI`` and ``UniqueTOI`` specifiers.
 
+.. _proc_bbox_inputs:
+
+BoundingBox Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: provide example and details, (crs, dimensions, etc.)
+.. todo:: cross-reference :ref:`cwl-io-types` for more details/examples
+
+.. _proc_col_inputs:
+
+Collection Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The |ogc-api-proc-part3-collection-input|_ is defined by the |ogc-api-proc-part3|_ extension. This allows to submit a
+:term:`Process Execution <proc_op_execute>` using the following :term:`JSON` structure when the targeted :term:`Process`
+can make use of the resulting data sources retrieved from the referred :term:`Collection` and processing conditions.
+The ``collection`` keyword is employed to identify this type of input, in contrast to literal data and complex file
+inputs respectively using ``value`` and ``href``, as presented in the :ref:`Process Execution <proc_op_execute>`
+section.
+
+.. literalinclude::  ../examples/collection-input-basic.json
+    :language: json
+    :caption: Process Execution with a Collection Input
+
+.. note::
+    More properties can be provided with the ``collection``, such as ``filter``, ``sortBy``, etc.
+    The :term:`OpenAPI` definition in `Weaver` is defined with a minimal set of properties, since specific requirements
+    to be supported might need multiple :term:`OGC` Testbed iterations to be established.
+    Also, different combinations of parameters will be supported depending on which remote :term:`API` gets
+    interrogated to resolve the :term:`Collection` contents. The |ogc-api-proc-part3|_ is still under development,
+    and interactions with the various access points of |ogc-api-standards|_ remains to
+    be evaluated in detail to further explore interoperability concerns between all :term:`API`implementations.
+    Refer to :ref:`proc_col_inputs_examples` for potential combinations and additional samples.
+
+To determine which *items* should be retrieved from the :term:`Collection`, whether they are obtained by
+|ogc-api-coverages|_, |ogc-api-features|_, |ogc-api-maps|_, |ogc-api-tiles|_, |stac-api-spec|_,
+or any other relevant data access mechanisms defined by the |ogc-api-standards|_,
+depends on the negotiated :term:`Media-Types` required by the corresponding input
+in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
+and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
+
+For example, if a :term:`Process` input indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
+or contained a ``format: geojson-feature-collection`` indicate in its ``schema``, the referenced ``collection``
+would most probably be accessed
+using |ogc-api-features|_ (i.e.: with request ``GET /collections/dataset-features/items``),
+to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be passed to the corresponding
+input of the :term:`Process`.
+However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
+the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
+
+Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process` while targeting
+the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
+potentially be retrieved as input for the :term:`Process Execution <proc_op_execute>`.
+
+In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
+the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
+specified. However, its capability to auto-resolve multiple :term:`Media-Types` negotiations, formats, data structures,
+data cardinality and :term:`API` protocols simultaneously can make its behavior hard to predict.
+
+.. hint::
+    In order to evaluate the expected resolution of a :term:`Collection`
+    prior to including it into a complex :term:`Process` or :ref:`Workflow` execution, the :ref:`proc_builtin`
+    :py:mod:`weaver.processes.builtin.collection_processor` can be employed to test its result.
+    This function will be used under-the-hood whenever a |ogc-api-proc-part3-collection-input|_ is specified.
+
+    Since the :term:`Builtin Process` only performs the resolution of the ``collection`` into the corresponding
+    data sources for the target :term:`Process`, without actually downloading the resolved :term:`URL` references,
+    using it can potentially help identify and avoid unintended large processing, or allow users to validate that
+    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval for the
+    desired execution purpose.
+
+.. seealso::
+    The :ref:`proc_col_inputs_examples` section further demonstrates how to
+    apply |ogc-api-proc-part3-collection-input|_ and how its parameters can help produce various result combinations.
+
+.. note::
+    Do not hesitate to |submit-issue|_ if the |ogc-api-proc-part3-collection-input|_ resolution does not seem
+    to behave according to your specific use cases.
+
+Format Selection
+^^^^^^^^^^^^^^^^
+
+For cases where the resolution does not automatically resolve with the intended behavior,
+any submitted |ogc-api-proc-part3-collection-input|_ can include the following additional parameters
+to hint the resolution toward certain outcomes.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,80
+
+    * - Parameter
+      - Description
+    * - ``type``
+      - Indicates the desired :term:`Media-Type` to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+        This can be used in situations where the target :term:`Process` receiving the :term:`Collection` as input
+        supports multiple compatible :term:`Media-Types`, and that the user wants to explicitly indicate which
+        one would be preferred, or to limit combinations to a certain :term:`Media-Type` when multiple matches
+        are resolved simultaneously.
+    * - ``schema``
+      - Indicates the desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
+        This can be used similarly to ``type``, but can provide further resolution indications in cases where
+        the ``type`` alone remains ambiguous, such as distinguishing between many different :term:`GeoJSON`
+        *feature types* which are all represented by the same ``application/geo+json`` media-type.
+    * - ``format``
+      - Indicates the preferred data access mechanism to employ amongst
+        :py:class:`weaver.execute.ExecuteCollectionFormat` supported values.
+        This can be used to explicitly override the selected :term:`API` or strategy to resolve
+        the |ogc-api-proc-part3-collection-input|_. Because many of the supported :term:`Collection` processors
+        share similar endpoints, query parameters and :term:`Media-Types` content negotiation strategies,
+        automatic resolution might not always result in the desired behavior. Omitting this parameter leaves it
+        up to available parameters to attempt an educated guess, which might not always be possible.
+
+.. _proc_col_inputs_filter:
+
+Filtering
+^^^^^^^^^
+
+When adding a ``filter`` parameter along the ``collection`` reference, it is possible to provide filtering conditions
+to limit the items to be extracted from the :term:`Collection`. See the :ref:`proc_col_inputs_examples` for samples.
+
+In the event that a ``filter`` contains coordinates that do not employ the
+commonly employed default :term:`CRS` of ``EPSG:4326`` (or ``CRS84``/``CRS84h`` equivalents),
+the ``filter-crs`` parameter can be specified to provide the applicable :term:`CRS`.
+
+.. note::
+    `Weaver` will not itself interpret the ``filter-crs`` beside transforming between :term:`URI` and
+    common short name representations to ensure the remote :term:`API` can properly resolve the intended reference.
+    If a ``filter-crs`` is provided, it is up to the remote :term:`API` receiving it to interpret it and the
+    referenced coordinates within ``filter`` correctly.
+    If the targeted server by the ``collection`` :term:`URL` cannot resolve the :term:`CRS`, the user will need
+    to convert it themselves to make it appropriate according to the target server capabilities.
+
+The ``filter-lang`` parameter can be employed to indicate which language encoding is specified in ``filter``.
+At the moment, the following languages (case-insensitive) are handled in `Weaver` using :mod:`pygeofilter`.
+
+.. list-table::
+    :header-rows: 1
+
+    * - Name and Reference
+      - Value for ``filter-lang``
+    * - |filter-cql2-json|_
+      - ``cql2-json``
+    * - |filter-cql2-text|_
+      - ``cql2-text``
+    * - |filter-cql-csw|_
+      - ``cql``
+    * - |filter-simple-cql|_
+      - ``simple-cql``
+    * - |filter-cql-json|_
+      - ``cql-json``
+    * - |filter-cql-text|_
+      - ``cql-text``
+    * - |filter-ecql|_
+      - ``ecql``
+    * - |filter-fes|_
+      - ``fes``
+    * - |filter-jfe|_
+      - ``jfe``
+
+.. note::
+    Although there are a lot of "*Common Query Language*" (CQL) variations, most of them only imply minimal
+    variations between some operations, sometimes allowing alternate or additional systax and/or operators.
+
+    Because most |ogc-api-standards|_ rely extensively on |filter-cql2-json|_ or |filter-cql2-text|_ encodings,
+    and that most of them have common bases that can be easily translated, all language variants
+    will be converted to an appropriate and equivalent CQL2-based definition, before submitting
+    it to the :term:`Collection` resolution operation.
+
+.. _proc_col_inputs_examples:
+
+Examples
+^^^^^^^^
+
+The following section presents some examples of potential |ogc-api-proc-part3-collection-input|_ definitions that could
+be used for :ref:`Process Execution <proc_op_execute>`, and some explanation about their expected resolution.
+
+The following example presents the use of a ``filter`` encoded with |filter-cql2-json|_, used to limit the retrieved
+geometries only to :term:`Feature` instances that intersect the specified polygon. Any :term:`Feature` that was matched
+should also be sorted in descending order of their respective ``id`` property, according to the ``sortBy`` parameter.
+Furthermore, the |ogc-api-features|_ resolution is requested using the ``format`` parameter. Because it is
+expected from this :term:`API` that a :term:`GeoJSON` ``FeatureCollection`` document would be returned,
+the ``features`` input of the :term:`Process` receiving this result should support ``application/geo+json``
+or a similar ``schema`` definition for this execution request to be successful. Since this :term:`Media-Type`
+is the default value returned by |ogc-api-features|_, the ``type`` does not need to be set explicitly.
+
+.. literalinclude::  ../examples/collection-input-filter-cql2-json-ogc-features.json
+    :language: json
+    :caption: |ogc-api-proc-part3-collection-input|_ with |filter-cql2-json|_ Filter using |ogc-api-features|_
+
+The following example presents a ``filter`` encoded with |filter-cql2-text|_, which aims to return only elements
+that contain a property matching the ``eo:cloud_cover < 0.1`` criteria from the :term:`Collection`
+named ``sentinel-2``. In this case, the |stac-api-spec|_ is indicated by the ``format``. Therefore,
+|stac-items|_ defined under that :term:`Collection` are expected to be considered if their properties respect
+the ``eo:cloud_cover`` filter. However, the :term:`Media-Type` defined by ``type`` corresponding to |geotiff-cog|_
+is also specified, meaning that the result from the |ogc-api-proc-part3-collection-input|_ resolution is not
+the :term:`GeoJSON` |stac-items|_ themselves, but the |stac-assets|_ they respectively contain, and that match
+this GeoTIFF ``type``.
+Therefore, the definition of the :term:`Process` input ``images`` should support an array of GeoTIFF images,
+for this resolution to succeed, and proceed to execute the :term:`Process` using them.
+
+.. literalinclude::  ../examples/collection-input-filter-cql2-text-stac.json
+    :language: json
+    :caption: |ogc-api-proc-part3-collection-input|_ with |filter-cql2-text|_ Filter and |stac-api-spec|_
+
+.. _proc_col_outputs:
+
+Collection Outputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: Not implemented. See `crim-ca/weaver#683 <https://github.com/crim-ca/weaver/issues/683>`_.
+
+.. _proc_multi_inputs:
+
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1325,6 +1577,8 @@ Multiple Inputs
 
 .. seealso::
     - :ref:`Multiple and Optional Values`
+
+.. _proc_multi_outputs:
 
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

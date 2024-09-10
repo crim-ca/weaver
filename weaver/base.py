@@ -95,7 +95,8 @@ class Constants(object, metaclass=_Const):
         """
         Returns the literal values assigned to corresponding enum elements.
         """
-        return [getattr(cls, member) for member in cls.__members__()]
+        members = [getattr(cls, member) for member in cls.__members__()]
+        return [member for member in members if not callable(member)]
 
 
 class classproperty(property):  # pylint: disable=C0103,invalid-name

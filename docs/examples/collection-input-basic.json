@@ -1,0 +1,7 @@
+{
+  "inputs": {
+    "image-input": {
+      "collection": "https://example.com/collections/sentinel-2"
+    }
+  }
+}
