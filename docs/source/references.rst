@@ -126,10 +126,14 @@
 .. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
 .. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
 .. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
-.. |ogc-exec-sync-responses| replace:: *OGC API - Processes*, Responses (sync)
-.. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-.. |ogc-exec-async-responses| replace:: *OGC API - Processes*, Responses (async)
-.. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
+.. |ogc-api-proc-exec-mode| replace:: *OGC API - Processes* - Execution Mode
+.. _ogc-api-proc-exec-mode: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode
+.. |ogc-api-proc-exec-responses-sync| replace:: *OGC API - Processes* - Execution Responses (sync)
+.. _ogc-api-proc-exec-responses-sync: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
+.. |ogc-api-proc-exec-responses-async| replace:: *OGC API - Processes* - Execution Responses (async)
+.. _ogc-api-proc-exec-responses-async: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
+.. |ogc-api-proc-exec-outputs| replace:: *OGC API - Processes* - Execution Outputs
+.. _ogc-api-proc-exec-outputs: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs
 .. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
 .. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
 .. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process

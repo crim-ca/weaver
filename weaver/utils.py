@@ -959,7 +959,7 @@ def as_version_major_minor_patch(version):
 def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
     # type: (Optional[AnyVersion], VersionFormat) -> AnyVersion
     """
-    Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
+    Generates a ``MAJOR.MINOR.PATCH`` version with padded zeros for any missing parts.
     """
     if isinstance(version, (str, float, int)):
         ver_parts = list(Version(str(version)).version)

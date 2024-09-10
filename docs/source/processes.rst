@@ -579,11 +579,14 @@ Execution of a process (Execute)
     For backward compatibility, the |exec-req-job|_ request is also supported as alias to the above
     :term:`OGC API - Processes` compliant endpoint.
 
-This section will first describe the basics of this request format, and after go into details for specific use cases
-and parametrization of various input/output combinations. Let's employ the following example of JSON body sent to the
-:term:`Job` execution to better illustrate the requirements.
+This section will first describe the basics of this request format (:ref:`proc_exec_body`), and after go into
+further details for specific use cases and parametrization of various input/output combinations.
 
-.. table::
+Below are some examples of :term:`JSON` body that can be sent to the :term:`Job` execution endpoint to
+better illustrate where each of the mentioned parameters in following section are expected.
+
+.. table:: Example Job Execution Request Body
+    :name: table-exec-body
     :class: code-table
     :align: center
 
@@ -596,8 +599,8 @@ and parametrization of various input/output combinations. Let's employ the follo
     |     "response": "document",                   |     "response": "document",                   |
     |     "inputs": [                               |     "inputs": {                               |
     |       {                                       |       "input-file": {                         |
-    |         "id": "input-file",                   |         "href": "<some-file-reference"        |
-    |         "href": "<some-file-reference"        |       },                                      |
+    |         "id": "input-file",                   |         "href": "<file-reference>"            |
+    |         "href": "<file-reference>"            |       },                                      |
     |       },                                      |       "input-value": {                        |
     |       {                                       |         "value": 1                            |
     |         "id": "input-value",                  |       }                                       |
@@ -623,17 +626,18 @@ and parametrization of various input/output combinations. Let's employ the follo
 
 .. note::
     Other parameters can be added to the request to provide further functionalities. Above fields are the minimum
-    requirements to request a :term:`Job`. Please refer to the |exec-api|_ definition for all applicable features.
+    requirements to request a :term:`Job`. Please refer to the |exec-api|_ definition, as well as following sections,
+    for all applicable features.
 
 .. seealso::
-    - :ref:`proc_exec_body` and :ref:`proc_exec_mode` details applicable for `Weaver` specifically.
-    - `OGC API - Processes, Process Outputs <https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs>`_
-      for more general details on ``transmissionMode`` parameter.
-    - `OGC API - Processes, Execution Mode <https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_
-      for more general details on the execution negotiation (formerly with ``mode`` parameter) and more recently
-      with ``Prefer`` header.
-    - |ogc-exec-sync-responses|_ and |ogc-exec-async-responses|_
-      for a complete listing of available ``response`` formats considering all other parameters.
+    - :ref:`proc_exec_body`, :ref:`proc_exec_mode` and :ref:`proc_exec_response` sections provide details
+      applicable to `Weaver`, which align with :term:`OGC API - Processes`, but that can also support additional
+      capabilities.
+    - |ogc-api-proc-exec-outputs|_ offers general details on ``transmissionMode`` parameter of requested outputs.
+    - |ogc-api-proc-exec-mode|_ describes general details about the execution negotiation (`sync`/`async`),
+      formerly with ``mode`` parameter, and more recently with ``Prefer`` header.
+    - |ogc-api-proc-exec-responses-sync|_ and |ogc-api-proc-exec-responses-async|_ provide
+      a complete listing of available ``response`` formats considering all other parameters.
 
 .. |exec-api| replace:: OpenAPI Execute
 .. _exec-api: `exec-req`_
@@ -656,34 +660,42 @@ required when submitting the execution request, even for a no-input process (an 
 It defines which parameters
 to forward to the referenced :term:`Process` to be executed. All ``id`` elements in this :term:`Job` request
 body must correspond to valid ``inputs`` from the definition returned by :ref:`DescribeProcess <proc_op_describe>`
-response. Obviously, all formatting requirements (i.e.: proper file :term:`MIME-types`),
+response. Obviously, all formatting requirements (i.e.: proper file :term:`Media-Types`),
 data types (e.g.: ``int``, ``string``, etc.) and validations rules (e.g.: ``minOccurs``, ``AllowedValues``, etc.)
 must also be fulfilled. When providing files as input,
 multiple protocols are supported. See later section :ref:`File Reference Types` for details.
 
-The ``outputs`` section defines, for each ``id`` corresponding to the :term:`Process` definition, how to
-report the produced outputs from a successful :term:`Job` completion. For the time being, `Weaver` only implement the
-``reference`` result as this is the most common variation. In this case, the produced file is
-stored locally and exposed externally with returned reference URL. The other mode ``value`` returns the contents
-directly in the response instead of the URL.
+The ``outputs`` section defines, for each ``id`` available from the :term:`Process` definition, how to
+report the produced outputs from a successful :term:`Job` execution. The method under which each output will
+be returned depends on the negotiated :ref:`proc_exec_mode` and :ref:`proc_exec_response`.
 
-When ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed should return all
+When an output corresponds to a file produced by the :term:`Application Package`, and stored locally, the
+result will typically (unless requested otherwise), be exposed externally using the returned reference :term:`URL`.
+For outputs that correspond to literal data, such as plain strings or numbers, `Weaver` will typically prefer
+returning the ``value`` directly. However, alternate link representations can also be obtained if specified in the
+execution request.
+
+When the ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed should return all
 outputs it offers in the created :ref:`Job Results <proc_op_result>`. In such case, because no representation modes
-is specified for individual outputs, `Weaver` automatically selects ``reference`` as it makes all outputs more easily
-accessible with distinct URL afterwards. If the ``outputs`` section is specified, but that one of the outputs defined
-in the :ref:`Process Description <proc_op_describe>` is not specified, that output should be omitted from the produced
-results. For the time being, because only ``reference`` representation is offered for produced output files, this
-filtering is not implemented as it offers no additional advantage for files accessed directly with their distinct URLs.
-This could be added later if ``Multipart`` raw data representation is required.
-Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
+is specified for individual outputs, `Weaver` automatically selects ``reference`` for files as it makes all outputs
+more easily accessible with distinct :term:`URL` afterwards, and ``values`` for literal data to obtain them directly.
+If the ``outputs`` section is specified, but that one of the ``outputs`` defined in
+the :ref:`Process Description <proc_op_describe>` is not specified, this indicates that the :term:`Job` should
+omit this output from the produced results.
 
 .. fixme:
 .. todo::
+    For the time being, because only ``reference`` representation is offered for produced output files, this
+    filtering is not implemented as it offers no additional advantage for files accessed directly with their
+    distinct links.
+    This could be added later if ``Multipart`` raw data representation is required.
+    Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
+
     Filtering of ``outputs`` not implemented (everything always available).
     https://github.com/crim-ca/weaver/issues/380
 
 Other parameters presented in the above examples, namely ``mode`` and ``response`` are further detailed in
-the following :ref:`proc_exec_mode` section.
+the following :ref:`proc_exec_mode` and :ref:`proc_exec_response` sections.
 
 .. _proc_exec_mode:
 
@@ -694,8 +706,8 @@ In order to select how to execute a :term:`Process`, either `synchronously` or `
 should be specified. If omitted, `Weaver` defaults to `asynchronous` execution. To execute `asynchronously` explicitly,
 ``Prefer: respond-async`` should be used. Otherwise, the `synchronous` execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
-within that time, or if this value is greater than ``weaver.exec_sync_max_wait``, the :term:`Job` will resume
-`asynchronously` and the response will be returned. Furthermore, `synchronous` and `asynchronous` execution of
+within that time, or if this value is greater than the |weaver-execute-sync-max-wait|_ setting, the :term:`Job` will
+resume `asynchronously` and the response will be returned. Furthermore, `synchronous` and `asynchronous` execution of
 a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
 its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
 applicable modes when :ref:`Deploying a Process <proc_op_deploy>` to allow it to run as desired. By default, `Weaver`
@@ -713,19 +725,25 @@ will assume that deployed processes are only `asynchronous` to handle longer ope
     queue, as this allows `Weaver` to offer better availability for all requests submitted by its users.
     The `synchronous` mode should be reserved only for very quick and relatively low computation intensive operations.
 
-The ``mode`` field displayed in the body is another method to tell whether to run the :term:`Process` in a blocking
-(``sync``) or non-blocking (``async``) manner. Note that support is limited for mode ``sync`` as this use case is often
-more cumbersome than ``async`` execution. Effectively, ``sync`` mode requires to have a task worker executor available
-to run the :term:`Job` (otherwise it fails immediately due to lack of processing resource), and the requester must wait
-for the *whole* execution to complete to obtain the result. Given that :term:`Process` could take a very long time to
-complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
+.. fixme:
+.. todo::
+    Support the ``Prefer: handling=strict`` modifier to disallow switching between sync/async
+    https://github.com/crim-ca/weaver/issues/701
+
+The ``mode`` field displayed in the :ref:`table-exec-body` is another method to tell whether to run the :term:`Process`
+in a blocking (``sync``) or non-blocking (``async``) manner. Note that support is limited for mode ``sync`` as this use
+case is often more cumbersome than ``async`` execution. Effectively, ``sync`` mode requires to have a task worker
+executor available to run the :term:`Job` (otherwise it fails immediately due to lack of processing resource), and
+the requester must wait for the *whole* execution to complete to obtain the result.
+Given that :term:`Process` could take a very long time to complete, it is not practical to execute them in this
+manner and potentially have to wait hours to retrieve outputs.
 Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
 will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and ``Location``
 where the user can probe for its status, using :ref:`Monitoring <proc_op_monitor>` request. As soon as any task worker
 becomes available, it will pick any leftover queued :term:`Job` to execute it.
 
 .. note::
-    The ``mode`` field is an older methodology that precedes the official :term:`OGC API - Processes` method using
+    The ``mode`` field is an older methodology that precedes the latest :term:`OGC API - Processes` method using
     the ``Prefer`` header. It is recommended to employ the ``Prefer`` header that ensures higher interoperability
     with other services using the same standard. The ``mode`` field is deprecated and preserved only for backward
     compatibility purpose.
@@ -754,7 +772,35 @@ It is also possible that a ``failed`` :term:`Job`, even when `synchronous`, will
 to the status location instead of results. This is because it is impossible for `Weaver` to return
 the result(s) as outputs would not be generated by the incomplete :term:`Job`.
 
-Finally, the ``response`` parameter defines how to return the results produced by the :term:`Process`.
+For any of the execution combinations, it is always possible to obtain :term:`Job` outputs,
+along with logs, exceptions and other details using the :ref:`proc_op_result` endpoints.
+
+.. _proc_exec_response:
+
+Execution Response
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When requesting a :term:`Job` execution, the structure under which the :term:`Process` results are returned can
+be adjusted using the ``Prefer`` header with the ``return`` parameter. More precisely, the ``Prefer: return=minimal``
+and ``Prefer: return=representation`` definitions can be used to control whether the resulting ``outputs`` would be
+provided by
+
+.. note::
+    The previous :term:`OGC API - Processes` standard revision instead made use of the ``response`` parameter
+    in the execution request body, as shown in the table :ref:`table-exec-body`. In general, the ``return=minimal``
+    representation
+
+
+.. fixme: requested ``transmissionMode`` parameter (``value``/``reference``),
+
+.. fixme: The other ``transmissionMode: value`` would instead return
+          the contents directly in the response rather than the :term:`URL`.
+
+.. fixme: Using ``Prefer: return=representation`` ...
+
+.. fixme: reword below with ``Prefer``
+
+The ``response`` parameter defines how to return the results produced by the :term:`Process`.
 When ``response=document``, regardless of ``mode=async`` or ``mode=sync``, and regardless of requested
 outputs ``transmissionMode=value`` or ``transmissionMode=reference``, the results will be returned in
 a :term:`JSON` format containing either literal values or URL references to produced files. If ``mode=async``,
@@ -764,11 +810,19 @@ depends both on the number of available :term:`Process` outputs, which ones were
 requested (i.e.: ``transmissionMode``). It is also possible that further content negotiation gets involved
 accordingly to the ``Accept`` header and available ``Content-Type`` of the outputs if multiple formats are supported
 by the :term:`Process`. For more details regarding those combination, the official
-|ogc-exec-sync-responses|_ and |ogc-exec-async-responses|_ should be employed as reference.
+|ogc-api-proc-exec-responses-sync|_ and |ogc-api-proc-exec-responses-async|_ should be employed as reference.
 
-For any of the previous combinations, it is always possible to obtain :term:`Job` outputs, along with logs, exceptions
-and other details using the :ref:`proc_op_result` endpoints.
+.. note::
+    The ``transmissionMode`` and ``response`` fields are part of the older methodology that precedes
+    the latest :term:`OGC API - Processes` standard revision using the ``Prefer`` header.
 
+    Whenever possible, it is recommended to employ the ``Prefer`` header that should provide higher interoperability
+    with other services using the same standard. However, given that ``transmissionMode`` and ``response`` fields
+    can allow more flexibility and strict control regarding how data is returned is specific edge cases, in contrast
+    to the ``Prefer`` header approach, they remain available in `Weaver`.
+
+    See the `opengeospatial/ogcapi-processes#412 <https://github.com/opengeospatial/ogcapi-processes/issues/412>`_
+    discussions for more details about each approach, their considerations, and potential side-effects.
 
 .. _proc_exec_steps:
 

@@ -404,6 +404,7 @@ they are optional and which default value or operation is applied in each situat
   .. versionadded:: 4.15
   .. versionchanged:: 4.34
 
+.. |weaver-execute-sync-max-wait| replace:: ``weaver.execute_sync_max_wait``
 .. _weaver-execute-sync-max-wait:
 
 - | ``weaver.execute_sync_max_wait = <int>`` [:class:`int`, seconds]
