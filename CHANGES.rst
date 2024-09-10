@@ -25,10 +25,11 @@ Changes:
 - Add better validation off well-known `CWL` ``$namespaces`` as reserved keywords when deploying a `Process` to ensure
   better interoperability between implementations and adequate metadata resolution
   (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
-- Add documentation about *Jupyter Notebook* to `CWL` convertion
+- Add documentation about *Jupyter Notebook* to `CWL` conversion
   utility `ipython2cwl <https://github.com/common-workflow-lab/ipython2cwl>`_
   and a sample `crim-ca/ncml2stac <https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac>`_ repository
-  making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition.
+  making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
+  (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
 
 Fixes:
 ------
