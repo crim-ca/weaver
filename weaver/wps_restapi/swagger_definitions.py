@@ -808,7 +808,7 @@ class Link(LinkRelationship, LinkBase):
 class MetadataValueField(OneOfKeywordSchema):
     _one_of = [
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
-        ExtendedSchemaNode(String()),
+        ExtendedSchemaNode(String(), description="Plain text value of the information."),
         # literal JSON schema, permissive since it can be anything
         PermissiveMappingSchema(description="Flexible schema definition for the metadata value.")
     ]
