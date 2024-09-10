@@ -1,3 +1,5 @@
+import csv
+import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -5,9 +7,6 @@ if TYPE_CHECKING:
     # Therefore, it is not executed when running hte notebook.
     # In other words, 'ipython2cwl' does not even need to be installed!
     from ipython2cwl.iotypes import CWLFilePathInput, CWLFilePathOutput
-
-import csv
-import json
 
 input_file: "CWLFilePathInput" = "data.csv"
 with open(input_file, mode="r", encoding="utf-8") as f:
