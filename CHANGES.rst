@@ -3,7 +3,10 @@
 Changes
 *******
 
-.. **REPLACE AND/OR ADD SECTION ENTRIES ACCORDINGLY WITH APPLIED CHANGES**
+Changes:
+--------
+- Add parsing of additional metadata from schema.org in CWL document to convert into process fields (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_) 
+- Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_) 
 
 .. _changes_latest:
 
