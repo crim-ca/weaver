@@ -911,6 +911,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
+            "version": "1.0",
             "metadata": [
                 {
                     "type": "text/html",
@@ -918,7 +919,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                     "href": "https://gitlab.com/"
                 },
             ],
-            "version": "1.0"
         }
     ),
     (
@@ -933,6 +933,94 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             "abstract": "",
             "title": "",
             "version": "1.0.0"
+        }
+    ),
+    (
+        # Test contributor
+        {
+            "cwl_package_package": {
+                "s:contributor": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "",
+            "metadata": [
+                {
+                    "role": "contributor",
+                    "value": {
+                        "$schema": "https://schema.org/Person",
+                        "name": "John Doe",
+                        "affiliation": "Example Inc."
+                    }
+                }
+            ]
+        }
+    ),
+    (
+        # Test citation
+        {
+            "cwl_package_package": {
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "",
+            "metadata": [
+                {
+                    "type": "text/plain",
+                    "rel": "citation",
+                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                },
+            ],
+        }
+    ),
+    (
+        # Test dateCreated with existing metadata
+        {
+            "cwl_package_package": {
+                "s:dateCreated": [
+                    {"class": "s:DateTime", "s:dateCreated": "2016-12-13"}
+                ],
+            },
+            "wps_package_metadata": {
+                "abstract": "",
+                "title": "",
+                "version": "",
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                ],
+            }
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "",
+            "metadata": [
+                {
+                    "type": "text/plain",
+                    "rel": "citation",
+                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                },
+                {
+                    "role": "dateCreated",
+                    "value": {
+                        "$schema": "https://schema.org/DateTime",
+                        "dateCreated": "2016-12-13",
+                    }
+                }
+            ]
         }
     ),
 ])
