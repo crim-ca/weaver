@@ -95,6 +95,136 @@ provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamica
     :caption: Sample CWL definition of a Python script
     :name: example_app_pkg_script
 
+.. seealso::
+    See the :ref:`app_pkg_python` section for more utilities to help create an :term:`Application Package` from Python.
+
+.. seealso::
+    For other programing languages, see |cwl-dev-tools|_ for a list of related utilities that helps working
+    with :term:`CWL`, some of which offering convertion capabilities.
+
+.. _app_pkg_python:
+
+Python Applications
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the :term:`Application Package` to be generated consists of a Python script, which happens to make use of
+the builtin |python-argparse|_ package, it is possible to employ the |argparse2tool|_ utility, which will automatically
+generate a corresponding :term:`CWL` definition using the specified :term:`CLI` arguments and their types.
+
+The |argparse2tool|_ utility can help quickly generate a valid :term:`CWL` definition, but it is the responsibility
+of the user to validate that converted arguments have the appropriate types, or any additional metadata required to
+properly describe the intended :term:`Process`. Notably, users might find the need to add appropriate ``format``
+definitions to the :term:`I/O`, since those will generally be missing descriptive :term:`Media-Types`.
+
+.. note::
+    Although |argparse2tool|_ can help in the initial :term:`CWL` generation procedure, it is recommended to apply
+    additional containerization best-practices, such as described in :ref:`app_pkg_script`, to increase chances to
+    obtain a replicable and reusable :term:`Application Package` definition.
+
+.. seealso::
+    For pure Python scripts not using |python-argparse|_, the |scriptcwl|_ utility can be considered instead.
+
+.. seealso::
+    For Python code embedded in |jupyter-notebooks|_, refer to :ref:`app_pkg_jupyter_notebook` for more details.
+
+.. |python-argparse| replace:: ``argparse``
+.. _python-argparse: https://docs.python.org/3/library/argparse.html
+
+.. |argparse2tool| replace:: ``argparse2tool``
+.. _argparse2tool: https://github.com/hexylena/argparse2tool
+
+.. |scriptcwl| replace:: ``scriptcwl``
+.. _scriptcwl: https://github.com/NLeSC/scriptcwl
+
+.. _app_pkg_jupyter_notebook:
+
+Jupyter Notebook Applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When working on experimental or research applications, a |jupyter-notebook|_ is a popular development environment,
+due to its convenient interface for displaying results, interacting with visualization tools, or the larger plugin
+ecosystem that it can offer. However, a |jupyter-notebook|_ is typically insufficient by itself to describe a complete
+application. To help developers transition from a |jupyter-notebook|_ to :ref:`app_pkg_docker`, which ensures the
+:term:`Application Package` can be deployed and reused, the |jupyter-ipython2cwl|_ utility can be employed.
+
+Using |jupyter-repo2cwl| (after installing |jupyter-ipython2cwl|_ in the Python environment), it is possible to
+directly convert a Git repository reference containing a |jupyter-notebook|_ into deployable :term:`CWL` leveraging
+a :term:`Docker` container. To do this, the utility uses two strategies under the hood:
+
+1. |jupyterhub-repo2docker|_ is employed to convert a Git repository into a :term:`Docker` container, with any
+   applicable package requirements, project metadata, and advanced configuration details.
+2. Python typing annotations provided by |jupyter-ipython2cwl|_ define the :term:`CWL` :term:`I/O`
+   from variables and results located within the |jupyter-notebook|_.
+
+.. note::
+    Because |jupyterhub-repo2docker|_ is employed, which is highly adaptable to many use cases, all typical Python
+    project `Configuration Files <https://repo2docker.readthedocs.io/en/latest/config_files.html>`_,
+    such as ``requirements.txt``, ``environment.yml``, ``setup.py``, ``pyproject.toml``, etc. can be employed.
+    The :term:`Docker` container dependencies can be provided with an explicit ``Dockerfile`` as well.
+    Please refer to the official documentation for all advanced configuration options.
+
+Because Python type annotations are employed with |jupyter-repo2cwl|
+to indicate which variables will contain the :term:`CWL` :term:`I/O` references, it is actually possible
+to annotate a |jupyter-notebook|_ *without any additional package dependencies*. To do so, one only needs
+to employ *string annotations* as follows.
+
+.. literalinclude:: ../examples/jupyter_repo2cwl_python.py
+    :language: python
+    :caption: Sample CWL annotations of Python code in Jupyter Notebook
+    :name: example_app_pkg_jupyter_repo2cwl_python
+
+.. seealso::
+    See `IPython2CWL Supported Types <https://ipython2cwl.readthedocs.io/en/latest/#module-ipython2cwl.iotypes>`_
+    for more details about the mapping from a Python annotation to the resulting :term:`CWL` :ref:`cwl-io-types`.
+
+When the above code is saved in a |jupyter-notebook|_ and committed to a Git repository, the |jupyterhub-repo2docker|_
+utility can automatically clone the repository, parse the Python code, extract the :term:`CWL` annotations, and
+generate the :term:`Application Package` with a :term:`Docker` container containing all of their respective definitions.
+All of this is accomplished with a single call to obtain a deployable :term:`CWL` in `Weaver`, which can then take over
+from the :ref:`Process Deployment <proc_op_deploy>` to obtain an :term:`OGC API - Process` definition.
+
+Jupyter Notebook to CWL Example: NCML to STAC Application
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For a more concrete example of a |jupyter-notebook|_ convertion to :term:`CWL`, see the |ncml2stac-repo|_ GitHub
+repository, which contains a sample |ncml2stac-notebook|_.
+This script, as indicated by its name, converts *NCML XML metadata with CMIP6 attributes* into the
+corresponding *SpatioTemporal Asset Catalog* (STAC) definition and extensions.
+It uses the same |jupyter-ipython2cwl|_ type annotation strategy as presented
+:ref:`above <example_app_pkg_jupyter_repo2cwl_python>` to indicate which NCML ``File`` variable is to be employed as
+as the :term:`CWL` input reference, and the expected STAC ``File`` as output to be collected by :term:`CWL`.
+
+Using |jupyter-repo2cwl| and the :ref:`Weaver CLI <cli_commands>` in combination, as shown below,
+it is possible to automatically convert the |jupyter-notebook|_ script into a Dockerized :term:`CWL` and
+deploy it to a :term:`OGC API - Processes` server supporting :term:`Application Package` such as `Weaver`.
+
+.. code-block:: shell
+    :caption: |jupyter-notebook|_ conversion to :term:`CWL` and deployment as :term:`OGC API - Processes`
+
+    jupyter-repo2cwl "https://github.com/crim-ca/ncml2stac" -o /tmp
+    weaver deploy -u http://example.com/weaver -i ncml2stac --cwl /tmp/notebooks_ncml2stac.cwl
+
+.. seealso::
+    - Refer to the |ncml2stac-repo|_ repository's README for more details about the utilities.
+    - Refer to the |ncml2stac-notebook|_ for the implementation of the :term:`Application Package` script.
+
+.. |jupyter-notebook| replace:: Jupyter Notebook
+.. _jupyter-notebook: https://jupyter.org/
+
+.. |jupyterhub-repo2docker| replace:: ``jupyterhub/repo2docker``
+.. _jupyterhub-repo2docker: https://github.com/jupyterhub/repo2docker
+
+.. |jupyter-repo2cwl| replace:: ``jupyter repo2cwl``
+
+.. |jupyter-ipython2cwl| replace:: ``IPython2CWL``
+.. _jupyter-ipython2cwl: https://github.com/common-workflow-lab/ipython2cwl
+
+.. |ncml2stac-repo| replace:: ``crim-ca/ncml2stac``
+.. _ncml2stac-repo: https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+
+.. |ncml2stac-notebook| replace:: NCML to STAC Jupyter Notebook
+.. _ncml2stac-notebook: https://github.com/crim-ca/ncml2stac/blob/main/notebooks/ncml2stac.ipynb
+
 .. _app_pkg_docker:
 
 Dockerized Applications

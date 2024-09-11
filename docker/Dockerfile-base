@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         netbase \
         gcc \
+        g++ \
         git \
         nodejs \
     && pip install --no-cache-dir --upgrade -r requirements-sys.txt \
@@ -27,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip install --no-cache-dir -e ${APP_DIR} \
     && apt-get remove -y \
         gcc \
+        g++ \
         git \
     && rm -rf /var/lib/apt/lists/*
 
