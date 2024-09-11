@@ -41,6 +41,9 @@ Fixes:
   disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
 - Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
   different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
+- Pin ``pymongo>=4.3`` and remove ``celery[mongodb]`` extra requirement to avoid incompatible resolution
+  of ``pymongo[srv]>=4.8.0`` (relates to `celery/celery#9254 <https://github.com/celery/celery/issues/9254>`_
+  and `MongoDB PYTHON-4756 <https://jira.mongodb.org/browse/PYTHON-4756>`_).
 
 .. _changes_5.8.0:
 
