@@ -120,8 +120,9 @@ def get_queried_jobs(request):
         params.pop(param_name, None)
     filters = {**params, "process": process, "service": service}
 
-    detail = filters.pop("detail", False)
-    groups = filters.pop("groups", None)
+    f_html = ContentType.TEXT_HTML in str(guess_target_format(request))
+    detail = filters.pop("detail", False) or f_html  # detail always required in HTML for rendering
+    groups = filters.pop("groups", None) and not f_html  # unsupported groups in HTML
     filters["status"] = filters["status"].split(",") if "status" in filters else None
     filters["min_duration"] = filters.pop("minDuration", None)
     filters["max_duration"] = filters.pop("maxDuration", None)
