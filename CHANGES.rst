@@ -33,6 +33,9 @@ Fixes:
   disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
 - Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
   different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
+- Fix ``GET /jobs`` endpoint failing to return the rendered `HTML` listing when ``detail=true`` was omitted or
+  set to any non-detailed value. The ``detail`` query parameter is ignored for `HTML` since details are always
+  required to populate the `Job` table.
 
 .. _changes_5.8.0:
 
