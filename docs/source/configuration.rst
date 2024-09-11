@@ -325,7 +325,7 @@ they are optional and which default value or operation is applied in each situat
     default. Explicit response media-types can be requested in both cases using either an explicit ``Accept`` header
     of the desired media-type, or their corresponding ``f`` query format.
   |
-  | This option is Only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
+  | This option is only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
     always employed by default.
 
   .. versionadded:: 5.7.0

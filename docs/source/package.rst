@@ -2,6 +2,19 @@
 .. _package:
 .. _application-package:
 
+.. shortcuts for visualization
+
+.. |br| raw:: html
+
+    <br>
+
+.. |na| replace:: *n/a*
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+.. |<=>| unicode:: 0x21D4
+
 *************************
 Application Package
 *************************
@@ -1187,17 +1200,6 @@ Below is a list of compatible elements.
 
 .. [#cwl_schemaorg]
     See example: `cwl-metadata`_
-
-.. |br| raw:: html
-
-    <br>
-
-.. |na| replace:: *n/a*
-
-.. |nbsp| unicode:: 0xA0
-   :trim:
-
-.. |<=>| unicode:: 0x21D4
 
 .. _app_pkg_secret_parameters:
 
