@@ -48,6 +48,7 @@ from weaver.processes.wps_package import (
     WpsPackage,
     _load_package_content,
     _update_package_compatibility,
+    _update_package_metadata,
     format_extension_validator,
     get_application_requirement,
     mask_process_inputs
@@ -841,3 +842,186 @@ def test_mask_process_inputs(inputs, expect):
 def test_format_extension_validator_basic(data_input, mode, expect):
     # type: (Any, int, bool) -> None
     assert format_extension_validator(data_input, mode) == expect
+
+
+@pytest.mark.parametrize("original, expected", [
+    (
+        # Test author metadata with empty wps_package
+        {
+            "cwl_package_package": {
+                "s:author": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "metadata": [
+                {
+                    "role": "author",
+                    "value": {
+                        "$schema": "https://schema.org/Person",
+                        "name": "John Doe",
+                        "affiliation": "Example Inc."
+                    }
+                }
+            ]
+        }
+    ),
+    (
+        # Test codeRepository
+        {
+            "cwl_package_package": {
+                "s:codeRepository": "https://gitlab.com/",
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "metadata": [
+                {
+                    "type": "text/html",
+                    "rel": "codeRepository",
+                    "href": "https://gitlab.com/"
+                }
+            ]
+        }
+    ),
+    (
+        # Test Version with existing metadata
+        {
+            "cwl_package_package": {
+                "s:version": "1.0"
+            },
+            "wps_package_metadata": {
+                "metadata": [
+                    {
+                        "type": "text/html",
+                        "rel": "codeRepository",
+                        "href": "https://gitlab.com/"
+                    }
+                ]
+            }
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "1.0",
+            "metadata": [
+                {
+                    "type": "text/html",
+                    "rel": "codeRepository",
+                    "href": "https://gitlab.com/"
+                },
+            ],
+        }
+    ),
+    (
+        # Test softwareVersion
+        {
+            "cwl_package_package": {
+                "s:softwareVersion": "1.0.0"
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "version": "1.0.0"
+        }
+    ),
+    (
+        # Test contributor
+        {
+            "cwl_package_package": {
+                "s:contributor": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "metadata": [
+                {
+                    "role": "contributor",
+                    "value": {
+                        "$schema": "https://schema.org/Person",
+                        "name": "John Doe",
+                        "affiliation": "Example Inc."
+                    }
+                }
+            ]
+        }
+    ),
+    (
+        # Test citation
+        {
+            "cwl_package_package": {
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+            },
+            "wps_package_metadata": {}
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "metadata": [
+                {
+                    "type": "text/plain",
+                    "rel": "citation",
+                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                },
+            ],
+        }
+    ),
+    (
+        # Test dateCreated with existing metadata
+        {
+            "cwl_package_package": {
+                "s:dateCreated": [
+                    {"class": "s:DateTime", "s:dateCreated": "2016-12-13"}
+                ],
+            },
+            "wps_package_metadata": {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                ],
+            }
+        },
+        {
+            "abstract": "",
+            "title": "",
+            "metadata": [
+                {
+                    "type": "text/plain",
+                    "rel": "citation",
+                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                },
+                {
+                    "role": "dateCreated",
+                    "value": {
+                        "$schema": "https://schema.org/DateTime",
+                        "dateCreated": "2016-12-13",
+                    }
+                }
+            ]
+        }
+    ),
+])
+def test_process_metadata(original, expected):
+    # type: (CWL, CWL) -> None
+    cwl_package_package = original["cwl_package_package"]
+    wps_package_metadata = original["wps_package_metadata"]
+    _update_package_metadata(wps_package_metadata, cwl_package_package)
+    # Assertions
+    assert wps_package_metadata == expected

@@ -34,6 +34,8 @@
 .. _cwl-spec: https://www.commonwl.org/specification/
 .. |cwl-guide| replace:: CWL User Guide
 .. _cwl-guide: http://www.commonwl.org/user_guide/
+.. |cwl-dev-tools| replace:: CWL Development Tools
+.. _cwl-dev-tools: https://www.commonwl.org/tools/
 .. |cwl-cmdtool| replace:: CWL CommandLineTool
 .. _cwl-cmdtool: https://www.commonwl.org/v1.1/CommandLineTool.html
 .. |cwl-workflow| replace:: CWL Workflow
@@ -55,7 +57,10 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
+.. |cwl-metadata| replace:: CWL Examples - Metadata and Authorship
 .. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
+.. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
+.. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
