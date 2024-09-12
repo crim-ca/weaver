@@ -41,6 +41,9 @@ Fixes:
   disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
 - Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
   different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
+- Fix ``GET /jobs`` endpoint failing to return the rendered `HTML` listing when ``detail=true`` was omitted or
+  set to any non-detailed value. The ``detail`` query parameter is ignored for `HTML` since details are always
+  required to populate the `Job` table.
 - Pin ``pymongo>=4.3`` and remove ``celery[mongodb]`` extra requirement to avoid incompatible resolution
   of ``pymongo[srv]>=4.8.0`` (relates to `celery/celery#9254 <https://github.com/celery/celery/issues/9254>`_
   and `MongoDB PYTHON-4756 <https://jira.mongodb.org/browse/PYTHON-4756>`_).
