@@ -1302,18 +1302,16 @@ Below is a list of compatible elements.
 +-----------------------------------------+----------------------------------------------------------+
 | Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
 +=========================================+==========================================================+
-| ``keywords``                            | ``s:keywords`` (expecting ``s`` in ``$namespace``        |
-|                                         | referring to http://schema.org [#cwl_schemaorg]_)        |
+| ``keywords``                            | ``s:keywords`` [#cwl_schemaorg]_                         |
 +-----------------------------------------+----------------------------------------------------------+
-| ``metadata``                            | ``$schemas``/``$namespace``                              |
-| (using ``title`` and ``href`` fields)   | (using namespace name and HTTP references)               |
-|                                         | ``s:author``                                             |
-|                                         | ``s:citation``                                           |
-|                                         | ``s:codeRepository``                                     |
-|                                         | ``s:contributor``                                        |
-|                                         | ``s:dateCreated``                                        |
-|                                         | ``s:license``                                            |
-|                                         | ``s:releaseNotes`` [#cwl_schemaorg]_                     |
+| ``metadata``                            | Supported fields [#cwl_schemaorg]_ : |br|                |
+| (using ``title``, ``role``, ``value``,  | - ``s:author`` |br|                                      |
+| ``rel`` and ``href`` fields)            | - ``s:citation`` |br|                                    |
+|                                         | - ``s:codeRepository`` |br|                              |
+|                                         | - ``s:contributor`` |br|                                 |
+|                                         | - ``s:dateCreated`` |br|                                 |
+|                                         | - ``s:license`` |br|                                     |
+|                                         | - ``s:releaseNotes`` |br|                                |
 +-----------------------------------------+----------------------------------------------------------+
 | ``title``                               | ``label``                                                |
 +-----------------------------------------+----------------------------------------------------------+
@@ -1325,7 +1323,12 @@ Below is a list of compatible elements.
 .. rubric:: Footnotes
 
 .. [#cwl_schemaorg]
-    See example: `cwl-metadata`_
+    When using these properties, it is expected that the :term:`CWL` :term:`Application Package` resolves
+    the ``$schema`` with a reference to the RDF definitions from `cwl-metadata-schema-org`_.
+    Furthermore, the ``$namespaces`` is expected to resolve the prefix ``s`` to the `http://schema.org`_
+    definitions corresponding to the RDF schema.
+
+    See |cwl-metadata|_ for a concrete example employing those fields and their expected contents.
 
 .. |br| raw:: html
 
