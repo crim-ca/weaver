@@ -832,7 +832,7 @@ Following is a detailed listing of the expected response structure according to 
     +--------------------+--------------+---------------+-----------+-----------------------------------------------+
     | |none|             | ``document`` | |none|        | 1         | [#res-auto]_                                  |
     +--------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|             | ``document`` | ``value``     | 1         | Results as :term:`JSON`, but each                                    |
+    | |none|             | ``document`` | ``value``     | 1         | Results as :term:`JSON`, but each             |
     +--------------------+--------------+---------------+-----------+-----------------------------------------------+
     | |none|             | ``document`` | ``reference`` | 1         | Auto                                          |
     +--------------------+--------------+---------------+-----------+-----------------------------------------------+
@@ -869,9 +869,11 @@ Following is a detailed listing of the expected response structure according to 
 
 .. rubric:: Footnotes
 
-.. fixme:
 .. [#n_out]
     Corresponds to the number of ``outputs`` *requested* in the :ref:`proc_exec_body`.
+    Note that omitting ``outputs`` (i.e.: indicated by |none| in the table) is equivalent to requesting *all* outputs.
+    To request "*no outputs at all*" (if it makes sense for :term:`Process` to do so), the empty mapping ``outputs: {}``
+    should be submitted explicitly. See table :ref:`table-exec-body` for an example requesting specific outputs.
 
 .. fixme: distinguish omitted 'outputs' (ie default "all") vs '{}' no outputs (empty contents)
 .. todo:: update description, and add example to the table
@@ -1967,7 +1969,7 @@ response instead of using ``Content-Location``.
 Job Inputs
 ^^^^^^^^^^^^^^^^^^^^
 
-In order to better understand the parameters that where submitted during :term:`Job` creation, the |inputs-req|_
+In order to better understand the parameters that were submitted during :term:`Job` creation, the |inputs-req|_
 can be employed. This will return both the data and reference ``inputs`` that were submitted, as well as
 the *requested* ``outputs`` to retrieve any relevant ``transmissionMode``, ``format``, etc. parameters
 that where specified during submission of the :ref:`proc_exec_body`.
