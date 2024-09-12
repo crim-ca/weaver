@@ -1884,31 +1884,35 @@ only to fetch the results (not persistent storage), and could therefore be purge
 The format should be similar to the following example, with minor variations according to :ref:`Configuration`
 parameters for the base :term:`WPS` output location:
 
-.. code-block:: json
-
-    {
-      "outputs": [
-        {
-          "id": "output",
-          "href": "{WEAVER_URL}/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output_netcdf.nc"
-        }
-      ]
-    }
+.. literalinclude:: ../examples/job_outputs_listing.json
+    :language: json
 
 In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal``, the contents
-of a :ref:`proc_op_job_results` be very similar to the above :term:`JSON` contents, but using the ``{outputID}``
-mapping representation instead.
+of a :ref:`proc_op_job_results` will be very similar to the above :term:`JSON` contents, but using the ``{outputID}``
+mapping representation directly returned, instead of listing them as "output items" under ``outputs``.
 
 On the other hand, a :term:`Job` submitted with ``response=raw`` or ``Prefer: return=representation`` can produce
-many alternative variations according to :term:`OGC` requirements, the number of ``outputs`` the :term:`Process`
-supports, and the respective :term:`Media-Type`, schema or literal data of each output. For this reason,
+many alternative content variations according to :term:`OGC` requirements, the number of requested ``outputs``,
+and the respective :term:`Media-Type`, schema or literal data of each output. For this reason,
 the :ref:`proc_op_job_outputs` endpoint will always provide all data and file references in the response body
-as the above :term:`JSON`, no matter which :ref:`proc_exec_results` parameters where originally submitted.
+as represented by the above :term:`JSON`, no matter which :ref:`proc_exec_results` parameters where originally
+submitted. In other words, the contents of the "``output_netcdf.nc``" file will never be directly returned as
+response when using the :ref:`proc_op_job_outputs` endpoint, and will always use the ``document``/``minimal`` links.
 
-The *outputs* endpoint can also
-receive additional query parameters, such as ``schema``, to return contents formatted similarly to *results*, but
-enforcing a :term:`JSON` body as if ``response=document`` was specified during submission of the :term:`Process`
-execution.
+Furthermore, because this response nests the items under ``outputs``, other information can be returned,
+such as relevant ``links``
+with references to :ref:`proc_op_job_inputs`, :ref:`proc_op_job_logs`, :ref:`Job Status <proc_op_status>`,
+or the source :ref:`Process Description <proc_op_describe>` that produced returned :term:`Job` outputs.
+
+The :ref:`proc_op_job_outputs` endpoint can also receive additional query parameters,
+such as ``schema=OGC+strict``, which
+allows it to return contents formatted slightly differently, to imitate the :term:`JSON` mapping representation
+(rather than the array) used by the :ref:`proc_exec_results` endpoint as if ``response=document`` was specified
+during submission of the :term:`Process` execution. However, this :term:`JSON` mapping will still employ a
+nested ``outputs`` property, as presented below, in order to allow additional  ``links`` information.
+
+.. literalinclude:: ../examples/job_outputs_mapping.json
+    :language: json
 
 .. _proc_op_job_results:
 
@@ -1916,15 +1920,47 @@ Job Results
 ^^^^^^^^^^^^^^^^^^^^
 
 This corresponds to the :term:`OGC API - Processes` compliant endpoint, using the |results-req| request.
+Contrary to :ref:`proc_op_job_outputs`, where the :term:`JSON` representation is always enforced, this endpoint
+will respond according to the submitted :term:`Job` parameters, as described in :ref:`proc_exec_results`.
 
-In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal``, the contents
-will be very similar to the following :term:`JSON` contents.
+In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal`` with multiple outputs,
+the contents will typically be a :term:`JSON` mapping representation, where each *requested* ``{outputID}`` can be
+found either as ``value`` or ``reference``, accordingly to how they were requested or resolved according
+to :ref:`proc_exec_results`. An example of such results is presented below.
 
-.. fixme:
-.. todo:: add job results JSON example
-.. todo:: cross-reference :ref:`proc_exec_results`
+.. literalinclude:: ../examples/job_results_document.json
+    :language: json
 
+.. note::
+    The ``{outputID}`` are returned at the root of the contents using this representation,
+    contrary to the :ref:`proc_op_job_outputs` endpoint that nests them under ``outputs``.
 
+When a :term:`Job` is executed with ``response=raw``, or when the *requested* ``outputs``[#n_out]_ consisted only of
+a single ``{outputID}``, the returned data will directly
+be the contents of the produced file, or literal value, as applicable according to the ``schema`` definition of the
+corresponding output in the :ref:`Process Description <proc_op_describe>`. For example, a single-output results
+could be returned in the following response.
+
+.. literalinclude:: ../examples/job_results_raw_single.http
+    :caption: Example of a single output returned directly (``raw``) with ``representation`` preference
+    :language: http
+
+When the number of *requested* ``outputs``[#n_out]_ is more than one, the response will either be
+multipart contents or similar to the above ``document`` :term:`JSON` structure, accordingly to the
+negotiated ``Content-Type``. An example of a multipart representation is shown below.
+
+.. literalinclude:: ../examples/job_results_raw_multi.http
+    :caption: Example of a multiple outputs returned directly (``raw``) with ``minimal`` preference
+    :language: http
+
+Note that, in the above response, the ``Content-Location`` is used for the ``output-file``, whereas the data
+is directly returned for the ``output-data``. This is based on `Weaver` auto-resolving ``transmissionMode: reference``
+for a :ref:`File Reference <file_ref_types>` result, while using ``transmissionMode: value`` by default for literal
+data types. This is equivalent to requesting the :term:`Job` execution with ``Prefer: return=minimal``.
+
+If the ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs``[#n_out]_
+or ``Prefer: return=representation`` were used, the data of the file would be directly included in the
+response instead of using ``Content-Location``.
 
 .. _proc_op_job_inputs:
 

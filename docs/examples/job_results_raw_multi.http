@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Host: weaver.example.com
+Content-Type: multipart/form-data; boundary=43003e2f205a180ace9cd34d98f911ff
+
+--43003e2f205a180ace9cd34d98f911ff
+Content-ID: output-file
+Content-Location: https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output_netcdf.nc
+Content-Type: application/x-netcdf
+
+--43003e2f205a180ace9cd34d98f911ff
+Content-ID: output-data
+Content-Type: text/plain
+
+3.1416
+--43003e2f205a180ace9cd34d98f911ff--

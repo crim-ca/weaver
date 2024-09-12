@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Host: weaver.example.com
+Content-Type: application/x-netcdf
+
+<netcdf data>
