@@ -1312,6 +1312,20 @@ Below is a list of compatible elements.
 +-----------------------------------------+----------------------------------------------------------+
 | ``abstract``/``description``            | ``doc``                                                  |
 +-----------------------------------------+----------------------------------------------------------+
+| ``version``                             | ``s:version``/``s:softwareVersion``                      |
++-----------------------------------------+----------------------------------------------------------+
+
+Additional compatible elements found under ``metadata`` in :term:`WPS` Context  
+
+Parameters in :term:`CWL` Context:
+
+- ``s:author``
+- ``s:citation``
+- ``s:codeRepository``
+- ``s:contributor``
+- ``s:dateCreated``
+- ``s:license``
+- ``s:releaseNotes``
 
 .. rubric:: Footnotes
 
