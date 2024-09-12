@@ -227,6 +227,16 @@ PACKAGE_PROGRESS_DONE = 100
 
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
 
+SUPPORTED_METADATA_MAPPING = [
+    "s:author",
+    "s:citation",
+    "s:codeRepository",
+    "s:contributor",
+    "s:dateCreated",
+    "s:license",
+    "s:releaseNotes",
+]
+
 
 def get_status_location_log_path(status_location, out_dir=None):
     # type: (str, Optional[str]) -> str
@@ -788,6 +798,55 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         wps_package_metadata["keywords"] = list(
             set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
         )
+
+    # specific use case with a different mapping
+    # https://docs.ogc.org/bp/20-089r1.html#toc31
+    if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
+        version_value = (
+            wps_package_metadata.get("version")
+            or cwl_package_package.get("s:version")
+            or cwl_package_package.get("s:softwareVersion")
+        )
+        # Only set the key if version_value is not empty or null
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
+    else:
+        version_value = wps_package_metadata.get("version")
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
+
+    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
+        if metadata_mapping in cwl_package_package:
+            metadata = wps_package_metadata.get("metadata", [])
+            if (
+                isinstance((cwl_package_package[metadata_mapping]), str)
+                and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
+            ):
+                url = cwl_package_package[metadata_mapping]
+                if metadata_mapping == "s:codeRepository":
+                    type = "text/html"
+                else:
+                    type = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
+                metadata.append({
+                    "type": type,
+                    "rel": metadata_mapping.strip("s:"),
+                    "href": cwl_package_package[metadata_mapping]
+                })
+            else:
+                for objects in cwl_package_package[metadata_mapping]:
+                    class_name = objects["class"].strip("s:")
+                    value = {
+                        "$schema": f"https://schema.org/{class_name}"
+                    }
+                    for key, val in objects.items():
+                        if key.startswith("s:"):
+                            value[key.strip("s:")] = val
+                    metadata.append({
+                        "role": metadata_mapping.strip("s:"),
+                        "value": value
+                    })
+
+            wps_package_metadata["metadata"] = metadata
 
 
 def _patch_wps_process_description_url(reference, process_hint):
