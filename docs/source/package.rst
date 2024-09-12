@@ -644,13 +644,13 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | :term:`CWL` ``type`` | :term:`WPS` data type   | :term:`OAS` type       | Description                                |
-|                      | and sub-type :sup:`(1)` |                        |                                            |
+|                      | and sub-type [#note1]_  |                        |                                            |
 +======================+=========================+========================+============================================+
 | ``Any``              | |na|                    | |na|                   | Not supported. See :ref:`note <warn-any>`. |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``null``             | |na|                    | |na|                   | Cannot be used by itself. |br|             |
 |                      |                         |                        | Represents optional :term:`I/O` when       |
-|                      |                         |                        | combined with other types :sup:`(2)`.      |
+|                      |                         |                        | combined with other types [#note2]_.       |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``boolean``          | ``Literal`` |br|        | ``boolean``            | Binary value.                              |
 |                      | (``bool``, ``boolean``) |                        |                                            |
@@ -658,13 +658,13 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 | ``int``,             | ``Literal`` |br|        | ``integer``,           | Numeric whole value. |br|                  |
 | ``long``             | (``int``, ``integer``,  | ``number`` |br|        | Unless when explicit conversion between    |
 |                      | ``long``,               | (format: ``int32``,    | contextes can accomplished, the generic    |
-|                      | ``positiveInteger``,    | ``int64``) :sup:`(3)`  | ``integer`` will be employed.              |
+|                      | ``positiveInteger``,    | ``int64``) [#note3]_   | ``integer`` will be employed.              |
 |                      | ``nonNegativeInteger``) |                        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``float``,           | ``Literal`` |br|        | ``number`` |br|        | Numeric floating-point value.              |
 | ``double``           | (``float``, ``double``, | (format: ``float``,    | By default, ``float`` is used unless more  |
-|                      | ``scale``, ``angle``)   | ``double``) :sup:`(3)` | explicit context conversion can be         |
-|                      |                         |                        | accomplished :sup:`(4)`.                   |
+|                      | ``scale``, ``angle``)   | ``double``) [#note3]_  | explicit context conversion can be         |
+|                      |                         |                        | accomplished [#note4]_.                    |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``string``           | ``Literal`` |br|        | ``string`` |br|        | Generic string. Default employed if        |
 |                      | (``string``,  ``date``, | (format: ``date``,     | nothing more specific is resolved. |br|    |
@@ -673,40 +673,50 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | ``date-time``,         | :ref:`File Reference <file_ref_types>`     |
 |                      |                         | ``full-date``,         | as plain URL string without resolution.    |
 |                      |                         | ``uri``, ``url``,      |                                            |
-|                      |                         | etc.) :sup:`(5)`       |                                            |
+|                      |                         | etc.) [#note5]_        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``File``             | ``BoundingBox``         | :term:`JSON`           | Partial support available. |br|            |
-|                      |                         | :sup:`(6)`             | See :ref:`note <bbox-note>`.               |
+| ``File``             | ``BoundingBox``         | :term:`JSON` [#note6]_ | Partial support available[#bbox-note]_.    |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``File``             | ``Complex``             | :term:`JSON`           | :ref:`File Reference <file_ref_types>`     |
-|                      |                         | :sup:`(6)`             | with Media-Type validation and staging     |
+| ``File``             | ``Complex``             | :term:`JSON` [#note6]_ | :ref:`File Reference <file_ref_types>`     |
+|                      |                         |                        | with Media-Type validation and staging     |
 |                      |                         |                        | according to the applicable scheme.        |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``Directory``        | ``Complex``             | :term:`JSON`           | :ref:`Directory Reference <cwl-dir>`       |
-|                      |                         | :sup:`(6)`             | handled as nested ``Files`` to stage.      |
+| ``Directory``        | ``Complex``             | :term:`JSON` [#note6]_ | :ref:`Directory Reference <cwl-dir>`       |
+|                      |                         |                        | handled as nested ``Files`` to stage.      |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 
-| :sup:`(1)` Resolution method according to critical fields defined in :ref:`cwl-type`.
-| :sup:`(2)` More details in :ref:`oas_basic_types` and :ref:`cwl-array-null-values` sections.
-| :sup:`(3)` Number is used in combination with ``format`` to find best match between integer and floating point values.
-  If not provided, it defaults to ``float`` to handle both cases.
-| :sup:`(4)` The ``float`` name is employed loosely to represent any *floating-point* value rather than
-  *single-precision* (16-bits). Its internal representation is *double-precision* (32-bits) given that the
-  implementation is in Python.
-| :sup:`(5)` Because ``string`` is the default, any ``format`` and ``pattern`` can be specified.
-  More specific types with these items can help apply additional validation, although not strictly enforced.
-| :sup:`(6)` Specific schema required as described in :ref:`oas_json_types`.
+.. rubric:: Footnotes
 
-.. _bbox-note:
-.. note::
+.. [#note1]
+    Resolution method according to critical fields defined in :ref:`cwl-type`.
+
+.. [#note2]
+    More details in :ref:`oas_basic_types` and :ref:`cwl-array-null-values` sections.
+
+.. [#note3]
+    Number is used in combination with ``format`` to find best match between integer and floating point values.
+    If not provided, it defaults to ``float`` to handle both cases.
+
+.. [#note4]
+    The ``float`` name is employed loosely to represent any *floating-point* value rather than
+    *single-precision* (16-bits). Its internal representation is *double-precision* (32-bits) given that the
+    implementation is in Python.
+
+.. [#note5]
+    Because ``string`` is the default, any ``format`` and ``pattern`` can be specified.
+    More specific types with these items can help apply additional validation, although not strictly enforced.
+
+.. [#note6]
+    Specific schema required as described in :ref:`oas_json_types`.
+
+.. [#bbox-note]
     The :term:`WPS` data type ``BoundingBox`` has a schema definition in :term:`WPS` and :term:`OAS` contexts,
     but is not handled natively by :term:`CWL` types. When the conversion to a :term:`CWL` job occurs, an equivalent
     ``Complex`` type using a :term:`CWL` ``File`` with ``format: ogc-bbox`` and the contents stored as :term:`JSON` is
     employed. It is up to the :term:`Application Package` to parse this :term:`JSON` content as necessary.
-    Alternatively, it is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_ if it
-    is deemed preferable that the :term:`CWL` script receives the data directly without intermediate interpretation.
-
-.. [#] |wkt-example|_
+    Alternatively, it is possible to use a ``Literal`` data of type ``string`` corresponding
+    to :term:`WKT` (see |wkt-example|_) if it is deemed preferable that the :term:`CWL` script
+    receives the data directly without intermediate interpretation.
 
 .. _cwl-type:
 
@@ -1127,35 +1137,38 @@ Note that all :term:`OAS` elements are always nested under the ``schema`` field 
 located where appropriate as per :term:`OpenAPI` specification. Other :term:`OAS` fields are still permitted, but
 are not explicitly handled to search for corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context   |
-+=====================================+=======================================+=====================================+
-| ``minOccurs``/``maxOccurs`` |br|    | ``type``/``oneOf`` combination |br|   | ``type`` modifiers: |br|            |
-|                                     |                                       |                                     |
-| - ``minOccurs=0``                   | - single type unless ``minItems=0``   | - ``?``/``"null"`` if ``min*=0``    |
-| - ``maxOccurs>1`` or ``unbounded``  | - ``minItems``/``maxItems`` (array)   | - ``[]``/``array`` if ``max*>1``    |
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| ``formats`` |br|                    | ``oneOf`` (for each format) |br|      | ``format`` |br|                     |
-|                                     |                                       |                                     |
-| - ``mimeType``/``mediaType``        | - ``contentMediaType``                | - *namespaced* ``mediaType``        |
-| - ``encoding``                      | - ``contentEncoding``                 | - |na|                              |
-| - ``schema``                        | - ``contentSchema``                   | - full-URI ``format``/``$schema``   |
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| ``literalDataDomains``              | |br|                                  | |br|                                |
-|                                     |                                       |                                     |
-| - ``allowedValues`` (int/float/str) | - ``enum`` array of values            | - ``enum`` type with ``symbols``    |
-|                                     |   |br| |br| |br|                      |   |br| |br| |br|                    |
-| - ``allowedValues`` (range) |br|    |                                       |                                     |
-|     - ``minimumValue``              | - ``minimum`` value                   | - |na| |br|                         |
-|     - ``maximumValue``              | - ``maximum`` value                   | - |na| |br|                         |
-|     - ``spacing``                   | - ``multipleOf`` value                | - |na| |br|                         |
-|     - ``rangeClosure`` |br|         | - ``exclusiveMinimum``/               | - |na| |br|                         |
-|       (combination of open, closed, |   ``exclusiveMaximum`` |br| (set      |   |br| |br|                         |
-|       open-closed, closed-open)     |   ``true`` for corresponding "open")  |   |br| |br|                         |
-|                                     |   |br| |br| |br|                      |                                     |
-| - ``valueDefinition`` (name)        | - ``type``/``format`` combination     | - ``type`` (simplified as needed)   |
-| - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"``  |
-+-------------------------------------+---------------------------------------+-------------------------------------+
+.. table::
+    :align: center
+
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context  |
+    +=====================================+=======================================+====================================+
+    | ``minOccurs``/``maxOccurs`` |br|    | ``type``/``oneOf`` combination |br|   | ``type`` modifiers: |br|           |
+    |                                     |                                       |                                    |
+    | - ``minOccurs=0``                   | - single type unless ``minItems=0``   | - ``?``/``"null"`` if ``min*=0``   |
+    | - ``maxOccurs>1`` or ``unbounded``  | - ``minItems``/``maxItems`` (array)   | - ``[]``/``array`` if ``max*>1``   |
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | ``formats`` |br|                    | ``oneOf`` (for each format) |br|      | ``format`` |br|                    |
+    |                                     |                                       |                                    |
+    | - ``mimeType``/``mediaType``        | - ``contentMediaType``                | - *namespaced* ``mediaType``       |
+    | - ``encoding``                      | - ``contentEncoding``                 | - |na|                             |
+    | - ``schema``                        | - ``contentSchema``                   | - full-URI ``format``/``$schema``  |
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | ``literalDataDomains``              | |br|                                  | |br|                               |
+    |                                     |                                       |                                    |
+    | - ``allowedValues`` (int/float/str) | - ``enum`` array of values            | - ``enum`` type with ``symbols``   |
+    |                                     |   |br| |br| |br|                      |   |br| |br| |br|                   |
+    | - ``allowedValues`` (range) |br|    |                                       |                                    |
+    |     - ``minimumValue``              | - ``minimum`` value                   | - |na| |br|                        |
+    |     - ``maximumValue``              | - ``maximum`` value                   | - |na| |br|                        |
+    |     - ``spacing``                   | - ``multipleOf`` value                | - |na| |br|                        |
+    |     - ``rangeClosure`` |br|         | - ``exclusiveMinimum``/               | - |na| |br|                        |
+    |       (combination of open, closed, |   ``exclusiveMaximum`` |br| (set      |   |br| |br|                        |
+    |       open-closed, closed-open)     |   ``true`` for corresponding "open")  |   |br| |br|                        |
+    |                                     |   |br| |br| |br|                      |                                    |
+    | - ``valueDefinition`` (name)        | - ``type``/``format`` combination     | - ``type`` (simplified as needed)  |
+    | - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"`` |
+    +-------------------------------------+---------------------------------------+------------------------------------+
 
 In order to be :term:`OGC`-compliant, any previously deployed :term:`Process` will automatically generate any missing
 ``schema`` specification for all :term:`I/O` it employs when calling its :ref:`Process Description <proc_op_describe>`.
@@ -1299,36 +1312,48 @@ metadata fields (notably descriptions), are also transferred.
 
 Below is a list of compatible elements.
 
-+-----------------------------------------+----------------------------------------------------------+
-| Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
-+=========================================+==========================================================+
-| ``keywords``                            | ``s:keywords`` [#cwl_schemaorg]_                         |
-+-----------------------------------------+----------------------------------------------------------+
-| ``metadata``                            | Supported fields [#cwl_schemaorg]_ : |br|                |
-| (using ``title``, ``role``, ``value``,  | - ``s:author`` |br|                                      |
-| ``rel`` and ``href`` fields)            | - ``s:citation`` |br|                                    |
-|                                         | - ``s:codeRepository`` |br|                              |
-|                                         | - ``s:contributor`` |br|                                 |
-|                                         | - ``s:dateCreated`` |br|                                 |
-|                                         | - ``s:license`` |br|                                     |
-|                                         | - ``s:releaseNotes`` |br|                                |
-+-----------------------------------------+----------------------------------------------------------+
-| ``title``                               | ``label``                                                |
-+-----------------------------------------+----------------------------------------------------------+
-| ``abstract``/``description``            | ``doc``                                                  |
-+-----------------------------------------+----------------------------------------------------------+
-| ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
-+-----------------------------------------+----------------------------------------------------------+
+
+.. table:: Mapping of metadata properties between the :term:`WPS` and :term:`CWL` contexts
+    :align: center
+    :widths: 20,20
+
+    +-----------------------------------------+----------------------------------------------------------+
+    | Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
+    +=========================================+==========================================================+
+    | ``keywords``                            | ``s:keywords`` [#cwl_schemaorg]_                         |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``metadata`` |br|                       | Supported fields [#cwl_schemaorg]_ : |br|                |
+    | (using ``title``, ``role``, ``value``,  | - ``s:author`` |br|                                      |
+    | ``rel`` and ``href`` fields)            | - ``s:citation`` |br|                                    |
+    |                                         | - ``s:codeRepository`` |br|                              |
+    |                                         | - ``s:contributor`` |br|                                 |
+    |                                         | - ``s:dateCreated`` |br|                                 |
+    |                                         | - ``s:license`` |br|                                     |
+    |                                         | - ``s:releaseNotes`` |br|                                |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``title``                               | ``label``                                                |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``abstract``/``description``            | ``doc``                                                  |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
+    +-----------------------------------------+----------------------------------------------------------+
 
 .. rubric:: Footnotes
 
 .. [#cwl_schemaorg]
     When using these properties, it is expected that the :term:`CWL` :term:`Application Package` resolves
-    the ``$schema`` with a reference to the RDF definitions from `cwl-metadata-schema-org`_.
-    Furthermore, the ``$namespaces`` is expected to resolve the prefix ``s`` to the `http://schema.org`_
-    definitions corresponding to the RDF schema.
+    the ``$schemas`` with a reference to the |cwl-metadata-schema-org|_. Furthermore, the ``$namespaces``
+    is expected to resolve the prefix ``s`` to the `http://schema.org <http://schema.org>`_ definitions
+    corresponding to the RDF schema, as shown below.
 
-    See |cwl-metadata|_ for a concrete example employing those fields and their expected contents.
+    See |cwl-metadata|_ for a complete example using those fields and their expected contents.
+
+.. code-block:: yaml
+
+    $schemas:
+      - https://schema.org/version/latest/schemaorg-current-https.rdf
+    $namespaces:
+      s: http://schema.org
 
 .. |br| raw:: html
 

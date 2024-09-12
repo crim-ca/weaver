@@ -59,6 +59,7 @@
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
 .. |cwl-metadata| replace:: CWL Examples - Metadata and Authorship
 .. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
+.. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
 .. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
