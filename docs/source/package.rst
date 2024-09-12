@@ -1307,25 +1307,20 @@ Below is a list of compatible elements.
 +-----------------------------------------+----------------------------------------------------------+
 | ``metadata``                            | ``$schemas``/``$namespace``                              |
 | (using ``title`` and ``href`` fields)   | (using namespace name and HTTP references)               |
+|                                         | ``s:author``                                             |
+|                                         | ``s:citation``                                           |
+|                                         | ``s:codeRepository``                                     |
+|                                         | ``s:contributor``                                        |
+|                                         | ``s:dateCreated``                                        |
+|                                         | ``s:license``                                            |
+|                                         | ``s:releaseNotes`` [#cwl_schemaorg]_                     |
 +-----------------------------------------+----------------------------------------------------------+
 | ``title``                               | ``label``                                                |
 +-----------------------------------------+----------------------------------------------------------+
 | ``abstract``/``description``            | ``doc``                                                  |
 +-----------------------------------------+----------------------------------------------------------+
-| ``version``                             | ``s:version``/``s:softwareVersion``                      |
+| ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
 +-----------------------------------------+----------------------------------------------------------+
-
-Additional compatible elements found under ``metadata`` in :term:`WPS` Context
-
-Parameters in :term:`CWL` Context:
-
-- ``s:author``
-- ``s:citation``
-- ``s:codeRepository``
-- ``s:contributor``
-- ``s:dateCreated``
-- ``s:license``
-- ``s:releaseNotes``
 
 .. rubric:: Footnotes
 

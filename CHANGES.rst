@@ -31,8 +31,8 @@ Changes:
   making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
   (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
 - Add parsing of additional metadata from schema.org in CWL document to convert into process fields
-  (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_) 
-- Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_) 
+  (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
+- Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_).
 
 Fixes:
 ------
