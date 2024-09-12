@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_5.9.0:
+
+`5.9.0 <https://github.com/crim-ca/weaver/tree/5.9.0>`_ (2024-09-12)
+========================================================================
+
+Changes:
+--------
 - Add `CWL` schema definitions with ``weaver`` namespace
   (see `weaver/schemas/cwl <https://github.com/crim-ca/weaver/tree/master/weaver/schemas/cwl>`_)
   that provide explicit requirement classes
