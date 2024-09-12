@@ -1315,7 +1315,7 @@ Below is a list of compatible elements.
 | ``version``                             | ``s:version``/``s:softwareVersion``                      |
 +-----------------------------------------+----------------------------------------------------------+
 
-Additional compatible elements found under ``metadata`` in :term:`WPS` Context  
+Additional compatible elements found under ``metadata`` in :term:`WPS` Context
 
 Parameters in :term:`CWL` Context:
 
