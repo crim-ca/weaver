@@ -802,13 +802,18 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     # specific use case with a different mapping
     # https://docs.ogc.org/bp/20-089r1.html#toc31
     if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
-        wps_package_metadata["version"] = str(
-            str(wps_package_metadata.get("version", ""))
+        version_value = (
+            wps_package_metadata.get("version")
             or cwl_package_package.get("s:version")
             or cwl_package_package.get("s:softwareVersion")
         )
+        # Only set the key if version_value is not empty or null
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
     else:
-        wps_package_metadata["version"] = str(wps_package_metadata.get("version", ""))
+        version_value = wps_package_metadata.get("version")
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
 
     for metadata_mapping in SUPPORTED_METADATA_MAPPING:
         if metadata_mapping in cwl_package_package:

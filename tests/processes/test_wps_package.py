@@ -858,7 +858,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
-            "version": "",
             "metadata": [
                 {
                     "role": "author",
@@ -882,7 +881,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
-            "version": "",
             "metadata": [
                 {
                     "type": "text/html",
@@ -948,7 +946,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
-            "version": "",
             "metadata": [
                 {
                     "role": "contributor",
@@ -972,7 +969,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
-            "version": "",
             "metadata": [
                 {
                     "type": "text/plain",
@@ -993,7 +989,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             "wps_package_metadata": {
                 "abstract": "",
                 "title": "",
-                "version": "",
                 "metadata": [
                     {
                         "type": "text/plain",
@@ -1006,7 +1001,6 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         {
             "abstract": "",
             "title": "",
-            "version": "",
             "metadata": [
                 {
                     "type": "text/plain",
