@@ -3,10 +3,10 @@
     max-width: none;
 }
 
-/* force code-table to align their cells to top (align code line numbers between columns)
+/* force table-code to align their cells to top (align code line numbers between columns)
     note: class attribute must be applied to match this specific type of table
 */
-.code-table tbody tr td {
+.table-code tbody tr td {
     vertical-align: top !important;
 
     /* max-width: min-content; */
@@ -21,10 +21,33 @@
 div[class^="highlight"] {
     max-width: min-content;
 }
-.code-table tbody tr td div {
+.table-code tbody tr td div {
     max-width: none !important;
 }
 */
+
+.table-exec-results thead,
+.table-exec-results tbody {
+    vertical-align: top !important;
+}
+
+.table-exec-results thead {
+    background-color: #cccccc;
+}
+
+.table-exec-results thead tr:nth-child(1) > th:nth-child(1),
+.table-exec-results thead tr:nth-child(1) > th:nth-child(2) {
+    border-bottom-color: #777777 !important;
+}
+
+.table-exec-results tr:nth-child(1) > th:nth-child(2),
+.table-exec-results tr:nth-child(1) > th:nth-child(3),
+.table-exec-results tr:nth-child(2) > th:nth-child(2),
+.table-exec-results td:nth-child(2),
+.table-exec-results td:nth-child(4) {
+    border-left-color: #777777 !important;
+    border-left-width: medium !important;
+}
 
 /* override table width restrictions
    avoids cells trying to fit all their text single line with a slider

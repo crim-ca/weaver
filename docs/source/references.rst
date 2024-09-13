@@ -154,7 +154,6 @@
 .. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
 .. _ogc-proc-ext-quotation: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 .. |quote-estimator| replace:: *Quote Estimator*
-.. _quote-estimator: :ref:`quotation_quote_estimator`
 .. |quote-estimation-config| replace:: *Quote Estimator Configuration*
 .. _quote-estimation-config: ../../../weaver/schemas/quotation/quote-estimator.yaml
 .. |quote-estimation-result| replace:: *Quote Estimation Result*
@@ -177,9 +176,6 @@
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
-.. inter-reference to 'process->Deploy' section, but cannot be a link since not included
-.. _process-deploy-op: :ref:`proc_op_deploy`
-.. |process-deploy-op| replace:: Process deployment operation
 
 .. STAC
 .. |stac-spec| replace:: STAC Specification

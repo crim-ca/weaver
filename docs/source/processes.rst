@@ -509,22 +509,27 @@ will have to be available and respect the expected update level to be accepted a
 The applicable revision level depends on the contents being modified using submitted request body fields according
 to the following table. When a combination of the below items occur, the higher update level is required.
 
-+-------------+-----------+------------------------------------+------------------------------------------------------+
-| HTTP Method | Level     | Change                             | Examples                                             |
-+=============+===========+====================================+======================================================+
-| ``PATCH``   | ``PATCH`` | Modifications to metadata          | - :term:`Process` ``description``, ``title`` strings |
-|             |           | not impacting the :term:`Process`  | - :term:`Process` ``keywords``, ``metadata`` lists   |
-|             |           | execution or definition.           | - inputs/outputs ``description``, ``title`` strings  |
-|             |           |                                    | - inputs/outputs ``keywords``, ``metadata`` lists    |
-+-------------+-----------+------------------------------------+------------------------------------------------------+
-| ``PATCH``   | ``MINOR`` | Modification that impacts *how*    | - :term:`Process` ``jobControlOptions`` (async/sync) |
-|             |           | the :term:`Process` could be       | - :term:`Process` ``outputTransmission`` (ref/value) |
-|             |           | executed, but not its definition.  | - :term:`Process` ``visibility``                     |
-+-------------+-----------+------------------------------------+------------------------------------------------------+
-| ``PUT``     | ``MAJOR`` | Modification that impacts *what*   | - Any :term:`Application Package` modification       |
-|             |           | the :term:`Process` executes.      | - Any inputs/outputs change (formats, occurs, type)  |
-|             |           |                                    | - Any inputs/outputs addition or removal             |
-+-------------+-----------+------------------------------------+------------------------------------------------------+
+.. table:: Process Semantic Version Level Resolution according to Applied Changes
+    :name: table-process-version
+    :align: center
+
+    +-------------+-----------+---------------------------------+------------------------------------------------------+
+    | HTTP Method | Level     | Change                          | Examples                                             |
+    +=============+===========+=================================+======================================================+
+    | ``PATCH``   | ``PATCH`` | Modifications to metadata       | - :term:`Process` ``description``, ``title`` strings |
+    |             |           | not impacting the               | - :term:`Process` ``keywords``, ``metadata`` lists   |
+    |             |           | :term:`Process` execution       | - inputs/outputs ``description``, ``title`` strings  |
+    |             |           | or definition.                  | - inputs/outputs ``keywords``, ``metadata`` lists    |
+    +-------------+-----------+---------------------------------+------------------------------------------------------+
+    | ``PATCH``   | ``MINOR`` | Modification that impacts *how* | - :term:`Process` ``jobControlOptions`` (async/sync) |
+    |             |           | the :term:`Process` could be    | - :term:`Process` ``outputTransmission`` (ref/value) |
+    |             |           | executed, but not its           | - :term:`Process` ``visibility``                     |
+    |             |           | definition.                     |                                                      |
+    +-------------+-----------+---------------------------------+------------------------------------------------------+
+    | ``PUT``     | ``MAJOR`` | Modification that impacts       | - Any :term:`Application Package` modification       |
+    |             |           | *what* the :term:`Process`      | - Any inputs/outputs change (formats, occurs, type)  |
+    |             |           | executes.                       | - Any inputs/outputs addition or removal             |
+    +-------------+-----------+---------------------------------+------------------------------------------------------+
 
 .. note::
     For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
@@ -604,7 +609,7 @@ better illustrate where each of the mentioned parameters in following section ar
 
 .. table:: Example Job Execution Request Body
     :name: table-exec-body
-    :class: code-table
+    :class: table-code
     :align: center
 
     +-----------------------------------------------+-----------------------------------------------+
@@ -723,7 +728,8 @@ In order to select how to execute a :term:`Process`, either `synchronously` or `
 should be specified. If omitted, `Weaver` defaults to `asynchronous` execution. To execute `asynchronously` explicitly,
 ``Prefer: respond-async`` should be used. Otherwise, the `synchronous` execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
-within that time, or if this value is greater than the |weaver-execute-sync-max-wait|_ setting, the :term:`Job` will
+within that time, or if this value is greater than
+the ``weaver.execute_sync_max_wait`` setting (see :ref:`detail <weaver-execute-sync-max-wait>`), the :term:`Job` will
 resume `asynchronously` and the response will be returned. Furthermore, `synchronous` and `asynchronous` execution of
 a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
 its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
@@ -818,73 +824,132 @@ to the ``Prefer`` header approach, both approaches remain available in `Weaver`.
 
 Following is a detailed listing of the expected response structure according to requested parameters.
 
+.. fixme: add missing combinations
+
 .. table:: Expected *Execution Results* according to *Requested Parameters*
-    :name: table-exec-resp
+    :name: table-exec-results
+    :class: table-exec-results
     :align: center
 
-    +--------------------+------------------------------+-----------+-----------------------------------------------+
-    | |oap| v2.0         | |oap| v1.0                   | # outputs | Results                                       |
-    +--------------------+--------------+---------------+ [#n_out]_ |                                               |
-    | ``Prefer: return`` | ``response`` | |out-mode|    |           |                                               |
-    |  header            | |body-param| | |body-param|  |           |                                               |
-    +====================+==============+===============+===========+===============================================+
-    | |none|             | |none|       | |none|        | 1         | [#res-auto]_                                  |
-    +--------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|             | ``document`` | |none|        | 1         | [#res-auto]_                                  |
-    +--------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|             | ``document`` | ``value``     | 1         | Results as :term:`JSON`, but each             |
-    +--------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|             | ``document`` | ``reference`` | 1         | Auto                                          |
-    +--------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|             | ``raw``      | |none|        | 1         | |res-raw|                                     |
-    +--------------------+--------------+---------------+-----------+-----------------------------------------------+
+    +---------------------+------------------------------+-----------+-----------------------------------------------+
+    | |oap| v2.0          | |oap| v1.0                   | #         | Results                                       |
+    +---------------------+--------------+---------------+ requested |                                               |
+    | ``Prefer: return``  | ``response`` | |out-mode|    | outputs   |                                               |
+    | header              | |body-param| | |body-param|  | [#outN]_  |                                               |
+    +=====================+==============+===============+===========+===============================================+
+    | |any|               | |any|        | |na|          | 0         | |res-empty| [#resNoContent]_                  |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | |none|       | |none|        | 1         | |res-accept|                                  |
+    |                     |              |               |           | |res-json-warn|_                              |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | ``raw``      | |none|        | 1         | - |res-accept|                                |
+    |                     |              |               |           | - |res-auto| [#resValRef]_                    |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | ``raw``      | ``value``     | 1         | - |res-accept|                                |
+    |                     |              |               |           | - |res-data|_                                 |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | ``raw``      | ``reference`` | 1         | - |res-accept|                                |
+    |                     |              |               |           | - |res-ref|_                                  |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | |none|       | |none|        | >1        | |res-accept| [#resCTypeMulti]_                |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | ``document`` | |none|        | 1         | :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           | [#resValRef]_                                 |
+    +---------------------+              |               |           |                                               |
+    | ``minimal``         |              |               |           |                                               |
+    |                     |              |               |           |                                               |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |na|                | ``document`` | ``value``     | 1         | :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           | with data included inline.                    |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    | |none|              | ``document`` | ``reference`` | 1         | :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           | with linked file reference.                   |
+    +---------------------+              |               |           |                                               |
+    | ``minimal``         |              |               |           |                                               |
+    |                     |              |               |           |                                               |
+    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
 
 .. |oap| replace:: :term:`OGC API - Processes`
 .. |body-param| replace:: body parameter
 .. |out-mode| replace:: ``transmissionMode``
-.. |res-auto| replace:: Auto. Resolves as if ``response=document`` and ``transmissionMode=reference``
-.. |res-raw| replace::
-    Results are returned in their raw data representation, whether they represent
+.. |res-empty| replace:: *empty*
+.. |res-accept| replace:: *as negotiated by* ``Accept`` *header or* ``format`` *parameter*
+.. |res-auto| replace:: *with auto resolution of data/link representation*
 
+.. |res-data| replace:: Results for a Single Output with Data
+.. _res-data: processes.html#job-results-raw-single-data
 
-.. warning::
+.. |res-ref| replace:: Results for a Single Output with Link
+.. _res-ref: processes.html#job-results-raw-single-ref
+
+.. important::
+    Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
+    simultaneously (although permitted), since they should be interchangeable in most situations.
+    The table indicates both variations to illustrate which combinations lead to the **same result**.
+    If a client happens to use both combination simultaneously, the body parameters will take precedence
+    over the ``Prefer`` header.
+
+.. important::
     It is important not to confuse expected *Results* above with *Responses*.
 
     The actual HTTP *Response* returned from the execution endpoint will depend on the requested :ref:`proc_exec_mode`.
-    A :term:`Job` resolved with `synchronous` execution will return the *Results* shown in the table *directly*, whereas
-    an `asynchronous` execution will *always* return a :term:`JSON` :ref:`Job Status <proc_op_status>` *Response*.
-    In this case, a subsequent :ref:`Results Request <proc_op_result>` following the successful :term:`Job` completion
-    is needed to obtain the *Results* presented in the table. Note that a `synchronous` execution can also
-    make use of the :ref:`Results <proc_op_result>` operations at a later time to obtain :term:`Job` information.
+    A :term:`Job` successfully resolved with `synchronous` execution will return the *Results* shown in the table
+    directly with a *HTTP 200 OK* status, whereas an `asynchronous` execution will always return a
+    :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted* status.
+
+    In the case of a successfully completed `asynchronous` execution, a
+    subsequent :ref:`Results Request <proc_op_result>` using the :term:`Job` ``Location``
+    is needed to obtain the *Results* presented in the above table. Note that a `synchronous` execution can also
+    make use of the :ref:`Results Request <proc_op_result>` operations at a later time to obtain
+    additional :term:`Job` information such as logs or metadata.
 
 .. note::
-    Typically, clients should **NOT** use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
-    simultaneously, since they should be interchangeable in most situations. The table indicates both variations to
-    illustrate which combinations lead to the same result. If a client happens to use both combination simultaneously,
-    the body parameters will take precedence over the ``Prefer`` header, except for cases where ``transmissionMode``
-    would be omitted for specific ``outputs`` entries.
+    Combinations using |none| indicate that the parameter is **omitted entirely** from the request.
+    When the value is provided but "*does not matter*" (i.e.: leading to the same outcome regardless),
+    the |any| notation is used instead.
+    The |na| notation indicates *not applicable* cases, due to a technical or logical impossibility.
 
-.. note::
-    Combinations using |none| indicate that the parameter is omitted entirely from the request.
+.. |res-json-warn| replace:: :sup:`(warning: ambiguity)`
+.. _res-json-warn:
 
-.. rubric:: Footnotes
+.. warning::
+    When negotiating a single output as :term:`JSON`, there is a potential ambiguity between
+    :ref:`Results <proc_op_job_results>` representation and a single file's data, such as in the
+    case of a :term:`GeoJSON` structure, both of which are encoded in :term:`JSON`.
 
-.. [#n_out]
+    Similar ambiguities could also occur, depending on supported formats, such as representing
+    :term:`Job` results in :term:`XML`, or retrieving a file's data encoded as GML :term:`XML`.
+
+    To avoid ambiguity, it is recommended that the ``response: document`` or ``response: raw``
+    is explicitly set for such cases to ensure the result matches the desired outcome.
+
+.. rubric:: Details
+
+.. [#outN]
     Corresponds to the number of ``outputs`` *requested* in the :ref:`proc_exec_body`.
-    Note that omitting ``outputs`` (i.e.: indicated by |none| in the table) is equivalent to requesting *all* outputs.
-    To request "*no outputs at all*" (if it makes sense for :term:`Process` to do so), the empty mapping ``outputs: {}``
-    should be submitted explicitly. See table :ref:`table-exec-body` for an example requesting specific outputs.
+    Note that omitting ``outputs`` (i.e.: indicated by |out-mode| with |none| in the table) is equivalent to
+    requesting *all* outputs offered by the :term:`Process`. To request "*no outputs at all*"
+    (if it makes sense for :term:`Process` to do so),
+    the empty mapping ``outputs: {}`` should be submitted explicitly [#resNoContent]_.
+    See table :ref:`table-exec-body` for an example requesting specific outputs.
 
-.. fixme: distinguish omitted 'outputs' (ie default "all") vs '{}' no outputs (empty contents)
-.. todo:: update description, and add example to the table
-    The |empty|, meaning that *no outputs were explicitly requested*, definition must be distinguished from the empty :term:`JSON`` ``{}``
+.. [#resNoContent]
+    The *HTTP 204 No Contents* response will be returned regardless of the ``response`` parameter, the ``Prefer``
+    header, or the requested ``Accept`` header. Since "*no outputs*" is requested with an explicit ``outputs: {}``,
+    the ``transmissionMode`` do not apply by definition.
 
-.. fixme:
-.. [#res-auto]
-    sss
+.. [#resCTypeMulti]
+    The data of the multiple outputs are simultaneously returned, but their encoding depend on the requested ``Accept``
+    header. By default, the :ref:`Results <job-results-document-minimal>` structure encoded as :term:`JSON` is employed.
+    However, the :ref:`Results for Multiple Outputs <job-results-raw-multi>` example using ``multipart/related``
+    contents could also be obtained if requested. Other representations, such as packaging the results under
+    a single ZIP archive could also be returned.
 
-
-.. fixme: requested ``transmissionMode`` parameter (``value``/``reference``),
+.. [#resValRef]
+    Although the general "*response structure*" is established by other parameters in this case, whether respective
+    outputs are returned by ``value`` or by ``reference`` depend on the ``Prefer`` header and ``transmissionMode``
+    combinations, as well as each output's literal/complex data type representation. See :ref:`proc_op_job_results`
+    for more details.
 
 .. fixme:
     reword below, above table results identical for Prefer/mode sync/async,
@@ -990,7 +1055,7 @@ File Reference Types
 
 Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
 The former represents basic values such as integers or strings, while the other represents a ``File`` or ``Directory``
-reference. Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as |media-types|_.
+reference. Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as :term:`Media-Types`.
 
 .. seealso::
     - :ref:`cwl-wps-mapping`
@@ -1142,7 +1207,7 @@ combinations.
 .. |EMS| replace:: :term:`EMS`
 .. |HYBRID| replace:: :term:`HYBRID`
 
-.. rubric:: Footnotes
+.. rubric:: Details
 
 .. [#openseach]
     References defined by |os_scheme| will trigger an :term:`OpenSearch` query using the provided URL as
@@ -1878,7 +1943,7 @@ Obtaining job results, outputs, logs or errors
 .. _proc_op_job_outputs:
 
 Job Outputs
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~
 
 In the case of successful :term:`Job` execution, the *outputs* can be retrieved with |outputs-req|_ request to list
 each corresponding output ``id`` with the generated file reference URL. Keep in mind that the purpose of those URLs are
@@ -1919,7 +1984,7 @@ nested ``outputs`` property, as presented below, in order to allow additional  `
 .. _proc_op_job_results:
 
 Job Results
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~
 
 This corresponds to the :term:`OGC API - Processes` compliant endpoint, using the |results-req| request.
 Contrary to :ref:`proc_op_job_outputs`, where the :term:`JSON` representation is always enforced, this endpoint
@@ -1930,8 +1995,10 @@ the contents will typically be a :term:`JSON` mapping representation, where each
 found either as ``value`` or ``reference``, accordingly to how they were requested or resolved according
 to :ref:`proc_exec_results`. An example of such results is presented below.
 
-.. literalinclude:: ../examples/job_results_document.json
+.. literalinclude:: ../examples/job_results_document_minimal.json
     :language: json
+    :caption: Results for a ``document`` response with ``minimal`` representation
+    :name: job-results-document-minimal
 
 .. note::
     The ``{outputID}`` are returned at the root of the contents using this representation,
@@ -1940,34 +2007,55 @@ to :ref:`proc_exec_results`. An example of such results is presented below.
 When a :term:`Job` is executed with ``response=raw``, or when the *requested* ``outputs``[#n_out]_ consisted only of
 a single ``{outputID}``, the returned data will directly
 be the contents of the produced file, or literal value, as applicable according to the ``schema`` definition of the
-corresponding output in the :ref:`Process Description <proc_op_describe>`. For example, a single-output results
-could be returned in the following response.
+corresponding output in the :ref:`Process Description <proc_op_describe>`.
 
-.. literalinclude:: ../examples/job_results_raw_single.http
-    :caption: Example of a single output returned directly (``raw``) with ``representation`` preference
+The following result will be obtained if any of the following conditions are encountered:
+1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=representation`` header was used
+2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: value`` parameter was used
+3. The result is a literal data type, whether or not ``Prefer``/``transmissionMode`` were specified with above values.
+
+.. literalinclude:: ../examples/job_results_raw_single_data.http
     :language: http
+    :caption: Results for a single output returned directly by value
+    :name: job-results-raw-single-data
+
+The following result will be obtained if any of the following conditions are encountered:
+1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=minimal`` header was used
+2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: reference`` parameter was used
+3. The result is a literal data type, and any above ``Prefer``/``transmissionMode`` value is *explicitly* requested.
+
+.. literalinclude:: ../examples/job_results_raw_single_ref.http
+    :language: http
+    :caption: Results for a single output returned directly by reference
+    :name: job-results-raw-single-ref
 
 When the number of *requested* ``outputs``[#n_out]_ is more than one, the response will either be
-multipart contents or similar to the above ``document`` :term:`JSON` structure, accordingly to the
+multipart contents or similar to the first ``document`` :term:`JSON` structure, accordingly to the
 negotiated ``Content-Type``. An example of a multipart representation is shown below.
+The resolution of the nested outputs within each boundary, either by value or reference, will resolve
+for each respective output according to the same rules combinations specified above for single output.
 
 .. literalinclude:: ../examples/job_results_raw_multi.http
-    :caption: Example of a multiple outputs returned directly (``raw``) with ``minimal`` preference
-    :language: http
+    :language: mime
+    :caption: Results for multiple outputs returned directly (``raw``) with ``minimal`` preference
+    :name: job-results-raw-multi
 
 Note that, in the above response, the ``Content-Location`` is used for the ``output-file``, whereas the data
 is directly returned for the ``output-data``. This is based on `Weaver` auto-resolving ``transmissionMode: reference``
 for a :ref:`File Reference <file_ref_types>` result, while using ``transmissionMode: value`` by default for literal
-data types. This is equivalent to requesting the :term:`Job` execution with ``Prefer: return=minimal``.
+data types. This is equivalent to requesting the :term:`Job` execution with ``Prefer: return=minimal``, since the
+most succinct *response contents* for a file is obtained by using a link reference, whereas literal data types can be
+provided directly.
 
-If the ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs``[#n_out]_
-or ``Prefer: return=representation`` were used, the data of the file would be directly included in the
-response instead of using ``Content-Location``.
+If the ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs`` [#outN]_
+or ``Prefer: return=representation`` were used, the data of the file would be directly included inline within the
+response instead of using ``Content-Location``, similarly to the :ref:`job-results-raw-single-data` example,
+but nested within its respective ``Content-ID: output-file`` multipart bounds.
 
 .. _proc_op_job_inputs:
 
 Job Inputs
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~
 
 In order to better understand the parameters that were submitted during :term:`Job` creation, the |inputs-req|_
 can be employed. This will return both the data and reference ``inputs`` that were submitted, as well as
@@ -1983,7 +2071,7 @@ that where specified during submission of the :ref:`proc_exec_body`.
 .. _proc_op_job_exceptions:
 
 Job Exceptions
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 
 In situations where the :term:`Job` resulted into ``failed`` status, the |except-req|_ can be used to retrieve
 the potential cause of failure, by capturing any raised exception. Below is an example of such exception details.
@@ -2000,7 +2088,7 @@ provide details over each step of the operation.
 .. _proc_op_job_logs:
 
 Job Logs
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~
 
 Any :term:`Job` executed by `Weaver` will provide minimal information log, such as operation setup, the moment
 when it started execution and latest status. The extent of other log entries will more often than not depend on the
@@ -2139,7 +2227,8 @@ ADES dispatching using Data Sources
 --------------------------------------
 
 When using either the :term:`EMS` or :term:`HYBRID` [#notedatasource]_ configurations, :term:`Process`
-executions are dispatched to the relevant :term:`ADES` or another :term:`HYBRID` server supporting |process-deploy-op|_
+executions are dispatched to the relevant :term:`ADES` or another :term:`HYBRID` server supporting
+:ref:`Process Deployment <proc_op_deploy>`
 when inputs are matched against one of the configured :term:`Data Source`. Minimal implementations
 of :term:`OGC API - Processes` can also work as external :term:`Provider` where to dispatch executions, but in
 the case of *core* implementations, the :term:`Process` should be already available since it cannot be deployed.
@@ -2158,7 +2247,7 @@ pulling the data locally when :term:`Data Source` become substantial. Furthermor
 providers to define custom or private data retrieval mechanisms, where data cannot be exposed or offered externally,
 but are still available for use when requested.
 
-.. rubric:: Footnotes
+.. rubric:: Details
 
 .. [#notedatasource]
     Configuration :term:`HYBRID` applies here in cases where `Weaver` acts as an :term:`EMS` for remote dispatch

@@ -431,8 +431,8 @@ CWL Workflow
 ------------------------
 
 `Weaver` also supports :term:`CWL` ``class: Workflow``. When an :term:`Application Package` is defined this way, the
-|process-deploy-op|_ will attempt to resolve each ``step`` as another process. The reference to the :term:`CWL`
-definition can be placed in any location supported as for the case of atomic processes
+:ref:`Process Deployment <proc_op_deploy>` operation will attempt to resolve each ``step`` as another :term:`Process`.
+The reference to the :term:`CWL` definition can be placed in any location supported as for the case of atomic processes
 (see details about :ref:`supported package locations <proc_ogc_api>`).
 
 The following :term:`CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
@@ -570,7 +570,7 @@ same process definition after deployment. For simplification purpose, below exam
 Other fields are discussed afterward in specific sections.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
 
     +-----------------------------------+----------------------------------------+----------------------------------+
@@ -698,7 +698,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         |                        | handled as nested ``Files`` to stage.      |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 
-.. rubric:: Footnotes
+.. rubric:: Details
 
 .. [#note1]
     Resolution method according to critical fields defined in :ref:`cwl-type`.
@@ -830,7 +830,7 @@ multiple ``File`` locations from ``s3://`` buckets to stage for :ref:`Process Ex
 The following ``Directory`` listing formats are supported.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 70,30
 
@@ -878,7 +878,7 @@ will be mapped against corresponding *namespaced* ``format`` of :term:`CWL`.
 Following is an example where input definitions are equivalent in both :term:`CWL` and :term:`WPS` contexts.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 50,50
 
@@ -977,7 +977,7 @@ inputs to a specific set of values. In :term:`CWL`, the same can be achieved usi
 the following two variants are equivalent and completely interchangeable.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 50,50
 
@@ -1044,7 +1044,7 @@ a given input. Some parts of the following definitions are purposely omitted to 
 of *multiple* and *optional* information.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 50,50
 
@@ -1098,7 +1098,7 @@ Obviously, corresponding definitions can become more or less complicated with mu
 parameters presented later in this section. Some definitions are also not completely portable between contexts.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 33,34,33
 
@@ -1209,7 +1209,7 @@ Following is a sample representation of equivalent variants :term:`JSON` definit
 automatically expended using the ``oneOf`` structure with other missing components if applicable.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 50,50
 
@@ -1285,7 +1285,7 @@ following structures. If the ``contentMediaType`` happens to be :term:`JSON`, th
 schema can be added as well, as presented in :ref:`oas_json_types` section.
 
 .. table::
-    :class: code-table
+    :class: table-code
     :align: center
     :widths: 50,50
 
@@ -1351,7 +1351,7 @@ Below is a list of compatible elements.
     | ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
     +-----------------------------------------+----------------------------------------------------------+
 
-.. rubric:: Footnotes
+.. rubric:: Details
 
 .. [#cwl_schemaorg]
     When using these properties, it is expected that the :term:`CWL` :term:`Application Package` resolves
