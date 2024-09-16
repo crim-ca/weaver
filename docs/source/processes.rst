@@ -824,57 +824,81 @@ to the ``Prefer`` header approach, both approaches remain available in `Weaver`.
 
 Following is a detailed listing of the expected response structure according to requested parameters.
 
-.. fixme: add missing combinations
-
 .. table:: Expected *Execution Results* according to *Requested Parameters*
     :name: table-exec-results
     :class: table-exec-results
     :align: center
 
-    +---------------------+------------------------------+-----------+-----------------------------------------------+
-    | |oap| v2.0          | |oap| v1.0                   | #         | Results                                       |
-    +---------------------+--------------+---------------+ requested |                                               |
-    | ``Prefer: return``  | ``response`` | |out-mode|    | outputs   |                                               |
-    | header              | |body-param| | |body-param|  | [#outN]_  |                                               |
-    +=====================+==============+===============+===========+===============================================+
-    | |any|               | |any|        | |na|          | 0         | |res-empty| [#resNoContent]_                  |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | |none|       | |none|        | 1         | |res-accept|                                  |
-    |                     |              |               |           | |res-json-warn|_                              |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | ``raw``      | |none|        | 1         | - |res-accept|                                |
-    |                     |              |               |           | - |res-auto| [#resValRef]_                    |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | ``raw``      | ``value``     | 1         | - |res-accept|                                |
-    |                     |              |               |           | - |res-data|_                                 |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | ``raw``      | ``reference`` | 1         | - |res-accept|                                |
-    |                     |              |               |           | - |res-ref|_                                  |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | |none|       | |none|        | >1        | |res-accept| [#resCTypeMulti]_                |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | ``document`` | |none|        | 1         | :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               |           | [#resValRef]_                                 |
-    +---------------------+              |               |           |                                               |
-    | ``minimal``         |              |               |           |                                               |
-    |                     |              |               |           |                                               |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |na|                | ``document`` | ``value``     | 1         | :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               |           | with data included inline.                    |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
-    | |none|              | ``document`` | ``reference`` | 1         | :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               |           | with linked file reference.                   |
-    +---------------------+              |               |           |                                               |
-    | ``minimal``         |              |               |           |                                               |
-    |                     |              |               |           |                                               |
-    +---------------------+--------------+---------------+-----------+-----------------------------------------------+
+    +---------------------+------------------------------+-----------+-------------------------------------------------+
+    | |oap| v2.0          | |oap| v1.0                   | |nReqOut| | Results |res-important|_                        |
+    +---------------------+--------------+---------------+ [#outN]_  |                                                 |
+    | ``Prefer: return``  | ``response`` | |out-mode|    |           |                                                 |
+    | header              | |body-param| | |body-param|  |           |                                                 |
+    +=====================+==============+===============+===========+=================================================+
+    | |any|               | |any|        | |na|          | 0         | |res-empty| [#resNoContent]_                    |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |none|              | |none|       | |none|        | 1         | |res-accept| |res-fmt-warn|_                    |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``representation``  | ``raw``      | |none|        | 1         | - |res-accept|                                  |
+    |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
+    |                     |              |               | (literal) | - |res-data|_                                   |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``representation``  | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
+    |                     |              |               | (complex) | - |res-ref|_                                    |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-data|_                                   |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-ref|_                                    |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |none|              | |none|       | |none|        | >1        | - :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           |   content by default [#resCTypeMulti]_          |
+    |                     |              |               |           | - otherwise, |res-accept| |res-fmt-warn|_       |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``representation``  | ``raw``      | |none|        | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
+    |                     |              |               |           |   content [#resCTypeMulti]_                     |
+    |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
+    | [#resPreferReturn]_ |              | *or*          |           |   content [#resCTypeMulti]_                     |
+    |                     |              | ``reference`` |           | - using embedded content part data/link         |
+    |                     |              |               |           |   as requested by |out-mode| [#resValRefForce]_ |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           |   content                                       |
+    |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``minimal``         | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               |           |   content                                       |
+    |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``minimal``         | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    | [#resPreferReturn]_ |              |               | (literal) |   content                                       |
+    |                     |              |               |           | - using data included inline                    |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``minimal``         | ``document`` | ``reference`` | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    | [#resPreferReturn]_ |              |               | (complex) |   content                                       |
+    |                     |              |               |           | - using file link reference                     |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    | [#resPreferReturn]_ |              |               | (complex) |   content                                       |
+    |                     |              |               |           | - using data included inline [#resValRefForce]_ |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``document`` | ``reference`` | |any|     | - :ref:`Results <job-results-document-minimal>` |
+    | [#resPreferReturn]_ |              |               | (literal) |   content                                       |
+    |                     |              |               |           | - using file link reference [#resValRefForce]_  |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
 
 .. |oap| replace:: :term:`OGC API - Processes`
 .. |body-param| replace:: body parameter
 .. |out-mode| replace:: ``transmissionMode``
+.. |nReqOut| replace:: Amount and type of |br| *requested outputs*
 .. |res-empty| replace:: *empty*
 .. |res-accept| replace:: *as negotiated by* ``Accept`` *header or* ``format`` *parameter*
-.. |res-auto| replace:: *with auto resolution of data/link representation*
+.. |res-auto| replace:: *using automatic resolution of data/link representation*
 
 .. |res-data| replace:: Results for a Single Output with Data
 .. _res-data: processes.html#job-results-raw-single-data
@@ -885,9 +909,12 @@ Following is a detailed listing of the expected response structure according to 
 .. important::
     Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
     simultaneously (although permitted), since they should be interchangeable in most situations.
-    The table indicates both variations to illustrate which combinations lead to the **same result**.
+    The table indicates both |oap| v1.0/v2.0 variations to illustrate which combinations lead to the **same result**.
     If a client happens to use both combination simultaneously, the body parameters will take precedence
     over the ``Prefer`` header.
+
+.. |res-important| replace:: :sup:`(see: important note)`
+.. _res-important:
 
 .. important::
     It is important not to confuse expected *Results* above with *Responses*.
@@ -896,7 +923,6 @@ Following is a detailed listing of the expected response structure according to 
     A :term:`Job` successfully resolved with `synchronous` execution will return the *Results* shown in the table
     directly with a *HTTP 200 OK* status, whereas an `asynchronous` execution will always return a
     :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted* status.
-
     In the case of a successfully completed `asynchronous` execution, a
     subsequent :ref:`Results Request <proc_op_result>` using the :term:`Job` ``Location``
     is needed to obtain the *Results* presented in the above table. Note that a `synchronous` execution can also
@@ -909,16 +935,15 @@ Following is a detailed listing of the expected response structure according to 
     the |any| notation is used instead.
     The |na| notation indicates *not applicable* cases, due to a technical or logical impossibility.
 
-.. |res-json-warn| replace:: :sup:`(warning: ambiguity)`
-.. _res-json-warn:
+.. |res-fmt-warn| replace:: :sup:`(warning: ambiguity)`
+.. _res-fmt-warn:
 
 .. warning::
     When negotiating a single output as :term:`JSON`, there is a potential ambiguity between
     :ref:`Results <proc_op_job_results>` representation and a single file's data, such as in the
     case of a :term:`GeoJSON` structure, both of which are encoded in :term:`JSON`.
-
-    Similar ambiguities could also occur, depending on supported formats, such as representing
-    :term:`Job` results in :term:`XML`, or retrieving a file's data encoded as GML :term:`XML`.
+    Similar ambiguities could also occur for other :term:`Media-Types`, depending on supported formats,
+    such as representing :term:`Job` results in :term:`XML`, or retrieving a file's data encoded as GML :term:`XML`.
 
     To avoid ambiguity, it is recommended that the ``response: document`` or ``response: raw``
     is explicitly set for such cases to ensure the result matches the desired outcome.
@@ -926,7 +951,9 @@ Following is a detailed listing of the expected response structure according to 
 .. rubric:: Details
 
 .. [#outN]
-    Corresponds to the number of ``outputs`` *requested* in the :ref:`proc_exec_body`.
+    Corresponds to the number of ``outputs`` *requested* in the :ref:`proc_exec_body`, and the data type of
+    those outputs if this distinction impacts the results.
+    
     Note that omitting ``outputs`` (i.e.: indicated by |out-mode| with |none| in the table) is equivalent to
     requesting *all* outputs offered by the :term:`Process`. To request "*no outputs at all*"
     (if it makes sense for :term:`Process` to do so),
@@ -942,14 +969,38 @@ Following is a detailed listing of the expected response structure according to 
     The data of the multiple outputs are simultaneously returned, but their encoding depend on the requested ``Accept``
     header. By default, the :ref:`Results <job-results-document-minimal>` structure encoded as :term:`JSON` is employed.
     However, the :ref:`Results for Multiple Outputs <job-results-raw-multi>` example using ``multipart/related``
-    contents could also be obtained if requested. Other representations, such as packaging the results under
-    a single ZIP archive could also be returned.
+    contents could also be obtained if requested, or as established by using other parameter combinations.
+    Other content representations, such as packaging the results under a single ZIP archive, could also be returned
+    if requested. However, alternate representations might not allow some ``transmissionMode`` combinations according
+    to their logical representation (e.g.: a ZIP archive could refuse ``transmissionMode: reference`` to only allow
+    files to be directly included in the ZIP, rather than link references to them).
 
 .. [#resValRef]
     Although the general "*response structure*" is established by other parameters in this case, whether respective
     outputs are returned by ``value`` or by ``reference`` depend on the ``Prefer`` header and ``transmissionMode``
-    combinations, as well as each output's literal/complex data type representation. See :ref:`proc_op_job_results`
-    for more details.
+    combinations, as well as each output's literal/complex data type representation.
+    Typically, complex file-like outputs would be automatically represented by link references, and literal data
+    outputs would be represented with their values inline. See :ref:`proc_op_job_results` for more details.
+
+    To request only a specific output, while using the automatic resolution rather than
+    specifying ``value`` or ``reference`` explicitly, the ``transmissionMode`` should be
+    omitted from the :ref:`proc_exec_body` (i.e.: ``outputs: { "<outputID>": {} }``).
+
+.. [#resValRefForce]
+    The ``value`` or ``reference`` format is enforced accordingly to the requested ``transmissionMode`` of each
+    respective output.
+    In the case of a file-like complex data, ``value`` would force the file contents to be embedded inline in the
+    document, whereas ``reference`` would use a link (its usual default behavior). Similarly, a literal data type
+    would have its output placed inline in the document using ``value`` (its usual default behavior), whereas a
+    link would be enforced if ``reference`` was requested.
+
+.. [#resPreferReturn]
+    Using only the |oap| v2.0 ``Prefer: return`` header parameter, it is not always possible to *enforce* every
+    result combination as when using |oap| v1.0 parameters. More specifically, it is not possible to replicate
+    cases where a requested output specifies a ``transmissionMode`` using an *opposite* representation from its
+    "*default minimum*" representation of literal or complex data. However, ``Prefer: return`` header is equivalent
+    for cases where *every requested output* uses the default matching the specified or resolved ``transmissionMode``
+    (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
 .. fixme:
     reword below, above table results identical for Prefer/mode sync/async,
@@ -1555,7 +1606,7 @@ Collection Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The |ogc-api-proc-part3-collection-input|_ is defined by the |ogc-api-proc-part3|_ extension. This allows to submit a
-:term:`Process Execution <proc_op_execute>` using the following :term:`JSON` structure when the targeted :term:`Process`
+:ref:`Process Execution <proc_op_execute>` using the following :term:`JSON` structure when the targeted :term:`Process`
 can make use of the resulting data sources retrieved from the referred :term:`Collection` and processing conditions.
 The ``collection`` keyword is employed to identify this type of input, in contrast to literal data and complex file
 inputs respectively using ``value`` and ``href``, as presented in the :ref:`Process Execution <proc_op_execute>`
