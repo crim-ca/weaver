@@ -602,10 +602,10 @@ Execution of a Process (Execute)
     :term:`OGC API - Processes` compliant endpoint.
 
 This section will first describe the basics of this request format (:ref:`proc_exec_body`), and after go into
-further details for specific use cases and parametrization of various input/output combinations.
-
+further details for specific use cases and parametrization of various input/output combinations
+(:ref:`proc_exec_mode`, :ref:`proc_exec_results`, etc.).
 Below are some examples of :term:`JSON` body that can be sent to the :term:`Job` execution endpoint to
-better illustrate where each of the mentioned parameters in following section are expected.
+better illustrate where each of the mentioned parameters in following sections are expected.
 
 .. table:: Example Job Execution Request Body
     :name: table-exec-body
@@ -646,12 +646,11 @@ better illustrate where each of the mentioned parameters in following section ar
     data (values provided without the nested ``value`` field). The listing representation is the older format employed
     during previous :term:`OGC` testbed developments.
 
-.. note::
-    Other parameters can be added to the request to provide further functionalities. Above fields are the minimum
-    requirements to request a :term:`Job`. Please refer to the |exec-api|_ definition, as well as following sections,
-    for all applicable features.
-
 .. seealso::
+    Many additional parameters can be used to request further functionalities. The above fields only present the
+    most common definitions employed to request a :term:`Job`. Please refer to the |exec-api|_ definition, as well
+    as following sections, for all applicable features.
+
     - :ref:`proc_exec_body`, :ref:`proc_exec_mode` and :ref:`proc_exec_results` sections provide details
       applicable to `Weaver`, which align with :term:`OGC API - Processes`, but that can also support additional
       capabilities.
@@ -1625,7 +1624,7 @@ section.
     Also, different combinations of parameters will be supported depending on which remote :term:`API` gets
     interrogated to resolve the :term:`Collection` contents. The |ogc-api-proc-part3|_ is still under development,
     and interactions with the various access points of |ogc-api-standards|_ remains to
-    be evaluated in detail to further explore interoperability concerns between all :term:`API`implementations.
+    be evaluated in detail to further explore interoperability concerns between all :term:`API` implementations.
     Refer to :ref:`proc_col_inputs_examples` for potential combinations and additional samples.
 
 To determine which *items* should be retrieved from the :term:`Collection`, whether they are obtained by
@@ -1889,9 +1888,9 @@ avoid conflicts. Therefore, outputs will be available with the following locatio
 
 .. code-block::
 
-    {WPS_OUTPUT_URL}/{JOB_UUID}.xml             # status location
-    {WPS_OUTPUT_URL}/{JOB_UUID}.log             # execution logs
-    {WPS_OUTPUT_URL}/{JOB_UUID}/{output.ext}    # results of the job if successful
+    {WPS_OUTPUT_URL}/{JOB_UUID}.xml                         # status location
+    {WPS_OUTPUT_URL}/{JOB_UUID}.log                         # execution logs
+    {WPS_OUTPUT_URL}/{JOB_UUID}/{outputID}/{output.ext}     # results of the job if successful
 
 .. note::
     Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with ``weaver.wps_output_url``,
@@ -1904,11 +1903,11 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
 
 .. code-block::
 
-    {WPS_OUTPUT_URL}/project/test-1/{JOB_UUID}/{output.ext}
+    {WPS_OUTPUT_URL}/project/test-1/{JOB_UUID}/{outputID}/{output.ext}
 
 .. note::
-    Values provided by ``X-WPS-Output-Context`` can only contain alphanumeric, hyphens, underscores and path
-    separators that will result in a valid directory and URL locations. The path is assumed relative by design to be
+    Values provided by ``X-WPS-Output-Context`` can only contain alphanumeric, hyphens, underscores and path separators
+    that will result in a valid directory and :term:`URL` locations. The path is assumed relative by design to be
     resolved under the :term:`WPS` output directory, and will therefore reject any ``.`` or ``..`` path references.
     The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
     the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
@@ -1931,16 +1930,16 @@ Notification Subscribers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When submitting a :term:`Job` for execution, it is possible to provide the ``notification_email`` field.
-Doing so will tell `Weaver` to send an email to the specified address with successful or failure details
+Doing so will tell `Weaver` to send an email to the specified address with *successful* or *failure* details
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
-email-specific settings (see: :ref:`Configuration`).
+email-specific settings (see: :ref:`Email Configuration <weaver-wps-email>`).
 
 Alternatively to ``notification_email``, the ``subscribers`` field of the :term:`API` can be employed during :term:`Job`
 submission. Using this field will take precedence over ``notification_email`` for corresponding email and status
 combinations. The :term:`Job` ``subscribers`` allow more fined-grained control over which emails will be sent for
 the various combinations of :term:`Job` status milestones.
 
-Furthermore, ``subscribers`` allow specifying URLs where HTTP(S) requests will be sent with
+Furthermore, ``subscribers`` allow specifying URLs where HTTP(S) callback requests (i.e.: webhooks) will be sent with
 the :ref:`Job Status <proc_op_status>` or :ref:`Job Results <proc_op_result>` contents directly in :term:`JSON` format.
 This allows users and/or servers to directly receive the necessary details using a push-notification mechanism instead
 of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint otherwise required to obtain updated
@@ -1955,10 +1954,10 @@ of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint o
 Monitoring of a Process Execution (GetStatus)
 ---------------------------------------------------------------------
 
-Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the :ref:`Execute`
-operation and verifying the indicated ``status`` for the expected result. The ``status`` can correspond to any of the
-value defined by :data:`weaver.status.JOB_STATUS_VALUES` accordingly to the internal state of the workers processing
-their execution.
+Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the
+:ref:`Execute <proc_op_execute>` operation and verifying the indicated ``status`` for the expected result.
+The ``status`` can correspond to any of the value defined by :data:`weaver.status.JOB_STATUS_VALUES`
+accordingly to the internal state of the workers processing their execution.
 
 When targeting a :term:`Job` submitted to a `Weaver` instance, monitoring is usually accomplished through
 the :term:`OGC API - Processes` endpoint using |status-req|_, which will return a :term:`JSON` body.
@@ -1979,7 +1978,7 @@ format is employed according to the chosen location.
       - Contents
       - Location
     * - :term:`OGC API - Processes`
-      - JSON
+      - :term:`JSON`
       - ``{WEAVER_URL}/jobs/{JobUUID}``
     * - :term:`WPS`
       - :term:`XML`
@@ -1990,13 +1989,17 @@ format is employed according to the chosen location.
 
 .. _proc_op_result:
 
-Obtaining Job Results, Outputs, Logs or Errors
+Obtaining Job Outputs, Results, Logs or Errors
 ---------------------------------------------------------------------
 
 .. _proc_op_job_outputs:
 
 Job Outputs
 ~~~~~~~~~~~
+
+.. note::
+    This endpoint is a `Weaver`-specific implementation provided for convenience.
+    For the :term:`OGC API - Processes` compliant endpoint, refer to :ref:`proc_op_job_results`.
 
 In the case of successful :term:`Job` execution, the *outputs* can be retrieved with |outputs-req|_ request to list
 each corresponding output ``id`` with the generated file reference URL. Keep in mind that the purpose of those URLs are
@@ -2006,33 +2009,41 @@ parameters for the base :term:`WPS` output location:
 
 .. literalinclude:: ../examples/job_outputs_listing.json
     :language: json
+    :caption: :term:`Job` Outputs Response with Listing Representation
+    :name: job-outputs-listing
 
-In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal``, the contents
-of a :ref:`proc_op_job_results` will be very similar to the above :term:`JSON` contents, but using the ``{outputID}``
-mapping representation directly returned, instead of listing them as "output items" under ``outputs``.
-
-On the other hand, a :term:`Job` submitted with ``response=raw`` or ``Prefer: return=representation`` can produce
-many alternative content variations according to :term:`OGC` requirements, the number of requested ``outputs``,
-and the respective :term:`Media-Type`, schema or literal data of each output. For this reason,
-the :ref:`proc_op_job_outputs` endpoint will always provide all data and file references in the response body
-as represented by the above :term:`JSON`, no matter which :ref:`proc_exec_results` parameters where originally
-submitted. In other words, the contents of the "``output_netcdf.nc``" file will never be directly returned as
-response when using the :ref:`proc_op_job_outputs` endpoint, and will always use the ``document``/``minimal`` links.
-
-Furthermore, because this response nests the items under ``outputs``, other information can be returned,
-such as relevant ``links``
-with references to :ref:`proc_op_job_inputs`, :ref:`proc_op_job_logs`, :ref:`Job Status <proc_op_status>`,
-or the source :ref:`Process Description <proc_op_describe>` that produced returned :term:`Job` outputs.
-
-The :ref:`proc_op_job_outputs` endpoint can also receive additional query parameters,
-such as ``schema=OGC+strict``, which
-allows it to return contents formatted slightly differently, to imitate the :term:`JSON` mapping representation
+The :ref:`proc_op_job_outputs` endpoint can receive additional query parameters,
+such as ``schema=OGC+strict`` (see :py:class:`weaver.processes.constants.JobInputsOutputsSchema` for other values),
+which allows it to return contents formatted slightly differently, to imitate the :term:`JSON` mapping representation
 (rather than the array) used by the :ref:`proc_exec_results` endpoint as if ``response=document`` was specified
 during submission of the :term:`Process` execution. However, this :term:`JSON` mapping will still employ a
-nested ``outputs`` property, as presented below, in order to allow additional  ``links`` information.
+nested ``outputs`` property, as presented below.
 
 .. literalinclude:: ../examples/job_outputs_mapping.json
     :language: json
+    :caption: :term:`Job` Outputs Response with Mapping Representation
+    :name: job-outputs-mapping
+
+Because these responses nests the items under ``outputs`` (in contrast to :ref:`proc_op_job_results`
+returning ``{outputID}`` directly at the root), other information can be returned, such as relevant ``links``
+with references to :ref:`proc_op_job_inputs`, :ref:`proc_op_job_logs`, :ref:`Job Status <proc_op_status>`,
+or the source :ref:`Process Description <proc_op_describe>` that produced returned :term:`Job` outputs.
+
+In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal``, the contents
+of :ref:`proc_op_job_results` will be very similar to the above :ref:`Output Mapping <job-outputs-mapping>` contents,
+but with respective ``{outputID}`` returned directly at the root, instead of nesting them under ``outputs``.
+On the other hand, a :term:`Job` submitted with ``response=raw`` or ``Prefer: return=representation`` can produce
+many alternative content variations (see :ref:`proc_exec_results`) to respect :term:`OGC` compliance requirements,
+according to the number of requested ``outputs``, submitted request parameters, and the respective :term:`Media-Type`,
+schema or literal data of each output.
+For this reason, the :ref:`proc_op_job_outputs` endpoint will always provide all data and file references in the
+response body using the minimal representation as shown by above :term:`JSON` examples, no matter which request
+parameters where originally submitted to execute the :term:`Job`.
+In other words, the contents of the "``output_netcdf.nc``" file will never be directly
+returned inline/by-value in the :term:`JSON` response when using the :ref:`proc_op_job_outputs` endpoint,
+and will always use the ``document``/``minimal`` file links. This is done to offer a simplified data access mechanism
+without having to deal will all possible combinations of data representations potentially returned
+by :ref:`proc_exec_results`.
 
 .. _proc_op_job_results:
 
@@ -2040,8 +2051,13 @@ Job Results
 ~~~~~~~~~~~
 
 This corresponds to the :term:`OGC API - Processes` compliant endpoint, using the |results-req| request.
-Contrary to :ref:`proc_op_job_outputs`, where the :term:`JSON` representation is always enforced, this endpoint
-will respond according to the submitted :term:`Job` parameters, as described in :ref:`proc_exec_results`.
+Contrary to :ref:`proc_op_job_outputs`, where the :term:`JSON` ``document`` representation is always enforced,
+this endpoint will respond according to the submitted :term:`Job` parameters.
+
+.. seealso::
+    This section presents examples of the most typical result combinations.
+    For an exhaustive list of expected content results and resolution behaviors,
+    according to submitted execution parameters, refer to the :ref:`proc_exec_results` section.
 
 In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal`` with multiple outputs,
 the contents will typically be a :term:`JSON` mapping representation, where each *requested* ``{outputID}`` can be
@@ -2057,16 +2073,19 @@ to :ref:`proc_exec_results`. An example of such results is presented below.
     The ``{outputID}`` are returned at the root of the contents using this representation,
     contrary to the :ref:`proc_op_job_outputs` endpoint that nests them under ``outputs``.
 
-When a :term:`Job` is executed with ``response=raw``, or when the *requested* ``outputs``[#n_out]_ consisted only of
+When a :term:`Job` is executed with ``response=raw``, or when the *requested* ``outputs`` [#outN]_ consisted only of
 a single ``{outputID}``, the returned data will directly
 be the contents of the produced file, or literal value, as applicable according to the ``schema`` definition of the
 corresponding output in the :ref:`Process Description <proc_op_describe>`.
 
 The following result will be obtained if any of the following conditions are encountered:
 
-1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=representation`` header was used
-2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: value`` parameter was used
-3. The result is a literal data type, whether or not ``Prefer``/``transmissionMode`` were specified with above values.
+1. The result is a complex :ref:`File Reference <file_ref_types>`
+   and the ``Prefer: return=representation`` header was used
+2. The result is a complex :ref:`File Reference <file_ref_types>`
+   and the ``transmissionMode: value`` parameter was used
+3. The result is a literal data type,
+   whether or not ``Prefer``/``transmissionMode`` were specified with above values.
 
 .. literalinclude:: ../examples/job_results_raw_single_data.http
     :language: http
@@ -2075,9 +2094,12 @@ The following result will be obtained if any of the following conditions are enc
 
 The following result will be obtained if any of the following conditions are encountered:
 
-1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=minimal`` header was used
-2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: reference`` parameter was used
-3. The result is a literal data type, and any above ``Prefer``/``transmissionMode`` value is *explicitly* requested.
+1. The result is a complex :ref:`File Reference <file_ref_types>`
+   and the ``Prefer: return=minimal`` header was used
+2. The result is a complex :ref:`File Reference <file_ref_types>`
+   and the ``transmissionMode: reference`` parameter was used
+3. The result is a literal data type,
+   and any above ``Prefer``/``transmissionMode`` value is *explicitly* requested.
 
 .. literalinclude:: ../examples/job_results_raw_single_ref.http
     :language: http
@@ -2085,10 +2107,10 @@ The following result will be obtained if any of the following conditions are enc
     :name: job-results-raw-single-ref
 
 When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will either be
-multipart contents or similar to the first ``document`` :term:`JSON` structure, accordingly to the
-negotiated ``Content-Type``. An example of a multipart representation is shown below.
+multipart contents or similar to the ``document`` :term:`JSON` structure :ref:`example <job-results-document-minimal>`,
+accordingly to the negotiated ``Accept`` content header. An example of a multipart representation is shown below.
 The resolution of the nested outputs within each boundary, either by value or reference, will resolve
-for each respective output according to the same rules combinations specified above for single output.
+for each respective output according to the same rule combinations specified above for single output.
 
 .. literalinclude:: ../examples/job_results_raw_multi.http
     :language: mime
@@ -2104,7 +2126,8 @@ provided directly.
 
 If the ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs`` [#outN]_
 or ``Prefer: return=representation`` were used, the data of the file would be directly included inline within the
-response instead of using ``Content-Location``, similarly to the :ref:`job-results-raw-single-data` example,
+response instead of using ``Content-Location``, similarly to
+the :ref:`Single Output Value <job-results-raw-single-data>` example,
 but nested within its respective ``Content-ID: output-file`` multipart bounds.
 
 .. _proc_op_job_inputs:
@@ -2112,15 +2135,19 @@ but nested within its respective ``Content-ID: output-file`` multipart bounds.
 Job Inputs
 ~~~~~~~~~~~
 
-In order to better understand the parameters that were submitted during :term:`Job` creation, the |inputs-req|_
-can be employed. This will return both the data and reference ``inputs`` that were submitted, as well as
-the *requested* ``outputs`` to retrieve any relevant ``transmissionMode``, ``format``, etc. parameters
-that where specified during submission of the :ref:`proc_exec_body`.
+In order to better understand the parameters that were *originally* submitted during :term:`Job` creation,
+the |inputs-req|_ can be employed. This will return both the data and reference ``inputs`` that were submitted,
+as well as the *requested* ``outputs`` [#outN]_ to retrieve any relevant ``transmissionMode``, ``format``, etc.
+parameters that where specified during submission of the :ref:`proc_exec_body`.
+For convenience, this endpoint also returns relevant ``links`` applicable for the requested :term:`Job`.
 
+.. literalinclude:: ../examples/job_inputs.json
+    :language: json
+    :caption: Example :term:`JSON` Response from :term:`Job` Inputs
+    :name: job-inputs
 
-.. fixme:
-.. todo:: add job inputs JSON example
-
+.. note::
+    The ``links`` presented above are not an exhaustive list to keep the example relatively small.
 
 .. _proc_op_job_error:
 .. _proc_op_job_exceptions:
@@ -2167,7 +2194,8 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_logs.json
     :language: json
-
+    :caption: Example :term:`JSON` Representation of :term:`Job` Logs Response
+    :name: job-logs
 
 .. note::
     All endpoints to retrieve any of the above information about a :term:`Job` can either be requested directly
