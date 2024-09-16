@@ -706,12 +706,6 @@ omit this output from the produced results.
 
 .. fixme:
 .. todo::
-    For the time being, because only ``reference`` representation is offered for produced output files, this
-    filtering is not implemented as it offers no additional advantage for files accessed directly with their
-    distinct links.
-    This could be added later if ``Multipart`` raw data representation is required.
-    Please |submit-issue|_ to request this feature if it is relevant for your use-cases.
-
     Filtering of ``outputs`` not implemented (everything always available).
     https://github.com/crim-ca/weaver/issues/380
 
@@ -920,8 +914,9 @@ Following is a detailed listing of the expected response structure according to 
 
     The actual HTTP *Response* returned from the execution endpoint will depend on the requested :ref:`proc_exec_mode`.
     A :term:`Job` successfully resolved with `synchronous` execution will return the *Results* shown in the table
-    directly with a *HTTP 200 OK* status, whereas an `asynchronous` execution will always return a
-    :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted* status.
+    directly with a *HTTP 200 OK* or *HTTP 204 No Content* status (as applicable), whereas an `asynchronous` execution
+    will always return a :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted*
+    status (accordingly if the :term:`Job` started immediately or is still pending).
     In the case of a successfully completed `asynchronous` execution, a
     subsequent :ref:`Results Request <proc_op_result>` using the :term:`Job` ``Location``
     is needed to obtain the *Results* presented in the above table.
@@ -1003,23 +998,14 @@ Following is a detailed listing of the expected response structure according to 
     for cases where *every requested output* uses the default matching the specified or resolved ``transmissionMode``
     (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
-.. fixme:
-    reword below, above table results identical for Prefer/mode sync/async,
-    except that returned directly for sync, and via results endpoint in async
-    describe that sync can still access results afterward, as if async was used 
+In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
+The ``Prefer`` header is also used by |oap| v2.0 to control how the results are encoded, whereas v1.0 relies on a
+separate ``transmissionMode`` parameter. By reducing the amount of parameters involved, v2.0 makes the request easier
+to submit with a single header (also used to indicate the :ref:`proc_exec_mode`), but limits certain representation
+combinations only possible with v1.0.
 
-The ``response`` parameter defines how to return the results produced by the :term:`Process`.
-When ``response=document``, regardless of ``mode=async`` or ``mode=sync``, and regardless of requested
-outputs ``transmissionMode=value`` or ``transmissionMode=reference``, the results will be returned in
-a :term:`JSON` format containing either literal values or URL references to produced files. If ``mode=async``,
-this results *document* is obtained with |results-req|_ request, while ``mode=sync`` returns it directly.
-When ``response=raw``, the specific contents (type and quantity), HTTP ``Link`` headers or a mix of those components
-depends both on the number of available :term:`Process` outputs, which ones were requested, and how they were
-requested (i.e.: ``transmissionMode``). It is also possible that further content negotiation gets involved
-accordingly to the ``Accept`` header and available ``Content-Type`` of the outputs if multiple formats are supported
-by the :term:`Process`. For more details regarding those combination, the official
-|ogc-api-proc-exec-responses-sync|_ and |ogc-api-proc-exec-responses-async|_ should be employed as reference.
-
+.. seealso::
+    Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.
 
 .. _proc_exec_steps:
 
@@ -2106,8 +2092,22 @@ The following result will be obtained if any of the following conditions are enc
     :caption: Results for a single output returned directly by reference
     :name: job-results-raw-single-ref
 
+When results are resolved as ``transmissionMode: reference``, either using ``Prefer: return=minimal``
+or ``response: raw`` parameters, leading to the creation of a :ref:`File Reference <file_ref_types>` link
+directly returned as above (rather than embedded in a :ref:`Document Result <job-results-document-minimal>`),
+the generated reference will be reported using a HTTP ``Link`` header, for each applicable output, in order to fulfill
+|oap| v1.0 `Requirement 30 <https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref>`_.
+However, given that such ``Link`` headers can result into conflicting ``rel: {outputID}`` with other ``Link``
+entries found in the response, and require additional parsing of the value to extract the :term:`URL`, a combination
+of ``Content-ID``, ``Content-Type`` and ``Content-Location`` will also be provided.
+
+.. note::
+    For cases where an output would represent an array of :ref:`File References <file_ref_types>`, returned ``Link``
+    headers for each of these links will employ ``rel: "{outputID}.{index}"`` with their respective ``index`` from
+    the array.
+
 When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will either be
-multipart contents or similar to the ``document`` :term:`JSON` structure :ref:`example <job-results-document-minimal>`,
+multipart contents or similar to the :ref:`Document Result <job-results-document-minimal>` contents,
 accordingly to the negotiated ``Accept`` content header. An example of a multipart representation is shown below.
 The resolution of the nested outputs within each boundary, either by value or reference, will resolve
 for each respective output according to the same rule combinations specified above for single output.
