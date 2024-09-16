@@ -843,10 +843,10 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_                                   |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-data|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-ref|_                                    |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-ref|_                                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
     | [#resPreferReturn]_ |              |               | (complex) | - |res-data|_                                   |
@@ -928,8 +928,8 @@ Following is a detailed listing of the expected response structure according to 
     is needed to obtain the *Results* presented in the above table.
 
     Note that a `synchronous` execution can also
-    make use of the :ref:`Results Request <proc_op_result>` operation to obtain the outputs again at a later time,
-    or to request alternate representations, or retrieve additional :term:`Job` information such as logs or metadata.
+    make use of the :ref:`Results Request <proc_op_result>` operation to obtain the outputs again at a later time, to
+    request alternate output representations, or retrieve additional :term:`Job` information such as logs and metadata.
 
 .. note::
     Combinations using |none| indicate that the parameter is **omitted entirely** from the request.
@@ -2063,6 +2063,7 @@ be the contents of the produced file, or literal value, as applicable according 
 corresponding output in the :ref:`Process Description <proc_op_describe>`.
 
 The following result will be obtained if any of the following conditions are encountered:
+
 1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=representation`` header was used
 2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: value`` parameter was used
 3. The result is a literal data type, whether or not ``Prefer``/``transmissionMode`` were specified with above values.
@@ -2073,6 +2074,7 @@ The following result will be obtained if any of the following conditions are enc
     :name: job-results-raw-single-data
 
 The following result will be obtained if any of the following conditions are encountered:
+
 1. The result is a :ref:`File Reference <file_ref_types>` and the ``Prefer: return=minimal`` header was used
 2. The result is a :ref:`File Reference <file_ref_types>` and the ``transmissionMode: reference`` parameter was used
 3. The result is a literal data type, and any above ``Prefer``/``transmissionMode`` value is *explicitly* requested.
@@ -2082,7 +2084,7 @@ The following result will be obtained if any of the following conditions are enc
     :caption: Results for a single output returned directly by reference
     :name: job-results-raw-single-ref
 
-When the number of *requested* ``outputs``[#n_out]_ is more than one, the response will either be
+When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will either be
 multipart contents or similar to the first ``document`` :term:`JSON` structure, accordingly to the
 negotiated ``Content-Type``. An example of a multipart representation is shown below.
 The resolution of the nested outputs within each boundary, either by value or reference, will resolve
