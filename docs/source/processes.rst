@@ -925,9 +925,11 @@ Following is a detailed listing of the expected response structure according to 
     :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted* status.
     In the case of a successfully completed `asynchronous` execution, a
     subsequent :ref:`Results Request <proc_op_result>` using the :term:`Job` ``Location``
-    is needed to obtain the *Results* presented in the above table. Note that a `synchronous` execution can also
-    make use of the :ref:`Results Request <proc_op_result>` operations at a later time to obtain
-    additional :term:`Job` information such as logs or metadata.
+    is needed to obtain the *Results* presented in the above table.
+
+    Note that a `synchronous` execution can also
+    make use of the :ref:`Results Request <proc_op_result>` operation to obtain the outputs again at a later time,
+    or to request alternate representations, or retrieve additional :term:`Job` information such as logs or metadata.
 
 .. note::
     Combinations using |none| indicate that the parameter is **omitted entirely** from the request.
