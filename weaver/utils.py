@@ -709,7 +709,7 @@ def parse_kvp(query,                    # type: str
     """
     Parse key-value pairs using specified separators.
 
-    All values are normalized under a list, whether their have an unique or multi-value definition.
+    All values are normalized under a list, whether they have a unique or multi-value definition.
     When a key is by itself (without separator and value), the resulting value will be an empty list.
 
     When :paramref:`accumulate_keys` is enabled, entries such as ``{key}={val};{key}={val}`` will be joined together
@@ -851,6 +851,10 @@ def parse_prefer_header_execute_mode(
     wait = wait_max
     if "wait" in params:
         try:
+            if any(param.isnumeric() for param in params):
+                # 'wait=x,y,z' parsed as 'wait=x' and 'y' / 'z' parameters on their own
+                # since 'wait' is the only referenced that users integers, it is guaranteed to be a misuse
+                raise ValueError("Invalid 'wait' with comma-separated values.")
             if not len(params["wait"]) == 1:
                 raise ValueError("Too many values.")
             wait = params["wait"][0]
@@ -881,7 +885,7 @@ def parse_prefer_header_execute_mode(
         if auto == mode:
             if auto == ExecuteMode.ASYNC:
                 applied_preferences.append("respond-async")
-            if wait:
+            if wait and "wait" in params:
                 applied_preferences.append(f"wait={wait}")
         # /rec/core/process-execute-honor-prefer (A: async & B: wait)
         # https://datatracker.ietf.org/doc/html/rfc7240#section-3
@@ -895,8 +899,10 @@ def parse_prefer_header_execute_mode(
     if len(supported_modes) == 2:
         if auto == ExecuteMode.ASYNC:
             return ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"}
-        if wait:
+        if wait and "wait" in params:
             return ExecuteMode.SYNC, wait, {"Preference-Applied": f"wait={wait}"}
+        if wait:  # default used, not a supplied preference
+            return ExecuteMode.SYNC, wait, {}
     return ExecuteMode.ASYNC, None, {}
 
 

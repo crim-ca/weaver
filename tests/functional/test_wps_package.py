@@ -43,7 +43,13 @@ from tests.utils import (
     mocked_wps_output,
     setup_aws_s3_bucket
 )
-from weaver.execute import ExecuteCollectionFormat, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteCollectionFormat,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -3512,6 +3518,44 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         assert results
 
+    def test_execute_single_output_prefer_header_return_representation(self):
+        body = self.retrieve_payload("EchoResultsTester", "deploy", local=True)
+        desc = self.deploy_process(body)
+
+        exec_headers = {
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}"
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_single_output_prefer_header_return_minimal(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_single_output_response_raw_value(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_single_output_response_raw_reference(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_prefer_header_return_representation(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_prefer_header_return_minimal(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_response_raw_value(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_response_raw_reference(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_response_raw_mixed(self):
+        raise NotImplementedError  # FIXME: implement
+
+    # FIXME: implement other variations as well... see doc 'Execution Results' combinations
+
 
 @pytest.mark.functional
 class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
@@ -3666,13 +3710,12 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
-    # FIXME: implement
     @pytest.mark.skip(reason="OAS execute parse/validate values not implemented")
     def test_execute_job_with_oas_validation(self):
         """
         Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # FIXME: implement
 
     @mocked_aws_config
     @mocked_aws_s3

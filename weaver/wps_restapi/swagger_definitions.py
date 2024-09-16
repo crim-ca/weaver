@@ -7113,7 +7113,7 @@ class PreferenceAppliedHeader(ExtendedSchemaNode):
     description = "Applied preferences from submitted 'Prefer' header after validation."
     name = "Preference-Applied"
     schema_type = String
-    example = "wait=10s, respond-async"
+    example = "wait=10, respond-async"
 
 
 class LocationHeader(URL):

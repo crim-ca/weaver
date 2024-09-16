@@ -25,6 +25,11 @@ class ExecuteControlOption(Constants):
         return [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
 
 
+class ExecuteReturnPreference(Constants):
+    MINIMAL = "minimal"
+    REPRESENTATION = "representation"
+
+
 class ExecuteResponse(Constants):
     RAW = "raw"
     DOCUMENT = "document"
