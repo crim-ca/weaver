@@ -387,14 +387,14 @@ following request (`DescribeProviderProcess`_):
 
 .. _proc_operations:
 
-Managing processes included in Weaver ADES/EMS
+Managing Processes included in Weaver ADES/EMS
 ==================================================
 
 Following steps represent the typical steps applied to deploy a process, execute it and retrieve the results.
 
 .. _proc_op_deploy:
 
-Register a new process (Deploy)
+Register a New Process (Deploy)
 -----------------------------------------
 
 Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
@@ -437,7 +437,7 @@ For most traditional use cases, properties are mapped between the two interfaces
 .. _proc_op_getcap:
 .. _proc_op_describe:
 
-Access registered processes (GetCapabilities, DescribeProcess)
+Access Registered Processes (GetCapabilities, DescribeProcess)
 ------------------------------------------------------------------------
 
 Available processes can all be listed using |getcap-req|_ request. This request will return all locally registered
@@ -473,7 +473,7 @@ the |getcap-req|_ request.
 .. _proc_op_undeploy:
 .. _proc_op_update:
 
-Modify an existing process (Update, Replace, Undeploy)
+Modify an Existing Process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
 Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
@@ -592,7 +592,7 @@ new :ref:`Deploy <proc_op_deploy>` request.
 
 .. _proc_op_execute:
 
-Execution of a process (Execute)
+Execution of a Process (Execute)
 ---------------------------------------------------------------------
 
 :term:`Process` execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request.
@@ -1952,7 +1952,7 @@ of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint o
 .. _proc_op_status:
 .. _proc_op_monitor:
 
-Monitoring of a process execution (GetStatus)
+Monitoring of a Process Execution (GetStatus)
 ---------------------------------------------------------------------
 
 Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the :ref:`Execute`
@@ -1990,7 +1990,7 @@ format is employed according to the chosen location.
 
 .. _proc_op_result:
 
-Obtaining job results, outputs, logs or errors
+Obtaining Job Results, Outputs, Logs or Errors
 ---------------------------------------------------------------------
 
 .. _proc_op_job_outputs:
