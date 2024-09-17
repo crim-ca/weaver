@@ -832,17 +832,17 @@ Following is a detailed listing of the expected response structure according to 
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | |none|       | |none|        | 1         | |res-accept| |res-fmt-warn|_                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | ``representation``  | ``raw``      | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    | |na|                | ``raw``      | |none|        | 1         | - |res-accept|                                  |
+    | [#resPreferReturn]_ |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (literal) | - |res-data|_                                   |
+    |                     |              |               | (literal) | - |res-data|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | ``representation``  | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
+    | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
     | [#resPreferReturn]_ |              |               | (complex) | - |res-ref|_                                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | |na|                | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (complex) | - |res-data|_                                   |
+    | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
+    |                     |              |               | (complex) | - |res-data|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
     | [#resPreferReturn]_ |              |               | (literal) | - |res-ref|_                                    |
@@ -851,14 +851,22 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           |   content by default [#resCTypeMulti]_          |
     |                     |              |               |           | - otherwise, |res-accept| |res-fmt-warn|_       |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | ``representation``  | ``raw``      | |none|        | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
-    |                     |              |               |           |   content [#resCTypeMulti]_                     |
+    | |na|                | ``raw``      | |none|        | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
+    | [#resPreferReturn]_ |              |               |           |   content [#resCTypeMulti]_                     |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
-    | [#resPreferReturn]_ |              | *or*          |           |   content [#resCTypeMulti]_                     |
-    |                     |              | ``reference`` |           | - using embedded content part data/link         |
-    |                     |              |               |           |   as requested by |out-mode| [#resValRefForce]_ |
+    | [#resPreferReturn]_ |              | *and*         |           |   content [#resCTypeMulti]_                     |
+    |                     |              | ``reference`` |           | - using embedded content parts with data/link   |
+    |                     |              | (``mixed``)   |           |   as requested by |out-mode| [#resValRefForce]_ |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``representation``  | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
+    |                     |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
+    |                     |              |               |           | - using embedded content parts with data        |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
+    | ``representation``  |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
+    |                     |              |               |           | - using embedded content parts with data        |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content                                       |
@@ -869,11 +877,11 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    | [#resPreferReturn]_ |              |               | (literal) |   content                                       |
+    |                     |              |               | (literal) |   content                                       |
     |                     |              |               |           | - using data included inline                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | ``reference`` | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    | [#resPreferReturn]_ |              |               | (complex) |   content                                       |
+    |                     |              |               | (complex) |   content                                       |
     |                     |              |               |           | - using file link reference                     |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
@@ -904,7 +912,9 @@ Following is a detailed listing of the expected response structure according to 
     simultaneously (although permitted), since they should be interchangeable in most situations.
     The table indicates both |oap| v1.0/v2.0 variations to illustrate which combinations lead to the **same result**.
     If a client happens to use both combination simultaneously, the body parameters will take precedence
-    over the ``Prefer`` header.
+    over the ``Prefer`` header for conflicting cases. This is in order to respect the fact that body parameters
+    are "*hard requirements*", whereas ``Prefer`` is a "*soft requirement*" (i.e.: a preference) that does not
+    necessarily need to be respected if the server cannot resolve the combination.
 
 .. |res-important| replace:: :sup:`(see: important note)`
 .. _res-important:
@@ -962,14 +972,23 @@ Following is a detailed listing of the expected response structure according to 
     the ``transmissionMode`` do not apply by definition.
 
 .. [#resCTypeMulti]
-    The data of the multiple outputs are simultaneously returned, but their encoding depend on the requested ``Accept``
-    header. By default, the :ref:`Results <job-results-document-minimal>` structure encoded as :term:`JSON` is employed.
-    However, the :ref:`Results for Multiple Outputs <job-results-raw-multi>` example using ``multipart/related``
-    contents could also be obtained if requested, or as established by using other parameter combinations.
-    Other content representations, such as packaging the results under a single ZIP archive, could also be returned
-    if requested. However, alternate representations might not allow some ``transmissionMode`` combinations according
-    to their logical representation (e.g.: a ZIP archive could refuse ``transmissionMode: reference`` to only allow
-    files to be directly included in the ZIP, rather than link references to them).
+    When data of multiple outputs are simultaneously returned, their encoding depend on the requested ``Accept`` header.
+    By default (when neither of ``Prefer`` or ``response`` are provided to establish the contents structure to employ),
+    the :ref:`Results Document <job-results-document-minimal>` encoded as :term:`JSON` is employed. A similar
+    representation using other encoding (e.g.: :term:`XML` or :term:`YAML`) could be returned if requested by
+    the ``Accept`` header.
+
+    For every other case where a return ``representation`` or ``raw`` results are explicitly requested,
+    the :ref:`Multipart Results <job-results-raw-multi>` structure using ``multipart/related`` contents
+    is employed by default. The representation of each part (as literal data or link reference [#resValRef]_)
+    is established by the ``transmissionMode`` parameter combinations, or as applicable according to the ``Accept``
+    and the ``Prefer: return`` header.
+
+    Other content representations, such as packaging the results under a single ZIP archive, could also be
+    returned if requested with the ``Accept`` header and supported according to the :term:`Process` description.
+    However, alternate representations might not allow certain ``transmissionMode`` combinations according to
+    their logical representation (e.g.: a ZIP archive could refuse ``transmissionMode: reference`` to only allow
+    files to be directly included within the ZIP, rather than link references to them).
 
 .. [#resValRef]
     Although the general "*response structure*" is established by other parameters in this case, whether respective
@@ -994,8 +1013,9 @@ Following is a detailed listing of the expected response structure according to 
     Using only the |oap| v2.0 ``Prefer: return`` header parameter, it is not always possible to *enforce* every
     result combination as when using |oap| v1.0 parameters. More specifically, it is not possible to replicate
     cases where a requested output specifies a ``transmissionMode`` using an *opposite* representation from its
-    "*default minimum*" representation of literal or complex data. However, ``Prefer: return`` header is equivalent
-    for cases where *every requested output* uses the default matching the specified or resolved ``transmissionMode``
+    "*default*" ``minimum`` or ``representation`` contents of literal or complex data. However, ``Prefer: return``
+    header is equivalent for cases where *every requested output* is returned with a representation that matches
+    the default data type representation of specified by ``transmissionMode``
     (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
 In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
