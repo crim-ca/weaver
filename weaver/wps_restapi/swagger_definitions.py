@@ -766,8 +766,8 @@ class NoContent(ExtendedMappingSchema):
 class FileUploadHeaders(RequestHeaders):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
-        example=f"{ContentType.MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
-        default=ContentType.MULTI_PART_FORM,
+        example=f"{ContentType.MULTIPART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
+        default=ContentType.MULTIPART_FORM,
         description="Desired Content-Type of the file being uploaded.", missing=required)
     content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
     content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
@@ -7359,7 +7359,7 @@ class VaultUploadBody(ExtendedSchemaNode):
     schema_type = String
     description = "Multipart file contents for upload to the vault."
     examples = {
-        ContentType.MULTI_PART_FORM: {
+        ContentType.MULTIPART_FORM: {
             "summary": "Upload JSON file to vault as multipart content.",
             "value": EXAMPLES["vault_file_upload.txt"],
         }

@@ -116,7 +116,8 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
-    MULTI_PART_FORM = "multipart/form-data"
+    MULTIPART_FORM = "multipart/form-data"
+    MULTIPART_RELATED = "multipart/related"
     TEXT_ENRICHED = "text/enriched"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
@@ -447,12 +448,12 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: "",
     ContentType.APP_FORM: "",
-    ContentType.MULTI_PART_FORM: "",
+    ContentType.MULTIPART_FORM: "",
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
     ContentType.APP_FORM,
-    ContentType.MULTI_PART_FORM,
+    ContentType.MULTIPART_FORM,
 ]
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query

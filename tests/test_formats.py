@@ -232,7 +232,7 @@ def test_get_format(test_content_type, expected_content_type, expected_content_e
     [
         f.ContentType.APP_OCTET_STREAM,
         f.ContentType.APP_FORM,
-        f.ContentType.MULTI_PART_FORM,
+        f.ContentType.MULTIPART_FORM,
     ]
 )
 def test_get_format_media_type_no_extension(test_extension):
@@ -289,7 +289,7 @@ def test_get_format_media_type_from_schema(test_format, expect_media_type):
         [
             f.ContentType.APP_OCTET_STREAM,
             f.ContentType.APP_FORM,
-            f.ContentType.MULTI_PART_FORM,
+            f.ContentType.MULTIPART_FORM,
         ]
     )
 )

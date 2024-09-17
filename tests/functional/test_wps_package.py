@@ -7,11 +7,14 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
+import inspect
+
 import contextlib
 import copy
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 from inspect import cleandoc
@@ -71,7 +74,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
+from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file, parse_kvp
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -3519,16 +3522,49 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert results
 
     def test_execute_single_output_prefer_header_return_representation(self):
-        body = self.retrieve_payload("EchoResultsTester", "deploy", local=True)
-        desc = self.deploy_process(body)
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}"
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+            }
         }
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-        raise NotImplementedError  # FIXME: implement
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        assert results.text == output_json
+        assert outputs.json == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
 
     def test_execute_single_output_prefer_header_return_minimal(self):
         raise NotImplementedError  # FIXME: implement
@@ -3540,7 +3576,68 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         raise NotImplementedError  # FIXME: implement
 
     def test_execute_multi_output_prefer_header_return_representation(self):
-        raise NotImplementedError  # FIXME: implement
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+                # request multiple outputs, but not 'all', to test filter behavior at the same time
+                # use 1 expected as 'File' and 1 'string' literal to test conversion to raw 'value'
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.MULTIPART_RELATED)
+        boundary = parse_kvp(results.content_type)["boundary"][0]
+        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        results_body = inspect.cleandoc(f"""
+            --{boundary}
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-ID: output_data
+            
+            test
+            --{boundary}
+            Content-Type: {ContentType.APP_JSON}
+            Content-ID: output_json
+            
+            {output_json}
+            --{boundary}--
+        """)
+        assert results.text == results_body
+        assert outputs.json["outputs"] == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
 
     def test_execute_multi_output_prefer_header_return_minimal(self):
         raise NotImplementedError  # FIXME: implement
@@ -3552,6 +3649,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         raise NotImplementedError  # FIXME: implement
 
     def test_execute_multi_output_response_raw_mixed(self):
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_response_document_defaults(self):
+        """
+        Test ``response: document`` with default ``transmissionMode`` resolutions for literal/complex outputs.
+        """
+        raise NotImplementedError  # FIXME: implement
+
+    def test_execute_multi_output_response_document_mixed(self):
+        """
+        Test ``response: document`` with ``transmissionMode`` specified to force convertion of literal/complex outputs.
+        """
         raise NotImplementedError  # FIXME: implement
 
     # FIXME: implement other variations as well... see doc 'Execution Results' combinations
