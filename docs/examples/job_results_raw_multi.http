@@ -1,15 +1,15 @@
 HTTP/1.1 200 OK
 Host: weaver.example.com
-Content-Type: multipart/related; boundary=43003e2f205a180ace9cd34d98f911ff; type=application/x-netcdf
+Content-Type: multipart/mixed; boundary=43003e2f205a180ace9cd34d98f911ff
 
 --43003e2f205a180ace9cd34d98f911ff
 Content-Type: application/x-netcdf
-Content-ID: output-file
-Content-Location: https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output_netcdf.nc
+Content-ID: <output-file@f93a15be-6e16-11ea-b667-08002752172a>
+Content-Location: https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output-file/output_netcdf.nc
 
 --43003e2f205a180ace9cd34d98f911ff
 Content-Type: text/plain
-Content-ID: output-data
+Content-ID: <output-data@f93a15be-6e16-11ea-b667-08002752172a>
 
 3.1416
 --43003e2f205a180ace9cd34d98f911ff--

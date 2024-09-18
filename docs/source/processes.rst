@@ -18,6 +18,15 @@
 
 .. |<=>| unicode:: 0x21D4
 
+.. |synchronous| replace:: *synchronous*
+.. |synchronously| replace:: *synchronously*
+.. |asynchronous| replace:: *asynchronous*
+.. |asynchronously| replace:: *asynchronously*
+.. _synchronous: processes.html#execution-mode
+.. _synchronously: processes.html#execution-mode
+.. _asynchronous: processes.html#execution-mode
+.. _asynchronously: processes.html#execution-mode
+
 **********
 Processes
 **********
@@ -717,29 +726,29 @@ the following :ref:`proc_exec_mode` and :ref:`proc_exec_results` sections.
 Execution Mode
 ~~~~~~~~~~~~~~~~~~~~~
 
-In order to select how to execute a :term:`Process`, either `synchronously` or `asynchronously`, the ``Prefer`` header
-should be specified. If omitted, `Weaver` defaults to `asynchronous` execution. To execute `asynchronously` explicitly,
-``Prefer: respond-async`` should be used. Otherwise, the `synchronous` execution can be requested
+In order to select how to execute a :term:`Process`, either |synchronously|_ or |asynchronously|_, the ``Prefer`` header
+should be specified. If omitted, `Weaver` defaults to |asynchronous|_ execution. To execute |asynchronously|_ explicitly,
+``Prefer: respond-async`` should be used. Otherwise, the |synchronous|_ execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
 within that time, or if this value is greater than
 the ``weaver.execute_sync_max_wait`` setting (see :ref:`detail <weaver-execute-sync-max-wait>`), the :term:`Job` will
-resume `asynchronously` and the response will be returned. Furthermore, `synchronous` and `asynchronous` execution of
+resume |asynchronously|_ and the response will be returned. Furthermore, |synchronous|_ and |asynchronous|_ execution of
 a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
 its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
 applicable modes when :ref:`Deploying a Process <proc_op_deploy>` to allow it to run as desired. By default, `Weaver`
-will assume that deployed processes are only `asynchronous` to handle longer operations.
+will assume that deployed processes are only |asynchronous|_ to handle longer operations.
 
 .. versionchanged:: 4.15
     By default, every :ref:`proc_builtin` :term:`Process` can accept both modes.
-    All previously deployed processes will only allow `asynchronous` execution, as only this one was supported.
+    All previously deployed processes will only allow |asynchronous|_ execution, as only this one was supported.
     This should be reported in their ``jobControlOptions``.
 
 .. warning::
     It is important to remember that the ``Prefer`` header is indeed a *preference*. If `Weaver` deems it cannot
-    allocate a worker to execute the task `synchronously` within a reasonable delay, it can enforce the `asynchronous`
-    execution. The `asynchronous` mode is also *prioritized* for running longer :term:`Job` submitted over the task
+    allocate a worker to execute the task |synchronously|_ within a reasonable delay, it can enforce the |asynchronous|_
+    execution. The |asynchronous|_ mode is also *prioritized* for running longer :term:`Job` submitted over the task
     queue, as this allows `Weaver` to offer better availability for all requests submitted by its users.
-    The `synchronous` mode should be reserved only for very quick and relatively low computation intensive operations.
+    The |synchronous|_ mode should be reserved only for very quick and relatively low computation intensive operations.
 
 .. fixme:
 .. todo::
@@ -764,27 +773,27 @@ becomes available, it will pick any leftover queued :term:`Job` to execute it.
     with other services using the same standard. The ``mode`` field is deprecated and preserved only for backward
     compatibility purpose.
 
-When requesting a `synchronous` execution, and provided a worker was available to pick and complete the task before
+When requesting a |synchronous|_ execution, and provided a worker was available to pick and complete the task before
 the maximum ``wait`` time was reached, the final status will be directly returned. Therefore, the contents obtained this
 way will be identical to any following :ref:`Job Status <proc_op_status>` request. If no worker is available, or if
 the worker that picked the :term:`Job` cannot complete it in time (either because it takes too long to execute or had
-to wait on resources for too long), the :term:`Job` execution will automatically switch to `asynchronous` mode.
+to wait on resources for too long), the :term:`Job` execution will automatically switch to |asynchronous|_ mode.
 
-The distinction between an `asynchronous` or `synchronous` response when executing a :term:`Job` can be
+The distinction between an |asynchronous|_ or |synchronous|_ response when executing a :term:`Job` can be
 observed in multiple ways. The easiest is with the HTTP status code of the response, 200 being for
 a :term:`Job` *entirely completed* synchronously, and 201 for a created :term:`Job` that should be
 :ref:`monitored <proc_op_monitor>` asynchronously. Another method is to observe the ``"status"`` value.
-Effectively, a :term:`Job` that is executed `asynchronously` will return status information contents, while
-a `synchronous` :term:`Job` will return the results directly, along a ``Location`` header referring to the
-equivalent contents returned by :ref:`GetStatus <proc_op_status>` as in the case of `asynchronous` :term:`Job`.
+Effectively, a :term:`Job` that is executed |asynchronously|_ will return status information contents, while
+a |synchronous|_ :term:`Job` will return the results directly, along a ``Location`` header referring to the
+equivalent contents returned by :ref:`GetStatus <proc_op_status>` as in the case of |asynchronous|_ :term:`Job`.
 It is also possible to extract the ``Preference-Applied`` response header which will clearly indicate if the
 submitted ``Prefer`` header was respected (because it could be with available worker resources) or not.
 In general, this means that if the :term:`Job` submission request was not provided with ``Prefer: wait=X`` **AND**
 replied with the same ``Preference-Applied`` value, it is safe to assume `Weaver` decided to queue the :term:`Job`
-for `asynchronous` execution. That :term:`Job` could be executed immediately, or at a later time, according to
+for |asynchronous|_ execution. That :term:`Job` could be executed immediately, or at a later time, according to
 worker availability.
 
-It is also possible that a ``failed`` :term:`Job`, even when `synchronous`, will respond with equivalent contents
+It is also possible that a ``failed`` :term:`Job`, even when |synchronous|_, will respond with equivalent contents
 to the status location instead of results. This is because it is impossible for `Weaver` to return
 the result(s) as outputs would not be generated by the incomplete :term:`Job`.
 
@@ -865,7 +874,7 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           | - using embedded content parts with data        |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
-    | ``representation``  |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
+    | [#resPreferReturn]_ |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
     |                     |              |               |           | - using embedded content parts with data        |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
@@ -923,15 +932,15 @@ Following is a detailed listing of the expected response structure according to 
     It is important not to confuse expected *Results* above with *Responses*.
 
     The actual HTTP *Response* returned from the execution endpoint will depend on the requested :ref:`proc_exec_mode`.
-    A :term:`Job` successfully resolved with `synchronous` execution will return the *Results* shown in the table
-    directly with a *HTTP 200 OK* or *HTTP 204 No Content* status (as applicable), whereas an `asynchronous` execution
+    A :term:`Job` successfully resolved with |synchronous|_ execution will return the *Results* shown in the table
+    directly with a *HTTP 200 OK* or *HTTP 204 No Content* status (as applicable), whereas an |asynchronous|_ execution
     will always return a :ref:`Job Status <proc_op_status>` *Response* with *HTTP 201 Created* or *HTTP 202 Accepted*
     status (accordingly if the :term:`Job` started immediately or is still pending).
-    In the case of a successfully completed `asynchronous` execution, a
+    In the case of a successfully completed |asynchronous|_ execution, a
     subsequent :ref:`Results Request <proc_op_result>` using the :term:`Job` ``Location``
     is needed to obtain the *Results* presented in the above table.
 
-    Note that a `synchronous` execution can also
+    Note that a |synchronous|_ execution can also
     make use of the :ref:`Results Request <proc_op_result>` operation to obtain the outputs again at a later time, to
     request alternate output representations, or retrieve additional :term:`Job` information such as logs and metadata.
 
@@ -979,10 +988,15 @@ Following is a detailed listing of the expected response structure according to 
     the ``Accept`` header.
 
     For every other case where a return ``representation`` or ``raw`` results are explicitly requested,
-    the :ref:`Multipart Results <job-results-raw-multi>` structure using ``multipart/related`` contents
-    is employed by default. The representation of each part (as literal data or link reference [#resValRef]_)
+    the :ref:`Multipart Results <job-results-raw-multi>` structure
+    using ``multipart`` contents (:rfc:`2046#section-5.1`) is employed by default.
+    The representation of each part (as literal data or link reference [#resValRef]_)
     is established by the ``transmissionMode`` parameter combinations, or as applicable according to the ``Accept``
-    and the ``Prefer: return`` header.
+    and the ``Prefer: return`` headers. Alternatively to requesting ``representation`` or ``raw`` results,
+    the :ref:`Multipart Results <job-results-raw-multi>` structure *could* also be requested explicitly
+    using ``Accept: multipart/*`` or ``Accept: multipart/mixed``. However, this :term:`Media-Type` will only
+    be respected for the response's contents if the :term:`Job` is executed |synchronously|_, since |asynchronous|_
+    execution **MUST** respond with a :ref:`Job Status <proc_op_status>`, which is typically encoded in :term:`JSON`.
 
     Other content representations, such as packaging the results under a single ZIP archive, could also be
     returned if requested with the ``Accept`` header and supported according to the :term:`Process` description.
@@ -1039,7 +1053,7 @@ parametrization details, etc.), followed by ``running`` when effectively reachin
 :term:`Application Package` operation. This status will remain as such until the operation completes, either with
 ``succeeded`` or ``failed`` status.
 
-At any moment during `asynchronous` execution, the :term:`Job` status can be requested using |status-req|_. Note that
+At any moment during |asynchronous|_ execution, the :term:`Job` status can be requested using |status-req|_. Note that
 depending on the timing at which the user executes this request and the availability of task workers, it could be
 possible that the :term:`Job` be already in ``running`` state, or even ``failed`` in case of early problem detected.
 
@@ -1342,7 +1356,7 @@ respected.
     - |aws_s3_obj_key_names|_
 
 When using |vault_ref| references, the resulting file name will be obtained from the ``filename`` specified in
-the ``Content-Disposition`` within the uploaded content of the ``multipart/form-data`` request.
+the ``Content-Disposition`` within the uploaded content of the ``multipart/form-data`` (:rfc:`7578`) request.
 
 .. seealso::
     - :ref:`vault_upload`
@@ -2030,7 +2044,7 @@ nested ``outputs`` property, as presented below.
     :caption: :term:`Job` Outputs Response with Mapping Representation
     :name: job-outputs-mapping
 
-Because these responses nests the items under ``outputs`` (in contrast to :ref:`proc_op_job_results`
+Because these responses nests the results under ``outputs`` (in contrast to :ref:`proc_op_job_results`
 returning ``{outputID}`` directly at the root), other information can be returned, such as relevant ``links``
 with references to :ref:`proc_op_job_inputs`, :ref:`proc_op_job_logs`, :ref:`Job Status <proc_op_status>`,
 or the source :ref:`Process Description <proc_op_describe>` that produced returned :term:`Job` outputs.
@@ -2038,18 +2052,25 @@ or the source :ref:`Process Description <proc_op_describe>` that produced return
 In the event of a :term:`Job` executed with ``response=document`` or ``Prefer: return=minimal``, the contents
 of :ref:`proc_op_job_results` will be very similar to the above :ref:`Output Mapping <job-outputs-mapping>` contents,
 but with respective ``{outputID}`` returned directly at the root, instead of nesting them under ``outputs``.
-On the other hand, a :term:`Job` submitted with ``response=raw`` or ``Prefer: return=representation`` can produce
-many alternative content variations (see :ref:`proc_exec_results`) to respect :term:`OGC` compliance requirements,
-according to the number of requested ``outputs``, submitted request parameters, and the respective :term:`Media-Type`,
-schema or literal data of each output.
-For this reason, the :ref:`proc_op_job_outputs` endpoint will always provide all data and file references in the
-response body using the minimal representation as shown by above :term:`JSON` examples, no matter which request
-parameters where originally submitted to execute the :term:`Job`.
-In other words, the contents of the "``output_netcdf.nc``" file will never be directly
-returned inline/by-value in the :term:`JSON` response when using the :ref:`proc_op_job_outputs` endpoint,
-and will always use the ``document``/``minimal`` file links. This is done to offer a simplified data access mechanism
-without having to deal will all possible combinations of data representations potentially returned
-by :ref:`proc_exec_results`.
+On the other hand, a :term:`Job` submitted with ``response=raw``, ``Prefer: return=representation`` or other
+combinations of ``Accept`` headers and ``transmissionMode`` parameters, can produce
+many alternative content variations (see :ref:`proc_exec_results`) to respect :term:`OGC` compliance requirements.
+The structure of contents received from :ref:`proc_op_job_results` responses can also surprisingly vary according to
+the number of requested ``outputs``, the submitted request parameters, and the alternative :term:`Media-Type`, schema
+or literal data supported by each respective output.
+For this reason, the :ref:`proc_op_job_outputs` endpoint will **always** provide all data and links in the
+response body using the ``minimal`` representation as shown by above :term:`JSON` examples,
+**no matter which request parameters** where originally submitted to execute the :term:`Job`.
+In other words, the contents of a complex :ref:`File Reference <file_ref_types>` (such as the "|output_netcdf|_")
+will never be directly returned inline/by-value in the :term:`JSON` response when using the :ref:`proc_op_job_outputs`
+endpoint, and will always use the ``document``/``minimal`` file link. Similarly, a literal data value will never be
+returned by link reference, nor be returned directly as the response contents. An output of literal data will
+always have its value included inline in the :term:`JSON` document. This behavior is performed to offer a
+simplified data access mechanism without having to deal will all possible combinations of data representations
+potentially returned by :ref:`proc_exec_results`.
+
+.. |output_netcdf| replace:: ``output_netcdf.nc``
+.. _output_netcdf: processes.html#job-outputs-mapping
 
 .. _proc_op_job_results:
 
@@ -2118,19 +2139,23 @@ directly returned as above (rather than embedded in a :ref:`Document Result <job
 the generated reference will be reported using a HTTP ``Link`` header, for each applicable output, in order to fulfill
 |oap| v1.0 `Requirement 30 <https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref>`_.
 However, given that such ``Link`` headers can result into conflicting ``rel: {outputID}`` with other ``Link``
-entries found in the response, and require additional parsing of the value to extract the :term:`URL`, a combination
-of ``Content-ID``, ``Content-Type`` and ``Content-Location`` will also be provided.
+entries found in the response, and that they require additional parsing of the value to extract the :term:`URL`,
+a combination of ``Content-ID``, ``Content-Type`` and ``Content-Location`` will also be provided.
 
 .. note::
     For cases where an output would represent an array of :ref:`File References <file_ref_types>`, returned ``Link``
     headers for each of these links will employ ``rel: "{outputID}.{index}"`` with their respective ``index`` from
     the array.
 
-When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will either be
-multipart contents or similar to the :ref:`Document Result <job-results-document-minimal>` contents,
-accordingly to the negotiated ``Accept`` content header. An example of a multipart representation is shown below.
+    To respect :rfc:`2392` definitions, ``Content-ID`` will use pattern ``<{outputID}@{jobID}>`` as unique identifier,
+    and ``<{outputID}.{index}@{jobID}>`` in the case of an array of :ref:`File References <file_ref_types>`.
+
+When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will
+either be ``multipart`` contents (:rfc:`2046#section-5.1`) or similar to
+the :ref:`Document Result <job-results-document-minimal>` contents,
+accordingly to the negotiated ``Accept`` content header. An example of a ``multipart`` representation is shown below.
 The resolution of the nested outputs within each boundary, either by value or reference, will resolve
-for each respective output according to the same rule combinations specified above for single output.
+for each respective output according to the same rule conditions specified above for single output.
 
 .. literalinclude:: ../examples/job_results_raw_multi.http
     :language: mime
@@ -2140,15 +2165,12 @@ for each respective output according to the same rule combinations specified abo
 Note that, in the above response, the ``Content-Location`` is used for the ``output-file``, whereas the data
 is directly returned for the ``output-data``. This is based on `Weaver` auto-resolving ``transmissionMode: reference``
 for a :ref:`File Reference <file_ref_types>` result, while using ``transmissionMode: value`` by default for literal
-data types. This is equivalent to requesting the :term:`Job` execution with ``Prefer: return=minimal``, since the
-most succinct *response contents* for a file is obtained by using a link reference, whereas literal data types can be
-provided directly.
-
-If the ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs`` [#outN]_
-or ``Prefer: return=representation`` were used, the data of the file would be directly included inline within the
-response instead of using ``Content-Location``, similarly to
-the :ref:`Single Output Value <job-results-raw-single-data>` example,
-but nested within its respective ``Content-ID: output-file`` multipart bounds.
+data types. This also assumes that ``response: raw`` was requested, and that no ``transmissionMode`` were specified.
+If ``transmissionMode: value`` under ``output-file`` in the *requested* ``outputs`` [#outN]_ was used
+(or alternatively, if ``Prefer: return=representation`` was specified),
+the data of the file would be directly included inline within the response instead of using ``Content-Location``,
+similarly to the :ref:`Single Output Value <job-results-raw-single-data>` example,
+but with its contents nested within its respective boundaries for the corresponding ``Content-ID``.
 
 .. _proc_op_job_inputs:
 
