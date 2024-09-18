@@ -116,8 +116,10 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
-    MULTIPART_FORM = "multipart/form-data"
-    MULTIPART_RELATED = "multipart/related"
+    MULTIPART_ANY = "multipart/*"
+    MULTIPART_FORM = "multipart/form-data"      # data/file upload
+    MULTIPART_MIXED = "multipart/mixed"         # content of various types
+    MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
