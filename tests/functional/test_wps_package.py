@@ -14,7 +14,6 @@ import copy
 import json
 import logging
 import os
-import re
 import shutil
 import tempfile
 from inspect import cleandoc
@@ -123,10 +122,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     def setUp(self) -> None:
         self.process_store.clear_processes()
-
-    @classmethod
-    def request(cls, method, url, *args, **kwargs):
-        raise NotImplementedError  # not used
 
     def test_deploy_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
@@ -3521,6 +3516,31 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         assert results
 
+
+@pytest.mark.functional
+class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
+    """
+    Tests to evaluate the various combinations of results response representations.
+
+    .. seealso::
+        - :ref:`proc_exec_results`
+        - :ref:`proc_op_job_results`
+    """
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.settings = {
+            "weaver.wps": True,
+            "weaver.wps_path": "/ows/wps",
+            "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
+        }
+        super(WpsPackageAppTestResultResponses, cls).setUpClass()
+
+    def setUp(self) -> None:
+        self.process_store.clear_processes()
+
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3781,7 +3801,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_json": {
                 "value": output_json,
-                "type": ContentType.APP_JSON,
+                "mediaType": ContentType.APP_JSON,
             },
         }
 
@@ -4362,7 +4382,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "output_json": {
                 "value": output_json,
-                "type": ContentType.APP_JSON,
+                "mediaType": ContentType.APP_JSON,
             },
             "output_text": {
                 "href": f"{out_url}/{job_id}/output_text/output.txt",
@@ -4492,7 +4512,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "output_json": {
                 "value": output_json,
-                "type": ContentType.APP_JSON,
+                "mediaType": ContentType.APP_JSON,
             },
             "output_text": {
                 "href": f"{out_url}/{job_id}/output_text/output.txt",

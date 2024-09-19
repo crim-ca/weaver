@@ -31,7 +31,7 @@ from weaver.exceptions import (
     ServiceNotAccessible,
     ServiceNotFound
 )
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteResponse, ExecuteTransmissionMode, parse_prefer_header_return, ExecuteReturnPreference
 from weaver.formats import ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
@@ -57,7 +57,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
@@ -441,24 +441,69 @@ def get_results(  # pylint: disable=R1260
     return outputs, headers
 
 
-def get_job_results_response(job, container, headers=None):
-    # type: (Job, AnySettingsContainer, Optional[AnyHeadersContainer]) -> AnyResponseType
+def get_job_return(job, body=None, headers=None):
+    # type: (Job, Optional[JSON], Optional[AnyHeadersContainer]) -> ExecuteResponse
+    """
+    Obtain the :term:`Job` result representation based on the resolution order of preferences and request parameters.
+    """
+    body = body or {}
+    resp = ExecuteResponse.get(body.get("response"))
+    if resp:
+        return resp
+
+    pref = parse_prefer_header_return(headers)
+    if pref == ExecuteReturnPreference.MINIMAL:
+        return ExecuteResponse.DOCUMENT
+    if pref == ExecuteReturnPreference.REPRESENTATION:
+        return ExecuteResponse.RAW
+
+    return job.execution_response
+
+
+def get_job_results_response(
+    job,                        # type: Job
+    container,                  # type: AnySettingsContainer
+    *,                          # type: Any
+    headers=None,               # type: Optional[AnyHeadersContainer]
+    results_headers=None,       # type: Optional[AnyHeadersContainer]
+    results_contents=None,      # type: Optional[JSON]
+):                              # type: (...) -> AnyResponseType
     """
     Generates the :term:`OGC` compliant :term:`Job` results response according to submitted execution parameters.
 
     Parameters that impact the format of the response are:
-        - Amount of outputs to be returned.
-        - Parameter ``response: raw|document``
-        - Parameter ``transmissionMode: value|reference`` per output if ``response: raw``.
+        - Body parameter ``outputs`` with the amount of *requested outputs* to be returned.
+        - Body parameter ``response: raw|document`` for content representation.
+        - Body parameter ``transmissionMode: value|reference`` per output.
+        - Header parameter ``Prefer: return=representation|minimal`` for content representation.
+        - Overrides, for any of the previous parameters, allowing request of an alternate representation.
+
+    Resolution order/priority:
+
+    1. :paramref:`override_contents`
+    2. :paramref:`override_headers`
+    3. :paramref:`job` definitions
+
+    The logic of the resolution order is that any body parameters resolving to an equivalent information provided
+    by header parameters will be more important, since ``Prefer`` are *soft* requirements, whereas body parameters
+    are *hard* requirements. The parameters stored in the :paramref:`job` are defined during :term:`Job` submission,
+    which become the "default" results representation if requested as is. If further parameters are provided to
+    override during the results request, they modify the "default" results representation. In this case, an header
+    provided in the results request overrides the body parameters from the original :term:`Job`, since their results
+    request context is "closer" than the ones at the time of the :term:`Job` submission.
 
     .. seealso::
         More details available for each combination:
         - https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
         - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
+        - :ref:`proc_op_job_results`
+        - :ref:`proc_exec_results`
 
-    :param job: Job for which to generate the results response.
+    :param job: Job for which to generate the results response, which contains the originally submitted parameters.
     :param container: Application settings.
     :param headers: Additional headers to provide in the response.
+    :param results_headers: Headers that override originally submitted job parameters when requesting results.
+    :param results_contents: Body contents that override originally submitted job parameters when requesting results.
     """
     raise_job_dismissed(job, container)
     raise_job_bad_status(job, container)
@@ -467,7 +512,7 @@ def get_job_results_response(job, container, headers=None):
     # See:
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7 (/req/core/job-results-async-document)
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
-    is_raw = job.execution_response == ExecuteResponse.RAW
+    is_raw = get_job_return(job, results_contents, results_headers) == ExecuteResponse.RAW
     results, refs = get_results(job, container, value_key="value",
                                 schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
                                 link_references=is_raw)
@@ -477,7 +522,7 @@ def get_job_results_response(job, container, headers=None):
 
     if not is_raw:
         try:
-            results_schema = sd.Result()
+            results_schema = sd.ResultsDocument()
             results_json = results_schema.deserialize(results)
             if len(results_json) != len(results):  # pragma: no cover  # ensure no outputs silently dismissed
                 raise colander.Invalid(
@@ -547,18 +592,21 @@ def get_job_results_response(job, container, headers=None):
 
 
 def get_job_submission_response(body, headers, error=False):
-    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated]
+    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated, HTTPBadRequest]
     """
-    Generates the successful response from contents returned by :term:`Job` submission process.
+    Generates the response contents returned by :term:`Job` submission process.
 
     If :term:`Job` already finished processing within requested ``Prefer: wait=X`` seconds delay (and if allowed by
     the :term:`Process` ``jobControlOptions``), return the successful status immediately instead of created status.
 
+    If the status is not successful, return the failed :term:`Job` status response.
+
     Otherwise, return the status monitoring location of the created :term:`Job` to be monitored asynchronously.
 
     .. seealso::
-        :func:`weaver.processes.execution.submit_job`
-        :func:`weaver.processes.execution.submit_job_handler`
+        - :func:`weaver.processes.execution.submit_job`
+        - :func:`weaver.processes.execution.submit_job_handler`
+        - :ref:`proc_op_job_status`
     """
     # convert headers to pass as list to avoid any duplicate Content-related headers
     # otherwise auto-added by JSON handling when provided by dict-like structure

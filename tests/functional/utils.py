@@ -48,6 +48,7 @@ if TYPE_CHECKING:
         AnyUUID,
         CWL,
         ExecutionResults,
+        JobStatusResponse,
         JSON,
         ProcessDeployment,
         ProcessDescription,
@@ -433,7 +434,7 @@ class WpsConfigBase(unittest.TestCase):
         return info  # type: ignore
 
     def _try_get_logs(self, status_url):
-        _resp = self.app.get(f"{status_url}/logs", headers=self.json_headers)
+        _resp = self.app.get(f"{status_url}/logs", headers=dict(self.json_headers))
         if _resp.status_code == 200:
             _text = "\n".join(_resp.json)
             return f"Error logs:\n{_text}"
@@ -445,6 +446,11 @@ class WpsConfigBase(unittest.TestCase):
         test_name = f"{class_name}.{self._testMethodName}{extra_name}".replace(".", "-")
         return test_name
 
+    @overload
+    def monitor_job(self, status_url, return_status=False, **__):
+        # type: (str, Literal[True], **Any) -> JobStatusResponse
+        ...
+
     def monitor_job(self,
                     status_url,                         # type: str
                     timeout=None,                       # type: Optional[int]
@@ -452,7 +458,7 @@ class WpsConfigBase(unittest.TestCase):
                     return_status=False,                # type: bool
                     wait_for_status=None,               # type: Optional[str]
                     expect_failed=False,                # type: bool
-                    ):                                  # type: (...) -> ExecutionResults
+                    ):                                  # type: (...) -> Union[ExecutionResults, JobStatusResponse]
         """
         Job polling of status URL until completion or timeout.
 
@@ -505,7 +511,7 @@ class WpsConfigBase(unittest.TestCase):
         return resp.json
 
     def get_outputs(self, status_url):
-        resp = self.app.get(f"{status_url}/outputs", headers=self.json_headers)
+        resp = self.app.get(f"{status_url}/outputs", headers=dict(self.json_headers))
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"

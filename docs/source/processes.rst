@@ -2007,6 +2007,10 @@ format is employed according to the chosen location.
 .. seealso::
     For the :term:`WPS` endpoint, refer to :ref:`conf_settings`.
 
+.. _proc_op_job_status:
+.. fixme: add example
+.. fixme: describe minimum fields and extra fields
+
 .. _proc_op_result:
 
 Obtaining Job Outputs, Results, Logs or Errors

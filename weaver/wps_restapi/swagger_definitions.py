@@ -5924,10 +5924,8 @@ class ResultData(OneOfKeywordSchema):
     ]
 
 
-class Result(ExtendedMappingSchema):
-    """
-    Result outputs obtained from a successful process job execution.
-    """
+class ResultsDocument(ExtendedMappingSchema):
+    description = "Results representation as JSON document."
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/results.yaml"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
@@ -5936,6 +5934,19 @@ class Result(ExtendedMappingSchema):
             "(Note: '{output-id}' is a variable corresponding for each output identifier of the process)"
         )
     )
+
+
+class ResultsContent(ExtendedSchemaNode):
+    description = "Results representation as literal contents."
+    schema_type = String()
+
+
+class ResultsBody(OneOfKeywordSchema):
+    description = "Results obtained from a successful process job execution."
+    _one_of = [
+        ResultsDocument(),
+        ResultsContent(),
+    ]
 
 
 class JobInputsBody(ExecuteInputOutputs):
@@ -7240,7 +7251,7 @@ class RedirectResultResponse(ExtendedMappingSchema):
 class OkGetJobResultsResponse(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/Results.yaml"
     header = ResponseHeaders()
-    body = Result()
+    body = ResultsBody()
 
 
 class NoContentJobResultsHeaders(NoContent):

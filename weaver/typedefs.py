@@ -523,6 +523,16 @@ if TYPE_CHECKING:
         "successEmail": NotRequired[str],
         "inProgressEmail": NotRequired[str],
     }, total=True)
+    JobStatusResponse = TypedDict("JobStatusResponse", {
+        "status": Required[AnyStatusType],
+        "type": Required[Literal["process", "provider"]],
+        "id": NotRequired[str],  # TBD alternative to 'jobID' considered by SWG
+        "jobID": Required[str],
+        "processID": Required[str],
+        "providerID": NotRequired[Optional[str]],
+        "links": NotRequired[List[Link]],
+        # many other fields... only listing accessed ones in code
+    }, total=False)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
     ExecutionInputsMap = Dict[str, Union[AnyValueType, JobValueObject, List[JobValueObject]]]

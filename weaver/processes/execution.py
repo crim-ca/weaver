@@ -15,7 +15,7 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteControlOption, ExecuteMode
+from weaver.execute import ExecuteControlOption, ExecuteMode, parse_prefer_header_execute_mode
 from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
@@ -43,7 +43,6 @@ from weaver.utils import (
     now,
     parse_kvp,
     parse_number_with_unit,
-    parse_prefer_header_execute_mode,
     raise_on_xml_exception,
     wait_secs
 )
