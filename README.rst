@@ -16,7 +16,8 @@ Weaver
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
-* |ems-long| for dispatching distrubted workflow processing
+* |jupyter-nb-app|_ as |ogc-apppkg|_
+* |ems-long| for dispatching distributed workflow processing
 * |ades-long| for processing close to the data
 
 Weaver (the nest-builder)
@@ -147,8 +148,27 @@ Following videos present some of the features and potential capabilities of serv
 offered by |ades| and |ems| instances like `Weaver`.
 
 **Keywords**:
-Big Data, software architecture, Earth Observation, satellite data, processing, climate change, machine learning,
-climate services.
+
+.. image:: https://img.shields.io/badge/Software%20Architecture-blue
+   :alt: Software Architecture
+.. image:: https://img.shields.io/badge/Cloud%20Computing-blue
+   :alt: Cloud Computing
+.. image:: https://img.shields.io/badge/Earth%20Observation-blue
+   :alt: Earth Observation
+.. image:: https://img.shields.io/badge/Big%20Data-blue
+   :alt: Big Data
+.. image:: https://img.shields.io/badge/Satellite%20Data-blue
+   :alt: Satellite Data
+.. image:: https://img.shields.io/badge/Data%20Processing-blue
+   :alt: Data Processing
+.. image:: https://img.shields.io/badge/Climate%20Change-blue
+   :alt: Climate Change
+.. image:: https://img.shields.io/badge/Climate%20Services-blue
+   :alt: Climate Services
+.. image:: https://img.shields.io/badge/Application%20Package-blue
+   :alt: Application Package
+.. image:: https://img.shields.io/badge/Machine%20Learning-blue
+   :alt: Machine Learning
 
 Applications
 ~~~~~~~~~~~~~~~~
@@ -328,11 +348,7 @@ Developments are continued in |ogc-tb16|_ to improve methodologies in order to p
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 Findings and recommendations are presented in the |ogc-tb16-data-access-proc-er|_.
 
-.. fixme:
-.. todo::
-   deploy from ipynb, add |ogc-tb16-ipynb-er| (https://github.com/crim-ca/weaver/issues/63)
-
-Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
+`Videos <features>`_ and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
 Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
@@ -362,6 +378,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |cwl| replace:: CWL
 .. _cwl: https://www.commonwl.org/
 .. _openEO: https://openeo.org/
+.. |jupyter-nb-app| replace:: Jupyter Notebook Applications
+.. _jupyter-nb-app: https://pavics-weaver.readthedocs.io/en/latest/package.html#jupyter-notebook-applications
 .. |esgf| replace:: `Earth System Grid Federation`_ (ESGF)
 .. _`Earth System Grid Federation`: https://esgf.llnl.gov/
 .. |ems| replace:: Execution Management Service
