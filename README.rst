@@ -147,28 +147,37 @@ Features
 Following videos present some of the features and potential capabilities of servicing and executing processes
 offered by |ades| and |ems| instances like `Weaver`.
 
-**Keywords**:
+.. list-table::
+    :stub-columns: 1
+    :widths: 20,80
 
-.. image:: https://img.shields.io/badge/Software%20Architecture-blue
+    * - **Keywords**
+      - |kw01| |kw02| |kw03| |kw04| |kw05| |kw06| |kw07| |kw08| |kw09| |kw10| |kw11| |kw12|
+
+.. |kw01| image:: https://img.shields.io/badge/Software%20Architecture-blue
    :alt: Software Architecture
-.. image:: https://img.shields.io/badge/Cloud%20Computing-blue
+.. |kw02| image:: https://img.shields.io/badge/Cloud%20Computing-blue
    :alt: Cloud Computing
-.. image:: https://img.shields.io/badge/Earth%20Observation-blue
+.. |kw03| image:: https://img.shields.io/badge/Earth%20Observation-blue
    :alt: Earth Observation
-.. image:: https://img.shields.io/badge/Big%20Data-blue
+.. |kw04| image:: https://img.shields.io/badge/Big%20Data-blue
    :alt: Big Data
-.. image:: https://img.shields.io/badge/Satellite%20Data-blue
+.. |kw05| image:: https://img.shields.io/badge/Satellite%20Data-blue
    :alt: Satellite Data
-.. image:: https://img.shields.io/badge/Data%20Processing-blue
+.. |kw06| image:: https://img.shields.io/badge/Data%20Processing-blue
    :alt: Data Processing
-.. image:: https://img.shields.io/badge/Climate%20Change-blue
-   :alt: Climate Change
-.. image:: https://img.shields.io/badge/Climate%20Services-blue
+.. |kw07| image:: https://img.shields.io/badge/Workflow%20Processing-blue
+   :alt: Workflow Processing
+.. |kw08| image:: https://img.shields.io/badge/Climate%20Science-blue
+   :alt: Climate Science
+.. |kw09| image:: https://img.shields.io/badge/Climate%20Services-blue
    :alt: Climate Services
-.. image:: https://img.shields.io/badge/Application%20Package-blue
+.. |kw10| image:: https://img.shields.io/badge/Application%20Package-blue
    :alt: Application Package
-.. image:: https://img.shields.io/badge/Machine%20Learning-blue
+.. |kw11| image:: https://img.shields.io/badge/Machine%20Learning-blue
    :alt: Machine Learning
+.. |kw12| image:: https://img.shields.io/badge/Open%20Science-blue
+   :alt: Open Science
 
 Applications
 ~~~~~~~~~~~~~~~~
