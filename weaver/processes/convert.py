@@ -150,6 +150,7 @@ if TYPE_CHECKING:
         ExecutionOutputsList,
         ExecutionOutputsMap,
         JobValueFile,
+        JobValueItem,
         JSON,
         OpenAPISchema,
         OpenAPISchemaArray,
@@ -1865,7 +1866,7 @@ def convert_input_values_schema(inputs, schema):
         raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
     if schema == JobInputsOutputsSchema.OGC:
         input_dict = {}
-        for input_item in inputs:
+        for input_item in inputs:  # type: JobValueItem
             input_id = get_any_id(input_item, pop=True)
             input_val = get_any_value(input_item)
             input_key = get_any_value(input_item, key=True, data=True, file=False)
@@ -1909,18 +1910,18 @@ def convert_input_values_schema(inputs, schema):
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchema.OGC) -> ExecutionOutputsMap
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchema.OGC) -> Optional[ExecutionOutputsMap]
     ...
 
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchema.OLD) -> ExecutionOutputsList
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchema.OLD) -> Optional[ExecutionOutputsList]
     ...
 
 
 def convert_output_params_schema(outputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchemaType) -> ExecutionOutputs
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaType) -> Optional[ExecutionOutputs]
     """
     Convert execution output parameters between equivalent formats.
 
@@ -1936,6 +1937,8 @@ def convert_output_params_schema(outputs, schema):
     :param schema: Desired schema.
     :return: Converted outputs.
     """
+    if outputs is None:
+        return outputs
     if isinstance(schema, str):
         schema = schema.lower().split("+")[0]
     if (

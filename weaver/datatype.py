@@ -898,7 +898,7 @@ class Job(Base, LoggerHandler):
         return "provider"
 
     def _get_inputs(self):
-        # type: () -> Optional[ExecutionInputs]
+        # type: () -> ExecutionInputs
         if self.get("inputs") is None:
             return {}
         return dict.__getitem__(self, "inputs")
@@ -912,9 +912,7 @@ class Job(Base, LoggerHandler):
 
     def _get_outputs(self):
         # type: () -> Optional[ExecutionOutputs]
-        if self.get("outputs") is None:
-            return {}
-        return dict.__getitem__(self, "outputs")
+        return self.get("outputs")
 
     def _set_outputs(self, outputs):
         # type: (Optional[ExecutionOutputs]) -> None

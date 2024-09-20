@@ -2,6 +2,8 @@ import math
 import os
 import shutil
 from copy import deepcopy
+from email.message import MIMEPart
+from email.mime.multipart import MIMEMultipart
 from typing import TYPE_CHECKING, cast
 
 import colander
@@ -13,11 +15,11 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPNoContent,
     HTTPNotFound,
-    HTTPNotImplemented,
     HTTPOk
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
+from requests.structures import CaseInsensitiveDict
 
 from weaver.database import get_db
 from weaver.datatype import Job, Process
@@ -352,6 +354,15 @@ def get_results(  # pylint: disable=R1260
     out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
     references = {}
     for result in job.results:
+        # Filter outputs not requested, unless 'all' requested by omitting
+        out_id = get_any_id(result)
+        if (
+            (isinstance(job.outputs, dict) and out_id not in job.outputs) or
+            (isinstance(job.outputs, list) and not any(get_any_id(out) == out_id for out in job.outputs))
+        ):
+            LOGGER.debug("Removing [%s] from %s results response because not requested.", out_id, job)
+            continue
+
         # Complex result could contain both 'data' and a reference (eg: JSON file and its direct representation).
         # Literal result is only by itself. Therefore, find applicable field by non 'data' match.
         rtype = "href" if get_any_value(result, key=True, file=True, data=False) else "data"
@@ -375,7 +386,6 @@ def get_results(  # pylint: disable=R1260
                 rtype = "href" if get_any_value(val_item, key=True, file=True, data=False) else "data"
                 val_data = get_any_value(val_item, file=True, data=False)
             out_key = rtype
-            out_id = get_any_id(result)
             out_mode = out_ref.get(out_id, {}).get("transmissionMode")
             as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
             if rtype == "href" and isinstance(val_data, str):
@@ -516,9 +526,11 @@ def get_job_results_response(
     results, refs = get_results(job, container, value_key="value",
                                 schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
                                 link_references=is_raw)
-    headers = headers or {}
-    if "location" not in headers:
-        headers["Location"] = job.status_url(container)
+
+    headers = CaseInsensitiveDict(headers or {})
+    if "Location" in headers:
+        headers.setdefault("Content-Location", headers.pop("Location"))
+    headers.setdefault("Content-Location", job.status_url(container))
 
     if not is_raw:
         try:
@@ -561,15 +573,12 @@ def get_job_results_response(
         out_type = get_any_value(out_info, key=True)
         out_data = get_any_value(out_info)
 
-        # FIXME: https://github.com/crim-ca/weaver/issues/376
-        #  implement multipart, both for multi-output IDs and array-output under same ID
-        if len(results) > 1 or (isinstance(out_data, list) and len(out_data) > 1):
-            # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
-            raise HTTPNotImplemented(json={
-                "code": "NotImplemented",
-                "type": "NotImplemented",
-                "detail": "Multipart results with 'transmissionMode=value' and 'response=raw' not implemented.",
-            })
+        if (
+            len(results) > 1 or
+            (isinstance(out_data, list) and len(out_data) > 1) or
+            (isinstance(job.accept_type, str) and any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART))
+        ):
+            return get_job_results_multipart(job, results)
 
         # single value only
         out_data = out_data[0] if isinstance(out_data, list) else out_data
@@ -588,6 +597,39 @@ def get_job_results_response(
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
         resp.headerlist.extend(refs)
+    return resp
+
+
+def get_job_results_multipart(job, results):
+    # type: (Job, ExecutionResults) -> HTTPOk
+    """
+    Generates the :term:`Job` results multipart response from available or requested outputs.
+
+    .. seealso::
+        Function :func:`get_results` should be used to avoid re-processing all output format combinations.
+
+    :param job:
+    :param results: Pre-filtered and pre-processed results in a normalized format structure.
+    """
+    # FIXME: https://github.com/crim-ca/weaver/issues/376
+    #  implement multipart, both for multi-output IDs and array-output under same ID
+    multi = MIMEMultipart()
+    for res_id, result in results.items():
+        part = MIMEPart()
+        part.add_header()  # other ? content-disposition filename from output ID?
+        # ctype header
+        part.set_type()
+        part.set_charset()
+        part.set_param()  # in ctype
+        # data
+        part.set_payload()
+        multi.attach(part)
+
+    resp = HTTPOk(
+        detail=f"Multipart Response for {job}",
+        headers={"Content-Type": multi.get_content_type()},
+    )
+    resp.body = multi.as_bytes()
     return resp
 
 
