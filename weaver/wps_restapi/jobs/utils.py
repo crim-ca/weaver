@@ -61,6 +61,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
+    from weaver.execute import AnyExecuteResponse
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -452,7 +453,7 @@ def get_results(  # pylint: disable=R1260
 
 
 def get_job_return(job, body=None, headers=None):
-    # type: (Job, Optional[JSON], Optional[AnyHeadersContainer]) -> ExecuteResponse
+    # type: (Job, Optional[JSON], Optional[AnyHeadersContainer]) -> AnyExecuteResponse
     """
     Obtain the :term:`Job` result representation based on the resolution order of preferences and request parameters.
     """
@@ -615,10 +616,19 @@ def get_job_results_multipart(job, results):
     #  implement multipart, both for multi-output IDs and array-output under same ID
     multi = MIMEMultipart()
     for res_id, result in results.items():
+        key = get_any_value(result, key=True)
+        val = get_any_value(result)
+        if key == "href":
+            typ = result.get("type") or ContentType.APP_OCTET_STREAM
+            res_headers = get_href_headers(val, download_headers=True, content_headers=True, content_type=typ)
+        else:
+            typ = ContentType.TEXT_PLAIN
+
+        get_href_headers()
+        fmt = get_format()
         part = MIMEPart()
-        part.add_header()  # other ? content-disposition filename from output ID?
-        # ctype header
-        part.set_type()
+        part.add_header("Content-Disposition", "inline", filename=f"{res_id}{ext}")
+        part.set_type(typ)
         part.set_charset()
         part.set_param()  # in ctype
         # data

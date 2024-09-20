@@ -449,7 +449,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
-    ContentType.APP_OCTET_STREAM: "",
+    ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
 }

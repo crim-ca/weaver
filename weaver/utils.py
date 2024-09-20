@@ -1184,21 +1184,23 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_href_headers(path,                      # type: str
-                     download_headers=False,    # type: bool
-                     location_headers=True,     # type: bool
-                     content_headers=False,     # type: bool
-                     content_type=None,         # type: Optional[str]
-                     settings=None,             # type: Optional[SettingsType]
-                     **option_kwargs,           # type: Unpack[Union[SchemeOptions, RequestOptions]]
-                     ):                         # type: (...) -> MetadataResult
+def get_href_headers(
+    path,                                   # type: str
+    download_headers=False,                 # type: bool
+    location_headers=True,                  # type: bool
+    content_headers=False,                  # type: bool
+    content_type=None,                      # type: Optional[str]
+    content_disposition_type="attachment",  # type: Literal["attachment", "inline"]
+    settings=None,                          # type: Optional[SettingsType]
+    **option_kwargs,                        # type: Unpack[Union[SchemeOptions, RequestOptions]]
+ ):                                         # type: (...) -> MetadataResult
     """
     Obtain headers applicable for the provided file or directory reference.
 
     :rtype: object
     :param path: File to describe. Either a local path or remote URL.
     :param download_headers:
-        If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
+        If enabled, add the ``Content-Disposition`` header with attachment/inline filename for downloading the file.
         If the reference is a directory, this parameter is ignored, since files must be retrieved individually.
     :param location_headers:
         If enabled, add the ``Content-Location`` header referring to the input location.
@@ -1207,6 +1209,8 @@ def get_href_headers(path,                      # type: str
         Explicit ``Content-Type`` to provide.
         Otherwise, use default guessed by file system (often ``application/octet-stream``).
         If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+    :param content_disposition_type:
+        Whether ``inline`` or ``attachment`` should be used, when enabled by :paramref:`download_headers`.
     :param settings: Application settings to pass down to relevant utility functions.
     :return: Headers for the reference.
     """
@@ -1272,8 +1276,11 @@ def get_href_headers(path,                      # type: str
             "Content-Length": str(f_size),
         })
         if download_headers:
+            if os.path.splitext(path)[-1] in ["", "."]:
+                f_ext = get_extension(f_type, dot=True)
+                path = f"{path}{f_ext}"
             headers.update({
-                "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
+                "Content-Disposition": f"{content_disposition_type}; filename=\"{os.path.basename(path)}\"",
             })
     f_current = get_file_header_datetime(now())
     f_modified = get_file_header_datetime(f_modified)

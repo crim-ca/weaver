@@ -7,22 +7,67 @@ from weaver.base import Constants
 from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple
+    from typing import List, Optional, Union, Tuple
 
-    from weaver.typedefs import AnyHeadersContainer, HeadersType
+    from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal
+
+    ExecutionModeAutoType = Literal["auto"]
+    ExecutionModeAsyncType = Literal["async"]
+    ExecutionModeSyncType = Literal["sync"]
+    AnyExecuteMode = Union[
+        ExecutionModeAutoType,
+        ExecutionModeAsyncType,
+        ExecutionModeSyncType,
+    ]
+    ExecuteControlOptionAsyncType = Literal["async-execute"]
+    ExecuteControlOptionSyncType = Literal["sync-execute"]
+    AnyExecuteControlOption = Union[
+        ExecuteControlOptionAsyncType,
+        ExecuteControlOptionSyncType,
+    ]
+    ExecuteReturnPreferenceMinimalType = Literal["minimal"]
+    ExecuteReturnPreferenceRepresentationType = Literal["representation"]
+    AnyExecuteReturnPreference = Union[
+        ExecuteReturnPreferenceMinimalType,
+        ExecuteReturnPreferenceRepresentationType,
+    ]
+    ExecuteResponseDocumentType = Literal["document"]
+    ExecuteResponseRawType = Literal["raw"]
+    AnyExecuteResponse = Union[
+        ExecuteResponseDocumentType,
+        ExecuteResponseRawType,
+    ]
+    ExecuteTransmissionModeReferenceType = Literal["reference"]
+    ExecuteTransmissionModeValueType = Literal["value"]
+    AnyExecuteTransmissionMode = Union[
+        ExecuteTransmissionModeReferenceType,
+        ExecuteTransmissionModeValueType,
+    ]
+    ExecuteCollectionFormatType_STAC = Literal["stac-collection"]
+    ExecuteCollectionFormatType_OGC_COVERAGE = Literal["ogc-coverage-collection"]
+    ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]
+    ExecuteCollectionFormatType_OGC_MAP = Literal["ogc-map-collection"]
+    ExecuteCollectionFormatType_GEOJSON = Literal["geojson-feature-collection"]
+    AnyExecuteCollectionFormat = Union[
+        ExecuteCollectionFormatType_STAC,
+        ExecuteCollectionFormatType_OGC_COVERAGE,
+        ExecuteCollectionFormatType_OGC_FEATURES,
+        ExecuteCollectionFormatType_OGC_MAP,
+        ExecuteCollectionFormatType_GEOJSON,
+    ]
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ExecuteMode(Constants):
-    AUTO = "auto"
-    ASYNC = "async"
-    SYNC = "sync"
+    AUTO = "auto"       # type: ExecutionModeAutoType
+    ASYNC = "async"     # type: ExecutionModeAsyncType
+    SYNC = "sync"       # type: ExecutionModeSyncType
 
 
 class ExecuteControlOption(Constants):
-    ASYNC = "async-execute"
-    SYNC = "sync-execute"
+    ASYNC = "async-execute"     # type: ExecuteControlOptionAsyncType
+    SYNC = "sync-execute"       # type: ExecuteControlOptionSyncType
 
     @classmethod
     def values(cls):
@@ -34,58 +79,30 @@ class ExecuteControlOption(Constants):
 
 
 class ExecuteReturnPreference(Constants):
-    MINIMAL = "minimal"
-    REPRESENTATION = "representation"
+    MINIMAL = "minimal"                 # type: ExecuteReturnPreferenceMinimalType
+    REPRESENTATION = "representation"   # type: ExecuteReturnPreferenceRepresentationType
 
 
 class ExecuteResponse(Constants):
-    RAW = "raw"
-    DOCUMENT = "document"
+    RAW = "raw"             # type: ExecuteResponseRawType
+    DOCUMENT = "document"   # type: ExecuteResponseDocumentType
 
 
 class ExecuteTransmissionMode(Constants):
-    VALUE = "value"
-    REFERENCE = "reference"
+    VALUE = "value"             # type: ExecuteTransmissionModeValueType
+    REFERENCE = "reference"     # type: ExecuteTransmissionModeReferenceType
 
 
 class ExecuteCollectionFormat(Constants):
-    STAC = "stac-collection"
-    OGC_COVERAGE = "ogc-coverage-collection"
-    OGC_FEATURES = "ogc-features-collection"
-    OGC_MAP = "ogc-map-collection"
-    GEOJSON = "geojson-feature-collection"
-
-
-if TYPE_CHECKING:
-    from weaver.typedefs import Literal
-
-    AnyExecuteMode = Literal[
-        ExecuteMode.ASYNC,
-        ExecuteMode.SYNC,
-    ]
-    AnyExecuteControlOption = Literal[
-        ExecuteControlOption.ASYNC,
-        ExecuteControlOption.SYNC,
-    ]
-    AnyExecuteResponse = Literal[
-        ExecuteResponse.DOCUMENT,
-        ExecuteResponse.RAW,
-    ]
-    AnyExecuteTransmissionMode = Literal[
-        ExecuteTransmissionMode.REFERENCE,
-        ExecuteTransmissionMode.VALUE,
-    ]
-    AnyExecuteCollectionFormat = Literal[
-        ExecuteCollectionFormat.STAC,
-        ExecuteCollectionFormat.OGC_COVERAGE,
-        ExecuteCollectionFormat.OGC_FEATURES,
-        ExecuteCollectionFormat.OGC_MAP,
-        ExecuteCollectionFormat.GEOJSON,
-    ]
+    STAC = "stac-collection"                    # type: ExecuteCollectionFormatType_STAC
+    OGC_COVERAGE = "ogc-coverage-collection"    # type: ExecuteCollectionFormatType_OGC_COVERAGE
+    OGC_FEATURES = "ogc-features-collection"    # type: ExecuteCollectionFormatType_OGC_FEATURES
+    OGC_MAP = "ogc-map-collection"              # type: ExecuteCollectionFormatType_OGC_MAP
+    GEOJSON = "geojson-feature-collection"      # type: ExecuteCollectionFormatType_GEOJSON
 
 
 def parse_prefer_header_return(headers):
-    # type: (AnyHeadersContainer) -> Optional[ExecuteReturnPreference]
+    # type: (AnyHeadersContainer) -> Optional[AnyExecuteReturnPreference]
     """
     Get the return preference if specified.
     """

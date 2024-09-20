@@ -19,7 +19,7 @@ from decimal import ConversionSyntax, Decimal
 from io import BytesIO
 from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urljoin, urlparse
 
 import colander
@@ -210,11 +210,14 @@ class AutoBase(DictBase):
     """
     def __new__(cls, *args, **kwargs):
         extra_props = set(dir(cls)) - set(dir(DictBase))
-        auto_cls = DictBase.__new__(cls, *args, **kwargs)
+        auto_cls = cast(
+            "AutoBase",
+            DictBase.__new__(cls, *args, **kwargs)
+        )
         for prop in extra_props:
             prop_func = property(
-                lambda self, key: dict.__getitem__(self, key),
-                lambda self, key, value: dict.__setattr__(self, key, value)
+                lambda self, key: dict.__getitem__(self, key),                  # type: ignore
+                lambda self, key, value: dict.__setattr__(self, key, value)     # type: ignore
             )
             default = getattr(auto_cls, prop, None)
             setattr(auto_cls, prop, prop_func)
@@ -908,7 +911,11 @@ class Job(Base, LoggerHandler):
         self["inputs"] = inputs
 
     # allows to correctly update list by ref using 'job.inputs.extend()'
-    inputs = property(_get_inputs, _set_inputs, doc="Input values and reference submitted for execution.")
+    inputs = property(
+        _get_inputs,  # type: ignore
+        _set_inputs,  # type: ignore
+        doc="Input values and reference submitted for execution.",
+    )
 
     def _get_outputs(self):
         # type: () -> Optional[ExecutionOutputs]
@@ -918,7 +925,11 @@ class Job(Base, LoggerHandler):
         # type: (Optional[ExecutionOutputs]) -> None
         self["outputs"] = outputs
 
-    outputs = property(_get_outputs, _set_outputs, doc="Output transmission modes submitted for execution.")
+    outputs = property(
+        _get_outputs,  # type: ignore
+        _set_outputs,  # type: ignore
+        doc="Output transmission modes submitted for execution.",
+    )
 
     @property
     def user_id(self):
@@ -1119,7 +1130,7 @@ class Job(Base, LoggerHandler):
     created = LocalizedDateTimeProperty(default_now=True)
     started = LocalizedDateTimeProperty()
     finished = LocalizedDateTimeProperty()
-    updated = LocalizedDateTimeProperty(fget=_get_updated)
+    updated = LocalizedDateTimeProperty(fget=_get_updated)  # type: ignore
 
     @property
     def duration(self):
@@ -1179,7 +1190,11 @@ class Job(Base, LoggerHandler):
         self["results"] = results
 
     # allows to correctly update list by ref using 'job.results.extend()'
-    results = property(_get_results, _set_results, doc="Output values and references that resulted from execution.")
+    results = property(
+        _get_results,  # type: ignore
+        _set_results,  # type: ignore
+        doc="Output values and references that resulted from execution.",
+    )
 
     def _get_exceptions(self):
         # type: () -> List[Union[str, Dict[str, str]]]
@@ -1194,7 +1209,7 @@ class Job(Base, LoggerHandler):
         self["exceptions"] = exceptions
 
     # allows to correctly update list by ref using 'job.exceptions.extend()'
-    exceptions = property(_get_exceptions, _set_exceptions)
+    exceptions = property(_get_exceptions, _set_exceptions)  # type: ignore
 
     def _get_logs(self):
         # type: () -> List[str]
@@ -1209,7 +1224,7 @@ class Job(Base, LoggerHandler):
         self["logs"] = logs
 
     # allows to correctly update list by ref using 'job.logs.extend()'
-    logs = property(_get_logs, _set_logs)
+    logs = property(_get_logs, _set_logs)  # type: ignore
 
     def _get_tags(self):
         # type: () -> List[Optional[str]]
@@ -1224,7 +1239,7 @@ class Job(Base, LoggerHandler):
         self["tags"] = tags
 
     # allows to correctly update list by ref using 'job.tags.extend()'
-    tags = property(_get_tags, _set_tags)
+    tags = property(_get_tags, _set_tags)  # type: ignore
 
     @property
     def access(self):
@@ -1431,7 +1446,7 @@ class Job(Base, LoggerHandler):
             "estimatedCompletion": None,
             "percentCompleted": self.progress,
             # new name as per OGC-API, enforced integer
-            # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+            # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
@@ -1956,9 +1971,11 @@ class Process(Base):
         # type: (str) -> None
         self["id"] = _id
 
-    id = identifier = property(fget=_get_id, fset=_set_id, doc=(
-        "Unique process identifier with optional version number if it corresponds to an older revision."
-    ))
+    id = identifier = property(
+        _get_id,  # type: ignore
+        _set_id,  # type: ignore
+        doc="Unique process identifier with optional version number if it corresponds to an older revision.",
+    )
 
     @classmethod
     def split_version(cls, process_id):
@@ -2031,7 +2048,11 @@ class Process(Base):
         # type: (str) -> None
         self["abstract"] = description
 
-    description = abstract = property(fget=_get_desc, fset=_set_desc, doc="Process description.")
+    description = abstract = property(
+        fget=_get_desc,     # type: ignore
+        fset=_set_desc,     # type: ignore
+        doc="Process description.",
+    )
 
     @property
     def keywords(self):
