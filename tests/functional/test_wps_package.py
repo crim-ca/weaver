@@ -69,11 +69,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SECRETS,
+    JobInputsOutputsSchema,
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file, parse_kvp
+from weaver.utils import fetch_file, get_any_value, get_header, get_path_kvp, is_uuid, load_file, parse_kvp
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -3540,6 +3541,22 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
     def setUp(self) -> None:
         self.process_store.clear_processes()
+    
+    @staticmethod
+    def remove_result_format(results):
+        """
+        Remove the results ``format`` property to simplify test comparions.
+        
+        For backward compatibility, the ``format`` property is inserted in result definitions when represented
+        as :term:`JSON`, on top of the :term:`OGC` compliant ``type``, ``mediaType``, etc. of the "format" schema
+        for qualified values and link references.
+        """
+        if not results or not isinstance(results, dict):
+            return results
+        for result in results.values():
+            if isinstance(result, dict):
+                result.pop("format", None)
+        return results
 
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
@@ -3576,7 +3593,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
         assert results.text == "test"
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_data": "test",
@@ -3619,7 +3636,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.text == output_json
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_json": {
@@ -3660,11 +3677,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             assert status["status"] == Status.SUCCEEDED
 
         job_id = status["jobID"]
-        out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
         assert results.text == "test"
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_data": "test",
@@ -3704,11 +3720,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         assert results.status_code == 204, "No contents expected for minimal reference result."
+        assert results.body == b""
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.text == output_json
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/output.json"
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_json": {
@@ -3753,7 +3769,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
         assert results.text == "test"
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -3795,7 +3811,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.json == {"data": "test"}
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -3844,7 +3860,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.body == b""
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
         assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_data/output.txt"
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -3889,7 +3905,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.body == b""
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/output.json"
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
@@ -3898,8 +3914,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    # FIXME: Should this be permitted? Technically, a multipart of 1 bounded contents is valid...
-    def test_execute_single_output_multipart_error(self):
+    def test_execute_single_output_multipart_accept_data(self):
+        """
+        Validate that requesting multipart for a single output is permitted.
+
+        Although somewhat counter-productive to wrap a single output as multipart, this is technically permitted.
+        This can be used to "normalize" the response to always be multipart, regardless of the amount outputs
+        produced by the process job. The output format should be contained within the part.
+
+        .. seealso::
+            - :func:`test_execute_single_output_multipart_accept_link`
+            - :func:`test_execute_single_output_multipart_accept_alt_format`
+        """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
@@ -3918,7 +3944,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "message": "test"
             },
             "outputs": {
-                "output_data": {}
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE}
             }
         }
         with contextlib.ExitStack() as stack:
@@ -3927,22 +3953,49 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 406, f"Expected error. Instead got: [{resp.status_code}]\nReason:\n{resp.json}"
-            assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
-            assert resp.json["detail"] == "Multipart is not acceptable for single output results."
-            assert resp.json["value"] == ContentType.MULTIPART_MIXED
-            assert resp.json["cause"] == {
-                "name": "Accept",
-                "in": "headers",
-            }
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
-    @parameterized.expand([
-        ContentType.MULTIPART_ANY,
-        ContentType.MULTIPART_MIXED,
-    ])
-    def test_execute_multi_output_multipart_accept(self, multipart_header):
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.content_type)["boundary"][0]
+        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        results_body = inspect.cleandoc(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_JSON}
+            Content-ID: <output_json@{job_id}>
+
+            {output_json}
+            --{boundary}--
+        """)
+        assert results.text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_multipart_accept_link(self):
         """
-        Requesting ``multipart`` explicitly should return it instead of default :term:`JSON` ``document`` response.
+        Validate that requesting multipart for a single output is permitted.
+
+        Embedded part contains the link instead of the data contents.
+
+        .. seealso::
+            - :func:`test_execute_single_output_multipart_accept_data`
+            - :func:`test_execute_single_output_multipart_accept_alt_format`
         """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3953,9 +4006,162 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         #   no 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
         #   without 'Accept' using multipart, it is expected that JSON document is used
         exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # WARNING: force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.content_type)["boundary"][0]
+        results_body = inspect.cleandoc(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_JSON}
+            Content-ID: <output_json@{job_id}>
+            Content-Location: {out_url}/{job_id}/output_json/output.json
+            --{boundary}--
+        """)
+        assert results.text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_execute_single_output_multipart_accept_alt_format(self):
+        """
+        Validate the returned contents combining an ``Accept`` header as ``multipart`` and a ``format`` in ``outputs``.
+
+        The main contents of the response should be ``multipart``, but the nested contents should be the transformed
+        output representation, based on the ``format`` definition.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # WARNING: force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # embed in the part contents
+                    "format": {"mediaType": ContentType.APP_YAML},      # request alternate output format
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.content_type)["boundary"][0]
+        output_json_as_yaml = yaml.safe_dump({"data": "test"})
+        results_body = inspect.cleandoc(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_YAML}
+            Content-ID: <output_json@{job_id}>
+            
+            {output_json_as_yaml}
+            --{boundary}--
+        """)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results.text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.yml",
+                "type": ContentType.APP_YAML,
+            },
+        }
+
+        # validate the results can be obtained with the "real" representation
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.text == output_json
+
+    @parameterized.expand([
+        ContentType.MULTIPART_ANY,
+        ContentType.MULTIPART_MIXED,
+    ])
+    def test_execute_multi_output_multipart_accept(self, multipart_header):
+        """
+        Requesting ``multipart`` explicitly should return it instead of default :term:`JSON` ``document`` response.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        exec_headers = {
             "Accept": multipart_header,
             "Content-Type": ContentType.APP_JSON,
-            "Prefer": "respond-async",
+            "Prefer": "wait=5",
         }
         exec_content = {
             "inputs": {
@@ -4000,7 +4206,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4009,6 +4215,85 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.APP_JSON,
             },
         }
+
+    def test_execute_multi_output_multipart_accept_async_not_acceptable(self):
+        """
+        When executing the process asynchronously, ``Accept`` with multipart (strictly) is not acceptable.
+
+        Because async requires to respond a Job Status, the ``Accept`` actually refers to that response,
+        rather than a results response as returned directly in sync.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept`
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": "respond-async",
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 406, f"Expected error. Instead got: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
+            assert "Accept header" in resp.json["detail"]
+            assert resp.json["value"] == ContentType.MULTIPART_MIXED
+            assert resp.json["cause"] == {
+                "name": "Accept",
+                "in": "headers",
+            }
+
+    def test_execute_multi_output_multipart_accept_async_alt_acceptable(self):
+        """
+        When executing the process asynchronously, ``Accept`` with multipart and an alternative is acceptable.
+
+        Because async requires to respond a Job Status, the ``Accept`` actually refers to that response,
+        rather than a results response as returned directly in sync.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": f"{ContentType.MULTIPART_MIXED}, {ContentType.APP_JSON}",
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": "respond-async",
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
+            assert "status" in resp.json, "Expected a JSON Job Status response."
 
     def test_execute_multi_output_prefer_header_return_representation(self):
         proc = "EchoResultsTester"
@@ -4065,7 +4350,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4128,7 +4413,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4188,7 +4473,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4256,7 +4541,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4310,15 +4595,16 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.json == {
+        assert results_json == {
             "output_data": "test",
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/output.json",
                 "type": ContentType.APP_JSON,
             },
         }
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4373,9 +4659,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.json == {
+        assert results_json == {
             "output_data": {
                 "href": f"{out_url}/{job_id}/output_text/output.txt",
                 "type": ContentType.TEXT_PLAIN,
@@ -4389,7 +4676,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.TEXT_PLAIN,
             },
         }
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4443,15 +4730,16 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.json == {
+        assert results_json == {
             "output_data": "test",
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/output.json",
                 "type": ContentType.APP_JSON,
             },
         }
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",
@@ -4503,9 +4791,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.json == {
+        assert results_json == {
             "output_data": {
                 "href": f"{out_url}/{job_id}/output_text/output.txt",
                 "type": ContentType.TEXT_PLAIN,
@@ -4519,7 +4808,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.TEXT_PLAIN,
             },
         }
-        outputs = self.app.get(f"/jobs/{job_id}/outputs")
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_data": "test",

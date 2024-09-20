@@ -75,6 +75,7 @@ if TYPE_CHECKING:
     from weaver.status import StatusType
     from weaver.typedefs import (
         AnyAcceptLanguageHeader,
+        AnyHeadersContainer,
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
@@ -697,7 +698,16 @@ def submit_job(request, reference, tags=None):
         accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
         matched_lang = accepts_lang.lookup(support_lang, default="") or None
         if lang and not matched_lang:
-            raise HTTPNotAcceptable(f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].")
+            raise HTTPNotAcceptable(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].",
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {"name": "Accept-Language", "in": "headers"},
+                    "value": repr_json(lang, force_string=False),
+                })
+            )
         lang = matched_lang
     elif isinstance(reference, Service):
         service_url = reference.url
@@ -776,22 +786,25 @@ def submit_job_handler(payload,             # type: ProcessExecution
     exec_max_wait = settings.get("weaver.execute_sync_max_wait", settings.get("weaver.exec_sync_max_wait"))
     exec_max_wait = as_int(exec_max_wait, default=20)
     mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
-    get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
         is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
     else:
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
+    accept_type = validate_job_accept_header(headers, mode)
+    get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
+
     exec_resp = json_body.get("response")
     subscribers = map_job_subscribers(json_body, settings)
-
+    job_inputs = json_body.get("inputs")
+    job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
-                         inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
-                         is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
-                         execute_async=is_execute_async, execute_response=exec_resp,
-                         custom_tags=tags, accept_language=language, subscribers=subscribers)
+                         inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
+                         execute_async=is_execute_async, execute_response=exec_resp, custom_tags=tags, user_id=user,
+                         access=visibility, context=context, subscribers=subscribers,
+                         accept_type=accept_type, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
     location_url = job.status_url(settings)
@@ -837,6 +850,36 @@ def submit_job_handler(payload,             # type: ProcessExecution
     }
     resp = get_job_submission_response(body, resp_headers)
     return resp
+
+
+def validate_job_accept_header(headers, execution_mode):
+    # type: (AnyHeadersContainer, ExecuteMode) -> Optional[str]
+    """
+    Validate that the submitted ``Accept`` header is permitted.
+    """
+    accept = get_header("accept", headers)
+    if not accept:
+        return
+    # compare with 'in' to allow alternate types, one of which must be JSON for async
+    if ContentType.APP_JSON in accept:
+        return ContentType.APP_JSON
+    # anything always allowed in sync, since results returned directly
+    if execution_mode == ExecuteMode.SYNC:
+        return accept
+    raise HTTPNotAcceptable(
+        json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+            "type": "NotAcceptable",
+            "title": "Execution request is not acceptable.",
+            "detail": (
+                "When running asynchronously, the Accept header must correspond"
+                "to the Job Status response instead of the desired Result response"
+                "returned when executing synchronously."
+            ),
+            "status": HTTPNotAcceptable.code,
+            "cause": {"name": "Accept", "in": "headers"},
+            "value": repr_json(accept, force_string=False),
+        })
+    )
 
 
 def validate_process_io(process, payload):

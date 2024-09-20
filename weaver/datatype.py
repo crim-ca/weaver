@@ -1002,6 +1002,18 @@ class Job(Base, LoggerHandler):
         self["subscribers"] = subscribers or None
 
     @property
+    def accept_type(self):
+        # type: () -> Optional[str]
+        return self.get("accept_type")
+
+    @accept_type.setter
+    def accept_type(self, content_type):
+        # type: (Optional[Union[str]]) -> None
+        if not isinstance(content_type, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_type'")
+        self["accept_type"] = content_type
+
+    @property
     def accept_language(self):
         # type: () -> Optional[str]
         return self.get("accept_language")

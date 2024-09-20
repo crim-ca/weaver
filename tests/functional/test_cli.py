@@ -770,8 +770,8 @@ class TestWeaverClient(TestWeaverClientBase):
 class TestWeaverCLI(TestWeaverClientBase):
     def setUp(self):
         super(TestWeaverCLI, self).setUp()
-        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333",
-                                      process="fake-process", access=Visibility.PUBLIC)
+        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process",
+                                      access=Visibility.PUBLIC)
         job.status = Status.SUCCEEDED
         self.test_job = self.job_store.update_job(job)
 
@@ -2001,8 +2001,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         svc = self.service_store.save_service(Service(name="random", url="https://random.com", public=True))
         proc = self.test_process["Echo"]
         job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
-        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, service=svc.name,
-                                       access=Visibility.PUBLIC)
+        job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, service=svc.name, access=Visibility.PUBLIC)
         self.job_store.save_job(task_id=uuid.uuid4(), process="CatFile", access=Visibility.PUBLIC)
 
         lines = mocked_sub_requests(

@@ -181,6 +181,7 @@ class StoreJobs(StoreInterface):
                  access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
                  subscribers=None,          # type: Optional[ExecutionSubscribers]
+                 accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job

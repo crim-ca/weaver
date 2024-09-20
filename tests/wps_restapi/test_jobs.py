@@ -179,7 +179,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      user_id=user_id, execute_async=True, access=access, created=created)
+                                      execute_async=True, user_id=user_id, access=access, created=created)
         job.status = status
         if status != Status.ACCEPTED:
             job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)
@@ -1538,7 +1538,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         job_none.pop("$id", None)
         assert job_none == {
             "inputs": {},
-            "outputs": {},
+            "outputs": None,
             "mode": ExecuteMode.AUTO,
             "response": ExecuteResponse.DOCUMENT
         }
@@ -1578,7 +1578,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         job_out_none.pop("$id", None)
         assert job_out_none == {
             "inputs": {"random": "ok"},
-            "outputs": {},
+            "outputs": None,
             "mode": ExecuteMode.AUTO,
             "response": ExecuteResponse.DOCUMENT
         }

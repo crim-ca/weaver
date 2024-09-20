@@ -4130,7 +4130,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   It is **VERY** important to use 'default={}' and not 'missing=drop' contrary to other optional fields.
     #   Using 'drop' causes and invalid input definition to be ignored/removed and not be validated for expected schema.
     #   We want to ensure format is validated if present to rapidly report the issue and not move on to full execution.
-    #   If 'inputs' are indeed omitted, the default with match against and empty 'ExecuteInputMapValues' schema.
+    #   If 'inputs' are indeed omitted, the default will match against an empty 'ExecuteInputMapValues' schema.
     #   If 'inputs' are explicitly provided as '{}' or '[]', it will also behave the right way for no-inputs process.
     #
     # See tests validating both cases (incorrect schema vs optionals inputs):
@@ -4146,7 +4146,10 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
             "the 'response' type, and the execution 'mode' provided "
             f"(see for more details: {DOC_URL}/processes.html#execution-body)."
         ),
-        default={}
+        # NOTE:
+        #   Explicitly submitted {} or [] means that *no outputs* are requested.
+        #   This must be distinguished from 'all outputs' requested, which is done by omiting 'outputs' field entirely.
+        default=None,
     )
 
 
