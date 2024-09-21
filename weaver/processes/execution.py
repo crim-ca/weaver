@@ -71,6 +71,7 @@ if TYPE_CHECKING:
     from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
+    from weaver.execute import AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
     from weaver.typedefs import (
@@ -836,7 +837,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # sync not respected, therefore must drop it
             # since both could be provided as alternative preferences, drop only async with limited subset
             prefer = get_header("Preference-Applied", headers, pop=True)
-            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteMode.ASYNC])
+            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteControlOption.ASYNC])
             if async_applied:
                 resp_headers.update(async_applied)
 
@@ -853,7 +854,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
 
 def validate_job_accept_header(headers, execution_mode):
-    # type: (AnyHeadersContainer, ExecuteMode) -> Optional[str]
+    # type: (AnyHeadersContainer, AnyExecuteMode) -> Optional[str]
     """
     Validate that the submitted ``Accept`` header is permitted.
     """

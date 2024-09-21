@@ -3486,7 +3486,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         status_path = os.path.join(resources.FUNCTIONAL_APP_PKG, "Finch_EnsembleGridPointWetdays/status.xml")
         status_url = f"{resources.TEST_REMOTE_SERVER_URL}/status.xml"
-        output_log_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.txt"
+        output_log_url = f"{resources.TEST_REMOTE_SERVER_URL}/result.txt"
         output_zip_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.zip"
         with open(status_path, mode="r", encoding="utf-8") as status_file:
             status_body = status_file.read().format(
@@ -3640,7 +3640,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -3723,12 +3723,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.status_code == 204, "No contents expected for minimal reference result."
         assert results.body == b""
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/output.json"
+        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/result.json"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -3859,7 +3859,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.status_code == 204, "No contents expected for single reference result."
         assert results.body == b""
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_data/output.txt"
+        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_data/result.txt"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -3904,12 +3904,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.status_code == 204, "No contents expected for single reference result."
         assert results.body == b""
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/output.json"
+        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/result.json"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -3963,6 +3963,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         )
         job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
         assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
 
         # validate the results based on original execution request
         results = resp
@@ -3982,7 +3983,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4044,7 +4045,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
-            Content-Location: {out_url}/{job_id}/output_json/output.json
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
         """)
         assert results.text == results_body
@@ -4052,7 +4053,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4181,7 +4182,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4201,7 +4202,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
-            Content-Location: {out_url}/{job_id}/output_json/output.json
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
@@ -4211,7 +4212,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4355,7 +4356,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4418,7 +4419,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4464,11 +4465,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
-            Content-Location: {out_url}/{job_id}/output_data/output.txt
+            Content-Location: {out_url}/{job_id}/output_data/result.txt
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
-            Content-Location: {out_url}/{job_id}/output_json/output.json
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
         """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
@@ -4478,7 +4479,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4531,7 +4532,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_text@{job_id}>
-            Content-Location: {out_url}/{job_id}/output_text/output.txt
+            Content-Location: {out_url}/{job_id}/output_text/result.txt
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
@@ -4546,11 +4547,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_text": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4600,7 +4601,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results_json == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4609,7 +4610,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4664,7 +4665,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
@@ -4672,7 +4673,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "mediaType": ContentType.APP_JSON,
             },
             "output_text": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
         }
@@ -4681,11 +4682,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
             "output_text": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
         }
@@ -4735,7 +4736,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results_json == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4744,7 +4745,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
         }
@@ -4796,7 +4797,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
@@ -4804,7 +4805,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "mediaType": ContentType.APP_JSON,
             },
             "output_text": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
         }
@@ -4813,11 +4814,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.json["outputs"] == {
             "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.json",
+                "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
             "output_text": {
-                "href": f"{out_url}/{job_id}/output_text/output.txt",
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
         }

@@ -20,6 +20,7 @@ from pyramid.httpexceptions import (
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 from requests.structures import CaseInsensitiveDict
+from webob.headers import ResponseHeaders
 
 from weaver.database import get_db
 from weaver.datatype import Job, Process
@@ -50,7 +51,8 @@ from weaver.utils import (
     get_secure_path,
     get_settings,
     get_weaver_url,
-    is_uuid
+    is_uuid,
+    make_link_header,
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
@@ -61,7 +63,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple, Union
 
-    from weaver.execute import AnyExecuteResponse
+    from weaver.execute import AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -313,8 +315,8 @@ def make_result_link(result_id, result, job_id, settings):
             url = get_any_value(value, data=False, file=True)  # should already include full path
             if fmt == ContentType.TEXT_PLAIN and not enc:  # only if text, otherwise binary content could differ
                 enc = "UTF-8"  # default both omit/empty
-        encoding = f"; charset={enc}" if enc else ""
-        links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}{encoding}")
+        link_header = make_link_header(url, rel=f"{result_id}{suffix}", type=typ, charset=enc)
+        links.append(link_header)
     return links
 
 
@@ -471,6 +473,17 @@ def get_job_return(job, body=None, headers=None):
     return job.execution_response
 
 
+def get_job_output_transmission(job, output_id):
+    # type: (Job, str) -> Optional[AnyExecuteTransmissionMode]
+    """
+    Obtain the requested :term:`Job` output ``transmissionMode``.
+    """
+    outputs = job.outputs or {}
+    out = outputs.get(output_id) or {}
+    mode = out.get("transmissionMode")
+    return mode
+
+
 def get_job_results_response(
     job,                        # type: Job
     container,                  # type: AnySettingsContainer
@@ -528,12 +541,18 @@ def get_job_results_response(
                                 schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
                                 link_references=is_raw)
 
-    headers = CaseInsensitiveDict(headers or {})
-    if "Location" in headers:
-        headers.setdefault("Content-Location", headers.pop("Location"))
-    headers.setdefault("Content-Location", job.status_url(container))
+    headers = ResponseHeaders(headers or {})
+    headers.pop("Location", None)
+    headers.setdefault("Content-Location", job.results_url(container))
+    for link in job.links(container, self_link="results"):
+        link_header = make_link_header(link)
+        headers.add("Link", link_header)
 
-    if not is_raw:
+    is_accept_multipart = (
+        isinstance(job.accept_type, str) and
+        any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART)
+    )
+    if not is_raw and not is_accept_multipart:
         try:
             results_schema = sd.ResultsDocument()
             results_json = results_schema.deserialize(results)
@@ -563,8 +582,8 @@ def get_job_results_response(
         # Status code 204 for empty body
         # see:
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
-        refs.extend(headers.items())
-        return HTTPNoContent(headers=refs)
+        headers.extend(refs)
+        return HTTPNoContent(headers=headers)
 
     # raw response can be data-only value, link-only or a mix of them
     if results:
@@ -577,9 +596,9 @@ def get_job_results_response(
         if (
             len(results) > 1 or
             (isinstance(out_data, list) and len(out_data) > 1) or
-            (isinstance(job.accept_type, str) and any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART))
+            is_accept_multipart
         ):
-            return get_job_results_multipart(job, results)
+            return get_job_results_multipart(job, results, container)
 
         # single value only
         out_data = out_data[0] if isinstance(out_data, list) else out_data
@@ -601,8 +620,8 @@ def get_job_results_response(
     return resp
 
 
-def get_job_results_multipart(job, results):
-    # type: (Job, ExecutionResults) -> HTTPOk
+def get_job_results_multipart(job, results, container):
+    # type: (Job, ExecutionResults, AnySettingsContainer) -> HTTPOk
     """
     Generates the :term:`Job` results multipart response from available or requested outputs.
 
@@ -612,34 +631,71 @@ def get_job_results_multipart(job, results):
     :param job:
     :param results: Pre-filtered and pre-processed results in a normalized format structure.
     """
-    # FIXME: https://github.com/crim-ca/weaver/issues/376
-    #  implement multipart, both for multi-output IDs and array-output under same ID
-    multi = MIMEMultipart()
-    for res_id, result in results.items():
-        key = get_any_value(result, key=True)
-        val = get_any_value(result)
-        if key == "href":
-            typ = result.get("type") or ContentType.APP_OCTET_STREAM
-            res_headers = get_href_headers(val, download_headers=True, content_headers=True, content_type=typ)
-        else:
-            typ = ContentType.TEXT_PLAIN
+    settings = get_settings(container)
 
-        get_href_headers()
-        fmt = get_format()
-        part = MIMEPart()
-        part.add_header("Content-Disposition", "inline", filename=f"{res_id}{ext}")
-        part.set_type(typ)
-        part.set_charset()
-        part.set_param()  # in ctype
-        # data
-        part.set_payload()
-        multi.attach(part)
+    def add_result_parts(result_parts):
+        multi = MIMEMultipart("mixed")
+        for res_id, result in result_parts.items():
+            if isinstance(result, list):
+                sub_parts = {f"{res_id}.{i}": data for i, data in enumerate(result)}
+                part = add_result_parts(sub_parts)
+                multi.attach(part)
+                continue
 
+            key = get_any_value(result, key=True)
+            val = get_any_value(result)
+            mode = get_job_output_transmission(job, res_id)
+            # FIXME: adjust output based on transmissionMode rather than href/value key
+            if key == "value":
+                url = None
+                if mode == ExecuteTransmissionMode.REFERENCE:
+                    url = None  # FIXME: write file
+                else:
+                    mode = ExecuteTransmissionMode.VALUE  # in case unspecified, default "auto"
+            if key == "href":
+                url = val
+                if mode == ExecuteTransmissionMode.VALUE:
+                    val = None  # FIXME: read file
+                else:
+                    mode = ExecuteTransmissionMode.REFERENCE  # in case unspecified, default "auto"
+
+            # NOTE: work with local files (since we have them), to avoid unnecessary loopback request
+            # FIXME: Handle S3 output storage. Should multipart response even be allowed in this case?
+            if key == "href":
+                typ = result.get("type") or ContentType.APP_OCTET_STREAM
+                loc = map_wps_output_location(url, settings, exists=True, file_scheme=True, url=False)
+                res_headers = get_href_headers(
+                    loc,
+                    download_headers=True,
+                    content_headers=True,
+                    content_type=typ,
+                    settings=settings,
+                )
+                res_headers["Content-Location"] = url  # rewrite back the original URL
+            else:
+                typ = ContentType.TEXT_PLAIN
+                name = f"{res_id}.txt"
+                res_headers = get_href_headers(
+                    name,
+                    download_headers=True,
+                    content_headers=True,
+                    content_type=typ,
+                    settings=settings,
+                )
+
+            part = MIMEPart()
+            for hdr_key, hdr_val in res_headers.items():
+                part.add_header(hdr_key, hdr_val)
+            part.set_payload(val)
+            multi.attach(part)
+        return multi
+
+    res_multi = add_result_parts(results)
     resp = HTTPOk(
         detail=f"Multipart Response for {job}",
-        headers={"Content-Type": multi.get_content_type()},
+        headers={"Content-Type": res_multi.get_content_type()},
     )
-    resp.body = multi.as_bytes()
+    resp.body = res_multi.as_bytes()
     return resp
 
 

@@ -38,7 +38,7 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, repr_json
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat, repr_json
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -63,6 +63,7 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_date_fmt,
     get_log_fmt,
+    get_path_kvp,
     get_settings,
     now,
     request_extra
@@ -1363,6 +1364,7 @@ class Job(Base, LoggerHandler):
         :param self_link: name of a section that represents the current link that will be returned.
         """
         settings = get_settings(container)
+        html_on = settings.get("weaver.wps_restapi_html", True)
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
@@ -1371,8 +1373,8 @@ class Job(Base, LoggerHandler):
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
-            {"href": job_path, "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
-            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+            {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,
+             "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
             {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
              "title": "List of submitted jobs."},
             {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
@@ -1380,6 +1382,19 @@ class Job(Base, LoggerHandler):
             {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
         ]
+        if html_on:
+            job_links.append({
+                "href": get_path_kvp(job_path, f=OutputFormat.HTML),
+                "rel": "alternate",
+                "title": "HTML Job Status",
+                "type": ContentType.TEXT_HTML,
+            })
+        if self_link in ["status", None]:
+            job_links.extend([
+                {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+
+            ])
+
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
             if job_status == Status.SUCCEEDED:
@@ -1413,7 +1428,8 @@ class Job(Base, LoggerHandler):
         job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": ContentType.APP_JSON, "hreflang": AcceptLanguage.EN_CA}
         for link in job_links:
-            link.update(link_meta)
+            for meta, parma in link_meta.items():
+                link.setdefault(meta, parma)
         return job_links
 
     def json(self, container=None):  # pylint: disable=W0221,arguments-differ
@@ -1484,6 +1500,7 @@ class Job(Base, LoggerHandler):
             "request": self.request,
             "response": self.response,
             "subscribers": self.subscribers,
+            "accept_type": self.accept_type,
             "accept_language": self.accept_language,
         }
 
