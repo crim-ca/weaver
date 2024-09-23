@@ -1352,6 +1352,32 @@ class Job(Base, LoggerHandler):
         # type: (Optional[AnySettingsContainer]) -> str
         return self.job_url(container=container, extra_path="/results")
 
+    def result_path(self, job_id=None, output_id=None, file_name=None):
+        # type: (Optional[AnyUUID], Optional[str], Optional[str]) -> str
+        """
+        Obtains a *relative* result path, according to requested parameters and the :term:`Job` definition.
+
+        The generated path will automatically apply the relative job context if defined.
+
+        :param job_id: Override ID to employ for the job path. Otherwise, uses the usually job UUID by default.
+            This should be used for cases where the ID is "not yet" established by the job, or that an alternate
+            location based on a UUID established by another source must be employed.
+        :param output_id:
+            Output ID to refer to in the path. If omitted, the path prefix will stop at the job ID fragment.
+        :param file_name:
+            Output file name and extension to apply to the path. If omitted, the path prefix will stop at the output ID.
+        :return: Resolved *relative* result path.
+        """
+        result_job_id = str(job_id or self.id)
+        result_job_path = os.path.join(self.context, result_job_id) if self.context else result_job_id
+        if not output_id:
+            return result_job_path
+        result_job_path = os.path.join(result_job_path, output_id)
+        if not file_name:
+            return result_job_path
+        result_job_path = os.path.join(result_job_path, file_name)
+        return result_job_path
+
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """

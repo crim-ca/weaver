@@ -157,6 +157,7 @@ if TYPE_CHECKING:
     MetadataResult = TypedDict("MetadataResult", {
         "Date": str,
         "Last-Modified": str,
+        "Content-ID": NotRequired[str],
         "Content-Type": NotRequired[str],
         "Content-Length": NotRequired[str],
         "Content-Location": NotRequired[str],
@@ -1191,6 +1192,8 @@ def get_href_headers(
     content_headers=False,                  # type: bool
     content_type=None,                      # type: Optional[str]
     content_disposition_type="attachment",  # type: Literal["attachment", "inline"]
+    content_location=None,                  # type: Optional[str]
+    content_id=None,                        # type: Optional[str]
     settings=None,                          # type: Optional[SettingsType]
     **option_kwargs,                        # type: Unpack[Union[SchemeOptions, RequestOptions]]
  ):                                         # type: (...) -> MetadataResult
@@ -1209,8 +1212,16 @@ def get_href_headers(
         Explicit ``Content-Type`` to provide.
         Otherwise, use default guessed by file system (often ``application/octet-stream``).
         If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+        Requires that :paramref:`content_headers` is enabled.
     :param content_disposition_type:
-        Whether ``inline`` or ``attachment`` should be used, when enabled by :paramref:`download_headers`.
+        Whether ``inline`` or ``attachment`` should be used.
+        Requires that :paramref:`content_headers` and :paramref:`download_headers` are enabled.
+    :param content_location:
+        Override ``Content-Location`` to include in headers. Otherwise, defaults to the :paramref:`path`.
+        Requires that :paramref:`location_headers` and :paramref:`content_headers` are enabled in each case.
+    :param content_id:
+        Optional ``Content-ID`` to include in the headers.
+        Requires that :paramref:`content_headers` is enabled.
     :param settings: Application settings to pass down to relevant utility functions.
     :return: Headers for the reference.
     """
@@ -1259,8 +1270,13 @@ def get_href_headers(
             f_size = stat.st_size
             f_modified = datetime.fromtimestamp(stat.st_mtime)
 
-    headers = {"Content-Location": href} if location_headers else {}
+    headers = {}
     if content_headers:
+        content_id = content_id.strip("<>") if isinstance(content_id, str) else ""
+        if content_id:
+            headers["Content-ID"] = f"<{content_id}>"
+        if location_headers:
+            headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
         if not f_type:
             if c_type == ContentType.APP_OCTET_STREAM:  # default

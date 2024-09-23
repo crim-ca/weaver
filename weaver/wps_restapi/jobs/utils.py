@@ -19,7 +19,6 @@ from pyramid.httpexceptions import (
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
-from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders
 
 from weaver.database import get_db
@@ -66,6 +65,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
+        AnyData,
         AnyHeadersContainer,
         AnyRequestType,
         AnyResponseType,
@@ -77,7 +77,9 @@ if TYPE_CHECKING:
         ExecutionResults,
         ExecutionResultValue,
         HeadersTupleType,
+        HeadersType,
         JSON,
+        Path,
         PyramidRequest,
         SettingsType
     )
@@ -473,15 +475,20 @@ def get_job_return(job, body=None, headers=None):
     return job.execution_response
 
 
-def get_job_output_transmission(job, output_id):
-    # type: (Job, str) -> Optional[AnyExecuteTransmissionMode]
+def get_job_output_transmission(job, output_id, is_reference):
+    # type: (Job, str, bool) -> AnyExecuteTransmissionMode
     """
     Obtain the requested :term:`Job` output ``transmissionMode``.
     """
     outputs = job.outputs or {}
     out = outputs.get(output_id) or {}
     mode = out.get("transmissionMode")
-    return mode
+    # because mode can be omitted, resolve their default explicitly
+    if not mode and is_reference:
+        return ExecuteTransmissionMode.REFERENCE
+    if not mode and not is_reference:
+        return ExecuteTransmissionMode.VALUE
+    return cast("AnyExecuteTransmissionMode", mode)
 
 
 def get_job_results_response(
@@ -620,6 +627,80 @@ def get_job_results_response(
     return resp
 
 
+def generate_or_resolve_result(
+    job,            # type: Job
+    result,         # type: ExecutionResultObject
+    result_id,      # type: str
+    output_id,      # type: str
+    output_mode,    # type: ExecuteTransmissionMode
+    settings,       # type: SettingsType
+):                  # type: (...) -> Tuple[HeadersType, AnyData]
+    """
+    Obtains the local file path and the corresponding :term:`URL` reference for a given result, generating it as needed.
+
+    :param job: Job with results details.
+    :param result: The specific output value or reference (could be an item index within an array of a given output).
+    :param result_id: Specific identifier of the result, including any array index as applicable.
+    :param output_id: Generic identifier of the output containing the result.
+    :param output_mode: Desired output transmission mode.
+    :param settings: Application settings to resolve locations.
+    :return: Resolved locations.
+    """
+    key = get_any_value(result, key=True)
+    val = get_any_value(result)
+    cid = f"{result_id}@{job.id}"
+    url = None
+    loc = None
+    typ = None
+    res_data = None
+
+    # NOTE:
+    #   work with local files (since we have them), to avoid unnecessary loopback request
+    #   then, rewrite the locations after generating their headers to obtain the final result URL
+
+    # FIXME: Handle S3 output storage. Should multipart response even be allowed in this case?
+
+    if key == "href":
+        url = val
+        typ = result.get("type") or ContentType.APP_OCTET_STREAM
+        loc = map_wps_output_location(val, settings, exists=True, file_scheme=True, url=False)
+
+    if not url:
+        out_dir = get_wps_output_dir(settings)
+        out_name = f"{result_id}.txt"
+        job_path = job.result_path(output_id=output_id, file_name=out_name)
+        loc = os.path.join(out_dir, job_path)
+        url = map_wps_output_location(loc, settings, exists=True, url=True)
+
+    if key == "value":
+        res_data = val
+        typ = ContentType.TEXT_PLAIN
+
+    if key == "value" and output_mode == ExecuteTransmissionMode.REFERENCE:
+        if not os.path.isfile(loc):
+            os.makedirs(os.path.dirname(loc), exist_ok=True)
+            with open(loc, mode="w", encoding="utf-8") as out_file:
+                out_file.write(val)
+
+    if key == "href" and output_mode == ExecuteTransmissionMode.VALUE:
+        with open(loc, mode="rb") as out_file:
+            res_data = out_file.read()
+
+    if output_mode == ExecuteTransmissionMode.REFERENCE:
+        res_data = ""
+
+    res_headers = get_href_headers(
+        loc,
+        download_headers=True,
+        content_headers=True,
+        content_type=typ,
+        content_id=cid,
+        content_location=url,  # rewrite back the original URL
+        settings=settings,
+    )
+    return res_headers, res_data
+
+
 def get_job_results_multipart(job, results, container):
     # type: (Job, ExecutionResults, AnySettingsContainer) -> HTTPOk
     """
@@ -630,67 +711,35 @@ def get_job_results_multipart(job, results, container):
 
     :param job:
     :param results: Pre-filtered and pre-processed results in a normalized format structure.
+    :param container: Application settings to resolve locations.
     """
     settings = get_settings(container)
 
     def add_result_parts(result_parts):
+        # type: (List[Tuple[str, str, ExecutionResultObject]]) -> MIMEMultipart
+
         multi = MIMEMultipart("mixed")
-        for res_id, result in result_parts.items():
+        for res_id, out_id, result in result_parts:
             if isinstance(result, list):
-                sub_parts = {f"{res_id}.{i}": data for i, data in enumerate(result)}
+                sub_parts = [(f"{out_id}.{i}", out_id, data) for i, data in enumerate(result)]
                 part = add_result_parts(sub_parts)
                 multi.attach(part)
                 continue
 
             key = get_any_value(result, key=True)
-            val = get_any_value(result)
-            mode = get_job_output_transmission(job, res_id)
-            # FIXME: adjust output based on transmissionMode rather than href/value key
-            if key == "value":
-                url = None
-                if mode == ExecuteTransmissionMode.REFERENCE:
-                    url = None  # FIXME: write file
-                else:
-                    mode = ExecuteTransmissionMode.VALUE  # in case unspecified, default "auto"
-            if key == "href":
-                url = val
-                if mode == ExecuteTransmissionMode.VALUE:
-                    val = None  # FIXME: read file
-                else:
-                    mode = ExecuteTransmissionMode.REFERENCE  # in case unspecified, default "auto"
-
-            # NOTE: work with local files (since we have them), to avoid unnecessary loopback request
-            # FIXME: Handle S3 output storage. Should multipart response even be allowed in this case?
-            if key == "href":
-                typ = result.get("type") or ContentType.APP_OCTET_STREAM
-                loc = map_wps_output_location(url, settings, exists=True, file_scheme=True, url=False)
-                res_headers = get_href_headers(
-                    loc,
-                    download_headers=True,
-                    content_headers=True,
-                    content_type=typ,
-                    settings=settings,
-                )
-                res_headers["Content-Location"] = url  # rewrite back the original URL
-            else:
-                typ = ContentType.TEXT_PLAIN
-                name = f"{res_id}.txt"
-                res_headers = get_href_headers(
-                    name,
-                    download_headers=True,
-                    content_headers=True,
-                    content_type=typ,
-                    settings=settings,
-                )
+            mode = get_job_output_transmission(job, out_id, is_reference=(key == "href"))
+            res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, mode, settings)
 
             part = MIMEPart()
             for hdr_key, hdr_val in res_headers.items():
                 part.add_header(hdr_key, hdr_val)
-            part.set_payload(val)
+            if res_data:
+                part.set_payload(res_data)
             multi.attach(part)
         return multi
 
-    res_multi = add_result_parts(results)
+    results_parts = [(_res_id, _res_id, _res_val) for _res_id, _res_val in results.items()]
+    res_multi = add_result_parts(results_parts)
     resp = HTTPOk(
         detail=f"Multipart Response for {job}",
         headers={"Content-Type": res_multi.get_content_type()},

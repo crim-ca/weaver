@@ -359,6 +359,7 @@ if TYPE_CHECKING:
     AnyRegistryContainer = AnyContainer
     AnyDatabaseContainer = AnyContainer
 
+    AnyData = Union[str, bytes, bytearray]
     CookiesType = Dict[str, str]
     HeadersType = Dict[str, str]
     CookiesTupleType = List[Tuple[str, str]]

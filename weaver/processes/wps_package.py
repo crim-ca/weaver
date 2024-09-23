@@ -2727,7 +2727,7 @@ class WpsPackage(Process):
             )
 
         output_job_id = str(self.response.uuid)
-        output_prefix = os.path.join(self.job.context, output_job_id) if self.job.context else output_job_id
+        output_prefix = self.job.result_path(job_id=output_job_id)
         # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
         if storage_type == STORE_TYPE.S3:
             storage.prefix = output_prefix
