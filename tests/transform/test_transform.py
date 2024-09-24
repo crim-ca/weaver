@@ -4,7 +4,7 @@ import shutil
 import tempfile
 
 from pyramid.response import FileResponse
-from weaver.tranform.transform import Transform, FAMILIES
+from weaver.transform.transform import Transform, FAMILIES
 
 
 def using_mimes(func):

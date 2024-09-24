@@ -21,10 +21,10 @@ from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
 from weaver.formats import get_extension
-from weaver.tranform.png2svg import rgba_image_to_svg_contiguous
-from weaver.tranform.tiff import Tiff
+from weaver.transform.png2svg import rgba_image_to_svg_contiguous
+from weaver.transform.tiff import Tiff
 
-from weaver.tranform.utils import is_png, is_gif, is_svg, write_content, get_content, is_image, is_tiff, \
+from weaver.transform.utils import is_png, is_gif, is_svg, write_content, get_content, is_image, is_tiff, \
     get_file_extension
 
 LOGGER = get_task_logger(__name__)

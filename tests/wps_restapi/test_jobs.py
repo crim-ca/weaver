@@ -30,7 +30,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from tests.transform.test_tranform import test_transformations
+from tests.transform.test_transform import test_transformations
 from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode

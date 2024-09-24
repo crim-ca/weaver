@@ -38,7 +38,7 @@ from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.tranform import transform
+from weaver.transform import transform
 from weaver.utils import (
     get_any_id,
     get_any_value,

@@ -15,7 +15,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
-from weaver.tranform.transform import Transform
+from weaver.transform.transform import Transform
 from weaver.utils import get_settings
 from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd

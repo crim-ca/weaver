@@ -378,7 +378,7 @@ provider_outputs_service = Service(name="provider_outputs", path=provider_servic
 provider_output_service = Service(name="provider_output", path=provider_service.path + process_output_service.path)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
-provider_transformer_service = Service(name="provider_tranformer",
+provider_transformer_service = Service(name="provider_transformer",
                                        path=provider_service.path + process_transformer_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
@@ -6060,7 +6060,7 @@ class JobStatisticsSchema(ExtendedMappingSchema):
     outputs = OutputStatisticsMap(missing=drop)
 
 
-class JobTranformerSchema(ExtendedMappingSchema):
+class JobtransformerSchema(ExtendedMappingSchema):
     application = ApplicationStatisticsSchema(missing=drop)
     process = ProcessStatisticsSchema(missing=drop)
     outputs = OutputStatisticsMap(missing=drop)
@@ -7393,9 +7393,9 @@ class OkGetJobStatsResponse(ExtendedMappingSchema):
     body = JobStatisticsSchema()
 
 
-class OkGetJobTranformerResponse(ExtendedMappingSchema):
+class OkGetJobtransformerResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobTranformerSchema()
+    body = JobtransformerSchema()
 
 
 class VaultFileID(UUID):
@@ -7963,7 +7963,7 @@ get_prov_stats_responses.update({
 })
 
 get_job_transformer_responses = {
-    "200": OkGetJobTranformerResponse(description="success", examples={
+    "200": OkGetJobtransformerResponse(description="success", examples={
         "JobTransformer": {
             "summary": "Obtained possible output format.",
             "value": EXAMPLES["job_transformer.json"],

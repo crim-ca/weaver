@@ -3,7 +3,7 @@ import numpy as np
 import rasterio
 from PIL import Image, UnidentifiedImageError
 
-from weaver.tranform.utils import write_images
+from weaver.transform.utils import write_images
 
 
 def normalize_band(image_band: np.ndarray) -> np.ndarray:
