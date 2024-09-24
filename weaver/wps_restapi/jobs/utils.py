@@ -1,9 +1,12 @@
+import io
+
 import math
 import os
 import shutil
 from copy import deepcopy
 from email.message import MIMEPart
 from email.mime.multipart import MIMEMultipart
+from email.policy import HTTP as PolicyHTTP
 from typing import TYPE_CHECKING, cast
 
 import colander
@@ -19,6 +22,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
 
 from weaver.database import get_db
@@ -60,12 +64,12 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
-        AnyData,
+        AnyDataStream,
         AnyHeadersContainer,
         AnyRequestType,
         AnyResponseType,
@@ -83,6 +87,17 @@ if TYPE_CHECKING:
         PyramidRequest,
         SettingsType
     )
+
+    MultiPartFieldsParamsType = Union[
+        AnyDataStream,
+        # filename, data/io
+        Tuple[Optional[str], AnyDataStream],
+        # filename, data/io, content-type
+        Tuple[Optional[str], AnyDataStream, Optional[str], HeadersType],
+        # filename, data/io, content-type, headers
+        Tuple[Optional[str], AnyDataStream, str, HeadersType],
+    ]
+    MultiPartFieldsType = Sequence[Tuple[str, MultiPartFieldsParamsType]]
 
 LOGGER = get_task_logger(__name__)
 
@@ -605,7 +620,7 @@ def get_job_results_response(
             (isinstance(out_data, list) and len(out_data) > 1) or
             is_accept_multipart
         ):
-            return get_job_results_multipart(job, results, container)
+            return get_job_results_multipart(job, results, headers=headers, container=container)
 
         # single value only
         out_data = out_data[0] if isinstance(out_data, list) else out_data
@@ -632,9 +647,9 @@ def generate_or_resolve_result(
     result,         # type: ExecutionResultObject
     result_id,      # type: str
     output_id,      # type: str
-    output_mode,    # type: ExecuteTransmissionMode
+    output_mode,    # type: AnyExecuteTransmissionMode
     settings,       # type: SettingsType
-):                  # type: (...) -> Tuple[HeadersType, AnyData]
+):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
     Obtains the local file path and the corresponding :term:`URL` reference for a given result, generating it as needed.
 
@@ -673,7 +688,8 @@ def generate_or_resolve_result(
         url = map_wps_output_location(loc, settings, exists=True, url=True)
 
     if key == "value":
-        res_data = val
+        res_data = io.StringIO()
+        res_data.read(val)
         typ = ContentType.TEXT_PLAIN
 
     if key == "value" and output_mode == ExecuteTransmissionMode.REFERENCE:
@@ -683,11 +699,9 @@ def generate_or_resolve_result(
                 out_file.write(val)
 
     if key == "href" and output_mode == ExecuteTransmissionMode.VALUE:
-        with open(loc, mode="rb") as out_file:
-            res_data = out_file.read()
-
-    if output_mode == ExecuteTransmissionMode.REFERENCE:
-        res_data = ""
+        res_data = io.FileIO(loc, mode="rb")
+        # with open(loc, mode="rb") as out_file:
+        #     res_data = out_file.read()
 
     res_headers = get_href_headers(
         loc,
@@ -698,11 +712,15 @@ def generate_or_resolve_result(
         content_location=url,  # rewrite back the original URL
         settings=settings,
     )
+    if output_mode == ExecuteTransmissionMode.REFERENCE:
+        res_data = None
+        res_headers["Content-Length"] = "0"
+
     return res_headers, res_data
 
 
-def get_job_results_multipart(job, results, container):
-    # type: (Job, ExecutionResults, AnySettingsContainer) -> HTTPOk
+def get_job_results_multipart(job, results, headers, container):
+    # type: (Job, ExecutionResults, AnyHeadersContainer, AnySettingsContainer) -> HTTPOk
     """
     Generates the :term:`Job` results multipart response from available or requested outputs.
 
@@ -711,40 +729,68 @@ def get_job_results_multipart(job, results, container):
 
     :param job:
     :param results: Pre-filtered and pre-processed results in a normalized format structure.
+    :param headers: Additional headers to include in the response.
     :param container: Application settings to resolve locations.
     """
     settings = get_settings(container)
 
-    def add_result_parts(result_parts):
-        # type: (List[Tuple[str, str, ExecutionResultObject]]) -> MIMEMultipart
+    # class AnyMultipartEncoder(MultipartEncoder):
+    #     def __init__(self, fields, content_type=ContentType.MULTIPART_MIXED, **kwargs):
+    #         # type: (MultiPartFieldsType, str, **str) -> None
+    #         super().__init__(fields, **kwargs)
+    #         self._content_type = content_type
+    #
+    #     @property
+    #     def content_type(self):
+    #         return f"{self._content_type}; boundary=\"{self.boundary_value}\""
 
-        multi = MIMEMultipart("mixed")
+    def add_result_parts(result_parts):
+        # type: (List[Tuple[str, str, ExecutionResultObject]]) -> MultiPartFieldsType
+        #### type: (List[Tuple[str, str, ExecutionResultObject]]) -> MIMEMultipart
+
+        ##multi = AnyMultipartEncoder("mixed", policy=PolicyHTTP)
         for res_id, out_id, result in result_parts:
             if isinstance(result, list):
                 sub_parts = [(f"{out_id}.{i}", out_id, data) for i, data in enumerate(result)]
-                part = add_result_parts(sub_parts)
-                multi.attach(part)
-                continue
+                sub_parts = add_result_parts(sub_parts)
+                sub_multi = MultipartEncoder(sub_parts)
+                sub_out_url = job.result_path(output_id=out_id)
+                sub_headers = {
+                    "Content-Type": sub_multi.content_type,
+                    "Content-ID": f"<{out_id}@{job.id}>",
+                    "Content-Location": sub_out_url
+                }
+                yield out_id, (None, sub_multi, None, sub_headers)
+                ###part = add_result_parts(sub_parts)
+                ###multi.attach(part)
+                ##continue
 
             key = get_any_value(result, key=True)
             mode = get_job_output_transmission(job, out_id, is_reference=(key == "href"))
             res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, mode, settings)
+            yield out_id, (None, res_data, None, res_headers)
 
-            part = MIMEPart()
-            for hdr_key, hdr_val in res_headers.items():
-                part.add_header(hdr_key, hdr_val)
-            if res_data:
-                part.set_payload(res_data)
-            multi.attach(part)
-        return multi
+            # part = MIMEPart(policy=PolicyHTTP)
+            # for hdr_key, hdr_val in res_headers.items():
+            #     if hdr_val:
+            #         part.add_header(hdr_key, hdr_val)
+            # if res_data:
+            #     part.set_payload(res_data)
+            ###multi.attach(part)
+        ##return multi
 
     results_parts = [(_res_id, _res_id, _res_val) for _res_id, _res_val in results.items()]
-    res_multi = add_result_parts(results_parts)
-    resp = HTTPOk(
-        detail=f"Multipart Response for {job}",
-        headers={"Content-Type": res_multi.get_content_type()},
-    )
-    resp.body = res_multi.as_bytes()
+    results_parts = list(add_result_parts(results_parts))
+    #res_multi = AnyMultipartEncoder(results_parts)
+    res_multi = MultipartEncoder(results_parts)
+    ##resp_ctype = f"{res_multi.get_content_type()}; boundary=\"{res_multi.get_boundary()}\""
+    resp_headers = headers or {}
+    ##resp_headers.update({"Content-Type": resp_ctype})
+    resp_headers.update({"Content-Type": res_multi.content_type})
+    resp = HTTPOk(detail=f"Multipart Response for {job}", headers=resp_headers)
+    # drop generator contents that includes its own headers in the body, only keep nested parts
+    ###resp.body = res_multi.as_bytes(policy=PolicyHTTP).split(res_multi.policy.linesep.encode(), 3)[-1]
+    resp.body = res_multi.read()
     return resp
 
 

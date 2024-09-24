@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
+    import io
     import os
     import sys
     import uuid
@@ -360,6 +361,7 @@ if TYPE_CHECKING:
     AnyDatabaseContainer = AnyContainer
 
     AnyData = Union[str, bytes, bytearray]
+    AnyDataStream = Union[AnyData, io.IOBase]
     CookiesType = Dict[str, str]
     HeadersType = Dict[str, str]
     CookiesTupleType = List[Tuple[str, str]]
