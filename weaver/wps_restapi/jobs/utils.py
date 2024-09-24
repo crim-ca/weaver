@@ -2,15 +2,15 @@ import math
 import os
 import shutil
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import colander
 from celery.utils.log import get_task_logger
-from humanfriendly.terminal import output
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
     HTTPForbidden,
+    HTTPInternalServerError,
     HTTPNoContent,
     HTTPNotFound,
     HTTPNotImplemented,
@@ -46,6 +46,7 @@ from weaver.utils import (
     get_href_headers,
     get_path_kvp,
     get_sane_name,
+    get_secure_path,
     get_settings,
     get_weaver_url,
     is_uuid
@@ -309,7 +310,10 @@ def get_schema_query(schema, strict=True):
     if not schema:
         return None
     # unescape query (eg: "OGC+strict" becomes "OGC string" from URL parsing)
-    schema_checked = str(schema).replace(" ", "+").lower()
+    schema_checked = cast(
+        "JobInputsOutputsSchemaType",
+        str(schema).replace(" ", "+").lower()
+    )
     if JobInputsOutputsSchema.get(schema_checked) is None:
         raise HTTPBadRequest(json={
             "type": "InvalidParameterValue",
@@ -347,6 +351,7 @@ def make_result_link(result_id, result, job_id, settings):
             loc = os.path.join(str(job_id), f"{result_id}{suffix}.txt")
             url = f"{wps_url}/{loc}"
             path = os.path.join(out, loc)
+            path = get_secure_path(path)
             with open(path, mode="w", encoding=enc) as out_file:
                 out_file.write(val)
         else:
@@ -361,12 +366,13 @@ def make_result_link(result_id, result, job_id, settings):
     return links
 
 
-def get_results(job,  # type: Job
-                container,  # type: AnySettingsContainer
-                value_key=None,  # type: Optional[str]
-                schema=JobInputsOutputsSchema.OLD,  # type: JobInputsOutputsSchemaType
-                link_references=False,  # type: bool
-                ):  # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
+def get_results(  # pylint: disable=R1260
+    job,                                # type: Job
+    container,                          # type: AnySettingsContainer
+    value_key=None,                     # type: Optional[str]
+    schema=JobInputsOutputsSchema.OLD,  # type: Optional[JobInputsOutputsSchemaType]
+    link_references=False,              # type: bool
+):                                      # type: (...) -> Tuple[ExecutionResults, HeadersTupleType]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 
@@ -378,7 +384,7 @@ def get_results(job,  # type: Job
     :param schema:
         Selects which schema to employ for representing the output results (listing or mapping).
     :param link_references:
-        If enabled, an output that was requested by reference instead of value will be returned as ``Link`` reference.
+        If enabled, an output that was requested by reference instead of by value will be returned as ``Link`` header.
     :returns:
         Tuple with:
             - List or mapping of all outputs each with minimally an ID and value under the requested key.
@@ -397,56 +403,84 @@ def get_results(job,  # type: Job
     out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
     references = {}
     for result in job.results:
-        rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
+        # Complex result could contain both 'data' and a reference (eg: JSON file and its direct representation).
+        # Literal result is only by itself. Therefore, find applicable field by non 'data' match.
+        rtype = "href" if get_any_value(result, key=True, file=True, data=False) else "data"
         value = get_any_value(result)
-        out_key = rtype
-        out_id = get_any_id(result)
-        out_mode = out_ref.get(out_id, {}).get("transmissionMode")
-        as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
-        if rtype == "href":
-            # fix paths relative to instance endpoint, but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
-            if value.startswith("/"):
-                value = str(value).lstrip("/")
-            if "://" not in value:
-                value = wps_url + value
-        elif ogc_api:
-            out_key = "value"
-        elif value_key:
-            out_key = value_key
-        output = {out_key: value}
-        if rtype == "href":  # required for the rest to be there, other fields optional
-            if "mimeType" not in result:
-                result["mimeType"] = get_format(value, default=ContentType.TEXT_PLAIN).mime_type
-            if ogc_api or not strict:
-                output["type"] = result["mimeType"]
-            if not ogc_api or not strict or as_ref:
-                output["format"] = {fmt_key: result["mimeType"]}
-                for field in ["encoding", "schema"]:
-                    if field in result:
-                        output["format"][field] = result[field]
-        elif rtype != "href":
-            # literal data
-            # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
-            dtype = result.get("dataType", any2wps_literal_datatype(value, is_value=True) or "string")
-            if ogc_api:
-                output["dataType"] = {"name": dtype}
-            else:
-                output["dataType"] = dtype
-
-        if ogc_api or as_ref:
-            mapping = references if as_ref else outputs
-            if out_id in mapping:
-                output_list = mapping[out_id]
-                if not isinstance(output_list, list):
-                    output_list = [output_list]
-                output_list.append(output)
-                mapping[out_id] = output_list
-            else:
-                mapping[out_id] = output
+        # An array of literals can be merged as-is
+        if (
+            isinstance(value, list) and
+            all(
+                isinstance(val, (bool, float, int, str, type(None)))
+                for val in value
+            )
+        ):
+            array = [value]  # array of array such that it iterated as the array of literals directly
+        # Any other type of array implies complex data (bbox or file)
+        # They must be defined on their own with respective media-type/format details per item.
         else:
-            # if ordered insert supported by python version, insert ID first
-            output = dict([("id", out_id)] + list(output.items()))  # noqa
-            outputs.append(output)
+            array = value if isinstance(value, list) else [value]
+        for val_item in array:
+            val_data = val_item
+            if isinstance(val_item, dict) and isinstance(value, list):
+                rtype = "href" if get_any_value(val_item, key=True, file=True, data=False) else "data"
+                val_data = get_any_value(val_item, file=True, data=False)
+            out_key = rtype
+            out_id = get_any_id(result)
+            out_mode = out_ref.get(out_id, {}).get("transmissionMode")
+            as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
+            if rtype == "href" and isinstance(val_data, str):
+                # fix paths relative to instance endpoint,
+                # but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
+                if val_data.startswith("/"):
+                    val_data = val_data.lstrip("/")
+                if "://" not in val_data:
+                    val_data = wps_url + val_data
+            elif ogc_api:
+                out_key = "value"
+            elif value_key:
+                out_key = value_key
+
+            output = {out_key: val_data}
+
+            # required for the rest to be there, other fields optional
+            if rtype == "href":
+                val_fmt = val_item if isinstance(val_item, dict) else result
+                if "mimeType" not in val_fmt:
+                    val_fmt["mimeType"] = get_format(val_data, default=ContentType.TEXT_PLAIN).mime_type
+                if ogc_api or not strict:
+                    output["type"] = val_fmt["mimeType"]
+                if not ogc_api or not strict or as_ref:
+                    output["format"] = {fmt_key: val_fmt["mimeType"]}
+                    for field in ["encoding", "schema"]:
+                        if field in result:
+                            output["format"][field] = val_fmt[field]
+            elif rtype != "href":
+                dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
+                if ogc_api:
+                    output["dataType"] = {"name": dtype}
+                else:
+                    output["dataType"] = dtype
+
+            if schema == JobInputsOutputsSchema.OGC_STRICT:
+                out_fmt = output.pop("format", {})
+                for fmt_key, fmt_val in out_fmt.items():
+                    output.setdefault(fmt_key, fmt_val)
+
+            if ogc_api or as_ref:
+                mapping = references if as_ref else outputs
+                if out_id in mapping:
+                    output_list = mapping[out_id]
+                    if not isinstance(output_list, list):
+                        output_list = [output_list]
+                    output_list.append(output)
+                    mapping[out_id] = output_list
+                else:
+                    mapping[out_id] = output
+            else:
+                # if ordered insert supported by python version, insert ID first
+                output = dict([("id", out_id)] + list(output.items()))  # noqa
+                outputs.append(output)
 
     # needed to collect and aggregate outputs of same ID first in case of array
     # convert any requested link references using indices if needed
@@ -493,11 +527,30 @@ def get_job_results_response(job, container, headers=None):
         headers["Location"] = job.status_url(container)
 
     if not is_raw:
+        try:
+            results_schema = sd.Result()
+            results_json = results_schema.deserialize(results)
+            if len(results_json) != len(results):  # pragma: no cover  # ensure no outputs silently dismissed
+                raise colander.Invalid(
+                    results_schema,
+                    msg=f"Failed validation for values of outputs: {list(set(results) - set(results_json))}",
+                    value=results,
+                )
+        except colander.Invalid as exc:  # pragma: no cover
+            raise HTTPInternalServerError(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "InvalidSchema",
+                    "title": "Invalid Results",
+                    "detail": "Results body failed schema validation.",
+                    "status": HTTPInternalServerError.status_code,
+                    "error": exc.msg,
+                    "value": repr_json(exc.value),
+                })
+            )
         # note:
         #   Cannot add "links" field in response body because variable Output ID keys are directly at the root
         #   Possible conflict with an output that would be named "links".
-        results = sd.Result().deserialize(results)
-        return HTTPOk(json=results, headers=headers)
+        return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body

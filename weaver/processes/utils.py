@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import colander
 import docker
 import yaml
-from docker.errors import ImageNotFound
+from docker.errors import ImageNotFound  # pylint: disable=E0611
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -74,7 +74,6 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from logging import Logger
     from typing import Any, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
@@ -96,6 +95,7 @@ if TYPE_CHECKING:
         SettingsType,
         TypedDict
     )
+    from weaver.utils import LoggerHandler
 
     UpdateFieldListMethod = Literal["append", "override"]
     UpdateFieldListSpec = TypedDict("UpdateFieldListSpec", {
@@ -195,7 +195,7 @@ def _check_deploy(payload):
     """
     message = "Process deployment definition is invalid."
     try:
-        results = sd.Deploy().deserialize(payload)
+        results = sd.Deploy(schema_meta_include=False, schema_include=False).deserialize(payload)
         # Because many fields are optional during deployment to allow flexibility between compatible WPS/CWL
         # definitions, any invalid field at lower-level could make a full higher-level definition to be dropped.
         # Verify the result to ensure this was not the case for known cases to attempt early detection.
@@ -224,7 +224,7 @@ def _check_deploy(payload):
                         f"to avoid mismatching definitions."
                     )
                     raise HTTPBadRequest(json={
-                        "description": message,
+                        "title": message,
                         "cause": "unknown",
                         "error": "Invalid",
                         "value": d_io
@@ -239,14 +239,17 @@ def _check_deploy(payload):
         r_exec_unit = results.get("executionUnit", [{}])
         if p_exec_unit and p_exec_unit != r_exec_unit:
             message = "Process deployment execution unit is invalid."
-            d_exec_unit = sd.ExecutionUnitList().deserialize(p_exec_unit)  # raises directly if caused by invalid schema
+            d_exec_unit = sd.ExecutionUnitVariations(
+                schema_meta_include=False,
+                schema_include=False,
+            ).deserialize(p_exec_unit)  # raises directly if caused by invalid schema
             if r_exec_unit != d_exec_unit:  # otherwise raise a generic error, don't allow differing definitions
                 message = (
                     "Process deployment execution unit resolved as valid definition but differs from submitted "
                     "package. Aborting deployment to avoid mismatching package definitions."
                 )
                 raise HTTPBadRequest(json={
-                    "description": message,
+                    "title": message,
                     "cause": "unknown",
                     "error": PackageRegistrationError.__name__,
                     "value": d_exec_unit
@@ -260,10 +263,11 @@ def _check_deploy(payload):
     except colander.Invalid as exc:
         LOGGER.debug("Failed deploy body schema validation:\n%s", exc)
         raise HTTPBadRequest(json={
-            "description": message,
-            "cause": f"Invalid schema: [{exc.msg!s}]",
+            "title": message,
+            "detail": f"Invalid schema: [{exc.msg!s}]",
             "error": exc.__class__.__name__,
-            "value": exc.value
+            "cause": exc.asdict(),
+            "value": repr_json(exc.value),
         })
 
 
@@ -280,7 +284,14 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
     from weaver.processes.wps_package import check_package_instance_compatible, get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        info = get_process_definition(process_info, reference, package, data_source=None, headers=headers)
+        info = get_process_definition(
+            process_info,
+            reference,
+            package,
+            data_source=None,
+            headers=headers,
+            container=settings,
+        )
 
         # validate process type and package against weaver configuration
         cfg = get_weaver_configuration(settings)
@@ -352,6 +363,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)
+    payload.pop("$id", None)
 
     # validate identifier naming for unsupported characters
     process_desc = payload.get("processDescription", {})  # empty possible if CWL directly passed
@@ -396,7 +408,11 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             if not any(deployment_profile_name.lower().endswith(typ) for typ in allowed_profile_suffix):
                 raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
-        if not isinstance(execution_units, list):
+        if isinstance(execution_units, dict):
+            if "unit" not in execution_units:
+                execution_units = {"unit": execution_units}
+            execution_units = [execution_units]
+        if not isinstance(execution_units, list) or not len(execution_units) == 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         for execution_unit in execution_units:
             if not isinstance(execution_unit, dict):
@@ -446,6 +462,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     process_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
     process_info["outputTransmission"] = process_desc.get("outputTransmission", [])
     process_info["processDescriptionURL"] = description_url
+
     # insert the "resolved" context using details retrieved from "executionUnit"/"href" or directly with "owsContext"
     if "owsContext" not in process_info and reference:
         process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
@@ -459,6 +476,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # remove schema to avoid later deserialization error if different, but remaining content is valid
     # also, avoid storing this field in the process object, regenerate it as needed during responses
     process_info.pop("$schema", None)
+    process_info.pop("$id", None)
 
     try:
         process = Process(process_info)  # if 'version' was provided in deploy info, it will be added as hint here
@@ -471,11 +489,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         raise HTTPBadRequest(detail=str(exc))
     except HTTPException:
         raise
+    links = process.links(container)
+    process_summary["links"] = links
     data = {
         "description": sd.OkPostProcessesResponse.description,
         "processSummary": process_summary,
         "deploymentDone": True,
-        "links": process.links(container),
     }
     if deployment_profile_name:
         data["deploymentProfileName"] = deployment_profile_name
@@ -495,7 +514,7 @@ def _save_deploy_process(process, override, container):
         process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": str(exc),
             "status": HTTPConflict.code,
@@ -533,7 +552,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     """
     if not process.mutable:
         raise HTTPForbidden(json={
-            "type": "ProcessImmutable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
             "title": "Process immutable.",
             "detail": "Cannot update an immutable process.",
             "status": HTTPForbidden.code,
@@ -603,7 +622,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
         if new_version is not None:
             new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
         raise HTTPConflict(json={
-            "type": "ProcessRegistrationError",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
             "title": "Process definition conflict.",
             "detail": "Failed update of process conflicting with another definition or revision.",
             "status": HTTPConflict.code,
@@ -865,8 +884,8 @@ def parse_wps_process_config(config_entry):
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
     # if explicit name was provided, validate it (assert fail if not),
-    # otherwise replace silently bad character since since is requested to be inferred
-    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name))
+    # otherwise replace silently bad character since it is requested to be inferred
+    svc_name = get_sane_name(svc_name or url_p.hostname, assert_invalid=bool(svc_name), min_len=1)
     svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa  # 'identifier=a,b,c' techically allowed
     svc_proc = [proc.strip() for proc in svc_proc if proc.strip()]  # remote empty
     if not isinstance(svc_name, str):
@@ -914,7 +933,7 @@ def register_wps_processes_static(service_url, service_name, service_visibility,
         return
     wps_processes = [wps.describeprocess(p) for p in service_processes] or wps.processes
     for wps_process in wps_processes:
-        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier)}"
+        proc_id = f"{service_name}_{get_sane_name(wps_process.identifier, min_len=1)}"
         wps_pid = wps_process.identifier
         proc_url = f"{service_url}?service=WPS&request=DescribeProcess&identifier={wps_pid}&version={wps.version}"
         svc_vis = Visibility.PUBLIC if service_visibility else Visibility.PRIVATE
@@ -1123,9 +1142,8 @@ def is_cwl_package(package):
 def load_package_file(file_path):
     # type: (str) -> CWL
     """
-    Loads the package in YAML/JSON format specified by the file path.
+    Loads the package in :term:`YAML`/:term:`JSON` format specified by the file path.
     """
-
     file_path = _check_package_file(file_path)
     try:
         file_data = load_file(file_path)
@@ -1217,12 +1235,15 @@ def register_cwl_processes_from_config(container):
 
 
 def pull_docker(docker_auth, logger=LOGGER):
-    # type: (DockerAuthentication, Logger) -> Optional[DockerClient]
+    # type: (DockerAuthentication, LoggerHandler) -> Optional[DockerClient]
     """
     Pulls the referenced Docker image to local cache from an optionally secured registry.
 
     If the Docker image is already available locally, simply validates it.
     Authentication are applied as necessary using the provided parameters.
+
+    .. warning::
+        Logging calls must employ the
 
     :param docker_auth: Docker reference with optional authentication parameters.
     :param logger: Alternative logger reference to log status messages about the operation.
@@ -1233,7 +1254,7 @@ def pull_docker(docker_auth, logger=LOGGER):
     ref = docker_auth.reference
     try:
         # load from env is the same as CLI call
-        client = docker.from_env()
+        client = docker.from_env()  # pylint: disable=I1101
         # following login does not update '~/.docker/config.json' by design, but can use it if available
         # session remains active only within the client
         # Note:
@@ -1244,14 +1265,18 @@ def pull_docker(docker_auth, logger=LOGGER):
         #   Without re-auth, plain credentials resolved from auth config are returned in body instead!
         #   With re-auth, body *could* contain an identity token depending on auth method.
         if docker_auth.credentials:
-            logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+            logger.log(logging.DEBUG, "Retrieving image [%s] from Docker registry or cache.", ref)
             body = client.login(reauth=True, **docker_auth.credentials)
             if body.get("Status") != "Login Succeeded":
-                logger.debug("Failed authentication to Docker private registry [%s].", docker_auth.registry)
+                logger.log(
+                    logging.DEBUG,
+                    "Failed authentication to Docker private registry [%s].",
+                    docker_auth.registry,
+                )
                 return None
         else:
-            logger.warning("Expecting public access for image [%s] in Docker registry.", ref)
-        logger.debug("Retrieving image [%s] from Docker registry or cache.", ref)
+            logger.log(logging.WARNING, "Expecting public access for image [%s] in Docker registry.", ref)
+        logger.log(logging.DEBUG, "Retrieving image [%s] from Docker registry or cache.", ref)
         # docker client pulls all available images when no tag, provide the default to limit
         try:
             tag = docker_auth.tag or "latest"
@@ -1260,10 +1285,17 @@ def pull_docker(docker_auth, logger=LOGGER):
             image = client.images.get(ref)  # resolved from cache or raise ImageNotFound
             LOGGER.warning("Failed pull of image [%s] from Docker registry, but found it in cache.", ref)
     except Exception as exc:  # noqa: W0703 # nosec: B110  # do not let anything up to avoid leaking auths
-        logger.debug("Unhandled exception [%s] during Docker registry authentication or image retrieval.",
-                     exc.__class__.__name__, exc_info=False)  # only class name to help debug, but no contents
+        logger.log(
+            logging.DEBUG,
+            "Unhandled exception [%s] during Docker registry authentication or image retrieval.",
+            exc.__class__.__name__, exc_info=False,  # only class name to help debug, but no contents
+        )
     if not image or docker_auth.docker not in image.tags:
-        logger.debug("Failed authorization or could not retrieve Docker image [%s] from private registry.", ref)
+        logger.log(
+            logging.DEBUG,
+            "Failed authorization or could not retrieve Docker image [%s] from private registry.",
+            ref,
+        )
         return None
-    logger.debug("Docker image [%s] retrieved.", ref)
+    logger.log(logging.DEBUG, "Docker image [%s] retrieved.", ref)
     return client

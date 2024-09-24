@@ -9,9 +9,10 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
 from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
-from pywps.response import WPSResponse
+from pywps.response.basic import WPSResponse
 from pywps.response.execute import ExecuteResponse
 from requests.structures import CaseInsensitiveDict
+from werkzeug.datastructures import Headers
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
@@ -24,7 +25,7 @@ from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import extend_instance, get_header, get_registry, get_settings, get_weaver_url
+from weaver.utils import extend_instance, get_header, get_registry, get_request_args, get_settings, get_weaver_url
 from weaver.visibility import Visibility
 from weaver.wps.storage import ReferenceStatusLocationStorage
 from weaver.wps.utils import (
@@ -44,9 +45,8 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Job
     from weaver.typedefs import (
-        AnyHeadersContainer,
+        AnyHeadersCookieContainer,
         AnyRequestType,
-        HeadersType,
         HTTPValid,
         JSON,
         SettingsType,
@@ -61,31 +61,34 @@ class WorkerRequest(WPSRequest):
     """
     _auth_headers = CaseInsensitiveDict({  # take advantage of case-insensitive only, value don't care
         "Authorization": None,
+        "Proxy-Authorization": None,
         "X-Auth": None,
+        "Cookie": None,
+        "Set-Cookie": None,
         sd.XAuthVaultFileHeader.name: None,
     })
 
     def __init__(self, http_request=None, http_headers=None, **kwargs):
-        # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer], **Any) -> None
+        # type: (Optional[AnyRequestType], Optional[AnyHeadersCookieContainer], **Any) -> None
         if http_request and not isinstance(http_request, WerkzeugRequest):
             http_request = extend_instance(http_request, WerkzeugRequest)
         super(WorkerRequest, self).__init__(http_request, **kwargs)
-        self.auth_headers = CaseInsensitiveDict()
+        self.auth_headers = Headers()
         if http_request:
             self.auth_headers.update(self.parse_auth_headers(http_request.headers))
         if http_headers:
             self.auth_headers.update(self.parse_auth_headers(http_headers))
 
     def parse_auth_headers(self, headers):
-        # type: (Optional[AnyHeadersContainer]) -> HeadersType
+        # type: (Optional[AnyHeadersCookieContainer]) -> Headers
         if not headers:
-            return {}
-        if isinstance(headers, list):
-            headers = dict(headers)
-        auth_headers = {}
-        for name, value in headers.items():
+            return Headers()
+        if isinstance(headers, dict):
+            headers = list(headers.items())
+        auth_headers = Headers()
+        for name, value in headers:
             if name in self._auth_headers:
-                auth_headers[name] = value
+                auth_headers.add(name, value)
         return auth_headers
 
 
@@ -162,7 +165,7 @@ class WorkerService(ServiceWPS):
         """
         req = wps_request.http_request
         req = extend_instance(req, PyramidRequest)  # apply query 'params' method
-        accept_type = guess_target_format(req, default=None)
+        accept_type = guess_target_format(req, default=ContentType.APP_XML)
         if accept_type == ContentType.APP_JSON:
             url = get_weaver_url(self.settings)
             proc = wps_request.identifiers
@@ -194,7 +197,7 @@ class WorkerService(ServiceWPS):
 
         Returns the status response as is if XML, or convert it to JSON, according to request ``Accept`` header.
         """
-        req = wps_request.http_request
+        req = wps_request.http_request  # type: Union[PyramidRequest, WerkzeugRequest]
         pid = wps_request.identifier
         ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
         proc = get_process(process_id=pid, settings=self.settings)  # raises if invalid or missing
@@ -202,7 +205,8 @@ class WorkerService(ServiceWPS):
 
         # create the JSON payload from the XML content and submit job
         is_workflow = proc.type == ProcessType.WORKFLOW
-        tags = req.args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
+        args = get_request_args(req)
+        tags = args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
@@ -298,7 +302,7 @@ class WorkerService(ServiceWPS):
                     wps_inputs,         # type: List[WPS_InputData]
                     wps_outputs,        # type: List[WPS_OutputRequested]
                     remote_process,     # type: Optional[Process]
-                    headers,            # type: Optional[AnyHeadersContainer]
+                    headers,            # type: Optional[AnyHeadersCookieContainer]
                     ):                  # type: (...) -> WPSExecution
         """
         Real execution of the process by active Celery Worker.
@@ -307,7 +311,7 @@ class WorkerService(ServiceWPS):
         execution = WPSExecution(version="2.0", url="localhost")
         xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=job.execution_mode, lineage=True)
         wps_request = WorkerRequest(http_headers=headers)
-        wps_request.identifier = process_id
+        wps_request.identifier = process_id  # pylint: disable=W0201
         wps_request.check_and_set_language(job.accept_language)
         wps_request.set_version("2.0.0")
         request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)  # noqa: W0212
@@ -317,7 +321,7 @@ class WorkerService(ServiceWPS):
         #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
         #  but this is needed since this job is running within Celery worker already async
         #  (daemon process can't have children processes).
-        wps_request.status = "false"
+        wps_request.status = "false"  # pylint: disable=W0201
 
         # When 'execute' is called, pywps will in turn call 'prepare_process_for_execution',
         # which then setups and retrieves currently loaded 'local' processes.

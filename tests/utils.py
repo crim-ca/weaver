@@ -20,9 +20,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
+import celery
 import mock
 import moto
-import pkg_resources
 import pyramid_celery
 import responses
 from celery.exceptions import TimeoutError as CeleryTaskTimeoutError
@@ -32,11 +32,13 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from pyramid.testing import DummyRequest
+from pytest_server_fixtures.http import HTTPTestServer, SimpleHTTPTestServer
 from requests import Response
 from webtest import TestApp, TestResponse
 
 from weaver import __name__ as __package__
 from weaver.app import main as weaver_app
+from weaver.compat import Version
 from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -46,6 +48,7 @@ from weaver.utils import (
     AWS_S3_REGIONS,
     bytes2str,
     fetch_file,
+    generate_diff,
     get_header,
     get_path_kvp,
     get_url_without_query,
@@ -56,15 +59,25 @@ from weaver.utils import (
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, load_pywps_config
 
+try:
+    from importlib.metadata import version as get_distribution_version  # noqa  # not available for Python<=3.7
+except ImportError:  # pragma: no cover
+    import pkg_resources
+
+    def get_distribution_version(distribution: str) -> str:
+        return pkg_resources.get_distribution(distribution).version
+
+
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
-    from typing_extensions import Literal
+    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+    from typing_extensions import Annotated, Literal
 
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
+    from requests.models import PreparedRequest, Response as RequestsResponse
     from responses import _Body as BodyType  # noqa: W0212
 
     from weaver.typedefs import (
@@ -83,8 +96,12 @@ if TYPE_CHECKING:
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
 
-    # [WPS1-URL, GetCapPathXML, [DescribePathXML], [ExecutePathXML]]
-    MockConfigWPS1 = Sequence[str, str, Optional[Sequence[str]], Optional[Sequence[str]]]
+    # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
+    MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
+    MockConfigWPS1 = Union[
+        Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]],
+        Annotated[Sequence[str], 3]
+    ]
     MockReturnType = TypeVar("MockReturnType")
     MockHttpMethod = Union[
         responses.HEAD,
@@ -239,8 +256,6 @@ def get_test_weaver_config(config=None, settings=None):
     config.registry.settings["weaver.wps_processes"] = ""
     if settings:
         config.registry.settings.update(settings)
-    # create the test application
-    config.include("weaver")
     return config
 
 
@@ -289,12 +304,12 @@ def get_module_version(module):
         if version is not None:
             return version
         module = module.__name__
-    return pkg_resources.get_distribution(module).version
+    return get_distribution_version(module)
 
 
 def init_weaver_service(registry):
     # type: (Registry) -> None
-    service_store = registry.db.get_store(MongodbServiceStore)
+    service_store = get_db(registry).get_store(MongodbServiceStore)
     service_store.save_service(Service({
         "type": "",
         "name": "weaver",
@@ -322,12 +337,17 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
     :param expect_error:
         Expect the returned code to be any non-zero value. Otherwise, the returned code must be zero for success.
         Any mismatching error code between expected success/failure is asserted to ensure expected conditions happened.
-        If error is expected, ``stderr`` is captured and returned. Otherwise, ``stdout`` is captured and returned.
+        The returned lines from standard stream are prioritized depending on the expected error status.
+        If an error is expected, ``stderr`` is returned, unless empty, for which case ``stdout`` is returned instead.
+        If no error is expected, ``stdout`` is returned, unless empty, for which case ``stderr`` is returned instead.
+        Fallback standard stream sources according to expected error are returned in order to consider certain commands
+        that report an *"error"* in the form of a (``stdout``) output message, or that simply use ``stderr``/``stdout``
+        interchangeably without any further consideration of the type of message to communicate.
     :param entrypoint:
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
         Python context to preserve any active mocks.
-    :return: retrieved command outputs.
+    :return: retrieved command standard output or error as applicable.
     """
     # pylint: disable=R1732
 
@@ -342,33 +362,38 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
         env = {"PATH": f"{python_path}:{debug_path}"}
-        std = {"stderr": subprocess.PIPE} if expect_error else {"stdout": subprocess.PIPE}
+        std = {"stderr": subprocess.PIPE, "stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
+        ret = proc.returncode
     else:
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
             with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
-                err = entrypoint(*tuple(command))
-            out = stdout.getvalue()
+                ret = entrypoint(*tuple(command))
         except SystemExit as exc:
-            err = exc.code
-            if not expect_error and err != 0:
+            ret = exc.code
+            if not expect_error and ret != 0:
                 raise  # raise directly to have the most context/traceback as possible in failed test
-            if expect_error:
-                out = stderr.getvalue()
-            else:
-                out = stdout.getvalue()
+        finally:
+            out = stdout.getvalue()
+            err = stderr.getvalue()
+    out_n = f"{out}\n" if out and not out.endswith("\n") else out
+    err_n = f"{err}\n" if err and not err.endswith("\n") else err
+    msg = f"\n---\ncollected stdout:\n---\n{out_n}---\ncollected stderr:\n---\n{err_n}---\n"
     if expect_error:
-        assert err, f"process returned successfully when error was expected: {err!s}"
+        assert ret, f"process returned successfully when error was expected:{msg}"
     else:
-        assert not err, f"process returned with error code: {err!s}"
+        assert not ret, f"process returned with error code {ret}:{msg}"
         # when no output is present, it is either because CLI was not installed correctly, or caused by some other error
-        assert out != "", "process did not execute as expected, no output available"
-    out_lines = [line for line in out.splitlines() if not trim or (line and not line.startswith(" "))]
+        assert out != "", f"process did not execute as expected, no output available!{msg}"
+    # prioritize with expectation, but use the other as fallback
+    # sometimes, the expected result is an "error", but this error consist only of a printed output from the command
+    src = (err or out) if expect_error else (out or err)
+    out_lines = [line for line in src.splitlines() if not trim or (line and not line.startswith(" "))]
     if not expect_error:
-        assert len(out_lines), "could not retrieve any console output"
+        assert len(out_lines), f"could not retrieve any console output{msg}"
     return out_lines
 
 
@@ -478,7 +503,7 @@ def mocked_sub_requests(app,                # type: TestApp
         url = req_kwargs.pop("base_url", url)
         body = req_kwargs.pop("data", None)
         _json = req_kwargs.pop("json", None)
-        query = req_kwargs.pop("query", None)
+        query = req_kwargs.pop("query", None) or ""
         params = req_kwargs.pop("params", {})
         if query:
             url += ("" if query.startswith("?") else "?") + query
@@ -491,16 +516,26 @@ def mocked_sub_requests(app,                # type: TestApp
         allow_json = True
         # convert 'requests.request' parameter 'files' to corresponding 'TestApp' parameter 'upload_files'
         # requests format:
-        #   { field_name: file_contents | (file_name, file_content/stream, file_content_type)  }
+        #   { field_name: file_data | (file_name[, file_data/stream[, file_content_type[, file_custom_headers]]]) }
+        #   (all intermediate variations with only 'file_name', and adding 1 more field after, are supported)
         # TestApp format:
-        #   (field_name, filename[, file_content_data][, file_content_type])
+        #   (field_name, filename[, file_bytes[, file_content_type]])
         if "files" in req_kwargs:
             files = req_kwargs.pop("files")
             if isinstance(files, dict):
                 files = [
-                    (file_key, file_key, str2bytes(file_meta[0].read()))
+                    (
+                        file_key,
+                        file_key,
+                        str2bytes(file_meta[0].read()),
+                    )
                     if len(file_meta) < 2 else
-                    (file_key, file_meta[0], str2bytes(file_meta[1].read()), *file_meta[2:])
+                    (
+                        file_key,
+                        file_meta[0],
+                        str2bytes(file_meta[1].read()),
+                        *file_meta[2:3],  # ignore custom headers if any (unsupported by TestApp)
+                    )
                     for file_key, file_meta in files.items()
                 ]
             req_kwargs["upload_files"] = files
@@ -510,7 +545,7 @@ def mocked_sub_requests(app,                # type: TestApp
             if key in req_kwargs:
                 LOGGER.warning("Dropping unsupported '%s' parameter for mocked test request.", key)
             req_kwargs.pop(key, None)
-        cookies = req_kwargs.pop("cookies", None)
+        cookies = req_kwargs.pop("cookies", None) or {}
         if cookies:
             cookies = dict(cookies)  # in case list of tuples
             for name, value in cookies.items():
@@ -544,7 +579,7 @@ def mocked_sub_requests(app,                # type: TestApp
         # type: (AnyResponseType, str) -> None
         if not hasattr(response, "content"):
             setattr(response, "content", response.body)
-        if not hasattr(response, "reason"):
+        if not hasattr(response, "reason") and hasattr(response, "errors"):
             setattr(response, "reason", response.errors)
         if not hasattr(response, "raise_for_status"):
             setattr(response, "raise_for_status", lambda: Response.raise_for_status(response))
@@ -637,10 +672,11 @@ def mocked_remote_wps(processes, languages=None):
     )
 
 
-def mocked_remote_server_requests_wps1(server_configs,          # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
-                                       mock_responses=None,     # type: Optional[responses.RequestsMock]
-                                       data=False,              # type: bool
-                                       ):                       # type: (...) -> Optional[MockPatch]
+def mocked_remote_server_requests_wps1(
+    server_configs,         # type: Union[MockConfigWPS1, Sequence[MockConfigWPS1]]
+    mock_responses=None,    # type: Optional[responses.RequestsMock]
+    data=False,             # type: bool
+):                          # type: (...) -> Optional[MockPatch]
     """
     Mocks *remote* WPS-1 requests/responses with specified XML contents from local test resources in returned body.
 
@@ -672,6 +708,16 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         def test_function():
             pass
 
+    Process description ID override Mock example:
+
+    .. code-block:: python
+
+        @mocked_remote_server_requests_wps1(
+            [ "<server-url>", "<getcaps-xml-path>", {"proc-1": "<describe-xml>", "proc-2": "<describe-xml>", ...} ]
+        )
+        def test_function():
+            pass
+
     The generated responses mock can be obtained as follows to add further request definitions to simulate:
 
     .. code-block:: python
@@ -695,12 +741,13 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
         Single level or nested 2D list/tuples of 3 elements, where each one defines:
             1. WPS server URL to be mocked to simulate response contents from requests for following items.
             2. Single XML file path to the expected response body of a server ``GetCapabilities`` request.
-            3. List of XML file paths to one or multiple expected response body of ``DescribeProcess`` requests.
+            3. List of XML file paths or data to one or multiple expected response body of ``DescribeProcess`` requests,
+               or mapping of desired process ID to their corresponding ``DescribeProcess`` XML file path or string data.
     :param mock_responses:
         Handle to the generated mock instance by this decorator on the first wrapped call to add more configurations.
         In this case, wrapper function is not returned.
     :param data:
-        Flag indicating that provided strings are the literal data instead of file references.
+        Flag indicating that provided strings are directly the XML data instead of file references.
         All server configurations must be file OR data references, no mixing between them supported.
     :returns: wrapper that mocks multiple WPS-1 servers and their responses with provided processes and XML contents.
     """
@@ -715,22 +762,41 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     if not isinstance(server_configs[0], (tuple, list)):
         server_configs = [server_configs]
 
-    for test_server_wps, resource_xml_getcap, resource_xml_describe in server_configs:
-        assert isinstance(resource_xml_getcap, str)
-        assert isinstance(resource_xml_describe, (set, list, tuple))
+    for svr_config in server_configs:
+        test_server_wps, resource_xml_getcap, resource_xml_describe = svr_config
+        assert isinstance(resource_xml_getcap, str) or callable(resource_xml_getcap)
+        assert isinstance(resource_xml_describe, (set, list, tuple, dict))
         if not data:
-            assert os.path.isfile(resource_xml_getcap)
-            assert all(os.path.isfile(file) for file in resource_xml_describe)
+            if isinstance(resource_xml_getcap, str):
+                assert os.path.isfile(resource_xml_getcap)
+            if isinstance(resource_xml_describe, dict):
+                desc_values = resource_xml_describe.values()
+            else:
+                desc_values = resource_xml_describe
+            assert all(
+                os.path.isfile(file_or_call) if isinstance(file_or_call, str) else callable(file_or_call)
+                for file_or_call in desc_values
+            )
+        if isinstance(resource_xml_describe, dict):
+            map_describe = list(resource_xml_describe.items())
+        else:
+            map_describe = [(None, desc) for desc in resource_xml_describe]
 
-        get_cap_xml = get_xml(resource_xml_getcap)
+        get_cap_xml = get_xml(resource_xml_getcap) if isinstance(resource_xml_getcap, str) else resource_xml_getcap
         version_query = "&version=1.0.0"
         get_cap_url = f"{test_server_wps}?service=WPS&request=GetCapabilities"
         all_request.add((responses.GET, get_cap_url, get_cap_xml))
         all_request.add((responses.GET, get_cap_url + version_query, get_cap_xml))
-        for proc_desc_xml in resource_xml_describe:
-            describe_xml = get_xml(proc_desc_xml)
+        for map_desc_id, proc_desc_xml in map_describe:
+            describe_xml = get_xml(proc_desc_xml) if isinstance(proc_desc_xml, str) else proc_desc_xml
             # assume process ID is always the first identifier (ignore input/output IDs after)
             proc_desc_id = re.findall("<ows:Identifier>(.*)</ows:Identifier>", describe_xml)[0]
+            if map_desc_id is not None and map_desc_id != proc_desc_id and isinstance(describe_xml, str):
+                describe_xml = describe_xml.replace(
+                    f"<ows:Identifier>{proc_desc_id}</ows:Identifier>",
+                    f"<ows:Identifier>{map_desc_id}</ows:Identifier>",
+                )
+                proc_desc_id = map_desc_id
             proc_desc_url = f"{test_server_wps}?service=WPS&request=DescribeProcess&identifier={proc_desc_id}"
             all_request.add((responses.GET, proc_desc_url, describe_xml))
             all_request.add((responses.GET, proc_desc_url + version_query, describe_xml))
@@ -740,10 +806,19 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
             all_request.add((responses.GET, getcap_with_proc_id_url + version_query, get_cap_xml))
 
     def apply_mocks(_mock_resp, _requests):
-        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, str]]) -> None
+        # type: (responses.RequestsMock, Iterable[Tuple[MockHttpMethod, str, Union[str, MockConfigCall]]]) -> None
         xml_header = {"Content-Type": ContentType.APP_XML}
-        for meth, url, body in _requests:
-            _mock_resp.add(meth, url, body=body, headers=xml_header)
+        for meth, url, _body_or_call in _requests:
+            if isinstance(_body_or_call, str):
+                _mock_resp.add(meth, url, body=_body_or_call, headers=xml_header)
+            else:
+                _mock_resp.add_callback(
+                    meth,
+                    url,
+                    callback=_body_or_call,
+                    match_querystring=True,
+                    content_type=xml_header["Content-Type"],
+                )
 
     def mocked_remote_server_wrapper(test):
         # type: (Callable[[..., Any], Any]) -> Callable[[..., Any], Any]
@@ -770,15 +845,28 @@ def mocked_remote_server_requests_wps1(server_configs,          # type: Union[Mo
     return mocked_remote_server_wrapper
 
 
+@overload
+def mocked_dir_listing(local_directory, directory_path, **__):
+    # type: (str, str, **bool) -> str
+    ...
+
+
+@overload
+def mocked_dir_listing(local_directory, directory_path, only_references):
+    # type: (str, str, Literal[True]) -> List[str]
+    ...
+
+
 def mocked_dir_listing(local_directory,             # type: str
                        directory_path,              # type: str
                        *,                           # force named keyword arguments after
+                       only_references=False,       # type: bool
                        include_dir_heading=True,    # type: bool
                        include_separators=True,     # type: bool
                        include_code_format=True,    # type: bool
                        include_table_format=True,   # type: bool
                        include_modified_date=True,  # type: bool
-                       ):                           # type: (...) -> str
+                       ):                           # type: (...) -> Union[str, List[str]]
     """
     Generate the requested HTML directory listing.
 
@@ -790,6 +878,7 @@ def mocked_dir_listing(local_directory,             # type: str
 
     :param local_directory: Real directory location to emulate HTML listing.
     :param directory_path: Relative base directory to be represented by the served HTML listing.
+    :param only_references: Return the listing of directory and files directly without HTML formatting.
     :param include_dir_heading: Add HTML tags with the relative directory displayed as page heading.
     :param include_separators: Add HTML tags to place visual separators between various elements.
     :param include_code_format: Add HTML tags wrapping the listing in a code-formatted text.
@@ -800,6 +889,8 @@ def mocked_dir_listing(local_directory,             # type: str
     dir_files = os.listdir(local_directory)
     dir_files = [".."] + sorted(dir_files)  # most indexes provide the parent relative link to allow browsing upward
     dir_files = [f"{path}/" if os.path.isdir(os.path.join(local_directory, path)) else path for path in dir_files]
+    if only_references:
+        return dir_files
     ref_files = [
         ("<tr><td>" if include_table_format else "") +
         ("<pre>" if include_table_format and include_code_format else "") +
@@ -843,6 +934,30 @@ def mocked_dir_listing(local_directory,             # type: str
     </html>
     """)
     return dir_html
+
+
+class FileServer(SimpleHTTPTestServer):
+    """
+    Generate a file server that can host files under :attr:`document_root`.
+
+    Contrary to :func:`mocked_file_server` where requests are captured and redirected to the corresponding files,
+    this server receives *real* requests (via a socket) and returns matched files. This is particularly important
+    during tests that call subprocesses independently of the main Python test process
+    (e.g.: :term:`CWL` ``CommandLineTool` for a ``Builtin`` :term:`Process`), because mocks applied in the main test
+    process are not reflected in the other subprocesses.
+
+    .. warning::
+        This server takes more time to start than usual mocks. Use it sparingly, and consider maintaining a single
+        instance over multiple tests of a complete test suite rather than recreating a server for each test.
+    """
+    def __init__(self):  # pylint: disable=W0231
+        self._port = self.get_port()
+        self._uri = f"http://0.0.0.0:{self._port}"
+
+        # purposely call 'HTTPTestServer' instead of 'SimpleHTTPTestServer' to enforce the URI hostname
+        # otherwise, 'socket.gethostname()' is used (machine name), and the obtained URI fails our schema validation
+        HTTPTestServer.__init__(self, hostname="0.0.0.0", port=self._port, uri=self._uri)  # pylint: disable=W0233
+        self.cwd = self.document_root
 
 
 def mocked_file_server(directory,                   # type: str
@@ -932,6 +1047,11 @@ def mocked_file_server(directory,                   # type: str
             if dir_path.endswith("index.html"):
                 dir_path = dir_path.rsplit("/", 1)[0]
             dir_list = os.path.join(directory, dir_path.lstrip("/"))
+            if ContentType.APP_JSON in str(request.headers.get("Accept")):
+                dir_refs = mocked_dir_listing(dir_list, dir_path, only_references=True)
+                dir_data = json.dumps({"links": [{"href": dir_refs} for ref in dir_refs]})
+                headers = {"Content-Type": ContentType.APP_JSON, "Content-Length": str(len(dir_data))}
+                return 200, headers, dir_data
             dir_html = mocked_dir_listing(dir_list, dir_path, **directory_listing_kwargs)
             headers = {"Content-Type": ContentType.TEXT_HTML, "Content-Length": str(len(dir_html))}
             return 200, headers, dir_html
@@ -998,8 +1118,12 @@ def mocked_wps_output(settings,                 # type: SettingsType
     )
 
 
-def mocked_execute_celery(celery_task="weaver.processes.execution.execute_process", func_execute_task=None):
-    # type: (str, Optional[Callable[[...], Any]]) -> Iterable[MockPatch]
+def mocked_execute_celery(
+    celery_task="weaver.processes.execution.execute_process",   # type: str
+    func_execute_task=None,                                     # type: Optional[Callable[[...], Any]]
+    web_test_app=None,                                          # type: Optional[TestApp]
+    celery_app_name="app",                                      # type: str
+):                                                              # type: (...) -> Iterable[MockPatch]
     """
     Contextual mock of a task execution to run locally instead of dispatched :mod:`celery` worker.
 
@@ -1023,11 +1147,17 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         should omit the input argument for the :class:`celery.task.Task` that will not be automatically inserted.
         The return value is ignored, as the mocked :class:`celery.task.Task` is always returned instead.
         If not provided, the function referred by :paramref:`celery_task` is imported and called directly.
+    :param web_test_app:
+        Test web application employed to execute tasks that would normally be dispatched to a :mod:`celery` worker.
+        If provided, ensures that references to :mod:`celery` that would normally look for the :mod:`pyramid` registry
+        will find the one provided by this test application, and all relevant settings set for it.
+    :param celery_app_name:
+        Name of the :mod:`celery` application or imported alias within the module referenced by :paramref:`celery_task`.
     """
 
-    class MockTask(object):
+    class MockTaskContext(object):
         """
-        Mocks the Celery Task for testing.
+        Mocks the :class:`celery.app.task.Context` for testing.
 
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
         call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
@@ -1045,15 +1175,17 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
         # all following methods return what would be returned normally in sync mode
 
         def wait(self, *_, **__):
+            # type: (*Any, **Any) -> Type[CeleryTaskTimeoutError]
             raise CeleryTaskTimeoutError
 
         def ready(self, *_, **__):
+            # type: (*Any, **Any) -> bool
             return True
 
-    task = MockTask()
+    mocked_task_context = MockTaskContext()
 
     def mock_execute_task(*args, **kwargs):
-        # type: (*Any, **Any) -> MockTask
+        # type: (*Any, **Any) -> MockTaskContext
         if func_execute_task is None:
             mod, func = celery_task.rsplit(".", 1)
             module = importlib.import_module(mod)
@@ -1061,17 +1193,37 @@ def mocked_execute_celery(celery_task="weaver.processes.execution.execute_proces
             task_func(*args, **kwargs)
         else:
             func_execute_task(*args, **kwargs)  # noqa
-        return task
+        return mocked_task_context
 
-    return (
+    celery_mocks = [
         mock.patch(f"{celery_task}.delay", side_effect=mock_execute_task),
-        mock.patch("celery.app.task.Context", return_value=task)
-    )
+        mock.patch("celery.app.task.Context", return_value=mocked_task_context),
+    ]
+
+    class MockCeleryApp(celery.Celery):
+        @property
+        def conf(self):
+            return {"PYRAMID_REGISTRY": web_test_app.app.registry}
+
+    if isinstance(web_test_app, TestApp):
+        # WARNING:
+        #   It is very critical that the mock referencing to the above test app registry is applied as context manager.
+        #   Since the Celery app is created globally by 'pyramid_celery', omitting to reset the mock could cause the
+        #   Pyramid registry and the underlying settings to be make its way across tests references. This can cause
+        #   unexpected side-effects if configurations vary between tests to evaluate distinct use cases. Using the
+        #   context manager, we make sure that the mock should live only during the corresponding 'with' block lifetime,
+        #   which should be limited to more controlled duration than globally.
+        celery_task_module = celery_task.rsplit(".", 1)[0]
+        celery_mocks.append(
+            mock.patch(f"{celery_task_module}.{celery_app_name}", new_callable=MockCeleryApp, spec=celery.Celery)
+        )
+
+    return celery_mocks
 
 
 @contextlib.contextmanager
 def mocked_dismiss_process():
-    # type: () -> mock.MagicMock
+    # type: () -> Union[contextlib.ContextDecorator, contextlib.AbstractContextManager[mock.MagicMock]]
     """
     Mock operations called to terminate :mod:`Celery` tasks.
 
@@ -1086,7 +1238,8 @@ def mocked_dismiss_process():
         with mock_celery_revoke:
             yield   # for direct use by context or decorator
     finally:
-        return mock_celery_revoke  # for use by combined ExitStack context  # pylint: disable=W0150.lost-exception
+        # used by ExitStack context, which would handle the exception appropriately
+        return mock_celery_revoke  # noqa: B012  # pylint: disable=W0150,lost-exception
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
@@ -1184,20 +1337,24 @@ def mocked_aws_s3(test_func):
     @functools.wraps(test_func)
     def wrapped(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        with moto.mock_s3():
+        if Version(moto.__version__).major >= 5:
+            mock_aws_s3 = moto.mock_aws  # pylint: disable=E1101,no-member
+        else:
+            mock_aws_s3 = moto.mock_s3  # pylint: disable=E1101,no-member
+        with mock_aws_s3():
             return test_func(*args, **kwargs)
     return wrapped
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
     ...
 
 
 @overload
-def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=False):
-    # type: (Any, Any, BucketLocationConstraintType, str, Literal[False]) -> Callable[[...], Any]
+def setup_aws_s3_bucket(__func=null, *, region=MOCK_AWS_REGION, bucket="", client=True):
+    # type: (Any, Any, BucketLocationConstraintType, str, Literal[True]) -> S3Client
     ...
 
 
@@ -1391,6 +1548,7 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
                            expect,          # type: Iterable[Any]
                            comparer=None,   # type: Optional[Callable[[CompareType, CompareType], bool]]
                            formatter=str,   # type: Optional[Callable[[CompareType], str]]
+                           diff=False,      # type: bool
                            ):               # type: (...) -> None
     if not callable(comparer):
         def comparer(_res, _exp):  # pylint: disable=E0102
@@ -1401,10 +1559,16 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
     # also use the copy to remove items such that all must be matched
     result = list(result)
     expect = list(expect)
-    assert len(result) == len(expect), "Expected items sizes mismatch between iterable containers."
+    assert len(result) == len(expect), (
+        "Expected items sizes mismatch between iterable containers." +
+        ("\n" + generate_diff(result, expect) if diff else "")
+    )
     for res in result:
         for exp in expect:
             if comparer(res, exp):
                 expect.remove(exp)
                 break
-    assert not expect, f"Not all expected items matched {[formatter(exp) for exp in expect]}"
+    assert not expect, (
+        f"Not all expected items matched {[formatter(exp) for exp in expect]}" +
+        ("\n" + generate_diff(result, expect) if diff else "")
+    )

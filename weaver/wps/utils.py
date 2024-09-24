@@ -12,6 +12,7 @@ from owslib.util import Authentication
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk, HTTPUnprocessableEntity
 from pywps import configuration as pywps_config
+from requests.structures import CaseInsensitiveDict
 from webob.acceptparse import create_accept_language_header
 
 from weaver import owsexceptions, xml_util
@@ -156,9 +157,9 @@ def get_wps_output_context(request):
 def get_wps_local_status_location(url_status_location, container, must_exist=True):
     # type: (str, AnySettingsContainer, bool) -> Optional[str]
     """
-    Attempts to retrieve the local XML file path corresponding to the WPS status location as URL.
+    Attempts to retrieve the local :term:`XML` file path corresponding to the :term:`WPS` status location as URL.
 
-    :param url_status_location: URL reference pointing to some WPS status location XML.
+    :param url_status_location: URL reference pointing to some WPS status location :term:`XML`.
     :param container: any settings container to map configured local paths.
     :param must_exist: return only existing path if enabled, otherwise return the parsed value without validation.
     :returns: found local file path if it exists, ``None`` otherwise.
@@ -281,6 +282,7 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
         language = str(language)
     if headers is not None and not isinstance(headers, dict):
         headers = dict(headers)
+    headers = get_wps_client_filtered_headers(headers, container)
     request_args = (url, headers, verify, language)
     if get_no_cache_option(headers, request_options=opts):
         for func in (_get_wps_client_cached, _describe_process_cached):
@@ -288,6 +290,30 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
             invalidate_region(caching_args)
     wps = _get_wps_client_cached(*request_args)
     return wps
+
+
+def get_wps_client_filtered_headers(headers, container):
+    # type: (Optional[HeadersType], AnySettingsContainer) -> HeadersType
+    """
+    Filters out any headers configured for the :term:`WPS` client by the ``weaver.wps_client_headers_filter`` setting.
+
+    :param headers: Headers to filter as applicable.
+    :param container: Any settings container to retrieve application settings.
+    :return: Filtered :term:`WPS` headers.
+    """
+    if not headers:
+        return {}
+    settings = get_settings(container) or {}
+    hdr_spec = settings.get("weaver.wps_client_headers_filter") or "Host,"  # default if missing (match docs/example)
+    if isinstance(hdr_spec, str):
+        hdr_spec = [hdr.strip() for hdr in hdr_spec.split(",")]
+    hdr_spec = [hdr for hdr in hdr_spec if hdr]
+    if not hdr_spec:
+        return headers
+    headers = CaseInsensitiveDict(headers.copy())
+    for hdr in hdr_spec:
+        headers.pop(hdr, None)
+    return dict(headers)
 
 
 def check_wps_status(location=None,     # type: Optional[str]
@@ -493,12 +519,20 @@ def load_pywps_config(container, config=None):
         pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible
         pywps_config.CONFIG.set("s3", "encrypt", "true")  # encrypts data server-side, transparent from this side
 
+    allowed_input_file_paths = [
+        tempfile.gettempdir(),
+        output_dir,
+    ]
+
     # enforce back resolved values onto PyWPS config
     pywps_config.CONFIG.set("server", "setworkdir", "true")
     pywps_config.CONFIG.set("server", "sethomedir", "true")
     pywps_config.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
     pywps_config.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
     pywps_config.CONFIG.set("server", "url", get_wps_url(settings, load=False))
+    pywps_config.CONFIG.set("server", "allowedinputpaths", os.pathsep.join(allowed_input_file_paths))
+    pywps_config.CONFIG.set("server", "maxrequestsize", settings.get("weaver.wps_max_request_size") or "30MB")
+    pywps_config.CONFIG.set("server", "maxsingleinputsize", settings.get("weaver.wps_max_single_input_size") or "3GB")
     settings["weaver.wps_configured"] = True
     return pywps_config.CONFIG
 

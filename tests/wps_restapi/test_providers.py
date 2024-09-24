@@ -1,8 +1,8 @@
 import unittest
 
 import owslib
-import pyramid.testing
 import pytest
+from pyramid.httpexceptions import HTTPNotFound
 
 from tests import resources
 from tests.utils import (
@@ -48,10 +48,6 @@ class WpsProviderBase(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def setUp(self):
         # rebuild clean db on each test
@@ -107,7 +103,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ServiceIdentification>",
                 "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
             )
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
         # must store directly otherwise it raises during registration check
         # (simulate original service was ok, but was restarted at some point and now has invalid XML)
         self.service_store.save_service(Service(name=invalid_id, url=invalid_url))
@@ -122,7 +118,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ProcessOffering>",
                 "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
             )
-        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((recover_url, recover_data, []), mock_responses, data=True)
         # must store directly otherwise it raises during registration check
         # (simulate original service was ok, but was restarted at some point and now has invalid XML)
         self.service_store.save_service(Service(name=recover_id, url=recover_url))
@@ -184,7 +180,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ServiceIdentification>",
                 "<ows:ServiceIdentification> <ows:Title>Double Title <bad></ows:Title>"
             )
-        mocked_remote_server_requests_wps1([invalid_url, invalid_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((invalid_url, invalid_data, []), mock_responses, data=True)
 
         resp = self.register_provider(clear=True, error=True, data={"id": invalid_id, "url": invalid_url})
         assert resp.status_code == 422
@@ -193,6 +189,11 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resp.json["error"] == "AttributeError", "Expected service to have trouble parsing metadata"
 
     @pytest.mark.filterwarnings("ignore::weaver.warning.NonBreakingExceptionWarning")
+    @mocked_remote_server_requests_wps1([  # register mock-server to avoid real requests to the remote URL
+        resources.TEST_REMOTE_SERVER_URL,
+        lambda _: HTTPNotFound(),
+        [],
+    ])
     def test_register_provider_unresponsive(self):
         """
         Test registration of a service that is unreachable (cannot obtain XML GetCapabilities because no response).
@@ -204,8 +205,8 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert unresponsive_id in resp.json["description"]
         err_msg = "Expected service to have trouble retrieving metadata, error: {} not in {}"
         # different errors/causes are raised first based on requests version, but same issue
-        known_causes = ["Connection refused", "Connection aborted", "not accessible"]
-        known_errors = ["ConnectionError", "ConnectTimeout", "SSLError"]
+        known_causes = ["Connection refused", "Connection aborted", "not accessible", "Unable to process"]
+        known_errors = ["ConnectionError", "ConnectTimeout", "ReadTimeout", "SSLError", "ServiceParsingError"]
         resp_cause = resp.json["cause"]
         resp_error = resp.json["error"]
         assert any(err_cause in resp_cause for err_cause in known_causes), err_msg.format(resp_cause, known_causes)
@@ -234,7 +235,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
                 "<ows:ProcessOffering>",
                 "<ows:ProcessOffering   <wps:random> bad content <!-- -->  <info>  >"
             )
-        mocked_remote_server_requests_wps1([recover_url, recover_data, []], mock_responses, data=True)
+        mocked_remote_server_requests_wps1((recover_url, recover_data, []), mock_responses, data=True)
 
         resp = self.register_provider(clear=True, error=False, data={"id": recover_id, "url": recover_url})
         assert resp.json["id"] == recover_id
@@ -623,6 +624,35 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         inputs = resp.json["process"]["inputs"]
         assert "maximumMegabytes" in inputs[11]["formats"][0]
         assert inputs[11]["formats"][0]["maximumMegabytes"] == 200
+
+
+class WpsShortNameProviderTest(WpsProviderBase):
+    remote_provider_name = "x"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps_path": "/ows/wps",
+        "weaver.configuration": WeaverConfiguration.HYBRID
+    }
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        {"y": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML},
+    ])
+    def test_get_provider_process_description_short_names(self):
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == self.remote_provider_name
+
+        path = f"/providers/{self.remote_provider_name}/processes/y"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["id"] == "y"
 
 
 class WpsProviderLocalOnlyTest(WpsProviderBase):

@@ -1,10 +1,8 @@
-version: "3.4"
+version: "3.8"
 services:
   mongodb:
-    image: mongo:3.6.0
+    image: mongo:5.0
     container_name: smoke_test_mongodb
-    # mongodb crash with permission denied errors if the command is not overridden like this
-    command: bash -c 'chown -R mongodb:mongodb /data && chmod -R 755 /data && mongod --bind_ip_all'
     restart: "no"
 
   weaver:
@@ -17,7 +15,8 @@ services:
     ports:
       - "4001:4001"
     volumes:
-      - ../../config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
+      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      - ./tests:/tests
     networks:
       - default
     restart: "no"
@@ -28,5 +27,5 @@ services:
     links:
       - mongodb
     volumes:
-      - ../../config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
+      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
     restart: "no"

@@ -29,11 +29,12 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
 if TYPE_CHECKING:
+    import cgi
     from typing import Optional
 
+    from pyramid.config import Configurator
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
-    from webob.compat import cgi_FieldStorage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def upload_file(request):
     """
     error = "File missing."
     try:
-        req_file = request.POST.get("file")         # type: Optional[cgi_FieldStorage]
+        req_file = request.POST.get("file")         # type: Optional[cgi.FieldStorage]
         req_fs = getattr(req_file, "file", None)    # type: Optional[BufferedIOBase]
     except Exception as exc:
         error = str(exc)
@@ -70,7 +71,7 @@ def upload_file(request):
 
     # save file to disk from request contents
     # note: 'vault_file.name' includes everything after 'vault_dir' (<id>/<original_name.ext>)
-    vault_file = VaultFile("")
+    vault_file = VaultFile("", file_format=req_file.type)
     vault_dir = get_vault_dir(request)
     vault_fs = LocalFileStorage(vault_dir)
     vault_fs.extensions = get_allowed_extensions()
@@ -127,7 +128,7 @@ def describe_file(request):
         )
         headers["Content-Location"] = get_vault_url(vault_file, request)
     finally:
-        if os.path.isfile(tmp_file):
+        if tmp_file and os.path.isfile(tmp_file):
             os.remove(tmp_file)
     return HTTPHeadFileResponse(code=200, headers=headers)
 
@@ -165,3 +166,10 @@ def download_file(request):
     resp = FileResponse(out_path, request=request)
     resp.headers.update(headers)
     return resp
+
+
+def includeme(config):
+    # type: (Configurator) -> None
+    LOGGER.info("Adding file vault views...")
+    config.add_cornice_service(sd.vault_service)
+    config.add_cornice_service(sd.vault_file_service)

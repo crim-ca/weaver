@@ -6,13 +6,14 @@ import tempfile
 import time
 from typing import TYPE_CHECKING
 
-from requests.structures import CaseInsensitiveDict
+from werkzeug.datastructures import Headers
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
+from weaver.processes.convert import get_cwl_io_type
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -41,8 +42,11 @@ if TYPE_CHECKING:
         AnyResponseType,
         CookiesTupleType,
         CWL_ExpectedOutputs,
+        CWL_Output_Type,
         CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
+        JobCustomInputs,
+        JobCustomOutputs,
         JobInputs,
         JobMonitorReference,
         JobOutputs,
@@ -96,23 +100,22 @@ class WpsProcessInterface(abc.ABC):
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
         self.temp_staging = set()
-        self.stage_output_id_nested = False
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> None
+        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> JobOutputs
         """
         Execute the core operation of the remote :term:`Process` using the given inputs.
 
         The function is expected to monitor the process and update the status.
         Retrieve the expected outputs and store them in the ``out_dir``.
 
-        :param workflow_inputs: `CWL` job dict
-        :param out_dir: directory where the outputs must be written
-        :param expected_outputs: expected value outputs as `{'id': 'value'}`
+        :param workflow_inputs: :term:`CWL` job dictionary.
+        :param out_dir: directory where the outputs must be written.
+        :param expected_outputs: expected outputs to collect from complex references.
         """
         self.update_status("Preparing process for remote execution.",
                            RemoteJobProgress.PREPARE, Status.RUNNING)
-        self.prepare()
+        self.prepare(workflow_inputs, expected_outputs)
         self.update_status("Process ready for execute remote process.",
                            RemoteJobProgress.READY, Status.RUNNING)
 
@@ -158,17 +161,23 @@ class WpsProcessInterface(abc.ABC):
 
         self.update_status("Execution of remote process execution completed successfully.",
                            RemoteJobProgress.COMPLETED, Status.SUCCEEDED)
+        return results
 
-    def prepare(self):
-        # type: () -> None
+    def prepare(  # noqa: B027  # intentionally not an abstract method to allow no-op
+        self,
+        workflow_inputs,    # type: CWL_RuntimeInputsMap
+        expected_outputs,   # type: CWL_ExpectedOutputs
+    ):                      # type: (...) -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
 
         This is an optional step that can be omitted entirely if not needed.
+        This step should be considered for the creation of a reusable client or object handler that does not need to be
+        recreated on any subsequent steps, such as for :meth:`dispatch` and :meth:`monitor` calls.
         """
 
-    def format_inputs(self, workflow_inputs):
-        # type: (JobInputs) -> Union[JobInputs, Any]
+    def format_inputs(self, job_inputs):
+        # type: (JobInputs) -> Union[JobInputs, JobCustomInputs]
         """
         Implementation dependent operations to configure input values for :term:`Job` execution.
 
@@ -176,10 +185,10 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step inputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_inputs
+        return job_inputs
 
-    def format_outputs(self, workflow_outputs):
-        # type: (JobOutputs) -> JobOutputs
+    def format_outputs(self, job_outputs):
+        # type: (JobOutputs) -> Union[JobOutputs, JobCustomOutputs]
         """
         Implementation dependent operations to configure expected outputs for :term:`Job` execution.
 
@@ -187,11 +196,11 @@ class WpsProcessInterface(abc.ABC):
         Otherwise, the implementing :term:`Process` can override the step to reorganize workflow step outputs into the
         necessary format required for their :meth:`dispatch` call.
         """
-        return workflow_outputs
+        return job_outputs
 
     @abc.abstractmethod
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> JobMonitorReference
+        # type: (Union[JobInputs, JobCustomInputs], Union[JobOutputs, JobCustomOutputs]) -> JobMonitorReference
         """
         Implementation dependent operations to dispatch the :term:`Job` execution to the remote :term:`Process`.
 
@@ -254,7 +263,7 @@ class WpsProcessInterface(abc.ABC):
         headers = {}
         if self.request and self.request.auth_headers:
             headers = self.request.auth_headers.copy()
-        return CaseInsensitiveDict(headers)
+        return Headers(headers)
 
     def get_auth_cookies(self):
         # type: () -> CookiesTupleType
@@ -283,8 +292,8 @@ class WpsProcessInterface(abc.ABC):
         Sends the request with additional parameter handling for the current process definition.
         """
         retries = int(retry) if retry is not None else 0
-        cookies = CaseInsensitiveDict(cookies or {})
-        headers = CaseInsensitiveDict(headers or {})
+        cookies = Headers(cookies or {})
+        headers = Headers(headers or {})
         cookies.update(self.get_auth_cookies())
         headers.update(self.headers.copy())
         headers.update(self.get_auth_headers())
@@ -329,34 +338,34 @@ class WpsProcessInterface(abc.ABC):
             We cannot rely on specific file names to be mapped, since glob can match many (eg: ``"*.txt"``).
 
         .. seealso::
-            Function :func:`weaver.processes.convert.any2cwl_io` defines a generic glob pattern using the output ID
-            and expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
-            doesn't necessarily produces file names with the output ID as expected to find them (could be anything),
+            Function :func:`weaver.processes.convert._convert_any2cwl_io_complex` defines a generic glob pattern from
+            the expected file extension based on Content-Type format. Since the remote :term:`WPS` :term:`Process`
+            doesn't necessarily produce file names with the output ID as expected to find them (could be anything),
             staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
-
-        .. warning::
-            Only remote :term:`Provider` implementations (which auto-generate a pseudo :term:`CWL` to map components)
-            that produce outputs with inconsistent file names as described above should set attribute
-            :attr:`WpsProcessInterface.stage_output_id_nested` accordingly. For :term:`Process` that directly provide
-            an actual :term:`CWL` :term:`Application Package` definition (e.g.: Docker application), auto-mapping
-            of glob patterns should be avoided, as it is expected that the :term:`CWL` contains real mapping to be
-            respected for correct execution and retrieval of outputs from the application.
         """
         for result in results:
             res_id = get_any_id(result)
             if res_id not in expected_outputs:
                 continue
 
-            # plan ahead when list of multiple output values could be supported
+            # Ignore outputs 'collected' by CWL tool to allow a 'string' value to resolve 'loadContent' operation.
+            # However, the reference file used to load contents from an expression, does not (and should not)
+            # itself need staging or fetching from the remote process. The resulting 'string' value only is used.
+            res_def = {"name": res_id, "type": expected_outputs[res_id]["type"]}  # type: CWL_Output_Type
+            res_type = get_cwl_io_type(res_def).type  # resolve atomic type in case of nested/array/nullable definition
+            if res_type not in PACKAGE_COMPLEX_TYPES:
+                continue
+
+            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
+            os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
+
+            # handle list in case of multiple output values
             result_values = get_any_value(result)
             if not isinstance(result_values, list):
                 result_values = [result_values]
-            if self.stage_output_id_nested:
-                cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
-            else:
-                cwl_out_dir = out_dir.rstrip("/")
-            os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
             for value in result_values:
+                if isinstance(value, dict):
+                    value = get_any_value(value, file=True, data=False)
                 src_name = value.split("/")[-1]
                 dst_path = "/".join([cwl_out_dir, src_name])
                 # performance improvement:
@@ -433,11 +442,11 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         self.deploy_body = step_payload
         self.process = process
 
-    def format_outputs(self, workflow_outputs):
+    def format_outputs(self, job_outputs):
         # type: (JobOutputs) -> JobOutputs
-        for output in workflow_outputs:
+        for output in job_outputs:
             output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
-        return workflow_outputs
+        return job_outputs
 
     def dispatch(self, process_inputs, process_outputs):
         # type: (JobInputs, JobOutputs) -> str
@@ -451,9 +460,19 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         LOGGER.debug("Execute process %s body for [%s]:\n%s", self.process_type, self.process, repr_json(execute_body))
         request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
         response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
+        if response.status_code in [404, 405]:
+            request_url = self.url + sd.process_execution_service.path.format(process_id=self.process)
+            response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
         if response.status_code != 201:
             LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
-            raise Exception(f"Was expecting a 201 status code from the execute request : {request_url}")
+            self.update_status(
+                f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
+                f"{repr_json(response.text, indent=2)}",
+                RemoteJobProgress.EXECUTION,
+                Status.FAILED,
+                level=logging.ERROR,
+            )
+            raise Exception(f"Was expecting a 201 status code from the execute request: [{request_url}]")
 
         job_status_uri = response.headers["Location"]
         return job_status_uri

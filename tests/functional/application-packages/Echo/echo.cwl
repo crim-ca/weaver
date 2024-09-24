@@ -15,3 +15,4 @@ outputs:
     # note: format omitted on purpose to let Weaver Process/CWL resolution generate the IANA namespace mapping
     outputBinding:
       glob: "stdout.log"
+stdout: stdout.log

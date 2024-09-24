@@ -7,10 +7,10 @@ from requests.exceptions import HTTPError
 
 from weaver import xml_util
 from weaver.execute import ExecuteMode
-from weaver.formats import get_format
+from weaver.formats import DEFAULT_FORMAT, get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import DEFAULT_FORMAT, ows2json_output_data
+from weaver.processes.convert import ows2json_output_data
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import RemoteJobProgress, WpsProcessInterface
 from weaver.status import Status, map_status
@@ -32,7 +32,8 @@ if TYPE_CHECKING:
     from owslib.wps import WebProcessingService
 
     from weaver.typedefs import (
-        CWL_RuntimeInputList,
+        CWL_ExpectedOutputs,
+        CWL_RuntimeInputsMap,
         JobExecution,
         JobInputs,
         JobOutputs,
@@ -62,7 +63,6 @@ class Wps1Process(WpsProcessInterface):
         # following are defined after 'prepare' step
         self.wps_provider = None    # type: Optional[WebProcessingService]
         self.wps_process = None     # type: Optional[ProcessOWS]
-        self.stage_output_id_nested = True
         super(Wps1Process, self).__init__(
             request,
             lambda _message, _progress, _status, *args, **kwargs: update_status(
@@ -70,12 +70,12 @@ class Wps1Process(WpsProcessInterface):
             )
         )
 
-    def format_inputs(self, workflow_inputs):
-        # type: (CWL_RuntimeInputList) -> OWS_InputDataValues
+    def format_inputs(self, job_inputs):
+        # type: (JobInputs) -> OWS_InputDataValues
         """
         Convert submitted :term:`CWL` workflow inputs into corresponding :mod:`OWSLib.wps` representation for execution.
 
-        :param workflow_inputs: mapping of input IDs and values submitted to the workflow.
+        :param job_inputs: inputs list with IDs and values submitted to the workflow.
         :returns: converted OWS inputs ready for submission to remote WPS process.
         """
         # prepare inputs
@@ -85,7 +85,7 @@ class Wps1Process(WpsProcessInterface):
                 complex_inputs.append(process_input.identifier)
 
         wps_inputs = []
-        for input_item in workflow_inputs:
+        for input_item in job_inputs:
             input_key = get_any_id(input_item)
             input_val = get_any_value(input_item)
 
@@ -125,9 +125,9 @@ class Wps1Process(WpsProcessInterface):
                 wps_inputs.append((input_key, input_value))
         return wps_inputs
 
-    def format_outputs(self, workflow_outputs):
+    def format_outputs(self, job_outputs):
         # type: (JobOutputs) -> JobOutputs
-        expected_outputs = {get_any_id(out) for out in workflow_outputs}
+        expected_outputs = {get_any_id(out) for out in job_outputs}
         provided_outputs = self.wps_process.processOutputs
         outputs_as_ref = [
             {"id": out.identifier, "as_ref": out.dataType == WPS_COMPLEX_DATA}
@@ -139,15 +139,15 @@ class Wps1Process(WpsProcessInterface):
                            "Provided: %s\nExpected: %s", list(expected_outputs), list(provided_outputs))
         return outputs_as_ref
 
-    def prepare(self):
-        # type: () -> None
+    def prepare(self, workflow_inputs, expected_outputs):
+        # type: (CWL_RuntimeInputsMap, CWL_ExpectedOutputs) -> None
         LOGGER.debug("Execute WPS-1 provider: [%s]", self.provider)
         LOGGER.debug("Execute WPS-1 process: [%s]", self.process)
         try:
             headers = {}
             headers.update(self.get_auth_cookies())
             headers.update(self.get_auth_headers())
-            self.wps_provider = get_wps_client(self.provider, headers=headers)
+            self.wps_provider = get_wps_client(self.provider, self.settings, headers=headers)
             raise_on_xml_exception(self.wps_provider._capabilities)  # noqa: W0212
         except Exception as ex:
             raise OWSNoApplicableCode(f"Failed to retrieve WPS capabilities. Error: [{ex!s}].")

@@ -5,7 +5,7 @@ Package :mod:`lxml` is employed directly even though some linters (e.g.: ``bandi
 instead, because that package's extension with :mod:`lxml` is marked as deprecated.
 
 .. seealso::
-    https://pypi.org/project/defusedxml/#defusedxml-lxml
+    https://github.com/tiran/defusedxml/tree/main#defusedxmllxml
 
 To use the module, import is as if importing :mod:`lxml.etree`:
 
@@ -46,6 +46,7 @@ ParseError = lxml_etree.ParseError
 
 # define this type here so that code can use it for actual logic without repeating 'noqa'
 XML = lxml_etree._Element  # noqa
+XMLTree = lxml_etree._ElementTree  # noqa
 
 # save a local reference to method employed by OWSLib directly called
 _lxml_fromstring = lxml_etree.fromstring
@@ -59,7 +60,7 @@ def fromstring(text, parser=XML_PARSER):
 
 
 def parse(source, parser=XML_PARSER):
-    # type: (Union[str, BufferedReader], lxml_etree.XMLParser) -> XML
+    # type: (Union[str, BufferedReader], lxml_etree.XMLParser) -> XMLTree
     return lxml_etree.parse(source, parser=parser)  # nosec: B410
 
 

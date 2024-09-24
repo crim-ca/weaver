@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import datetime
 import logging
 import os
@@ -11,7 +12,6 @@ from typing import TYPE_CHECKING
 
 import colander
 import mock
-import pyramid.testing
 import pytest
 from dateutil import parser as date_parser
 from parameterized import parameterized
@@ -35,6 +35,7 @@ from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
+from weaver.notify import decrypt_email
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import get_path_kvp, now
@@ -70,11 +71,8 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+        cls.html_headers = {"Accept": ContentType.TEXT_HTML}
         cls.datetime_interval = cls.generate_test_datetimes()
-
-    @classmethod
-    def tearDownClass(cls):
-        pyramid.testing.tearDown()
 
     def setUp(self):
         # rebuild clean db on each test
@@ -324,6 +322,41 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
 
+    @parameterized.expand([
+        ({}, ),  # detail omitted should apply it for HTML, unlike JSON that returns the simplified listing by default
+        ({"detail": None}, ),
+        ({"detail": "true"}, ),
+        ({"detail": 1}, ),
+        ({"detail": "True"}, ),
+        ({"detail": "yes"}, ),
+        ({"detail": "false"}, ),
+        ({"detail": 0}, ),
+        ({"detail": "False"}, ),
+        ({"detail": "no"}, ),
+    ])
+    def test_get_jobs_detail_html_enforced(self, params):
+        """
+        Using :term:`HTML`, ``detail`` response is always enforced to allow rendering, regardless of the parameter.
+        """
+        path = get_path_kvp(sd.jobs_service.path, limit=6, **params)  # check that other params are still effective
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "<!DOCTYPE html>" in resp.text
+        assert "table-jobs" in resp.text
+        jobs = [line for line in resp.text.splitlines() if "job-list-item" in line]
+        assert len(jobs) == 6
+
+    def test_get_jobs_groups_html_unsupported(self):
+        groups = ["process", "service"]
+        path = get_path_kvp(sd.jobs_service.path, groups=groups)
+        resp = self.app.get(path, headers=self.html_headers, expect_errors=True)
+        assert resp.status_code == 400
+        desc = resp.json["description"]
+        assert "HTML" in desc and "unsupported" in desc
+        assert "cause" in resp.json
+        assert "groups" in resp.json["cause"]["name"]
+
     def test_get_jobs_valid_grouping_by_process(self):
         path = get_path_kvp(sd.jobs_service.path, detail="false", groups="process")
         resp = self.app.get(path, headers=self.json_headers)
@@ -544,6 +577,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert "limit" in str(resp.json["cause"]) and "less than minimum" in str(resp.json["cause"])
         assert "limit" in resp.json["value"] and resp.json["value"]["limit"] == str(0)
 
+    @pytest.mark.skip(reason="Obsolete feature. It is not possible to filter by encrypted notification email anymore.")
     def test_get_jobs_by_encrypted_email(self):
         """
         Verifies that literal email can be used as search criterion although not saved in plain text within db.
@@ -563,13 +597,20 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == ContentType.APP_JSON
-        job_id = resp.json["jobID"]
+            job_id = resp.json["jobID"]
+
+            # submit a second job just to make sure email doesn't match it as well
+            other_body = copy.deepcopy(body)
+            other_body["notification_email"] = "random@email.com"
+            resp = self.app.post_json(path, params=other_body, headers=self.json_headers)
+            assert resp.status_code == 201
 
         # verify the email is not in plain text
         job = self.job_store.fetch_by_id(job_id)
         assert job.notification_email != email and job.notification_email is not None
-        assert int(job.notification_email, 16) != 0  # email should be encrypted with hex string
+        assert decrypt_email(job.notification_email, self.settings) == email, "Email should be recoverable."
 
+        # make sure that jobs searched using email are found with encryption transparently for the user
         path = get_path_kvp(sd.jobs_service.path, detail="true", notification_email=email)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1501,6 +1542,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_none = sd.Execute().deserialize({})
         job_none.pop("$schema", None)
+        job_none.pop("$id", None)
         assert job_none == {
             "inputs": {},
             "outputs": {},
@@ -1510,6 +1552,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_none = sd.Execute().deserialize({"outputs": {"random": default_trans_mode}})
         job_in_none.pop("$schema", None)
+        job_in_none.pop("$id", None)
         assert job_in_none == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1519,6 +1562,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_dict = sd.Execute().deserialize({"inputs": {}, "outputs": {"random": default_trans_mode}})
         job_in_empty_dict.pop("$schema", None)
+        job_in_empty_dict.pop("$id", None)
         assert job_in_empty_dict == {
             "inputs": {},
             "outputs": {"random": default_trans_mode},
@@ -1528,6 +1572,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_in_empty_list = sd.Execute().deserialize({"inputs": [], "outputs": {"random": default_trans_mode}})
         job_in_empty_list.pop("$schema", None)
+        job_in_empty_list.pop("$id", None)
         assert job_in_empty_list == {
             "inputs": [],
             "outputs": {"random": default_trans_mode},
@@ -1537,6 +1582,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_none = sd.Execute().deserialize({"inputs": {"random": "ok"}})
         job_out_none.pop("$schema", None)
+        job_out_none.pop("$id", None)
         assert job_out_none == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1546,6 +1592,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_dict = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": {}})
         job_out_empty_dict.pop("$schema", None)
+        job_out_empty_dict.pop("$id", None)
         assert job_out_empty_dict == {
             "inputs": {"random": "ok"},
             "outputs": {},
@@ -1555,6 +1602,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         job_out_empty_list = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": []})
         job_out_empty_list.pop("$schema", None)
+        job_out_empty_list.pop("$id", None)
         assert job_out_empty_list == {
             "inputs": {"random": "ok"},
             "outputs": [],
@@ -1567,6 +1615,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
         })
         job_out_defined.pop("$schema", None)
+        job_out_defined.pop("$id", None)
         assert job_out_defined == {
             "inputs": {"random": "ok"},
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
@@ -1671,6 +1720,21 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert "Start" in lines[0]
         assert "Process" in lines[1]
         assert "Complete" in lines[2]
+
+    def test_job_logs_formats_unsupported(self):
+        path = f"/jobs/{self.job_info[0].id}/logs"
+        resp = self.app.get(path, headers={"Accept": ContentType.IMAGE_GEOTIFF}, expect_errors=True)
+        assert resp.status_code == 406
+        assert ContentType.APP_JSON in resp.content_type
+        assert "type" in resp.json
+        assert resp.json["type"] == "NotAcceptable"
+        assert "detail" in resp.json
+        assert "Accept header" in resp.json["detail"]
+        # expected that all acceptable media-types are listed
+        assert ContentType.TEXT_PLAIN in resp.json["detail"]
+        assert ContentType.APP_XML in resp.json["detail"]
+        assert ContentType.APP_JSON in resp.json["detail"]
+        assert ContentType.APP_YAML in resp.json["detail"]
 
     def test_job_statistics_missing(self):
         job = self.job_info[0]

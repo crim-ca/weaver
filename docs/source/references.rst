@@ -19,6 +19,12 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |crs| replace:: Coordinate Reference System
+.. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
+.. |crs-def| replace:: Coordinate Reference System (CRS)
+.. _crs-def: https://www.w3.org/TR/sdw-bp/#dfn-crs
+.. |datum-def| replace:: Datum
+.. _datum-def: https://www.w3.org/TR/sdw-bp/#dfn-datum
 .. |currency-converter| replace:: *Currency Converter*
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
@@ -28,13 +34,15 @@
 .. _cwl-spec: https://www.commonwl.org/specification/
 .. |cwl-guide| replace:: CWL User Guide
 .. _cwl-guide: http://www.commonwl.org/user_guide/
+.. |cwl-dev-tools| replace:: CWL Development Tools
+.. _cwl-dev-tools: https://www.commonwl.org/tools/
 .. |cwl-cmdtool| replace:: CWL CommandLineTool
 .. _cwl-cmdtool: https://www.commonwl.org/v1.1/CommandLineTool.html
 .. |cwl-workflow| replace:: CWL Workflow
 .. _cwl-workflow: https://www.commonwl.org/v1.1/Workflow.html
 .. |cwl-workdir-req| replace:: InitialWorkDirRequirement
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
-.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
+.. _cwl-workdir-ex: https://www.commonwl.org/user_guide/topics/staging-input-files.html
 .. |cwl-docker-req| replace:: DockerRequirement
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
 .. FIXME apply official CWL specification location
@@ -49,7 +57,10 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
-.. _cwl-metadata: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. |cwl-metadata| replace:: CWL Examples - Metadata and Authorship
+.. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
+.. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
+.. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
@@ -58,29 +69,85 @@
 .. |esgf-cwt-git| replace:: ESGF Compute API
 .. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
-.. _edam-link: http://edamontology.org/
+.. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
+.. |feature-ogc-def| replace:: Feature
+.. _feature-ogc-def: https://docs.ogc.org/DRAFTS/20-024.html#feature-definition
+.. |feature-w3c-def| replace:: Feature
+.. _feature-w3c-def: https://www.w3.org/TR/sdw-bp/#dfn-feature
+.. |feature-w3c-desc| replace:: Feature
+.. _feature-w3c-desc: https://www.w3.org/TR/sdw-bp/#spatial-things-features-and-geometry
+.. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
+.. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
+.. |filter-simple-cql| replace:: Simple CQL
+.. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. |filter-cql-json| replace:: CQL-JSON
+.. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. |filter-cql-text| replace:: CQL-Text
+.. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. |filter-cql2-json| replace:: CQL2-JSON
+.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065.html#cql2-json
+.. |filter-cql2-text| replace:: CQL2-Text
+.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
+.. |filter-ecql| replace:: ECQL (Extended CQL)
+.. _filter-ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
+.. |filter-fes| replace:: Filter Encoding Standard 2.0
+.. _filter-fes: http://docs.opengeospatial.org/is/09-026r2/09-026r2.html
+.. |filter-jfe| replace:: JSON Filter Expressions
+.. _filter-jfe: https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
+.. |geotiff-cog| replace:: Cloud Optimized GeoTIFF (COG)
+.. _geotiff-cog: https://www.cogeo.org/
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
+.. |geojson| replace:: GeoJSON
+.. _geojson: https://geojson.org/
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-api-proc| replace:: `OGC API - Processes`
+.. |ogc-collection| replace:: Collection Definition
+.. _ogc-collection: https://docs.ogc.org/DRAFTS/20-024.html#collections-introduction
+.. |ogc-api-standards| replace:: *OGC Web API* standards
+.. _ogc-api-standards: https://ogcapi.ogc.org/
+.. |ogc-api-common| replace:: *OGC API - Common*
+.. _ogc-api-common: https://ogcapi.ogc.org/common/
+.. |ogc-api-coverages| replace:: *OGC API - Coverages*
+.. _ogc-api-coverages: https://ogcapi.ogc.org/coverages/
+.. |ogc-api-features| replace:: *OGC API - Features*
+.. _ogc-api-features: https://ogcapi.ogc.org/features/
+.. |ogc-api-maps| replace:: *OGC API - Maps*
+.. _ogc-api-maps: https://ogcapi.ogc.org/maps/
+.. |ogc-api-tiles| replace:: *OGC API - Tiles*
+.. _ogc-api-tiles: https://ogcapi.ogc.org/tiles/
+.. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
-.. |ogc-exec-sync-responses| replace:: OGC API - Processes, Responses (sync)
+.. |ogc-api-proc-part1-spec-html| replace:: *OGC API - Processes* - Part 1: Core Specification
+.. _ogc-api-proc-part1-spec-html: https://docs.ogc.org/is/18-062r2/18-062r2.html
+.. |ogc-api-proc-part1-spec-pdf| replace:: *OGC API - Processes* - Part 1: Core Specification
+.. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
+.. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
+.. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
+.. |ogc-exec-sync-responses| replace:: *OGC API - Processes*, Responses (sync)
 .. _ogc-exec-sync-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-.. |ogc-exec-async-responses| replace:: OGC API - Processes, Responses (async)
+.. |ogc-exec-async-responses| replace:: *OGC API - Processes*, Responses (async)
 .. _ogc-exec-async-responses: https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
-.. |ogc-api-proc-part2| replace:: OGC API - Processes - Part 2: Deploy, Replace, Undeploy
+.. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
+.. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
+.. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
+.. |ogc-api-proc-part2| replace:: *OGC API - Processes* - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
-.. |ogc-proc-ext-billing| replace:: OGC API - Processes - Billing extension
+.. |ogc-api-proc-part3| replace:: *OGC API - Processes* - Part 3: Workflows
+.. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
+.. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
+.. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
-.. |ogc-proc-ext-quotation| replace:: OGC API - Processes - Quotation extension
+.. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
 .. _ogc-proc-ext-quotation: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/quotation
 .. |quote-estimator| replace:: *Quote Estimator*
 .. _quote-estimator: :ref:`quotation_quote_estimator`
@@ -102,8 +169,6 @@
 .. _pywps-multi-output: https://pywps.readthedocs.io/en/master/process.html#returning-multiple-files
 .. |wkt-example| replace:: WKT Examples
 .. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
-.. |wkt-format| replace:: WKT Formats
-.. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
 .. |weaver-issues| replace:: Weaver issues
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
@@ -111,6 +176,18 @@
 .. inter-reference to 'process->Deploy' section, but cannot be a link since not included
 .. _process-deploy-op: :ref:`proc_op_deploy`
 .. |process-deploy-op| replace:: Process deployment operation
+
+.. STAC
+.. |stac-spec| replace:: STAC Specification
+.. _stac-spec: https://stacspec.org/en/about/stac-spec/
+.. |stac-api-spec| replace:: STAC API Specification
+.. _stac-api-spec: https://github.com/radiantearth/stac-api-spec
+.. |stac-collections| replace:: STAC Collections
+.. _stac-collections: https://github.com/radiantearth/stac-spec/blob/master/collection-spec/collection-spec.md
+.. |stac-items| replace:: STAC Items
+.. _stac-items: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
+.. |stac-assets| replace:: STAC Assets
+.. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/commons/assets.md
 
 .. Example references
 .. |examples| replace:: Examples
@@ -139,7 +216,9 @@
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
-.. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. _docker-compose.yml.example: ../../../docker/docker-compose.yml.example
+.. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
+.. |default-notify-email-template| replace:: Default Notification Email Mako Template
 .. |opensearch-deploy| replace:: OpenSearch Deploy
 .. _opensearch-deploy: ../../../tests/opensearch/json/opensearch_deploy.json
 .. |opensearch-examples| replace:: OpenSearch Examples
@@ -147,6 +226,8 @@
 
 .. API requests
 .. Full path displayed, otherwise use '-name' suffixed reference for same link with only the general name (no path)
+.. |oas-rtd| replace:: OpenAPI Documentation
+.. _oas-rtd: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. |deploy-req-name| replace:: Deploy
 .. _deploy-req-name: `deploy-req`_
 .. |deploy-req| replace:: ``POST {WEAVER_URL}/processes`` (Deploy)

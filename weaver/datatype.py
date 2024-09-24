@@ -7,14 +7,17 @@ import copy
 import enum
 import inspect
 import json
+import os
 import re
+import shutil
+import tempfile
 import traceback
 import uuid
 import warnings
 from datetime import datetime, timedelta
 from decimal import ConversionSyntax, Decimal
 from io import BytesIO
-from logging import ERROR, INFO, Logger, getLevelName, getLogger
+from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
@@ -24,7 +27,7 @@ import pyramid.httpexceptions
 import requests.exceptions
 from cryptography.fernet import Fernet
 from dateutil.parser import parse as dt_parse
-from docker.auth import decode_auth
+from docker.auth import decode_auth  # pylint: disable=E0611
 from owslib.util import ServiceException as OWSServiceException
 from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
@@ -36,7 +39,14 @@ from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import AcceptLanguage, ContentType, repr_json
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_OGC_API, ProcessSchema
+from weaver.processes.constants import (
+    CWL_NAMESPACE_WEAVER_ID,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,
+    CWL_REQUIREMENT_APP_OGC_API,
+    CWL_REQUIREMENT_APP_WPS1,
+    ProcessSchema
+)
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
@@ -44,6 +54,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreProcesses
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
+    LoggerHandler,
     VersionFormat,
     apply_number_with_unit,
     as_version_major_minor_patch,
@@ -63,6 +74,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
+    from logging import Logger
     from typing import Any, Callable, Dict, IO, Iterator, List, Optional, Tuple, Union
     from typing_extensions import TypeAlias
 
@@ -85,10 +97,12 @@ if TYPE_CHECKING:
         CWL,
         ExecutionInputs,
         ExecutionOutputs,
+        ExecutionSubscribers,
         JSON,
         Link,
         Metadata,
         Number,
+        Path,
         Price,
         QuoteProcessParameters,
         QuoteProcessResults,
@@ -615,7 +629,7 @@ class Service(Base):
         return False
 
 
-class Job(Base):
+class Job(Base, LoggerHandler):
     """
     Dictionary that contains :term:`Job` details for local :term:`Process` or remote :term:`OWS` execution.
 
@@ -629,6 +643,33 @@ class Job(Base):
             raise TypeError(f"Parameter 'task_id' is required for '{self.__name__}' creation.")
         if not isinstance(self.id, (str, uuid.UUID)):
             raise TypeError(f"Type 'str' or 'UUID' is required for '{self.__name__}.id'")
+        self["__tmpdir"] = None
+
+    def update_from(self, job):
+        # type: (Job) -> None
+        """
+        Forwards any internal or control properties from the specified :class:`Job` to this one.
+        """
+        self["__tmpdir"] = job.get("__tmpdir")
+
+    def cleanup(self):
+        # type: () -> None
+        _tmpdir = self.get("__tmpdir")
+        if isinstance(_tmpdir, str) and os.path.isdir(_tmpdir):
+            shutil.rmtree(_tmpdir, ignore_errors=True)
+
+    @property
+    def tmpdir(self):
+        # type: () -> Path
+        """
+        Optional temporary directory available for the :term:`Job` to store files needed for its operation.
+
+        It is up to the caller to remove the contents by calling :meth:`cleanup`.
+        """
+        _tmpdir = self.get("__tmpdir")
+        if not _tmpdir:
+            _tmpdir = self["__tmpdir"] = tempfile.mkdtemp()
+        return _tmpdir
 
     @staticmethod
     def _get_message(message, size_limit=None):
@@ -653,7 +694,18 @@ class Job(Base):
         error_msg = Job._get_message(error.text, size_limit=size_limit)
         return f"{error_msg} - code={error.code} - locator={error.locator}"
 
+    def log(self, level, message, *args, **kwargs):
+        # type: (AnyLogLevel, str, *str, **Any) -> None
+        """
+        Provides the :class:`LoggerHandler` interface, allowing to pass the :term:`Job` directly as a logger reference.
+
+        The same parameters as :meth:`save_log` can be provided.
+        """
+        message = message.format(*args, **kwargs)
+        return self.save_log(level=level, message=message, **kwargs)
+
     def save_log(self,
+                 *,
                  errors=None,           # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,           # type: Optional[Logger]
                  message=None,          # type: Optional[str]
@@ -838,7 +890,7 @@ class Job(Base):
         Obtain the type of the element associated to the creation of this job.
 
         .. seealso::
-            - Defined in http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
+            - Defined in https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml.
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:
@@ -925,28 +977,29 @@ class Job(Base):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.status_location'")
         self["status_location"] = location_url
 
-    def status_url(self, container=None):
-        # type: (Optional[AnySettingsContainer]) -> str
-        """
-        Obtain the resolved endpoint where the :term:`Job` status information can be obtained.
-        """
-        settings = get_settings(container)
-        location_base = f"/providers/{self.service}" if self.service else ""
-        api_base_url = get_wps_restapi_base_url(settings)
-        location_url = f"{api_base_url}{location_base}/processes/{self.process}/jobs/{self.id}"
-        return location_url
-
     @property
-    def notification_email(self):
-        # type: () -> Optional[str]
-        return self.get("notification_email")
+    def subscribers(self):
+        # type: () -> Optional[ExecutionSubscribers]
+        return self.get("subscribers")
 
-    @notification_email.setter
-    def notification_email(self, email):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(email, str):
-            raise TypeError(f"Type 'str' is required for '{self.__name__}.notification_email'")
-        self["notification_email"] = email
+    @subscribers.setter
+    def subscribers(self, subscribers):
+        # type: (Optional[ExecutionSubscribers]) -> None
+        if subscribers and not (
+            isinstance(subscribers, dict) and
+            all(
+                sub_type and isinstance(sub_type, str) and
+                sub and isinstance(sub, str) and
+                val and isinstance(val, str)
+                for sub_type, subs in subscribers.items()
+                for sub, val in (subs if isinstance(subs, dict) else {None: None}).items()
+            )
+        ):
+            raise TypeError(
+                "Mapping of subscriber types, status and notification references "
+                f"is required for '{self.__name__}.subscribers'."
+            )
+        self["subscribers"] = subscribers or None
 
     @property
     def accept_language(self):
@@ -1236,12 +1289,42 @@ class Job(Base):
             response = xml_util.tostring(response)
         self["response"] = response
 
-    def _job_url(self, base_url=None):
-        # type: (Optional[str]) -> str
+    def _job_url(self, base_url):
+        # type: (str) -> str
         if self.service is not None:
             base_url += sd.provider_service.path.format(provider_id=self.service)
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
         return base_url + job_path
+
+    def job_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        settings = get_settings(container)
+        base_url = get_wps_restapi_base_url(settings)
+        return self._job_url(base_url) + (extra_path or "")
+
+    def status_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container)
+
+    def logs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/logs")
+
+    def exceptions_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/exceptions")
+
+    def inputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/inputs")
+
+    def outputs_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/outputs")
+
+    def results_url(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> str
+        return self.job_url(container=container, extra_path="/results")
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
@@ -1308,10 +1391,10 @@ class Job(Base):
             link.update(link_meta)
         return job_links
 
-    def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer]) -> JSON
         """
-        Obtains the JSON data representation for response body.
+        Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -1340,7 +1423,7 @@ class Job(Base):
             # new name as per OGC-API, enforced integer
             # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
             "progress": int(self.progress),
-            "links": self.links(settings, self_link=self_link)
+            "links": self.links(settings, self_link="status")
         }
         return sd.JobStatusInfo().deserialize(job_json)
 
@@ -1375,7 +1458,7 @@ class Job(Base):
             "context": self.context,
             "request": self.request,
             "response": self.response,
-            "notification_email": self.notification_email,
+            "subscribers": self.subscribers,
             "accept_language": self.accept_language,
         }
 
@@ -2152,11 +2235,20 @@ class Process(Base):
 
         if cls == ProcessType.WORKFLOW:
             profile = f"{base}workflow"
-        elif ProcessType.is_wps(typ):
+        elif ProcessType.is_wps(typ) or req in [
+            CWL_REQUIREMENT_APP_WPS1,
+            f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_WPS1}",
+        ]:
             profile = f"{base}wpsApplication"
-        elif typ == ProcessType.OGC_API or req == CWL_REQUIREMENT_APP_OGC_API:
+        elif typ == ProcessType.OGC_API or req in [
+            CWL_REQUIREMENT_APP_OGC_API,
+            f"{CWL_NAMESPACE_WEAVER_ID}:{CWL_REQUIREMENT_APP_OGC_API}",
+        ]:
             profile = f"{base}ogcapiApplication"
-        elif typ == ProcessType.APPLICATION or req == CWL_REQUIREMENT_APP_DOCKER:
+        elif typ == ProcessType.APPLICATION or req in [
+            CWL_REQUIREMENT_APP_DOCKER,
+            CWL_REQUIREMENT_APP_DOCKER_GPU,
+        ]:
             profile = f"{base}dockerizedApplication"
         else:
             profile = base + typ
@@ -2247,7 +2339,7 @@ class Process(Base):
     @property
     def visibility(self):
         # type: () -> Visibility
-        return Visibility.get(self.get("visibility"), Visibility.PRIVATE)
+        return Visibility.get(self.get("visibility"), Visibility.PUBLIC)
 
     @visibility.setter
     def visibility(self, visibility):
@@ -2371,6 +2463,15 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
+            {"href": f"{proc_desc}?f=xml", "rel": "alternate",
+             "title": "Alternate process description.", "type": ContentType.APP_XML},
+        ]
+        if self.service:
+            links.append(
+                {"href": f"{proc_desc}?f=html", "rel": "alternate",
+                 "title": "Alternate process description.", "type": ContentType.TEXT_HTML}
+            )
+        links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
              "title": "Process execution endpoint for job submission."},
@@ -2379,7 +2480,7 @@ class Process(Base):
             {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
-        ]
+        ])
         if self.version:
             proc_tag = f"{proc_list}/{self.tag}"
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
@@ -2510,9 +2611,9 @@ class Process(Base):
             for io_type in ["inputs", "outputs"]:
                 process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
             process.update({"process": dict(process)})
-            return sd.ProcessDescriptionOLD().deserialize(process)
+            return sd.ProcessDescriptionOLD(schema_meta_include=True).deserialize(process)
         # process fields directly at root + I/O as mappings
-        return sd.ProcessDescriptionOGC().deserialize(process)
+        return sd.ProcessDescriptionOGC(schema_meta_include=True).deserialize(process)
 
     def summary(self, revision=False, links=True, container=None):
         # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON
@@ -2564,7 +2665,7 @@ class Process(Base):
             svc_name = service.get("name")  # can be a custom ID or identical to provider name
             remote_service_url = service.url
             local_provider_url = f"{wps_api_url}/providers/{svc_name}"
-            svc_provider_name = service.wps().provider.name
+            svc_provider_name = service.wps(container).provider.name
         describe_process_url = f"{local_provider_url}/processes/{process.identifier}"
         execute_process_url = f"{describe_process_url}/jobs"
         package, info = ows2json(process, svc_name, remote_service_url, svc_provider_name)
@@ -2626,13 +2727,13 @@ class Process(Base):
         wps_request = WPSRequest()
         wps_request.language = http_request.accept_language.header_value or AcceptLanguage.EN_CA
         wps_request.http_request = http_request  # set instead of init param to bypass extra setup arguments
-        processes = {self.id: self.wps()}
+        processes = {self.id: self.wps(request)}
         describer = DescribeResponse(wps_request, uuid=None, processes=processes, identifiers=list(processes))
         offering, _ = describer.get_response_doc()
         return offering
 
-    def wps(self):
-        # type: () -> ProcessWPS
+    def wps(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> ProcessWPS
         """
         Converts this :class:`Process` to a corresponding format understood by :mod:`pywps`.
         """
@@ -2655,7 +2756,8 @@ class Process(Base):
             process_key = self.identifier
         if process_key not in process_map:
             raise ProcessInstanceError(f"Unknown process '{process_key}' in mapping.")
-        return process_map[process_key](**self.params_wps)
+        settings = get_settings(container)
+        return process_map[process_key](**self.params_wps, settings=settings)
 
 
 class PriceMixin(Base, abc.ABC):

@@ -15,7 +15,7 @@ pyramid.debug_routematch = false
 pyramid.default_locale_name = en
 
 # mongodb
-mongodb.host = 127.0.0.1
+mongodb.host = mongodb
 mongodb.port = 27017
 mongodb.db_name = weaver
 
@@ -48,7 +48,7 @@ cache.quotation.enabled = true
 #   EMS:     current instance dispatches execution to other remote ADES or WPS providers
 #   HYBRID:  current instance does both ADES and EMS roles with flexible combinations depending on situation
 weaver.configuration = HYBRID
-weaver.url = http://127.0.0.1:4002
+weaver.url = http://localhost:4001
 
 # Static endpoint to external schema locations for reference in responses.
 # If not provided, the current instance OpenAPI JSON path is employed instead.
@@ -63,7 +63,7 @@ weaver.log_level =
 # SSL verification should be enabled for secured connections
 # setting is available for convenience, debug purposes and local environments
 # preferably, use specific request options
-weaver.ssl_verify = false
+weaver.ssl_verify = true
 # file with request options to be used with 'weaver.utils.request_extra'
 # see 'requests_options.yml.example'
 weaver.request_options =
@@ -111,7 +111,13 @@ weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
 weaver.wps_output_s3_bucket =
 weaver.wps_output_s3_region =
-weaver.wps_workdir = /tmp/weaver/wps_workdir
+weaver.wps_workdir =
+weaver.wps_max_request_size = 30MB
+weaver.wps_max_single_input_size = 3GB
+
+# List of comma-separated case-insensitive headers that will be removed from incoming requests before
+# passing them down to invoke an operation with the corresponding WPS provider through the WPS client.
+weaver.wps_client_headers_filter = Host,
 
 # --- Weaver WPS metadata ---
 # all attributes under "metadata:main" can be specified as 'weaver.wps_metadata_<field>'
@@ -141,6 +147,12 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
+# Allow OGC API - Processes endpoints to render
+# contents in HTML as alternate responses to JSON.
+weaver.wps_restapi_html = true
+# Special handling of rendering default HTML vs JSON by web browsers.
+# See documentation for details.
+weaver.wps_restapi_html_override_user_agent = false
 
 # --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email
@@ -148,6 +160,7 @@ weaver.wps_email_encrypt_rounds = 100000
 weaver.wps_email_notify_smtp_host =
 weaver.wps_email_notify_from_addr = example@email.com
 weaver.wps_email_notify_password = 123456
+weaver.wps_email_notify_timeout = 10
 weaver.wps_email_notify_port = 25
 weaver.wps_email_notify_ssl = true
 weaver.wps_email_notify_template_dir =
@@ -171,7 +184,7 @@ weaver.vault_dir = /tmp/vault
 ###
 [celery]
 #USE_CELERYCONFIG = True
-BROKER_URL = mongodb://127.0.0.1:27017/celery
+BROKER_URL = mongodb://mongodb:27017/celery
 # Result backend is required for SYNC execution.
 #   Using only the backend type matching the broker URL will automatically resolve to use it database location.
 #   For an alternative result location, provide the full backend directly rather than using "mongodb_backend_settings".
@@ -191,7 +204,7 @@ RESULT_BACKEND = mongodb
 
 # --- gunicorn ---
 use = egg:gunicorn#main
-bind = 127.0.0.1:4002
+bind = 0.0.0.0:4001
 workers = 10
 timeout = 10
 

@@ -1,0 +1,108 @@
+<!-- PyWPS 4.0.0 -->
+<wps:ProcessDescriptions
+    xmlns:gml="http://schemas.opengis.net/gml"
+    xmlns:ows="http://www.opengis.net/ows/1.1"
+    xmlns:wps="http://www.opengis.net/wps/1.0.0"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+    service="WPS" version="1.0.0" xml:lang="en-US"
+>
+    <ProcessDescription wps:processVersion="1.2.3" storeSupported="true" statusSupported="true">
+        <ows:Identifier>wps_literal_enum_io</ows:Identifier>
+        <ows:Title>WPS Literal Enum IO</ows:Title>
+        <DataInputs>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>enum-str</ows:Identifier>
+                <ows:Title>Enum String</ows:Title>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>A</ows:Value>
+                        <ows:Value>B</ows:Value>
+                        <ows:Value>C</ows:Value>
+                    </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="2" maxOccurs="3">
+                <ows:Identifier>enum-array-str</ows:Identifier>
+                <ows:Title>Enum Array String</ows:Title>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>A</ows:Value>
+                        <ows:Value>B</ows:Value>
+                        <ows:Value>C</ows:Value>
+                    </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>enum-int</ows:Identifier>
+                <ows:Title>Enum Integer</ows:Title>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#integer">integer</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>1</ows:Value>
+                        <ows:Value>2</ows:Value>
+                        <ows:Value>3</ows:Value>
+                    </ows:AllowedValues>
+              </LiteralData>
+            </Input>
+            <Input minOccurs="2" maxOccurs="3">
+                <ows:Identifier>enum-array-int</ows:Identifier>
+                <ows:Title>Enum Array Integer</ows:Title>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#integer">integer</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>1</ows:Value>
+                        <ows:Value>2</ows:Value>
+                        <ows:Value>3</ows:Value>
+                    </ows:AllowedValues>
+              </LiteralData>
+            </Input>
+            <Input minOccurs="1" maxOccurs="1">
+              <ows:Identifier>enum-float</ows:Identifier>
+              <ows:Title>Enum Float</ows:Title>
+              <LiteralData>
+                  <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#float">float</ows:DataType>
+                  <ows:AllowedValues>
+                      <ows:Value>1.2</ows:Value>
+                      <ows:Value>3.4</ows:Value>
+                      <ows:Value>5.6</ows:Value>
+                  </ows:AllowedValues>
+              </LiteralData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="3">
+                <ows:Identifier>enum-array-float</ows:Identifier>
+                <ows:Title>Enum Array Float</ows:Title>
+                <LiteralData>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#float">float</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>1.2</ows:Value>
+                        <ows:Value>3.4</ows:Value>
+                        <ows:Value>5.6</ows:Value>
+                    </ows:AllowedValues>
+                </LiteralData>
+            </Input>
+        </DataInputs>
+        <ProcessOutputs>
+          <!-- no concept of 'enum' or 'AllowedValues' in WPS outputs -->
+            <Output>
+                <ows:Identifier>output</ows:Identifier>
+                <ows:Title>Output</ows:Title>
+                <ComplexOutput>
+                  <Default>
+                      <Format>
+                          <MimeType>text/plain</MimeType>
+                      </Format>
+                  </Default>
+                  <Supported>
+                      <Format>
+                          <MimeType>text/plain</MimeType>
+                      </Format>
+                  </Supported>
+                </ComplexOutput>
+            </Output>
+        </ProcessOutputs>
+    </ProcessDescription>
+</wps:ProcessDescriptions>

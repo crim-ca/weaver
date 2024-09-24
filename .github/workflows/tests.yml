@@ -7,32 +7,37 @@ on:
   - release
   - workflow_dispatch
 
+# cancel the current workflow if another commit was pushed on the same PR or reference
+# uses the GitHub workflow name to avoid collision with other workflows running on the same PR/reference
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
   skip_duplicate:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, 'refs/tags') }}
+      should_skip: ${{ steps.skip_duplicate.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'origin/master') }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
         with:
-          concurrent_skipping: "same_content"
+          concurrent_skipping: "same_content_newer"
           skip_after_successful_duplicate: "true"
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule", "release"]'
+          do_not_skip: '["workflow_dispatch", "schedule", "release"]'
 
   # see: https://github.com/actions/setup-python
   tests:
-    # FIXME: https://github.com/fkirc/skip-duplicate-actions/issues/90
-    #   disable for now because the tests never run... somehow similar config works in Magpie...
-    # needs: skip_duplicate
-    # if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    needs: skip_duplicate
+    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
+      DOCKER_TEST_EXEC_ARGS: "-T"
     services:
       # Label used to access the service container
       mongodb:
@@ -42,26 +47,17 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
-          # end-of-life python
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-unit-only
-          - os: ubuntu-20.04
-            python-version: "3.6"
-            allow-failure: true
-            test-case: test-func-only
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-func-only
           # linter tests
@@ -96,9 +92,10 @@ jobs:
       - name: Setup Python
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
+          cache: 'pip'
       - name: Parse Python Version
         id: python-semver
         run: |
@@ -116,11 +113,14 @@ jobs:
         if: ${{ matrix.test-case != 'test-docker' }}
         # install package and dependencies directly,
         # skip sys/conda setup to use active python
-        run: make install-sys install-pkg install-pip install-raw install-dev version
+        run: make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
       - name: Display Packages
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        run: pip freeze
+        run: |
+          pip freeze
+          npm list
+          make version
       #- name: Setup Environment Variables
       #  uses: c-py/action-dotenv-to-setenv@v2
       #  with:

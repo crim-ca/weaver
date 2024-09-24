@@ -1,9 +1,12 @@
 """
 Unit test for :mod:`weaver.cli` utilities.
 """
+import argparse
 import base64
+import contextlib
 import inspect
 import json
+import os
 import tempfile
 import uuid
 from contextlib import ExitStack
@@ -20,10 +23,11 @@ from weaver.cli import (
     BearerAuthHandler,
     CookieAuthHandler,
     OperationResult,
+    SubscriberAction,
     WeaverClient,
     main as weaver_cli
 )
-from weaver.formats import ContentType
+from weaver.formats import ContentEncoding, ContentType
 
 
 @pytest.mark.cli
@@ -63,6 +67,7 @@ def test_parse_inputs_from_file():
         inputs.append(_inputs)
         return mock_result
 
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_json:
             json.dump({"inputs": {"input1": "data"}}, input_json)
@@ -72,6 +77,66 @@ def test_parse_inputs_from_file():
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == {"input1": "data"}
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["data_inputs", "expect_inputs"],
+    [
+        (
+            # CWL definition with an input named 'inputs' not to be confused with OGC execution body
+            {
+                "inputs": {
+                    "class": "File",
+                    "path": "https://fake.domain.com/some-file.txt",
+                },
+            },
+            {
+                "inputs": {
+                    "href": "https://fake.domain.com/some-file.txt",
+                },
+            }
+        ),
+        (
+            # OGC execution body with explicit 'inputs' to be interpreted as is
+            {
+                "inputs": {
+                    "in-1": {"value": "data"},
+                    "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                },
+            },
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            }
+        ),
+        (
+            # OGC execution mapping that must not be confused as a CWL mapping
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            },
+            {
+                "in-1": {"value": "data"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+            }
+        )
+    ]
+)
+def test_parse_inputs(data_inputs, expect_inputs):
+    inputs = []
+    mock_result = OperationResult(False, code=500)
+
+    def parsed_inputs(_inputs, *_, **__):
+        inputs.append(_inputs)
+        return mock_result
+
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
+        result = WeaverClient().execute("fake_process", inputs=data_inputs, url="http://fake.domain.com")
+    assert result is mock_result
+    assert len(inputs) == 1
+    assert inputs[0] == expect_inputs
 
 
 @pytest.mark.cli
@@ -89,6 +154,7 @@ def test_parse_inputs_with_media_type():
         weaver_cli(*args)
         return 0
 
+    # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yml") as input_yaml:
             yaml.safe_dump({"info": {"data": "yaml"}}, input_yaml)
@@ -207,6 +273,35 @@ def test_auth_handler_bearer():
     assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
 
 
+def test_auth_handler_bearer_explicit_token():
+    req = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth = BearerAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" in resp.headers and len(resp.headers["Authorization"])
+    assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
+
+
+def test_auth_handler_bearer_explicit_token_matches_request_token():
+    req_explicit_token = WebTestRequest({})
+    req_request_token = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth_explicit_token = BearerAuthHandler(token=token)
+    auth_request_token = BearerAuthHandler(identity=str(uuid.uuid4()))
+    with mock.patch(
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+    ) as mock_request:
+        resp_explicit_token = auth_explicit_token(req_explicit_token)  # type: ignore
+        mock_request.assert_not_called()
+        resp_request_token = auth_request_token(req_request_token)  # type: ignore
+    assert "Authorization" in resp_explicit_token.headers and len(resp_explicit_token.headers["Authorization"])
+    assert "Authorization" in resp_request_token.headers and len(resp_request_token.headers["Authorization"])
+    assert resp_explicit_token.headers["Authorization"] == resp_request_token.headers["Authorization"]
+
+
 def test_auth_handler_cookie():
     req = WebTestRequest({})
     auth = CookieAuthHandler(identity=str(uuid.uuid4()))
@@ -219,6 +314,71 @@ def test_auth_handler_cookie():
     assert "Authorization" not in resp.headers
     assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
     assert resp.headers["Cookie"] == token
+
+
+def test_auth_handler_cookie_explicit_token_string():
+    req = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert resp.headers["Cookie"] == token
+
+
+def test_auth_handler_cookie_explicit_token_mapping_single():
+    req = WebTestRequest({})
+    cookie_key = "auth_example"
+    cookie_value = str(uuid.uuid4())
+    token = {cookie_key: cookie_value}
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert resp.headers["Cookie"] == f"{cookie_key}={cookie_value}"
+
+
+def test_auth_handler_cookie_explicit_token_mapping_multi():
+    req = WebTestRequest({})
+    token = {"auth_example": str(uuid.uuid4()), "auth_example2": str(uuid.uuid4())}
+    auth = CookieAuthHandler(token=token)
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert "Authorization" not in resp.headers
+    assert "Cookie" in resp.headers and len(resp.headers["Cookie"])
+    assert f"auth_example={token['auth_example']}" in resp.headers["Cookie"].split("; ")
+    assert f"auth_example2={token['auth_example2']}" in resp.headers["Cookie"].split("; ")
+
+
+def test_auth_handler_cookie_explicit_token_matches_request_token():
+    req_explicit_token = WebTestRequest({})
+    req_request_token = WebTestRequest({})
+    token = str(uuid.uuid4())
+    auth_explicit_token = CookieAuthHandler(token=token)
+    auth_request_token = CookieAuthHandler(identity=str(uuid.uuid4()))
+    with mock.patch(
+        "requests.Session.request",
+        side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
+    ) as mock_request:
+        resp_explicit_token = auth_explicit_token(req_explicit_token)  # type: ignore
+        mock_request.assert_not_called()
+        resp_request_token = auth_request_token(req_request_token)  # type: ignore
+    assert "Cookie" in resp_explicit_token.headers and len(resp_explicit_token.headers["Cookie"])
+    assert "Cookie" in resp_request_token.headers and len(resp_request_token.headers["Cookie"])
+    assert resp_explicit_token.headers["Cookie"] == resp_request_token.headers["Cookie"]
+
+
+def test_upload_file_not_found():
+    with tempfile.NamedTemporaryFile() as tmp_file_deleted:
+        pass   # delete on close
+    result = WeaverClient().upload(tmp_file_deleted.name)
+    assert not result.success
+    assert "does not exist" in result.message
 
 
 @pytest.mark.cli
@@ -236,8 +396,16 @@ def test_href_inputs_not_uploaded_to_vault():
 
 
 @pytest.mark.cli
-def test_file_inputs_uploaded_to_vault():
-    fake_href = "https://some-host.com/some-file.zip"
+@pytest.mark.parametrize(
+    ["test_file_name", "expect_file_format"],
+    [
+        ("some-file.zip", {"mediaType": ContentType.APP_ZIP, "encoding": ContentEncoding.BASE64}),
+        ("some-text.txt", {"mediaType": ContentType.TEXT_PLAIN}),
+        ("some-data.json", {"mediaType": ContentType.APP_JSON}),
+    ]
+)
+def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
+    fake_href = f"https://some-host.com/{test_file_name}"
     fake_id = "fake_id"
     fake_token = "fake_token"
 
@@ -245,9 +413,7 @@ def test_file_inputs_uploaded_to_vault():
     expected_output = (
         {
             "file": {
-                "format": {
-                    "mediaType": ContentType.APP_ZIP
-                },
+                "format": expect_file_format,
                 "href": fake_href
             }
         },
@@ -261,8 +427,56 @@ def test_file_inputs_uploaded_to_vault():
     def mock_upload(_href, *_, **__):
         return mock_result
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".zip") as input_file:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(test_file_name)[-1]) as input_file:
         inputs = {"file": {"href": input_file.name}}
+        with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
+            result = WeaverClient()._upload_files(inputs=inputs)
+    assert result == expected_output
+
+
+@pytest.mark.cli
+def test_file_inputs_array_uploaded_to_vault():
+    fake_href1 = "https://some-host.com/file1.json"
+    fake_href2 = "https://some-host.com/file2.zip"
+    fake_id = "fake_id"
+    fake_token = "fake_token"
+
+    expected_output = (
+        {
+            "file": [
+                {
+                    "href": fake_href1,
+                    "format": {"mediaType": ContentType.APP_JSON},
+                },
+                {
+                    "href": fake_href2,
+                    "format": {
+                        "mediaType": ContentType.APP_ZIP,
+                        "encoding": ContentEncoding.BASE64,
+                    },
+                }
+            ]
+        },
+        {
+            "X-Auth-Vault": f"token {fake_token}; id={fake_id}"
+        }
+    )
+
+    def mock_upload(_href, *_, **__):
+        fake_href = fake_href1 if _href.endswith(".json") else fake_href2
+        output_body = {"file_href": fake_href, "file_id": fake_id, "access_token": fake_token}
+        mock_result = OperationResult(True, code=200, body=output_body)
+        return mock_result
+
+    with contextlib.ExitStack() as stack:
+        input1 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href1)[-1]))
+        input2 = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=os.path.splitext(fake_href2)[-1]))
+        inputs = {
+            "file": [
+                {"href": input1.name},
+                {"href": input2.name}
+            ]
+        }
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result == expected_output
@@ -280,3 +494,91 @@ def test_file_inputs_not_uploaded_to_vault():
         with mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload):
             result = WeaverClient()._upload_files(inputs=inputs)
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
+
+
+@pytest.mark.parametrize(
+    ["expect_error", "subscriber_option", "subscriber_dest", "subscriber_value", "subscriber_result"],
+    [
+        (
+            None,
+            "--subscriber-email",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.email",
+            "test@email.com",
+            {"subscriber": {"email": "test@email.com"}},
+        ),
+        (
+            None,
+            "--random-option",
+            "subscriber.callback",
+            "https://some-server.com/path",
+            {"subscriber": {"callback": "https://some-server.com/path"}}
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "https://some-server.com/path",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "test@email.com",
+            None,
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-email",
+            "subscriber.email",
+            "random",
+            None
+        ),
+        (
+            argparse.ArgumentError,
+            "--subscriber-callback",
+            "subscriber.callback",
+            "random",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "test@email.com",
+            None
+        ),
+        (
+            NotImplementedError,
+            "--subscriber-unknown",
+            "subscriber.unknown",
+            "https://some-server.com/path",
+            None
+        ),
+    ]
+)
+def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, subscriber_value, subscriber_result):
+    ns = argparse.Namespace()
+    try:
+        action = SubscriberAction(["-sXX", subscriber_option], dest=subscriber_dest)
+        action(argparse.ArgumentParser(), ns, subscriber_value)
+    except Exception as exc:
+        assert expect_error is not None, f"Test was not expected to fail, but raised {exc!s}."
+        assert isinstance(exc, expect_error), f"Test expected to raise {expect_error}, but raised {exc!s} instead."
+    else:
+        assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
+        assert dict(**vars(ns)) == subscriber_result  # pylint: disable=R1735

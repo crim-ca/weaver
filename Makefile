@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 4.30.0
+APP_VERSION ?= 5.9.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -17,6 +17,7 @@ DOCKER_REPO ?= pavics/weaver
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
+SUDO ?=
 
 # conda
 CONDA_CMD      ?= __EMPTY__
@@ -37,7 +38,7 @@ else
   else
     CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
   endif
-  CONDA_BIN := $(CONDA_BIN_DIR)/conda
+  CONDA_BIN ?= $(CONDA_BIN_DIR)/conda
   CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
   CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 
@@ -271,31 +272,24 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 
 # install locally to ensure they can be found by config extending them
 .PHONY: install-npm
-install-npm:    ## install npm package manager and dependencies if they cannot be found
+install-npm:	## install npm package manager and dependencies if they cannot be found
 	@[ -f "$(shell which npm)" ] || ( \
 		echo "Binary package manager npm not found. Attempting to install it."; \
-		apt-get install npm \
+		$(SUDO) apt-get install npm \
 	)
 
 .PHONY: install-npm-stylelint
-install-npm-stylelint: install-npm   	## install stylelint dependency for 'check-css' target using npm
-	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | wc -l` = 1 ] || ( \
+install-npm-stylelint: install-npm	## install stylelint dependency for 'check-css' target using npm
+	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for CSS checks." && \
-		npm install stylelint stylelint-config-standard --save-dev \
+		npm install --save-dev \
 	)
 
 .PHONY: install-npm-remarklint
-install-npm-remarklint: install-npm    ## install remark-lint dependency for 'check-md' target using npm
-	@[ `npm ls 2>/dev/null | grep remark-lint | wc -l` = 1 ] || ( \
+install-npm-remarklint: install-npm		## install remark-lint dependency for 'check-md' target using npm
+	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
-		 	remark-lint \
-		 	remark-gfm \
-		 	remark-cli \
-		 	remark-lint-maximum-line-length \
-		 	remark-lint-checkbox-content-indent \
-		 	remark-preset-lint-recommended \
-		 	remark-preset-lint-markdown-style-guide \
 	)
 
 y.PHONY: install-transform
@@ -318,8 +312,11 @@ install-transform: install-cairo-dependencies       # install-trfm-dependencies 
 install-cairo-dependencies:   ## install required dependencies for Transformer
 	@[ -f "$(shell which cairo)" ] || ( \
 		echo "Binary package manager cairo not found. Attempting to install it."; \
-		apt-get install libpangocairo-1.0-0 \
+		$(SUDO) apt-get install libpangocairo-1.0-0 \
 	)
+.PHONY: install-dev-npm
+install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## install all npm development dependencies
+
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
 .PHONY: clean
@@ -514,7 +511,7 @@ check-all: install-dev $(CHECKS_ALL) 	## check all code linters
 
 .PHONY: check-pep8-only
 check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
-	@echo "Running pep8 code style checks..."
+	@echo "Running PEP8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
@@ -554,7 +551,6 @@ check-security-deps-only: mkdir-reports  ## run security checks on package depen
 			-r "$(APP_ROOT)/requirements-dev.txt" \
 			-r "$(APP_ROOT)/requirements-doc.txt" \
 			-r "$(APP_ROOT)/requirements-sys.txt" \
-			-r "$(APP_ROOT)/requirements-trfm.txt" \
 			$(SAFETY_IGNORE) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
@@ -580,7 +576,7 @@ check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
 	@echo "Checking PEP8 doc formatting problems..."
 	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --check --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --check --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1>&2 2> >(tee "$(REPORTS_DIR)/check-docf.txt")'
 
 # FIXME: no configuration file support
@@ -625,7 +621,7 @@ check-imports-only: mkdir-reports 	## check imports ordering and styles
 check-css-only: mkdir-reports  	## check CSS linting
 	@echo "Running CSS style checks..."
 	@npx --no-install stylelint \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/check-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -640,7 +636,7 @@ check-md-only: mkdir-reports 	## check Markdown linting
 		--inspect --frail \
 		--silently-ignore \
 		--stdout --color \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		> "$(REPORTS_DIR)/check-md.txt"
@@ -701,7 +697,7 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
-		docformatter --in-place --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		docformatter --in-place --diff --recursive --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only
@@ -715,9 +711,9 @@ fix-fstring-only: mkdir-reports
 .PHONY: fix-css-only
 fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
-	@npx stylelint \
+	@npx --no-install stylelint \
 		--fix \
-		--config "$(APP_ROOT)/.stylelintrc.json" \
+		--config "$(APP_ROOT)/package.json" \
 		--output-file "$(REPORTS_DIR)/fixed-css.txt" \
 		"$(APP_ROOT)/**/*.css"
 
@@ -731,7 +727,7 @@ fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
 	@npx --no-install remark \
 		--output --frail \
 		--silently-ignore \
-		--rc-path "$(APP_ROOT)/.remarkrc" \
+		--rc-path "$(APP_ROOT)/package.json" \
 		--ignore-path "$(APP_ROOT)/.remarkignore" \
 		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
 		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
@@ -824,25 +820,28 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
+DOCKER_COMPOSE_CMD ?= docker compose
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
-	docker-compose $(DOCKER_TEST_COMPOSES) up -d
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
 	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
 	@curl localhost:4001 | grep "Weaver Information" || \
-		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
-		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
-	docker-compose $(DOCKER_TEST_COMPOSES) stop
+		( $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
+		  $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop
 
 .PHONY: docker-stat
 docker-stat:  ## query docker-compose images status (from 'docker-test')
-	docker-compose $(DOCKER_TEST_COMPOSES) ps
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
 docker-clean:  ## remove all built docker images (only matching current/latest versions)
-	docker-compose $(DOCKER_TEST_COMPOSES) down || true
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) down || true
 	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)-manager" || true
 	docker rmi -f "$(DOCKER_REPO):latest-manager" || true
 	docker rmi -f "$(APP_NAME):$(APP_VERSION)-manager" || true
@@ -857,13 +856,6 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 	docker rmi -f "$(APP_NAME):latest" || true
 	docker rmi -f "$(APP_NAME):base" || true
 
-.PHONY: transformer
-fix-fstring-only: mkdir-reports
-	@echo "Fixing code string formats substitutions to f-string definitions..."
-	@-rm -f "$(REPORTS_DIR)/fixed-fstring.txt"
-	@bash -c '$(CONDA_CMD) \
-		flynt $(FLYNT_FLAGS) "$(APP_ROOT)" \
-		1> >(tee "$(REPORTS_DIR)/fixed-fstring.txt")'
 
 ## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
@@ -880,4 +872,6 @@ stop: 		## kill application instance(s) started with gunicorn (pserve)
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
 
-
+# Reapply config if overrides were defined.
+# Ensure overrides take precedence over targets and auto-resolution logic of variables.
+-include Makefile.config

@@ -1,6 +1,14 @@
 import pytest
 
-from weaver.processes.constants import CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS
+from weaver.processes.constants import (
+    CWL_NAMESPACE_CWL_SPEC_DEFINITION,
+    CWL_NAMESPACE_CWLTOOL_DEFINITION,
+    CWL_NAMESPACE_SCHEMA_DEFINITION,
+    CWL_NAMESPACE_WEAVER_DEFINITION,
+    CWL_NAMESPACES,
+    CWL_NAMESPACES_REVERSED,
+    CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS
+)
 
 
 def test_cuda_default_parameters_immutable():
@@ -31,3 +39,20 @@ def test_cuda_default_parameters_copy_mutable(parameters_copy):
     assert parameters_copy["value"] == "test"
     assert key in CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS
     assert key not in parameters_copy
+
+
+@pytest.mark.parametrize(
+    "namespace",
+    [
+        CWL_NAMESPACES,
+        CWL_NAMESPACES_REVERSED,
+        CWL_NAMESPACE_CWLTOOL_DEFINITION,
+        CWL_NAMESPACE_SCHEMA_DEFINITION,
+        CWL_NAMESPACE_CWL_SPEC_DEFINITION,
+        CWL_NAMESPACE_WEAVER_DEFINITION,
+    ]
+)
+def test_cwl_namespaces_immutable(namespace):
+    with pytest.raises((AttributeError, TypeError)):  # type: ignore
+        namespace.update({"random": "ignore"})
+    assert "random" not in namespace

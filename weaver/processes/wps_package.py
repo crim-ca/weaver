@@ -7,7 +7,7 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
 
 .. seealso::
     - `CWL specification <https://www.commonwl.org/specification/>`_
-    - `WPS-1/2 schemas <http://schemas.opengis.net/wps/>`_
+    - `WPS-1/2 XML schemas <http://schemas.opengis.net/wps/>`_
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """
@@ -21,26 +21,33 @@ import sys
 import tempfile
 import time
 import uuid
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import parse_qsl, urlparse
 
 import colander
 import cwltool
 import cwltool.docker
+import cwltool.process
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
-from cwltool.process import use_custom_schema
+from cwltool.process import shortname, use_custom_schema
+from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pywps import Process
-from pywps.inout.basic import SOURCE_TYPE
+from pywps.inout.basic import SOURCE_TYPE, DataHandler, FileHandler, IOHandler, NoneIOHandler
+from pywps.inout.formats import Format
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
-from pywps.inout.outputs import ComplexOutput
+from pywps.inout.outputs import BoundingBoxOutput, ComplexOutput
 from pywps.inout.storage import STORE_TYPE, CachedStorage
 from pywps.inout.storage.file import FileStorage, FileStorageBuilder
 from pywps.inout.storage.s3 import S3Storage, S3StorageBuilder
+from pywps.validator import get_validator
+from pywps.validator.base import emptyvalidator
+from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
+from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
@@ -49,14 +56,26 @@ from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
     PackageNotFound,
-    PackageParsingError,
     PackageRegistrationError,
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import ContentType, get_content_type, get_cwl_file_format, get_format, repr_json
+from weaver.formats import (
+    DEFAULT_FORMAT,
+    ContentType,
+    clean_media_type_format,
+    get_content_type,
+    get_cwl_file_format,
+    get_extension,
+    get_format,
+    map_cwl_media_type,
+    repr_json
+)
 from weaver.processes import opensearch
 from weaver.processes.constants import (
+    CWL_NAMESPACE_CWLTOOL_URL,
+    CWL_NAMESPACE_WEAVER_DEFINITION,
+    CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -65,30 +84,34 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_REMOTE,
     CWL_REQUIREMENT_APP_TYPES,
+    CWL_REQUIREMENT_APP_WEAVER_CLASSES,
+    CWL_REQUIREMENT_APP_WEAVER_DEFINITION,
     CWL_REQUIREMENT_APP_WPS1,
     CWL_REQUIREMENT_CUDA,
     CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS,
+    CWL_REQUIREMENT_CUDA_NAME,
     CWL_REQUIREMENT_CUDA_NAMESPACE,
     CWL_REQUIREMENT_ENV_VAR,
     CWL_REQUIREMENT_RESOURCE,
+    CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENTS_SUPPORTED,
-    CWL_TOOL_NAMESPACE_URL,
+    IO_INPUT,
+    IO_OUTPUT,
     PACKAGE_COMPLEX_TYPES,
     PACKAGE_DIRECTORY_TYPE,
     PACKAGE_EXTENSIONS,
-    PACKAGE_FILE_TYPE,
-    WPS_INPUT,
-    WPS_OUTPUT
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.convert import (
-    DEFAULT_FORMAT,
+    any2json_literal_data,
     cwl2wps_io,
+    get_cwl_io_type,
     json2wps_field,
     json2wps_io,
     merge_package_io,
     normalize_ordered_io,
     ogcapi2cwl_process,
-    parse_cwl_array_type,
+    resolve_cwl_namespaced_name,
     wps2json_io,
     xml_wps2cwl
 )
@@ -99,6 +122,7 @@ from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    Lazify,
     OutputMethod,
     adjust_directory_local,
     adjust_file_local,
@@ -108,6 +132,7 @@ from weaver.utils import (
     fully_qualified_name,
     generate_diff,
     get_any_id,
+    get_any_value,
     get_header,
     get_job_log_msg,
     get_log_date_fmt,
@@ -138,34 +163,37 @@ if TYPE_CHECKING:
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
-    from pywps.inout.formats import Format
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
-    from weaver.processes.convert import (
-        ANY_IO_Type,
-        CWL_Input_Type,
-        JSON_IO_Type,
-        PKG_IO_Type,
-        WPS_Input_Type,
-        WPS_Output_Type
-    )
+    from weaver.processes.constants import CWL_RequirementCUDANameType, CWL_RequirementDockerGpuType, IO_Select_Type
+    from weaver.processes.convert import ANY_IO_Type, JSON_IO_Type, PKG_IO_Type, WPS_Input_Type, WPS_Output_Type
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
+        AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_AnyRequirementObject,
         CWL_AnyRequirements,
+        CWL_Input_Type,
         CWL_IO_ComplexType,
+        CWL_IO_Type,
         CWL_Requirement,
         CWL_RequirementNames,
         CWL_RequirementsDict,
+        CWL_RequirementsList,
         CWL_Results,
+        CWL_SchemaNames,
+        CWL_SchemaSalad,
         CWL_ToolPathObject,
+        CWL_WorkflowInputs,
         CWL_WorkflowStepPackage,
         CWL_WorkflowStepPackageMap,
         CWL_WorkflowStepReference,
         Default,
+        ExecutionInputs,
+        JobValueItem,
         JSON,
         Literal,
         Number,
@@ -177,7 +205,7 @@ if TYPE_CHECKING:
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
-#   In that case, employ 'self.logger' instead so that the executed process has its self-contained job log entries.
+#   In that case, employ 'self.log_message' instead so that the executed process has its self-contained job log entries.
 LOGGER = logging.getLogger(__name__)
 
 # CWL package references
@@ -198,6 +226,16 @@ PACKAGE_PROGRESS_PREP_OUT = 98
 PACKAGE_PROGRESS_DONE = 100
 
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
+
+SUPPORTED_METADATA_MAPPING = [
+    "s:author",
+    "s:citation",
+    "s:codeRepository",
+    "s:contributor",
+    "s:dateCreated",
+    "s:license",
+    "s:releaseNotes",
+]
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -230,20 +268,21 @@ def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
         LOGGER.warning("Failed retrieving package log for %s", job)
 
 
-def get_process_location(process_id_or_url, data_source=None):
-    # type: (Union[Dict[str, Any], str], Optional[str]) -> str
+def get_process_location(process_id_or_url, data_source=None, container=None):
+    # type: (Union[Dict[str, Any], str], Optional[str], Optional[AnySettingsContainer]) -> str
     """
     Obtains the URL of a WPS REST DescribeProcess given the specified information.
 
     :param process_id_or_url: process "identifier" or literal URL to DescribeProcess WPS-REST location.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
+    :param container: Container that provides access to application settings.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
-    data_source_url = retrieve_data_source_url(data_source)
-    process_id = get_sane_name(process_id_or_url)
+    data_source_url = retrieve_data_source_url(data_source, container=container)
+    process_id = get_sane_name(process_id_or_url, min_len=1)
     process_url = sd.process_service.path.format(process_id=process_id)
     return f"{data_source_url}{process_url}"
 
@@ -273,8 +312,8 @@ def get_package_workflow_steps(package_dict_or_url):
     return workflow_steps_ids
 
 
-def _fetch_process_info(process_info_url, fetch_error):
-    # type: (str, Type[Exception]) -> JSON
+def _fetch_process_info(process_info_url, fetch_error, container=None):
+    # type: (str, Type[Exception], Optional[AnySettingsContainer]) -> JSON
     """
     Fetches the JSON process information from the specified URL and validates that it contains something.
 
@@ -285,7 +324,8 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, str):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": ContentType.APP_JSON}, settings=get_settings())
+    settings = get_settings(container)
+    resp = request_extra("get", process_info_url, headers={"Accept": ContentType.APP_JSON}, settings=settings)
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -294,8 +334,8 @@ def _fetch_process_info(process_info_url, fetch_error):
     return body
 
 
-def _get_process_package(process_url):
-    # type: (str) -> Tuple[CWL, str]
+def _get_process_package(process_url, container=None):
+    # type: (str, Optional[AnySettingsContainer]) -> Tuple[CWL, str]
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
@@ -303,13 +343,13 @@ def _get_process_package(process_url):
     :return: tuple of package body as dictionary and package reference name.
     """
     package_url = f"{process_url}/package"
-    package_body = _fetch_process_info(package_url, PackageNotFound)
+    package_body = _fetch_process_info(package_url, PackageNotFound, container=container)
     package_name = process_url.split("/")[-1]
     return package_body, package_name
 
 
-def _get_process_payload(process_url):
-    # type: (str) -> JSON
+def _get_process_payload(process_url, container=None):
+    # type: (str, Optional[AnySettingsContainer]) -> JSON
     """
     Retrieves the WPS process payload content from given process ID or literal URL.
 
@@ -318,7 +358,7 @@ def _get_process_payload(process_url):
     """
     process_url = get_process_location(process_url)
     payload_url = f"{process_url}/payload"
-    payload_body = _fetch_process_info(payload_url, PayloadNotFound)
+    payload_body = _fetch_process_info(payload_url, PayloadNotFound, container=container)
     return payload_body
 
 
@@ -345,10 +385,67 @@ def _get_package_requirements_normalized(requirements, as_dict=False):
             reqs.append({"class": req})
             reqs[-1].update(requirements[req] or {})
         return reqs
-    reqs = [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
+    # ensure list-of-dict instead of sequence of dict-like
+    reqs = [dict(req) for req in requirements]  # type: CWL_RequirementsList
     if as_dict:
-        return {req.pop("class"): req for req in reqs}
+        return cast(
+            "CWL_RequirementsDict",
+            {req.pop("class"): req for req in reqs}  # noqa
+        )
     return reqs
+
+
+def _patch_cuda_requirement(package, app_pkg_req, patch_requirement):
+    # type: (CWL, CWL_Requirement, Union[CWL_RequirementCUDANameType, CWL_RequirementDockerGpuType]) -> CWL
+    """
+    Updates legacy :term:`CWL` definitions for combinations of `CUDA` and `Docker` requirements and/or hints.
+    """
+    # backup original for later compare and find requirements of interest
+    # requirements unrelated to update must remain in same locations and formats to preserve behavior
+    r_original = package.get("requirements", {})
+    h_original = package.get("hints", {})
+    r_list = _get_package_requirements_normalized(r_original)
+    h_list = _get_package_requirements_normalized(h_original)
+    search_reqs = {patch_requirement, CWL_REQUIREMENT_CUDA_NAME}
+    r_no_patched = list(filter(lambda _req: not _req["class"].endswith(patch_requirement), r_list))
+    h_no_patched = list(filter(lambda _req: not _req["class"].endswith(patch_requirement), h_list))
+    r_other = list(filter(lambda _req: not any(_req["class"].endswith(name) for name in search_reqs), r_no_patched))
+    h_other = list(filter(lambda _req: not any(_req["class"].endswith(name) for name in search_reqs), h_no_patched))
+    r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA_NAME), r_list))
+    h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA_NAME), h_list))
+    if patch_requirement.endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+        app_pkg_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement (preserve other params)
+    else:
+        app_pkg_req = {}  # updating only namespaced CUDA requirement, no application pacakge requirement
+    if (r_cuda and h_cuda) or len(r_cuda) > 1 or len(h_cuda) > 1:
+        h_cuda = [] if r_cuda else h_cuda
+        LOGGER.warning(
+            "Detected multiple CUDA requirements/hints employed simultaneously. "
+            "Will keep only the first definition, with prioritized requirements over hints. "
+            "Remaining items will be ignored."
+        )
+    cuda_req = r_cuda or h_cuda
+    cuda_found = bool(cuda_req)
+    # if CUDA not explicitly provided along the older GPU requirement, define default, otherwise reuse
+    cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy() if not cuda_req else cuda_req[0]
+    cuda_req["class"] = CWL_REQUIREMENT_CUDA  # force always with namespace
+    r_app_pkg = [app_pkg_req] if app_pkg_req and r_list != r_other and h_list == h_no_patched else []
+    h_app_pkg = [app_pkg_req] if app_pkg_req and h_list != h_other and r_list == r_no_patched else []
+    if not cuda_found:  # apply default in same place as the application requirement
+        r_cuda = [cuda_req] if r_app_pkg else []
+        h_cuda = [cuda_req] if h_app_pkg else []
+    r_list = r_app_pkg + r_cuda + r_other
+    h_list = h_app_pkg + h_cuda + h_other
+    # revert list conversion if necessary
+    r_list = _get_package_requirements_normalized(r_list, as_dict=isinstance(r_original, dict))
+    h_list = _get_package_requirements_normalized(h_list, as_dict=isinstance(h_original, dict))
+    if r_list:
+        package["requirements"] = r_list
+    if h_list:
+        package["hints"] = h_list
+    package.setdefault("$namespaces", {})
+    package["$namespaces"].update(dict(CWL_REQUIREMENT_CUDA_NAMESPACE))
+    return package
 
 
 def _update_package_compatibility(package):
@@ -359,49 +456,64 @@ def _update_package_compatibility(package):
     package_original = copy.deepcopy(package)
     package_type = _get_package_type(package)
     if package_type == ProcessType.APPLICATION:
-        docker_req = get_application_requirement(package, validate=False, required=False)
-        if docker_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
-            # backup original for later compare and find requirements of interest
-            # requirements unrelated to update must be preserved in same locations and formats to preserve behavior
-            r_original = package.get("requirements", {})
-            h_original = package.get("hints", {})
-            r_list = _get_package_requirements_normalized(r_original)
-            h_list = _get_package_requirements_normalized(h_original)
-            r_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), r_list))
-            h_no_docker = list(filter(lambda _req: not _req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU), h_list))
-            r_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), r_list))
-            h_cuda = list(filter(lambda _req: _req["class"].endswith(CWL_REQUIREMENT_CUDA), h_list))
-            docker_req["class"] = CWL_REQUIREMENT_APP_DOCKER  # GPU to official Docker requirement
-            cuda_req = r_cuda or h_cuda
-            cuda_found = bool(cuda_req)
-            if not cuda_req:  # if CUDA no explicitly provided along the older GPU requirement, define default
-                cuda_req = CWL_REQUIREMENT_CUDA_DEFAULT_PARAMETERS.copy()
-                cuda_req["class"] = CWL_REQUIREMENT_CUDA
-            # apply the change to the relevant list where it was originally found
-            if r_list == r_no_docker and h_list != h_no_docker:
-                h_list = h_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
-            elif r_list != r_no_docker and h_list == h_no_docker:
-                r_list = r_no_docker + ([docker_req] if cuda_found else [docker_req, cuda_req])
-            else:
-                raise PackageParsingError(
-                    f"Expected to find a unique '{CWL_REQUIREMENT_APP_DOCKER_GPU}' definition in CWL "
-                    "requirements or hints, but could not resolve it between mapping and listing representations."
-                )
-            # revert list conversion if necessary
-            r_list = _get_package_requirements_normalized(r_list, as_dict=isinstance(r_original, dict))
-            h_list = _get_package_requirements_normalized(h_list, as_dict=isinstance(h_original, dict))
-            if r_list:
-                package["requirements"] = r_list
-            if h_list:
-                package["hints"] = h_list
-            package.setdefault("$namespaces", {})
-            package["$namespaces"].update(CWL_REQUIREMENT_CUDA_NAMESPACE.copy())
+        app_pkg_req = get_application_requirement(package, validate=False, required=False)
+        if app_pkg_req["class"].endswith(CWL_REQUIREMENT_APP_DOCKER_GPU):
+            _patch_cuda_requirement(package, app_pkg_req, CWL_REQUIREMENT_APP_DOCKER_GPU)
             LOGGER.warning(
-                "CWL package definition updated using '%s' backward-compatibility definition.\n%s",
+                "CWL package definition updated using '%s' backward-compatibility definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
                 CWL_REQUIREMENT_APP_DOCKER_GPU,
                 generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
             )
+        # CUDA requirement missing cwltool-specific namespace
+        # This is not considered an Application Package requirement for a process by itself.
+        # Therefore, all requirements/hints must be checked as 'get_application_requirement' will not return it.
+        elif any(
+            req["class"] == CWL_REQUIREMENT_CUDA_NAME for req in
+            _get_package_requirements_normalized(package.get("requirements", [])) +
+            _get_package_requirements_normalized(package.get("hints", []))
+        ):
+            _patch_cuda_requirement(package, app_pkg_req, CWL_REQUIREMENT_CUDA_NAME)
+            LOGGER.warning(
+                "CWL package definition with '%s' updated using namespaced '%s' definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
+                CWL_REQUIREMENT_CUDA_NAME, CWL_REQUIREMENT_CUDA,
+                generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
+            )
+        # weaver-specific requirements extensions with namespaced specification
+        elif (
+            not app_pkg_req["class"].startswith(f"{CWL_NAMESPACE_WEAVER_ID}:")
+            and any(app_pkg_req["class"].endswith(req) for req in CWL_REQUIREMENT_APP_WEAVER_CLASSES)
+        ):
+            weaver_hint = app_pkg_req["class"]  # type: CWL_RequirementNames  # noqa
+            weaver_req = f"{CWL_NAMESPACE_WEAVER_ID}:{weaver_hint}"  # type: CWL_RequirementNames  # noqa
+            app_pkg_hints = package.get("hints", [])  # don't need to check requirements (would not have worked anyway)
+            if isinstance(app_pkg_hints, dict):
+                hint = app_pkg_hints.pop(weaver_hint)
+                app_pkg_hints[weaver_req] = hint
+            else:
+                for hint in app_pkg_hints:
+                    if hint["class"] == weaver_hint:
+                        hint["class"] = weaver_req
+                        break
+            package.setdefault("$namespaces", {})
+            package["$namespaces"].update(CWL_NAMESPACE_WEAVER_DEFINITION)
+            LOGGER.warning(
+                "CWL package definition with '%s' updated using namespaced '%s' definition. "
+                "Consider updating the Application Package with relevant changes to avoid this warning.\n%s",
+                weaver_hint, weaver_req,
+                generate_diff(package_original, package, val_name="Original CWL", ref_name="Updated CWL")
+            )
     return package
+
+
+@cache
+def _load_weaver_extensions_schema():
+    # type: () -> CWL_SchemaSalad
+    LOGGER.debug("Loading Weaver schema extensions...")
+    with open_module_resource_file("weaver", "schemas/cwl/weaver-extensions.yml") as r_file:
+        weaver_schema = yaml.safe_load(r_file)
+    return weaver_schema
 
 
 def _load_supported_schemas():
@@ -415,8 +527,6 @@ def _load_supported_schemas():
 
     This operation must be called before the :class:`CWLFactory` attempts loading and validating a :term:`CWL` document.
     """
-    schema_supported = [name.rsplit(":", 1)[-1] for name in CWL_REQUIREMENTS_SUPPORTED]
-
     # explicitly omit dev versions, only released versions allowed
     extension_resources = {
         "v1.0": "extensions.yml",
@@ -433,17 +543,22 @@ def _load_supported_schemas():
         with open_module_resource_file(cwltool, ext_version_file) as r_file:
             schema = yaml.safe_load(r_file)
 
-        extensions = schema["$graph"]
+        weaver_ext_schema = _load_weaver_extensions_schema()
+        extensions_weaver = weaver_ext_schema["$graph"]
+        schema.setdefault("$namespaces", {})
+        schema["$namespaces"].update(weaver_ext_schema.get("$namespaces", {}))
+
+        extensions_cwl = schema["$graph"]
         extensions_supported = []
         extensions_imports = []
         extensions_enabled = set()
         extensions_dropped = set()
-        for ext in extensions:
+        for ext in extensions_cwl + extensions_weaver:
             if "name" not in ext and "$import" in ext:
                 extensions_imports.append(ext)
                 continue
             ext_name = ext["name"]
-            if ext_name in schema_supported:
+            if ext_name in CWL_REQUIREMENTS_SUPPORTED:
                 extensions_enabled.add(ext_name)
                 extensions_supported.append(ext)
             else:
@@ -457,9 +572,12 @@ def _load_supported_schemas():
         schema["$graph"] = extensions_imports + extensions_supported
 
         schema_data = bytes2str(yaml.safe_dump(schema, encoding="utf-8", sort_keys=False))
-        schema_base = CWL_TOOL_NAMESPACE_URL.split("#", 1)[0]
+        schema_base = CWL_NAMESPACE_CWLTOOL_URL.split("#", 1)[0]
         use_custom_schema(version, schema_base, schema_data)
         PACKAGE_SCHEMA_CACHE[version] = (schema_base, schema_data)
+
+    # ensure that any weaver-namespaced requirement can be loaded by cwltool
+    cwltool.process.supportedProcessRequirements.extend(set(CWL_REQUIREMENT_APP_WEAVER_DEFINITION.values()))
 
 
 @overload
@@ -471,6 +589,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):                                        # type: (...) -> None
     ...
 
@@ -484,6 +603,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):  # type: (...) -> Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]
     ...
 
@@ -496,6 +616,7 @@ def _load_package_content(package_dict,                             # type: CWL
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
+                          container=None,                           # type: Optional[AnySettingsContainer]
                           ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, CWL_WorkflowStepPackageMap]]
     """
     Loads :term:`CWL` package definition using various contextual resources.
@@ -521,6 +642,7 @@ def _load_package_content(package_dict,                             # type: CWL
     :param loading_context: :mod:`cwltool` context used to create the :term:`CWL` package.
     :param runtime_context: :mod:`cwltool` context used to execute the :term:`CWL` package.
     :param process_offering: :term:`JSON` body of the process description payload (used as I/O hint ordering).
+    :param container: Container that provides access to application settings.
     :returns:
         If :paramref:`only_dump_file` is ``True``, returns ``None``.
         Otherwise, :class:`tuple` of:
@@ -544,10 +666,18 @@ def _load_package_content(package_dict,                             # type: CWL
     step_packages = {}
     for step in workflow_steps:
         # generate sub-package file and update workflow step to point to it
-        step_process_url = get_process_location(step["reference"], data_source)
-        package_body, package_name = _get_process_package(step_process_url)
-        _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
-                              data_source=data_source, only_dump_file=True)
+        step_process_url = get_process_location(step["reference"], data_source, container=container)
+        package_body, package_name = _get_process_package(step_process_url, container=container)
+        _load_package_content(
+            package_body,
+            package_name,
+            tmp_dir=tmp_dir,
+            data_source=data_source,
+            loading_context=loading_context,
+            runtime_context=runtime_context,
+            container=container,
+            only_dump_file=True,
+        )
         step_name = step["name"]
         package_dict["steps"][step_name]["run"] = package_name
         step_packages[step_name] = {"id": package_name, "package": package_body}
@@ -599,13 +729,13 @@ def _merge_package_inputs_outputs(wps_inputs_defs,      # type: Union[List[ANY_I
     """
     wps_inputs_defs = normalize_ordered_io(wps_inputs_defs)
     wps_outputs_defs = normalize_ordered_io(wps_outputs_defs)
-    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, WPS_INPUT)
-    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, WPS_OUTPUT)
+    wps_inputs_merged = merge_package_io(wps_inputs_defs, cwl_inputs_list, IO_INPUT)
+    wps_outputs_merged = merge_package_io(wps_outputs_defs, cwl_outputs_list, IO_OUTPUT)
     return wps_inputs_merged, wps_outputs_merged
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, str, bool) -> List[PKG_IO_Type]
+    # type: (CWLFactoryCallable, IO_Select_Type, bool) -> List[PKG_IO_Type]
     """
     Retrieves I/O definitions from a validated :class:`CWLFactoryCallable`.
 
@@ -613,15 +743,15 @@ def _get_package_io(package_factory, io_select, as_json):
         Factory can be obtained with validation using :func:`_load_package_content`.
 
     :param package_factory: :term:`CWL` factory that contains I/O references to the package definition.
-    :param io_select: either :data:`WPS_INPUT` or :data:`WPS_OUTPUT` according to what needs to be processed.
+    :param io_select: either :data:`IO_INPUT` or :data:`IO_OUTPUT` according to what needs to be processed.
     :param as_json: toggle to the desired output type.
         If ``True``, converts the I/O definitions into :term:`JSON` representation.
         If ``False``, converts the I/O definitions into :term:`WPS` objects.
     :returns: I/O format depending on value :paramref:`as_json`.
     """
-    if io_select == WPS_OUTPUT:
+    if io_select == IO_OUTPUT:
         io_attrib = "outputs_record_schema"
-    elif io_select == WPS_INPUT:
+    elif io_select == IO_INPUT:
         io_attrib = "inputs_record_schema"
     else:
         raise PackageTypeError(f"Unknown I/O selection: '{io_select}'.")
@@ -638,8 +768,8 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
     """
     Generates :term:`WPS`-like ``(inputs, outputs)`` tuple using parsed CWL package definitions.
     """
-    return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
-            _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
+    return (_get_package_io(package_factory, io_select=IO_INPUT, as_json=as_json),
+            _get_package_io(package_factory, io_select=IO_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
@@ -668,6 +798,55 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         wps_package_metadata["keywords"] = list(
             set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
         )
+
+    # specific use case with a different mapping
+    # https://docs.ogc.org/bp/20-089r1.html#toc31
+    if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
+        version_value = (
+            wps_package_metadata.get("version")
+            or cwl_package_package.get("s:version")
+            or cwl_package_package.get("s:softwareVersion")
+        )
+        # Only set the key if version_value is not empty or null
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
+    else:
+        version_value = wps_package_metadata.get("version")
+        if version_value:
+            wps_package_metadata["version"] = str(version_value)
+
+    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
+        if metadata_mapping in cwl_package_package:
+            metadata = wps_package_metadata.get("metadata", [])
+            if (
+                isinstance((cwl_package_package[metadata_mapping]), str)
+                and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
+            ):
+                url = cwl_package_package[metadata_mapping]
+                if metadata_mapping == "s:codeRepository":
+                    type = "text/html"
+                else:
+                    type = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
+                metadata.append({
+                    "type": type,
+                    "rel": metadata_mapping.strip("s:"),
+                    "href": cwl_package_package[metadata_mapping]
+                })
+            else:
+                for objects in cwl_package_package[metadata_mapping]:
+                    class_name = objects["class"].strip("s:")
+                    value = {
+                        "$schema": f"https://schema.org/{class_name}"
+                    }
+                    for key, val in objects.items():
+                        if key.startswith("s:"):
+                            value[key.strip("s:")] = val
+                    metadata.append({
+                        "role": metadata_mapping.strip("s:"),
+                        "value": value
+                    })
+
+            wps_package_metadata["metadata"] = metadata
 
 
 def _patch_wps_process_description_url(reference, process_hint):
@@ -863,7 +1042,7 @@ def get_application_requirement(package,        # type: CWL
     requirement = app_hints[0] if app_hints else req_default
 
     if validate:
-        all_classes = sorted(list(set(item.get("class") for item in all_hints)))
+        all_classes = sorted(list(set(resolve_cwl_namespaced_name(item.get("class")) for item in all_hints)))
         app_required = _get_package_type(package) == ProcessType.APPLICATION
         if required and app_required:
             cwl_impl_type_reqs = sorted(list(CWL_REQUIREMENT_APP_TYPES))
@@ -966,6 +1145,38 @@ def get_auth_requirements(requirement, headers):
     return None
 
 
+def mask_process_inputs(package, inputs, secret_store=None):
+    # type: (CWL, ExecutionInputs, Optional[SecretStore]) -> ExecutionInputs
+    """
+    Obtains a masked representation of the input values as applicable.
+
+    .. seealso::
+        :data:`CWL_REQUIREMENT_SECRETS`
+    """
+    if not package:
+        return inputs
+    req_secrets = get_application_requirement(package, search=CWL_REQUIREMENT_SECRETS, required=False, default={})
+    if not req_secrets or "secrets" not in req_secrets:
+        return inputs
+    masked_inputs = copy.deepcopy(inputs)
+    secret_store = secret_store or SecretStore()
+    is_input_map = isinstance(inputs, dict)
+    for idx_or_key, input_def in (
+        masked_inputs.items() if is_input_map else enumerate(masked_inputs)
+    ):  # type: Union[str, int], JobValueItem
+        input_id = idx_or_key if is_input_map else get_any_id(input_def)
+        if input_id in req_secrets["secrets"]:
+            if isinstance(input_def, dict):
+                val_key = get_any_value(input_def, key=True, data=True)
+                value = input_def.get(val_key)
+                if val_key and isinstance(value, str):
+                    input_def[val_key] = secret_store.add(value)
+                    masked_inputs[idx_or_key] = input_def
+            elif isinstance(input_def, str):
+                masked_inputs[idx_or_key] = secret_store.add(input_def)
+    return masked_inputs
+
+
 def get_process_identifier(process_info, package):
     # type: (JSON, CWL) -> str
     """
@@ -974,17 +1185,19 @@ def get_process_identifier(process_info, package):
     process_id = get_any_id(process_info)
     if not process_id:
         process_id = package.get("id")
-    process_id = get_sane_name(process_id, assert_invalid=True)
+    process_id = get_sane_name(process_id, assert_invalid=True, min_len=1)
     return process_id
 
 
-def get_process_definition(process_offering,    # type: JSON
-                           reference=None,      # type: Optional[str]
-                           package=None,        # type: Optional[CWL]
-                           data_source=None,    # type: Optional[str]
-                           headers=None,        # type: Optional[AnyHeadersContainer]
-                           builtin=False,       # type: bool
-                           ):                   # type: (...) -> JSON
+def get_process_definition(
+    process_offering,   # type: JSON
+    reference=None,     # type: Optional[str]
+    package=None,       # type: Optional[CWL]
+    data_source=None,   # type: Optional[str]
+    headers=None,       # type: Optional[AnyHeadersContainer]
+    builtin=False,      # type: bool
+    container=None,     # type: Optional[AnySettingsContainer]
+):                      # type: (...) -> JSON
     """
     Resolve the process definition considering corresponding metadata from the offering, package and references.
 
@@ -998,6 +1211,7 @@ def get_process_definition(process_offering,    # type: JSON
     :param data_source: Where to resolve process IDs (default: localhost if ``None``).
     :param headers: Request headers provided during deployment to retrieve details such as authentication tokens.
     :param builtin: Indicate if the package is expected to be a :data:`CWL_REQUIREMENT_APP_BUILTIN` definition.
+    :param container: Container that provides access to application settings.
     :return: Updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
@@ -1033,7 +1247,12 @@ def get_process_definition(process_offering,    # type: JSON
 
     LOGGER.debug("Using data source: '%s'", data_source)
     package_factory, process_type, _ = try_or_raise_package_error(
-        lambda: _load_package_content(package, data_source=data_source, process_offering=process_info),
+        lambda: _load_package_content(
+            package,
+            data_source=data_source,
+            process_offering=process_info,
+            container=container,
+        ),
         reason="Loading package content",
     )
 
@@ -1081,6 +1300,19 @@ def get_process_definition(process_offering,    # type: JSON
         "auth": auth_requirements,
     })
     return process_offering
+
+
+def format_extension_validator(data_input, mode):
+    # type: (Union[ComplexInput, ComplexOutput], int) -> bool
+    """
+    Validator that will only check that the extension matches the selected data format.
+    """
+    if not isinstance(data_input, (ComplexInput, ComplexOutput)):
+        return False  # validator applied on wrong type
+    if mode == MODE.NONE or data_input.data_format is None:
+        return True
+    ext = get_extension(data_input.data_format.mime_type, dot=True)
+    return os.path.splitext(data_input._iohandler._file)[-1] == ext
 
 
 class DirectoryNestedStorage(CachedStorage):
@@ -1207,8 +1439,16 @@ class DirectoryNestedStorage(CachedStorage):
 
 
 class WpsPackage(Process):
-    def __init__(self, package=None, payload=None, **kw):
-        # type: (CWL, Optional[JSON], **Any) -> None
+    def __init__(
+        self,
+        *,
+        identifier,     # type: str
+        title=None,     # type: Optional[str]
+        package=None,   # type: CWL
+        payload=None,   # type; Optional[JSON]
+        settings=None,  # type: Optional[AnySettingsContainer]
+        **kw,           # type: Any
+    ):                  # type: (...) -> None
         """
         Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
@@ -1218,42 +1458,50 @@ class WpsPackage(Process):
         Provided ``kw`` should correspond to :meth:`weaver.datatype.Process.params_wps`
         """
         # defined only after/while _handler is called (or sub-methods)
-        self.package_id = None               # type: Optional[str]
-        self.package_type = None             # type: Optional[str]
-        self.package_requirement = None      # type: Optional[CWL_RequirementsDict]
-        self.package_log_hook_stderr = None  # type: Optional[str]
-        self.package_log_hook_stdout = None  # type: Optional[str]
-        self.percent = None                  # type: Optional[Number]
-        self.remote_execution = None         # type: Optional[bool]
-        self.log_file = None                 # type: Optional[str]
-        self.log_level = None                # type: Optional[int]
-        self.logger = None                   # type: Optional[logging.Logger]
-        self.step_packages = None            # type: Optional[CWL_WorkflowStepPackageMap]
-        self.step_launched = None            # type: Optional[List[str]]
-        self.request = None                  # type: Optional[WorkerRequest]
-        self.response = None                 # type: Optional[ExecuteResponse]
-        self._job = None                     # type: Optional[Job]
-        self._job_status_file = None         # type: Optional[str]
+        self.package_id = identifier            # type: str
+        self.package_type = None                # type: Optional[str]
+        self.package_requirement = None         # type: Optional[CWL_RequirementsDict]
+        self.package_log_hook_stderr = None     # type: Optional[str]
+        self.package_log_hook_stdout = None     # type: Optional[str]
+        self.percent = None                     # type: Optional[Number]
+        self.status = None                      # type: Optional[AnyStatusType]
+        self.remote_execution = None            # type: Optional[bool]
+        self._log_file = None                   # type: Optional[str]
+        self._log_level = None                  # type: Optional[int]
+        self._logger = None                     # type: Optional[logging.Logger]
+        self.step_packages = {}                 # type: CWL_WorkflowStepPackageMap
+        self.step_launched = []                 # type: List[str]
+        self.request = None                     # type: Optional[WorkerRequest]
+        self.response = None                    # type: Optional[ExecuteResponse]
+        self.uuid = None                        # type: Optional[uuid.UUID]
+        self._job = None                        # type: Optional[Job]
+        self._job_status_file = None            # type: Optional[str]
 
         self.payload = payload
         self.package = package
-        self.settings = get_settings()
+        self.settings = get_settings(settings)
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
         if not isinstance(self.package, dict):
             raise PackageRegistrationError("Unknown parsing of package definition for package process.")
 
-        inputs = kw.pop("inputs", [])
+        # prepare some metadata about the package that are often reused
+        self.package_type = _get_package_type(self.package)
+        self.package_requirement = get_application_requirement(self.package)
+        self.step_packages = self.package.get("steps") or {}
 
+        inputs = kw.pop("inputs", [])
         # handle EOImage inputs
         inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
-        inputs = [json2wps_io(i, WPS_INPUT) for i in inputs]
-        outputs = [json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", [])]
+        inputs = [json2wps_io(i, IO_INPUT) for i in inputs]
+        outputs = [json2wps_io(o, IO_OUTPUT) for o in kw.pop("outputs", [])]
         metadata = [json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", [])]
 
         super(WpsPackage, self).__init__(
             self._handler,
+            identifier,
+            title=title or identifier,
             inputs=inputs,
             outputs=outputs,
             metadata=metadata,
@@ -1296,33 +1544,46 @@ class WpsPackage(Process):
             :func:`retrieve_package_job_log`
         """
         setup_loggers(self.settings)
-        self.log_level = self.log_level or logging.getLogger("weaver").getEffectiveLevel()
+        self._log_level = self._log_level or logging.getLogger("weaver").getEffectiveLevel()
 
         # file logger for output
-        self.log_file = get_status_location_log_path(self.status_location)
-        log_file_handler = logging.FileHandler(self.log_file)
+        self._log_file = get_status_location_log_path(self.status_location)
+        log_file_handler = logging.FileHandler(self._log_file)
         log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
         log_file_formatter.converter = time.gmtime
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger(f"{LOGGER.name}|{self.package_id}")
-        self.logger.addHandler(log_file_handler)
-        self.logger.setLevel(self.log_level)
+        self._logger = logging.getLogger(f"{LOGGER.name}|{self.package_id}")
+        if not any(isinstance(handler, logging.FileHandler) for handler in self._logger.handlers):
+            self._logger.addHandler(log_file_handler)
+        self._logger.setLevel(self._log_level)
 
         # add CWL job and CWL runner logging to current package logger
         job_logger = logging.getLogger(f"job {PACKAGE_DEFAULT_FILE_NAME}")
-        job_logger.addHandler(log_file_handler)
-        job_logger.setLevel(self.log_level)
+        if not any(isinstance(handler, logging.FileHandler) for handler in job_logger.handlers):
+            job_logger.addHandler(log_file_handler)
+        job_logger.setLevel(self._log_level)
         cwl_logger = logging.getLogger("cwltool")
-        cwl_logger.addHandler(log_file_handler)
-        cwl_logger.setLevel(self.log_level)
+        if not any(isinstance(handler, logging.FileHandler) for handler in cwl_logger.handlers):
+            cwl_logger.addHandler(log_file_handler)
+        cwl_logger.setLevel(self._log_level)
 
         # add stderr/stdout CWL hook to capture logs/prints/echos from subprocess execution
         # using same file so all kind of message are kept in chronological order of generation
+        # NOTE:
+        #   If the package itself defined stdout/stderr at the root of the CWL document,
+        #   it is possibly employed by one of its outputs as output binding glob.
+        #   The value in this case must not be overridden or it could break the defined package.
         if log_stdout_stderr:
-            self.package_log_hook_stderr = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
-            self.package_log_hook_stdout = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
+            self.package_log_hook_stderr = self.package.get(
+                "stderr",
+                PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4())),
+            )
+            self.package_log_hook_stdout = self.package.get(
+                "stdout",
+                PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4())),
+            )
             package_outputs = self.package.get("outputs")
             if isinstance(package_outputs, list):
                 package_outputs.extend([{"id": self.package_log_hook_stderr, "type": "stderr"},
@@ -1330,12 +1591,14 @@ class WpsPackage(Process):
             else:
                 package_outputs.update({self.package_log_hook_stderr: {"type": "stderr"},
                                         self.package_log_hook_stdout: {"type": "stdout"}})
-            self.package.update({"stderr": "stderr.log", "stdout": "stdout.log"})
+            self.package.setdefault("stderr", "stderr.log")
+            self.package.setdefault("stdout", "stdout.log")
 
         # add weaver Tweens logger to current package logger
         weaver_tweens_logger = logging.getLogger("weaver.tweens")
-        weaver_tweens_logger.addHandler(log_file_handler)
-        weaver_tweens_logger.setLevel(self.log_level)
+        if not any(isinstance(handler, logging.FileHandler) for handler in weaver_tweens_logger.handlers):
+            weaver_tweens_logger.addHandler(log_file_handler)
+        weaver_tweens_logger.setLevel(self._log_level)
 
     def insert_package_log(self, result):
         # type: (Union[CWL_Results, CWLException]) -> List[str]
@@ -1373,7 +1636,11 @@ class WpsPackage(Process):
             with_stderr_file = os.path.isfile(stderr_file)
             with_stdout_file = os.path.isfile(stdout_file)
             if not with_stdout_file and not with_stderr_file:
-                self.log_message(status, "Could not retrieve any internal application log.", level=logging.WARNING)
+                self.log_message(
+                    "Could not retrieve any internal application log.",
+                    status=status,
+                    level=logging.WARNING,
+                )
                 return captured_log
             out_log = []
             if with_stdout_file:
@@ -1388,9 +1655,13 @@ class WpsPackage(Process):
                     if err_log:
                         err_log = ["----- Captured Log (stderr) -----\n"] + err_log
             if not out_log and not err_log:
-                self.log_message(status, "Nothing captured from internal application logs.", level=logging.INFO)
+                self.log_message(
+                    "Nothing captured from internal application logs.",
+                    status=status,
+                    level=logging.INFO,
+                )
                 return captured_log
-            with open(self.log_file, mode="r", encoding="utf-8") as pkg_log_fd:
+            with open(self._log_file, mode="r", encoding="utf-8") as pkg_log_fd:
                 pkg_log = pkg_log_fd.readlines()
             cwl_end_index = -1
             cwl_end_search = f"[cwltool] [job {self.package_id}] completed"  # success/permanentFail
@@ -1400,7 +1671,7 @@ class WpsPackage(Process):
                     break
             captured_log = out_log + err_log + ["----- End of Logs -----\n"]
             merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
-            with open(self.log_file, mode="w", encoding="utf-8") as pkg_log_fd:
+            with open(self._log_file, mode="w", encoding="utf-8") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
         except Exception as exc:  # pragma: no cover  # log exception, but non-failing
             self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=status,
@@ -1416,32 +1687,43 @@ class WpsPackage(Process):
         """
         # check multiple conditions where Docker authentication never applies
         if self.remote_execution:
-            self.logger.debug("Skipping Docker setup not needed for remote execution.")
+            self.log_message("Skipping Docker setup not needed for remote execution.", level=logging.DEBUG)
             return None
         if self.package_type != ProcessType.APPLICATION:
-            self.logger.debug("Skipping Docker setup not needed for CWL Workflow. "
-                              "Sub-step must take care of it if needed.")
+            self.log_message(
+                "Skipping Docker setup not needed for CWL Workflow. Sub-step must take care of it if needed.",
+                level=logging.DEBUG,
+            )
             return None
         if self.package_requirement["class"] != CWL_REQUIREMENT_APP_DOCKER:
-            self.logger.debug("Skipping Docker setup not needed for CWL application without Docker requirement.")
+            self.log_message(
+                "Skipping Docker setup not needed for CWL application without Docker requirement.",
+                level=logging.DEBUG,
+            )
             return None
         if self.job.service:
-            self.logger.debug("Skipping Docker setup not needed for remote WPS provider process.")
+            self.log_message(
+                "Skipping Docker setup not needed for remote WPS provider process.",
+                level=logging.DEBUG,
+            )
             return None
 
         store = get_db(self.settings).get_store(StoreProcesses)
         process = store.fetch_by_id(self.job.process)
         if not isinstance(process.auth, DockerAuthentication):
-            self.logger.debug("Skipping Docker setup not needed for public repository access.")
+            self.log_message("Skipping Docker setup not needed for public repository access.", level=logging.DEBUG)
             return None
         if self.package_requirement["dockerPull"] != process.auth.link:
             # this is mostly to make sure references are still valid (process/package modified after deployment?)
             # since they should originate from the same CWL 'dockerPull', something went wrong if they don't match
-            self.logger.debug("Skipping Docker setup not applicable for Application Package's Docker reference "
-                              "mismatching registered Process Authentication Docker reference.")
+            self.log_message(
+                "Skipping Docker setup not applicable for Application Package's Docker reference "
+                "mismatching registered Process Authentication Docker reference.",
+                level=logging.DEBUG,
+            )
             return None
 
-        client = pull_docker(process.auth, self.logger)
+        client = pull_docker(process.auth, logger=self)
         return client is not None
 
     def setup_runtime(self):
@@ -1475,7 +1757,7 @@ class WpsPackage(Process):
             "tmp_outdir_prefix": cwl_outdir,
             # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
             "outdir": self.workdir,
-            "debug": self.logger.isEnabledFor(logging.DEBUG),
+            "debug": self._logger.isEnabledFor(logging.DEBUG),
             # when process is a docker image, memory monitoring information is obtained with CID file
             # this file is only generated when the below command is explicitly None (not even when '')
             "user_space_docker_cmd": None,
@@ -1509,8 +1791,11 @@ class WpsPackage(Process):
                 for req_rm in ["dockerFile", "dockerOutputDirectory"]:
                     is_rm = req_def.pop(req_rm, None)
                     if is_rm:
-                        self.logger.warning("Removed CWL [%s.%s] %s parameter from [%s] package definition (forced).",
-                                            req_cls, req_rm, req_type[:-1], self.package_id)
+                        self.log_message(
+                            f"Removed CWL [{req_cls}.{req_rm}] {req_type[:-1]} "
+                            f"parameter from [{self.package_id}] package definition (forced).",
+                            level=logging.WARNING,
+                        )
 
         # update python reference if builtin script
         #   since subprocess is created by CWL, the default python detected is from the OS
@@ -1541,6 +1826,49 @@ class WpsPackage(Process):
             if self.package.get("baseCommand") == "python":
                 self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
+    def update_cwl_schema_names(self):
+        # type: () -> None
+        """
+        Detect duplicate :term:`CWL` schema types not referred by name to provide one and avoid resolution failure.
+
+        Doing this resolution avoids reused definitions being considered as "conflicts" because of missing ``name``.
+        To avoid introducing a real conflict, names are injected only under corresponding :term:`CWL` I/O by ID.
+        The most common type of definition resolved this way is when :term:`CWL` ``Enum`` is reused for single and
+        array-based definitions simultaneously without using an explicit ``SchemaDefRequirement`` for them.
+
+        .. seealso::
+            - :func:`weaver.processes.convert.resolve_cwl_io_type_schema`
+            - :meth:`weaver.processes.wps_package.WpsPackage.make_inputs`
+
+        .. fixme:
+        .. todo::
+            Workaround for https://github.com/common-workflow-language/cwltool/issues/1908.
+        """
+        for io_select in ["inputs", "outputs"]:
+            if isinstance(self.package[io_select], dict):
+                io_items = self.package[io_select]  # type: Dict[str, CWL_IO_Type]
+            else:
+                io_items = {item["id"]: item for item in self.package[io_select]}  # type: Dict[str, CWL_IO_Type]
+            for io_name, io_def in io_items.items():
+                if isinstance(io_def["type"], list):
+                    item_enum = None
+                    array_enum = None
+                    for io_item in io_def["type"]:
+                        if not isinstance(io_item, dict):
+                            continue
+                        if io_item.get("type") == "enum":
+                            item_enum = io_item
+                            continue
+                        if io_item.get("type") != "array":
+                            continue
+                        if not isinstance(io_item.get("items", {}), dict):
+                            continue
+                        if io_item["items"].get("type") == "enum":
+                            array_enum = io_item["items"]
+                    # only apply the name reference if not already provided (eg: explicit name defined in original CWL)
+                    if item_enum and array_enum and item_enum == array_enum and "name" not in item_enum:
+                        item_enum["name"] = array_enum["name"] = f"{io_name}{uuid.uuid4()}"
+
     def update_effective_user(self):
         # type: () -> None
         """
@@ -1560,32 +1888,38 @@ class WpsPackage(Process):
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
         app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
         if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
-            self.logger.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
+            self.log_message("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
         else:
-            self.logger.log(logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
-                            "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid)
+            self.log_message(
+                "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid,
+                level=logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
+            )
 
     def update_status(self, message, progress, status, error=None):
         # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
         """
-        Updates the `PyWPS` real job status from a specified parameters.
+        Updates the :mod:`pywps` real job status from a specified parameters.
         """
         self.percent = progress or self.percent or 0
+        self.status = status
 
-        # find the enum PyWPS status matching the given one as string
-        pywps_status = map_status(status, StatusCompliant.PYWPS)
-        pywps_status_id = STATUS_PYWPS_IDS[pywps_status]
+        # ignore pywps hook when not yet in runtime context
+        if self.response:
+            # find the enum PyWPS status matching the given one as string
+            pywps_status = map_status(status, StatusCompliant.PYWPS)
+            pywps_status_id = STATUS_PYWPS_IDS[pywps_status]
+            # NOTE:
+            #   When running process in sync (because executed within celery worker already async),
+            #   pywps reverts status file output flag. Re-enforce it for our needs.
+            #   (see: 'weaver.wps.WorkerService.execute_job')
+            self.response.store_status_file = True
+            # pywps overrides 'status' by 'accepted' in 'update_status'
+            # therefore, use the '_update_status' to enforce the status
+            # using protected method also avoids weird overrides of progress
+            # percent on failure and final 'success' status
+            self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
 
-        # NOTE:
-        #   When running process in sync (because executed within celery worker already async),
-        #   pywps reverts status file output flag. Re-enforce it for our needs.
-        #   (see: 'weaver.wps.WorkerService.execute_job')
-        self.response.store_status_file = True
-
-        # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
-        # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
-        self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
         if isinstance(error, Exception):
             self.exception_message(exception_type=type(error), exception=error,
                                    status=status, message=message, progress=progress)
@@ -1609,18 +1943,30 @@ class WpsPackage(Process):
             error=error,
         )
 
-    def log_message(self, status, message, progress=None, level=logging.INFO):
-        # type: (AnyStatusType, str, Optional[Number], int) -> None
+    def log(self, level, message, *args, **kwargs):
+        # type: (int, str, *str, **Any) -> None
+        """
+        Logging interface matching :class:`logging.Logger` for use by other utilities.
+        """
+        self.log_message(message, *args, level=level, **kwargs)
+
+    def log_message(self, message, *args, status=None, progress=None, level=logging.INFO, **kwargs):
+        # type: (str, *str, Optional[AnyStatusType], Optional[Number], int, **Any) -> None
+        if not self._logger.isEnabledFor(level):
+            return
+        status = map_status(status or self.status)
         progress = progress if progress is not None else self.percent
-        message = get_job_log_msg(status=map_status(status), message=message, progress=progress)
+        message = get_job_log_msg(status=status, message=message, progress=progress)
+        if args:
+            message = message.replace("% ", "%% ")  # escape to avoid string formatting error when passed to logger
         # Avoid logging plain 'NoneType: None' if exception was handled (therefore nothing raised) but should still
         # be reported as error. Otherwise, include it manually the same way it would be added automatically.
-        exc_info = None
-        if level > logging.INFO:
+        exc_info = kwargs.pop("exc_info", None)
+        if exc_info is None and level > logging.INFO:
             exc_info = sys.exc_info()
             if exc_info == (None, None, None):
                 exc_info = None
-        self.logger.log(level, message, exc_info=exc_info)
+        self._logger.log(level, message, *args, exc_info=exc_info, **kwargs)
 
     def exception_message(self, exception_type, exception=None, message="no message",
                           status=Status.EXCEPTION, progress=None, level=logging.ERROR):
@@ -1683,9 +2029,6 @@ class WpsPackage(Process):
         self.package_id = self.request.identifier
 
         try:
-            # prepare some metadata about the package that are often reused
-            self.package_type = _get_package_type(self.package)
-            self.package_requirement = get_application_requirement(self.package)
             try:
                 # workflows do not support stdout/stderr
                 log_stdout_stderr = (
@@ -1731,10 +2074,15 @@ class WpsPackage(Process):
 
             self.update_effective_user()
             self.update_requirements()
+            self.update_cwl_schema_names()
 
             runtime_params = self.setup_runtime()
-            self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
+            self.log_message(
+                f"Using cwltool.RuntimeContext args:\n{Lazify(lambda: json.dumps(runtime_params, indent=2))}",
+                level=logging.DEBUG,
+            )
             runtime_context = RuntimeContext(kwargs=runtime_params)
+            runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
             try:
                 self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -1766,7 +2114,8 @@ class WpsPackage(Process):
                                                                                 eoimage_data_sources,
                                                                                 accept_mime_types,
                                                                                 settings=self.settings)
-                cwl_inputs = self.make_inputs(request.inputs, cwl_inputs_info)
+                cwl_schema_refs = package_inst.t.names.names
+                cwl_inputs = self.make_inputs(request.inputs, cwl_inputs_info, cwl_schema_refs)
                 self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, Status.RUNNING)
             except PackageException as exc:
                 raise self.exception_message(type(exc), None, str(exc))  # re-raise as is, but with extra log entry
@@ -1786,7 +2135,11 @@ class WpsPackage(Process):
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, Status.RUNNING)
-                self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
+                cwl_inputs = mask_process_inputs(self.package, cwl_inputs, runtime_context.secret_store)
+                self.log_message(
+                    f"Launching process package with inputs:\n{Lazify(lambda: json.dumps(cwl_inputs, indent=2))}",
+                    level=logging.DEBUG,
+                )
                 result = package_inst(**cwl_inputs)  # type: CWL_Results
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, Status.RUNNING)
             except Exception as exc:
@@ -1804,7 +2157,7 @@ class WpsPackage(Process):
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"
-            error_msg = f"Package completed with errors. Server logs: [{self.log_file}], Available at: [{log_url}]"
+            error_msg = f"Package completed with errors. Server logs: [{self._log_file}], Available at: [{log_url}]"
             self.update_status(error_msg, self.percent, Status.FAILED)
             raise
         self.update_status("Package operations complete.", PACKAGE_PROGRESS_DONE, Status.SUCCEEDED)
@@ -1824,8 +2177,7 @@ class WpsPackage(Process):
         """
         if self.remote_execution or self.package_type == ProcessType.WORKFLOW:
             return False
-        app_req = get_application_requirement(self.package)
-        if app_req["class"] in CWL_REQUIREMENT_APP_REMOTE:
+        if self.package_requirement["class"] in CWL_REQUIREMENT_APP_REMOTE:
             if input_ref.startswith("s3://"):
                 return True
             return False
@@ -1837,6 +2189,7 @@ class WpsPackage(Process):
     def make_inputs(self,
                     wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
+                    cwl_schema_names,   # type: CWL_SchemaNames
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
         Converts :term:`WPS` input values to corresponding :term:`CWL` input values for processing by the package.
@@ -1847,6 +2200,7 @@ class WpsPackage(Process):
 
         :param wps_inputs: Actual :term:`WPS` inputs parsed from execution request.
         :param cwl_inputs_info: Expected CWL input definitions for mapping.
+        :param cwl_schema_names: Mapping of CWL type schema references to resolve 'type: <ref>' if used in a definition.
         :return: :term:`CWL` input values.
         """
         cwl_inputs = {}
@@ -1858,8 +2212,8 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            io_def = parse_cwl_array_type(cwl_inputs_info[input_id])
-            if isinstance(input_i, ComplexInput) or io_def.type in PACKAGE_COMPLEX_TYPES:
+            io_def = get_cwl_io_type(cwl_inputs_info[input_id], cwl_schema_names=cwl_schema_names)
+            if isinstance(input_i, (ComplexInput, BoundingBoxInput)) or io_def.type in PACKAGE_COMPLEX_TYPES:
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
                 if io_def.array:
@@ -1869,16 +2223,42 @@ class WpsPackage(Process):
                     input_href = self.make_location_input(io_def.type, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
-            elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
+            elif isinstance(input_i, LiteralInput):
                 # extend array data that allow max_occur > 1
                 if io_def.array:
-                    input_data = [i.url if i.as_reference else i.data for i in input_occurs]
+                    input_data = [self.make_literal_input(input_def) for input_def in input_occurs]
                 else:
-                    input_data = input_i.url if input_i.as_reference else input_i.data
+                    input_data = self.make_literal_input(input_i)
                 cwl_inputs[input_id] = input_data
             else:
                 raise PackageTypeError(f"Undefined package input for execution: {type(input_i)}.")
         return cwl_inputs
+
+    @staticmethod
+    def make_literal_input(input_definition):
+        # type: (LiteralInput) -> JSON
+        """
+        Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
+        """
+        if input_definition.as_reference:
+            return input_definition.url
+        return any2json_literal_data(input_definition.data, input_definition.data_type)
+
+    @staticmethod
+    def make_location_bbox(input_definition):
+        # type: (BoundingBoxInput) -> None
+        """
+        Convert a Bounding Box to a compatible :term:`CWL` ``File`` using corresponding IOHandler of a Complex input.
+        """
+        input_definition.data_format = Format(ContentType.APP_JSON, schema=sd.OGC_API_BBOX_FORMAT)
+        input_location = IOHandler._build_file_name(input_definition)
+        input_definition._iohandler = FileHandler(input_location, input_definition)
+        input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}
+        input_definition.data = input_value
+
+        # make sure the file is generated with its contents
+        with open(input_definition.file, mode="w", encoding="utf-8") as bbox_file:
+            json.dump(input_value, bbox_file, ensure_ascii=False)
 
     def make_location_input_security_check(self, input_scheme, input_type, input_id, input_location, input_definition):
         # type: (str, CWL_IO_ComplexType, str, str, ComplexInput) -> str
@@ -1900,9 +2280,11 @@ class WpsPackage(Process):
             input_url = get_vault_url(vault_id, self.settings)
             resp = request_extra("HEAD", input_url, settings=self.settings, headers=self.auth)
             if resp.status_code == 200:
-                self.logger.debug("Detected and validated remotely accessible reference [%s] "
-                                  "matching local Vault [%s]. Replacing URL reference for local access.",
-                                  input_location, input_url)
+                self.log_message(
+                    f"Detected and validated remotely accessible reference [{input_location}] "
+                    f"matching local Vault [{input_url}]. Replacing URL reference for local access.",
+                    level=logging.DEBUG,
+                )
                 # pre-fetch by move and delete file from vault and decrypt it (as download would)
                 # to save transfer time/data from local file already available
                 auth = parse_vault_token(self.auth.get(sd.XAuthVaultFileHeader.name), unique=False)
@@ -1910,14 +2292,18 @@ class WpsPackage(Process):
                 input_location = map_vault_location(input_url, self.settings)
                 input_location = decrypt_from_vault(file, input_location,
                                                     out_dir=input_definition.workdir, delete_encrypted=True)
-                self.logger.debug("Moved Vault file to temporary location: [%s]. "
-                                  "File not accessible from Vault endpoint anymore. "
-                                  "Location will be deleted after process execution.",
-                                  input_location)
+                self.log_message(
+                    f"Moved Vault file to temporary location: [{input_location}]. "
+                    "File not accessible from Vault endpoint anymore. "
+                    "Location will be deleted after process execution.",
+                    level=logging.DEBUG,
+                )
             else:
-                self.logger.error("Detected Vault file reference that is not accessible [%s] caused "
-                                  "by HTTP [%s] Detail:\n%s", input_location,
-                                  resp.status_code, repr_json(resp.text, indent=2))
+                self.log_message(
+                    f"Detected Vault file reference that is not accessible [{input_location}] caused "
+                    f"by HTTP [{resp.status_code}] Detail:\n{Lazify(lambda: repr_json(resp.text, indent=2))}",
+                    level=logging.ERROR,
+                )
                 raise PackageAuthenticationError(
                     f"Input {input_id} with Vault reference [{vault_id}] is not accessible."
                 )
@@ -1926,14 +2312,16 @@ class WpsPackage(Process):
             if input_local_ref:
                 resp = request_extra("HEAD", input_location, settings=self.settings, headers=self.auth)
                 if resp.status_code == 200:  # if failed, following fetch will produce the appropriate HTTP error
-                    self.logger.debug("Detected and validated remotely accessible reference [%s] "
-                                      "matching local WPS outputs [%s]. Skipping fetch using direct reference.",
-                                      input_location, input_local_ref)
+                    self.log_message(
+                        f"Detected and validated remotely accessible reference [{input_location}] "
+                        f"matching local WPS outputs [{input_local_ref}]. Skipping fetch using direct reference.",
+                        level=logging.DEBUG,
+                    )
                     input_location = input_local_ref
         return input_location
 
     def make_location_input(self, input_type, input_definition):
-        # type: (CWL_IO_ComplexType, ComplexInput) -> Optional[JSON]
+        # type: (CWL_IO_ComplexType, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
         """
         Generates the JSON content required to specify a `CWL` ``File`` or ``Directory`` input from a location.
 
@@ -1963,6 +2351,9 @@ class WpsPackage(Process):
         # cannot rely only on 'as_reference' as often it is not provided by the request, although it's an href
         if input_definition.as_reference:
             input_location = input_definition.url
+        # convert the BBOX to a compatible CWL File using corresponding IOHandler setup as ComplexInput
+        if isinstance(input_definition._iohandler, NoneIOHandler) and isinstance(input_definition, BoundingBoxInput):
+            self.make_location_bbox(input_definition)
         # FIXME: PyWPS bug
         #   Calling 'file' method fetches it, and it is always called by the package itself
         #   during type validation if the MODE is anything else than disabled (MODE.NONE).
@@ -1983,7 +2374,11 @@ class WpsPackage(Process):
         # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
         # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
         if input_definition.source_type == SOURCE_TYPE.DATA:
-            input_location = input_definition.data
+            if input_definition.data is not None:
+                # use 'file' instead of '_iohandler._file' in this case to make sure
+                # the reference containing 'data' is generated if not already done
+                # this file will be needed to pass down to CWL by reference
+                input_location = input_definition.file
         input_scheme = None
         if not input_location:
             url = getattr(input_definition, "url")
@@ -2014,7 +2409,10 @@ class WpsPackage(Process):
             any(default_format_def.get("mimeType") == fmt.mime_type and fmt.mime_type is not None
                 for fmt in input_definition.supported_formats)
         ):
-            self.logger.debug("%s input (%s) DROPPED. Detected default format as data.", input_type, input_id)
+            self.log_message(
+                f"{input_type} input ({input_id}) DROPPED. Detected default format as data.",
+                level=logging.DEBUG,
+            )
             return None
 
         input_location = self.make_location_input_security_check(
@@ -2026,7 +2424,7 @@ class WpsPackage(Process):
         )
 
         if self.must_fetch(input_location, input_type):
-            self.logger.info("%s input (%s) ATTEMPT fetch: [%s]", input_type, input_id, input_location)
+            self.log_message(f"{input_type} input ({input_id}) ATTEMPT fetch: [{input_location}]")
             if input_type == PACKAGE_FILE_TYPE:
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
@@ -2034,7 +2432,7 @@ class WpsPackage(Process):
                 # Because a directory reference can contain multiple sub-dir definitions,
                 # avoid possible conflicts with other inputs by nesting them under the ID.
                 # This also ensures that each directory input can work with a clean staging directory.
-                out_dir = os.path.join(input_definition.workdir, input_definition.identifier)
+                out_dir = cast(str, os.path.join(input_definition.workdir, input_definition.identifier))
                 locations = fetch_directory(input_location, out_dir,
                                             settings=self.settings, headers=self.auth)
                 if not locations:
@@ -2050,7 +2448,14 @@ class WpsPackage(Process):
                     f"specified for input [{input_id}] from location [{input_location}]."
                 )
         else:
-            self.logger.info("%s input (%s) SKIPPED fetch: [%s]", input_type, input_id, input_location)
+            self.log_message(f"{input_type} input ({input_id}) SKIPPED fetch: [{input_location}]")
+
+        # when the process is passed around between OWSLib and PyWPS, it is very important to provide the scheme
+        # otherwise, they will interpret complex data directly instead of by reference
+        # (see for example 'owslib.wps.ComplexDataInput.get_xml' that relies only on the
+        #  presence of the scheme to infer whether the complex data is a reference or not)
+        if "://" not in input_location:
+            input_location = f"file://{input_location}"
 
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
@@ -2066,39 +2471,106 @@ class WpsPackage(Process):
         """
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
-                if len(cwl_result[output_id]) > 1:
-                    self.logger.warning(
-                        "Dropping additional output values (%s total), only 1 supported per identifier.",
-                        len(cwl_result[output_id])
-                    )
                 # provide more details than poorly descriptive IndexError
                 if not len(cwl_result[output_id]):
                     raise PackageExecutionError(
                         f"Process output '{output_id}' expects at least one value but none was found. "
                         "Possible incorrect glob pattern definition in CWL Application Package."
                     )
-                cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
-
-            if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
-                raise PackageTypeError(
-                    f"Process output '{output_id}' defines CWL type other than 'File'. "
-                    "Application output results must use 'File' type to return file references."
-                )
-            if "location" in cwl_result[output_id]:
-                self.make_location_output(cwl_result, output_id)
+                self.make_array_output(cwl_result, output_id)
                 continue
 
-            # data output
-            self.response.outputs[output_id].data = cwl_result[output_id]
-            self.response.outputs[output_id].as_reference = False
-            self.logger.info("Resolved WPS output [%s] as literal data", output_id)
+            if isinstance(cwl_result[output_id], dict):
+                if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
+                    raise PackageTypeError(
+                        f"Process output '{output_id}' defines CWL type other than 'File'. "
+                        "Application output results must use 'File' type to return file references."
+                    )
+                if "location" in cwl_result[output_id]:
+                    self.make_location_output(cwl_result, output_id)
+                if isinstance(self.response.outputs[output_id], ComplexOutput):
+                    continue
 
-    def make_location_output(self, cwl_result, output_id):
+                # unpack CWL File into Bounding Box
+                if isinstance(self.response.outputs[output_id], BoundingBoxOutput):
+                    self.make_bbox_output(cwl_result, output_id)
+                    continue
+
+            self.make_literal_output(cwl_result, output_id)
+
+    def make_array_output(self, cwl_result, output_id):
         # type: (CWL_Results, str) -> None
         """
-        Rewrite the `WPS` output with required location using result path from `CWL` execution.
+        Converts an array output into a :term:`JSON` literal representation.
+        """
+        # apply the relevant operation for each item type
+        # appropriate validation, storage and data-format conversion should be applied
+        collect_items = []
+        for idx, item in enumerate(cwl_result[output_id]):
+            if isinstance(item, dict):
+                if "location" in item:
+                    self.make_location_output(cwl_result, output_id, index=idx)
+                else:
+                    self.make_bbox_output(cwl_result, output_id, index=idx)
+            else:
+                self.make_literal_output(cwl_result, output_id, index=idx)
 
-        Configures the parameters such that `PyWPS` will either auto-resolve the local paths to match with URL
+            # retrieve the temporarily stored result as a single item
+            collect_items.append(self.response.outputs[output_id].json)
+
+        # use a custom representation to allow us handling the raw data array properly
+        array_data = repr_json(collect_items, force_string=True, indent=None)
+
+        # avoid error on mismatching atomic item type and the JSON array as string
+        self.response.outputs[output_id] = ComplexOutput(  # convert in case it was a literal
+            self.response.outputs[output_id].identifier,
+            self.response.outputs[output_id].title,
+            # use an alternate RAW+JSON media-type to avoid ambiguity between a real complex data
+            # that uses a JSON file (potentially reported as raw data instead of reference) and
+            # this workaround embedded JSON string for encapsulating multi-value outputs unsupported by WPS
+            data_format=Format(mime_type=ContentType.APP_RAW_JSON),
+            supported_formats=[Format(mime_type=ContentType.APP_RAW_JSON)],
+            as_reference=False,
+            mode=MODE.NONE,
+        )
+        self.response.outputs[output_id]._iohandler = DataHandler(array_data, self.response.outputs[output_id])
+        self.log_message(f"Resolved WPS output [{output_id}] as complex array data embedded as JSON string")
+
+    def make_literal_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
+        """
+        Converts Literal Data representations to compatible :term:`CWL` contents with :term:`JSON` encodable values.
+        """
+        data_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        data_output = repr_json(data_cwl, force_string=False)
+        self.response.outputs[output_id].data = data_output
+        self.response.outputs[output_id].as_reference = False
+        self.log_message(f"Resolved WPS output [{output_id}] as literal data")
+
+    def make_bbox_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
+        """
+        Generates the :term:`WPS` Bounding Box output from the :term:`CWL` ``File``.
+
+        Assumes that location outputs were resolved beforehand, such that the file is available locally.
+        """
+        bbox_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        bbox_loc = bbox_cwl["location"]
+        if bbox_loc.startswith("file://"):
+            bbox_loc = bbox_loc[7:]
+        with open(bbox_loc, mode="r", encoding="utf-8") as bbox_file:
+            bbox_data = json.load(bbox_file)
+        self.response.outputs[output_id].data = bbox_data["bbox"]
+        self.response.outputs[output_id].crs = bbox_data["crs"]
+        self.response.outputs[output_id].dimensions = len(bbox_data["bbox"]) // 2
+        self.response.outputs[output_id].as_reference = False
+
+    def make_location_output(self, cwl_result, output_id, index=None):
+        # type: (CWL_Results, str, Optional[int]) -> None
+        """
+        Rewrite the :term:`WPS` output with required location using result path from :term:`CWL` execution.
+
+        Configures the parameters such that :mod:`pywps` will either auto-resolve the local paths to match with URL
         defined by ``weaver.wps_output_url`` or upload it to `S3` bucket from ``weaver.wps_output_s3_bucket`` and
         provide reference directly.
 
@@ -2106,13 +2578,16 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
-        result_loc = cwl_result[output_id]["location"].replace("file://", "").rstrip("/")
+        result_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
+        result_loc = result_cwl["location"].replace("file://", "").rstrip("/")
         result_path = os.path.split(result_loc)[-1]
-        result_type = cwl_result[output_id].get("class", PACKAGE_FILE_TYPE)
+        result_type = result_cwl.get("class", PACKAGE_FILE_TYPE)
+        result_cwl_fmt = result_cwl.get("format")
         result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
         if result_is_dir and not result_path.endswith("/"):
             result_path += "/"
             result_loc += "/"
+            result_cwl_fmt = ContentType.APP_DIR
 
         # PyWPS internally sets a new FileStorage (default) inplace when generating the JSON definition of the output.
         # This is done such that the generated XML status document in WPS response can obtain the output URL location.
@@ -2143,19 +2618,90 @@ class WpsPackage(Process):
         result_wps = os.path.join(self.workdir, result_path)
 
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-            self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
+            self.log_message(f"Moving [{output_id}]: [{result_loc}] -> [{result_wps}]")
             if result_is_dir:
                 adjust_directory_local(result_loc, self.workdir, OutputMethod.MOVE)
             else:
                 adjust_file_local(result_loc, self.workdir, OutputMethod.MOVE)
+
         # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
-        self.response.outputs[output_id].as_reference = True
-        self.response.outputs[output_id].file = result_wps
+        resp_output = self.response.outputs[output_id]  # type: ComplexOutput
+        resp_output.as_reference = True
+
         # Since each output has its own storage already prefixed by '[Context/]JobID/', avoid JobID nesting another dir.
         # Instead, let it create a dir matching the output ID to get '[Context/]JobID/OutputID/[file(s).ext]'
-        self.response.outputs[output_id].uuid = output_id
+        resp_output.uuid = output_id
 
-        self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
+        # guess the produced file media-type to override the default one selected
+        # this step must be done before setting 'file' attribute, as that will trigger the validator check
+        if isinstance(resp_output, ComplexOutput):  # don't process bbox that are 'File' in CWL
+            self.resolve_output_format(resp_output, result_path, result_cwl_fmt)
+
+        resp_output.file = result_wps
+        self.log_message(f"Resolved WPS output [{output_id}] as file reference: [{result_wps}]")
+
+    @staticmethod
+    def resolve_output_format(output, result_path, result_cwl_format):
+        # type: (ComplexOutput, str, Optional[str]) -> None
+        """
+        Resolves the obtained media-type for an output :term:`CWL` ``File``.
+
+        Considers :term:`CWL` results ``format``, the file path, and the :term:`Process` description to resolve the
+        best possible match, retaining a much as possible the metadata that can be resolved from their corresponding
+        details.
+
+        When the media-type is resolved, ensure that an appropriate format validator is applied to perform relevant
+        checks, or omit them when not implemented.
+        """
+        result_ctype = map_cwl_media_type(result_cwl_format)
+        if not result_ctype:
+            # fallback attempt using extension if available
+            result_ext = os.path.splitext(result_path)[-1]
+            if result_ext:
+                result_ctype = get_content_type(result_ext)
+        if not result_ctype:
+            if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
+                output.valid_mode = MODE.NONE  # disable to avoid ensured failure
+            return
+
+        # - When resolving media-types, use the corresponding supported format defined in the process definition
+        #   instead of the generated one from CWL format, because process supported formats can provide more details
+        #   than the CWL format does, such as the encoding and any reference schema.
+        # - If no match is found, leave default format without applying the result CWL format since
+        #   we cannot generate an invalid output with unsupported formats (will raise later anyway).
+        # - Clean the media-types to consider partial match from extra parameters such as charset.
+        #   Gradually attempt mathing from exact type to looser definitions.
+        result_format_base = get_format(result_ctype)
+        result_ctype_clean = clean_media_type_format(
+            result_format_base.mime_type,
+            strip_parameters=True,
+            suffix_subtype=True,
+        )
+        result_formats = [result_format_base]
+        if result_format_base.mime_type != result_ctype_clean:
+            result_formats.append(get_format(result_ctype_clean))
+        for result_format in result_formats:
+            for strip, simplify in [
+                (False, False),
+                (True, False),
+                (False, True),
+                (True, True),
+            ]:
+                for fmt in output.supported_formats:
+                    fmt_type = clean_media_type_format(fmt.mime_type, strip_parameters=strip, suffix_subtype=simplify)
+                    if fmt_type == result_format.mime_type:
+                        output.data_format = fmt
+                        validator = get_validator(fmt.mime_type)
+                        if output.valid_mode != MODE.NONE and validator is emptyvalidator:
+                            if fmt_type == ContentType.TEXT_PLAIN:
+                                output.valid_mode = MODE.NONE  # disable since text can be used with many extensions
+                            else:
+                                output.data_format.validate = format_extension_validator
+                        return
+
+        # no match found, minimally check for extension
+        if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
+            output.data_format.validate = format_extension_validator
 
     def make_location_storage(self, storage_type, location_type):
         # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]
@@ -2193,8 +2739,43 @@ class WpsPackage(Process):
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (CWL_ToolPathObject, LoadingContext) -> ProcessCWL
+        """
+        Method called by :mod:`cwltool` to generate the tool object from the :term:`CWL` definition.
+        """
         from weaver.processes.wps_workflow import default_make_tool
-        return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
+
+        # When the tool package ID corresponds directly to the toolpath object ID,
+        # it means that either an atomic process was invoked, or that the top-most Workflow is called.
+        # In such case, it is safe to return the self-reference for the tool job, as it will refer to the same log/job.
+        # Also, this avoids duplicate setup of log handlers, which would result in inconsistant progress tracking.
+        process_id = shortname(toolpath_object["id"])
+        if self.package_id == process_id:
+            return default_make_tool(toolpath_object, loading_context, self)
+
+        # Otherwise, the tool creation was triggered by a step under the Workflow.
+        # An intermediate package definition must be created to pass around references.
+        # However, the PyWPS response and UUID references will not exist yet (since the step job is not yet started).
+        # Therefore, only partial initialization can be performed.
+        # Their respective full-initialization will be done by the resulting job submitted by the 'remote' execution.
+        package_process = WpsPackage(
+            identifier=process_id,
+            title=process_id,
+            package=toolpath_object,
+            settings=self.settings,
+        )
+        # transfer references that will allow the workflow step to correctly
+        # update its intermediate logs relative to the overall workflow execution
+        package_process.request = self.request
+        package_process.response = self.response
+        package_process.uuid = self.uuid
+        package_process._job = self.job
+        package_process.step_packages = self.step_packages
+        package_process.step_launched = self.step_launched
+
+        # make sure the logger references are defined to allow logging minimal status update messages
+        # however, skip stdout/stderr setup that is not supported by workflows (each steps will do it as needed)
+        package_process.setup_loggers(log_stdout_stderr=False)
+        return default_make_tool(toolpath_object, loading_context, package_process)
 
     def get_workflow_step_package(self, job_name):
         # type: (str) -> CWL_WorkflowStepPackage
@@ -2217,8 +2798,8 @@ class WpsPackage(Process):
             step_details = self.step_packages[job_name]
         return step_details
 
-    def get_job_process_definition(self, job_name, job_order, tool):  # noqa: E811
-        # type: (str, JSON, CWL) -> WpsPackage
+    def get_job_process_definition(self, job_name, job_order):  # noqa: E811
+        # type: (str, CWL_WorkflowInputs) -> WpsPackage
         """
         Obtain the execution job definition for the given process (:term:`Workflow` step implementation).
 
@@ -2228,30 +2809,15 @@ class WpsPackage(Process):
         It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the
         proper :term:`CWL` package definition, :term:`ADES` target and cookies to access it (if protected).
 
-        :param job_name: The workflow step or the package id that must be launched on an ADES :class:`string`
-        :param job_order: The params for the job :class:`dict {input_name: input_value}`
-                          input_value is one of `input_object` or `array [input_object]`
-                          input_object is one of `string` or `dict {class: File, location: string}`
-                          in our case input are expected to be File object
-        :param tool: Whole :term:`CWL` config including hints and requirements
-                     (see: :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES`)
+        :param job_name: The workflow step or the package ID that must be executed.
+        :param job_order: Execution input values submitted for the job.
         """
 
         if job_name == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
             # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
-            step_package_type = self.package_type
-            step_payload = self.payload
-            step_package = self.package
-            step_process = self.package_id
             job_type = "package"
         else:
-            # Here we got a step part of a workflow (self is the workflow package)
-            step_details = self.get_workflow_step_package(job_name)
-            step_process = step_details["id"]
-            step_package = step_details["package"]
-            step_package_type = _get_package_type(step_package)
-            step_payload = {}  # defer until package requirement resolve to avoid unnecessary fetch
             job_type = "step"
 
         # Progress made with steps presumes that they are done sequentially and have the same progress weight
@@ -2259,7 +2825,7 @@ class WpsPackage(Process):
         end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(job_name)
-        self.update_status(f"Preparing to launch {job_type} {job_name}.", start_step_progress, Status.RUNNING)
+        self.update_status(f"Preparing to launch {job_type} [{job_name}].", start_step_progress, Status.RUNNING)
 
         def _update_status_dispatch(_message, _progress, _status, _provider, *_, error=None, **__):
             # type: (str, Number, AnyStatusType, str, Any, Optional[Exception], Any) -> None
@@ -2270,7 +2836,7 @@ class WpsPackage(Process):
             )
 
         def _get_req_params(_requirement, required_params):
-            # type: (CWL_AnyRequirements, List[str]) -> CWL_Requirement
+            # type: (CWL_AnyRequirementObject, List[str]) -> CWL_Requirement
             _wps_params = {}
             for _param in required_params:
                 if _param not in _requirement:
@@ -2279,23 +2845,23 @@ class WpsPackage(Process):
                 _wps_params[_param] = _requirement[_param]
             return _wps_params
 
-        requirement = get_application_requirement(step_package)
-        req_class = requirement["class"]
+        req_class = resolve_cwl_namespaced_name(self.package_requirement["class"])
         req_source = "requirement/hint"
-        if step_package_type == ProcessType.WORKFLOW:
+        if self.package_type == ProcessType.WORKFLOW:
             req_class = ProcessType.WORKFLOW
             req_source = "tool class"
 
-        if job_type == "step" and not any(
-            req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT]
+        if (
+            (job_type == "step" or self.payload is None)
+            and not any(req_class.endswith(req) for req in [CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT])
         ):
             LOGGER.debug("Retrieve WPS-3 process payload for potential Data Source definitions to resolve.")
-            step_payload = _get_process_payload(step_process)
+            self.payload = _get_process_payload(self.identifier, container=self.settings)
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
-            self.logger.info("WPS-1 Package resolved from %s: %s", req_source, req_class)
+            self.log_message(f"WPS-1 Package resolved from [{req_source}]: {req_class}")
             from weaver.processes.wps1_process import Wps1Process
-            params = _get_req_params(requirement, ["provider", "process"])
+            params = _get_req_params(self.package_requirement, ["provider", "process"])
             return Wps1Process(
                 provider=params["provider"],
                 process=params["process"],
@@ -2303,9 +2869,9 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            self.logger.info("ESGF-CWT Package resolved from %s: %s", req_source, req_class)
+            self.log_message(f"ESGF-CWT Package resolved from [{req_source}]: {req_class}")
             from weaver.processes.esgf_process import ESGFProcess
-            params = _get_req_params(requirement, ["provider", "process"])
+            params = _get_req_params(self.package_requirement, ["provider", "process"])
             return ESGFProcess(
                 provider=params["provider"],
                 process=params["process"],
@@ -2313,10 +2879,10 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_OGC_API):
-            self.logger.info("OGC API Package resolved from %s: %s", req_source, req_class)
+            self.log_message(f"OGC API Package resolved from [{req_source}]: {req_class}")
             from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
-            params = _get_req_params(requirement, ["process"])
-            return OGCAPIRemoteProcess(step_payload=step_payload,
+            params = _get_req_params(self.package_requirement, ["process"])
+            return OGCAPIRemoteProcess(step_payload=self.payload,
                                        process=params["process"],
                                        request=self.request,
                                        update_status=_update_status_dispatch)
@@ -2325,10 +2891,10 @@ class WpsPackage(Process):
             # - `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_BUILTIN`
             # - `ProcessType.APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER`
             # - `ProcessType.WORKFLOW` nesting calls to other processes of various types and locations
-            self.logger.info("WPS-3 Package resolved from %s: %s", req_source, req_class)
+            self.log_message(f"WPS-3 Package resolved from [{req_source}]: {req_class}")
             from weaver.processes.wps3_process import Wps3Process
-            return Wps3Process(step_payload=step_payload,
+            return Wps3Process(step_payload=self.payload,
                                job_order=job_order,
-                               process=step_process,
+                               process=self.identifier,
                                request=self.request,
                                update_status=_update_status_dispatch)

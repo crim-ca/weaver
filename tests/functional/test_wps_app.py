@@ -7,21 +7,12 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 import contextlib
-import unittest
 
-import pyramid.testing
 import pytest
 import xmltodict
 
-from tests.utils import (
-    get_test_weaver_app,
-    get_test_weaver_config,
-    mocked_execute_celery,
-    setup_config_with_celery,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_mongodb_processstore
-)
+from tests.functional.utils import WpsConfigBase
+from tests.utils import mocked_execute_celery
 from weaver import xml_util
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
@@ -30,37 +21,33 @@ from weaver.visibility import Visibility
 
 
 @pytest.mark.functional
-class WpsAppTest(unittest.TestCase):
-    def setUp(self):
-        self.wps_path = "/ows/wps"
-        settings = {
-            "weaver.url": "https://localhost",
-            "weaver.wps": True,
-            "weaver.wps_path": self.wps_path,
-            "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
-            "weaver.wps_metadata_provider_name": WpsAppTest.__name__
-        }
-        config = get_test_weaver_config(settings=settings)
-        config = setup_config_with_mongodb(config)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        self.process_store = setup_mongodb_processstore(config)
-        self.app = get_test_weaver_app(config=config, settings=settings)
+class WpsAppTest(WpsConfigBase):
+    wps_path = "/ows/wps"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps": True,
+        "weaver.wps_path": wps_path,
+        "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+        "weaver.wps_metadata_provider_name": "WpsAppTest"
+    }
+    process_public = None   # type: WpsTestProcess
+    process_private = None  # type: WpsTestProcess
+
+    @classmethod
+    def setUpClass(cls):
+        super(WpsAppTest, cls).setUpClass()
 
         # add processes by database Process type
-        self.process_public = WpsTestProcess(identifier="process_public")
-        self.process_private = WpsTestProcess(identifier="process_private")
-        self.process_store.save_process(self.process_public)
-        self.process_store.save_process(self.process_private)
-        self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
-        self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
+        cls.process_public = WpsTestProcess(identifier="process_public")
+        cls.process_private = WpsTestProcess(identifier="process_private")
+        cls.process_store.save_process(cls.process_public)
+        cls.process_store.save_process(cls.process_private)
+        cls.process_store.set_visibility(cls.process_public.identifier, Visibility.PUBLIC)
+        cls.process_store.set_visibility(cls.process_private.identifier, Visibility.PRIVATE)
 
         # add processes by pywps Process type
-        self.process_store.save_process(HelloWPS())
-        self.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
-
-    def tearDown(self):
-        pyramid.testing.tearDown()
+        cls.process_store.save_process(HelloWPS())
+        cls.process_store.set_visibility(HelloWPS.identifier, Visibility.PUBLIC)
 
     def make_url(self, params):
         return f"{self.wps_path}?{params}"
@@ -132,6 +119,22 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in ContentType.ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
+    def test_describeprocess_no_format_default_api_client(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Robot"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
+    def test_describeprocess_no_format_default_web_browser(self):
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
+        resp = self.app.get(self.make_url(params), headers={"User-Agent": "Mozilla/Test"})
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+
     def test_execute_allowed_demo(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
@@ -145,6 +148,24 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain("<wps:ExecuteResponse")
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain(f"PyWPS Process {HelloWPS.identifier}")
+
+    def test_execute_allowed_empty_string(self):
+        template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name="
+        params = template.format(HelloWPS.identifier)
+        url = self.make_url(params)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url)
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain(f"PyWPS Process {HelloWPS.identifier}")
+        loc = resp.xml.get("statusLocation")
+        job_id = loc.rsplit("/", 1)[-1].split(".", 1)[0]
+        job = self.job_store.fetch_by_id(job_id)
+        assert job.inputs[0]["data"] == ""
 
     def test_execute_deployed_with_visibility_allowed(self):
         headers = {"Accept": ContentType.APP_XML}

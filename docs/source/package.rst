@@ -95,6 +95,136 @@ provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamica
     :caption: Sample CWL definition of a Python script
     :name: example_app_pkg_script
 
+.. seealso::
+    See the :ref:`app_pkg_python` section for more utilities to help create an :term:`Application Package` from Python.
+
+.. seealso::
+    For other programing languages, see |cwl-dev-tools|_ for a list of related utilities that helps working
+    with :term:`CWL`, some of which offering convertion capabilities.
+
+.. _app_pkg_python:
+
+Python Applications
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the :term:`Application Package` to be generated consists of a Python script, which happens to make use of
+the builtin |python-argparse|_ package, it is possible to employ the |argparse2tool|_ utility, which will automatically
+generate a corresponding :term:`CWL` definition using the specified :term:`CLI` arguments and their types.
+
+The |argparse2tool|_ utility can help quickly generate a valid :term:`CWL` definition, but it is the responsibility
+of the user to validate that converted arguments have the appropriate types, or any additional metadata required to
+properly describe the intended :term:`Process`. Notably, users might find the need to add appropriate ``format``
+definitions to the :term:`I/O`, since those will generally be missing descriptive :term:`Media-Types`.
+
+.. note::
+    Although |argparse2tool|_ can help in the initial :term:`CWL` generation procedure, it is recommended to apply
+    additional containerization best-practices, such as described in :ref:`app_pkg_script`, to increase chances to
+    obtain a replicable and reusable :term:`Application Package` definition.
+
+.. seealso::
+    For pure Python scripts not using |python-argparse|_, the |scriptcwl|_ utility can be considered instead.
+
+.. seealso::
+    For Python code embedded in |jupyter-notebooks|_, refer to :ref:`app_pkg_jupyter_notebook` for more details.
+
+.. |python-argparse| replace:: ``argparse``
+.. _python-argparse: https://docs.python.org/3/library/argparse.html
+
+.. |argparse2tool| replace:: ``argparse2tool``
+.. _argparse2tool: https://github.com/hexylena/argparse2tool
+
+.. |scriptcwl| replace:: ``scriptcwl``
+.. _scriptcwl: https://github.com/NLeSC/scriptcwl
+
+.. _app_pkg_jupyter_notebook:
+
+Jupyter Notebook Applications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When working on experimental or research applications, a |jupyter-notebook|_ is a popular development environment,
+due to its convenient interface for displaying results, interacting with visualization tools, or the larger plugin
+ecosystem that it can offer. However, a |jupyter-notebook|_ is typically insufficient by itself to describe a complete
+application. To help developers transition from a |jupyter-notebook|_ to :ref:`app_pkg_docker`, which ensures the
+:term:`Application Package` can be deployed and reused, the |jupyter-ipython2cwl|_ utility can be employed.
+
+Using |jupyter-repo2cwl| (after installing |jupyter-ipython2cwl|_ in the Python environment), it is possible to
+directly convert a Git repository reference containing a |jupyter-notebook|_ into deployable :term:`CWL` leveraging
+a :term:`Docker` container. To do this, the utility uses two strategies under the hood:
+
+1. |jupyterhub-repo2docker|_ is employed to convert a Git repository into a :term:`Docker` container, with any
+   applicable package requirements, project metadata, and advanced configuration details.
+2. Python typing annotations provided by |jupyter-ipython2cwl|_ define the :term:`CWL` :term:`I/O`
+   from variables and results located within the |jupyter-notebook|_.
+
+.. note::
+    Because |jupyterhub-repo2docker|_ is employed, which is highly adaptable to many use cases, all typical Python
+    project `Configuration Files <https://repo2docker.readthedocs.io/en/latest/config_files.html>`_,
+    such as ``requirements.txt``, ``environment.yml``, ``setup.py``, ``pyproject.toml``, etc. can be employed.
+    The :term:`Docker` container dependencies can be provided with an explicit ``Dockerfile`` as well.
+    Please refer to the official documentation for all advanced configuration options.
+
+Because Python type annotations are employed with |jupyter-repo2cwl|
+to indicate which variables will contain the :term:`CWL` :term:`I/O` references, it is actually possible
+to annotate a |jupyter-notebook|_ *without any additional package dependencies*. To do so, one only needs
+to employ *string annotations* as follows.
+
+.. literalinclude:: ../examples/jupyter_repo2cwl_python.py
+    :language: python
+    :caption: Sample CWL annotations of Python code in Jupyter Notebook
+    :name: example_app_pkg_jupyter_repo2cwl_python
+
+.. seealso::
+    See `IPython2CWL Supported Types <https://ipython2cwl.readthedocs.io/en/latest/#module-ipython2cwl.iotypes>`_
+    for more details about the mapping from a Python annotation to the resulting :term:`CWL` :ref:`cwl-io-types`.
+
+When the above code is saved in a |jupyter-notebook|_ and committed to a Git repository, the |jupyterhub-repo2docker|_
+utility can automatically clone the repository, parse the Python code, extract the :term:`CWL` annotations, and
+generate the :term:`Application Package` with a :term:`Docker` container containing all of their respective definitions.
+All of this is accomplished with a single call to obtain a deployable :term:`CWL` in `Weaver`, which can then take over
+from the :ref:`Process Deployment <proc_op_deploy>` to obtain an :term:`OGC API - Process` definition.
+
+Jupyter Notebook to CWL Example: NCML to STAC Application
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For a more concrete example of a |jupyter-notebook|_ convertion to :term:`CWL`, see the |ncml2stac-repo|_ GitHub
+repository, which contains a sample |ncml2stac-notebook|_.
+This script, as indicated by its name, converts *NCML XML metadata with CMIP6 attributes* into the
+corresponding *SpatioTemporal Asset Catalog* (STAC) definition and extensions.
+It uses the same |jupyter-ipython2cwl|_ type annotation strategy as presented
+:ref:`above <example_app_pkg_jupyter_repo2cwl_python>` to indicate which NCML ``File`` variable is to be employed as
+as the :term:`CWL` input reference, and the expected STAC ``File`` as output to be collected by :term:`CWL`.
+
+Using |jupyter-repo2cwl| and the :ref:`Weaver CLI <cli_commands>` in combination, as shown below,
+it is possible to automatically convert the |jupyter-notebook|_ script into a Dockerized :term:`CWL` and
+deploy it to a :term:`OGC API - Processes` server supporting :term:`Application Package` such as `Weaver`.
+
+.. code-block:: shell
+    :caption: |jupyter-notebook|_ conversion to :term:`CWL` and deployment as :term:`OGC API - Processes`
+
+    jupyter-repo2cwl "https://github.com/crim-ca/ncml2stac" -o /tmp
+    weaver deploy -u http://example.com/weaver -i ncml2stac --cwl /tmp/notebooks_ncml2stac.cwl
+
+.. seealso::
+    - Refer to the |ncml2stac-repo|_ repository's README for more details about the utilities.
+    - Refer to the |ncml2stac-notebook|_ for the implementation of the :term:`Application Package` script.
+
+.. |jupyter-notebook| replace:: Jupyter Notebook
+.. _jupyter-notebook: https://jupyter.org/
+
+.. |jupyterhub-repo2docker| replace:: ``jupyterhub/repo2docker``
+.. _jupyterhub-repo2docker: https://github.com/jupyterhub/repo2docker
+
+.. |jupyter-repo2cwl| replace:: ``jupyter repo2cwl``
+
+.. |jupyter-ipython2cwl| replace:: ``IPython2CWL``
+.. _jupyter-ipython2cwl: https://github.com/common-workflow-lab/ipython2cwl
+
+.. |ncml2stac-repo| replace:: ``crim-ca/ncml2stac``
+.. _ncml2stac-repo: https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+
+.. |ncml2stac-notebook| replace:: NCML to STAC Jupyter Notebook
+.. _ncml2stac-notebook: https://github.com/crim-ca/ncml2stac/blob/main/notebooks/ncml2stac.ipynb
+
 .. _app_pkg_docker:
 
 Dockerized Applications
@@ -514,13 +644,13 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | :term:`CWL` ``type`` | :term:`WPS` data type   | :term:`OAS` type       | Description                                |
-|                      | and sub-type :sup:`(1)` |                        |                                            |
+|                      | and sub-type [#note1]_  |                        |                                            |
 +======================+=========================+========================+============================================+
 | ``Any``              | |na|                    | |na|                   | Not supported. See :ref:`note <warn-any>`. |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``null``             | |na|                    | |na|                   | Cannot be used by itself. |br|             |
 |                      |                         |                        | Represents optional :term:`I/O` when       |
-|                      |                         |                        | combined with other types :sup:`(2)`.      |
+|                      |                         |                        | combined with other types [#note2]_.       |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``boolean``          | ``Literal`` |br|        | ``boolean``            | Binary value.                              |
 |                      | (``bool``, ``boolean``) |                        |                                            |
@@ -528,13 +658,13 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 | ``int``,             | ``Literal`` |br|        | ``integer``,           | Numeric whole value. |br|                  |
 | ``long``             | (``int``, ``integer``,  | ``number`` |br|        | Unless when explicit conversion between    |
 |                      | ``long``,               | (format: ``int32``,    | contextes can accomplished, the generic    |
-|                      | ``positiveInteger``,    | ``int64``) :sup:`(3)`  | ``integer`` will be employed.              |
+|                      | ``positiveInteger``,    | ``int64``) [#note3]_   | ``integer`` will be employed.              |
 |                      | ``nonNegativeInteger``) |                        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``float``,           | ``Literal`` |br|        | ``number`` |br|        | Numeric floating-point value.              |
 | ``double``           | (``float``, ``double``, | (format: ``float``,    | By default, ``float`` is used unless more  |
-|                      | ``scale``, ``angle``)   | ``double``) :sup:`(3)` | explicit context conversion can be         |
-|                      |                         |                        | accomplished :sup:`(4)`.                   |
+|                      | ``scale``, ``angle``)   | ``double``) [#note3]_  | explicit context conversion can be         |
+|                      |                         |                        | accomplished [#note4]_.                    |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``string``           | ``Literal`` |br|        | ``string`` |br|        | Generic string. Default employed if        |
 |                      | (``string``,  ``date``, | (format: ``date``,     | nothing more specific is resolved. |br|    |
@@ -543,29 +673,50 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | ``date-time``,         | :ref:`File Reference <file_ref_types>`     |
 |                      |                         | ``full-date``,         | as plain URL string without resolution.    |
 |                      |                         | ``uri``, ``url``,      |                                            |
-|                      |                         | etc.) :sup:`(5)`       |                                            |
+|                      |                         | etc.) [#note5]_        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| |na|                 | ``BoundingBox``         | :term:`JSON`           | Only partial support available. |br|       |
-|                      |                         | :sup:`(6)`             | See :ref:`note <bbox-note>`.               |
+| ``File``             | ``BoundingBox``         | :term:`JSON` [#note6]_ | Partial support available[#bbox-note]_.    |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``File``             | ``Complex``             | :term:`JSON`           | :ref:`File Reference <file_ref_types>`     |
-|                      |                         | :sup:`(6)`             | with Media-Type validation and staging     |
+| ``File``             | ``Complex``             | :term:`JSON` [#note6]_ | :ref:`File Reference <file_ref_types>`     |
+|                      |                         |                        | with Media-Type validation and staging     |
 |                      |                         |                        | according to the applicable scheme.        |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``Directory``        | ``Complex``             | :term:`JSON`           | :ref:`Directory Reference <cwl-dir>`       |
-|                      |                         | :sup:`(6)`             | handled as nested ``Files`` to stage.      |
+| ``Directory``        | ``Complex``             | :term:`JSON` [#note6]_ | :ref:`Directory Reference <cwl-dir>`       |
+|                      |                         |                        | handled as nested ``Files`` to stage.      |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 
-| :sup:`(1)` Resolution method according to critical fields defined in :ref:`cwl-type`.
-| :sup:`(2)` More details in :ref:`oas_basic_types` and :ref:`cwl-array-null-values` sections.
-| :sup:`(3)` Number is used in combination with ``format`` to find best match between integer and floating point values.
-  If not provided, it defaults to ``float`` to handle both cases.
-| :sup:`(4)` The ``float`` name is employed loosely to represent any *floating-point* value rather than
-  *single-precision* (16-bits). Its internal representation is *double-precision* (32-bits) given that the
-  implementation is in Python.
-| :sup:`(5)` Because ``string`` is the default, any ``format`` and ``pattern`` can be specified.
-  More specific types with these items can help apply additional validation, although not strictly enforced.
-| :sup:`(6)` Specific schema required as described in :ref:`oas_json_types`.
+.. rubric:: Footnotes
+
+.. [#note1]
+    Resolution method according to critical fields defined in :ref:`cwl-type`.
+
+.. [#note2]
+    More details in :ref:`oas_basic_types` and :ref:`cwl-array-null-values` sections.
+
+.. [#note3]
+    Number is used in combination with ``format`` to find best match between integer and floating point values.
+    If not provided, it defaults to ``float`` to handle both cases.
+
+.. [#note4]
+    The ``float`` name is employed loosely to represent any *floating-point* value rather than
+    *single-precision* (16-bits). Its internal representation is *double-precision* (32-bits) given that the
+    implementation is in Python.
+
+.. [#note5]
+    Because ``string`` is the default, any ``format`` and ``pattern`` can be specified.
+    More specific types with these items can help apply additional validation, although not strictly enforced.
+
+.. [#note6]
+    Specific schema required as described in :ref:`oas_json_types`.
+
+.. [#bbox-note]
+    The :term:`WPS` data type ``BoundingBox`` has a schema definition in :term:`WPS` and :term:`OAS` contexts,
+    but is not handled natively by :term:`CWL` types. When the conversion to a :term:`CWL` job occurs, an equivalent
+    ``Complex`` type using a :term:`CWL` ``File`` with ``format: ogc-bbox`` and the contents stored as :term:`JSON` is
+    employed. It is up to the :term:`Application Package` to parse this :term:`JSON` content as necessary.
+    Alternatively, it is possible to use a ``Literal`` data of type ``string`` corresponding
+    to :term:`WKT` (see |wkt-example|_) if it is deemed preferable that the :term:`CWL` script
+    receives the data directly without intermediate interpretation.
 
 .. _cwl-type:
 
@@ -573,16 +724,6 @@ Type Resolution
 ~~~~~~~~~~~~~~~
 
 In the :term:`WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
-
-.. _bbox-note:
-.. note::
-    As of the current version of `Weaver`, :term:`WPS` data type ``BoundingBox`` is not completely supported.
-    The schema definition exists in :term:`WPS` and :term:`OAS` contexts but is not handled by any :term:`CWL` type
-    conversion yet. This feature is reflected by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_.
-    It is possible to use a ``Literal`` data of type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
-
-.. [#] |wkt-example|_
-.. [#] |wkt-format|_
 
 As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
 which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be
@@ -640,8 +781,8 @@ it gets parsed as intended type.
 
 .. versionadded:: 4.16
 
-With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema definitions provided in
-the :term:`WPS` I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
+With more recent versions of `Weaver`, it is also possible to employ :term:`OpenAPI` schema (:term:`OAS`) definitions
+provided in the I/O to specify the explicit structure that applies to ``Literal``, ``BoundingBox`` and ``Complex``
 data types. When :term:`OpenAPI` schema are detected, they are also considered in the merging strategy along with
 other specifications provided in :term:`CWL` and :term:`WPS` contexts. More details about :term:`OAS` context is
 provided in :ref:`oas_io_schema` section.
@@ -873,15 +1014,12 @@ preferable to provide the ``minOccurs`` and ``maxOccurs`` in the :term:`WPS` con
 ``array`` and/or ``"null"`` type requirements automatically. Also, because of all implied parameters in this situation
 to specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
 trouble guessing the intended result when merging specifications. If unambiguous guess can be made, :term:`CWL` will be
-employed as deciding definition to resolve erroneous mismatches (as for any other corresponding fields).
-
-.. todo:: update warning according to Weaver issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_
+employed as the overruling definition to resolve erroneous mismatches (as for any other corresponding fields).
 
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the :term:`WPS` context. Native
-    :term:`WPS` therefore does not permit multiple output reference files. This can be worked around using a
-    |metalink|_ file, but this use case is not covered by `Weaver` yet as it requires special mapping with :term:`CWL`
-    that does support ``array`` type as output (see issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+    :term:`WPS` therefore does not permit multiple output reference files or data values under a same output ID.
+    To see potential workarounds, refer to :ref:`Multiple Outputs` section.
 
 .. note::
     Although :term:`WPS` multi-value inputs are defined as a single entity during deployment, special care must be taken
@@ -999,35 +1137,38 @@ Note that all :term:`OAS` elements are always nested under the ``schema`` field 
 located where appropriate as per :term:`OpenAPI` specification. Other :term:`OAS` fields are still permitted, but
 are not explicitly handled to search for corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context   |
-+=====================================+=======================================+=====================================+
-| ``minOccurs``/``maxOccurs`` |br|    | ``type``/``oneOf`` combination |br|   | ``type`` modifiers: |br|            |
-|                                     |                                       |                                     |
-| - ``minOccurs=0``                   | - single type unless ``minItems=0``   | - ``?``/``"null"`` if ``min*=0``    |
-| - ``maxOccurs>1`` or ``unbounded``  | - ``minItems``/``maxItems`` (array)   | - ``[]``/``array`` if ``max*>1``    |
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| ``formats`` |br|                    | ``oneOf`` (for each format) |br|      | ``format`` |br|                     |
-|                                     |                                       |                                     |
-| - ``mimeType``/``mediaType``        | - ``contentMediaType``                | - *namespaced* ``mediaType``        |
-| - ``encoding``                      | - ``contentEncoding``                 | - |na|                              |
-| - ``schema``                        | - ``contentSchema``                   | - full-URI ``format``/``$schema``   |
-+-------------------------------------+---------------------------------------+-------------------------------------+
-| ``literalDataDomains``              | |br|                                  | |br|                                |
-|                                     |                                       |                                     |
-| - ``allowedValues`` (int/float/str) | - ``enum`` array of values            | - ``enum`` type with ``symbols``    |
-|                                     |   |br| |br| |br|                      |   |br| |br| |br|                    |
-| - ``allowedValues`` (range) |br|    |                                       |                                     |
-|     - ``minimumValue``              | - ``minimum`` value                   | - |na| |br|                         |
-|     - ``maximumValue``              | - ``maximum`` value                   | - |na| |br|                         |
-|     - ``spacing``                   | - ``multipleOf`` value                | - |na| |br|                         |
-|     - ``rangeClosure`` |br|         | - ``exclusiveMinimum``/               | - |na| |br|                         |
-|       (combination of open, closed, |   ``exclusiveMaximum`` |br| (set      |   |br| |br|                         |
-|       open-closed, closed-open)     |   ``true`` for corresponding "open")  |   |br| |br|                         |
-|                                     |   |br| |br| |br|                      |                                     |
-| - ``valueDefinition`` (name)        | - ``type``/``format`` combination     | - ``type`` (simplified as needed)   |
-| - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"``  |
-+-------------------------------------+---------------------------------------+-------------------------------------+
+.. table::
+    :align: center
+
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context  |
+    +=====================================+=======================================+====================================+
+    | ``minOccurs``/``maxOccurs`` |br|    | ``type``/``oneOf`` combination |br|   | ``type`` modifiers: |br|           |
+    |                                     |                                       |                                    |
+    | - ``minOccurs=0``                   | - single type unless ``minItems=0``   | - ``?``/``"null"`` if ``min*=0``   |
+    | - ``maxOccurs>1`` or ``unbounded``  | - ``minItems``/``maxItems`` (array)   | - ``[]``/``array`` if ``max*>1``   |
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | ``formats`` |br|                    | ``oneOf`` (for each format) |br|      | ``format`` |br|                    |
+    |                                     |                                       |                                    |
+    | - ``mimeType``/``mediaType``        | - ``contentMediaType``                | - *namespaced* ``mediaType``       |
+    | - ``encoding``                      | - ``contentEncoding``                 | - |na|                             |
+    | - ``schema``                        | - ``contentSchema``                   | - full-URI ``format``/``$schema``  |
+    +-------------------------------------+---------------------------------------+------------------------------------+
+    | ``literalDataDomains``              | |br|                                  | |br|                               |
+    |                                     |                                       |                                    |
+    | - ``allowedValues`` (int/float/str) | - ``enum`` array of values            | - ``enum`` type with ``symbols``   |
+    |                                     |   |br| |br| |br|                      |   |br| |br| |br|                   |
+    | - ``allowedValues`` (range) |br|    |                                       |                                    |
+    |     - ``minimumValue``              | - ``minimum`` value                   | - |na| |br|                        |
+    |     - ``maximumValue``              | - ``maximum`` value                   | - |na| |br|                        |
+    |     - ``spacing``                   | - ``multipleOf`` value                | - |na| |br|                        |
+    |     - ``rangeClosure`` |br|         | - ``exclusiveMinimum``/               | - |na| |br|                        |
+    |       (combination of open, closed, |   ``exclusiveMaximum`` |br| (set      |   |br| |br|                        |
+    |       open-closed, closed-open)     |   ``true`` for corresponding "open")  |   |br| |br|                        |
+    |                                     |   |br| |br| |br|                      |                                    |
+    | - ``valueDefinition`` (name)        | - ``type``/``format`` combination     | - ``type`` (simplified as needed)  |
+    | - ``default``                       | - ``default``                         | - ``default`` and ``?``/``"null"`` |
+    +-------------------------------------+---------------------------------------+------------------------------------+
 
 In order to be :term:`OGC`-compliant, any previously deployed :term:`Process` will automatically generate any missing
 ``schema`` specification for all :term:`I/O` it employs when calling its :ref:`Process Description <proc_op_describe>`.
@@ -1171,24 +1312,48 @@ metadata fields (notably descriptions), are also transferred.
 
 Below is a list of compatible elements.
 
-+-----------------------------------------+----------------------------------------------------------+
-| Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
-+=========================================+==========================================================+
-| ``keywords``                            | ``s:keywords`` (expecting ``s`` in ``$namespace``        |
-|                                         | referring to http://schema.org [#schemaorg]_)            |
-+-----------------------------------------+----------------------------------------------------------+
-| ``metadata``                            | ``$schemas``/``$namespace``                              |
-| (using ``title`` and ``href`` fields)   | (using namespace name and HTTP references)               |
-+-----------------------------------------+----------------------------------------------------------+
-| ``title``                               | ``label``                                                |
-+-----------------------------------------+----------------------------------------------------------+
-| ``abstract``/``description``            | ``doc``                                                  |
-+-----------------------------------------+----------------------------------------------------------+
+
+.. table:: Mapping of metadata properties between the :term:`WPS` and :term:`CWL` contexts
+    :align: center
+    :widths: 20,20
+
+    +-----------------------------------------+----------------------------------------------------------+
+    | Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
+    +=========================================+==========================================================+
+    | ``keywords``                            | ``s:keywords`` [#cwl_schemaorg]_                         |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``metadata`` |br|                       | Supported fields [#cwl_schemaorg]_ : |br|                |
+    | (using ``title``, ``role``, ``value``,  | - ``s:author`` |br|                                      |
+    | ``rel`` and ``href`` fields)            | - ``s:citation`` |br|                                    |
+    |                                         | - ``s:codeRepository`` |br|                              |
+    |                                         | - ``s:contributor`` |br|                                 |
+    |                                         | - ``s:dateCreated`` |br|                                 |
+    |                                         | - ``s:license`` |br|                                     |
+    |                                         | - ``s:releaseNotes`` |br|                                |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``title``                               | ``label``                                                |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``abstract``/``description``            | ``doc``                                                  |
+    +-----------------------------------------+----------------------------------------------------------+
+    | ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
+    +-----------------------------------------+----------------------------------------------------------+
 
 .. rubric:: Footnotes
 
-.. [#schemaorg]
-    See example: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. [#cwl_schemaorg]
+    When using these properties, it is expected that the :term:`CWL` :term:`Application Package` resolves
+    the ``$schemas`` with a reference to the |cwl-metadata-schema-org|_. Furthermore, the ``$namespaces``
+    is expected to resolve the prefix ``s`` to the `http://schema.org <http://schema.org>`_ definitions
+    corresponding to the RDF schema, as shown below.
+
+    See |cwl-metadata|_ for a complete example using those fields and their expected contents.
+
+.. code-block:: yaml
+
+    $schemas:
+      - https://schema.org/version/latest/schemaorg-current-https.rdf
+    $namespaces:
+      s: http://schema.org
 
 .. |br| raw:: html
 
@@ -1200,3 +1365,98 @@ Below is a list of compatible elements.
    :trim:
 
 .. |<=>| unicode:: 0x21D4
+
+.. _app_pkg_secret_parameters:
+
+Using Secret Parameters
+=======================
+
+Under some circumstances, input parameters to a :term:`Job` must be hidden, whether to avoid leaking credentials
+required by the underlying application, or for using sensible information that should not be easily accessible.
+In such cases, typical :term:`CWL` ``string`` inputs should not be directly employed.
+
+There are 2 strategies available to employ *secrets* when working with `Weaver`:
+
+1. Using the :term:`Vault` feature
+2. Using ``cwltool:Secrets`` hint
+
+.. _app_pkg_secret_vault:
+
+Secrets using the File Vault
+----------------------------
+
+Using :ref:`file_vault_inputs` essentially consists of wrapping any sensible data within an input of type ``File``,
+which will be :ref:`Uploaded to the Vault <vault_upload>` for :term:`Job` execution. Once the file is accessed and
+staged by the relevant :term:`Job`, its contents are automatically deleted from the :term:`Vault`. This offers a
+secured single access endpoint only available by the client that uploaded the file, for a short period of time,
+which decides for which :term:`Process` it should be summited to with the corresponding authentication token and
+:term:`Vault` ID. Since the sensible data is contained within a file, its contents are only available by the targeted
+:term:`Job` for the selected :term:`Process`, while logs will only display a temporary path.
+
+However, the :term:`Vault` approach as potential drawbacks.
+
+1. It is a feature specific to `Weaver`, which will not be available an easily interoperable when involving
+   other :term:`OGC API - Processes` servers.
+
+2. It forces the :term:`CWL` to be implemented using a ``File`` input. While this is not necessarily an issue
+   in some cases, it becomes the responsibility of the :term:`Application Package` developer to figure out how
+   to propagate the contained data to the relevant piece of code if a plain string is needed. To do so, the
+   developer must also avoid outputting any information to ``stdout``. Otherwise, the data would be captured
+   in :term:`Job` logs and defeating the purpose of using the :term:`Vault`.
+
+.. note::
+    For more details about the :term:`Vault`, refer to sections :ref:`file_vault_inputs`, :ref:`vault_upload`,
+    and the corresponding capabilities in :term:`cli_example_upload`.
+
+.. _app_pkg_secret_cwltool:
+
+Secrets using the CWL Hints
+---------------------------
+
+An alternative approach is to use the :term:`CWL` hints as follows:
+
+.. code-block:: json
+    :caption: CWL Secrets Definition
+
+    {
+        "cwlVersion": "v1.2",
+        "inputs": {
+            "<input-name>": {
+                "type": "string"
+            }
+        },
+        "hints": {
+            "cwltool:Secrets": {
+                "secrets": [
+                    "<input-name>"
+                ]
+            }
+        },
+        "$namespaces": {
+            "cwltool": "http://commonwl.org/cwltool#"
+        }
+    }
+
+Using this definition either in a ``class: CommandLineTool`` (see :ref:`app_pkg_cmd`)
+or a ``class: Workflow`` (see :ref:`app_pkg_workflow`) will instruct the underlying :term:`Job` execution
+to replace all specified inputs (i.e.: ``<input-name>`` in the above example) to be masked in commands and logs.
+Looking at :term:`Job` logs, all sensible inputs will be replaced by a representation similar to ``(secret-<UUID>)``
+The original data identified by this masked definition will be substituted back only at the last possible moment,
+when the underlying operation accessed it to perform its processing.
+
+A few notable considerations must be taken when using the ``cwltool:Secrets`` definition.
+
+1. It is limited to ``string`` inputs. Any other literal data type and intermediate conversions would need
+   to be handled explicitly by the :term:`Application Package` maintainer.
+
+2. The secrets definition can only be provided in the ``hints`` section of the :term:`CWL` document, meaning
+   that any remote server supporting :term:`CWL` are not required to support this feature.
+   If the :term:`Application Package` is expected to be deployed remotely, it is up to the client to
+   determine whether the remote server will perform the necessary actions to mask sensible data.
+   If unsupported, secrets could become visible in the :term:`Job` logs as if they were submitted using
+   typical ``string`` inputs.
+
+3. The feature does not avoid any misuse of underlying commands that could expose the sensible data due
+   to manipulation errors or the use of operations that are redirected to ``stdout``. For example, if the
+   shell ``echo`` command is used within the :term:`CWL` with an input listed in ``cwltool:Secrets``, its
+   value will still be displayed in plain text in the :term:`Job` logs.

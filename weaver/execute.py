@@ -35,6 +35,14 @@ class ExecuteTransmissionMode(Constants):
     REFERENCE = "reference"
 
 
+class ExecuteCollectionFormat(Constants):
+    STAC = "stac-collection"
+    OGC_COVERAGE = "ogc-coverage-collection"
+    OGC_FEATURES = "ogc-features-collection"
+    OGC_MAP = "ogc-map-collection"
+    GEOJSON = "geojson-feature-collection"
+
+
 if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
@@ -53,4 +61,11 @@ if TYPE_CHECKING:
     AnyExecuteTransmissionMode = Literal[
         ExecuteTransmissionMode.REFERENCE,
         ExecuteTransmissionMode.VALUE,
+    ]
+    AnyExecuteCollectionFormat = Literal[
+        ExecuteCollectionFormat.STAC,
+        ExecuteCollectionFormat.OGC_COVERAGE,
+        ExecuteCollectionFormat.OGC_FEATURES,
+        ExecuteCollectionFormat.OGC_MAP,
+        ExecuteCollectionFormat.GEOJSON,
     ]

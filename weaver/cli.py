@@ -7,13 +7,16 @@ import logging
 import os
 import re
 import sys
+import textwrap
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 import yaml
+from colander import EMAIL_RE, URL_REGEX
 from pyramid.httpexceptions import HTTPNotImplemented
 from requests.auth import AuthBase, HTTPBasicAuth
+from requests.sessions import Session
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
@@ -22,7 +25,7 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, OutputFormat, get_content_type, get_format
+from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -35,6 +38,7 @@ from weaver.processes.wps_package import get_process_definition
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
+    Lazify,
     OutputMethod,
     copy_doc,
     fetch_reference,
@@ -51,11 +55,10 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
-from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union
+    from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type, Union
 
     from requests import Response
 
@@ -68,16 +71,28 @@ if TYPE_CHECKING:
             AnyRequestType,
             AnyResponseType,
             CWL,
+            CWL_IO_ValueMap,
+            ExecutionInputs,
             ExecutionInputsMap,
+            ExecutionResultObjectRef,
             ExecutionResults,
+            ExecutionResultValue,
             HeadersType,
-            JSON
+            JobSubscribers,
+            JSON,
+            SettingsType
         )
     except ImportError:
+        # pylint: disable=C0103,invalid-name
         # avoid linter issue
         AnyRequestMethod = str
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
-        CWL = JSON = ExecutionInputsMap = ExecutionResults = HeadersType = Any
+        CWL = JSON = Dict[str, Any]
+        CWL_IO_ValueMap = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = SettingsType = JSON
+        ExecutionInputs = Union[JSON, List[JSON]]
+        ExecutionResultValue = Union[ExecutionResultObjectRef, List[ExecutionResultObjectRef]]
+        JobSubscribers = Dict[str, Any]
+        HeadersType = Dict[str, str]
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
@@ -91,7 +106,7 @@ if TYPE_CHECKING:
     PostHelpFormatter = Callable[[str], str]
     ArgumentParserRule = Tuple[argparse._ActionsContainer, Callable[[argparse.Namespace], Optional[bool]], str]  # noqa
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("weaver.cli")  # do not use '__name__' since it becomes '__main__' from CLI call
 
 OPERATION_ARGS_TITLE = "Operation Arguments"
 OPTIONAL_ARGS_TITLE = "Optional Arguments"
@@ -236,6 +251,19 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
     """
     Base class to send a request in order to retrieve an authorization token.
     """
+
+    def __init__(self,
+                 identity=None,  # Optional[str]
+                 password=None,  # Optional[str]
+                 url=None,  # Optional[str]
+                 method="GET",  # AnyRequestMethod
+                 headers=None,  # Optional[AnyHeadersContainer]
+                 token=None):  # Any
+        # type: (...) -> None
+        AuthHandler.__init__(self, identity=identity, password=password, url=url, method=method, headers=headers)
+        HTTPBasicAuth.__init__(self, username=identity, password=password)
+        self.token = token
+
     @property
     def auth_token_name(self):
         # type: () -> str
@@ -251,6 +279,15 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         # type: (str) -> AnyHeadersContainer
         """
         Obtain the header definition with the provided authorization token.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    @abc.abstractmethod
+    def parse_token(token):
+        # type: (Any) -> str
+        """
+        Convert token to a form that can be included in a request header.
         """
         raise NotImplementedError
 
@@ -283,11 +320,15 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
 
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
-        auth_token = self.request_auth()
+        if self.token is None:
+            auth_token = self.request_auth()
+        else:
+            auth_token = self.token
         if not auth_token:
             LOGGER.warning("Expected authorization token could not be retrieved from: [%s] in [%s]",
                            self.url, fully_qualified_name(self))
         else:
+            auth_token = self.parse_token(auth_token)
             auth_header = self.auth_header(auth_token)
             request.headers.update(auth_header)
         return request
@@ -298,6 +339,16 @@ class BearerAuthHandler(RequestAuthHandler):
     Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
     """
 
+    @staticmethod
+    def parse_token(token):
+        # type: (str) -> str
+        """
+        Convert token to a form that can be included in a request header.
+
+        Returns the token string as is.
+        """
+        return token
+
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
         return {"Authorization": f"Bearer {token}"}
@@ -305,8 +356,23 @@ class BearerAuthHandler(RequestAuthHandler):
 
 class CookieAuthHandler(RequestAuthHandler):
     """
-    Adds the ``Authorization`` header formed of the authentication bearer token from the underlying request.
+    Adds the ``Cookie`` header formed from the authentication bearer token from the underlying request.
     """
+
+    @staticmethod
+    def parse_token(token):
+        # type: (Union[str, Mapping[str, str]]) -> str
+        """
+        Convert token to a form that can be included in a request header.
+
+        Returns the token string as is if it is a string. Otherwise, if the token is a mapping, where keys are cookie
+        names and values are cookie values, convert the cookie representation to a string that can be accepted as the
+        value of the "Cookie" header.
+        """
+        if isinstance(token, str):
+            return token
+        cookie_dict = CaseInsensitiveDict(token)
+        return "; ".join(f"{key}={val}" for key, val in cookie_dict.items())
 
     def auth_header(self, token):
         # type: (str) -> AnyHeadersContainer
@@ -323,7 +389,7 @@ class WeaverClient(object):
     auth = None  # type: AuthHandler
 
     def __init__(self, url=None, auth=None):
-        # type: (Optional[str], Optional[AuthHandler]) -> None
+        # type: (Optional[str], Optional[AuthBase]) -> None
         """
         Initialize the client with predefined parameters.
 
@@ -339,7 +405,7 @@ class WeaverClient(object):
         else:
             self._url = None
             LOGGER.warning("No URL provided. All operations must provide it directly or through another parameter!")
-        self.auth = auth
+        self.auth = cast(AuthHandler, auth)
         self._headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self._settings = {
             "weaver.request_options": {}
@@ -348,7 +414,6 @@ class WeaverClient(object):
     def _request(self,
                  method,                # type: AnyRequestMethod
                  url,                   # type: str
-                 *args,                 # type: Any
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  x_headers=None,        # type: Optional[AnyHeadersContainer]
                  request_timeout=None,  # type: Optional[int]
@@ -370,7 +435,20 @@ class WeaverClient(object):
         if isinstance(request_retries, int) and request_retries > 0:
             kwargs.setdefault("retries", request_retries)
 
-        return request_extra(method, url, *args, headers=headers, **kwargs)
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            fields = set(inspect.signature(Session.request).parameters) - {"params", "url", "method", "json", "body"}
+            options = {opt: val for opt, val in kwargs.items() if opt in fields}
+            tab = "  "
+            LOGGER.debug(
+                f"Request:\n{tab}%s %s\n{tab}Queries:\n%s\n{tab}Headers:\n%s\n{tab}Content:\n%s\n{tab}Options:\n%s",
+                method,
+                url,
+                textwrap.indent(repr_json(kwargs.get("params") or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(headers or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(kwargs.get("json") or kwargs.get("body") or {}, indent=len(tab)), tab * 2),
+                textwrap.indent(repr_json(options, indent=len(tab)), tab * 2),
+            )
+        return request_extra(method, url, headers=headers, **kwargs)
 
     def _get_url(self, url):
         # type: (Optional[str]) -> str
@@ -421,6 +499,8 @@ class WeaverClient(object):
                             for item in nested:
                                 if isinstance(item, dict):
                                     item.pop("links", None)
+                        elif isinstance(nested, dict):
+                            nested.pop("links", None)
                     body.pop("links", None)
                 msg = body.get("description", body.get("message", "undefined"))
             if code >= 400:
@@ -429,7 +509,8 @@ class WeaverClient(object):
             else:
                 _success = True
             msg = message or getattr(response, "message", None) or msg or "undefined"
-            text = text or OutputFormat.convert(body, output_format or OutputFormat.JSON_STR, item_root="result")
+            fmt = output_format or OutputFormat.JSON_STR
+            text = text or OutputFormat.convert(body, fmt, item_root="result")
         except Exception as exc:  # noqa  # pragma: no cover  # ignore safeguard against error in implementation
             msg = "Could not parse body."
             text = body = response.text
@@ -470,32 +551,52 @@ class WeaverClient(object):
                 desc = data.get("processDescription", {}).get("process", {}) or data.get("processDescription", {})
                 desc["id"] = process_id
             data.setdefault("processDescription", desc)  # already applied if description was found/updated at any level
-            desc["visibility"] = Visibility.PUBLIC
         except (ValueError, TypeError, ScannerError) as exc:  # pragma: no cover
             return OperationResult(False, f"Failed resolution of body definition: [{exc!s}]", body)
         return OperationResult(True, "", data)
 
     @staticmethod
-    def _parse_deploy_package(body, cwl, wps, process_id, headers):
-        # type: (JSON, Optional[CWL], Optional[str], Optional[str], HeadersType) -> OperationResult
+    def _parse_deploy_package(
+        body,           # type: JSON
+        cwl,            # type: Optional[Union[CWL, str]]
+        wps,            # type: Optional[str]
+        process_id,     # type: Optional[str]
+        headers,        # type: HeadersType
+        settings,       # type: SettingsType
+    ):                  # type: (...) -> OperationResult
         try:
             p_desc = get_process_information(body)
             p_id = get_any_id(p_desc, default=process_id)
             info = {"id": p_id}  # minimum requirement for process offering validation
             if (isinstance(cwl, str) and not cwl.startswith("{")) or isinstance(wps, str):
                 LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", p_id)
-                proc = get_process_definition(info, reference=cwl or wps, headers=headers)  # validate
+                proc = get_process_definition(  # validate
+                    info,
+                    reference=cwl or wps,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, str) and cwl.startswith("{") and cwl.endswith("}"):
                 LOGGER.debug("Override parsed CWL into provided/loaded body for process: [%s]", p_id)
                 pkg = yaml.safe_load(cwl)
                 if not isinstance(pkg, dict) or pkg.get("cwlVersion") is None:
                     raise PackageRegistrationError("Failed parsing or invalid CWL from expected literal JSON string.")
-                proc = get_process_definition(info, package=pkg, headers=headers)  # validate
+                proc = get_process_definition(  # validate
+                    info,
+                    package=pkg,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": proc["package"]}]
             elif isinstance(cwl, dict):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
-                get_process_definition(info, package=cwl, headers=headers)  # validate
+                get_process_definition(  # validate
+                    info,
+                    package=cwl,
+                    headers=headers,
+                    container=settings,
+                )
                 body["executionUnit"] = [{"unit": cwl}]
         except (PackageRegistrationError, ScannerError) as exc:  # pragma: no cover
             message = f"Failed resolution of package definition: [{exc!s}]"
@@ -527,7 +628,7 @@ class WeaverClient(object):
                  provider_id,           # type: str
                  provider_url,          # type: str
                  url=None,              # type: Optional[str]
-                 auth=None,             # type: Optional[AuthHandler]
+                 auth=None,             # type: Optional[AuthBase]
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  with_links=True,       # type: bool
                  with_headers=False,    # type: bool
@@ -537,6 +638,9 @@ class WeaverClient(object):
                  ):                     # type: (...) -> OperationResult
         """
         Registers a remote :term:`Provider` using specified references.
+
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
         :param provider_id: Identifier to employ for registering the new :term:`Provider`.
         :param provider_url: Endpoint location to register the new remote :term:`Provider`.
@@ -565,7 +669,7 @@ class WeaverClient(object):
     def unregister(self,
                    provider_id,             # type: str
                    url=None,                # type: Optional[str]
-                   auth=None,               # type: Optional[AuthHandler]
+                   auth=None,               # type: Optional[AuthBase]
                    headers=None,            # type: Optional[AnyHeadersContainer]
                    with_links=True,         # type: bool
                    with_headers=False,      # type: bool
@@ -575,6 +679,9 @@ class WeaverClient(object):
                    ):                       # type: (...) -> OperationResult
         """
         Unregisters a remote :term:`Provider` using the specified identifier.
+
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
         :param provider_id: Identifier to employ for unregistering the :term:`Provider`.
         :param url: Instance URL if not already provided during client creation.
@@ -609,7 +716,7 @@ class WeaverClient(object):
                password=None,           # type: Optional[str]
                undeploy=False,          # type: bool
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthHandler]
+               auth=None,               # type: Optional[AuthBase]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -629,8 +736,13 @@ class WeaverClient(object):
         If the reference is resolved to be a :term:`Workflow`, all its underlying :term:`Process` steps must be
         available under the same URL that this client was initialized with.
 
+        .. note::
+            This is only supported by :term:`OGC API - Processes` instances that support
+            the `Deploy, Replace, Undeploy` (DRU) extension.
+
         .. seealso::
-            :ref:`proc_op_deploy`
+            - :ref:`proc_op_deploy`
+            - |ogc-api-proc-part2|_
 
         :param process_id:
             Desired process identifier.
@@ -669,12 +781,14 @@ class WeaverClient(object):
         req_headers = copy.deepcopy(self._headers)
         req_headers.update(self._parse_auth_token(token, username, password))
         data = result.body
-        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers)
+        base = self._get_url(url)
+        settings = copy.deepcopy(self._settings)
+        settings["weaver.wps_restapi_url"] = base
+        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers, settings)
         if not result.success:
             return result
         p_id = result.message
         data = result.body
-        base = self._get_url(url)
         if undeploy:
             LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
             result = self.undeploy(process_id=p_id, url=base)
@@ -686,12 +800,13 @@ class WeaverClient(object):
         resp = self._request("POST", path, json=data,
                              headers=req_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
-        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+        return self._parse_result(resp, with_links=with_links, nested_links="processSummary",
+                                  with_headers=with_headers, output_format=output_format)
 
     def undeploy(self,
                  process_id,            # type: str
                  url=None,              # type: Optional[str]
-                 auth=None,             # type: Optional[AuthHandler]
+                 auth=None,             # type: Optional[AuthBase]
                  headers=None,          # type: Optional[AnyHeadersContainer]
                  with_links=True,       # type: bool
                  with_headers=False,    # type: bool
@@ -726,7 +841,7 @@ class WeaverClient(object):
 
     def capabilities(self,
                      url=None,              # type: Optional[str]
-                     auth=None,             # type: Optional[AuthHandler]
+                     auth=None,             # type: Optional[AuthBase]
                      headers=None,          # type: Optional[AnyHeadersContainer]
                      with_links=True,       # type: bool
                      with_headers=False,    # type: bool
@@ -802,7 +917,7 @@ class WeaverClient(object):
                  process_id,                # type: str
                  provider_id=None,          # type: Optional[str]
                  url=None,                  # type: Optional[str]
-                 auth=None,                 # type: Optional[AuthHandler]
+                 auth=None,                 # type: Optional[AuthBase]
                  headers=None,              # type: Optional[AnyHeadersContainer]
                  schema=ProcessSchema.OGC,  # type: Optional[ProcessSchemaType]
                  with_links=True,           # type: bool
@@ -856,9 +971,51 @@ class WeaverClient(object):
             path = f"{base}/processes/{process_id}"
         return path
 
+    def package(self,
+                process_id,                 # type: str
+                provider_id=None,           # type: Optional[str]
+                url=None,                   # type: Optional[str]
+                auth=None,                  # type: Optional[AuthBase]
+                headers=None,               # type: Optional[AnyHeadersContainer]
+                with_links=True,            # type: bool
+                with_headers=False,         # type: bool
+                request_timeout=None,       # type: Optional[int]
+                request_retries=None,       # type: Optional[int]
+                output_format=None,         # type: Optional[AnyOutputFormat]
+                ):                          # type: (...) -> OperationResult
+        """
+        Retrieve the :term:`Application Package` definition of the specified :term:`Process`.
+
+        .. note::
+            This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
+
+        :param process_id: Identifier of the local or remote process to describe.
+        :param provider_id: Identifier of the provider from which to locate a remote process to describe.
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        path = self._get_process_url(url, process_id, provider_id)
+        path = f"{path}/package"
+        resp = self._request("GET", path,
+                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             request_timeout=request_timeout, request_retries=request_retries)
+        return self._parse_result(resp, message="Retrieving process Application Package.",
+                                  output_format=output_format, with_links=with_links, with_headers=with_headers)
+
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, JSON]]) -> Union[OperationResult, ExecutionInputsMap]
+        # type: (Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
         """
         Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
 
@@ -885,17 +1042,33 @@ class WeaverClient(object):
                     inputs = []
             if isinstance(inputs, list):
                 inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
-            # consider possible ambiguity if literal CWL input is named 'inputs'
-            # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
-            #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
-            # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-            #   unless 'value/href' (and also 'id' technically) are present
+
             values = inputs.get("inputs", null)
+            if values is null:
+                values = inputs
             if (
-                values is null or
-                values is not null and (
-                    (isinstance(values, dict) and get_any_value(values) is null and "class" not in values) or
-                    (isinstance(values, list) and all(isinstance(v, dict) and get_any_value(v) is null for v in values))
+                # consider possible ambiguity if literal CWL input is named 'inputs'
+                # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
+                #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+                # - if value of 'inputs' is a mapping with nested objects,
+                #   they must be interpreted as the CWL form if a 'class' is found
+                #   (literals would be interpreted the same regardless of OGC or CWL form)
+                # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
+                #   unless 'value/href' (and also 'id' technically) are present
+                values is not null and
+                (
+                    (
+                        isinstance(values, dict) and
+                        get_any_value(values, default=null) is null and
+                        "class" in values
+                    ) or
+                    (
+                        isinstance(values, (dict, list)) and
+                        any(
+                            isinstance(v, dict) and get_any_value(v, default=null) is null
+                            for v in (values if isinstance(values, list) else values.values())
+                        )
+                    )
                 )
             ):
                 values = cwl2json_input_values(inputs, schema=ProcessSchema.OGC)
@@ -926,9 +1099,11 @@ class WeaverClient(object):
         auth_tokens = {}  # type: Dict[str, str]
         update_inputs = dict(inputs)
         for input_id, input_data in dict(inputs).items():
+            input_array = True
             if not isinstance(input_data, list):  # support array of files
                 input_data = [input_data]
-            for data in input_data:
+                input_array = False
+            for input_index, data in enumerate(input_data):
                 if not isinstance(data, dict):
                     continue
                 file = href = get_any_value(data, default=null, data=False)
@@ -956,7 +1131,8 @@ class WeaverClient(object):
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
-                res = self.upload(href, content_type=fmt.mime_type, url=url)
+                c_enc = get_field(fmt, "encoding", search_variations=True) or None
+                res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
                 vault_href = res.body["file_href"]
@@ -964,7 +1140,14 @@ class WeaverClient(object):
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
-                update_inputs[input_id] = {"href": vault_href, "format": {"mediaType": ctype}}
+                input_vault_href = {
+                    "href": vault_href,
+                    "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
+                }
+                if input_array:
+                    update_inputs[input_id][input_index] = input_vault_href
+                else:
+                    update_inputs[input_id] = input_vault_href
 
         auth_headers = {}
         if auth_tokens:
@@ -978,12 +1161,13 @@ class WeaverClient(object):
     def execute(self,
                 process_id,             # type: str
                 provider_id=None,       # type: Optional[str]
-                inputs=None,            # type: Optional[Union[str, JSON]]
+                inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
                 monitor=False,          # type: bool
                 timeout=None,           # type: Optional[int]
                 interval=None,          # type: Optional[int]
+                subscribers=None,       # type: Optional[JobSubscribers]
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthHandler]
+                auth=None,              # type: Optional[AuthBase]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
@@ -991,6 +1175,7 @@ class WeaverClient(object):
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
                 output_refs=None,       # type: Optional[Iterable[str]]
+                output_context=None,    # type: Optional[str]
                 ):                      # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
@@ -1004,13 +1189,14 @@ class WeaverClient(object):
         include details as the ``class: File`` and ``path`` with location.
 
         .. seealso::
-            :ref:`proc_op_execute`
+            - :ref:`proc_op_execute`
+            - :ref:`exec_output_location`
 
         .. note::
             Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
             they were executed synchronously, provide the :paramref:`monitor` argument. This offers more flexibility
             over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
-            errors that could occur for long running processes, since status is pooled iteratively rather than waiting.
+            errors that could occur for long-running processes, since status is pooled iteratively rather than waiting.
 
         :param process_id: Identifier of the local or remote process to execute.
         :param provider_id: Identifier of the provider from which to locate a remote process to execute.
@@ -1024,6 +1210,9 @@ class WeaverClient(object):
             Monitoring timeout (seconds) if requested.
         :param interval:
             Monitoring interval (seconds) between job status polling requests.
+        :param subscribers:
+            Job status subscribers to obtain email or callback request notifications.
+            The subscriber keys indicate which type of subscriber and for which status the notification will be sent.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1042,6 +1231,10 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_context:
+            Specify an output context for which the `Weaver` instance should attempt storing the :term:`Job` results
+            under the nested location of its configured :term:`WPS` outputs. Note that the instance is not required
+            to fulfill that preference, and can ignore this value if it deems that the provided context is inadequate.
         :returns: Results of the operation.
         """
         base = self._get_url(url)  # raise before inputs parsing if not available
@@ -1062,7 +1255,12 @@ class WeaverClient(object):
             # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
             "outputs": {}
         }
+        if subscribers:
+            LOGGER.debug("Adding job execution subscribers:\n%s", Lazify(lambda: repr_json(subscribers, indent=2)))
+            data["subscribers"] = subscribers
+
         # omit x-headers on purpose for 'describe', assume they are intended for 'execute' operation only
+        LOGGER.debug("Looking up process [%s] (provider: %s) to execute on [%s]", process_id, provider_id, base)
         result = self.describe(process_id, provider_id=provider_id, url=base, auth=auth)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
@@ -1088,6 +1286,8 @@ class WeaverClient(object):
         exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         exec_headers.update(self._headers)
         exec_headers.update(auth_headers)
+        if output_context:
+            exec_headers["X-WPS-Output-Context"] = str(output_context)
         resp = self._request("POST", exec_url, json=data,
                              headers=exec_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -1103,8 +1303,9 @@ class WeaverClient(object):
     def upload(self,
                file_path,               # type: str
                content_type=None,       # type: Optional[str]
+               content_encoding=None,   # type: Optional[ContentEncoding]
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthHandler]
+               auth=None,               # type: Optional[AuthBase]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -1127,6 +1328,10 @@ class WeaverClient(object):
             Explicit Content-Type of the file.
             This should be an IANA Media-Type, optionally with additional parameters such as charset.
             If not provided, attempts to guess it based on the file extension.
+        :param content_encoding:
+            Specify the Content-Encoding of the file.
+            For text use ``utf-8`` or leave ``None``.
+            For binary use ``base64`` or ``binary``.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1159,19 +1364,24 @@ class WeaverClient(object):
         if not os.path.isfile(file_path):
             return OperationResult(False, "Resolved local file reference does not exist.", {"file_path": file_path})
         LOGGER.debug("Processing file for vault upload: [%s]", file_path)
+        c_enc = ContentEncoding.get(content_encoding)
         file_headers = get_href_headers(
             file_path,
             download_headers=False,
             content_headers=True,
             content_type=content_type,
+            content_encoding=c_enc,
         )
         base = self._get_url(url)
         path = f"{base}/vault"
+
+        f_mode, f_enc = ContentEncoding.open_parameters(c_enc, mode="r")
         files = {
             "file": (
                 os.path.basename(file_path),
-                open(file_path, "r", encoding="utf-8"),  # pylint: disable=R1732
-                file_headers["Content-Type"]
+                open(file_path, mode=f_mode, encoding=f_enc),  # pylint: disable=R1732
+                file_headers["Content-Type"],
+                {"Content-Encoding": c_enc} if c_enc else {},
             )
         }
         req_headers = {
@@ -1186,7 +1396,7 @@ class WeaverClient(object):
 
     def jobs(self,
              url=None,              # type: Optional[str]
-             auth=None,             # type: Optional[AuthHandler]
+             auth=None,             # type: Optional[AuthBase]
              headers=None,          # type: Optional[AnyHeadersContainer]
              with_links=True,       # type: bool
              with_headers=False,    # type: bool
@@ -1268,7 +1478,7 @@ class WeaverClient(object):
     def status(self,
                job_reference,           # type: str
                url=None,                # type: Optional[str]
-               auth=None,               # type: Optional[AuthHandler]
+               auth=None,               # type: Optional[AuthBase]
                headers=None,            # type: Optional[AnyHeadersContainer]
                with_links=True,         # type: bool
                with_headers=False,      # type: bool
@@ -1308,7 +1518,7 @@ class WeaverClient(object):
                   x_path,                   # type: str
                   job_reference,            # type: str
                   url=None,                 # type: Optional[str]
-                  auth=None,                # type: Optional[AuthHandler]
+                  auth=None,                # type: Optional[AuthBase]
                   headers=None,             # type: Optional[AnyHeadersContainer]
                   with_links=True,          # type: bool
                   with_headers=False,       # type: bool
@@ -1369,7 +1579,7 @@ class WeaverClient(object):
                 interval=None,                      # type: Optional[int]
                 wait_for_status=Status.SUCCEEDED,   # type: str
                 url=None,                           # type: Optional[str]
-                auth=None,                          # type: Optional[AuthHandler]
+                auth=None,                          # type: Optional[AuthBase]
                 headers=None,                       # type: Optional[AnyHeadersContainer]
                 with_links=True,                    # type: bool
                 with_headers=False,                 # type: bool
@@ -1435,7 +1645,7 @@ class WeaverClient(object):
         return OperationResult(False, msg)
 
     def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
-        # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthHandler]) -> ExecutionResults
+        # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthBase]) -> ExecutionResults
         """
         Download file references from results response contents and link headers.
 
@@ -1464,7 +1674,7 @@ class WeaverClient(object):
             out_path = os.path.join(out_dir, out_id)
             is_list = True
             if not isinstance(value, list):
-                value = [value]
+                value = [value]  # type: List[ExecutionResultValue]
                 is_list = False
             for i, item in enumerate(value):
                 if "href" in item:
@@ -1484,15 +1694,15 @@ class WeaverClient(object):
             link, params = link_header.split(";", 1)
             href = link.strip("<>")
             params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
-            ctype = (params.get("type") or [None])[0]
+            ctype = (params.get("type") or [None])[0]  # type: str
             rel = params["rel"][0].split(".")
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
             ref_path = fetch_reference(href, out_dir, auth=auth,
                                        out_method=OutputMethod.COPY, out_listing=False)
-            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}
+            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}  # type: ExecutionResultObjectRef
             if output in outputs:
-                if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index"' was not employed
+                if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index>"' was not employed
                     outputs[output] = [outputs[output], value]
                 else:
                     outputs[output].append(value)
@@ -1505,7 +1715,7 @@ class WeaverClient(object):
                 out_dir=None,           # type: Optional[str]
                 download=False,         # type: bool
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthHandler]
+                auth=None,              # type: Optional[AuthBase]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
@@ -1565,7 +1775,7 @@ class WeaverClient(object):
     def dismiss(self,
                 job_reference,          # type: str
                 url=None,               # type: Optional[str]
-                auth=None,              # type: Optional[AuthHandler]
+                auth=None,              # type: Optional[AuthBase]
                 headers=None,           # type: Optional[AnyHeadersContainer]
                 with_links=True,        # type: bool
                 with_headers=False,     # type: bool
@@ -1664,9 +1874,10 @@ def add_shared_options(parser):
         "-H", "--header", action=ValidateHeaderAction, nargs=1, dest="headers", metavar="HEADER",
         help=(
             "Additional headers to apply for sending requests toward the service. "
-            "This option can be provided multiple times, each with a value formatted as:\n\n'Header-Name: value'\n\n"
+            "This option can be provided multiple times, each with a value formatted as:"
+            "\n\n``Header-Name: value``\n\n"
             "Header names are case-insensitive. "
-            "Quotes can be used in the <value> portion to delimit it. "
+            "Quotes can be used in the ``value`` portion to delimit it. "
             "Surrounding spaces are trimmed. "
             "Note that overridden headers expected by requests and the service could break some functionalities."
         )
@@ -1705,16 +1916,17 @@ def add_shared_options(parser):
         description="Parameters to obtain access to a protected service using a request authentication handler."
     )
     auth_handlers = "".join([
-        f"{fully_qualified_name(handler)}\n"
+        f"- `{fully_qualified_name(handler)}`\n\n"
         for handler in [BasicAuthHandler, BearerAuthHandler, CookieAuthHandler]
     ])
     auth_grp.add_argument(
         "-aC", "--auth-class", "--auth-handler", dest="auth_handler", metavar="AUTH_HANDLER_CLASS",
         action=ValidateAuthHandlerAction,
         help=(
-            "Script or module path reference to class implementation to handle inline request authentication. "
-            "Format [path/to/script.py:module.AuthHandlerClass] or [installed.module.AuthHandlerClass] is expected.\n\n"
-            f"Utility definitions are available as:\n\n{auth_handlers}\n\n"
+            "Script or module path reference to class implementation to handle inline request authentication.\n\n"
+            "Format ``path/to/script.py:module.AuthHandlerClass`` "
+            "or ``installed.module.AuthHandlerClass`` is expected.\n\n"
+            f"Utility definitions are available as:\n\n{auth_handlers}\n"
             "Custom implementations are allowed for more advanced use cases."
         )
     )
@@ -1743,10 +1955,19 @@ def add_shared_options(parser):
         "-aH", "--auth-header", action=ValidateHeaderAction, nargs=1, dest="auth_headers", metavar="HEADER",
         help=(
             "Additional headers to apply for sending requests when using the authentication handler. "
-            "This option can be provided multiple times, each with a value formatted as:\n\n'Header-Name: value'\n\n"
+            "This option can be provided multiple times, each with a value formatted as:"
+            "\n\n``Header-Name: value``\n\n"
             "Header names are case-insensitive. "
-            "Quotes can be used in the <value> portion to delimit it. "
+            "Quotes can be used in the ``value`` portion to delimit it. "
             "Surrounding spaces are trimmed."
+        )
+    )
+    auth_grp.add_argument(
+        "-aT", "--auth-token", dest="auth_token", metavar="TOKEN",
+        help=(
+            "Token to be added directly to the request headers. If this is specified, the authenticator will not make "
+            "an additional authentication request in order to obtain a token. The token specified here will be used "
+            "instead."
         )
     )
 
@@ -1784,6 +2005,7 @@ def parse_auth(kwargs):
     auth_url = kwargs.pop("auth_url", None)
     auth_method = kwargs.pop("auth_method", None)
     auth_headers = kwargs.pop("auth_headers", {})
+    auth_token = kwargs.pop("auth_token", None)
     if not (auth_handler and issubclass(auth_handler, (AuthHandler, AuthBase))):
         return None
     auth_handler_name = fully_qualified_name(auth_handler)
@@ -1795,6 +2017,7 @@ def parse_auth(kwargs):
         ("url", auth_url),
         ("method", auth_method),
         ("headers", CaseInsensitiveDict(auth_headers)),
+        ("token", auth_token)
     ]
     if len(auth_sign.parameters) == 0:
         auth_handler = auth_handler()
@@ -1863,6 +2086,108 @@ def add_timeout_param(parser):
     parser.add_argument(
         "-W", "--wait", "--interval", dest="interval", type=int, default=WeaverClient.monitor_interval,
         help="Wait interval (seconds) between each job status polling during monitoring (default: %(default)ss)."
+    )
+
+
+class SubscriberAction(argparse.Action):
+    """
+    Action that will validate that the input argument references a valid subscriber argument.
+
+    If valid, the returned value will be an updated subscriber definition.
+    All arguments using ``action=SubscriberType`` should include a ``dest="<holder>.<subscriber>"`` parameter that will
+    map the ``subscriber`` value under a dictionary ``holder`` that will be passed to the :class:`argparse.Namespace`.
+    """
+
+    def __init__(self, option_strings, dest=None, **kwargs):
+        # type: (List[str], str, Any) -> None
+        if not isinstance(dest, str) or "." not in dest:  # pragma: no cover  # only for self-validation
+            raise ValueError("Using 'SubscriberAction' requires 'dest=<holder>.<subscriber>' parameter.")
+        dest, self.field = dest.split(".", 1)
+        super(SubscriberAction, self).__init__(option_strings, dest=dest, **kwargs)
+
+    def __call__(self, parser, namespace, subscriber_param, option_string=None):
+        # type: (argparse.ArgumentParser, argparse.Namespace, str, Optional[str]) -> None
+
+        sub_options = "/".join(self.option_strings)
+        self.validate(sub_options, subscriber_param)
+
+        subs_params = getattr(namespace, self.dest, {}) or {}
+        subs_params[self.field] = subscriber_param
+        setattr(namespace, self.dest, subs_params)
+
+    def validate(self, option, value):
+        # type: (str, Any) -> None
+        metavar = self.metavar or ""
+        if any("email" in opt.lower() for opt in [option, self.field, metavar]):
+            pattern = re.compile(EMAIL_RE, flags=re.IGNORECASE)
+        elif any("callback" in opt.lower() for opt in [option, self.field, metavar]):
+            pattern = re.compile(URL_REGEX, flags=re.IGNORECASE)
+        else:
+            raise NotImplementedError(f"Cannot parse option: '{option}'")
+        if not re.match(pattern, value):
+            raise argparse.ArgumentError(self, f"Value '{value}' is not a valid subscriber argument for '{option}'.")
+
+
+def add_subscribers_params(parser):
+    # type: (argparse.ArgumentParser) -> None
+    subs_args = parser.add_argument_group(
+        title="Notification Subscribers",
+        description=(
+            "Email or callback request URL to obtain notification of job status milestones.\n\n"
+            "Note that for email notifications, the targeted server must have properly configured SMTP settings."
+        ),
+    )
+    subs_args.add_argument(
+        "-sEP", "--subscriber-email-progress",
+        action=SubscriberAction,
+        metavar="EMAIL",
+        dest="subscribers.inProgressEmail",
+        help="Send a notification email to this address once the job started execution."
+    )
+    subs_args.add_argument(
+        "-sEF", "--subscriber-email-failed",
+        action=SubscriberAction,
+        metavar="EMAIL",
+        dest="subscribers.failedEmail",
+        help="Send a notification email to this address if the job execution completed with failure."
+    )
+    subs_args.add_argument(
+        "-sES", "--subscriber-email-success",
+        action=SubscriberAction,
+        metavar="EMAIL",
+        dest="subscribers.successEmail",
+        help="Send a notification email to this address if the job execution completed successfully."
+
+    )
+    subs_args.add_argument(
+        "-sCP", "--subscriber-callback-progress",
+        action=SubscriberAction,
+        metavar="URL",
+        dest="subscribers.inProgressUri",
+        help=(
+            "Send an HTTP callback request to this URL once the job started execution.\n\n"
+            "The request body will contain the JSON representation of the job status details."
+        )
+    )
+    subs_args.add_argument(
+        "-sCF", "--subscriber-callback-failed",
+        action=SubscriberAction,
+        metavar="URL",
+        dest="subscribers.failedUri",
+        help=(
+            "Send an HTTP callback request to this URL if the job execution completed with failure.\n\n"
+            "The request body will contain the JSON representation of the job status details."
+        )
+    )
+    subs_args.add_argument(
+        "-sCS", "--subscriber-callback-success",
+        action=SubscriberAction,
+        metavar="URL",
+        dest="subscribers.successUri",
+        help=(
+            "Send an HTTP callback request to this URL if the job execution completed successfully.\n\n"
+            "The request body will contain the JSON representation of the job results."
+        )
     )
 
 
@@ -2116,9 +2441,9 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
 
     def add_subparsers(self, *args, **kwargs):  # type: ignore
         self.register("action", "parsers", WeaverSubParserAction)
-        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)  # type: WeaverSubParserAction
+        group = super(WeaverArgumentParser, self).add_subparsers(*args, **kwargs)
         setattr(group, "parser", self)
-        return group
+        return cast(WeaverSubParserAction, group)
 
     @property
     def help_mode(self):
@@ -2365,6 +2690,17 @@ def make_parser():
         help="Representation schema of the returned process description (default: %(default)s, case-insensitive)."
     )
 
+    op_package = WeaverArgumentParser(
+        "package",
+        description="Obtain the Application Package definition of an existing process.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_package)
+    add_url_param(op_package)
+    add_shared_options(op_package)
+    add_process_param(op_package)
+    add_provider_param(op_package, required=False)
+
     op_execute = WeaverArgumentParser(
         "execute",
         description="Submit a job execution for an existing process.",
@@ -2442,12 +2778,30 @@ def make_parser():
             Example: ``-R output-one -R output-two``
         """)
     )
+    op_execute_output_context = op_execute.add_mutually_exclusive_group()
+    op_execute_output_context.add_argument(
+        "-oP", "--output-public", dest="output_context", const="public", action="store_const",
+        help=(
+            "Set header ``X-WPS-Output-Context: public`` to indicate preference of job output context to be "
+            "located under the public WPS output location of the server. The server is not mandated to fulfill this "
+            "preference, but will apply it if supported and considered a valid value."
+        )
+    )
+    op_execute_output_context.add_argument(
+        "-oC", "--output-context", dest="output_context", type=str,
+        help=(
+            "Set header ``X-WPS-Output-Context`` with the specified value to indicate preference of job output context "
+            "located under the requested WPS output location of the server. The server is not mandated to fulfill this "
+            "preference, but will apply it if supported and considered a valid value."
+        )
+    )
     op_execute.add_argument(
         "-M", "--monitor", dest="monitor", action="store_true",
         help="Automatically perform the monitoring operation following job submission to retrieve final results. "
              "If not requested, the created job status location is directly returned."
     )
     add_timeout_param(op_execute)
+    add_subscribers_params(op_execute)
 
     op_jobs = WeaverArgumentParser(
         "jobs",
@@ -2503,7 +2857,7 @@ def make_parser():
         "status",
         description=(
             "Obtain the status of a job using a reference UUID or URL. "
-            "This is equivalent to doing a single-shot 'monitor' operation without any pooling or retries."
+            "This is equivalent to doing a single-shot ``monitor`` operation without any pooling or retries."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2516,7 +2870,7 @@ def make_parser():
         "logs",
         description=(
             "Obtain the logs of a job using a reference UUID or URL. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2530,7 +2884,7 @@ def make_parser():
         description=(
             "Obtain the exceptions and error details of a failed job using a reference UUID or URL. "
             "If the job is not marked with failed status, this will return an error. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2544,7 +2898,7 @@ def make_parser():
         description=(
             "Obtain the computation statistics details of a successful job using a reference UUID or URL. "
             "If the job is not marked with succeeded status, this will return an error. "
-            "Only guaranteed by Weaver instances. Pure 'OGC API - Processes' servers might not implement this feature."
+            "Only guaranteed by Weaver instances. Pure `OGC API - Processes` servers might not implement this feature."
         ),
         formatter_class=ParagraphFormatter,
     )
@@ -2573,7 +2927,7 @@ def make_parser():
     op_results.add_argument(
         "-O", "--outdir", dest="out_dir",
         help="Output directory where to store downloaded files from job results if requested "
-             "(default: ${CURDIR}/{JobID}/<outputs.files>)."
+             "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
 
     op_upload = WeaverArgumentParser(
@@ -2606,6 +2960,7 @@ def make_parser():
         op_unregister,
         op_capabilities,
         op_describe,
+        op_package,
         op_execute,
         op_jobs,
         op_monitor,
@@ -2644,7 +2999,7 @@ def main(*args):
     # remove logging params not known by operations
     for param in ["stdout", "log", "log_level", "quiet", "debug", "verbose"]:
         kwargs.pop(param, None)
-    oper = kwargs.pop("operation", None)
+    oper = kwargs.pop("operation", "")
     LOGGER.debug("Requested operation: [%s]", oper)
     if not oper or oper not in dir(WeaverClient):
         parser.print_help()

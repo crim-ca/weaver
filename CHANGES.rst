@@ -18,6 +18,625 @@ Fixes:
 ------
 - No change.
 
+.. _changes_5.9.0:
+
+`5.9.0 <https://github.com/crim-ca/weaver/tree/5.9.0>`_ (2024-09-12)
+========================================================================
+
+Changes:
+--------
+- Add `CWL` schema definitions with ``weaver`` namespace
+  (see `weaver/schemas/cwl <https://github.com/crim-ca/weaver/tree/master/weaver/schemas/cwl>`_)
+  that provide explicit requirement classes
+  for ``weaver:BuiltinRequirement``, ``weaver:WPS1Requirement``, ``weaver:OGCAPIRequirement``
+  and ``weaver:ESGF-CWTRequirement`` to avoid missing reference warnings that were previously raised by ``cwltool``
+  due to `Application Packages` using their non-``weaver`` namespaced classes in ``hints``. These new `CWL`
+  definitions can be reported directly in the ``requirements`` section, better describing the required dependencies
+  of the referenced `Process` and/or `Provider` in the workflow steps.
+- Add hosted `CWL` schema definitions for ``weaver`` accessible at the ``https://schemas.crim.ca/cwl/weaver#`` endpoint.
+- Add support of ``weaver`` namespaced ``requirements`` to the ``cwltool`` runner.
+- Add better validation off well-known `CWL` ``$namespaces`` as reserved keywords when deploying a `Process` to ensure
+  better interoperability between implementations and adequate metadata resolution
+  (relates to `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
+- Add documentation about *Jupyter Notebook* to `CWL` conversion
+  utility `ipython2cwl <https://github.com/common-workflow-lab/ipython2cwl>`_
+  and a sample `crim-ca/ncml2stac <https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac>`_ repository
+  making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
+  (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
+- Add parsing of additional metadata from schema.org in CWL document to convert into process fields
+  (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
+- Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_).
+
+Fixes:
+------
+- Fix ``VariableSchemaNode`` resolution of child nodes with complex mixture of ``StrictMappingSchema`` or when
+  using the equivalent ``unknown = "raise"`` parameter for a ``colander.Mapping`` schema type to
+  disallow ``additionalProperties`` that cannot be mapped to a particular child `JSON` schema definition.
+- Fix ``VariableSchemaNode`` resolution to allow mapping against multiple ``variable`` sub-nodes representing
+  different nested `JSON` schema nodes permitted under the ``additionalProperties`` mapping.
+- Fix ``GET /jobs`` endpoint failing to return the rendered `HTML` listing when ``detail=true`` was omitted or
+  set to any non-detailed value. The ``detail`` query parameter is ignored for `HTML` since details are always
+  required to populate the `Job` table.
+- Pin ``pymongo>=4.3`` and remove ``celery[mongodb]`` extra requirement to avoid incompatible resolution
+  of ``pymongo[srv]>=4.8.0`` (relates to `celery/celery#9254 <https://github.com/celery/celery/issues/9254>`_
+  and `MongoDB PYTHON-4756 <https://jira.mongodb.org/browse/PYTHON-4756>`_).
+
+.. _changes_5.8.0:
+
+`5.8.0 <https://github.com/crim-ca/weaver/tree/5.8.0>`_ (2024-09-05)
+========================================================================
+
+Changes:
+--------
+- Add support of *OGC API - Processes: Part 3* ``collection`` as input to a `Process`
+  (fixes `#682 <https://github.com/crim-ca/weaver/issues/682>`_).
+- Add ``AnyCRS`` schema definition with improved validation of allowed values.
+- Use ``AnyCRS`` schema for ``SupportedCRS``, ``XMLStringCRS``, ``BoundingBoxValue`` and ``ExecuteCollectionInput``
+  instead of a generic ``URL`` schema definition for better reference validation, while allowing alternate short forms.
+- Add auto-resolution of media-type for cases where it can reasonably be inferred from a ``schema`` reference,
+  such as an URI referring to a ``.json`` or ``.xsd`` respectively representing `JSON` and `XML` data.
+- Update ``cwltool`` with fork
+  `fmigneault/cwltool @ fix-load-contents-array <https://github.com/fmigneault/cwltool/tree/fix-load-contents-array>`_
+  until ``loadContents`` behavior is resolved for ``type: File[]``
+  (relates to `common-workflow-language/cwltool#2036 <https://github.com/common-workflow-language/cwltool/pull/2036>`_).
+
+Fixes:
+------
+- Fix `CWL` I/O with ``format`` defined as a `JavaScript Expression` to be incorrectly parsed by the convertion
+  operations to extract applicable media-types. These cases will be ignored, since media-types cannot be inferred
+  from them. The `WPS` or `OAS` I/O definitions should instead provide the applicable media-types
+  (relates to `common-workflow-language/cwl-v1.3#52 <https://github.com/common-workflow-language/cwl-v1.3/issues/52>`_).
+- Fix ``format`` parsing when trying to infer media-types from various I/O definition representations using a
+  reference provided as an URI schema from an ontology. Parsing caused the URI to be split, causing an invalid
+  resolution. If no appropriate media-type is provided, JSON will be used by default, while preserving the submitted
+  schema URI.
+- Fix invalid resolution of ``weaver.formats.ContentEncoding.open_parameters``.
+- Fix minor resolution combinations or redundant checks for multiple ``weaver.formats`` utilities.
+- Fix `CWL` ``format`` resolution check against `IANA` media-types if the reference ontology happens to be
+  temporarily/sporadically unresponsive to SSL handshake check, allowing temporary HTTP resolution of media-type.
+
+.. _changes_5.7.0:
+
+`5.7.0 <https://github.com/crim-ca/weaver/tree/5.7.0>`_ (2024-07-16)
+========================================================================
+
+Changes:
+--------
+- Add support of `HTML` responses for `OGC API - Processes` endpoints
+  (fixes `#210 <https://github.com/crim-ca/weaver/issues/210>`_).
+- Add ``weaver.wps_restapi_html`` configuration setting to control support of `HTML` responses.
+- Add ``weaver.wps_restapi_html_override_user_agent`` configuration setting for control of default `HTML` or `JSON`
+  rendering by requests from web browsers.
+- Refactor ``pyramid`` configuration to employ ``Configurator.add_cornice_service``
+  utility instead of ``Configurator.add_route`` and ``Configurator.add_view`` handlers that were causing a lot of
+  duplication between the ``cornice.Service`` parametrization and their corresponding view decorators. All metadata
+  is now embedded within the same decorator operation.
+- Add missing documentation for ``weaver.wps_restapi_doc`` and ``weaver.wps_restapi_ref`` configuration settings.
+- Modified the base path/URL resolution of the `OpenAPI` endpoint to be located at the application root instead of being
+  nested under ``weaver.wps_restapi_path`` or ``weaver.wps_restapi_url``, since the OpenAPI `JSON` and `HTML` responses
+  are employed for representing supported requests and responses of both the `REST` and the `OWS` `WPS` interfaces.
+- Update `Swagger-UI` version for latest rendering fixes of `OpenAPI` definitions.
+- Add automatic redirect from ``/api?f=json`` to ``/json`` response to allow `OpenAPI` schema access directly
+  from the same endpoint as the `Swagger-UI` rendering of the schemas. The ``Accept`` header
+  for ``application/json`` or explicitly ``application/vnd.oai.openapi+json; version=3.0`` are also supported
+  (fixes `#623 <https://github.com/crim-ca/weaver/issues/623>`_)
+- Add `OpenAPI` response rendering as `YAML` using ``/api?f=yaml`` or ``Accept: application/yaml``
+  (relates to `#456 <https://github.com/crim-ca/weaver/issues/456>`_).
+
+Fixes:
+------
+- Fix ``weaver.wps_restapi_path`` incorrectly resolved when populating `Process` paging links.
+- Fix invalid resolution of reported API endpoints in the `OpenAPI` and frontpage response when
+  ``weaver.wps_restapi_path``, ``weaver.wps_restapi_url``, ``weaver.wps_path`` or ``weaver.wps_url``
+  were set to other prefix path values than the default root base URL.
+- Fix ``weaver.formats.OutputFormat`` to return ``JSON`` by default when an invalid format could not be resolved.
+
+.. _changes_5.6.1:
+
+`5.6.1 <https://github.com/crim-ca/weaver/tree/5.6.1>`_ (2024-06-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix invalid ``default`` attribute resolution of an optional `WPS` ``ComplexData`` (i.e.: ``minOccurs: 0``) that also
+  provides a ``Default/Format`` in the `XML` process description. When that input was omitted (as permitted) from the
+  execution request, parsing of the `XML` would incorrectly inject the `JSON` representation of the ``Default/Format``
+  as a substitute for the ``default`` value. See ``weaver.processes.convert.ows2json_io`` implementation for details.
+
+.. _changes_5.6.0:
+
+`5.6.0 <https://github.com/crim-ca/weaver/tree/5.6.0>`_ (2024-06-11)
+========================================================================
+
+Changes:
+--------
+- Increase default ``pywps`` configuration values using new settings
+  ``weaver.wps_max_request_size = 30MB`` and ``weaver.wps_max_single_input_size = 3GB``.
+  Defaults are selected to allow larger files that are more in line with common occurrences
+  when dealing with Earth Observation data.
+
+Fixes:
+------
+- Fix resolution of ``null`` value explicitly provided or implicitly resolved by `CWL` between ``Workflow`` steps
+  and the `Process` execution context transfer between `OGC API - Processes` and `WPS`, in the case of ``ComplexData``
+  and ``BoundingBoxData`` structures. Inputs will now be omitted from execution request to obtain the intended behavior
+  instead of submitting empty data structures, leading to inconsistent parsing results and behaviors.
+- Fix resolution of the `CWL` ``outputBinding.glob`` for staging the output by ID within a ``Workflow`` that uses
+  recurring `Process` references across steps. To disambiguate between common output ID between steps, `CWL` uses the
+  step ID as prefix to the output long-name. This caused a mismatch with the output collection strategy for staging
+  the `Job` result, as the expected directory location does not contain the nested step ID.
+
+.. _changes_5.5.0:
+
+`5.5.0 <https://github.com/crim-ca/weaver/tree/5.5.0>`_ (2024-06-06)
+========================================================================
+
+Changes:
+--------
+- Add support of multiple-value array outputs to allow `CWL` `Application Package` that can make use of such definitions
+  (fixes `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+- Add ``weaver.wps_restapi.colander_extras.AnyType`` and ``weaver.wps_restapi.colander_extras.NoneType`` with their
+  corresponding `JSON`/`OpenAPI` schema converters to allow the definition of ``null`` and ``{}`` type definitions.
+
+Fixes:
+------
+- Fix ``weaver.wps_restapi.colander_extras.ExtendedSequenceSchema`` not allowing other item types than a mapping.
+
+.. _changes_5.4.2:
+
+`5.4.2 <https://github.com/crim-ca/weaver/tree/5.4.2>`_ (2024-06-05)
+========================================================================
+
+Changes:
+--------
+- Add ``POST /processes/{processId}/execution`` as fallback endpoint for ``POST /processes/{processId}/jobs`` to submit
+  the `Job` execution within a  `CWL` ``Workflow`` using a remote `OGC API - Processes` step to accommodate for varying
+  versions of the standard and implementations.
+- Add error status update of the response from a failed step ``Job`` request to allow investigating the cause from logs.
+
+Fixes:
+------
+- Fix ``Cookie`` header not propagated to every underlying `CWL` ``Workflow`` step causing authorization failure
+  midway during an authorized `Process` execution.
+
+.. _changes_5.4.1:
+
+`5.4.1 <https://github.com/crim-ca/weaver/tree/5.4.1>`_ (2024-06-03)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix `Process` ID resolution from `CWL` ``Workflow`` step package from long-form URL reference included as fragment.
+
+.. _changes_5.4.0:
+
+`5.4.0 <https://github.com/crim-ca/weaver/tree/5.4.0>`_ (2024-05-27)
+========================================================================
+
+Changes:
+--------
+- Use ``requests.auth.AuthBase`` type for ``auth`` parameter of ``weaver.cli.WeaverClient`` methods to allow
+  any ``requests`` compatible package to use their own implementation of the authentication mechanism without
+  explicitly deriving from ``weaver.cli.AuthHandler`` (fixes `#628 <https://github.com/crim-ca/weaver/issues/628>`_).
+- Add `CWL` ``MultipleInputFeatureRequirement`` support.
+- Add `CWL` ``SubworkflowFeatureRequirement`` support.
+- Add `CWL` ``Workflow`` explicit schema validation of its ``steps``.
+- Remove "unknown" definitions in `CWL` ``requirements``. Only fully defined and resolved definitions will be allowed.
+  If an unsupported `CWL` requirement by `Weaver` must be provided (but is a valid definition supported by ``cwltool``),
+  it must now be provided through ``hints`` to succeed schema validation.
+- Improve support of `CWL` output definition using ``loadContents`` to an ``outputBinding.glob`` reference to
+  load the ``File`` contents into a ``string`` output.
+- Improve support of `CWL` JavaScript expressions within intermediate steps of a ``Workflow`` to collect output results
+  from relevant sources with better data manipulation flexibility.
+- Modify signature of ``weaver.processes.wps_process_base.WpsProcessInterface`` to allow better reuse of the
+  common operations shared by derived `CWL` ``Workflow`` steps implemented by ``ESGFProcess``, ``Wps1Process``,
+  ``Wps3Process`` and ``OGCAPIRemoteProcessBase``.
+- Refactor ``ESGFProcess`` to use the common operations of `CWL` ``Workflow`` steps defined by ``WpsProcessInterface``.
+
+Fixes:
+------
+- Fix ``pywps.inout.basic.BasicComplex`` using default ``emptyvalidator`` when the expected output format does not
+  provide an explicit implementation, leading to failure of the `Job` due to ``MODE.SIMPLE`` validation level being set.
+  A basic validator will instead be set to check that the expected file extension minimally matches the expected type.
+- Fix `CLI` incorrectly parsing inputs when provided directly as `OGC` style mapping with ``href``.
+- Fix invalid `CWL` schema definition for ``ScatterFeatureRequirement`` that directly
+  contained the corresponding fields ``scatter`` and ``scatterMethod``, instead of the expected
+  definition within a `Workflow Step <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStep>`_.
+- Fix `CWL` ``requirements`` schema definition using ``OneOf`` and the ``discriminator`` property that could sometime
+  drop a definition when it only contained an empty mapping ``{}``, and that the corresponding requirement allows it.
+- Fix ``weaver.wps_restapi.colander_extras.AnyOfKeywordSchema`` not allowing distinct `JSON` structure ``type`` to be
+  combined simultaneously.
+- Fix `CWL` ``Workflow`` not retrieving output results when returned directly as literal data from a remote `Process`.
+- Fix `CWL` ``Workflow`` potentially failing tool resolution for a local step `Process` if ``hints`` where omitted.
+- Fix `CWL` ``Workflow`` resolution of step ``requirements`` from one of the `Weaver` application types
+  (i.e.: ``builtin``, ``docker``, ``ESGF-CWT``, ``OGCAPI``, ``WPS1``) due to ``cwltool`` namespace adding a
+  prefixed URI.
+- Pin ``requests>=2.32`` and ``docker>=7.1`` (Python Package) to address
+  `CVE-2024-35195 <https://nvd.nist.gov/vuln/detail/CVE-2024-35195>`_ to avoid inconsistent ``verify``
+  option over multiple requests when using a session
+  (relates to `psf/requests#6710 <https://github.com/psf/requests/pull/6710>`_
+  and `docker/docker-py#3257 <https://github.com/docker/docker-py/pull/3257>`_).
+
+.. _changes_5.3.0:
+
+`5.3.0 <https://github.com/crim-ca/weaver/tree/5.3.0>`_ (2024-05-13)
+========================================================================
+
+Changes:
+--------
+- Add `CWL` ``cwltool:Secrets`` support (fixes `#511 <https://github.com/crim-ca/weaver/issues/511>`_).
+- Add `CWL` ``StepInputExpressionRequirement`` support.
+
+Fixes:
+------
+- Pin ``json2xml==4.1.0`` to fix major release breaking older Python typings without any actual change to functionality.
+
+.. _changes_5.2.0:
+
+`5.2.0 <https://github.com/crim-ca/weaver/tree/5.2.0>`_ (2024-05-08)
+========================================================================
+
+Changes:
+--------
+- Add multiple missing `OGC API - Processes` conformance references.
+- Modify default query parameter value ``links=true`` for ``/processes`` summary listing to conform with
+  conformance class ``/conf/core/process-summary-links`` as default behavior
+  (relates to `opengeospatial/ogcapi-processes#406 <https://github.com/opengeospatial/ogcapi-processes/pull/406>`_,
+  fixes `crim-ca/weaver#622 <https://github.com/crim-ca/weaver/issues/622>`_).
+
+Fixes:
+------
+- Adjust ``weaver.utils.get_caller_name`` to better handle decorated functions, and apply more precise warning messages
+  to hunt down places were ``weaver.utils.get_request_options`` might still be causing inconsistent HTTP requests due
+  to missing *request options* for certain use cases.
+- Fix passing down of application settings for `WPS` requests of `Provider`/`Service` operations
+  potentially making use of *request options*, which could not obtain the relevant configuration.
+- Fix `CLI` failing to resolve a `CWL` Workflow step local reference to a `Process` using ``run: {process}.cwl``
+  definition due to the local `CLI` context not having the same URL resolution as the remote `Weaver` server
+  (fixes `#630 <https://github.com/crim-ca/weaver/issues/630>`_).
+- Fix `CWL` JSON schema reference pointing at older ``1.2.1_proposed`` branch in favor of ``v1.2.1`` tag (relates
+  to `common-workflow-language/cwl-v1.2#278 <https://github.com/common-workflow-language/cwl-v1.2/issues/278>`_).
+- Pin ``gunicorn>=22`` to address `CVE-2024-1135 <https://nvd.nist.gov/vuln/detail/CVE-2024-1135>`_.
+- Pin ``werkzeug>=3.0.3,<3.1`` to address `CVE-2024-34069 <https://nvd.nist.gov/vuln/detail/CVE-2024-34069>`_.
+
+.. _changes_5.1.1:
+
+`5.1.1 <https://github.com/crim-ca/weaver/tree/5.1.1>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Use ``typing_extensions.Unpack`` to correctly represent expected types
+  for respective ``request-options`` keywords parameters.
+- Fix ``linkcheck`` failing due to inconsistent HTTP responses
+  (relates to `sphinx-doc/sphinx#12030 <https://github.com/sphinx-doc/sphinx/issues/12030>`_).
+
+.. _changes_5.1.0:
+
+`5.1.0 <https://github.com/crim-ca/weaver/tree/5.1.0>`_ (2024-03-19)
+========================================================================
+
+Changes:
+--------
+- Add ``weaver.wps_client_headers_filter`` setting that allows filtering of specific `WPS` request headers from the
+  incoming request to be passed down to the `WPS` client employed to interact with the `WPS` provider
+  (fixes `#600 <https://github.com/crim-ca/weaver/issues/600>`_).
+- Add ``token`` optional argument to the ``weaver.cli.RequestAuthHandler`` class. If specified, the handler will use
+  this token instead of making an authentication request to obtain the token.
+
+Fixes:
+------
+- Fix ``moto>=5`` used in tests to mock AWS S3 operations that replaced ``mock_s3`` context manager by ``mock_aws``.
+
+.. _changes_5.0.0:
+
+`5.0.0 <https://github.com/crim-ca/weaver/tree/5.0.0>`_ (2023-12-12)
+========================================================================
+
+Changes:
+--------
+- Add ``weaver.formats.ContentEncoding`` with handlers for common encoding manipulation from input values.
+- Add |oap_echo|_ to the list of ``weaver.processes.builtin`` definitions with its `CWL` representation and
+  complementary `OGC API - Processes` reference implementation details. This `Process` will be automatically deployed
+  at `API` startup, and is employed to validate multiple parsing combinations of execution I/O values and encodings
+  (fixes `#379 <https://github.com/crim-ca/weaver/issues/379>`_).
+- Add support of `OGC` `BoundingBox` definition (``bbox`` and ``crs`` fields) as `Process` execution input value
+  with appropriate schema validation (fixes `#51 <https://github.com/crim-ca/weaver/issues/51>`_).
+- Add support of `Unit of Measure` (`UoM`) definition (``measurement`` and ``uom`` fields) as `Process` execution
+  input value with appropriate schema validation (fixes `#430 <https://github.com/crim-ca/weaver/issues/430>`_).
+- Add ``create_metalink`` utility function to facilitate generation of a ``.meta4`` or ``.metalink`` file definition
+  from a list of file link references (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+
+Fixes:
+------
+- Fix ``weaver.wps_restapi.swagger_definitions.ExecuteInputValues`` deserialization that sometimes silently dropped
+  invalid `JSON`-formatted inputs that did not fulfill schema validation. This was caused by a side effect regarding
+  how ``weaver.wps_restapi.colander_extras.VariableSchemaNode`` handled "unknown" `JSON` ``properties`` from submitted
+  content. In cases where *required* `Process` inputs were causing the invalid schema, `Job` execution would be aborted
+  and the error would be reported due to "missing" inputs. However, if the `JSON` failing schema validation happened to
+  be nested under an *optional* input definition, the `Job` execution could have resumed silently by omitting this
+  input's value propagation to the downstream `CWL`, `WPS` or `OGC API - Processes` implementation, which could make
+  it use an alternative default value than the real input that was submitted for the `Job`.
+- Fix schema name representation employed in generated ``colander.Invalid`` error when a schema validation failed, in
+  order to better represent deeply nested schema using multiple ``oneOf``, ``anyOf``, ``allOf`` schema nodes.
+  Using ``colander.Invalid.asdict``, each dictionary key now properly indicates the specific path of sub-nodes with
+  their relevant schema validation error.
+- Fix ``variable`` schema node names to provide a ``{SchemaName}<{VariableName}>`` representation, such that it can be
+  more easily identified. Schema nodes with a ``variable`` (i.e.: schema under ``additionalProperties``) previously only
+  indicated ``{VariableName}``, which made it complicated to follow reference schema classes that formed the error path.
+  Each of the evaluated fields against each possible ``variable`` schema will now report their corresponding nested
+  schema validation error as ``{SchemaName}<{VariableName}>({field})`` such that results can be understood.
+- Fix execution input reference (i.e.: using ``href``) dropping a ``schema`` URL reference if provided explicitly.
+  This parameter now remains within the produced content passed to the `Job`, and forwarded to a remote `Process` if
+  applicable, but no further schema validation is accomplished with the value in ``schema`` for the moment.
+- Fix ``ContentType.IMAGE_OGC_GEOTIFF`` using invalid media-type name (missing ``i`` in ``image``).
+- Fix `Job` input validation stripping additional parameters from provided Media-Type, potentially causing mismatching
+  Content-Type validation against the corresponding `Process` description inputs. Types should now match exactly the
+  original `Process` definition, including any additional parameters and sub-types.
+- Fix resolution of ``anyOf`` schema raising ``colander.Invalid`` even when the property was marked as optional
+  using ``missing=colander.drop``.
+- Fix ``$schema`` of `OGC` ``nameReferenceType`` being reported under every ``dataType`` of ``literalDataDomains`` for
+  literal `I/O` of `Process` descriptions. The reference is not only included in the `OpenAPI` definition as intended.
+- Fix override of `CWL` ``stderr`` and ``stdout`` definitions if specified by the original *Application Package* for
+  its own implementation. These stream handles are added to the `CWL` by Weaver to provide more contextual debugging
+  and traceability details of the internal application executed by the `Process`. However, a package making use of this
+  functionality of `CWL` to capture an output file would be broken unless naming the file exactly as ``stderr.log`` and
+  ``stdout.log``. Weaver will now employ the parameters provided by the *Application Package* if specified.
+
+.. _changes_4.38.0:
+
+`4.38.0 <https://github.com/crim-ca/weaver/tree/4.38.0>`_ (2023-11-24)
+========================================================================
+
+Changes:
+--------
+- Add Python 3.12 support (fixes `#587 <https://github.com/crim-ca/weaver/issues/587>`_).
+
+  * Depends on ``PasteDeploy==3.1.0``
+    (relates to `Pylons/pastedeploy#43 <https://github.com/Pylons/pastedeploy/pull/43>`_).
+  * Depends on ``pyramid_celery==5.0.0a`` [`crim-ca/pyramid_celery <https://github.com/crim-ca/pyramid_celery>`_ fork]
+    (relates to `sontek/pyramid_celery#102 <https://github.com/sontek/pyramid_celery/pull/102>`_).
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.37.0:
+
+`4.37.0 <https://github.com/crim-ca/weaver/tree/4.37.0>`_ (2023-11-22)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix default `XML` format resolution for `WPS` endpoint when no ``Accept`` header or ``format``/``f`` query parameter
+  is provided and that the request is submitted from a Web Browser, which involves additional control logic to select
+  the applicable ``Content-Type`` for the response.
+- Fix pre-forked ``celery`` worker process inconsistently resolving the ``pyramid`` registry applied
+  by ``pyramid_celery`` after worker restart.
+
+.. _changes_4.36.0:
+
+`4.36.0 <https://github.com/crim-ca/weaver/tree/4.36.0>`_ (2023-11-06)
+========================================================================
+
+Changes:
+--------
+- Drop Python 3.7 support.
+- Add Python 3.12 to GitHub CI experimental builds.
+- Bump ``werkzeug>=3.0.1`` to resolve security vulnerability from the package.
+
+Fixes:
+------
+- No change.
+
+.. _changes_4.35.0:
+
+`4.35.0 <https://github.com/crim-ca/weaver/tree/4.35.0>`_ (2023-11-03)
+========================================================================
+
+Changes:
+--------
+- Add more secure path validations steps before fetching contents.
+- Disallow ``builtin`` processes expecting a user-provided input path to run with local file references such that
+  they must respect any configured server-side remote file access rules instead of bypassing security validations
+  through resolved local paths.
+- Add multiple validation checks for more secure file paths handling when retrieving contents from remote locations.
+- Add more tests to validate core code paths of ``builtin`` `Process` ``jsonarray2netcdf``, ``metalink2netcdf`` and
+  ``file_index_selector`` with validation of happy path and error handling conditions.
+
+.. _oap_echo: https://schemas.opengis.net/ogcapi/processes/part1/1.0/examples/json/ProcessDescription.json
+.. |oap_echo| replace:: ``EchoProcess``
+
+Fixes:
+------
+- Fix invalid parsing of `XML` Metalink files in ``metalink2netcdf``. Metalink V3 and V4 will now properly consider the
+  namespace and specific content structure to extract the NetCDF URL reference, and the `Process` will validate that the
+  extracted reference respects the NetCDF extension.
+
+.. _changes_4.34.0:
+
+`4.34.0 <https://github.com/crim-ca/weaver/tree/4.34.0>`_ (2023-10-16)
+========================================================================
+
+Changes:
+--------
+- Add ``alternate`` references, as ``Link`` header and within the `JSON` content ``links`` property when applicable, in
+  the returned `Process` description response to refer between the `XML` and the corresponding `JSON` representations.
+- Support alternative representations from `OGC API - Processes` schemas for ``executionUnit`` definition
+  during `Process` deployment. The *unit* does not need to be nested under ``unit`` or a list anymore, and can instead
+  be directly provided as `JSON` mapping. For backward compatibility, the previous list representation is still allowed
+  (fixes `#507 <https://github.com/crim-ca/weaver/issues/507>`_).
+- Support an additional ``type`` property along a ``unit`` item describing an ``executionUnit`` to specify an IANA
+  Media-Type that categories the ``unit`` contents, similarly to how it could be provided for its ``href`` counterpart.
+  For the moment, only `CWL`-based ``unit`` are supported, but this could allow future extensions to provide alternate
+  representations of an `Application Package`.
+- Add schema validation and reference to the `API` landing page, with additional parameters to respect `OGC` schema.
+- Add multiple `JSON` schema references for schema classes that are represented by corresponding `OGC` definitions.
+- Add `Job` ``subscribers`` support to define `OGC`-compliant callback URLs where HTTP(S) requests will be sent upon
+  reaching certain `Job` status milestones (resolves `#230 <https://github.com/crim-ca/weaver/issues/230>`_).
+- Add email notification support to the new ``subscribers`` definition (extension over `OGC` minimal requirements).
+- Deprecate `Job` ``notification_email`` in the `OpenAPI` specification in favor of ``subscribers``, but preserve
+  parsing of its value if provided in the `JSON` body during `Job` submission for backward compatibility support of
+  existing servers. The ``Job.notification_email`` attribute is removed to avoid duplicate references.
+- Add notification email for `Job` ``started`` status, only available through the ``subscribers`` property.
+- Add `CLI` and ``WeaverClient`` options to support ``subscribers`` specification for submitted `Job` execution.
+- Add ``{PROCESS_ID}/{STATUS}.mako`` template detection under the ``weaver.wps_email_notify_template_dir`` location
+  to allow per-`Process` and per-`Job` status email customization.
+- Refactor ``weaver/notify.py`` and ``weaver/processes/execution.py`` to avoid mixed references to the
+  encryption/decryption logic employed for notification emails. All notifications including emails and
+  callback requests are now completely handled and contained in the ``weaver/notify.py`` module.
+- Remove partially duplicate Mako Template definition as hardcoded string and separate file for email notification.
+
+Fixes:
+------
+- Fix inconsistent or missing schema references to updated `OGC` schema locations, and align their based URL locations
+  for corresponding ``/conformance`` endpoint reporting.
+- Fix auto-insertion of ``$schema`` and ``$id`` URI references into `JSON` schema and their data content representation.
+  When in `OpenAPI` context, schemas now correctly report their ``$id`` as the reference schema they represent (usually
+  from external `OGC` schema references), and ``$schema`` as the `JSON` meta-schema. When representing `JSON` data
+  contents validated against a `JSON` schema, the ``$schema`` property is used instead to refer to that schema.
+  All auto-insertions of these references can be enabled or disabled with options depending on what is more sensible
+  for presenting results from various `API` responses.
+- Fix ``weaver.cli`` logger not properly configured when executed from `CLI` causing log messages to not be reported.
+
+.. _changes_4.33.0:
+
+`4.33.0 <https://github.com/crim-ca/weaver/tree/4.33.0>`_ (2023-10-06)
+========================================================================
+
+Changes:
+--------
+- Add utility methods for `Job` to easily retrieve its various URLs.
+- Add ``weaver.wps_email_notify_timeout`` setting (default 10s) to avoid SMTP server deadlock on failing connection.
+- Modify the ``encrypt_email`` function to use an alternate strategy allowing ``decrypt_email`` on `Job` completed.
+- Remove ``notification_email`` from ``GET /jobs`` query parameters.
+  Due to the nature of the encryption strategy, this cannot be supported anymore.
+- Add `CLI` ``execute`` options ``--output-public/-oP`` and ``--output-context/-oC OUTPUT_CONTEXT`` that add the
+  specified ``X-WPS-Output-Context`` header to request the relevant output storage location of `Job` results.
+
+Fixes:
+------
+- Fix `Job` submitted with a ``notification_email`` not reversible from its encrypted value to retrieve the original
+  email on `Job` completion to send the notification (fixes `#568 <https://github.com/crim-ca/weaver/issues/568>`_).
+- Fix example Mako Template for email notification using an unavailable property ``${logs}``.
+  Instead, the new utility methods ``job.[...]_url`` should be used to retrieve relevant locations.
+
+.. _changes_4.32.0:
+
+`4.32.0 <https://github.com/crim-ca/weaver/tree/4.32.0>`_ (2023-09-25)
+========================================================================
+
+Changes:
+--------
+- Add ``GET /providers/{provider_id}/processes/{process_id}/package`` endpoint that allows retrieval of the `CWL`
+  `Application Package` definition generated for the specific `Provider`'s `Process` definition.
+- Add `CLI` ``package`` operation to request the remote `Provider` or local `Process` `CWL` `Application Package`.
+- Add `CLI` output reporting of performed HTTP requests details when using the ``--debug/-d`` option.
+- Modify default behavior of ``visibility`` field (under ``processDescription`` or ``processDescription.process``)
+  to employ the expected functionality by native `OGC API - Processes` clients that do not support this option
+  (i.e.: ``public`` by default), and to align resolution strategy with deployments by direct `CWL` payload which do not
+  include this feature either. A `Process` deployment that desires to employ this feature (``visibility: private``) will
+  have to provide the value explicitly, or update the deployed `Process` definition afterwards with the relevant
+  ``PUT`` request. Since ``public`` will now be used by default, the `CLI` will not automatically inject the value
+  in the payload anymore when omitted.
+- Remove attribute ``WpsProcessInterface.stage_output_id_nested`` and enforce the behavior of nesting output by ID
+  under corresponding directories for all remote `Process` execution when resolving `CWL` `Workflow` steps. This
+  ensures a more consistent file and directory resolution between steps of different nature (`CWL`, `WPS`, `OGC` based)
+  using multiple combinations of ``glob`` patterns and expected media-types.
+
+Fixes:
+------
+- Fix missing Node.js requirement in built Docker image in order to evaluate definitions that employ
+  `CWL` ``InlineJavascriptRequirement``, such as ``valueFrom`` employed for numeric ``Enum`` input type validation.
+- Fix ``processes.wps_package.WpsPackage.make_inputs`` unable to parse multi-type `CWL` definitions due parsing
+  as single-type element with ``parse_cwl_array_type``. Function ``get_cwl_io_type`` is used instead to resolve any
+  `CWL` type combination properly.
+- Fix ``get_cwl_io_type`` function that would modify the I/O definition passed as argument, which could lead to failing
+  `CWL` ``class`` reference resolutions later on due to different ``type`` with ``org.w3id.cwl.cwl`` prefix simplified
+  before ``cwltool`` had the chance to resolve them.
+- Fix ``links`` listing duplicated in response from `Process` deployment.
+  Links will only be listed within the returned ``processSummary`` to respect the `OGC API - Processes` schema.
+- Fix `CLI` not removing embedded ``links`` in ``processSummary`` from ``deploy`` operation response
+  when ``-nL``/``--no-links`` option is specified.
+- Fix `CWL` definitions combining nested ``enum`` types as ``["null", <enum>, {type: array, items: <enum>]`` without an
+  explicit ``name`` or ``SchemaDefRequirement`` causing failing ``schema_salad`` resolution under ``cwltool``. A patch
+  is applied for the moment to inject a temporary ``name`` to let the `CWL` engine succeed schema validation (relates
+  to `common-workflow-language/cwltool#1908 <https://github.com/common-workflow-language/cwltool/issues/1908>`_).
+
+.. _changes_4.31.0:
+
+`4.31.0 <https://github.com/crim-ca/weaver/tree/4.31.0>`_ (2023-09-14)
+========================================================================
+
+Changes:
+--------
+- Add the official `CWL` `JSON` schema reference
+  (`common-workflow-language/cwl-v1.2#256 <https://github.com/common-workflow-language/cwl-v1.2/pull/256>`_)
+  as ``$schema`` parameter returned in under the `OpenAPI` schema for the `CWL` component employed by `Weaver`
+  (fixes `#547 <https://github.com/crim-ca/weaver/issues/547>`_).
+- Add ``$schema`` field auto-insertion into the generated `OpenAPI` schema definition by ``CorniceSwagger`` when
+  corresponding ``colander.SchemaNode`` definitions contain a ``_schema = "<URL>"`` attribute
+  (fixes `#157 <https://github.com/crim-ca/weaver/issues/157>`_).
+- Drop Python 3.6 support.
+
+Fixes:
+------
+- Fix broken `OpenAPI` schema link references to `OGC API - Processes` repository.
+- Fix ``GET /providers/{provider_id}`` response using ``$schema`` instead of ``$id`` to provide its content schema.
+- Fix `Job` creation failing when submitting an empty string as input for a `Process` that allows it due
+  to schema validation incorrectly preventing it.
+- Fix human-readable `JSON`-like content cleanup to preserve sequences of quotes corresponding to valid empty strings.
+- Fix `WPS` I/O ``integer`` literal data conversion to `OpenAPI` I/O ``schema`` definition injecting an
+  invalid ``format: double`` property due to type checking with ``float`` succeeding against ``int`` values.
+- Fix `CWL` I/O value validation for ``enum``-like definitions from corresponding `OpenAPI` and `WPS` I/O.
+  Since `CWL` I/O do not allow ``Enum`` type for values other than basic ``string`` type, ``valueFrom`` attribute is
+  used to handle ``int``, ``float`` and ``bool`` types, using an embedded JavaScript validation against allowed values.
+  Because of this validation strategy, `CWL` packages must now include ``InlineJavascriptRequirement`` when allowed
+  values for these basic types must be performed in order for the `CWL` engine to parse I/O contents of ``valueFrom``
+  (relates to `cwl-v1.2#267 <https://github.com/common-workflow-language/cwl-v1.2/issues/267>`_,
+  `common-workflow-language#764 <https://github.com/common-workflow-language/common-workflow-language/issues/764>`_ and
+  `common-workflow-language#907 <https://github.com/common-workflow-language/common-workflow-language/issues/907>`_).
+- Fix typing definitions for certain ``Literal`` references for proper resolution involving values stored in constants.
+- Fix ``get_sane_name`` checks performed on `Process` ID and `Service` name to use ``min_len=1`` in order to allow
+  valid `WPS` process definition on existing servers to resolve references that are shorter than the previous default
+  of 3 characters.
+
+.. _changes_4.30.1:
+
+`4.30.1 <https://github.com/crim-ca/weaver/tree/4.30.1>`_ (2023-07-07)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix broken Docker build of ``weaver-worker`` image due to unresolved ``docker-ce-cli`` package.
+  Installation is updated according to the reference documentation (https://docs.docker.com/engine/install/debian/).
+- Fix incorrect stream reader type (``bytes`` instead of ``str``) for some handlers in ``open_module_resource_file``.
+- Fix invalid ``jsonschema.validators.RefResolver`` reference in ``jsonschema>=4.18.0`` caused by refactor
+  (see https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst#v4180,
+  https://python-jsonschema.readthedocs.io/en/v4.18.0/api/jsonschema/validators/#jsonschema.validators._RefResolver
+  and `python-jsonschema/jsonschema#1049 <https://github.com/python-jsonschema/jsonschema/pull/1049>`_).
+- Fix multiple linting checks, documentation dependencies and link references.
+
 .. _changes_4.30.0:
 
 `4.30.0 <https://github.com/crim-ca/weaver/tree/4.30.0>`_ (2023-03-24)
@@ -705,7 +1324,7 @@ Changes:
   The previous schema for deployment with nested ``process`` field remains supported for backward compatibility.
 
 .. |ogc-app-pkg| replace:: OGC Application Package
-.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/extensions/deploy_replace_undeploy/standard/openapi/schemas/ogcapppkg.yaml
+.. _ogc-app-pkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 
 Fixes:
 ------
@@ -1169,7 +1788,7 @@ Changes:
   operation of pre-existing processes. When those fields are detected, they are converted inplace in favor of their
   corresponding new names aligned with `OGC-API`.
 - Update ``mimeType`` to ``mediaType`` as format type representation according to `OGC-API`
-  (relates to `#211  <https://github.com/crim-ca/weaver/issues/211>`_).
+  (relates to `#211 <https://github.com/crim-ca/weaver/issues/211>`_).
 - Add explicit pattern validation (``type/subtype``) of format string definitions with ``MediaType`` schema.
 - Add sorting capability to generate mapping schemas for API responses using overrides of
   properties ``_sort_first`` and ``_sort_after`` using lists of desired ordered field names.
@@ -1195,7 +1814,7 @@ Changes:
   URL formatted strings are allowed, or alternatively an explicit JSON definition. Previous definitions that would
   indicate an empty string schema are dropped since ``schema`` is optional.
 - Block unknown and ``builtin`` process types during deployment from the API
-  (fixes `#276  <https://github.com/crim-ca/weaver/issues/276>`_).
+  (fixes `#276 <https://github.com/crim-ca/weaver/issues/276>`_).
   Type ``builtin`` can only be registered by `Weaver` itself at startup. Other unknown types that have
   no indication for mapping to an appropriate ``Process`` implementation are preemptively validated.
 - Add parsing and generation of additional ``literalDataDomains`` for specification of WPS I/O data constrains and
@@ -1215,7 +1834,7 @@ Fixes:
 - Fix `#203 <https://github.com/crim-ca/weaver/issues/203>`_ with explicit validation test of ``ProcessSummary``
   schema for providers response.
 - Fix failing ``minOccurs`` and ``maxOccurs`` generation from a remote provider ``Process`` to support `OGC-API` format
-  (relates to `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+  (relates to `#263 <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fix schemas references and apply deserialization to providers listing request.
 - Fix failing deserialization of ``variable`` children schema under mapping when this variable element is allowed
   to be undefined (i.e.: defined with ``missing=drop``). Allows support of empty ``inputs`` mapping of `OGC-API`
@@ -1294,7 +1913,7 @@ Changes:
 Fixes:
 ------
 - Fix ``minOccurs`` and ``maxOccurs`` representation according to `OGC-API`
-  (fixes `#263  <https://github.com/crim-ca/weaver/issues/263>`_).
+  (fixes `#263 <https://github.com/crim-ca/weaver/issues/263>`_).
 - Fixed the format of the output file URL. When the prefix ``/`` was not present,
   URL was incorrectly handled by not prepending the required base URL location.
 
@@ -1330,12 +1949,12 @@ Changes:
 Fixes:
 ------
 - Pin ``pywps==4.4.3`` and fix incompatibility introduced by its refactor of I/O base classes in
-  `#602 <https://github.com/geopython/pywps/pull/602>`_
+  `geopython/pywps#602 <https://github.com/geopython/pywps/pull/602>`_
   (specifically `commit 343d825 <https://github.com/geopython/pywps/commit/343d82539576b1e73eee3102654749c3d3137cff>`_),
   which broke the ``ComplexInput`` work-around to avoid useless of file URLs
-  (see issue `#526 <https://github.com/geopython/pywps/issues/526>`_).
+  (see issue `geopython/pywps#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Fix default execution mode specification in process job control options
-  (fixes `#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
+  (fixes `opengeospatial/ogcapi-processes#182 <https://github.com/opengeospatial/ogcapi-processes/pull/182>`_).
 - Fix old OGC-API WPS REST bindings link in landing page for the more recent `OGC-API Processes` specification.
 - Fix invalid deserialization of schemas using ``not`` keyword that would result in all fields returned instead of
   limiting them to the expected fields from the schema definitions for ``LiteralInputType`` in process description.
@@ -1419,7 +2038,8 @@ Fixes:
   file path explicitly instead of returning an invalid directory.
 - Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
 - Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
-  patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
+  patch on ``null`` since fix `geopython/pywps#507 <https://github.com/geopython/pywps/pull/507>`_ not released at
+  this point).
 - Fix potential invalid database state that could have saved an invalid process although the following
   ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
   after complete and successful schema validation.
@@ -1649,8 +2269,8 @@ Changes:
   where potentially inaccessible (according to settings). Definition of `CWL` package will need to add
   `InitialWorkDirRequirement <https://www.commonwl.org/v1.0/CommandLineTool.html#InitialWorkDirRequirement>`_ as per
   defined by reference specification to stage those files if they need to be accessed with write permissions
-  (see: `example <https://www.commonwl.org/user_guide/15-staging/>`_). Addresses some issues listed in
-  `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
+  (see: `example <https://www.commonwl.org/user_guide/topics/staging-input-files.html>`_).
+  Addresses some issues listed in `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
 - Enforce removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and

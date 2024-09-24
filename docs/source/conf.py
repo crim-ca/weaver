@@ -57,7 +57,6 @@ extensions = [
     "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
-    "cloud_sptheme.ext.autodoc_sections",   # allow sections in docstrings code
     "sphinx.ext.githubpages",   # for publishing the doc to GitHub pages
     "sphinx.ext.todo",          # support directives
     "sphinx.ext.viewcode",      # add links to highlighted source code
@@ -98,9 +97,16 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 #   configuration for the purpose of parsing the source to generate the OpenAPI
 config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
+config.commit()
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
 # must disable references when using redoc (alpha version note rendering them correctly)
-api_spec_json = get_openapi_json(http_host="example", http_scheme="https", use_docstring_summary=True, use_refs=False)
+api_spec_json = get_openapi_json(
+    http_host="example",
+    http_scheme="https",
+    use_docstring_summary=True,
+    use_refs=False,
+    container=config,
+)
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, "w") as f:
@@ -428,12 +434,8 @@ linkcheck_ignore = [
     r"http[s]*://example.com.*",
     # ignore celery docs having problem (https://github.com/celery/celery/issues/7351), use 'docs.celeryq.dev' instead
     "https://docs.celeryproject.org/",
-    "https://mouflon.dkrz.de/",
     # following have sporadic downtimes
-    "https://esgf-data.dkrz.de/",
-    "https://indico.egi.eu/",
-    # ignore anchors not found although valid
-    "https://spec.openapis.org/oas/v3.1.0/*#*",
+    "https://www.pacificclimate.org",
     ".*docker-registry.crim.ca.*",  # protected
     # might not exist yet (we are generating it!)
     "https://pavics-weaver.readthedocs.io/en/latest/api.html",
@@ -444,13 +446,29 @@ linkcheck_ignore = [
     "https://ogc-ems.crim.ca/.*",
     "https://ogc-ades.crim.ca/.*",
     "https://ogc.crim.ca/.*",
+    "https://github.com/.*\\.rst#.*",
+    # FIXME: ignore URL causing HTTP 405 inconsistently
+    #   - https://github.com/sphinx-doc/sphinx/issues/12030
+    #   - https://github.com/orgs/sphinx-doc/discussions/12032
+    "https://app.dimensions.ai/details/grant/grant.8105745",
 ]
+linkcheck_anchors_ignore = [
+    "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
+    "data-types",  # https://spec.openapis.org/oas/v3.1.0
+    "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
+    "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+]
+linkcheck_request_headers = {
+    "https://github.com/": {
+        "Accept": "text/html,application/xhtml+xml,application/xml,image/avif,image/webp,image/png,image/svg+xml,*/*"
+    }
+}
 
 linkcheck_timeout = 30
 linkcheck_retries = 5
 
 # avoid 403 by some links that explicitly block robots/scripts with mocked user-agent
-user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"
+# user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:25.0) Gecko/20100101 Firefox/25.0"
 
 # known warning issues to be ignored
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-nitpick_ignore

@@ -32,7 +32,8 @@ limit-inference-results=100
 # usually to register additional checkers.
 # https://pylint.pycqa.org/en/latest/technical_reference/extensions.html
 load-plugins=pylint.extensions.docparams,
-             pylint.extensions.mccabe
+             pylint.extensions.mccabe,
+             pylint_per_file_ignores
 
 # https://pylint.pycqa.org/en/latest/technical_reference/extensions.html#design-checker-options
 max-complexity = 24
@@ -94,6 +95,7 @@ disable=C0111,missing-docstring,
         R0401,cyclic-import,
         R0801,duplicate-code,
         R0901,too-many-ancestors,
+        R0902,too-many-instance-attributes,
         R0904,too-many-public-methods,
         R0912,too-many-branches,
         R0914,too-many-locals,
@@ -124,6 +126,9 @@ disable=C0111,missing-docstring,
         W9016,missing-type-doc
 
 # note: (C0412, ungrouped-imports) is managed via isort tool, ignore false positives
+
+per-file-ignores =
+  tests/*:R1729
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -376,9 +381,11 @@ class-attribute-naming-style=any
 # Naming style matching correct class names.
 class-naming-style=PascalCase
 
-# Regular expression matching correct class names. Overrides class-naming-
-# style.
-#class-rgx=
+# Regular expression matching correct class names. Overrides class-naming-style.
+# Allow typing definitions that are matched as 'classes' to have slightly more versatile names.
+class-rgx=((_{0,2}[A-Z][a-zA-Z0-9]+)|((CWL|PKG|WPS|OAS|JSON|IO|ANY)_[a-zA-Z0-9_]+Types?))$
+
+typealias-rgx=_{0,2}(?!T[A-Z]|Type)((CWL|PKG|WPS|OAS|JSON|IO|ANY)_)?[A-Z]+[a-z0-9]+(?:[A-Z][a-z0-9]+)*$
 
 # Naming style matching correct constant names.
 const-naming-style=UPPER_CASE
@@ -402,7 +409,7 @@ function-naming-style=snake_case
 good-names=i,j,k,v,kv,ex,x,y,z,f,h,db,kw,dt,q,ns,id,s3,to,_
 
 # Include a hint for the correct naming format with invalid-name.
-include-naming-hint=no
+include-naming-hint=yes
 
 # Naming style matching correct inline iteration names.
 inlinevar-naming-style=any

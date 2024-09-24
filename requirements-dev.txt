@@ -9,7 +9,7 @@ bump2version
 codacy-coverage
 coverage
 doc8>=0.8.1
-docformatter==1.5.0     # add support of config file
+docformatter>=1.5.0     # add support of config file
 flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
 flynt
 isort>=5
@@ -19,12 +19,17 @@ mock<4
 moto>=4.0.8
 mypy
 parameterized
+path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pytest-plugins/issues/224)
 pluggy>=0.7
 # FIXME: bad interpolation of 'setup.cfg' for pytest 'log_format' (https://github.com/pytest-dev/pytest/issues/10019)
 pytest<7
+pytest-httpserver>=1.0.7  # support werkzeug>=3
+pytest-server-fixtures
+pytest-rerunfailures
 pydocstyle
-pylint>=2.11,!=2.12,<2.14; python_version <= "3.6"
-pylint>=2.15.4; python_version >= "3.7"
+# FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
+pylint>=2.15.4,<3
+pylint-per-file-ignores
 pylint_quotes
 responses
 safety

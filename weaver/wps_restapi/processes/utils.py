@@ -11,9 +11,10 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_path_kvp, get_settings, get_weaver_url
+from weaver.utils import get_path_kvp, get_settings
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
@@ -58,8 +59,8 @@ def resolve_process_tag(request, process_query=False):
     return process_id
 
 
-def get_processes_filtered_by_valid_schemas(request, detail=True):
-    # type: (PyramidRequest, bool) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
+def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
+    # type: (PyramidRequest, bool, bool) -> Tuple[List[JSON], List[str], Dict[str, Optional[int]], bool, int]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
 
@@ -71,7 +72,7 @@ def get_processes_filtered_by_valid_schemas(request, detail=True):
         with_providers = asbool(request.params.get("providers", False))
     revisions_param = sd.ProcessRevisionsQuery(unknown="ignore").deserialize(request.params)
     with_revisions = revisions_param.get("revisions")
-    with_links = asbool(request.params.get("links", False)) and detail
+    with_links = links and detail
     paging_query = sd.ProcessPagingQuery()
     paging_value = {param.name: param.default for param in paging_query.children}
     paging_names = set(paging_value)
@@ -114,7 +115,7 @@ def get_process_list_links(request, paging, total, provider=None):
     """
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
-    base_url = get_weaver_url(request)
+    base_url = get_wps_restapi_base_url(request)
     links = []
     if provider:
         proc_path = sd.provider_processes_service.path.format(provider_id=provider.id)

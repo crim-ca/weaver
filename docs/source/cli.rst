@@ -82,7 +82,8 @@ For each of the following examples, the client is created as follows:
 .. code-block:: python
     :caption: Python
 
-    client = WeaverClient(url="{WEAVER_URL}")
+    WEAVER_URL = os.getenv("WEAVER_URL")
+    client = WeaverClient(url=WEAVER_URL)
 
 
 .. _cli_example_auth:
@@ -91,16 +92,16 @@ For each of the following examples, the client is created as follows:
 Authentication Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For any operation that requires authentication/authorization to access a protected service targeted by ``{WEAVER_URL}``,
+For any operation that requires authentication/authorization to access a protected service targeted by ``WEAVER_URL``,
 it is possible to either provide the ``auth`` parameter during initialization of the :py:class:`weaver.cli.WeaverClient`
 itself (the specific :py:class:`weaver.cli.AuthHandler` is reused for **all** operations), or as argument to individual
 methods when calling the respective operation (handler only used for that step).
 
 Any class implementation that derives from :py:class:`weaver.cli.AuthHandler` or :py:class:`requests.auth.AuthBase` can
-be used for the ``auth`` argument. This class must implement the ``__call__`` method taking a single ``request``argument
-and returning the adjusted ``request`` instance. The call should apply any relevant modifications to grant the necessary
-authentication/authorization details. This ``__call__`` will be performed inline prior to sending the actual request
-toward the service.
+be used for the ``auth`` argument. This class must implement the ``__call__`` method taking a single ``request``
+argument and returning the adjusted ``request`` instance. The call should apply any relevant modifications to grant the
+necessary authentication/authorization details. This ``__call__`` will be performed inline prior to sending the actual
+request toward the service.
 
 .. note::
     There are multiple predefined handlers available for use:
@@ -127,13 +128,21 @@ Below are examples of possible commands:
 .. code-block:: shell
     :caption: Command Line
 
-    weaver capabilities -u {WEAVER_URL} -aH requests_magpie.MagpieAuth -aU ${MAGPIE_URL} -aI <username> -aP <password>
+    weaver capabilities \
+        -u ${WEAVER_URL} \
+        -aC requests_magpie.MagpieAuth \
+        -aU ${MAGPIE_URL} \
+        -aI ${MAGPIE_USERNAME} \
+        -aP ${MAGPIE_PASSWORD}
 
 When using the :ref:`Python Interface <client_commands>`, the desired implementation can be specified directly.
 
 .. code-block:: python
 
-    client.capabilities(auth=requests_magpie.MagpieAuth("${MAGPIE_URL]", "<username>", "<password>"))
+    MAGPIE_URL = os.getenv("MAGPIE_URL")
+    MAGPIE_USERNAME = os.getenv("MAGPIE_USERNAME")
+    MAGPIE_PASSWORD = os.getenv("MAGPIE_PASSWORD")
+    client.capabilities(auth=requests_magpie.MagpieAuth(MAGPIE_URL, MAGPIE_USERNAME, MAGPIE_PASSWORD))
 
 
 .. _cli_example_deploy:
@@ -172,7 +181,8 @@ The contents of below URL definition is also available in :ref:`example_app_pkg_
 .. code-block:: shell
     :caption: Command Line
 
-    weaver deploy -u {WEAVER_URL} \
+    weaver deploy \
+        -u ${WEAVER_URL} \
         -p docker-python-script-report \
         --cwl https://raw.githubusercontent.com/crim-ca/weaver/master/docs/examples/docker-python-script-report.cwl
 
@@ -202,7 +212,7 @@ from the service. Requires a `Weaver` or |ogc-api-proc-part2|_ compliant instanc
 .. code-block:: shell
     :caption: Command Line
 
-    weaver undeploy -u {WEAVER_URL} -p docker-python-script-report
+    weaver undeploy -u ${WEAVER_URL} -p docker-python-script-report
 
 .. code-block:: python
     :caption: Python
@@ -225,7 +235,7 @@ Accomplishes the :ref:`GetCapabilities <proc_op_getcap>` request to obtain a lis
 .. code-block:: shell
     :caption: Command Line
 
-    weaver capabilities -u {WEAVER_URL}
+    weaver capabilities -u ${WEAVER_URL}
 
 .. code-block:: python
     :caption: Python
@@ -249,7 +259,7 @@ Accomplishes the :ref:`DescribeProcess <proc_op_describe>` request to obtain the
 .. code-block:: shell
     :caption: Command Line
 
-    weaver describe -u {WEAVER_URL} -p jsonarray2netcdf
+    weaver describe -u ${WEAVER_URL} -p jsonarray2netcdf
 
 .. code-block:: python
     :caption: Python
@@ -297,7 +307,9 @@ to be submitted to the :term:`Process`. Please refer to :term:`CLI` :ref:`execut
 .. code-block:: shell
     :caption: Command Line
 
-    weaver execute -u {WEAVER_URL} -p Echo \
+    weaver execute \
+        -u ${WEAVER_URL} \
+        -p Echo \
         -I "message='Hello World!'" \
         -I value:int=123456 \
         -I array:float=1.23,4.56 \
@@ -325,7 +337,7 @@ above :term:`CLI` variations, but it is usually more intuitive to use a Python :
             {"href": "http://another.com/data.json"},
         ],
         "single": {
-            "href": "/workspace/data.xml@mediaType",  # note: uploaded to vault automatically before execution
+            "href": "/workspace/data.xml",  # note: uploaded to vault automatically before execution
             "type": "text/xml",
         }
     })
@@ -347,7 +359,7 @@ any stored results from a successful execution.
 .. code-block:: shell
     :caption: Command Line
 
-    weaver dismiss -u {WEAVER_URL} -j "29af3a33-0a3e-477d-863e-efccc97e0b02"
+    weaver dismiss -u ${WEAVER_URL} -j "29af3a33-0a3e-477d-863e-efccc97e0b02"
 
 .. code-block:: python
     :caption: Python
@@ -370,7 +382,7 @@ Accomplishes the :ref:`GetStatus <proc_op_status>` operation to request the curr
 .. code-block:: shell
     :caption: Command Line
 
-    weaver status -u {WEAVER_URL} -j "797c0c5e-9bc2-4bf3-ab73-5f3df32044a8"
+    weaver status -u ${WEAVER_URL} -j "797c0c5e-9bc2-4bf3-ab73-5f3df32044a8"
 
 .. code-block:: python
     :caption: Python
@@ -394,7 +406,7 @@ Accomplishes the :term:`Job` listing request to obtain known :term:`Job` definit
 .. code-block:: shell
     :caption: Command Line
 
-    weaver jobs -u {WEAVER_URL} -nL
+    weaver jobs -u ${WEAVER_URL} -nL
 
 .. code-block:: python
     :caption: Python
@@ -428,7 +440,7 @@ a pending or running :term:`Job`.
     :caption: Command Line
 
     # assuming job is 'running'
-    weaver monitor -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
+    weaver monitor -u ${WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
 
 .. code-block:: python
     :caption: Python
@@ -454,7 +466,7 @@ Retrieves the :ref:`Job Results <proc_op_result>` from a successful :term:`Job` 
 .. code-block:: shell
     :caption: Command Line
 
-    weaver results -u {WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
+    weaver results -u ${WEAVER_URL} -j "14c68477-c3ed-4784-9c0f-a4c9e1344db5"
 
 .. code-block:: python
     :caption: Python
@@ -485,7 +497,7 @@ This operation allows manual upload of a local file to the :term:`Vault`.
 .. code-block:: shell
     :caption: Command Line
 
-    weaver upload -u {WEAVER_URL} -f /path/to/file.txt
+    weaver upload -u ${WEAVER_URL} -f /path/to/file.txt
 
 .. code-block:: python
     :caption: Python

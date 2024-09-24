@@ -1,5 +1,6 @@
 import abc
 from typing import TYPE_CHECKING
+from typing_extensions import Literal, get_args
 
 from weaver.utils import VersionFormat
 
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
         DatetimeIntervalType,
         ExecutionInputs,
         ExecutionOutputs,
+        ExecutionSubscribers,
         JSON,
         SettingsType,
         TypedDict
@@ -33,8 +35,24 @@ if TYPE_CHECKING:
     JobSearchResult = Tuple[Union[List[Job], JobGroupCategory], int]
 
 
+StoreServicesType = Literal["services"]
+StoreProcessesType = Literal["processes"]
+StoreJobsType = Literal["jobs"]
+StoreBillsType = Literal["bills"]
+StoreQuotesType = Literal["quotes"]
+StoreVaultType = Literal["vault"]
+StoreTypeName = Literal[
+    StoreBillsType,
+    StoreJobsType,
+    StoreProcessesType,
+    StoreQuotesType,
+    StoreServicesType,
+    StoreVaultType
+]
+
+
 class StoreInterface(object, metaclass=abc.ABCMeta):
-    type = None      # type: str
+    type = None      # type: StoreTypeName
     settings = None  # type: SettingsType
 
     def __init__(self, settings=None):
@@ -45,7 +63,7 @@ class StoreInterface(object, metaclass=abc.ABCMeta):
 
 
 class StoreServices(StoreInterface):
-    type = "services"
+    type = get_args(StoreServicesType)[0]
 
     @abc.abstractmethod
     def save_service(self, service, overwrite=True):
@@ -79,7 +97,7 @@ class StoreServices(StoreInterface):
 
 
 class StoreProcesses(StoreInterface):
-    type = "processes"
+    type = get_args(StoreProcessesType)[0]
 
     @abc.abstractmethod
     def save_process(self, process, overwrite=True):
@@ -145,7 +163,7 @@ class StoreProcesses(StoreInterface):
 
 
 class StoreJobs(StoreInterface):
-    type = "jobs"
+    type = get_args(StoreJobsType)[0]
 
     @abc.abstractmethod
     def save_job(self,
@@ -162,7 +180,7 @@ class StoreJobs(StoreInterface):
                  user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
-                 notification_email=None,   # type: Optional[str]
+                 subscribers=None,          # type: Optional[ExecutionSubscribers]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job
@@ -200,7 +218,6 @@ class StoreJobs(StoreInterface):
                   job_type=None,            # type: Optional[str]
                   tags=None,                # type: Optional[List[str]]
                   access=None,              # type: Optional[str]
-                  notification_email=None,  # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
                   page=0,                   # type: Optional[int]
@@ -220,7 +237,7 @@ class StoreJobs(StoreInterface):
 
 
 class StoreQuotes(StoreInterface):
-    type = "quotes"
+    type = get_args(StoreQuotesType)[0]
 
     @abc.abstractmethod
     def save_quote(self, quote):
@@ -249,7 +266,7 @@ class StoreQuotes(StoreInterface):
 
 
 class StoreBills(StoreInterface):
-    type = "bills"
+    type = get_args(StoreBillsType)[0]
 
     @abc.abstractmethod
     def save_bill(self, bill):
@@ -273,7 +290,7 @@ class StoreBills(StoreInterface):
 
 
 class StoreVault(StoreInterface):
-    type = "vault"
+    type = get_args(StoreVaultType)[0]
 
     @abc.abstractmethod
     def get_file(self, file_id, nothrow=False):
