@@ -586,6 +586,7 @@ class NoneType(colander.SchemaType):
     """
     Type representing an explicit :term:`JSON` ``null`` value.
     """
+
     def serialize(self, node, appstruct):  # noqa
         # type: (colander.SchemaNode, Any) -> Union[None, colander.null, colander.drop]
         if appstruct in (colander.null, colander.drop):
@@ -609,6 +610,7 @@ class AnyType(colander.SchemaType):
     """
     Type representing any :term:`JSON` structure.
     """
+
     def serialize(self, node, appstruct):  # noqa
         # type: (colander.SchemaNode, Any) -> Any
         return appstruct
@@ -2517,6 +2519,7 @@ class SchemaRefConverter(TypeConverter):
     """
     Converter that will add :term:`OpenAPI` ``$schema`` and ``$id`` references if they are provided in the schema node.
     """
+
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema
         result = super(SchemaRefConverter, self).convert_type(schema_node)
@@ -2532,6 +2535,7 @@ class ExtendedTypeConverter(SchemaRefConverter):
     """
     Base converter with support of `Extended` schema type definitions.
     """
+
     def convert_type(self, schema_node):
         # type: (colander.SchemaNode) -> OpenAPISchema
         # base type converters expect raw pattern string

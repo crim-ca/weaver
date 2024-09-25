@@ -18,6 +18,7 @@ from parameterized import parameterized
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
+from tests.transform.test_transform import test_transformations
 from tests.utils import (
     get_links,
     get_module_version,
@@ -30,7 +31,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from tests.transform.test_transform import test_transformations
 from weaver.compat import Version
 from weaver.datatype import Job, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode

@@ -1,7 +1,8 @@
-from PIL import Image
 import operator
 from collections import deque
 from io import StringIO
+
+from PIL import Image
 
 
 def add_tuple(a, b):
@@ -32,7 +33,7 @@ def normalize(a):
 
 def svg_header(width, height):
     return """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="%d" height="%d"
      xmlns="http://www.w3.org/2000/svg" version="1.1">
@@ -111,7 +112,7 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                     visited.putpixel(neighbour, 1)
                 piece.append(here)
 
-            if not rgba in color_pixel_lists:
+            if rgba not in color_pixel_lists:
                 color_pixel_lists[rgba] = []
             color_pixel_lists[rgba].append(piece)
 
@@ -141,7 +142,7 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                     if neighbour in piece_pixel_list:
                         continue
                     edge_set.add(edge)
-            if not rgba in color_edge_lists:
+            if rgba not in color_edge_lists:
                 color_edge_lists[rgba] = []
             color_edge_lists[rgba].append(edge_set)
 
@@ -171,7 +172,7 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                     s.write(""" L %d,%d """ % here)
                 s.write(""" Z """)
             s.write(
-                """ " style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (color[0:3], float(color[3]) / 255))
+                f""" " style="fill:rgb{color[0:3]}; fill-opacity:{float(color[3]) / 255:.3f}; stroke:none;" />\n""")
 
     s.write("""</svg>\n""")
     return s.getvalue()
@@ -189,8 +190,8 @@ def rgba_image_to_svg_pixels(im, opaque=None):
             if opaque and not rgba[3]:
                 continue
             s.write(
-                """  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (
-                x, y, rgba[0:3], float(rgba[2]) / 255))
+                """  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s;
+                  fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[0:3], float(rgba[2]) / 255))
     s.write("""</svg>\n""")
     return s.getvalue()
 

@@ -52,8 +52,8 @@ class Tiff:
             if index in self.range:
                 return self.dataset.read(index)
             return None
-        except:
-            raise
+        except KeyError as e:
+            raise RuntimeError(f"Failed to read data at index {index}") from e
 
     def get_images(self, red_band: int = 1, green_band: int = 2, blue_band: int = 3):
         if self.is_geotiff:

@@ -32,7 +32,7 @@ from weaver.exceptions import (
     ServiceNotFound
 )
 from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_format, repr_json, get_extension
+from weaver.formats import ContentType, get_extension, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -99,8 +99,8 @@ def get_job_possible_output_formats(job):
 
 def get_link(output_id, mime_type, url):
     return {
-        "href": url + "/" + output_id + "?f=" + mime_type, "rel": "output:" + output_id,
-        "type": mime_type, "title": "Link to job " + output_id + " result in " + mime_type
+        "href": f"{url}/{output_id}?f={mime_type}", "rel": f"output:{output_id}",
+        "type": mime_type, "title": f"Link to job {output_id} result in {mime_type}"
     }
 
 
@@ -112,7 +112,7 @@ def get_all_possible_formats_links(request, job):
         links = []
         url = request.url
         links.append({
-            "href": url[:url.rfind('/')] + "/transforms", "rel": "up",
+            "href": f"{url[:url.rfind('/')]}/transforms", "rel": "up",
             "type": ContentType.APP_JSON, "title": "List of possible output formats."
         })
 

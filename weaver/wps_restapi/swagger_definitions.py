@@ -856,7 +856,7 @@ class LinkRelationshipType(OneOfKeywordSchema):
             "This should be one item amongst registered relations https://www.iana.org/assignments/link-relations/."
         )),
         URL(description="Fully qualified extension link relation to the current content."),
-        NRST(description="Link to Job output_id.") # NamespacedRelationshipType
+        NRST(description="Link to Job output_id.")  # NamespacedRelationshipType
     ]
 
 
@@ -5414,7 +5414,7 @@ class CWLInputType(OneOfKeywordSchema):
 class CWLInputMap(PermissiveMappingSchema):
     input_id = CWLInputType(variable="{input-id}", title="CWLInputDefinition",
                             description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
-                                        " (Note: '{input-id}' is a variable corresponding for each identifier)")
+                            " (Note: '{input-id}' is a variable corresponding for each identifier)")
 
 
 class CWLInputItem(CWLInputObject):
@@ -5465,7 +5465,7 @@ class CWLOutputType(OneOfKeywordSchema):
 class CWLOutputMap(ExtendedMappingSchema):
     output_id = CWLOutputType(variable="{output-id}", title="CWLOutputDefinition",
                               description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
-                                          " (Note: '{output-id}' is a variable corresponding for each identifier)")
+                              " (Note: '{output-id}' is a variable corresponding for each identifier)")
 
 
 class CWLOutputItem(CWLOutputObject):

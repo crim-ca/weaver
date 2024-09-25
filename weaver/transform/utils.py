@@ -64,7 +64,7 @@ def write_images(images, output_file, ext="png"):
     with tempfile.TemporaryDirectory() as tmp_path:
         imgs = []
         for i, img in enumerate(images):
-            ip = os.path.join(tmp_path, str(i).zfill(4)) + "." + ext
+            ip = f"{os.path.join(tmp_path, str(i).zfill(4))}.{ext}"
             img.save(ip), imgs.append(img)
 
         if len(imgs) > 1:

@@ -10,22 +10,29 @@ import jinja2
 import pandas as pd
 import xmltodict
 import yaml
-from PIL import Image
 from bs4 import BeautifulSoup
 from cairosvg import svg2png
 from celery.utils.log import get_task_logger
 from fpdf import FPDF
 from json2xml import json2xml
 from json2xml.utils import readfromjson
+from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
 from weaver.formats import get_extension
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
-
-from weaver.transform.utils import is_png, is_gif, is_svg, write_content, get_content, is_image, is_tiff, \
-    get_file_extension
+from weaver.transform.utils import (
+    get_content,
+    get_file_extension,
+    is_gif,
+    is_image,
+    is_png,
+    is_svg,
+    is_tiff,
+    write_content
+)
 
 LOGGER = get_task_logger(__name__)
 
@@ -54,6 +61,7 @@ def exception_handler(func):
 
     return inner_function
 
+
 @exception_handler
 def image_to_any(i, o):
     # exit if no transformation needed
@@ -70,7 +78,7 @@ def image_to_any(i, o):
         return images_to_any([Image.open(i).convert('RGB')], o)
 
     if is_svg(i):
-        png = i + ".png"
+        png = f"{i}.png"
         svg2png(open(i, 'rb').read(), write_to=open(png, 'wb'))
         i = png
 
@@ -103,7 +111,7 @@ def images_to_any(ims, o):
                 width, height = im.size
                 basewidth = 300
                 if max(width, height) > basewidth:
-                    wpercent = (basewidth / float(im.size[0]))
+                    wpercent = basewidth / float(im.size[0])
                     hsize = int((float(im.size[1]) * float(wpercent)))
                     im = im.resize((basewidth, hsize), Image.Resampling.LANCZOS)
                 if len(clrs) == 3:
@@ -123,12 +131,13 @@ def images_to_any(ims, o):
                     p = os.path.join(tmp_path, fn)
                     tar.add(p, arcname=fn)
 
+
 @exception_handler
 def any_to_html(i, o):
     if not is_image(i):
         write_content(o, HTML_CONTENT.replace("%CONTENT%", jinja2.escape(get_content(i))))
     else:
-        jpg = i + ".jpg"
+        jpg = f"{i}.jpg"
         image_to_any(i, jpg)
         write_content(o, HTML_CONTENT.replace("%CONTENT%", "<img src=\"data:image/jpeg;base64," + base64.b64encode(
             get_content(jpg, "rb")) + "\" alt=\"Result\" />"))
@@ -178,7 +187,7 @@ def any_to_pdf(i, o):
 
     new_pdf.output(o, 'F')
 
-        #ims[0].save(o, save_all=True, append_images=ims)
+    # ims[0].save(o, save_all=True, append_images=ims)
 
 
 @exception_handler
@@ -188,7 +197,7 @@ def csv_to_json(i, o):
 
         for i in range(len(csvReader.fieldnames)):
             if csvReader.fieldnames[i] == "":
-                csvReader.fieldnames[i] = "unknown_" + str(i)
+                csvReader.fieldnames[i] = f"unknown_{str(i)}"
 
         ret = []
         for rows in csvReader:
@@ -199,7 +208,7 @@ def csv_to_json(i, o):
 
 @exception_handler
 def csv_to_xml(i, o):
-    p = i + ".json"
+    p = f"{i}.json"
     csv_to_json(i, p)
     data = readfromjson(p)
     write_content(o, json2xml.Json2xml(data, item_wrap=False).to_xml())
@@ -213,14 +222,18 @@ def json_to_xml(i, o):
 
 @exception_handler
 def json_to_yaml(i, o):
-    with open(i, 'r') as file: configuration = json.load(file)
-    with open(o, 'w') as yaml_file: yaml.dump(configuration, yaml_file)
+    with open(i, 'r') as file:
+        configuration = json.load(file)
+    with open(o, 'w') as yaml_file:
+        yaml.dump(configuration, yaml_file)
 
 
 @exception_handler
 def yaml_to_json(i, o):
-    with open(i, 'r') as file: configuration = yaml.safe_load(file)
-    with open(o, 'w') as json_file: json.dump(configuration, json_file)
+    with open(i, 'r') as file:
+        configuration = yaml.safe_load(file)
+    with open(o, 'w') as json_file:
+        json.dump(configuration, json_file)
 
 
 @exception_handler
@@ -242,26 +255,26 @@ def html_to_txt(i, o):
 
 @exception_handler
 def yaml_to_csv(i, o):
-    yaml_to_json(i, i + ".json")
-    json_to_csv(i + ".json", o)
+    yaml_to_json(i, f"{i}.json")
+    json_to_csv(f"{i}.json", o)
 
 
 @exception_handler
 def yaml_to_xml(i, o):
-    yaml_to_json(i, i + ".json")
-    json_to_xml(i + ".json", o)
+    yaml_to_json(i, f"{i}.json")
+    json_to_xml(f"{i}.json", o)
 
 
 @exception_handler
 def xml_to_yaml(i, o):
-    xml_to_json(i, i + ".json")
-    json_to_yaml(i + ".json", o)
+    xml_to_json(i, f"{i}.json")
+    json_to_yaml(f"{i}.json", o)
 
 
 @exception_handler
 def csv_to_yaml(i, o):
-    csv_to_json(i, i + ".json")
-    json_to_yaml(i + ".json", o)
+    csv_to_json(i, f"{i}.json")
+    json_to_yaml(f"{i}.json", o)
 
 
 class Transform:
@@ -284,7 +297,6 @@ class Transform:
     def process(self):
         try:
             if self.output_path != self.file_path:
-                ext = self.wmt
                 if "text/" in self.cmt:
                     # Plain
                     if "plain" in self.cmt:
@@ -339,15 +351,15 @@ class Transform:
                     if "xml" in self.cmt:
                         # to JSON
                         if "json" in self.wmt:
-                            xml_to_json(self.file_path, self.output_pathh)
+                            xml_to_json(self.file_path, self.output_path)
                         # to YAML
                         if "yaml" in self.wmt:
-                            xml_to_yaml(self.file_path, self.output_pathh)
+                            xml_to_yaml(self.file_path, self.output_path)
                 elif "image/" in self.cmt:
                     # Potential conversion
                     if "image/" in self.wmt:
                         image_to_any(self.file_path, self.output_path)
-                        if not os.path.exists(self.output_path) and os.path.exists(self.output_path + ".tar.gz"):
+                        if not os.path.exists(self.output_path) and os.path.exists(f"{self.output_path}.tar.gz"):
                             self.output_path += ".tar.gz"
                     # PDF conversion
                     if "pdf" in self.wmt:
@@ -357,9 +369,10 @@ class Transform:
 
     def get(self):
         try:
-            if not os.path.exists(self.output_path): self.process()
+            if not os.path.exists(self.output_path):
+                self.process()
             response = FileResponse(self.output_path)
-            response.headers['Content-Disposition'] = ('attachment;  filename=' + os.path.basename(self.output_path))
+            response.headers['Content-Disposition'] = f"attachment;  filename={os.path.basename(self.output_path)}"
             return response
         except Exception as e:
             raise HTTPUnprocessableEntity(json={
@@ -373,7 +386,8 @@ class Transform:
     # Used for tests
     def _get(self):
         try:
-            if not os.path.exists(self.output_path): self.process()
+            if not os.path.exists(self.output_path):
+                self.process()
             return os.path.exists(self.output_path)
-        except:
-            raise
+        except Exception as e:
+            raise RuntimeError(f"Failed to process the output at {self.output_path}") from e

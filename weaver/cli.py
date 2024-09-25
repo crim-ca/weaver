@@ -2201,6 +2201,7 @@ class ValidateAuthHandlerAction(argparse.Action):
     """
     Action that will validate that the input argument references an authentication handler that can be resolved.
     """
+
     def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
         """
@@ -2250,6 +2251,7 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
 
         Header-Name: Header-Value
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """
@@ -2284,6 +2286,7 @@ class ValidateNonZeroPositiveNumberAction(argparse.Action):
     """
     Action that will validate that the input argument is a positive number greater than zero.
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """

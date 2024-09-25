@@ -125,9 +125,6 @@ class ContentType(Constants):
     TEXT_XML = "text/xml"
     VIDEO_MPEG = "video/mpeg"
 
-
-
-
     # special handling
     ANY_JSON = {
         APP_JSON, APP_YAML,

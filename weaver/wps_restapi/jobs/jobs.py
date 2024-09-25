@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
-from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity, HTTPNotFound
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
 
 from weaver.database import get_db
 from weaver.datatype import Job
@@ -21,14 +21,16 @@ from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
+    get_all_possible_formats_links,
     get_job,
     get_job_list_links,
+    get_job_possible_output_formats,
     get_job_results_response,
     get_results,
     get_schema_query,
     raise_job_bad_status,
     raise_job_dismissed,
-    validate_service_process, get_job_possible_output_formats, get_all_possible_formats_links
+    validate_service_process
 )
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
@@ -392,7 +394,8 @@ def get_job_outputs(request):
     links = job.links(request, self_link="outputs")
     f_links = get_all_possible_formats_links(request, job)
     LOGGER.warning(str(f_links))
-    if len(f_links) > 0: links.extend(f_links)
+    if len(f_links) > 0:
+        links.extend(f_links)
 
     outputs.update({"links": links})
     outputs = sd.JobOutputsBody().deserialize(outputs)
@@ -424,7 +427,8 @@ def get_job_output(request):
 
     # if any format requested, we take the resulting one
     frm = request.params.get("f")
-    if frm is not None: accept = frm
+    if frm is not None:
+        accept = frm
 
     if accept == "*/*":
         accept = result_media_type
@@ -445,7 +449,7 @@ def get_job_output(request):
     if not os.path.exists(res_file):
         raise HTTPNotFound({
             "code": "JobFileNotExists",
-            "description": str(output_id) + " - the job result does not exist (anymore)",
+            "description": f"{str(output_id)} - the job result does not exist (anymore)",
             "cause": "Job File Not Exists",
             "error": type(HTTPNotFound).__name__,
             "value": ""
@@ -453,6 +457,7 @@ def get_job_output(request):
 
     # Return resulting file transformed if necessary
     return Transform(file_path=res_file, current_media_type=result_media_type, wanted_media_type=accept).get()
+
 
 @sd.provider_results_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
@@ -487,7 +492,7 @@ def get_job_results(request):
 
 
 @sd.provider_transformer_service.get(
-    tags=[sd.TAG_JOBS,sd.TAG_RESULTS,sd.TAG_PROVIDERS],
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
     renderer=OutputFormat.JSON,
     schema=sd.ProviderTransformerEndpoint(),
     response_schemas=sd.get_prov_transformer_responses,
@@ -512,6 +517,7 @@ def get_job_transformer(request):
     """
     job = get_job(request)
     return get_job_possible_output_formats(job)
+
 
 @sd.provider_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
