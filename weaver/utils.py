@@ -33,6 +33,7 @@ from beaker.cache import Cache, cache_managers, cache_region, cache_regions, reg
 from beaker.container import MemoryNamespaceManager
 from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
+from botocore.exceptions import ClientError, HTTPClientError
 from bs4 import BeautifulSoup
 from celery.app import Celery
 from mypy_boto3_s3.literals import RegionName
@@ -1193,7 +1194,9 @@ def get_href_headers(
     content_type=None,                      # type: Optional[str]
     content_disposition_type="attachment",  # type: Literal["attachment", "inline"]
     content_location=None,                  # type: Optional[str]
+    content_name=None,                      # type: Optional[str]
     content_id=None,                        # type: Optional[str]
+    missing_ok=False,                       # type: bool
     settings=None,                          # type: Optional[SettingsType]
     **option_kwargs,                        # type: Unpack[Union[SchemeOptions, RequestOptions]]
  ):                                         # type: (...) -> MetadataResult
@@ -1219,9 +1222,19 @@ def get_href_headers(
     :param content_location:
         Override ``Content-Location`` to include in headers. Otherwise, defaults to the :paramref:`path`.
         Requires that :paramref:`location_headers` and :paramref:`content_headers` are enabled in each case.
+    :param content_name:
+        Optional ``name`` parameter to assign in the ``Content-Disposition`` header.
+        Requires that :paramref:`content_headers` and :paramref:`download_headers` are enabled.
     :param content_id:
         Optional ``Content-ID`` to include in the headers.
         Requires that :paramref:`content_headers` is enabled.
+        This should be a uniquely identifiable reference *across the server* (not just within a specific response),
+        which can be used for cross-referencing by ``{cid:<>}`` within and between multipart document contents.
+        For a generic ID or field name, employ :paramref:`content_name` instead.
+    :param missing_ok:
+        If the referenced resource does not exist (locally or remotely as applicable), and that content information
+        to describe it cannot be retrieved, either raise an error (default) or resume with the minimal information
+        details that could be resolved.
     :param settings: Application settings to pass down to relevant utility functions.
     :return: Headers for the reference.
     """
@@ -1229,6 +1242,9 @@ def get_href_headers(
     if not any(href.startswith(proto) for proto in ["file", "http", "https", "s3"]):
         href = f"file://{os.path.abspath(path)}"
     f_enc = None
+    f_size = None
+    f_type = None
+    f_modified = None
 
     # handle directory
     if path.endswith("/"):
@@ -1245,30 +1261,39 @@ def get_href_headers(
         options["http"].update(**configs)
 
         if path.startswith("s3://") or path.startswith("https://s3."):
-            s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-            s3_region = options["s3"].pop("region_name", None)
-            s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-            s3_bucket, file_key = path[5:].split("/", 1)
-            s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
-            f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
-            f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
-            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+            try:
+                s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+                s3_region = options["s3"].pop("region_name", None)
+                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+                s3_bucket, file_key = path[5:].split("/", 1)
+                s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
+                f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
+                f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
+                f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+            except (ClientError, HTTPClientError):
+                if not missing_ok:
+                    raise
 
         elif path.startswith("http://") or path.startswith("https://"):
             resp = request_extra("HEAD", href, **options["http"])
-            if not resp.status_code == 200:
+            if resp.status_code != 200 and not missing_ok:
                 raise ValueError(f"Could not obtain file reference metadata from [{href}]")
-            f_modified = resp.last_modified
-            f_type = content_type or resp.content_type
-            f_size = resp.content_length
-            f_enc = resp.content_encoding
+            if resp.status_code == 200:
+                f_modified = resp.last_modified
+                f_type = content_type or resp.content_type
+                f_size = resp.content_length
+                f_enc = resp.content_encoding
 
         else:
-            path = path.split("file://", 1)[-1]
-            stat = os.stat(path)
-            f_type = content_type
-            f_size = stat.st_size
-            f_modified = datetime.fromtimestamp(stat.st_mtime)
+            try:
+                path = path.split("file://", 1)[-1]
+                stat = os.stat(path)
+                f_type = content_type
+                f_size = stat.st_size
+                f_modified = datetime.fromtimestamp(stat.st_mtime)
+            except OSError:
+                if not missing_ok:
+                    raise
 
     headers = {}
     if content_headers:
@@ -1278,32 +1303,33 @@ def get_href_headers(
         if location_headers:
             headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
-        if not f_type:
+        f_type = f_type or content_type  # in case of error, all above failed, use provided content-type if any
+        if not f_type:  # last resort, guess from file path
             if c_type == ContentType.APP_OCTET_STREAM:  # default
                 f_ext = os.path.splitext(path)[-1]
                 f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
             else:
                 f_type = c_type
-        if not f_enc:
-            f_enc = c_enc
+        f_enc = f_enc or c_enc or ""
         headers.update({
             "Content-Type": f_type,
-            "Content-Encoding": f_enc or "",
-            "Content-Length": str(f_size),
+            "Content-Encoding": f_enc,
         })
+        if f_size is not None:
+            headers["Content-Length"] = str(f_size)
         if download_headers:
             if os.path.splitext(path)[-1] in ["", "."]:
                 f_ext = get_extension(f_type, dot=True)
                 path = f"{path}{f_ext}"
-            headers.update({
-                "Content-Disposition": f"{content_disposition_type}; filename=\"{os.path.basename(path)}\"",
-            })
+            content_disposition_params = f"filename=\"{os.path.basename(path)}\""
+            if content_name:
+                content_disposition_params += f"; name=\"{content_name}\""
+            headers["Content-Disposition"] = f"{content_disposition_type}; {content_disposition_params}"
     f_current = get_file_header_datetime(now())
-    f_modified = get_file_header_datetime(f_modified)
-    headers.update({
-        "Date": f_current,
-        "Last-Modified": f_modified,
-    })
+    headers["Date"] = f_current
+    if f_modified:
+        f_modified = get_file_header_datetime(f_modified)
+        headers["Last-Modified"] = f_modified
     return headers
 
 

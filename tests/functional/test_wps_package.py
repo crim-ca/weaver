@@ -7,16 +7,16 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
-import inspect
 
 import contextlib
 import copy
+import inspect
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
-from inspect import cleandoc
 from typing import TYPE_CHECKING
 
 import boto3
@@ -1957,7 +1957,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "listing": [
                         {
                             "entryname": "script.py",
-                            "entry": cleandoc("""
+                            "entry": inspect.cleandoc("""
                                 import json
                                 import os
                                 input = $(inputs)
@@ -2129,7 +2129,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "listing": [
                         {
                             "entryname": "script.py",
-                            "entry": cleandoc("""
+                            "entry": inspect.cleandoc("""
                                 import json
                                 import os
                                 import ast
@@ -3558,6 +3558,16 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 result.pop("format", None)
         return results
 
+    @staticmethod
+    def remove_result_multipart_variable(results):
+        # type: (str) -> str
+        """
+        Removes any variable headers from the multipart contents to simplify test comparison.
+        """
+        results = re.sub(r"Date: .*\r\n", "", results)
+        results = re.sub(r"Last-Modified: .*\r\n", "", results)
+        return results.strip()
+
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3596,7 +3606,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
-            "output_data": "test",
+            "output_data": {"value": "test"},
         }
 
     def test_execute_single_output_prefer_header_return_representation_complex(self):
@@ -3968,7 +3978,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # validate the results based on original execution request
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
@@ -3977,8 +3987,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json}
             --{boundary}--
-        """)
-        assert results.text == results_body
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4040,15 +4051,17 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # validate the results based on original execution request
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 0
             Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
-        """)
-        assert results.text == results_body
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4109,18 +4122,20 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # validate the results based on original execution request
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.APP_YAML}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 12
             
             {output_json_as_yaml}
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4192,21 +4207,24 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
+            Content-Length: 4
 
             test
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 0
             Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4303,9 +4321,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async",
+            "Content-Type": ContentType.APP_JSON,
         }
-        exec_headers.update(self.json_headers)
         exec_content = {
             "inputs": {
                 "message": "test"
@@ -4334,23 +4352,29 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; filename="output_data.txt" name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
+            Content-Length: 4
             
             test
             --{boundary}
+            Content-Disposition: attachment; filename="result.json" name="output_json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
+            Content-Length: 16
             
             {output_json}
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4397,21 +4421,23 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
+            Content-Length: 4
 
             test
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 16
 
             {output_json}
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4460,20 +4486,23 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
+            Content-Length: 0
             Content-Location: {out_url}/{job_id}/output_data/result.txt
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 0
             Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -4521,31 +4550,37 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        boundary = parse_kvp(results.content_type)["boundary"][0]
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
+            Content-Length: 4
             
             test
             --{boundary}
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_text@{job_id}>
+            Content-Length: 0
             Content-Location: {out_url}/{job_id}/output_text/result.txt
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
+            Content-Length: 16
             
             {output_json}
             --{boundary}--
-        """)
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_text": {
                 "href": f"{out_url}/{job_id}/output_text/result.txt",
                 "type": ContentType.TEXT_PLAIN,
@@ -4608,7 +4643,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4680,7 +4717,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4743,7 +4782,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4812,7 +4853,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,

@@ -58,7 +58,7 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response
+from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response, get_job_return
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
@@ -794,9 +794,9 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
     accept_type = validate_job_accept_header(headers, mode)
+    exec_resp = get_job_return(job=None, body=json_body, headers=headers)  # job 'none' since still doing 1st parsing
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
-    exec_resp = json_body.get("response")
     subscribers = map_job_subscribers(json_body, settings)
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
@@ -867,6 +867,8 @@ def validate_job_accept_header(headers, execution_mode):
     # anything always allowed in sync, since results returned directly
     if execution_mode == ExecuteMode.SYNC:
         return accept
+    if ContentType.ANY in accept:
+        return
     raise HTTPNotAcceptable(
         json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
             "type": "NotAcceptable",
