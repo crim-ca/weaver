@@ -335,6 +335,7 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
+job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
 job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
 job_output_service = Service(name="job_output", path=f"{job_outputs_service.path}/{{output_id}}")
@@ -342,7 +343,6 @@ job_output_service = Service(name="job_output", path=f"{job_outputs_service.path
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
 job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
-job_transformer_service = Service(name="job_transformer", path=f"{job_service.path}/transforms")
 
 processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
@@ -355,14 +355,14 @@ process_payload_service = Service(name="process_payload", path=f"{process_servic
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
+process_result_value_service = Service(name="process_result_value", path=process_service.path +
+                                       job_result_value_service.path)
 process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
 process_output_service = Service(name="process_output", path=process_service.path + job_output_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
-process_transformer_service = Service(name="process_transformer",
-                                      path=process_service.path + job_transformer_service.path)
 process_execution_service = Service(name="process_execution", path=f"{process_service.path}/execution")
 
 providers_service = Service(name="providers", path="/providers")
@@ -373,13 +373,13 @@ provider_process_package_service = Service(name="provider_process_pkg", path=f"{
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
+provider_result_value_service = Service(name="provider_result_value", path=provider_service.path +
+                                        process_result_value_service.path)
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
 provider_output_service = Service(name="provider_output", path=provider_service.path + process_output_service.path)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
-provider_transformer_service = Service(name="provider_transformer",
-                                       path=provider_service.path + process_transformer_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
 provider_execution_service = Service(name="provider_execution", path=f"{provider_process_service.path}/execution")
@@ -652,6 +652,14 @@ class AcceptHeader(ExtendedSchemaNode):
     default = ContentType.APP_JSON  # defaults to JSON for easy use within browsers
 
 
+class AcceptAnyHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Accept"
+    schema_type = String
+    missing = drop
+
+
 class AcceptLanguageHeader(ExtendedSchemaNode):
     # ok to use 'name' in this case because target 'key' in the mapping must
     # be that specific value but cannot have a field named with this format
@@ -715,6 +723,13 @@ class RequestHeaders(ExtendedMappingSchema):
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
     content_type = RequestContentTypeHeader()
+
+
+class RequestAnyHeaders(RequestHeaders):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
+    accept = AcceptAnyHeader()
 
 
 class ResponseHeaders(ResponseContentTypeHeader):
@@ -2368,8 +2383,8 @@ class QuotePath(ExtendedMappingSchema):
     quote_id = UUID(description="Quote ID")
 
 
-class ResultPath(ExtendedMappingSchema):
-    result_id = UUID(description="Result ID")
+class OutputPath(ExtendedMappingSchema):
+    output_id = UUID(description="Output ID")
 
 
 #########################################################
@@ -3247,6 +3262,38 @@ class JobEndpoint(JobPath):
     header = RequestHeaders()
 
 
+class OutputEndpoint(OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ResultValueEndpoint(OutputEndpoint):
+    pass
+
+
+class JobAnyOutputEndpoint(JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class JobResultValueEndpoint(JobAnyOutputEndpoint):
+    pass
+
+
+class ProcessAnyOutputEndpoint(LocalProcessPath, JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ProcessResultValueEndpoint(ProcessAnyOutputEndpoint):
+    pass
+
+
+class ProviderAnyOutputEndpoint(ProviderProcessPath, LocalProcessPath, JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
+    pass
+
+
 class ProcessInputsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
@@ -3396,21 +3443,6 @@ class ProcessJobStatisticsEndpoint(LocalProcessPath, JobPath):
 
 
 class ProviderJobStatisticsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
-
-
-class ProcessTransformerEndpoint(ProcessOutputsEndpoint):
-    deprecated = True
-    header = RequestHeaders()
-
-
-class ProviderTransformerEndpoint(ProviderOutputsEndpoint):
-    deprecated = True
-    header = RequestHeaders()
-
-
-class JobTransformerEndpoint(JobPath):
-    deprecated = True
     header = RequestHeaders()
 
 
@@ -6059,11 +6091,11 @@ class JobStatisticsSchema(ExtendedMappingSchema):
     process = ProcessStatisticsSchema(missing=drop)
     outputs = OutputStatisticsMap(missing=drop)
 
-
-class JobtransformerSchema(ExtendedMappingSchema):
-    application = ApplicationStatisticsSchema(missing=drop)
-    process = ProcessStatisticsSchema(missing=drop)
-    outputs = OutputStatisticsMap(missing=drop)
+# todo check
+# class JobtransformerSchema(ExtendedMappingSchema):
+#     application = ApplicationStatisticsSchema(missing=drop)
+#     process = ProcessStatisticsSchema(missing=drop)
+#     outputs = OutputStatisticsMap(missing=drop)
 
 
 class FrontpageParameterSchema(ExtendedMappingSchema):
@@ -7393,11 +7425,6 @@ class OkGetJobStatsResponse(ExtendedMappingSchema):
     body = JobStatisticsSchema()
 
 
-class OkGetJobtransformerResponse(ExtendedMappingSchema):
-    header = ResponseHeaders()
-    body = JobtransformerSchema()
-
-
 class VaultFileID(UUID):
     description = "Vault file identifier."
     example = "78977deb-28af-46f3-876b-cdd272742678"
@@ -7962,23 +7989,23 @@ get_prov_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 
-get_job_transformer_responses = {
-    "200": OkGetJobtransformerResponse(description="success", examples={
-        "JobTransformer": {
-            "summary": "Obtained possible output format.",
-            "value": EXAMPLES["job_transformer.json"],
-        }
-    }),
-    "400": InvalidJobResponseSchema(),
-    "404": NotFoundJobResponseSchema(),
-    "405": MethodNotAllowedErrorResponseSchema(),
-    "410": GoneJobResponseSchema(),
-    "500": InternalServerErrorResponseSchema(),
-}
-get_prov_transformer_responses = copy(get_job_transformer_responses)
-get_prov_transformer_responses.update({
-    "403": ForbiddenProviderLocalResponseSchema(),
-})
+# get_job_transformer_responses = {
+#     "200": OkGetJobtransformerResponse(description="success", examples={
+#         "JobTransformer": {
+#             "summary": "Obtained possible output format.",
+#             "value": EXAMPLES["job_transformer.json"],
+#         }
+#     }),
+#     "400": InvalidJobResponseSchema(),
+#     "404": NotFoundJobResponseSchema(),
+#     "405": MethodNotAllowedErrorResponseSchema(),
+#     "410": GoneJobResponseSchema(),
+#     "500": InternalServerErrorResponseSchema(),
+# }
+# get_prov_transformer_responses = copy(get_job_transformer_responses)
+# get_prov_transformer_responses.update({
+#     "403": ForbiddenProviderLocalResponseSchema(),
+# })
 
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),

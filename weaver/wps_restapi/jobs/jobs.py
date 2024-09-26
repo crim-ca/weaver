@@ -402,12 +402,42 @@ def get_job_outputs(request):
     return HTTPOk(json=outputs)
 
 
-@sd.provider_output_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                                schema=sd.ProviderOutputEndpoint(), response_schemas=sd.get_prov_output_responses)
-@sd.process_output_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                               schema=sd.ProcessOutputEndpoint(), response_schemas=sd.get_job_output_responses)
-@sd.job_output_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OutputFormat.JSON,
-                           schema=sd.JobOutputEndpoint(), response_schemas=sd.get_job_output_responses)
+@sd.provider_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProviderResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.process_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProcessResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.job_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    renderer=OutputFormat.JSON,
+    schema=sd.JobResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.provider_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProviderAnyOutputEndpoint(),
+    response_schemas=sd.get_prov_output_responses
+)
+@sd.process_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProcessAnyOutputEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.job_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.JobAnyOutputEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_output(request):
     # type: (PyramidRequest) -> AnyResponseType
@@ -489,34 +519,6 @@ def get_job_results(request):
     job = get_job(request)
     resp = get_job_results_response(job, request)
     return resp
-
-
-@sd.provider_transformer_service.get(
-    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
-    renderer=OutputFormat.JSON,
-    schema=sd.ProviderTransformerEndpoint(),
-    response_schemas=sd.get_prov_transformer_responses,
-)
-@sd.process_transformer_service.get(
-    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    renderer=OutputFormat.JSON,
-    schema=sd.ProcessTransformerEndpoint(),
-    response_schemas=sd.get_job_transformer_responses
-)
-@sd.job_transformer_service.get(
-    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
-    renderer=OutputFormat.JSON,
-    schema=sd.JobTransformerEndpoint(),
-    response_schemas=sd.get_job_transformer_responses
-)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def get_job_transformer(request):
-    # type: (PyramidRequest) -> AnyResponseType
-    """
-    Retrieve the possible formats of an output job.
-    """
-    job = get_job(request)
-    return get_job_possible_output_formats(job)
 
 
 @sd.provider_exceptions_service.get(
