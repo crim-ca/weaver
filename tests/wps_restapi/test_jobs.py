@@ -18,7 +18,6 @@ from parameterized import parameterized
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
-from tests.transform.test_transform import test_transformations
 from tests.utils import (
     get_links,
     get_module_version,
@@ -1346,7 +1345,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions", "transforms"]:
+        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -1434,7 +1433,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                 assert not os.path.exists(job_out_dir)
 
                 # subsequent operations returns Gone for sub-resources of the job execution
-                for sub_path in ["", "/outputs", "/results", "/logs", "/exceptions", "/transforms"]:
+                for sub_path in ["", "/outputs", "/results", "/logs", "/exceptions"]:
                     path = job_path + sub_path
                     func = self.app.get if sub_path else self.app.delete
                     resp = func(path, headers=self.json_headers, expect_errors=True)
@@ -1635,25 +1634,13 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         with self.assertRaises(colander.Invalid):
             sd.Execute().deserialize({"outputs": {"random": {"transmissionMode": "bad"}}})
 
-    def test_job_transforms(self):
-        # First try transformation engine
-        test_transformations()
-
-        # Then try transformation in action
         path = f"/jobs/{self.job_info[0].id}/outputs"
         resp = self.app.get(path, headers=self.json_headers)
         for link in resp.json["links"]:
-            header = {"Accept": link["type"], "Content-Type": link["type"]}
+            header = {"Accept": link["type"]}
             resp = self.app.get(link, headers=header)
             assert resp.status_code == 200
             assert link["type"] in resp.content_type or "application/gzip" in resp.content_type
-
-    def test_job_transforms_formats(self):
-        path = f"/jobs/{self.job_info[0].id}/transforms"
-        resp = self.app.get(path, headers=self.json_headers)
-        assert resp.status_code == 200
-        assert ContentType.APP_JSON in resp.content_type
-        assert isinstance(resp.json, list)
 
     def test_job_logs_formats(self):
         path = f"/jobs/{self.job_info[0].id}/logs"

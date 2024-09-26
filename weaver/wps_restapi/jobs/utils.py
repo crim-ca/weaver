@@ -1,3 +1,4 @@
+import io
 import math
 import os
 import shutil
@@ -31,7 +32,7 @@ from weaver.exceptions import (
     ServiceNotAccessible,
     ServiceNotFound
 )
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import AnyExecuteTransmissionMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType, get_extension, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
@@ -39,6 +40,7 @@ from weaver.processes.convert import any2wps_literal_datatype, convert_output_pa
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.transform import transform
+from weaver.typedefs import AnyDataStream, HeadersType
 from weaver.utils import (
     get_any_id,
     get_any_value,
@@ -365,6 +367,8 @@ def make_result_link(result_id, result, job_id, settings):
         links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}{encoding}")
     return links
 
+# TODO A VOIR
+
 
 def get_results(  # pylint: disable=R1260
     job,                                # type: Job
@@ -490,6 +494,8 @@ def get_results(  # pylint: disable=R1260
         headers.extend([("Link", link) for link in res_links])
 
     return outputs, headers
+
+# TODO CHECK THIS
 
 
 def get_job_results_response(job, container, headers=None):
@@ -634,6 +640,90 @@ def get_job_submission_response(body, headers, error=False):
     body["description"] = sd.CreatedLaunchJobResponse.description
     body = sd.CreatedJobStatusSchema().deserialize(body)
     return HTTPCreated(json=body, headerlist=headers)
+
+
+def generate_or_resolve_result(
+    job,            # type: Job
+    result,         # type: ExecutionResultObject
+    result_id,      # type: str
+    output_id,      # type: str
+    output_mode,    # type: AnyExecuteTransmissionMode
+    request,       # type: AnyRequestType
+):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
+    """
+    Obtains the local file path and the corresponding :term:`URL` reference for a given result, generating it as needed.
+    :param job: Job with results details.
+    :param result: The specific output value or reference (could be an item index within an array of a given output).
+    :param result_id: Specific identifier of the result, including any array index as applicable.
+    :param output_id: Generic identifier of the output containing the result.
+    :param output_mode: Desired output transmission mode.
+    :param settings: Application settings to resolve locations.
+    :return: Resolved locations.
+    """
+    settings = get_settings(request)
+    key = get_any_value(result, key=True)
+    val = get_any_value(result)
+    cid = f"{result_id}@{job.id}"
+    url = None
+    loc = None
+    typ = None
+    res_data = None
+    c_length = None
+
+    # NOTE:
+    #   work with local files (since we have them), to avoid unnecessary loopback request
+    #   then, rewrite the locations after generating their headers to obtain the final result URL
+
+    # FIXME: Handle S3 output storage. Should multipart response even be allowed in this case?
+
+    if key == "href":
+        url = val
+        typ = result.get("type") or ContentType.APP_OCTET_STREAM
+        loc = map_wps_output_location(val, settings, exists=True, url=False)
+
+    if not url:
+        out_dir = get_wps_output_dir(settings)
+        out_name = f"{result_id}.txt"
+        job_path = job.result_path(output_id=output_id, file_name=out_name)
+        loc = os.path.join(out_dir, job_path)
+        url = map_wps_output_location(loc, settings, exists=False, url=True)
+
+    if key == "value":
+        res_data = io.StringIO()
+        c_length = res_data.write(val)
+        typ = ContentType.TEXT_PLAIN
+
+    if key == "value" and output_mode == ExecuteTransmissionMode.REFERENCE:
+        if not os.path.isfile(loc):
+            os.makedirs(os.path.dirname(loc), exist_ok=True)
+            with open(loc, mode="w", encoding="utf-8") as out_file:
+                out_file.write(val)
+
+    if key == "href" and output_mode == ExecuteTransmissionMode.VALUE:
+        res_data = io.FileIO(loc, mode="rb")
+
+        # faire transform selon job output / result
+        # appeler weaver.format guess type TODO
+
+    res_headers = get_href_headers(
+        loc,
+        download_headers=True,
+        missing_ok=True,        # only basic details if file does not exist
+        content_headers=True,
+        content_type=typ,
+        content_id=cid,
+        content_name=result_id,
+        content_location=url,   # rewrite back the original URL
+        settings=settings,
+    )
+    if output_mode == ExecuteTransmissionMode.VALUE and not res_headers.get("Content-Length") and c_length is not None:
+        res_headers["Content-Length"] = str(c_length)
+    if output_mode == ExecuteTransmissionMode.REFERENCE:
+        res_data = None
+        res_headers["Content-Length"] = "0"
+    if not os.path.exists(loc):
+        res_headers.pop("Content-Location", None)
+    return res_headers, res_data
 
 
 def validate_service_process(request):
