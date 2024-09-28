@@ -22,15 +22,18 @@ outputs:
   output_data:
     type: string
     outputBinding:
+      # note: since no file is associated for literal type, a link representation from it should use 'output_data.txt'
       outputEval: $(inputs.message)
   output_text:
     type: File
     outputBinding:
+      # note: purposely use a different name than 'output_text' to validate the resulting path uses this one
       glob: result.txt
     format: "iana:text/plain"
   output_json:
     type: File
     outputBinding:
+      # note: purposely use a different name than 'output_json' to validate the resulting path uses this one
       glob: result.json
     format: "iana:application/json"
 $namespaces:

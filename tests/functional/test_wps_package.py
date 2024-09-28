@@ -3983,6 +3983,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
 
             {output_json}
@@ -4199,23 +4200,28 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
-            # request status instead of results since not expecting 'document' JSON in this case
-            status_url = resp.json["location"]
-            status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
-
-        job_id = status["jobID"]
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
         out_url = get_wps_output_url(self.settings)
+
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
 
             test
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
             Content-ID: <output_json@{job_id}>
             Content-Length: 0
@@ -4356,14 +4362,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
-            Content-Disposition: attachment; filename="output_data.txt" name="output_data"
+            Content-Disposition: attachment; filename="output_data.txt"; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
             
             test
             --{boundary}
-            Content-Disposition: attachment; filename="result.json" name="output_json"
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
@@ -4425,13 +4431,16 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
 
             test
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
 
@@ -4489,15 +4498,17 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_data" filename="output_data.txt"
             Content-Type: {ContentType.TEXT_PLAIN}
+            Content-Location: {out_url}/{job_id}/output_data/output_data.txt
             Content-ID: <output_data@{job_id}>
             Content-Length: 0
-            Content-Location: {out_url}/{job_id}/output_data/result.txt
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 0
-            Content-Location: {out_url}/{job_id}/output_json/result.json
             --{boundary}--
         """).replace("\n", "\r\n")
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4554,18 +4565,22 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json = json.dumps({"data": "test"}, separators=(",", ":"))
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
             
             test
             --{boundary}
+            Content-Disposition: attachment; name="output_text"; filename="result.txt"
             Content-Type: {ContentType.TEXT_PLAIN}
+            Content-Location: {out_url}/{job_id}/output_text/result.txt
             Content-ID: <output_text@{job_id}>
             Content-Length: 0
-            Content-Location: {out_url}/{job_id}/output_text/result.txt
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
             

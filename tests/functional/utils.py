@@ -443,7 +443,8 @@ class WpsConfigBase(unittest.TestCase):
     def fully_qualified_test_process_name(self, name=""):
         extra_name = f"-{name}" if name else ""
         class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}".replace(".", "-")
+        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
         return test_name
 
     @overload
