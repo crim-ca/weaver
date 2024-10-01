@@ -2126,7 +2126,8 @@ class TransmissionModeEnum(ExtendedSchemaNode):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/transmissionMode.yaml"
     schema_type = String
     title = "TransmissionMode"
-    default = ExecuteTransmissionMode.VALUE
+    # no default to allow auto-resolution as data/link if omitted
+    # default = ExecuteTransmissionMode.VALUE
     example = ExecuteTransmissionMode.VALUE
     validator = OneOf(ExecuteTransmissionMode.values())
 

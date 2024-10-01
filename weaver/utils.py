@@ -1480,6 +1480,20 @@ def bytes2str(string):
     return string.decode("UTF-8")
 
 
+def data2str(data):
+    # type: (Union[AnyValueType, io.IOBase]) -> str
+    """
+    Converts literal data to a plain string representation.
+    """
+    if hasattr(data, "seek"):
+        data.seek(0)
+    if hasattr(data, "read"):
+        data = data.read()
+    if not isinstance(data, (str, bytes)):
+        data = str(data)
+    return bytes2str(data)
+
+
 def islambda(func):
     # type: (Any) -> bool
     return isinstance(func, type(lambda: None)) and func.__name__ == (lambda: None).__name__

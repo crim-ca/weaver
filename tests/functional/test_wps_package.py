@@ -3643,7 +3643,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.text == output_json
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -3822,7 +3822,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.json == {"data": "test"}
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
@@ -3979,7 +3979,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
@@ -4130,7 +4130,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Type: {ContentType.APP_YAML}
             Content-ID: <output_json@{job_id}>
             Content-Length: 12
-            
+
             {output_json_as_yaml}
             --{boundary}--
         """).replace("\n", "\r\n")
@@ -4149,7 +4149,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == output_json
@@ -4223,9 +4223,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             --{boundary}
             Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 0
-            Content-Location: {out_url}/{job_id}/output_json/result.json
+
             --{boundary}--
         """).replace("\n", "\r\n")
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4234,7 +4235,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4359,14 +4362,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Disposition: attachment; filename="output_data.txt"; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
-            
+
             test
             --{boundary}
             Content-Disposition: attachment; name="output_json"; filename="result.json"
@@ -4374,7 +4377,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
-            
+
             {output_json}
             --{boundary}--
         """).replace("\n", "\r\n")
@@ -4384,7 +4387,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4428,7 +4433,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
@@ -4452,7 +4457,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4503,12 +4510,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Location: {out_url}/{job_id}/output_data/output_data.txt
             Content-ID: <output_data@{job_id}>
             Content-Length: 0
+
             --{boundary}
             Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 0
+
             --{boundary}--
         """).replace("\n", "\r\n")
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4517,7 +4526,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -4562,14 +4573,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = inspect.cleandoc(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
-            
+
             test
             --{boundary}
             Content-Disposition: attachment; name="output_text"; filename="result.txt"
@@ -4577,13 +4588,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Location: {out_url}/{job_id}/output_text/result.txt
             Content-ID: <output_text@{job_id}>
             Content-Length: 0
+
             --{boundary}
             Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
-            
+
             {output_json}
             --{boundary}--
         """).replace("\n", "\r\n")
@@ -4713,7 +4725,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_json = self.remove_result_format(results.json)
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
@@ -4849,11 +4861,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_json = self.remove_result_format(results.json)
-        output_json = json.dumps({"data": "test"}, separators=(",", ":"))
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
-                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "href": f"{out_url}/{job_id}/output_data/output_data.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {

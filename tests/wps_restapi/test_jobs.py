@@ -46,6 +46,7 @@ from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
     DATETIME_INTERVAL_OPEN_START_SYMBOL
 )
+from weaver.wps_restapi.jobs.utils import get_job_results_document
 
 if TYPE_CHECKING:
     from typing import Iterable, List, Optional, Tuple, Union
@@ -1732,3 +1733,49 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         finally:
             if job:
                 self.job_store.delete_job(job.id)
+
+
+@pytest.mark.parametrize(
+    ["results", "expected"],
+    [
+        # cases not handled by the function, expect qualified value representation as input
+        # ({"test": 1}, {"test": 1}),
+        # ({"test": [1, 2, 3]}, {"test": [1, 2, 3]}),
+        (
+            {"test": {"value": 1}},
+            {"test": 1},
+        ),
+        (
+            {"test": {"value": [1, 2, 3]}},
+            {"test": [1, 2, 3]},
+        ),
+        (
+            {"test": [1, {"value": 2}, {"value": 3, "mediaType": ContentType.TEXT_PLAIN}]},
+            {"test": [1, 2, 3]},
+        ),
+        (
+            {"test": [1, {"value": 2, "mediaType": "text/special"}, {"value": 3}]},
+            {"test": [
+                {"value": "1", "mediaType": ContentType.TEXT_PLAIN},
+                {"value": "2", "mediaType": "text/special"},
+                {"value": "3", "mediaType": ContentType.TEXT_PLAIN}
+            ]},
+        ),
+        (
+            {"test": [
+                {"value": 1, "mediaType": ContentType.APP_JSON},
+                {"value": 2, "mediaType": "text/special"},
+                {"value": 3, "mediaType": ContentType.APP_YAML}
+            ]},
+            {"test": [
+                {"value": "1", "mediaType": ContentType.APP_JSON},
+                {"value": "2", "mediaType": "text/special"},
+                {"value": "3", "mediaType": ContentType.APP_YAML}
+            ]},
+        ),
+    ]
+)
+def test_get_job_results_document(results, expected):
+    job = Job(task_id="test", outputs={})
+    output = get_job_results_document(job, results, container={})
+    assert output == expected

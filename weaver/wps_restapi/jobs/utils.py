@@ -42,6 +42,7 @@ from weaver.processes.convert import any2wps_literal_datatype, convert_output_pa
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    data2str,
     get_any_id,
     get_any_value,
     get_header,
@@ -598,13 +599,10 @@ def get_job_results_response(
                 })
             )
 
-        # simplify data literals if qualified value representation is not needed
         # use deserialized contents such that only the applicable fields remain
-        results_json = get_job_results_simplified(results_json)
-
-        # note:
-        #   Cannot add "links" field in response body because variable Output ID keys are directly at the root
-        #   Possible conflict with an output that would be named "links".
+        # (simplify compares, this is assumed by the following call)
+        results_json = get_job_results_document(job, results_json, container=container)
+        headers.extend(refs)
         return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
@@ -622,6 +620,7 @@ def get_job_results_response(
         out_type = get_any_value(out_info, key=True)
         out_data = get_any_value(out_info)
 
+        # multipart response
         if (
             len(results) > 1 or
             (isinstance(out_data, list) and len(out_data) > 1) or
@@ -647,28 +646,6 @@ def get_job_results_response(
         # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
         resp.headerlist.extend(refs)
     return resp
-
-
-def get_job_results_simplified(results):
-    # type: (ExecutionResults) -> ExecutionResults
-    """
-    Removes nested literal value definitions if qualified value representation is not needed.
-
-    Qualified value representation is not needed if no other field than ``value`` is provided with the literal data.
-    The simplification is applied for both literals on their own and nested array of literals.
-    """
-    out_results = {}
-    for res_id, res_val in results.items():
-        if isinstance(res_val, dict) and list(res_val) == ["value"]:
-            out_results[res_id] = res_val["value"]
-        elif isinstance(res_val, list):
-            out_results[res_id] = [
-                item["value"] if isinstance(item, dict) and list(item) == ["value"] else item
-                for item in res_val
-            ]
-        else:
-            out_results[res_id] = res_val
-    return out_results
 
 
 def generate_or_resolve_result(
@@ -719,8 +696,8 @@ def generate_or_resolve_result(
 
     if key == "value":
         res_data = io.StringIO()
-        c_length = res_data.write(val)
-        typ = ContentType.TEXT_PLAIN
+        c_length = res_data.write(data2str(val))
+        typ = result.get("mediaType") or ContentType.TEXT_PLAIN
 
     if key == "value" and output_mode == ExecuteTransmissionMode.REFERENCE:
         if not os.path.isfile(loc):
@@ -752,16 +729,98 @@ def generate_or_resolve_result(
     return res_headers, res_data
 
 
-def get_job_results_multipart(job, results, headers, container):
-    # type: (Job, ExecutionResults, AnyHeadersContainer, AnySettingsContainer) -> HTTPOk
+def get_job_results_document(job, results, *, container):
+    # type: (Job, ExecutionResults, Any, AnySettingsContainer) -> ExecutionResults
     """
-    Generates the :term:`Job` results multipart response from available or requested outputs.
+    Generates the :term:`Job` results document response from available or requested outputs with necessary conversions.
+
+    Removes nested literal value definitions if qualified value representation is not needed.
+    Qualified value representation is not needed if no other field than ``value`` is provided with the literal data,
+    or when the specified :term:`Media-Type` is simply the plain text default for data literals.
+    The simplification is applied for both literals on their own and nested array of literals.
+    However, when processing an array, the qualified value representation is preserved if any of the items requires
+    the explicit mention of another :term:`Media-Type` than plain text, to return a consistent structure.
+
+    Uses the :paramref:`job` definition and submitted ``headers``
+
+    .. warning::
+        This function assumes that schema deserialization was applied beforehand.
+        Therefore, it will not attempt matching every possible combination of the results representation.
+    """
+    settings = get_settings(container)
+
+    def make_result(result, result_id, output_id):
+        # type: (ExecutionResultValue, str, str) -> Union[AnyValueType, ExecutionResultObject]
+        if isinstance(result, dict):
+            key = get_any_value(result, key=True)
+            val = get_any_value(result)
+        else:
+            key = "value"
+            val = result
+            result = {"value": val}
+        mode = get_job_output_transmission(job, result_id, is_reference=(key == "href"))
+        headers, data = generate_or_resolve_result(job, result, result_id, output_id, mode, settings)
+        if data is None:
+            ref = {
+                "href": headers["Content-Location"],
+                "type": headers["Content-Type"],
+            }
+            return ref
+
+        c_type = headers.get("Content-Type") or ""
+        c_enc = headers.get("Content-Encoding")
+        if not c_type or (
+            # note:
+            #   Explicit content-type check to consider that any additional parameter provided
+            #   with text/plain must be reported. Only "purely" plain/text can be removed.
+            c_type == ContentType.TEXT_PLAIN and not c_enc
+        ):
+            value = val  # use original to avoid string conversion
+        else:
+            value = {
+                "value": data2str(data),
+                "mediaType": c_type,
+            }
+            if c_enc:
+                value["encoding"] = c_enc
+        return value
+
+    out_results = {}
+    for res_id, res_val in results.items():
+        if isinstance(res_val, list):
+            res_data = []
+            for out_idx, item in enumerate(res_val):
+                out_id = f"{res_id}.{out_idx}"
+                out_res = make_result(item, res_id, out_id)
+                res_data.append(out_res)
+
+            # backtrack is not all literals (all qualified or none qualified, but no mix)
+            is_qualified = [isinstance(item, dict) for item in res_data]
+            if not all(is_qualified) and len([item for item in is_qualified if item]):
+                res_data = [
+                    item
+                    if isinstance(item, dict)
+                    else {"value": data2str(item), "mediaType": ContentType.TEXT_PLAIN}
+                    for item in res_data
+                ]
+
+        else:
+            res_data = make_result(res_val, res_id, res_id)
+
+        out_results[res_id] = res_data
+    return out_results
+
+
+def get_job_results_multipart(job, results, *, headers, container):
+    # type: (Job, ExecutionResults, Any, AnyHeadersContainer, AnySettingsContainer) -> HTTPOk
+    """
+    Generates the :term:`Job` results multipart response from available or requested outputs with necessary conversions.
 
     .. seealso::
         - Function :func:`get_results` should be used to avoid re-processing all output format combinations.
         - Details of ``multipart`` (:rfc:`2046#section-5.1`) :term:`Media-Type` family.
 
-    :param job:
+    :param job: Job definition with potential metadata about requested outputs.
     :param results: Pre-filtered and pre-processed results in a normalized format structure.
     :param headers: Additional headers to include in the response.
     :param container: Application settings to resolve locations.
@@ -772,7 +831,7 @@ def get_job_results_multipart(job, results, headers, container):
         # type: (List[Tuple[str, str, ExecutionResultObject]]) -> MultiPartFieldsType
         for res_id, out_id, result in result_parts:
             if isinstance(result, list):
-                sub_parts = [(f"{out_id}.{i}", out_id, data) for i, data in enumerate(result)]
+                sub_parts = [(out_id, f"{out_id}.{out_idx}", data) for out_idx, data in enumerate(result)]
                 sub_parts = add_result_parts(sub_parts)
                 sub_multi = MultipartEncoder(sub_parts, content_type=ContentType.MULTIPART_MIXED)
                 sub_out_url = job.result_path(output_id=out_id)

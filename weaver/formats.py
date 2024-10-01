@@ -1159,8 +1159,8 @@ def json_default_handler(obj):
     raise TypeError(f"Type {type(obj)} not serializable.")
 
 
-def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
-    # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
+def repr_json(data, force_string=True, ensure_ascii=False, indent=2, separators=None, **kwargs):
+    # type: (Any, bool, bool, Optional[int], Optional[Tuple[str, str]], **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 
@@ -1173,8 +1173,18 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
         default = json_default_handler
     try:
         if isinstance(data, str):
-            return data  # avoid adding additional quotes
-        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
-        return data_str if force_string else data
+            try:
+                data = json.loads(data)
+            except ValueError:
+                return data.strip()  # avoid adding additional quotes
+        data_str = json.dumps(
+            data,
+            indent=indent,
+            ensure_ascii=ensure_ascii,
+            separators=separators,
+            default=default,
+            **kwargs,
+        )
+        return data_str.strip() if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

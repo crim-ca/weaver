@@ -628,23 +628,26 @@ def test_repr_json_default_string():
 
 
 @pytest.mark.parametrize(
-    ["test", "expect", "force_string"],
+    ["test", "expect", "force_string", "extra_params"],
     [
-        ("abc", "abc", True),
-        (123, 123, False),
-        (123, "123", True),
-        ([1, 2], [1, 2], False),
-        ([1, 2], "[1, 2]", True),
-        ("[1, 2]", "[1, 2]", True),
-        ({"a": 1}, {"a": 1}, False),
-        ({"a": 1}, "{\"a\": 1}", True),
-        ("{\"a\": 1}", "{\"a\": 1}", True),
-        (null, str(null), False),
-        (null, str(null), True),
+        ("abc", "abc", True, {}),
+        (123, 123, False, {}),
+        (123, "123", True, {}),
+        ([1, 2], [1, 2], False, {}),
+        ([1, 2], "[1, 2]", True, {}),
+        ("[1, 2]", "[1, 2]", True, {}),
+        ({"a": 1}, {"a": 1}, False, {}),
+        ({"a": 1}, "{\"a\": 1}", True, {}),
+        ({"a": [1, 2]}, "{\"a\":[1,2]}", True, {"separators": (",", ":")}),
+        ("{\"a\": 1}", "{\"a\": 1}", True, {}),
+        ("\t\r\n{\"a\": 1}\r\n", "{\"a\": 1}", True, {}),
+        ("\t\r\n{\"a\": [1, 2]}\r\n", "{\"a\":[1,2]}", True, {"separators": (",", ":")}),
+        (null, str(null), False, {}),
+        (null, str(null), True, {}),
     ]
 )
-def test_repr_json_force_string_handling(test, expect, force_string):
-    result = f.repr_json(test, force_string=force_string, indent=None)
+def test_repr_json_force_string_handling(test, expect, force_string, extra_params):
+    result = f.repr_json(test, force_string=force_string, indent=None, **extra_params)
     assert result == expect
 
 
