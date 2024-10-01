@@ -2,12 +2,12 @@
 Weaver
 =============================================
 
-\| `Summary <#summary>`_
-\| `Features <#features>`_
-\| `Links <#links>`_
-\| `Configuration <#configuration>`_
-\| `Documentation <#documentation>`_
-\| `Extra Details & Sponsors <#extra-details--sponsors>`_
+\| `Summary`_
+\| `Features`_
+\| `Links`_
+\| `Configuration`_
+\| `Documentation`_
+\| `Extra Details & Sponsors`_
 \|
 
 **Implementations**
@@ -357,8 +357,8 @@ Developments are continued in |ogc-tb16|_ to improve methodologies in order to p
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 Findings and recommendations are presented in the |ogc-tb16-data-access-proc-er|_.
 
-`Videos <features>`_ and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
-Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
+Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
+Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_. See `Features`_ for demonstrations.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
 technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2|_ backed by
