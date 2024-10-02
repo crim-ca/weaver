@@ -874,8 +874,10 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           | - using embedded content parts with data        |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
-    | [#resPreferReturn]_ |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
-    |                     |              |               |           | - using embedded content parts with data        |
+    | [#resPreferReturn]_ |              | (for *all*)   |           |   content with embedded part links if requested |
+    |                     |              |               |           |   by ``Accept`` header [#resCTypeMulti]_        |
+    |                     |              |               |           | - otherwise, similar to |res-ref|, but with     |
+    |                     |              |               |           |   a ``Link`` header for each requested output   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content                                       |
@@ -987,10 +989,14 @@ Following is a detailed listing of the expected response structure according to 
     representation using other encoding (e.g.: :term:`XML` or :term:`YAML`) could be returned if requested by
     the ``Accept`` header.
 
-    For every other case where a return ``representation`` or ``raw`` results are explicitly requested,
+    For cases where a return ``representation`` or ``raw`` response results are explicitly requested,
+    and that no ``Accept`` header explicitly requests an alternative representation,
     the :ref:`Multipart Results <job-results-raw-multi>` structure
-    using ``multipart`` contents (:rfc:`2046#section-5.1`) is employed by default.
-    The representation of each part (as literal data or link reference [#resValRef]_)
+    using ``multipart`` contents (:rfc:`2046#section-5.1`) is employed by default, unless *all* requested
+    outputs resolve to a :ref:`File Reference <file_ref_types>`. In such case, the references will be contained
+    in ``Link`` headers, similar to the |res-ref|_ response, but with multiple links for all requested outputs.
+
+    When resolved as ``multipart``, the representation of each part (as literal data or link reference [#resValRef]_)
     is established by the ``transmissionMode`` parameter combinations, or as applicable according to the ``Accept``
     and the ``Prefer: return`` headers. Alternatively to requesting ``representation`` or ``raw`` results,
     the :ref:`Multipart Results <job-results-raw-multi>` structure *could* also be requested explicitly
@@ -2154,10 +2160,16 @@ a combination of ``Content-ID``, ``Content-Type`` and ``Content-Location`` will 
     To respect :rfc:`2392` definitions, ``Content-ID`` will use pattern ``<{outputID}@{jobID}>`` as unique identifier,
     and ``<{outputID}.{index}@{jobID}>`` in the case of an array of :ref:`File References <file_ref_types>`.
 
-When the number of *requested* ``outputs`` [#outN]_ is more than one, the response will
-either be ``multipart`` contents (:rfc:`2046#section-5.1`) or similar to
-the :ref:`Document Result <job-results-document-minimal>` contents,
-accordingly to the negotiated ``Accept`` content header. An example of a ``multipart`` representation is shown below.
+When the number of *requested* ``outputs`` [#outN]_ is more than one, the obtained response will depend
+on the negotiated ``Accept`` content header and the data/link resolution of each output.
+
+1. If all outputs are :ref:`File References <file_ref_types>` and no ``Accept`` header was specified, a no-content
+   response with a ``Link`` for each output similarly to the above :ref:`job-results-raw-single-ref` is returned.
+2. If a ``response=document`` or ``Prefer: return=minimal`` resolution is requested, outputs are
+   embedded in the :ref:`Document Result <job-results-document-minimal>` contents.
+3. If either ``multipart`` contents (:rfc:`2046#section-5.1`) are explicitly requested by ``Accept`` header, or that
+   the above cases were not encountered, a multipart content response as shown below is returned [#resCTypeMulti]_.
+
 The resolution of the nested outputs within each boundary, either by value or reference, will resolve
 for each respective output according to the same rule conditions specified above for single output.
 

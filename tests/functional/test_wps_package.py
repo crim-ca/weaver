@@ -3739,7 +3739,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.headers["Content-Location"] == results_href
         assert ("Link", output_json_link) in results.headerlist
         assert not any(
-            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            any(out_id in link[-1] for out_id in ["output_data", "output_text"])
             for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -3875,15 +3875,15 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
-        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
-        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        output_data_href = f"{out_url}/{job_id}/output_data/output_data.txt"
+        output_data_link = f"<{output_data_href}>; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
         assert results.status_code == 204, "No contents expected for minimal reference result."
         assert results.body == b""
         assert results.content_type is None
         assert results.headers["Content-Location"] == results_href
-        assert ("Link", output_json_link) in results.headerlist
+        assert ("Link", output_data_link) in results.headerlist
         assert not any(
-            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            any(out_id in link[-1] for out_id in ["output_json", "output_text"])
             for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -3936,7 +3936,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.headers["Content-Location"] == results_href
         assert ("Link", output_json_link) in results.headerlist
         assert not any(
-            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            any(out_id in link[-1] for out_id in ["output_data", "output_text"])
             for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4490,7 +4490,15 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    def test_execute_multi_output_response_raw_reference(self):
+    def test_execute_multi_output_response_raw_reference_default_links(self):
+        """
+        All outputs resolved as reference (explicitly or inferred) with raw representation should be all Link headers.
+
+        The multipart representation of the corresponding request must ask for it explicitly.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_response_raw_reference_accept_multipart`
+        """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
@@ -4526,10 +4534,88 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_data_href = f"{out_url}/{job_id}/output_data/output_data.txt"
+        output_data_link = f"<{output_data_href}>; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        assert results.status_code == 204, "No contents expected for minimal reference result."
+        assert results.body == b""
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_data_link) in results.headerlist
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_raw_reference_accept_multipart(self):
+        """
+        Requesting ``multipart`` explicitly should return it instead of default ``Link`` headers response.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_response_raw_reference_default_links`
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": "wait=5",
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},  # should use 'reference' by default
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
-            Content-Disposition: attachment; name="output_data" filename="output_data.txt"
+            Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-Location: {out_url}/{job_id}/output_data/output_data.txt
             Content-ID: <output_data@{job_id}>
