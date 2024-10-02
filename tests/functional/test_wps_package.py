@@ -4079,10 +4079,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
             Content-Length: 0
-            Content-Location: {out_url}/{job_id}/output_json/result.json
+
             --{boundary}--
         """).replace("\n", "\r\n")
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4615,7 +4617,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = inspect.cleandoc(f"""
             --{boundary}
-            Content-Disposition: attachment; name="output_data"
+            Content-Disposition: attachment; name="output_data"; filename="output_data.txt"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-Location: {out_url}/{job_id}/output_data/output_data.txt
             Content-ID: <output_data@{job_id}>
