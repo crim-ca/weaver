@@ -4180,6 +4180,229 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == output_json
 
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_execute_single_output_response_document_alt_format(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # embed in the part contents
+                    "format": {"mediaType": ContentType.APP_YAML},      # request alternate output format
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        output_json_as_yaml = yaml.safe_dump({"data": "test"})
+        results_body = inspect.cleandoc(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_YAML}
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 12
+
+            {output_json_as_yaml}
+            --{boundary}--
+        """).replace("\n", "\r\n")
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.yml",
+                "type": ContentType.APP_YAML,
+            },
+        }
+
+        # validate the results can be obtained with the "real" representation
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.text == output_json
+
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_execute_single_output_response_document_alt_format_json(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.APP_JSON, # response 'document' should be enough to use JSON, but make extra sure
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    # note:
+                    #   Default output format is JSON, but request it as plain text.
+                    #   Ensure the JSON response contents does not revert it back to nested JSON.
+                    #   Expect a literal string containing the embedded JSON.
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # force convert of the file reference
+                    "format": {"mediaType": ContentType.TEXT_PLAIN},    # force output format explicitly
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "mediaType": ContentType.APP_RAW_JSON,  # ensure special type used to distinguish a literal JSON
+                "value": output_json,
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+        # validate the results can be obtained with the "real" representation
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.json == {"data": "test"}
+
+    def test_execute_single_output_response_document_default_format_json_special(self):
+        """
+        Validate that a :term:`JSON` output is directly embedded in a ``document`` response also using :term:`JSON`.
+
+        For most types, the data converted from a file reference would be directly embedded as a string
+        nested under a ``value`` property and provide the associated ``mediaType``. However, given the
+        same :term:`JSON` representation is used for the entire response contents and the nested contents,
+        this special case typically expected that the nested :term:`JSON` is not embedded in a string to
+        facilitate directly parsing the entire response contents as :term:`JSON`.
+
+        .. seealso::
+            - :func:`test_execute_single_output_response_document_alt_format_json`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.APP_JSON, # response 'document' should be enough to use JSON, but make extra sure
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    # note:
+                    #   Technically, 'format' does not necessarily need to be specified for this case since
+                    #   JSON is the default output format for this result, but specify it for clarity
+                    #   (see other test cases that ensure non-JSON by default can be converted).
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # force convert of the file reference
+                    "format": {"mediaType": ContentType.APP_JSON},      # request output format explicitly
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "mediaType": ContentType.APP_JSON,
+                "value": {"data": "test"},
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.yml",
+                "type": ContentType.APP_YAML,
+            },
+        }
+
     @parameterized.expand([
         ContentType.MULTIPART_ANY,
         ContentType.MULTIPART_MIXED,
