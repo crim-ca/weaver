@@ -607,6 +607,14 @@ def get_job_results_response(
         headers.extend(refs)
         return HTTPOk(json=results_json, headers=headers)
 
+    if is_raw and not is_accept_multipart:
+        # FIXME: convert on-demand as per requested transmissionMode
+        #   If "raw and not multipart" (ie: link_references=True), 'results' and 'refs' at this point would
+        #   contain a mixture of the desired output transmissionMode and the available ones as per their
+        #   original 'literal/complex' results, but they are not ALL converted to needed transmissionMode.
+        #   Must convert before below empty-results check to return multi-link no-content response.
+        pass
+
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
         # see:
