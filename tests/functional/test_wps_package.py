@@ -3730,10 +3730,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
         assert results.status_code == 204, "No contents expected for minimal reference result."
         assert results.body == b""
-        assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/result.json"
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json == {
@@ -3866,10 +3874,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        assert results.status_code == 204, "No contents expected for single reference result."
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        assert results.status_code == 204, "No contents expected for minimal reference result."
         assert results.body == b""
-        assert results.content_type.startswith(ContentType.TEXT_PLAIN)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_data/result.txt"
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -3911,10 +3927,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
         assert results.status_code == 204, "No contents expected for single reference result."
         assert results.body == b""
-        assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.headers["Content-Location"] == f"{out_url}/{job_id}/output_json/result.json"
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_datta", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {

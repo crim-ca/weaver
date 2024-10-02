@@ -368,7 +368,6 @@ def get_results(  # pylint: disable=R1260
     ogc_api = schema == JobInputsOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
-    out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
     references = {}
     for result in job.results:
         # Filter outputs not requested, unless 'all' requested by omitting
@@ -403,7 +402,7 @@ def get_results(  # pylint: disable=R1260
                 rtype = "href" if get_any_value(val_item, key=True, file=True, data=False) else "data"
                 val_data = get_any_value(val_item, file=True, data=False)
             out_key = rtype
-            out_mode = out_ref.get(out_id, {}).get("transmissionMode")
+            out_mode = get_job_output_transmission(job, out_id, is_reference=(out_key == "href"))
             as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
             if rtype == "href" and isinstance(val_data, str):
                 # fix paths relative to instance endpoint,
@@ -499,6 +498,7 @@ def get_job_output_transmission(job, output_id, is_reference):
     Obtain the requested :term:`Job` output ``transmissionMode``.
     """
     outputs = job.outputs or {}
+    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
     out = outputs.get(output_id) or {}
     mode = out.get("transmissionMode")
     # because mode can be omitted, resolve their default explicitly
@@ -562,9 +562,15 @@ def get_job_results_response(
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7 (/req/core/job-results-async-document)
     #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
     is_raw = get_job_return(job, results_contents, results_headers) == ExecuteResponse.RAW
+    # when multipart is needed (either requested explicitly or inferred), do not use references at this point
+    # this is to make multipart content generation simply by grouping everything under a single 'results' container
+    is_accept_multipart = (
+        isinstance(job.accept_type, str) and
+        any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART)
+    )
     results, refs = get_results(job, container, value_key="value",
                                 schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
-                                link_references=is_raw)
+                                link_references=is_raw and not is_accept_multipart)
 
     headers = ResponseHeaders(headers or {})
     headers.pop("Location", None)
@@ -573,10 +579,6 @@ def get_job_results_response(
         link_header = make_link_header(link)
         headers.add("Link", link_header)
 
-    is_accept_multipart = (
-        isinstance(job.accept_type, str) and
-        any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART)
-    )
     if not is_raw and not is_accept_multipart:
         try:
             results_schema = sd.ResultsDocument()
