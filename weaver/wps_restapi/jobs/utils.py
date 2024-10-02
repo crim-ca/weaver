@@ -418,13 +418,14 @@ def get_results(  # pylint: disable=R1260
             as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
             res_id = f"{out_id}{val_idx}" if res_multi else out_id
 
-            # on-demand convertion to requested transmission mode
+            # on-demand convertion to requested transmission mode, leave original data/link if not converted
             if convert_output_transmission:
-                res_hdr, val_data = generate_or_resolve_result(job, val_item, res_id, out_id, out_mode, settings)
-                if val_data is not None and is_ref:     # data generated from reference
+                res_hdr, res_data = generate_or_resolve_result(job, val_item, res_id, out_id, out_mode, settings)
+                if res_data is not None and is_ref:     # data generated from reference
                     is_ref = as_ref = False
                     out_key = value_key or "data"       # OGC schema overrides after as needed
-                elif val_data is None and not is_ref:   # reference generated from data
+                    val_data = res_data
+                elif res_data is None and not is_ref:   # reference generated from data
                     is_ref = as_ref = True
                     out_key = "href"
                     val_data = res_hdr["Content-Location"]
@@ -705,7 +706,6 @@ def generate_or_resolve_result(
     cid = f"{result_id}@{job.id}"
     url = None
     loc = None
-    typ = None
     res_data = None
     c_length = None
     is_val = key in ["value", "data"]
@@ -720,8 +720,13 @@ def generate_or_resolve_result(
     if is_ref:
         url = val
         typ = result.get("type") or ContentType.APP_OCTET_STREAM
-        loc = map_wps_output_location(val, settings, exists=True, url=False)
-        # FIXME: fails if output path is the "relative" results '/{jobID}/...'
+        job_out_url = job.result_path(output_id=output_id)
+        if url.startswith(f"/{job_out_url}/"):  # job "relative" path
+            out_url = get_wps_output_url(settings)
+            url = os.path.join(out_url, url[1:])
+        loc = map_wps_output_location(url, settings, exists=True, url=False)
+    else:
+        typ = result.get("mediaType") or ContentType.TEXT_PLAIN
 
     if not url:
         out_dir = get_wps_output_dir(settings)
@@ -730,16 +735,15 @@ def generate_or_resolve_result(
         loc = os.path.join(out_dir, job_path)
         url = map_wps_output_location(loc, settings, exists=False, url=True)
 
-    if is_val:
+    if is_val and output_mode == ExecuteTransmissionMode.VALUE:
         res_data = io.StringIO()
         c_length = res_data.write(data2str(val))
-        typ = result.get("mediaType") or ContentType.TEXT_PLAIN
 
     if is_val and output_mode == ExecuteTransmissionMode.REFERENCE:
         if not os.path.isfile(loc):
             os.makedirs(os.path.dirname(loc), exist_ok=True)
             with open(loc, mode="w", encoding="utf-8") as out_file:
-                out_file.write(val)
+                out_file.write(data2str(val))
 
     if is_ref and output_mode == ExecuteTransmissionMode.VALUE:
         res_data = io.FileIO(loc, mode="rb")
