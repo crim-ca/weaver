@@ -127,6 +127,8 @@ if TYPE_CHECKING:
 
     from weaver.processes.constants import (
         JobInputsOutputsSchemaType,
+        JobInputsOutputsSchemaAnyOGCType,
+        JobInputsOutputsSchemaAnyOLDType,
         ProcessSchemaType,
         WPS_DataType,
         WPS_LiteralData_Type
@@ -1910,13 +1912,13 @@ def convert_input_values_schema(inputs, schema):
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchema.OGC) -> Optional[ExecutionOutputsMap]
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOGCType) -> Optional[ExecutionOutputsMap]
     ...
 
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchema.OLD) -> Optional[ExecutionOutputsList]
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOLDType) -> Optional[ExecutionOutputsList]
     ...
 
 

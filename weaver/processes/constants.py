@@ -353,24 +353,36 @@ OAS_DATA_TYPES = frozenset(
     OAS_LITERAL_TYPES
 )
 
+ProcessSchemaOGCType = Literal["OGC", "ogc"]
+ProcessSchemaOLDType = Literal["OLD", "old"]
+ProcessSchemaWPSType = Literal["WPS", "wps"]
+ProcessSchemaType = Union[ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaWPSType]
+JobInputsOutputsSchemaType_OGC = Literal["OGC", "ogc"]
+JobInputsOutputsSchemaType_OLD = Literal["OLD", "old"]
+JobInputsOutputsSchemaType_OGC_STRICT = Literal["OGC+STRICT", "ogc+strict"]
+JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
+JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
+JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
+JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
+
 
 class ProcessSchema(Constants):
     """
     Schema selector to represent a :term:`Process` description.
     """
-    OGC = "OGC"
-    OLD = "OLD"
-    WPS = "WPS"
+    OGC = "OGC"  # type: ProcessSchemaOGCType
+    OLD = "OLD"  # type: ProcessSchemaOLDType
+    WPS = "WPS"  # type: ProcessSchemaWPSType
 
 
 class JobInputsOutputsSchema(Constants):
     """
     Schema selector to represent a :term:`Job` output results.
     """
-    OGC_STRICT = "ogc+strict"
-    OLD_STRICT = "old+strict"
-    OGC = "ogc"
-    OLD = "old"
+    OGC_STRICT = "ogc+strict"   # type: JobInputsOutputsSchemaType_OGC_STRICT
+    OLD_STRICT = "old+strict"   # type: JobInputsOutputsSchemaType_OLD_STRICT
+    OGC = "ogc"                 # type: JobInputsOutputsSchemaType_OGC
+    OLD = "old"                 # type: JobInputsOutputsSchemaType_OLD
 
 
 if TYPE_CHECKING:
@@ -402,15 +414,4 @@ if TYPE_CHECKING:
         CWL_RequirementSubworkflowFeatureType,
         CWL_RequirementToolTimeLimitType,
         CWL_RequirementWorkReuseType,
-    ]
-    ProcessSchemaType = Literal["OGC", "ogc", "OLD", "old", "WPS", "wps"]
-    JobInputsOutputsSchemaType = Literal[
-        "ogc+strict",
-        "OGC+STRICT",
-        "old+strict",
-        "OLD+STRICT",
-        "ogc",
-        "OGC",
-        "old",
-        "OLD",
     ]

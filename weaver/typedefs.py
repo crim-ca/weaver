@@ -546,6 +546,7 @@ if TYPE_CHECKING:
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
         "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
@@ -563,7 +564,7 @@ if TYPE_CHECKING:
     }, total=False)
     ExecutionResultObjectValue = TypedDict("ExecutionResultObjectValue", {
         "value": Optional[AnyValueType],
-        "type": NotRequired[str],
+        "mediaType": NotRequired[str],
     }, total=False)
     ExecutionResultObject = Union[ExecutionResultObjectRef, ExecutionResultObjectValue]
     ExecutionResultArray = List[ExecutionResultObject]

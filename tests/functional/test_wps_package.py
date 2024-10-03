@@ -3673,9 +3673,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
-        assert results.text == output_json
+        assert results.text == "{\"data\":\"test\"}"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -3685,16 +3684,20 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    def test_execute_single_output_prefer_header_return_minimal_literal(self):
+    def test_execute_single_output_prefer_header_return_minimal_literal_accept_default(self):
+        """
+        For single requested  output, without ``Accept`` content negotiation, its default format is returned directly.
+        """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Accept": ContentType.ANY,
+            "Content-Type": ContentType.APP_JSON,
         }
-        exec_headers.update(self.json_headers)
         exec_content = {
             "inputs": {
                 "message": "test"
@@ -3709,14 +3712,17 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
-            # request status instead of results since not expecting 'document' JSON in this case
-            status_url = resp.json["location"]
-            status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
 
-        job_id = status["jobID"]
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.TEXT_PLAIN)
         assert results.text == "test"
@@ -3728,16 +3734,72 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    def test_execute_single_output_prefer_header_return_minimal_complex(self):
+    def test_execute_single_output_prefer_header_return_minimal_literal_accept_json(self):
+        """
+        For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
+        """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
         }
-        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_data": "test"
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_complex_accept_default(self):
+        """
+        For single requested  output, without ``Accept`` content negotiation, its default format is returned by link.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Accept": ContentType.ANY,
+            "Content-Type": ContentType.APP_JSON,
+        }
         exec_content = {
             "inputs": {
                 "message": "test"
@@ -3752,14 +3814,17 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
 
-            # request status instead of results since not expecting 'document' JSON in this case
-            status_url = resp.json["location"]
-            status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
 
-        job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
@@ -3774,6 +3839,73 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             any(out_id in link[-1] for out_id in ["output_data", "output_text"])
             for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_complex_accept_json(self):
+        """
+        For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
+
+        .. note::
+            In this test, the selected output just so happens to be :term:`JSON` as well.
+            Since it is the ``Accept`` header that is requesting :term:`JSON`, and not a
+            combination of ``transmissionMode: value`` with :term:`JSON` ``format``, the
+            contents of ``output_json`` file are **NOT** directly returned in the response.
+
+        .. seealso::
+            - :func:`test_execute_single_output_response_raw_value_complex`
+              for case of embedded ``output_json`` file contents in the response.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {}  # no 'transmissionMode' to auto-resolve 'reference' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            }
+        }
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
@@ -3828,6 +3960,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         }
 
     def test_execute_single_output_response_raw_value_complex(self):
+        """
+        Since value transmission is requested for a single output, its :term:`JSON` contents are returned directly.
+
+        .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_json`
+        """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
@@ -4285,6 +4423,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+        # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
         output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
@@ -4292,16 +4431,14 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == output_json
 
-    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
-    @pytest.mark.xfail(reason="not implemented")
-    def test_execute_single_output_response_document_alt_format_json(self):
+    def test_execute_single_output_response_document_alt_format_json_raw_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Accept": ContentType.APP_JSON, # response 'document' should be enough to use JSON, but make extra sure
+            "Accept": ContentType.APP_JSON,  # response 'document' should be enough to use JSON, but make extra sure
             "Content-Type": ContentType.APP_JSON,
         }
         exec_content = {
@@ -4341,12 +4478,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         # validate the results based on original execution request
         results = resp
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.json == {
             "output_json": {
                 "mediaType": ContentType.APP_RAW_JSON,  # ensure special type used to distinguish a literal JSON
-                "value": output_json,
+                "value": "{\"data\":\"test\"}",
             }
         }
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4383,7 +4519,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         self.deploy_process(body, process_id=p_id)
 
         exec_headers = {
-            "Accept": ContentType.APP_JSON, # response 'document' should be enough to use JSON, but make extra sure
+            "Accept": ContentType.APP_JSON,  # response 'document' should be enough to use JSON, but make extra sure
             "Content-Type": ContentType.APP_JSON,
         }
         exec_content = {
@@ -4434,8 +4570,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.yml",
-                "type": ContentType.APP_YAML,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
@@ -4944,7 +5080,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
@@ -4967,7 +5102,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
 
-            {output_json}
+            {{"data":"test"}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
@@ -5096,7 +5231,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_json = self.remove_result_format(results.json)
-        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
@@ -5104,7 +5238,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
-                "value": output_json,
+                "value": {"data": "test"},
                 "mediaType": ContentType.APP_JSON,
             },
             "output_text": {
@@ -5232,7 +5366,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_json = self.remove_result_format(results.json)
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
@@ -5240,7 +5373,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
-                "value": output_json,
+                "value": {"data": "test"},
                 "mediaType": ContentType.APP_JSON,
             },
             "output_text": {

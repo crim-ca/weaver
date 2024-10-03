@@ -82,6 +82,7 @@ if TYPE_CHECKING:
         HeadersTupleType,
         HeadersType,
         JSON,
+        JobValueFormat,
         PyramidRequest,
         SettingsType
     )
@@ -415,13 +416,15 @@ def get_results(  # pylint: disable=R1260
 
             out_key = rtype
             is_ref = rtype == "href"
-            out_mode = get_job_output_transmission(job, out_id, is_reference=is_ref)
+            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=is_ref)
             as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
             res_id = f"{out_id}{val_idx}" if res_multi else out_id
 
             # on-demand convertion to requested transmission mode, leave original data/link if not converted
             if convert_output_transmission:
-                res_hdr, res_data = generate_or_resolve_result(job, val_item, res_id, out_id, out_mode, settings)
+                res_hdr, res_data = generate_or_resolve_result(
+                    job, val_item, res_id, out_id, out_mode, out_fmt, settings
+                )
                 if res_data is not None and is_ref:     # data generated from reference
                     is_ref = as_ref = False
                     out_key = value_key or "data"       # OGC schema overrides after as needed
@@ -519,20 +522,21 @@ def get_job_return(job=None, body=None, headers=None):
 
 
 def get_job_output_transmission(job, output_id, is_reference):
-    # type: (Job, str, bool) -> AnyExecuteTransmissionMode
+    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
     """
-    Obtain the requested :term:`Job` output ``transmissionMode``.
+    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
     """
     outputs = job.outputs or {}
     outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
     out = outputs.get(output_id) or {}
-    mode = out.get("transmissionMode")
+    mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
+    fmt = cast("JobValueFormat", out.get("format"))
     # because mode can be omitted, resolve their default explicitly
     if not mode and is_reference:
-        return ExecuteTransmissionMode.REFERENCE
+        return ExecuteTransmissionMode.REFERENCE, fmt
     if not mode and not is_reference:
-        return ExecuteTransmissionMode.VALUE
-    return cast("AnyExecuteTransmissionMode", mode)
+        return ExecuteTransmissionMode.VALUE, fmt
+    return mode, fmt
 
 
 def get_job_results_response(
@@ -709,6 +713,7 @@ def generate_or_resolve_result(
     result_id,      # type: str
     output_id,      # type: str
     output_mode,    # type: AnyExecuteTransmissionMode
+    output_format,  # type: Optional        # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
     settings,       # type: SettingsType
 ):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
@@ -792,6 +797,49 @@ def generate_or_resolve_result(
     return res_headers, res_data
 
 
+def resolve_result_json_literal(
+    result,                 # type: ExecutionResultValue
+    output_format,          # type: Optional[str]
+    content_type=None,      # type: Optional[str]
+    content_encoding=None,  # type: Optional[str]
+):                          # type: (...) -> ExecutionResultValue
+    """
+    Generates a :term:`JSON` literal string or object representation according to requested format and result contents.
+
+    If not a ``value`` structure, the result is returned unmodified. If no output ``format`` is provided, or that
+    the extracted result :term:`Media-Type` does not correspond to a :term:`JSON` value, the result is also unmodified.
+    Otherwise, string/object representation is resolved according to the relevant  :term:`Media-Type`.
+
+    :param result: Container with nested data.
+    :param output_format: Desired output transmission ``format``, with minimally the :term:`Media-Type`.
+    :param content_type: Explicit :term:`Media-Type` to employ instead of an embedded ``mediaType`` result property.
+    :param content_encoding: Explicit data encoding to employ instead of an embedded ``encoding`` result property.
+    :return: Converted :term:`JSON` data or the original result as applicable.
+    """
+    if not result or not isinstance(result, dict) or "value" not in result:
+        return result
+    if not content_type:
+        content_type = get_field(result, "mediaType", default=None, search_variations=True)
+    if not content_encoding:
+        content_encoding = get_field(result, "encoding", default="utf-8", search_variations=True)
+    if content_type == ContentType.APP_JSON and "value" in result:
+        is_ascii = str(content_encoding).lower() == "ascii"
+        out_type = get_field(output_format, "mediaType", default=ContentType.APP_JSON)
+        if out_type == ContentType.APP_JSON:
+            result["value"] = repr_json(result["value"], force_string=False, ensure_ascii=is_ascii)
+        elif out_type in [ContentType.TEXT_PLAIN, ContentType.APP_RAW_JSON]:
+            result["value"] = repr_json(
+                result["value"],
+                force_string=True,
+                ensure_ascii=is_ascii,
+                # following for minimal representation
+                indent=None,
+                separators=(",", ":"),
+            )
+            result["mediaType"] = ContentType.APP_RAW_JSON  # ensure disambiguation from other plain text
+    return result
+
+
 def get_job_results_document(job, results, *, container):
     # type: (Job, ExecutionResults, Any, AnySettingsContainer) -> ExecutionResults
     """
@@ -821,8 +869,8 @@ def get_job_results_document(job, results, *, container):
             key = "value"
             val = result
             result = {"value": val}
-        mode = get_job_output_transmission(job, result_id, is_reference=(key == "href"))
-        headers, data = generate_or_resolve_result(job, result, result_id, output_id, mode, settings)
+        out_mode, out_fmt = get_job_output_transmission(job, result_id, is_reference=(key == "href"))
+        headers, data = generate_or_resolve_result(job, result, result_id, output_id, out_mode, out_fmt, settings)
         if data is None:
             ref = {
                 "href": headers["Content-Location"],
@@ -846,6 +894,10 @@ def get_job_results_document(job, results, *, container):
             }
             if c_enc:
                 value["encoding"] = c_enc
+
+        # special case of nested JSON data within the JSON document
+        value = resolve_result_json_literal(value, out_fmt, c_type, c_enc)
+
         return value
 
     out_results = {}
@@ -907,8 +959,8 @@ def get_job_results_multipart(job, results, *, headers, container):
                 yield res_id, (None, sub_multi, None, sub_headers)
 
             key = get_any_value(result, key=True)
-            mode = get_job_output_transmission(job, out_id, is_reference=(key == "href"))
-            res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, mode, settings)
+            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=(key == "href"))
+            res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, out_mode, out_fmt, settings)
             c_type = res_headers.get("Content-Type")
             c_loc = res_headers.get("Content-Location")
             c_fn = os.path.basename(c_loc) if c_loc else None

@@ -1521,7 +1521,7 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, **KVP_Item) -> str
+    # type: (str, str, **AnyValueType) -> str
     """
     Generates the URL with Key-Value-Pairs (:term:`KVP`) query parameters.
 
