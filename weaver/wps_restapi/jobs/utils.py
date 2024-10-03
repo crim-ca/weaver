@@ -725,15 +725,17 @@ def generate_or_resolve_result(
         If only returned by reference, ``None`` data is returned. An empty-data contents would be an empty string.
         Therefore, the explicit check of ``None`` is important to identify a by-reference result.
     """
-    key = get_any_value(result, key=True)
+    key_val = get_any_value(result, key=True, file=False, data=True)
+    key_ref = get_any_value(result, key=True, file=True, data=False)
+    key = key_val or key_ref
+    is_val = bool(key_val)
+    is_ref = bool(key_ref)
     val = get_any_value(result)
     cid = f"{result_id}@{job.id}"
     url = None
     loc = None
     res_data = None
     c_length = None
-    is_val = key in ["value", "data"]
-    is_ref = key in ["href", "reference"]
 
     # NOTE:
     #   work with local files (since we have them), to avoid unnecessary loopback request
