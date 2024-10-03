@@ -1321,9 +1321,9 @@ def get_href_headers(
             if os.path.splitext(path)[-1] in ["", "."]:
                 f_ext = get_extension(f_type, dot=True)
                 path = f"{path}{f_ext}"
-            content_disposition_params = f"filename=\"{os.path.basename(path)}\""
-            if content_name:
-                content_disposition_params += f"; name=\"{content_name}\""
+            # set name, then filename, to align with order employed by requests-toolbelt multipart class
+            content_disposition_params = f"name=\"{content_name}\"; "if content_name else ""
+            content_disposition_params += f"filename=\"{os.path.basename(path)}\""
             headers["Content-Disposition"] = f"{content_disposition_type}; {content_disposition_params}"
     f_current = get_file_header_datetime(now())
     headers["Date"] = f_current
@@ -1368,6 +1368,23 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
+    return link
+
+
+def parse_link_header(link_header):
+    # type: (str) -> Link
+    """
+    Parses the parameters of the ``Link`` header.
+    """
+    url, params = link_header.split(";", 1)
+    href = url.strip("<>")
+    params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
+    ctype = (params.pop("type", None) or [None])[0]
+    rel = str(params.pop("rel")[0])
+    link = {"href": href, "rel": rel}  # type: Link
+    if ctype and isinstance(ctype, str):
+        link["type"] = ctype
+    link.update({param: value[0] for param, value in params.items() if value})
     return link
 
 

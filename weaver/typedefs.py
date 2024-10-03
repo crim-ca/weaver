@@ -113,7 +113,7 @@ if TYPE_CHECKING:
     JSON = Union[Dict[str, Union[_JSON, _JsonItem]], List[Union[_JSON, _JsonItem]], AnyValueType]
 
     Link = TypedDict("Link", {
-        "title": str,
+        "title": NotRequired[str],
         "rel": Required[str],
         "href": Required[str],
         "hreflang": NotRequired[str],
@@ -349,7 +349,8 @@ if TYPE_CHECKING:
     WPS_OutputAsRefMediaType = Tuple[str, Optional[bool], Optional[str]]    # (output_id, as_ref, mime_type)
     WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMediaType]
 
-    KVP_Item = Union[ValueType, Sequence[ValueType]]
+    KVP_Value = Optional[str]
+    KVP_Item = Union[KVP_Value, Sequence[KVP_Value]]
     KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
     KVP = Dict[str, List[KVP_Item]]
 

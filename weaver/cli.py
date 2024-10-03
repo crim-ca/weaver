@@ -51,7 +51,7 @@ from weaver.utils import (
     import_target,
     load_file,
     null,
-    parse_kvp,
+    parse_link_header,
     request_extra,
     setup_loggers
 )
@@ -1691,23 +1691,21 @@ class WeaverClient(object):
         # download links from headers
         LOGGER.debug("%s outputs in results link headers.", "Processing" if len(out_links) else "No")
         for _, link_header in ResponseHeaders(out_links).items():
-            link, params = link_header.split(";", 1)
-            href = link.strip("<>")
-            params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
-            ctype = (params.get("type") or [None])[0]  # type: str
-            rel = params["rel"][0].split(".")
+            link = parse_link_header(link_header)
+            rel = link["rel"].rsplit(".", 1)
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
-            ref_path = fetch_reference(href, out_dir, auth=auth,
+            ref_path = fetch_reference(link["href"], out_dir, auth=auth,
                                        out_method=OutputMethod.COPY, out_listing=False)
-            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}  # type: ExecutionResultObjectRef
+            link = cast("ExecutionResultObjectRef", link)
+            link.update({"path": ref_path, "source": "link"})
             if output in outputs:
                 if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index>"' was not employed
-                    outputs[output] = [outputs[output], value]
+                    outputs[output] = [outputs[output], link]
                 else:
-                    outputs[output].append(value)
+                    outputs[output].append(link)
             else:
-                outputs[output] = [value] if is_array else value
+                outputs[output] = [link] if is_array else link
         return outputs
 
     def results(self,

@@ -54,6 +54,7 @@ from weaver.utils import (
     get_weaver_url,
     is_uuid,
     make_link_header,
+    parse_link_header
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
@@ -582,6 +583,17 @@ def get_job_results_response(
     raise_job_dismissed(job, container)
     raise_job_bad_status(job, container)
 
+    # FIXME: if 'return=representation' (any type) without 'transmissionMode' override -> force 'transmissionMode=value'
+    #        (see 'test_execute_multi_output_prefer_header_return_representation')
+
+    # FIXME: if value is JSON with 'response=document' also JSON, auto-load value from ref to embed in body
+    #       - test_execute_single_output_response_document_default_format_json_special
+
+    # FIXME: apply converters (https://github.com/crim-ca/weaver/pull/548)
+    #       - test_execute_single_output_response_document_alt_format_json
+    #       - test_execute_single_output_response_document_alt_format_yaml
+    #       - test_execute_single_output_multipart_accept_alt_format
+
     # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
     # resolution of 'transmissionMode' for document representation will be done by its own handler function
     # See:
@@ -653,11 +665,23 @@ def get_job_results_response(
 
         # multipart response
         if (
-            len(results) > 1 or
+            (len(results) + len(refs)) > 1 or
             (isinstance(out_data, list) and len(out_data) > 1) or
             is_accept_multipart
         ):
-            return get_job_results_multipart(job, results, headers=headers, container=container)
+            # backtrack link references that were generated if 'Accept: multipart/*' was omitted
+            # while using 'response=raw' leading to at least 1 by-value output
+            # (must force multipart with empty-part for links to respect OGC API - Processes v1.0)
+            # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
+            for ref in refs:
+                ref_link = parse_link_header(ref[-1])
+                results[ref_link["rel"]] = ref_link
+            # attempt sort by original results ordering to generate multipart contents consistently
+            out_order = list(convert_output_params_schema(job.results, JobInputsOutputsSchema.OGC))
+            res_order = {out_id: results[out_id] for out_id in out_order if out_id in results}
+            res_array = sorted(set(results) - set(res_order))  # in case of 'out.idx' employed for arrays
+            res_order.update({out_id: results[out_id] for out_id in res_array})  # if missing link arrays
+            return get_job_results_multipart(job, res_order, headers=headers, container=container)
 
         # single value only
         out_data = out_data[0] if isinstance(out_data, list) else out_data
@@ -726,7 +750,7 @@ def generate_or_resolve_result(
             url = os.path.join(out_url, url[1:])
         loc = map_wps_output_location(url, settings, exists=True, url=False)
     else:
-        typ = result.get("mediaType") or ContentType.TEXT_PLAIN
+        typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
 
     if not url:
         out_dir = get_wps_output_dir(settings)

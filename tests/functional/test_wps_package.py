@@ -3568,6 +3568,34 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = re.sub(r"Last-Modified: .*\r\n", "", results)
         return results.strip()
 
+    @staticmethod
+    def fix_result_multipart_indent(results):
+        # type: (str) -> str
+        """
+        Remove indented whitespace from multipart literal contents.
+
+        This behaves similarly to :func:`inspect.cleandoc`, but handles cases were the nested part contents could
+        themselves contain newlines, leading to inconsistent indents for some lines when injected by string formating,
+        and causing :func:`inspect.cleandoc` to fail removing any indent.
+
+        Also, automatically applies ``\r\n`` characters correction which are critical in parsing multipart contents.
+        This is done to consider that literal newlines will include or not the ``\r`` depending on the OS running tests.
+
+        .. warning::
+            This should be used only for literal test string (i.e.: expected value) for comparison against the result.
+            Result contents obtained from the response should be compared as-is, without any fix for strict checks.
+        """
+        if results.startswith("\n "):
+            results = results[1:]
+        res_dedent = results.lstrip()
+        res_indent = len(results) - len(res_dedent)
+        res_spaces = " " * res_indent
+        res_dedent = res_dedent.replace(f"\n{res_spaces}", "\r\n")  # indented line
+        res_dedent = res_dedent.replace(f"\n\r\n", "\r\n\r\n")  # empty line (header/body separator)
+        res_dedent = res_dedent.replace("\r\r", "\r")  # in case windows
+        res_dedent = res_dedent.rstrip("\n ")  # last line often indented less because of closing multiline string
+        return res_dedent
+
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3605,8 +3633,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.text == "test"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
-        assert outputs.json == {
-            "output_data": {"value": "test"},
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
         }
 
     def test_execute_single_output_prefer_header_return_representation_complex(self):
@@ -3648,7 +3678,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.text == output_json
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
-        assert outputs.json == {
+        assert outputs.json["outputs"] == {
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -3692,8 +3722,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.text == "test"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
-        assert outputs.json == {
-            "output_data": "test",
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
         }
 
     def test_execute_single_output_prefer_header_return_minimal_complex(self):
@@ -3744,7 +3776,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
-        assert outputs.json == {
+        assert outputs.json["outputs"] == {
             "output_json": {
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
@@ -3790,7 +3822,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
         }
 
     def test_execute_single_output_response_raw_value_complex(self):
@@ -3889,7 +3923,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
+            "output_data": {
+                "value": "test"
+            },
         }
 
     def test_execute_single_output_response_raw_reference_complex(self):
@@ -4004,7 +4040,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
@@ -4012,7 +4048,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4077,7 +4113,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
@@ -4086,7 +4122,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Length: 0
 
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4151,7 +4187,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Type: {ContentType.APP_YAML}
             Content-ID: <output_json@{job_id}>
@@ -4159,7 +4195,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json_as_yaml}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -4182,7 +4218,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
     # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
     @pytest.mark.xfail(reason="not implemented")
-    def test_execute_single_output_response_document_alt_format(self):
+    def test_execute_single_output_response_document_alt_format_yaml(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
@@ -4227,7 +4263,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Type: {ContentType.APP_YAML}
             Content-ID: <output_json@{job_id}>
@@ -4235,7 +4271,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json_as_yaml}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -4461,7 +4497,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
@@ -4477,7 +4513,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Length: 0
 
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -4611,10 +4647,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
-        results_body = inspect.cleandoc(f"""
+        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
-            Content-Disposition: attachment; filename="output_data.txt"; name="output_data"
+            Content-Disposition: attachment; name="output_data"; filename="output_data.txt"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
@@ -4629,7 +4665,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -4683,7 +4719,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
@@ -4700,7 +4736,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results.text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4838,7 +4874,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        results_body = inspect.cleandoc(f"""
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"; filename="output_data.txt"
             Content-Type: {ContentType.TEXT_PLAIN}
@@ -4854,7 +4890,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Length: 0
 
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -4908,8 +4944,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
-        results_body = inspect.cleandoc(f"""
+        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
+        results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
@@ -4933,7 +4969,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             {output_json}
             --{boundary}--
-        """).replace("\n", "\r\n")
+        """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
         assert results_text == results_body
@@ -5060,11 +5096,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         results_json = self.remove_result_format(results.json)
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
+        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results_json == {
             "output_data": {
-                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "href": f"{out_url}/{job_id}/output_data/output_data.txt",
                 "type": ContentType.TEXT_PLAIN,
             },
             "output_json": {
