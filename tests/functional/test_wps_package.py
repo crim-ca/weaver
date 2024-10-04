@@ -4797,7 +4797,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
-            Content-Length: 16
+            Content-Length: 15
 
             {{"data":"test"}}
             --{boundary}--
@@ -4868,7 +4868,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
-            Content-Length: 16
+            Content-Length: 15
 
             {output_json}
             --{boundary}--
@@ -5101,7 +5101,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
-            Content-Length: 16
+            Content-Length: 15
 
             {{"data":"test"}}
             --{boundary}--

@@ -6,9 +6,10 @@ requirements:
     dockerPull: "debian:stretch-slim"
   InlineJavascriptRequirement: {}
   InitialWorkDirRequirement:
+    # note: use '>-' to avoid newline after the JSON contents in the generated file, tests validate that explicitly
     listing:
       - entryname: result.json
-        entry: |
+        entry: >-
           {"data":"$(inputs.message)"}
       - entryname: result.txt
         entry: |
