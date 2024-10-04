@@ -37,7 +37,13 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import AcceptLanguage, ContentType, OutputFormat, repr_json
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
@@ -81,7 +87,13 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
-    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
+    from weaver.execute import (
+        AnyExecuteControlOption,
+        AnyExecuteMode,
+        AnyExecuteResponse,
+        AnyExecuteReturnPreference,
+        AnyExecuteTransmissionMode
+    )
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.quotation.status import AnyQuoteStatus
@@ -1081,6 +1093,27 @@ class Job(Base, LoggerHandler):
         self["execution_response"] = exec_resp
 
     @property
+    def execution_return(self):
+        # type: () -> AnyExecuteReturnPreference
+        ret = self.setdefault("execution_return", ExecuteReturnPreference.MINIMAL)  # almost equivalent to 'document'
+        if ret not in ExecuteReturnPreference.values():
+            ret = ExecuteReturnPreference.MINIMAL
+        self["execution_return"] = ret
+        return ret
+
+    @execution_return.setter
+    def execution_return(self, return_preference):
+        # type: (Optional[Union[AnyExecuteReturnPreference, str]]) -> None
+        if return_preference is None:
+            exec_ret = ExecuteReturnPreference.MINIMAL
+        else:
+            exec_ret = ExecuteReturnPreference.get(return_preference)
+        if exec_ret not in ExecuteReturnPreference:
+            return_prefs = list(ExecuteReturnPreference.values())
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_return'. Must be one of {return_prefs}")
+        self["execution_return"] = exec_ret
+
+    @property
     def is_local(self):
         # type: () -> bool
         return self.get("is_local", not self.service)
@@ -1509,6 +1542,7 @@ class Job(Base, LoggerHandler):
             "status_message": self.status_message,
             "status_location": self.status_location,
             "execution_response": self.execution_response,
+            "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
             "is_workflow": self.is_workflow,
             "created": self.created,

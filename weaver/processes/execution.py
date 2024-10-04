@@ -794,7 +794,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
     accept_type = validate_job_accept_header(headers, mode)
-    exec_resp = get_job_return(job=None, body=json_body, headers=headers)  # job 'none' since still doing 1st parsing
+    exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
     subscribers = map_job_subscribers(json_body, settings)
@@ -803,8 +803,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
-                         execute_async=is_execute_async, execute_response=exec_resp, custom_tags=tags, user_id=user,
-                         access=visibility, context=context, subscribers=subscribers,
+                         execute_async=is_execute_async, execute_response=exec_resp, execute_return=exec_return,
+                         custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
                          accept_type=accept_type, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)

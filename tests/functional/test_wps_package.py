@@ -3673,6 +3673,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.status_code == 200, f"Failed with: [{results.status_code}]\nReason:\n{resp.text}"
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.text == "{\"data\":\"test\"}"
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4783,10 +4784,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, indent=None, separators=(",", ":"), force_string=True)
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
-            Content-Disposition: attachment; name="output_data"; filename="output_data.txt"
+            Content-Disposition: attachment; name="output_data"
             Content-Type: {ContentType.TEXT_PLAIN}
             Content-ID: <output_data@{job_id}>
             Content-Length: 4
@@ -4799,7 +4799,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-ID: <output_json@{job_id}>
             Content-Length: 16
 
-            {output_json}
+            {{"data":"test"}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4873,8 +4873,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             {output_json}
             --{boundary}--
         """)
+        results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results.text == results_body
+        assert results_text == results_body
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
