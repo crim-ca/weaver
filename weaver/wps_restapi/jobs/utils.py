@@ -652,6 +652,8 @@ def get_job_results_response(
             headers = get_job_results_links(job, results, out_transmissions, headers=headers, settings=settings)
             return HTTPNoContent(headers=headers)
 
+        # FIXME: support ZIP or similar "container" output (https://github.com/crim-ca/weaver/issues/726)
+        # FIXME: support Metalink - needs by-reference only (https://github.com/crim-ca/weaver/issues/663)
         # multipart response
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi

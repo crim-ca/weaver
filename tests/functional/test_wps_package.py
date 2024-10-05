@@ -3790,6 +3790,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     def test_execute_single_output_prefer_header_return_minimal_complex_accept_default(self):
         """
         For single requested  output, without ``Accept`` content negotiation, its default format is returned by link.
+
+        .. note::
+            Because :term:`JSON` ``Accept`` header is **NOT** explicitly requested along the ``Prefer`` header,
+            the response is returned by ``Link`` header. This is different from requesting ``Accept`` :term:`JSON`,
+            which "forces" ``minimal`` to be mapped to ``document`` response. This is because, for a single output
+            combined with ``minimal`` (i.e.: requesting explicitly not to return the contents of the file), a ``Link``
+            becomes required. To force the :term:`JSON` contents of the file to be returned directly, ``representation``
+            must be requested instead.
+
+        .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_json`
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
         """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3798,6 +3810,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         exec_headers = {
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            # omitting or specifying 'Accept' any must result the same (default link),
+            # but test it is handled explicitly since the header would be "found" when parsing
             "Accept": ContentType.ANY,
             "Content-Type": ContentType.APP_JSON,
         }
@@ -3860,8 +3874,13 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             contents of ``output_json`` file are **NOT** directly returned in the response.
 
         .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_default`
+              which returns the result by ``Link`` header, which refers to a :term:`JSON` file.
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
+              for case of embedded ``output_json`` file contents in the response using the other ``Prefer`` return.
             - :func:`test_execute_single_output_response_raw_value_complex`
-              for case of embedded ``output_json`` file contents in the response.
+              for case of embedded ``output_json`` file contents in the response,
+              using the ``response`` parameter at :term:`Job` execution time, as alternative method to ``Prefer``.
         """
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4181,11 +4200,13 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
+            Content-Length: 15
 
-            {{{"data":"test"}}}
+            {{"data":"test"}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4867,7 +4888,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-ID: <output_json@{job_id}>
             Content-Length: 15
 
-            {{{"data":"test"}}}
+            {{"data":"test"}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
