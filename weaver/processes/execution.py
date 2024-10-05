@@ -826,7 +826,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
             if job.status == Status.SUCCEEDED:
-                return get_job_results_response(job, settings, headers=resp_headers)
+                return get_job_results_response(job, headers=resp_headers, container=settings)
             # otherwise return the error status
             body = job.json(container=settings)
             body["location"] = location_url

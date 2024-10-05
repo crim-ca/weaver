@@ -3998,17 +3998,17 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             status = self.monitor_job(status_url, return_status=True)
             assert status["status"] == Status.SUCCEEDED
 
+        out_url = get_wps_output_url(self.settings)
         job_id = status["jobID"]
         results = self.app.get(f"/jobs/{job_id}/results")
         assert results.content_type.startswith(ContentType.APP_JSON)
         assert results.json == {"data": "test"}
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "value": output_json,
-                "mediaType": ContentType.APP_JSON,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
@@ -4049,7 +4049,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = self.app.get(f"/jobs/{job_id}/results")
         results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
         output_data_href = f"{out_url}/{job_id}/output_data/output_data.txt"
-        output_data_link = f"<{output_data_href}>; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
+        output_data_args = f"; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
+        output_data_link = f"<{output_data_href}>{output_data_args}"
         assert results.status_code == 204, "No contents expected for minimal reference result."
         assert results.body == b""
         assert results.content_type is None
@@ -4178,14 +4179,13 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         results = resp
         assert ContentType.MULTIPART_MIXED in results.content_type
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Type: {ContentType.APP_JSON}
             Content-Location: {out_url}/{job_id}/output_json/result.json
             Content-ID: <output_json@{job_id}>
 
-            {output_json}
+            {{{"data":"test"}}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
@@ -4350,10 +4350,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
         assert result_json.content_type == ContentType.APP_JSON
-        assert result_json.text == output_json
+        assert result_json.text == "{\"data\":\"test\"}"
 
     # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
     @pytest.mark.xfail(reason="not implemented")
@@ -4427,10 +4426,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
         assert result_json.content_type == ContentType.APP_JSON
-        assert result_json.text == output_json
+        assert result_json.text == "{\"data\":\"test\"}"
 
     def test_execute_single_output_response_document_alt_format_json_raw_literal(self):
         proc = "EchoResultsTester"
@@ -4854,7 +4852,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")
         boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
-        output_json = repr_json({"data": "test"}, separators=(",", ":"), force_string=True)
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
             Content-Disposition: attachment; name="output_data"
@@ -4870,7 +4867,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             Content-ID: <output_json@{job_id}>
             Content-Length: 15
 
-            {output_json}
+            {{{"data":"test"}}}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
