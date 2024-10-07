@@ -2,12 +2,12 @@
 Weaver
 =============================================
 
-\| `Summary <#summary>`_
-\| `Features <#features>`_
-\| `Links <#links>`_
-\| `Configuration <#configuration>`_
-\| `Documentation <#documentation>`_
-\| `Extra Details & Sponsors <#extra-details--sponsors>`_
+\| `Summary`_
+\| `Features`_
+\| `Links`_
+\| `Configuration`_
+\| `Documentation`_
+\| `Extra Details & Sponsors`_
 \|
 
 **Implementations**
@@ -16,7 +16,8 @@ Weaver
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
-* |ems-long| for dispatching distrubted workflow processing
+* |jupyter-nb-app|_ as |ogc-apppkg|_
+* |ems-long| for dispatching distributed workflow processing
 * |ades-long| for processing close to the data
 
 Weaver (the nest-builder)
@@ -55,13 +56,13 @@ for each process.
     :alt: Requires Python 3.8+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/5.8.0.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/5.9.0.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/5.8.0...master
+    :target: https://github.com/crim-ca/weaver/compare/5.9.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-5.8.0-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-5.9.0-blue
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/5.8.0
+    :target: https://github.com/crim-ca/weaver/tree/5.9.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
     :alt: Libraries.io Dependencies Status
@@ -75,9 +76,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=5.8.0&branch=5.8.0
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=5.9.0&branch=5.9.0
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A5.8.0
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A5.9.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: ReadTheDocs Build Status (master branch)
@@ -89,7 +90,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.8.0?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.9.0?label=tag%20status
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -146,9 +147,37 @@ Features
 Following videos present some of the features and potential capabilities of servicing and executing processes
 offered by |ades| and |ems| instances like `Weaver`.
 
-**Keywords**:
-Big Data, software architecture, Earth Observation, satellite data, processing, climate change, machine learning,
-climate services.
+.. list-table::
+    :stub-columns: 1
+    :widths: 20,80
+
+    * - **Keywords**
+      - |kw01| |kw02| |kw03| |kw04| |kw05| |kw06| |kw07| |kw08| |kw09| |kw10| |kw11| |kw12|
+
+.. |kw01| image:: https://img.shields.io/badge/Software%20Architecture-blue
+   :alt: Software Architecture
+.. |kw02| image:: https://img.shields.io/badge/Cloud%20Computing-blue
+   :alt: Cloud Computing
+.. |kw03| image:: https://img.shields.io/badge/Earth%20Observation-blue
+   :alt: Earth Observation
+.. |kw04| image:: https://img.shields.io/badge/Big%20Data-blue
+   :alt: Big Data
+.. |kw05| image:: https://img.shields.io/badge/Satellite%20Data-blue
+   :alt: Satellite Data
+.. |kw06| image:: https://img.shields.io/badge/Data%20Processing-blue
+   :alt: Data Processing
+.. |kw07| image:: https://img.shields.io/badge/Workflow%20Processing-blue
+   :alt: Workflow Processing
+.. |kw08| image:: https://img.shields.io/badge/Climate%20Science-blue
+   :alt: Climate Science
+.. |kw09| image:: https://img.shields.io/badge/Climate%20Services-blue
+   :alt: Climate Services
+.. |kw10| image:: https://img.shields.io/badge/Application%20Package-blue
+   :alt: Application Package
+.. |kw11| image:: https://img.shields.io/badge/Machine%20Learning-blue
+   :alt: Machine Learning
+.. |kw12| image:: https://img.shields.io/badge/Open%20Science-blue
+   :alt: Open Science
 
 Applications
 ~~~~~~~~~~~~~~~~
@@ -237,12 +266,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:5.8.0
+    docker pull pavics/weaver:5.9.0
 
 For convenience, following tags are also available:
 
-- ``weaver:5.8.0-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:5.8.0-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:5.9.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:5.9.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
@@ -328,12 +357,8 @@ Developments are continued in |ogc-tb16|_ to improve methodologies in order to p
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 Findings and recommendations are presented in the |ogc-tb16-data-access-proc-er|_.
 
-.. fixme:
-.. todo::
-   deploy from ipynb, add |ogc-tb16-ipynb-er| (https://github.com/crim-ca/weaver/issues/63)
-
 Videos and more functionalities were introduced in `Weaver` following |ogc-eo-apps-pilot|_.
-Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_.
+Corresponding developments are reported in the |ogc-eo-apps-pilot-er|_. See `Features`_ for demonstrations.
 
 `Weaver` has been used to participate in interoperability testing effort that lead to |ogc-best-practices-eo-apppkg|_
 technical report. This resulted, along with previous efforts, in the definition of |ogc-api-proc-part2|_ backed by
@@ -362,6 +387,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |cwl| replace:: CWL
 .. _cwl: https://www.commonwl.org/
 .. _openEO: https://openeo.org/
+.. |jupyter-nb-app| replace:: Jupyter Notebook Applications
+.. _jupyter-nb-app: https://pavics-weaver.readthedocs.io/en/latest/package.html#jupyter-notebook-applications
 .. |esgf| replace:: `Earth System Grid Federation`_ (ESGF)
 .. _`Earth System Grid Federation`: https://esgf.llnl.gov/
 .. |ems| replace:: Execution Management Service

@@ -70,6 +70,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+        cls.html_headers = {"Accept": ContentType.TEXT_HTML}
         cls.datetime_interval = cls.generate_test_datetimes()
 
     def setUp(self):
@@ -319,6 +320,41 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             for grouped_jobs in resp.json["groups"]:
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
+
+    @parameterized.expand([
+        ({}, ),  # detail omitted should apply it for HTML, unlike JSON that returns the simplified listing by default
+        ({"detail": None}, ),
+        ({"detail": "true"}, ),
+        ({"detail": 1}, ),
+        ({"detail": "True"}, ),
+        ({"detail": "yes"}, ),
+        ({"detail": "false"}, ),
+        ({"detail": 0}, ),
+        ({"detail": "False"}, ),
+        ({"detail": "no"}, ),
+    ])
+    def test_get_jobs_detail_html_enforced(self, params):
+        """
+        Using :term:`HTML`, ``detail`` response is always enforced to allow rendering, regardless of the parameter.
+        """
+        path = get_path_kvp(sd.jobs_service.path, limit=6, **params)  # check that other params are still effective
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "<!DOCTYPE html>" in resp.text
+        assert "table-jobs" in resp.text
+        jobs = [line for line in resp.text.splitlines() if "job-list-item" in line]
+        assert len(jobs) == 6
+
+    def test_get_jobs_groups_html_unsupported(self):
+        groups = ["process", "service"]
+        path = get_path_kvp(sd.jobs_service.path, groups=groups)
+        resp = self.app.get(path, headers=self.html_headers, expect_errors=True)
+        assert resp.status_code == 400
+        desc = resp.json["description"]
+        assert "HTML" in desc and "unsupported" in desc
+        assert "cause" in resp.json
+        assert "groups" in resp.json["cause"]["name"]
 
     def test_get_jobs_valid_grouping_by_process(self):
         path = get_path_kvp(sd.jobs_service.path, detail="false", groups="process")

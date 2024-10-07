@@ -57,7 +57,10 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. |cwl-io-type| replace:: CWLType Symbols
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
+.. |cwl-metadata| replace:: CWL Examples - Metadata and Authorship
 .. _cwl-metadata: https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html
+.. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
+.. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
@@ -94,7 +97,7 @@
 .. |filter-jfe| replace:: JSON Filter Expressions
 .. _filter-jfe: https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 .. |geotiff-cog| replace:: Cloud Optimized GeoTIFF (COG)
-.. _geotiff-cog: https://www.cogeo.org/
+.. _geotiff-cog: http://www.cogeo.org/
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
 .. |geojson| replace:: GeoJSON

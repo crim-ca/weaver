@@ -858,6 +858,15 @@ class Link(LinkRelationship, LinkBase):
     _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 
 
+class MetadataValueField(OneOfKeywordSchema):
+    _one_of = [
+        # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
+        ExtendedSchemaNode(String(), description="Plain text value of the information."),
+        # literal JSON schema, permissive since it can be anything
+        PermissiveMappingSchema(description="Flexible schema definition for the metadata value.")
+    ]
+
+
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     _not = [
         # make sure value metadata does not allow 'rel' and 'hreflang' reserved for link reference
@@ -865,7 +874,7 @@ class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
         LinkRelationship(description="Field 'rel' must refer to a link reference with 'href'."),
         LinkLanguage(description="Field 'hreflang' must refer to a link reference with 'href'."),
     ]
-    value = ExtendedSchemaNode(String(), description="Plain text value of the information.")
+    value = MetadataValueField(description="Explicit schema definition of the metadata value.")
 
 
 class MetadataLink(Link):
