@@ -5520,8 +5520,8 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
             ]
         }
         with contextlib.ExitStack() as stack_exec:

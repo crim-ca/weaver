@@ -42,6 +42,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
     data2str,
+    fetch_file,
     get_any_id,
     get_any_value,
     get_header,
@@ -744,18 +745,19 @@ def generate_or_resolve_result(
     #   work with local files (since we have them), to avoid unnecessary loopback request
     #   then, rewrite the locations after generating their headers to obtain the final result URL
 
-    # FIXME: Handle S3 output storage. Should multipart response even be allowed in this case?
-
     if is_ref:
         url = val
         typ = result.get("type")  # expected for typical link, but also check media-type variants in case pre-converted
         typ = typ or get_field(result, "mime_type", search_variations=True, default=ContentType.APP_OCTET_STREAM)
         job_out_url = job.result_path(output_id=output_id)
+        wps_out_url = get_wps_output_url(settings)
         if url.startswith(f"/{job_out_url}/"):  # job "relative" path
-            out_url = get_wps_output_url(settings)
-            url = os.path.join(out_url, url[1:])
-        loc = map_wps_output_location(url, settings, exists=True, url=False)
-        loc = get_secure_path(loc)
+            url = os.path.join(wps_out_url, url[1:])
+        if url.startswith(wps_out_url):
+            loc = map_wps_output_location(url, settings, exists=True, url=False)
+            loc = get_secure_path(loc)
+        else:
+            loc = url  # remote storage, S3, etc.
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
 
@@ -766,6 +768,8 @@ def generate_or_resolve_result(
         loc = os.path.join(out_dir, job_path)
         loc = get_secure_path(loc)
         url = map_wps_output_location(loc, settings, exists=False, url=True)
+    loc = loc[7:] if loc.startswith("file://") else loc
+    is_local = loc.startswith("/")
 
     if is_val and output_mode == ExecuteTransmissionMode.VALUE:
         res_data = io.StringIO()
@@ -778,7 +782,15 @@ def generate_or_resolve_result(
                 out_file.write(data2str(val))
 
     if is_ref and output_mode == ExecuteTransmissionMode.VALUE and typ != ContentType.APP_DIR:
-        res_path = loc[7:] if loc.startswith("file://") else loc
+        res_path = loc
+        if not is_local:
+            # reference is a remote file, but by-value requested explicitly
+            # try to retrieve its content locally to return it
+            wps_out_dir = get_wps_output_dir(settings)
+            job_out_dir = job.result_path(output_id=output_id)
+            job_out_dir = os.path.join(wps_out_dir, job_out_dir)
+            os.makedirs(job_out_dir, exist_ok=True)
+            res_path = fetch_file(res_path, job_out_dir, settings=settings)
         res_data = io.FileIO(res_path, mode="rb")
 
     res_headers = get_href_headers(
@@ -797,7 +809,7 @@ def generate_or_resolve_result(
     if output_mode == ExecuteTransmissionMode.REFERENCE:
         res_data = None
         res_headers["Content-Length"] = "0"
-    if not os.path.exists(loc):
+    if not os.path.exists(loc) and is_local:
         res_headers.pop("Content-Location", None)
     return res_headers, res_data
 

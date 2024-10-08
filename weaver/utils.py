@@ -95,7 +95,7 @@ if TYPE_CHECKING:
         TypeVar,
         Union
     )
-    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard, Unpack
+    from typing_extensions import NotRequired, Required, TypeAlias, TypedDict, TypeGuard, Unpack
 
     from mypy_boto3_s3.client import S3Client
 
@@ -119,7 +119,6 @@ if TYPE_CHECKING:
         HeadersType,
         JSON,
         KVP,
-        KVP_Item,
         Link,
         Literal,
         Number,
@@ -160,9 +159,10 @@ if TYPE_CHECKING:
         "Date": str,
         "Last-Modified": str,
         "Content-ID": NotRequired[str],
-        "Content-Type": NotRequired[str],
+        "Content-Type": Required[str],
         "Content-Length": NotRequired[str],
-        "Content-Location": NotRequired[str],
+        "Content-Encoding": NotRequired[str],
+        "Content-Location": str,
         "Content-Disposition": NotRequired[str],
     }, total=False)
     _OutputMethod = "OutputMethod"  # type: TypeAlias  # pylint: disable=C0103,invalid-name
@@ -1261,8 +1261,11 @@ def get_href_headers(
             settings=settings,
             **option_kwargs,
         )
-        f_modified = parse_dt(sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1])
-        f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
+        if listing:
+            f_modified = parse_dt(sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1])
+            f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
+        else:  # either empty directory, filtered contents, or failed to retrieve listing
+            f_size = "0"
         f_type = ContentType.APP_DIR
 
     # handle single file
@@ -1273,14 +1276,17 @@ def get_href_headers(
 
         if path.startswith("s3://") or path.startswith("https://s3."):
             try:
+                s3_region = None
+                if path.startswith("https://s3."):
+                    path, s3_region = resolve_s3_from_http(path)
                 s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-                s3_region = options["s3"].pop("region_name", None)
+                s3_region = s3_region or options["s3"].pop("region_name", None)
                 s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
                 s3_bucket, file_key = path[5:].split("/", 1)
                 s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
-                f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
-                f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
-                f_modified = parse_dt(s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"])
+                f_type = content_type or s3_file["ContentType"]
+                f_size = s3_file["ContentLength"]
+                f_modified = s3_file["LastModified"]
             except (ClientError, HTTPClientError):
                 if not missing_ok:
                     raise
@@ -2630,7 +2636,7 @@ def fetch_file(file_reference,                      # type: str
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
                **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
-               ):                                   # type: (...) -> str
+               ):                                   # type: (...) -> Path
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
 
@@ -2717,7 +2723,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> AnyOutputResult
+    # type: (str, str, OutputMethod) -> Path
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2955,21 +2961,17 @@ def fetch_files_s3(location,                            # type: str
     s3_files = filter_directory_patterns(s3_files, include, exclude, matcher, key=lambda _file: _file["Key"])
 
     if out_method == OutputMethod.META:
-        # FIXME: extra metadata needed?
-        #   Key/Size/LastModified available from listing directly
-        #   ContentType needs head object additional request per item
-        # s3_meta = (s3_client.head_object(Bucket=s3_bucket, Key=file_key) for file_key in s3_files)
-        # s3_meta = (file_meta["ResponseMetadata"]["HTTPHeaders"] for file_meta in s3_meta)
+        s3_files = list(s3_files)   # ensure generator is not pre-exhausted by following loop
         for file_meta in s3_files:  # type: MetadataResult
             file_key = file_meta.pop("Key")
             file_meta["Content-Location"] = f"{base_url}{file_key}"
-        return list(s3_files)
+        return s3_files
 
     s3_files = [file["Key"] for file in s3_files]
 
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
-    sub_dirs = {os.path.split(path)[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
+    sub_dirs = {os.path.split(str(path))[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
     sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
     for _dir in reversed(sorted(sub_dirs)):
         os.makedirs(_dir, exist_ok=True)

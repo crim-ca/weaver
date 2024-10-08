@@ -28,7 +28,7 @@ from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
 from weaver.processes.builtin import get_builtin_reference_mapping
-from weaver.processes.constants import ProcessSchema
+from weaver.processes.constants import JobInputsOutputsSchema, ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_weaver_url, load_file
