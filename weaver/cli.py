@@ -1175,6 +1175,7 @@ class WeaverClient(object):
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
                 output_refs=None,       # type: Optional[Iterable[str]]
+                output_filter=None,     # type: Optional[Sequence[str]]
                 output_context=None,    # type: Optional[str]
                 ):                      # type: (...) -> OperationResult
         """
@@ -1231,6 +1232,8 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_filter:
+            Indicates a list of outputs to omit from the results. If unspecified (default), all outputs are returned.
         :param output_context:
             Specify an output context for which the `Weaver` instance should attempt storing the :term:`Job` results
             under the nested location of its configured :term:`WPS` outputs. Note that the instance is not required
@@ -1252,8 +1255,7 @@ class WeaverClient(object):
             "mode": ExecuteMode.ASYNC,
             "inputs": values,
             "response": ExecuteResponse.DOCUMENT,
-            # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
-            "outputs": {}
+            "outputs": {},
         }
         if subscribers:
             LOGGER.debug("Adding job execution subscribers:\n%s", Lazify(lambda: repr_json(subscribers, indent=2)))
@@ -1268,17 +1270,19 @@ class WeaverClient(object):
         outputs = result.body.get("outputs")
         output_refs = set(output_refs or [])
         for output_id in outputs:
+            if output_filter and output_id in output_filter:
+                continue
             if output_id in output_refs:
                 # If any 'reference' is requested explicitly, must switch to 'response=raw'
                 # since 'response=document' ignores 'transmissionMode' definitions.
                 data["response"] = ExecuteResponse.RAW
                 # Use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers.
-                out_mode = ExecuteTransmissionMode.REFERENCE
+                out_mode = {"transmissionMode": ExecuteTransmissionMode.REFERENCE}
             else:
-                # make sure to set value to outputs not requested as reference in case another one needs reference
-                # mode doesn't matter if no output by reference requested since 'response=document' would be used
-                out_mode = ExecuteTransmissionMode.VALUE
-            data["outputs"][output_id] = {"transmissionMode": out_mode}
+                out_mode = {}  # auto-resolution
+            data["outputs"][output_id] = out_mode
+        if not data["outputs"]:
+            data.pop("outputs")  # avoid no-output request
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         desc_url = self._get_process_url(base, process_id, provider_id)
@@ -1712,6 +1716,7 @@ class WeaverClient(object):
                 job_reference,          # type: str
                 out_dir=None,           # type: Optional[str]
                 download=False,         # type: bool
+                download_links=None,    # type: Optional[Sequence[str]]
                 url=None,               # type: Optional[str]
                 auth=None,              # type: Optional[AuthBase]
                 headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1727,6 +1732,10 @@ class WeaverClient(object):
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param out_dir: Output directory where to store downloaded files if requested (default: CURDIR/JobID/<outputs>).
         :param download: Download any file reference found within results (CAUTION: could transfer lots of data!).
+        :param download_links:
+            Output IDs that are expected in ``Link`` headers, and that should be downloaded as well.
+            This is not performed automatically since there can be a lot of ``Links`` in responses,
+            and output IDs could have conflicting ``rel`` names with other indicative links.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1759,6 +1768,11 @@ class WeaverClient(object):
         outputs = res_out.body
         headers = res_out.headers
         out_links = res_out.links(["Link"])
+        out_links_meta = [(link, parse_link_header(link[-1])) for link in list(out_links.items())]
+        out_links = [
+            link for link, meta in out_links_meta
+            if not meta["href"].startswith(job_url) and meta["rel"] in (download_links or [])
+        ]
         if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):  # pragma: no cover
             return OperationResult(False, "Could not retrieve any output results from job.", outputs, headers)
         if not download:
