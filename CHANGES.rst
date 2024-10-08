@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``output_links``/``-oL`` parameter to Python client and CLI to retrieve ``Link`` headers as `Job` results.
+  Due to the multiple ``Link`` headers returned by `Job` results, this cannot be performed automatically without
+  the assumption of which ``rel`` links correspond to actual output IDs to extract.
 
 Fixes:
 ------

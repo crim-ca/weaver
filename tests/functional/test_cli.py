@@ -1604,6 +1604,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "-j", job_id,
                     "-wH",  # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
+                    "-oL", "output"
                 ],
                 trim=False,
                 entrypoint=weaver_cli,
@@ -1624,8 +1625,9 @@ class TestWeaverCLI(TestWeaverClientBase):
                     "-j", job_id,
                     "-wH",  # must display header to get 'Link'
                     "-F", OutputFormat.YAML,
+                    "-oL", "output",
                     "-D",
-                    "-O", out_tmp
+                    "-O", out_tmp,
                 ],
                 trim=False,
                 entrypoint=weaver_cli,

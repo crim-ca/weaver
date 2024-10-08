@@ -24,7 +24,7 @@ from yaml.scanner import ScannerError
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode, ExecuteReturnPreference
 from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
@@ -1716,7 +1716,6 @@ class WeaverClient(object):
                 job_reference,          # type: str
                 out_dir=None,           # type: Optional[str]
                 download=False,         # type: bool
-                download_links=None,    # type: Optional[Sequence[str]]
                 url=None,               # type: Optional[str]
                 auth=None,              # type: Optional[AuthBase]
                 headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1725,6 +1724,7 @@ class WeaverClient(object):
                 request_timeout=None,   # type: Optional[int]
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
+                output_links=None,      # type: Optional[Sequence[str]]
                 ):                      # type: (...) -> OperationResult
         """
         Obtain the results of a successful :term:`Job` execution.
@@ -1732,10 +1732,6 @@ class WeaverClient(object):
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param out_dir: Output directory where to store downloaded files if requested (default: CURDIR/JobID/<outputs>).
         :param download: Download any file reference found within results (CAUTION: could transfer lots of data!).
-        :param download_links:
-            Output IDs that are expected in ``Link`` headers, and that should be downloaded as well.
-            This is not performed automatically since there can be a lot of ``Links`` in responses,
-            and output IDs could have conflicting ``rel`` names with other indicative links.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1748,6 +1744,10 @@ class WeaverClient(object):
         :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param output_links:
+            Output IDs that are expected in ``Link`` headers, and that should be retrieved (or downloaded) as results.
+            This is not performed automatically since there can be a lot of ``Links`` in responses, and output IDs
+            could have conflicting ``rel`` names with other indicative links.
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -1759,6 +1759,11 @@ class WeaverClient(object):
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
+        headers = headers or {}
+        headers.update({
+            "Accept": ContentType.APP_JSON,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+        })
         resp = self._request("GET", result_url,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -1771,7 +1776,7 @@ class WeaverClient(object):
         out_links_meta = [(link, parse_link_header(link[-1])) for link in list(out_links.items())]
         out_links = [
             link for link, meta in out_links_meta
-            if not meta["href"].startswith(job_url) and meta["rel"] in (download_links or [])
+            if not meta["href"].startswith(job_url) and meta["rel"] in (output_links or [])
         ]
         if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):  # pragma: no cover
             return OperationResult(False, "Could not retrieve any output results from job.", outputs, headers)
@@ -2940,6 +2945,10 @@ def make_parser():
         "-O", "--outdir", dest="out_dir",
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
+    )
+    op_results.add_argument(
+        "-oL", "--output-link", dest="output_links", nargs="+",
+        help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
     )
 
     op_upload = WeaverArgumentParser(
