@@ -19,7 +19,7 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_duplicate.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'origin/master') }}
+      should_skip: ${{ steps.skip_duplicate.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master

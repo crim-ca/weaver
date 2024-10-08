@@ -5,7 +5,7 @@
 -r requirements.txt
 jinja2
 sphinx>=6,<8
-sphinx-argparse<0.5.0
+sphinx-argparse!=0.5.0
 sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1
 # adds redoc OpenAPI directly served on readthedocs
