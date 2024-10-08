@@ -1957,6 +1957,7 @@ def convert_output_params_schema(outputs, schema):
     if schema == JobInputsOutputsSchema.OGC:
         out_dict = {}
         for out in outputs:
+            out = dict(out)  # type: ignore  # avoid modifying reference
             out_id = get_any_id(out, pop=True)
             out_dict[out_id] = out
         return out_dict
