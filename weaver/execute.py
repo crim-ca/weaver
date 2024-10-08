@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPBadRequest
 
 from weaver.base import Constants
-from weaver.utils import get_header, parse_kvp, transform_json
+from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
     from typing import List, Optional, Union, Tuple
@@ -160,9 +160,8 @@ def parse_prefer_header_execute_mode(
         # /req/core/process-execute-default-execution-mode (C)
         return ExecuteMode.SYNC, wait_max, {}
 
-    params1 = parse_kvp(prefer, pair_sep=",", multi_value_sep=None)
-    params2 = parse_kvp(prefer, pair_sep=";", multi_value_sep=None)
-    params = transform_json(params1, extend=params2)
+    # allow both listing of multiple 'Prefer' headers and single 'Prefer' header with multi-param ';' separated
+    params = parse_kvp(prefer.replace(";", ","), pair_sep=",", multi_value_sep=None)
     wait = wait_max
     if "wait" in params:
         try:

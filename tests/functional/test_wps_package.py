@@ -2404,7 +2404,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
         headers = dict(self.json_headers)
 

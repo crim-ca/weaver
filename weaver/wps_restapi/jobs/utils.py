@@ -569,7 +569,7 @@ def get_job_results_response(
     #       - test_execute_single_output_multipart_accept_alt_format
 
     # FIXME: remove any 'refs' not needed anymore
-    results, refs = get_results(
+    results, _ = get_results(
         job, container,
         value_key="value",
         schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
@@ -629,7 +629,6 @@ def get_job_results_response(
         # use deserialized contents such that only the applicable fields remain
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
-        headers.extend(refs)
         return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
@@ -637,7 +636,6 @@ def get_job_results_response(
         # see:
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
         #   - https://docs.ogc.org/DRAFTS/18-062.html#req_core_job-results-param-outputs-empty
-        headers.extend(refs)
         return HTTPNoContent(headers=headers)
 
     # raw response can be data-only value, link-only or a mix of them
@@ -670,23 +668,10 @@ def get_job_results_response(
     out_info = out_vals[0][-1]  # type: ExecutionResultValue
     out_data = get_any_value(out_info)
     if (
-        (len(results) + len(refs)) > 1 or
+        len(results) > 1 or
         (isinstance(out_data, list) and len(out_data) > 1) or  # single output is an array, needs multipart
         is_accept_multipart
     ):
-        # FIXME: remove links backtrack not needed anymore - pass results directly
-        # backtrack link references that were generated if 'Accept: multipart/*' was omitted
-        # while using 'response=raw' leading to at least 1 by-value output
-        # (must force multipart with empty-part for links to respect OGC API - Processes v1.0)
-        # for ref in refs:
-        #     ref_link = parse_link_header(ref[-1])
-        #     results[ref_link["rel"]] = ref_link
-        # # attempt sort by original results ordering to generate multipart contents consistently
-        # out_order = list(convert_output_params_schema(job.results, JobInputsOutputsSchema.OGC))
-        # res_order = {out_id: results[out_id] for out_id in out_order if out_id in results}
-        # res_array = sorted(set(results) - set(res_order))  # in case of 'out.idx' employed for arrays
-        # res_order.update({out_id: results[out_id] for out_id in res_array})  # if missing link arrays
-        #return get_job_results_multipart(job, res_order, headers=headers, settings=settings)
         return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
@@ -698,14 +683,6 @@ def get_job_results_response(
     #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
     out_fmt = None
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
-
-    # FIXME: this else is impossible, remove 'if results' above and dedent
-    # else:
-    #     resp = HTTPOk(headers=headers)
-    # if refs:
-    #
-    #     resp.headerlist.extend(refs)
-    # return resp
 
 
 def generate_or_resolve_result(
