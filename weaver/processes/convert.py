@@ -3389,11 +3389,13 @@ def wps2json_job_payload(wps_request, wps_process):
         else:
             data_output = wps_request.outputs[oid]
         if as_ref:
-            data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.REFERENCE
         else:
             data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         data_output["id"] = oid
         data["outputs"].append(data_output)
+    if not data["outputs"]:
+        data.pop("outputs")  # ensure not 'no output' filter
     return data
 
 

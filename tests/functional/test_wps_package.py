@@ -1922,8 +1922,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 else:
                     # job not even created
                     assert code == 406, f"Error code should indicate not acceptable header for: [{lang}]"
-                    desc = resp.json.get("description")
-                    assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
+                    detail = resp.json.get("detail")
+                    assert "language" in detail and lang in detail, (
+                        "Expected error description to indicate bad language"
+                    )
 
     @mocked_aws_config
     @mocked_aws_s3
