@@ -2267,7 +2267,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
         assert results
         assert "bboxOutput" in results
-        assert results["bboxOutput"]["value"] == expect_bbox, (
+        assert results["bboxOutput"] == expect_bbox, (
             "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
         )
 

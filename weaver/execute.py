@@ -170,6 +170,7 @@ def parse_prefer_header_execute_mode(
                 # 'wait=x,y,z' parsed as 'wait=x' and 'y' / 'z' parameters on their own
                 # since 'wait' is the only referenced that users integers, it is guaranteed to be a misuse
                 raise ValueError("Invalid 'wait' with comma-separated values.")
+            params["wait"] = list(set(params["wait"]))  # allow duplicates silently because of extend/merge strategy
             if not len(params["wait"]) == 1:
                 raise ValueError("Too many 'wait' values.")
             wait = params["wait"][0]

@@ -27,6 +27,8 @@ from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
+    from typing import Any, Tuple
+
     from weaver.typedefs import ExecutionInputs, ExecutionOutputs, ExecutionResults, JSON, ProcessExecution
 
 
@@ -112,6 +114,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert body["outputTransmission"] == [ExecuteTransmissionMode.REFERENCE, ExecuteTransmissionMode.VALUE]
 
     def setup_jsonarray2netcdf_inputs(self, stack, use_temp_file=False):
+        # type: (contextlib.ExitStack[Any], bool) -> Tuple[JSON, str]
         if use_temp_file:
             dir_path = tempfile.gettempdir()
             url_path = f"file://{dir_path}"
@@ -449,7 +452,7 @@ class BuiltinAppTest(WpsConfigBase):
         ]
 
     def setup_echo_process_execution_body(self, stack):
-        # type: (contextlib.ExitStack) -> ProcessExecution
+        # type: (contextlib.ExitStack[Any]) -> ProcessExecution
         tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())  # pylint: disable=R1732
         tmp_feature_collection_geojson = stack.enter_context(
             tempfile.NamedTemporaryFile(suffix=".geojson", mode="w", dir=tmp_dir)  # pylint: disable=R1732
@@ -547,6 +550,12 @@ class BuiltinAppTest(WpsConfigBase):
                 }
             }
         }
+        # ensure outputs are not filtered, request all explicitly,
+        # but auto-resolve transmissionMode/format for missing ones
+        missing_outputs = {out.replace("Input", "Output") for out in inputs}
+        for out in missing_outputs:
+            if out not in outputs:
+                outputs[out] = {}
         body = {
             "inputs": inputs,
             "outputs": outputs,
@@ -597,8 +606,8 @@ class BuiltinAppTest(WpsConfigBase):
                         io_val.update(io_defaults[io_key])
         assert payload == body
 
-    def validate_echo_process_results(self, results, inputs):
-        # type: (ExecutionResults, ExecutionInputs) -> None
+    def validate_echo_process_results(self, results, inputs, outputs):
+        # type: (ExecutionResults, ExecutionInputs, ExecutionOutputs) -> None
         """
         Validate that the outputs from the example ``EchoProcess``.
 
@@ -626,39 +635,44 @@ class BuiltinAppTest(WpsConfigBase):
             "arrayOutput",
         ]:
             in_id = out_id.replace("Output", "Input")
-            out_val = results[out_id].get("value", results[out_id])
-            assert out_val == inputs[in_id]
+            if isinstance(results[out_id], dict) and "value" in results[out_id]:
+                res_val = results[out_id].get("value", results[out_id])
+            else:
+                res_val = results[out_id]
+            assert res_val == inputs[in_id]
 
         # special literal/bbox object handling
-        for out_id, out_fields_map in [
+        for out_id, res_fields_map in [
             (
                 "measureOutput",
                 [
-                    (["value", "measurement"], ["value"]),
+                    (["value", "measurement"], []),  # ["value"]),  # now returned directly for literal
                 ]
             ),
             (
                 "boundingBoxOutput",
                 [
-                    (["bbox"], ["value", "bbox"]),
-                    (Crs(inputs["boundingBoxInput"]["crs"]).getcodeurn(), ["value", "crs"]),
+                    (["bbox"], ["bbox"]),
+                    (Crs(inputs["boundingBoxInput"]["crs"]).getcodeurn(), ["crs"]),
                 ]
             ),
         ]:
             in_id = out_id.replace("Output", "Input")
-            for field_map in out_fields_map:
+            for field_map in res_fields_map:
                 in_val_nested = inputs[in_id]
-                out_val_nested = results[out_id]
+                res_val_nested = results[out_id]
                 if isinstance(field_map[0], list):
                     for nested_field in field_map[0]:
                         in_val_nested = in_val_nested[nested_field]
                 else:
                     in_val_nested = field_map[0]
                 for nested_field in field_map[1]:
-                    out_val_nested = out_val_nested[nested_field]
-                assert out_val_nested == in_val_nested
+                    res_val_nested = res_val_nested[nested_field]
+                assert res_val_nested == in_val_nested
 
         # complex outputs, contents should be the same, but stage-out URL is expected
+        outputs = copy.deepcopy(outputs)
+        outputs = {out["id"]: out for out in outputs} if isinstance(outputs, list) else outputs
         for out_id in [
             "complexObjectOutput",
             "geometryOutput",
@@ -667,20 +681,16 @@ class BuiltinAppTest(WpsConfigBase):
         ]:
             in_id = out_id.replace("Output", "Input")
             in_items = copy.deepcopy(inputs[in_id])
-            out_items = copy.deepcopy(results[out_id])
+            out_items = copy.deepcopy(outputs[out_id])
+            res_items = copy.deepcopy(results[out_id])
             in_items = [in_items] if isinstance(in_items, dict) else in_items
             out_items = [out_items] if isinstance(out_items, dict) else out_items
-            assert len(in_items) == len(out_items)
-            for in_def, out_def in zip(in_items, out_items):
-                assert "href" in out_def
+            res_items = [res_items] if isinstance(res_items, dict) else res_items
+            assert len(in_items) == len(res_items)
+            for in_def, out_def, res_def in zip(in_items, out_items, res_items):
                 # inputs use local paths (mocked by test for "remote" locations) or literal JSON
                 in_path = in_def.pop("href", None)
                 in_path = in_path[7:] if str(in_path).startswith("file://") else in_path
-                out_url = out_def.pop("href")  # compare the rest of the metadata after
-                out_path = map_wps_output_location(out_url, self.settings, url=False)
-                # use binary comparison since some contents are binary and others not
-                with open(out_path, mode="rb") as out_file:
-                    out_data = out_file.read()
                 in_as_data = not in_path
                 if in_as_data:
                     in_data = in_def.pop("value")
@@ -689,18 +699,47 @@ class BuiltinAppTest(WpsConfigBase):
                 else:
                     with open(in_path, mode="rb") as in_file:
                         in_data = in_file.read()
-                assert out_data == in_data
-                # even if the input was provided directly as JSON,
-                # the output will be provided as reference (return=minimal)
-                if in_def != {}:
-                    in_type = in_def["mediaType"] if in_as_data else in_def["type"]
-                    assert out_def["type"] == in_type, (
-                        "Since explicit format was specified, the same is expected as output"
-                    )
+
+                # validate output result against requested output transmission mode
+                out_mode = out_def.get("transmissionMode", ExecuteTransmissionMode.REFERENCE)
+                if out_mode == ExecuteTransmissionMode.REFERENCE:
+                    assert "href" in res_def
+                    assert "value" not in res_def
+                    res_url = res_def.pop("href")  # compare the rest of the metadata after
+                    res_path = map_wps_output_location(res_url, self.settings, url=False)
+                    # use binary comparison since some contents are binary and others not
+                    with open(res_path, mode="rb") as res_file:
+                        res_data = res_file.read()
+                    assert res_data == in_data
+                    # even if the input was provided directly as JSON,
+                    # the output will be provided as reference (return=minimal)
+                    if in_def != {}:
+                        in_type = in_def["mediaType"] if in_as_data else in_def["type"]
+                        assert res_def["type"] == in_type, (
+                            "Since explicit format was specified, the same is expected as output"
+                        )
+                    else:
+                        assert res_def["type"] == ContentType.APP_JSON, (
+                            "Since no explicit format was specified, at least needs to be JSON"
+                        )
                 else:
-                    assert out_def["type"] == ContentType.APP_JSON, (
-                        "Since no explicit format was specified, at least needs to be JSON"
-                    )
+                    assert "href" not in res_def
+                    assert "value" in res_def
+                    res_data = res_def.pop("value")  # compare the rest of the metadata after
+                    res_data = (json.dumps(res_data) if isinstance(res_data, dict) else res_data).encode()
+                    res_data = ContentEncoding.decode(res_data) if in_def.get("encoding") == "base64" else res_data
+                    assert res_data == in_data
+                    # even if the input was provided directly as JSON,
+                    # the output will be provided as reference (return=minimal)
+                    if in_def != {}:
+                        in_type = in_def["mediaType"] if in_as_data else in_def["type"]
+                        assert res_def["mediaType"] == in_type, (
+                            "Since explicit format was specified, the same is expected as output"
+                        )
+                    else:
+                        assert res_def["mediaType"] == ContentType.APP_JSON, (
+                            "Since no explicit format was specified, at least needs to be JSON"
+                        )
 
     def test_echo_process_execute_sync(self):
         """
@@ -728,14 +767,19 @@ class BuiltinAppTest(WpsConfigBase):
             # since sync, results are directly available instead of job status
             # even if results are returned directly (instead of status),
             # status location link is available for reference as needed
-            assert "Location" in resp.headers
+            assert "Location" not in resp.headers
+            link_headers = [ref for hdr, ref in resp.headerlist if hdr == "Link"]
+            link_relations = ["status", "monitor"]
+            link_job_status = [link for link in link_headers if any(f"rel=\"{rel}\"" in link for rel in link_relations)]
+            assert len(link_job_status) == len(link_relations)
+
             # validate sync was indeed applied (in normal situation, not considering mock test that runs in sync)
             assert resp.headers["Preference-Applied"] == headers["Prefer"]
             # following details should not be available since results are returned in sync instead of async job status
             for field in ["status", "created", "finished", "duration", "progress"]:
                 assert field not in resp.json
             results = resp.json
-            self.validate_echo_process_results(results, body["inputs"])
+            self.validate_echo_process_results(results, body["inputs"], body["outputs"])
 
     def test_echo_process_execute_async(self):
         """
@@ -773,7 +817,7 @@ class BuiltinAppTest(WpsConfigBase):
 
             job_url = resp.json["location"]
             results = self.monitor_job(job_url)
-            self.validate_echo_process_results(results, body["inputs"])
+            self.validate_echo_process_results(results, body["inputs"], body["outputs"])
 
 
 def test_jsonarray2netcdf_process():
