@@ -58,7 +58,7 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response, get_job_return
+from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_return, get_job_submission_response
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)

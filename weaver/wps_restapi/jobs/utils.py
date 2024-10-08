@@ -1,5 +1,4 @@
 import io
-
 import math
 import os
 import shutil
@@ -33,8 +32,8 @@ from weaver.exceptions import (
     ServiceNotAccessible,
     ServiceNotFound
 )
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode, parse_prefer_header_return, ExecuteReturnPreference
-from weaver.formats import ContentType, get_format, repr_json, ContentEncoding
+from weaver.execute import ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode, parse_prefer_header_return
+from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -79,8 +78,8 @@ if TYPE_CHECKING:
         ExecutionResultValue,
         HeadersTupleType,
         HeadersType,
-        JSON,
         JobValueFormat,
+        JSON,
         PyramidRequest,
         SettingsType
     )
@@ -301,7 +300,7 @@ def make_result_link(
     output_id,              # type: str
     output_mode,            # type: AnyExecuteTransmissionMode
     output_format=None,     # type: Optional[JobValueFormat]
-    *,                      # type: Any
+    *,                      # force named keyword arguments after
     settings,               # type: SettingsType
 ):                          # type: (...) -> List[str]
     """
@@ -315,7 +314,7 @@ def make_result_link(
     links = []
     for suffix, value in zip(suffixes, values):
         result_id = f"{output_id}{suffix}"
-        headers, _ = generate_or_resolve_result(job, result, result_id, output_id, output_mode, output_format, settings)
+        headers, _ = generate_or_resolve_result(job, value, result_id, output_id, output_mode, output_format, settings)
         url = headers["Content-Location"]
         typ = headers["Content-Type"]
         enc = headers.get("Content-Encoding", None)
@@ -387,7 +386,7 @@ def get_results(  # pylint: disable=R1260
         else:
             array = value if isinstance(value, list) else [value]
 
-        for val_idx, val_item in enumerate(array):
+        for val_item in array:
             val_data = val_item
             if isinstance(val_item, dict) and isinstance(value, list):
                 rtype = "href" if get_any_value(val_item, key=True, file=True, data=False) else "data"
@@ -516,7 +515,7 @@ def get_job_output_transmission(job, output_id, is_reference):
 
 def get_job_results_response(
     job,                        # type: Job
-    *,                          # type: Any
+    *,                          # force named keyword arguments after
     container,                  # type: AnySettingsContainer
     headers=None,               # type: Optional[AnyHeadersContainer]
     results_headers=None,       # type: Optional[AnyHeadersContainer]
@@ -839,7 +838,7 @@ def get_job_results_links(
     references,     # type: Dict[str, ExecutionResultValue]
     transmissions,  # type: Dict[str, Tuple[AnyExecuteTransmissionMode, JobValueFormat]]
     headers,        # type: AnyHeadersContainer
-    *,              # type: Any
+    *,              # force named keyword arguments after
     settings,       # type: SettingsType
 ):                  # type: (...) -> AnyHeadersContainer
     """
@@ -860,7 +859,7 @@ def get_job_results_single(
     output_id,      # type: str
     output_format,  # type: Optional[JobValueFormat]
     headers,        # type: AnyHeadersContainer
-    *,              # type: Any
+    *,              # force named keyword arguments after
     settings,       # type: AnySettingsContainer
 ):                  # type: (...) -> Union[HTTPOk, HTTPNoContent]
     """
@@ -881,6 +880,7 @@ def get_job_results_single(
     is_ref = bool(get_any_value(result, key=True, file=True, data=False))
     out_data = get_any_value(result, file=is_ref, data=not is_ref)
     out_mode, out_fmt = get_job_output_transmission(job, output_id, is_ref)
+    output_format = output_format or out_fmt
     if out_mode == ExecuteTransmissionMode.REFERENCE:
         link = make_result_link(job, result, output_id, out_mode, output_format, settings=settings)
         headers.extend([("Link", link[0])])
@@ -932,13 +932,13 @@ def get_job_results_document(job, results, *, settings):
     def make_result(result, result_id, output_id):
         # type: (ExecutionResultValue, str, str) -> Union[AnyValueType, ExecutionResultObject]
         if isinstance(result, dict):
-            key = get_any_value(result, key=True)
+            is_ref = bool(get_any_value(result, key=True, file=True, data=False))
             val = get_any_value(result)
         else:
-            key = "value"
+            is_ref = False
             val = result
             result = {"value": val}
-        out_mode, out_fmt = get_job_output_transmission(job, result_id, is_reference=(key == "href"))
+        out_mode, out_fmt = get_job_output_transmission(job, result_id, is_reference=is_ref)
         headers, data = generate_or_resolve_result(job, result, result_id, output_id, out_mode, out_fmt, settings)
         if data is None:
             ref = {
@@ -1026,8 +1026,8 @@ def get_job_results_multipart(job, results, *, headers, settings):
                 }
                 yield res_id, (None, sub_multi, None, sub_headers)
 
-            key = get_any_value(result, key=True)
-            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=(key == "href"))
+            is_ref = bool(get_any_value(result, key=True, file=True, data=False))
+            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=is_ref)
             res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, out_mode, out_fmt, settings)
             c_type = res_headers.get("Content-Type")
             c_loc = res_headers.get("Content-Location")

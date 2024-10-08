@@ -353,6 +353,7 @@ OAS_DATA_TYPES = frozenset(
     OAS_LITERAL_TYPES
 )
 
+# pylint: disable=C0103,invalid-name
 ProcessSchemaOGCType = Literal["OGC", "ogc"]
 ProcessSchemaOLDType = Literal["OLD", "old"]
 ProcessSchemaWPSType = Literal["WPS", "wps"]

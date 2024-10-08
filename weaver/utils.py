@@ -1200,7 +1200,7 @@ def get_href_headers(
     missing_ok=False,                       # type: bool
     settings=None,                          # type: Optional[SettingsType]
     **option_kwargs,                        # type: Unpack[Union[SchemeOptions, RequestOptions]]
- ):                                         # type: (...) -> MetadataResult
+):                                          # type: (...) -> MetadataResult
     """
     Obtain headers applicable for the provided file or directory reference.
 

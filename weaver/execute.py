@@ -7,7 +7,7 @@ from weaver.base import Constants
 from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Union, Tuple
+    from typing import List, Optional, Tuple, Union
 
     from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal
 
@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         ExecuteTransmissionModeReferenceType,
         ExecuteTransmissionModeValueType,
     ]
+    # pylint: disable=C0103,invalid-name
     ExecuteCollectionFormatType_STAC = Literal["stac-collection"]
     ExecuteCollectionFormatType_OGC_COVERAGE = Literal["ogc-coverage-collection"]
     ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]

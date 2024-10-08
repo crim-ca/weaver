@@ -3543,12 +3543,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
     def setUp(self) -> None:
         self.process_store.clear_processes()
-    
+
     @staticmethod
     def remove_result_format(results):
         """
         Remove the results ``format`` property to simplify test comparions.
-        
+
         For backward compatibility, the ``format`` property is inserted in result definitions when represented
         as :term:`JSON`, on top of the :term:`OGC` compliant ``type``, ``mediaType``, etc. of the "format" schema
         for qualified values and link references.
@@ -3593,7 +3593,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         res_indent = len(results) - len(res_dedent)
         res_spaces = " " * res_indent
         res_dedent = res_dedent.replace(f"\n{res_spaces}", "\r\n")  # indented line
-        res_dedent = res_dedent.replace(f"\n\r\n", "\r\n\r\n")  # empty line (header/body separator)
+        res_dedent = res_dedent.replace("\n\r\n", "\r\n\r\n")  # empty line (header/body separator)
         res_dedent = res_dedent.replace("\r\r", "\r")  # in case windows
         res_dedent = res_dedent.rstrip("\n ")  # last line often indented less because of closing multiline string
         return res_dedent

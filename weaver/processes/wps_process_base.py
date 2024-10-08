@@ -10,7 +10,7 @@ from werkzeug.datastructures import Headers
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode, ExecuteReturnPreference
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType, repr_json
 from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
 from weaver.processes.convert import get_cwl_io_type

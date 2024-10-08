@@ -37,7 +37,7 @@ from tests.utils import (
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode, ExecuteReturnPreference
+from weaver.execute import ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_MULTIPLE_INPUT,

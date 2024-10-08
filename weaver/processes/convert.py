@@ -126,9 +126,9 @@ if TYPE_CHECKING:
     from requests.models import Response
 
     from weaver.processes.constants import (
-        JobInputsOutputsSchemaType,
         JobInputsOutputsSchemaAnyOGCType,
         JobInputsOutputsSchemaAnyOLDType,
+        JobInputsOutputsSchemaType,
         ProcessSchemaType,
         WPS_DataType,
         WPS_LiteralData_Type

@@ -41,12 +41,12 @@ from weaver.utils import get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.utils import get_job_results_document
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
     DATETIME_INTERVAL_OPEN_START_SYMBOL
 )
-from weaver.wps_restapi.jobs.utils import get_job_results_document
 
 if TYPE_CHECKING:
     from typing import Iterable, List, Optional, Tuple, Union
