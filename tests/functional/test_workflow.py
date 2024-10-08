@@ -1525,14 +1525,14 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             log_full_trace=True,
         )
         assert result == {
-            "code1": {"value": 123456},
-            "code2": {"value": 123456},
-            "integer1": {"value": 3},
-            "integer2": {"value": 3},
-            "message1": {"value": "msg"},
-            "message2": {"value": "msg"},
-            "number1": {"value": 3.1416},
-            "number2": {"value": 3.1416},
+            "code1": 123456,
+            "code2": 123456,
+            "integer1": 3,
+            "integer2": 3,
+            "message1": "msg",
+            "message2": "msg",
+            "number1": 3.1416,
+            "number2": 3.1416,
         }
 
     def test_workflow_multi_input_and_subworkflow(self):
