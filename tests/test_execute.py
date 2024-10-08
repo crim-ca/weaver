@@ -63,10 +63,10 @@ def test_prefer_header_execute_mode(headers, support, expected, extra_prefer):
     ["headers", "expected"],
     [
         # 1st variant is considered as 1 Prefer header with all values supplied simultaneously
-        # 2nd variant is considered as 2 Prefer headers, each with their respective value
-        # (this is because urllib, under the hood, concatenates the list of header-values using ';' separator)
-        ({"Prefer": "respond-async, wait=4"}, (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
         ({"Prefer": "respond-async; wait=4"}, (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
+        # 2nd variant is considered as 2 Prefer headers, each with their respective value
+        # (this is because urllib, under the hood, concatenates the list of header-values using ',' separator)
+        ({"Prefer": "respond-async, wait=4"}, (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
     ]
 )
 def test_parse_prefer_header_execute_mode_flexible(headers, expected):

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPBadRequest
 
 from weaver.base import Constants
-from weaver.utils import get_header, parse_kvp
+from weaver.utils import get_header, parse_kvp, transform_json
 
 if TYPE_CHECKING:
     from typing import List, Optional, Union, Tuple
@@ -160,7 +160,9 @@ def parse_prefer_header_execute_mode(
         # /req/core/process-execute-default-execution-mode (C)
         return ExecuteMode.SYNC, wait_max, {}
 
-    params = parse_kvp(prefer, pair_sep=",", multi_value_sep=None)
+    params1 = parse_kvp(prefer, pair_sep=",", multi_value_sep=None)
+    params2 = parse_kvp(prefer, pair_sep=";", multi_value_sep=None)
+    params = transform_json(params1, extend=params2)
     wait = wait_max
     if "wait" in params:
         try:
@@ -169,7 +171,7 @@ def parse_prefer_header_execute_mode(
                 # since 'wait' is the only referenced that users integers, it is guaranteed to be a misuse
                 raise ValueError("Invalid 'wait' with comma-separated values.")
             if not len(params["wait"]) == 1:
-                raise ValueError("Too many values.")
+                raise ValueError("Too many 'wait' values.")
             wait = params["wait"][0]
             if not str.isnumeric(wait) or "." in wait or wait.startswith("-"):
                 raise ValueError("Invalid integer for 'wait' in seconds.")

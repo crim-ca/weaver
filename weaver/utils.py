@@ -3891,6 +3891,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
                    rename=None,             # type: Optional[Dict[AnyKey, Any]]
                    remove=None,             # type: Optional[List[AnyKey]]
                    add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   extend=None,             # type: Optional[Dict[AnyKey, Any]]
                    replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
                    replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
                    ):                       # type: (...) -> Dict[str, JSON]
@@ -3913,6 +3914,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     :param rename: rename matched fields key name to the associated value name.
     :param remove: remove matched fields by name.
     :param add: add or override the fields names with associated values.
+    :param extend: add or extend the fields names with associated values.
     :param replace_values: replace matched values by the associated new values regardless of field names.
     :param replace_func:
         Replace values under matched fields by name with the returned value from the associated function.
@@ -3923,6 +3925,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     rename = rename or {}
     remove = remove or []
     add = add or {}
+    extend = extend or {}
     replace_values = replace_values or {}
     replace_func = replace_func or {}
 
@@ -3938,6 +3941,17 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     # add
     for k, v in add.items():
         json_data[k] = v
+
+    # extend
+    for k, v in extend.items():
+        v = v if isinstance(v, list) else [v]
+        if k in json_data:
+            if isinstance(json_data[k], list):
+                json_data[k].extend(v)
+            else:
+                json_data[k] = [json_data[k]] + v
+        else:
+            json_data[k] = v
 
     # replace values
     for key, value in json_data.items():
