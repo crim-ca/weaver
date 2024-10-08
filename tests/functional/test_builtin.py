@@ -21,6 +21,7 @@ from tests.utils import (
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
+from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.status import Status
 from weaver.utils import create_metalink, fully_qualified_name
 from weaver.wps.utils import map_wps_output_location
@@ -140,12 +141,15 @@ class BuiltinAppTest(WpsConfigBase):
             assert "output" in results, "Expected result ID 'output' in response body"
             assert isinstance(results["output"], dict), "Container of result ID 'output' should be a dict"
             assert "href" in results["output"]
-            assert "format" in results["output"]
-            fmt = results["output"]["format"]  # type: JSON
-            assert isinstance(fmt, dict), "Result format should be provided with content details"
-            assert "mediaType" in fmt
-            assert isinstance(fmt["mediaType"], str), "Result format Content-Type should be a single string definition"
-            assert fmt["mediaType"] == ContentType.APP_NETCDF, "Result 'output' format expected to be NetCDF file"
+            assert "format" not in results["output"]  # old format not applied in results anymore
+            # fmt = results["output"]["format"]  # type: JSON
+            # assert isinstance(fmt, dict), "Result format should be provided with content details"
+            # assert "mediaType" in fmt
+            # assert isinstance(fmt["mediaType"], str), "Result format Content-Type should be a single string definition"
+            # assert fmt["mediaType"] == ContentType.APP_NETCDF, "Result 'output' format expected to be NetCDF file"
+            assert results["output"]["type"] == ContentType.APP_NETCDF, (
+                "Result 'output' format expected to be NetCDF file"
+            )
             nc_href = results["output"]["href"]
             assert isinstance(nc_href, str) and len(nc_href)
         elif links:
@@ -210,7 +214,7 @@ class BuiltinAppTest(WpsConfigBase):
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
-                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}],
+                "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
             })
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)
@@ -237,14 +241,18 @@ class BuiltinAppTest(WpsConfigBase):
 
         self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None)
 
-    def test_jsonarray2netcdf_execute_async_output_by_reference_dontcare_response_document(self):
+    def test_jsonarray2netcdf_execute_async_output_by_reference_response_document(self):
         """
-        Jobs submitted with ``response=document`` are not impacted by ``transmissionMode``.
+        Jobs submitted with ``response=document`` with ``transmissionMode`` by reference.
 
         The results schema should always be returned when document is requested.
 
         .. seealso::
             https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
+
+        .. versionchanged:: 6.0
+            Removed the "don't care" aspect of the test, since ``transmissionMode`` is now respected.
+            Therefore, ``transmissionMode=reference`` is explicitly requested.
         """
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
@@ -576,6 +584,8 @@ class BuiltinAppTest(WpsConfigBase):
                if the inputs failing schema validation happened to be optional, those could not be propagated correctly.
 
         .. versionadded:: 4.35
+        .. versionadded:: 6.0
+            Modified defaults that are not the same anymore to allow alternative request combinations.
         """
         with contextlib.ExitStack() as stack:
             body = self.setup_echo_process_execution_body(stack)
@@ -583,7 +593,8 @@ class BuiltinAppTest(WpsConfigBase):
         expect_defaults = {
             "$schema": sd.Execute._schema,
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT,
+            # not auto-default anymore, but default in code if omitted, to allow 'Prefer' override
+            # "response": ExecuteResponse.DOCUMENT,
         }
         expect_input_defaults = {
             "measureInput": {"mediaType": ContentType.APP_JSON},
@@ -591,9 +602,10 @@ class BuiltinAppTest(WpsConfigBase):
             "complexObjectInput": {"mediaType": ContentType.APP_JSON},
         }
         expect_output_defaults = {
-            "imagesOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
-            "geometryOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
-            "featureCollectionOutput": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            # 'value' is not default anymore, to allow auto-resolution of data/link by result literal/complex type
+            "imagesOutput": {},  # {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            "geometryOutput": {},  # {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            "featureCollectionOutput": {},  # {"transmissionMode": ExecuteTransmissionMode.VALUE},
         }
         body.update(expect_defaults)
         for io_holder, io_defaults in [("inputs", expect_input_defaults), ("outputs", expect_output_defaults)]:
@@ -792,13 +804,6 @@ class BuiltinAppTest(WpsConfigBase):
             body.update({
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
-                "outputs": [
-                    {
-                        "id": input_id.replace("Input", "Output"),
-                        "transmissionMode": ExecuteTransmissionMode.VALUE,
-                    }
-                    for input_id in body["inputs"]
-                ],
             })
             for mock_exec in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec)

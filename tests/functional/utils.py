@@ -507,7 +507,8 @@ class WpsConfigBase(unittest.TestCase):
         check_job_status(resp)
         if return_status or expect_failed:
             return resp.json
-        resp = self.app.get(f"{status_url}/results", headers=self.json_headers)
+        params = {"schema": JobInputsOutputsSchema.OGC}  # not strict to preserve old 'format' field
+        resp = self.app.get(f"{status_url}/results", params=params, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 
