@@ -21,7 +21,6 @@ from tests.utils import (
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
-from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.status import Status
 from weaver.utils import create_metalink, fully_qualified_name
 from weaver.wps.utils import map_wps_output_location
@@ -134,24 +133,31 @@ class BuiltinAppTest(WpsConfigBase):
         body = {"inputs": [{"id": "input", "href": f"{url_path}/{os.path.basename(tmp_json.name)}"}]}
         return body, nc_data
 
-    def validate_jsonarray2netcdf_results(self, results, outputs, data, links):
+    def validate_jsonarray2netcdf_results(self, results, outputs, data, links, exec_body):
         # first validate format of OGC-API results
         if results is not None:
             assert isinstance(results, dict)
             assert "output" in results, "Expected result ID 'output' in response body"
             assert isinstance(results["output"], dict), "Container of result ID 'output' should be a dict"
-            assert "href" in results["output"]
             assert "format" not in results["output"]  # old format not applied in results anymore
-            # fmt = results["output"]["format"]  # type: JSON
-            # assert isinstance(fmt, dict), "Result format should be provided with content details"
-            # assert "mediaType" in fmt
-            # assert isinstance(fmt["mediaType"], str), "Result format Content-Type should be a single string definition"
-            # assert fmt["mediaType"] == ContentType.APP_NETCDF, "Result 'output' format expected to be NetCDF file"
-            assert results["output"]["type"] == ContentType.APP_NETCDF, (
-                "Result 'output' format expected to be NetCDF file"
-            )
-            nc_href = results["output"]["href"]
-            assert isinstance(nc_href, str) and len(nc_href)
+            out_defs = {out["id"]: out for out in exec_body["outputs"]}
+            nc_href = None
+            if out_defs.get("output", {}).get("transmissionMode") == ExecuteTransmissionMode.VALUE:
+                assert "value" in results["output"]
+                assert "mediaType" in results["output"]
+                assert results["output"]["value"] == data
+                assert results["output"]["mediaType"] == ContentType.APP_NETCDF
+                assert "href" not in results["output"]
+                assert "type" not in results["output"]
+            else:
+                assert "href" in results["output"]
+                assert results["output"]["type"] == ContentType.APP_NETCDF, (
+                    "Result 'output' format expected to be NetCDF file"
+                )
+                nc_href = results["output"]["href"]
+                assert isinstance(nc_href, str) and len(nc_href)
+                assert "value" not in results["output"]
+                assert "mediaType" not in results["output"]
         elif links:
             assert isinstance(links, list) and len(links) == 1 and isinstance(links[0], tuple)
             assert "rel=\"output\"" in links[0][1]
@@ -232,6 +238,8 @@ class BuiltinAppTest(WpsConfigBase):
         assert "outputs" not in resp.json
 
         job_url = resp.json["location"]
+        assert "Location" in resp.headers
+        assert resp.headers["Location"] == job_url
         results = self.monitor_job(job_url)
 
         output_url = f"{job_url}/outputs"
@@ -239,7 +247,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None, body)
 
     def test_jsonarray2netcdf_execute_async_output_by_reference_response_document(self):
         """
@@ -285,7 +293,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
-        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, result_links, body)
 
     def test_jsonarray2netcdf_execute_async_output_by_value_response_raw(self):
         """
@@ -329,7 +337,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
 
-        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links, body)
 
     def test_jsonarray2netcdf_execute_async_output_by_reference_response_raw(self):
         """
@@ -370,7 +378,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links)
+        self.validate_jsonarray2netcdf_results(None, outputs, nc_data, result_links, body)
 
     def test_jsonarray2netcdf_execute_sync(self):
         """
@@ -398,16 +406,28 @@ class BuiltinAppTest(WpsConfigBase):
 
         # since sync, results are directly available instead of job status
         # even if results are returned directly (instead of status),
-        # status location link is available for reference as needed
-        assert "Location" in resp.headers
+        # status link is available for reference as needed
+        # however, 'Location' header is not provided since there is no need to redirect
+        assert "Location" not in resp.headers
+        link_headers = [ref for hdr, ref in resp.headerlist if hdr == "Link"]
+        link_relations = ["status", "monitor"]
+        link_job_status = [link for link in link_headers if any(f"rel=\"{rel}\"" in link for rel in link_relations)]
+        assert len(link_job_status) == len(link_relations)
         # validate sync was indeed applied (in normal situation, not considering mock test that runs in sync)
         assert resp.headers["Preference-Applied"] == headers["Prefer"]
         # following details should not be available since results are returned in sync instead of async job status
         for field in ["status", "created", "finished", "duration", "progress"]:
             assert field not in resp.json
 
+        # since sync response is represented as 'document',
+        # the 'Content-Location' header must indicate the Job Results endpoint
+        # that allows retrieving the same results at a later time
+        assert "Content-Location" in resp.headers
+        assert resp.headers["Content-Location"].endswith("/results")
+        job_results_url = resp.headers["Content-Location"]
+        job_url = job_results_url.rsplit("/results", 1)[0]
+
         # validate that job can still be found and its metadata are defined although executed in sync
-        job_url = resp.headers["Location"]
         resp = self.app.get(job_url, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == ContentType.APP_JSON
@@ -427,7 +447,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
-        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None)
+        self.validate_jsonarray2netcdf_results(results, outputs, nc_data, None, body)
 
     def test_echo_process_describe(self):
         resp = self.app.get("/processes/EchoProcess", headers=self.json_headers)
@@ -778,7 +798,8 @@ class BuiltinAppTest(WpsConfigBase):
 
             # since sync, results are directly available instead of job status
             # even if results are returned directly (instead of status),
-            # status location link is available for reference as needed
+            # status link is available for reference as needed
+            # however, 'Location' header is not provided since there is no need to redirect
             assert "Location" not in resp.headers
             link_headers = [ref for hdr, ref in resp.headerlist if hdr == "Link"]
             link_relations = ["status", "monitor"]
