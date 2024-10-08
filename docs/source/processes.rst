@@ -848,13 +848,13 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               | (literal) | - |res-data|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (complex) | - |res-ref|_                                    |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
     |                     |              |               | (complex) | - |res-data|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (literal) | - |res-ref|_                                    |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_                                   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | |none|       | |none|        | >1        | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content by default [#resCTypeMulti]_          |
@@ -876,24 +876,30 @@ Following is a detailed listing of the expected response structure according to 
     | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     | [#resPreferReturn]_ |              | (for *all*)   |           |   content with embedded part links if requested |
     |                     |              |               |           |   by ``Accept`` header [#resCTypeMulti]_        |
-    |                     |              |               |           | - otherwise, similar to |res-ref|, but with     |
+    |                     |              |               |           | - otherwise, similar to |res-link|, but with    |
     |                     |              |               |           |   a ``Link`` header for each requested output   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content                                       |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | ``minimal``         | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               |           |   content                                       |
+    | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
+    |                     |              |               | (literal) | - |res-data|_                                   |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
+    |                     |              |               | (complex) | - |res-link|_                                   |
+    +---------------------+--------------+---------------+-----------+-------------------------------------------------+
+    | ``minimal``         | ``document`` | |none|        | |none|    | - :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               | or >1     |   content                                       |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | ``minimal``         | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               | (literal) |   content                                       |
-    |                     |              |               |           | - using data included inline                    |
+    | ``minimal``         | ``document`` | ``value``     | |none|    | - :ref:`Results <job-results-document-minimal>` |
+    |                     |              |               | or >1     |   content                                       |
+    |                     |              |               | (literal) | - using data included inline                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | ``reference`` | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               | (complex) |   content                                       |
-    |                     |              |               |           | - using file link reference                     |
+    |                     |              |               | or >1     |   content                                       |
+    |                     |              |               | (complex) | - using file link reference                     |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``document`` | ``value``     | |any|     | - :ref:`Results <job-results-document-minimal>` |
     | [#resPreferReturn]_ |              |               | (complex) |   content                                       |
@@ -915,8 +921,8 @@ Following is a detailed listing of the expected response structure according to 
 .. |res-data| replace:: Results for a Single Output with Data
 .. _res-data: processes.html#job-results-raw-single-data
 
-.. |res-ref| replace:: Results for a Single Output with Link
-.. _res-ref: processes.html#job-results-raw-single-ref
+.. |res-link| replace:: Results for a Single Output with Link
+.. _res-link: processes.html#job-results-raw-single-ref
 
 .. important::
     Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
@@ -970,11 +976,16 @@ Following is a detailed listing of the expected response structure according to 
 .. [#outN]
     Corresponds to the number of ``outputs`` *requested* in the :ref:`proc_exec_body`, and the data type of
     those outputs if this distinction impacts the results.
-    
+
     Note that omitting ``outputs`` (i.e.: indicated by |out-mode| with |none| in the table) is equivalent to
-    requesting *all* outputs offered by the :term:`Process`. To request "*no outputs at all*"
-    (if it makes sense for :term:`Process` to do so),
-    the empty mapping ``outputs: {}`` should be submitted explicitly [#resNoContent]_.
+    requesting *all* outputs offered by the :term:`Process`. If a :term:`Process` happens to generate only a
+    single output, but that ``outputs`` was omitted, the interpretation will also be as if *all* outputs were
+    requested, typically resulting in a response similar to |any| or ``N>1`` cases. It is important to make this
+    distinction  from *explicitly* requesting a single output, which will return it directly in the response contents
+    rather than embedded within a "container" body such as the ``minimal``/``document`` response.
+
+    To request "*no outputs at all*" (if it makes sense for :term:`Process` to do so),
+    the empty mapping ``outputs: {}`` should be submitted *explicitly* [#resNoContent]_.
     See table :ref:`table-exec-body` for an example requesting specific outputs.
 
 .. [#resNoContent]

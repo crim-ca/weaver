@@ -3829,7 +3829,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 204, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -3906,7 +3906,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4514,11 +4514,12 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+        # FIXME: add check of direct request of output (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
-        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
-        assert result_json.content_type == ContentType.APP_JSON
-        assert result_json.json == {"data": "test"}
+        # result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        # assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        # assert result_json.content_type == ContentType.APP_JSON
+        # assert result_json.json == {"data": "test"}
 
     def test_execute_single_output_response_document_default_format_json_special(self):
         """

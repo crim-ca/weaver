@@ -593,7 +593,14 @@ def get_job_results_response(
     is_rep = job_ret == ExecuteReturnPreference.REPRESENTATION
     is_raw = job_resp == ExecuteResponse.RAW
 
-    if not is_raw and not is_accept_multipart:
+    # if a single output is explicitly requested, the representation must be ignored and return it directly
+    # (single result does not matter for a process generating only one, it is the N output requested that matters)
+    is_single_output_minimal = (
+        job.outputs is not None and len(job.outputs) == 1 and
+        not is_rep and ContentType.APP_JSON not in job.accept_type  # alternative way to request 'minimal'/'document'
+    )
+
+    if not is_raw and not is_accept_multipart and not is_single_output_minimal:
         try:
             results_schema = sd.ResultsDocument()
             results_json = results_schema.deserialize(results)
