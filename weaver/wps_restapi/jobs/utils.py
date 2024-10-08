@@ -640,72 +640,71 @@ def get_job_results_response(
         return HTTPNoContent(headers=headers)
 
     # raw response can be data-only value, link-only or a mix of them
-    if results:
-        # if raw representation is requested and all requested outputs resolve as links
-        # without explicit 'accept: multipart', then all must use link headers
-        #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
-        res_refs = {
-            out_id: bool(get_any_value(out, key=True, file=True, data=False))
-            for out_id, out in results.items()
-        }
-        out_transmissions = {
-            out_id: get_job_output_transmission(job, out_id, is_ref)
-            for out_id, is_ref in res_refs.items()
-        }
-        if is_raw and not is_rep and all(
-            out_mode == ExecuteTransmissionMode.REFERENCE
-            for out_mode, _ in out_transmissions.values()
-        ):
-            headers = get_job_results_links(job, results, out_transmissions, headers=headers, settings=settings)
-            return HTTPNoContent(headers=headers)
+    # if raw representation is requested and all requested outputs resolve as links
+    # without explicit 'accept: multipart', then all must use link headers
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
+    res_refs = {
+        out_id: bool(get_any_value(out, key=True, file=True, data=False))
+        for out_id, out in results.items()
+    }
+    out_transmissions = {
+        out_id: get_job_output_transmission(job, out_id, is_ref)
+        for out_id, is_ref in res_refs.items()
+    }
+    if is_raw and not is_rep and all(
+        out_mode == ExecuteTransmissionMode.REFERENCE
+        for out_mode, _ in out_transmissions.values()
+    ):
+        headers = get_job_results_links(job, results, out_transmissions, headers=headers, settings=settings)
+        return HTTPNoContent(headers=headers)
 
-        # FIXME: support ZIP or similar "container" output (https://github.com/crim-ca/weaver/issues/726)
-        # FIXME: support Metalink - needs by-reference only (https://github.com/crim-ca/weaver/issues/663)
-        # multipart response
-        #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
-        #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
-        #   - https://docs.ogc.org/DRAFTS/18-062.html#per_core_job-results-async-many-other-formats
-        # extract data to see if it happens to be an array (i.e.: 1 output "technically", but needs multipart)
-        out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
-        out_info = out_vals[0][-1]  # type: ExecutionResultValue
-        out_data = get_any_value(out_info)
-        if (
-            (len(results) + len(refs)) > 1 or
-            (isinstance(out_data, list) and len(out_data) > 1) or  # single output is an array, needs multipart
-            is_accept_multipart
-        ):
-            # FIXME: remove links backtrack not needed anymore - pass results directly
-            # backtrack link references that were generated if 'Accept: multipart/*' was omitted
-            # while using 'response=raw' leading to at least 1 by-value output
-            # (must force multipart with empty-part for links to respect OGC API - Processes v1.0)
-            # for ref in refs:
-            #     ref_link = parse_link_header(ref[-1])
-            #     results[ref_link["rel"]] = ref_link
-            # # attempt sort by original results ordering to generate multipart contents consistently
-            # out_order = list(convert_output_params_schema(job.results, JobInputsOutputsSchema.OGC))
-            # res_order = {out_id: results[out_id] for out_id in out_order if out_id in results}
-            # res_array = sorted(set(results) - set(res_order))  # in case of 'out.idx' employed for arrays
-            # res_order.update({out_id: results[out_id] for out_id in res_array})  # if missing link arrays
-            #return get_job_results_multipart(job, res_order, headers=headers, settings=settings)
-            return get_job_results_multipart(job, results, headers=headers, settings=settings)
+    # FIXME: support ZIP or similar "container" output (https://github.com/crim-ca/weaver/issues/726)
+    # FIXME: support Metalink - needs by-reference only (https://github.com/crim-ca/weaver/issues/663)
+    # multipart response
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
+    #   - https://docs.ogc.org/DRAFTS/18-062.html#per_core_job-results-async-many-other-formats
+    # extract data to see if it happens to be an array (i.e.: 1 output "technically", but needs multipart)
+    out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
+    out_info = out_vals[0][-1]  # type: ExecutionResultValue
+    out_data = get_any_value(out_info)
+    if (
+        (len(results) + len(refs)) > 1 or
+        (isinstance(out_data, list) and len(out_data) > 1) or  # single output is an array, needs multipart
+        is_accept_multipart
+    ):
+        # FIXME: remove links backtrack not needed anymore - pass results directly
+        # backtrack link references that were generated if 'Accept: multipart/*' was omitted
+        # while using 'response=raw' leading to at least 1 by-value output
+        # (must force multipart with empty-part for links to respect OGC API - Processes v1.0)
+        # for ref in refs:
+        #     ref_link = parse_link_header(ref[-1])
+        #     results[ref_link["rel"]] = ref_link
+        # # attempt sort by original results ordering to generate multipart contents consistently
+        # out_order = list(convert_output_params_schema(job.results, JobInputsOutputsSchema.OGC))
+        # res_order = {out_id: results[out_id] for out_id in out_order if out_id in results}
+        # res_array = sorted(set(results) - set(res_order))  # in case of 'out.idx' employed for arrays
+        # res_order.update({out_id: results[out_id] for out_id in res_array})  # if missing link arrays
+        #return get_job_results_multipart(job, res_order, headers=headers, settings=settings)
+        return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
-        # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-        res_id = out_vals[0][0]
-        # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
-        #   req_fmt = guess_target_format(container)   where container=request
-        #   out_fmt (see above)
-        #   out_type = result.get("type")
-        #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
-        out_fmt = None
-        return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+    # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
+    res_id = out_vals[0][0]
+    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
+    #   req_fmt = guess_target_format(container)   where container=request
+    #   out_fmt (see above)
+    #   out_type = result.get("type")
+    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
+    out_fmt = None
+    return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
 
     # FIXME: this else is impossible, remove 'if results' above and dedent
-    else:
-        resp = HTTPOk(headers=headers)
-    if refs:
-
-        resp.headerlist.extend(refs)
-    return resp
+    # else:
+    #     resp = HTTPOk(headers=headers)
+    # if refs:
+    #
+    #     resp.headerlist.extend(refs)
+    # return resp
 
 
 def generate_or_resolve_result(
@@ -778,8 +777,9 @@ def generate_or_resolve_result(
             with open(loc, mode="w", encoding="utf-8") as out_file:
                 out_file.write(data2str(val))
 
-    if is_ref and output_mode == ExecuteTransmissionMode.VALUE:
-        res_data = io.FileIO(loc, mode="rb")
+    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and typ != ContentType.APP_DIR:
+        res_path = loc[7:] if loc.startswith("file://") else loc
+        res_data = io.FileIO(res_path, mode="rb")
 
     res_headers = get_href_headers(
         loc,

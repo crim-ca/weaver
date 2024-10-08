@@ -37,7 +37,7 @@ from tests.utils import (
 )
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WeaverConfiguration
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteResponse, ExecuteTransmissionMode, ExecuteReturnPreference
 from weaver.formats import ContentType
 from weaver.processes.constants import (
     CWL_REQUIREMENT_MULTIPLE_INPUT,
@@ -926,7 +926,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                                 headers=self.headers, json=execute_body)
             self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING],
                              message="Response process execution job status should be one of running values.")
-            job_location = resp.json.get("location")
+            job_location = resp.location
             job_id = resp.json.get("jobID")
             self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
                              message="Response process execution job ID must match to validate results.")
@@ -988,7 +988,9 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 break
             self.assert_test(lambda: False, message=f"Unknown job execution status: '{status}'.")
         path = f"{job_location_url}/results"
-        resp = self.request("GET", path, headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
+        resp_headers = {"Accept": ContentType.APP_JSON, "Prefer": f"return={ExecuteReturnPreference.MINIMAL}"}
+        resp_headers.update(user_headers or {})
+        resp = self.request("GET", path, headers=resp_headers, cookies=user_cookies, status=HTTPOk.code)
         return resp, details
 
     def try_retrieve_logs(self, workflow_job_url, detailed_results):

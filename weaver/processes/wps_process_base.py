@@ -10,7 +10,7 @@ from werkzeug.datastructures import Headers
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode, ExecuteReturnPreference
 from weaver.formats import ContentType, repr_json
 from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
 from weaver.processes.convert import get_cwl_io_type
@@ -535,7 +535,8 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         """
         # use '/results' endpoint instead of '/outputs' to ensure support with other
         result_url = f"{monitor_reference}/results"
-        response = self.make_request(method="GET", url=result_url, retry=True)
+        result_headers = {"Prefer": f"return={ExecuteReturnPreference.MINIMAL}"}
+        response = self.make_request(method="GET", url=result_url, headers=result_headers, retry=True)
         response.raise_for_status()
         contents = response.json()
 

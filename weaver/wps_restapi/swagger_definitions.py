@@ -4149,7 +4149,8 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
         ),
         # NOTE:
         #   Explicitly submitted {} or [] means that *no outputs* are requested.
-        #   This must be distinguished from 'all outputs' requested, which is done by omiting 'outputs' field entirely.
+        #   This must be distinguished from 'all outputs' requested, which is done by omitting 'outputs' field entirely.
+        missing=None,
         default=None,
     )
 

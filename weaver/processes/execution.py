@@ -903,8 +903,8 @@ def validate_process_io(process, payload):
     :param payload: Submitted job execution body.
     :raises HTTPException: Corresponding error for detected invalid combination of inputs or outputs.
     """
-    payload_inputs = convert_input_values_schema(payload.get("inputs", {}), JobInputsOutputsSchema.OLD)
-    payload_outputs = convert_output_params_schema(payload.get("outputs", {}), JobInputsOutputsSchema.OLD)
+    payload_inputs = convert_input_values_schema(payload.get("inputs", {}), JobInputsOutputsSchema.OLD) or []
+    payload_outputs = convert_output_params_schema(payload.get("outputs", {}), JobInputsOutputsSchema.OLD) or []
 
     for io_type, io_payload, io_process in [
         ("inputs", payload_inputs, process.inputs),

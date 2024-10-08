@@ -2239,6 +2239,8 @@ class OneOfKeywordSchema(KeywordMapper):
         # not a single valid sub-node was found
         if self.missing is colander.drop:
             return colander.drop
+        if self.missing is None and cstruct in [None, colander.null]:
+            return None
 
         # add the invalid sub-errors to the parent oneOf for reporting each error case individually
         invalid = colander.Invalid(node=self, msg=message, value=cstruct)

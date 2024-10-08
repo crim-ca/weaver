@@ -36,6 +36,7 @@ from botocore.config import Config as S3Config
 from botocore.exceptions import ClientError, HTTPClientError
 from bs4 import BeautifulSoup
 from celery.app import Celery
+from dateutil.parser import parse as parse_dt
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -1241,6 +1242,7 @@ def get_href_headers(
     href = path
     if not any(href.startswith(proto) for proto in ["file", "http", "https", "s3"]):
         href = f"file://{os.path.abspath(path)}"
+        href += "/" if (path.endswith("/") and not href.endswith("/")) else ""
     f_enc = None
     f_size = None
     f_type = None
@@ -1249,9 +1251,18 @@ def get_href_headers(
     # handle directory
     if path.endswith("/"):
         download_headers = False
-        listing = fetch_directory(href, out_dir="", out_method=OutputMethod.META, settings=settings, **option_kwargs)
-        f_modified = sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1]
-        f_size = sum(get_header("Size", meta) for meta in listing)
+        dir_path = path[7:] if path.startswith("file://") else path
+        listing = fetch_directory(
+            href,
+            # files will not be "fetched" under the director since using 'META' output method,
+            # but the actual path is needed to get the file os.stats, to obtain their metadata
+            out_dir=dir_path,
+            out_method=OutputMethod.META,
+            settings=settings,
+            **option_kwargs,
+        )
+        f_modified = parse_dt(sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1])
+        f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
         f_type = ContentType.APP_DIR
 
     # handle single file
@@ -1269,7 +1280,7 @@ def get_href_headers(
                 s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
                 f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
                 f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
-                f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+                f_modified = parse_dt(s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"])
             except (ClientError, HTTPClientError):
                 if not missing_ok:
                     raise
@@ -1279,7 +1290,7 @@ def get_href_headers(
             if resp.status_code != 200 and not missing_ok:
                 raise ValueError(f"Could not obtain file reference metadata from [{href}]")
             if resp.status_code == 200:
-                f_modified = resp.last_modified
+                f_modified = parse_dt(resp.last_modified)
                 f_type = content_type or resp.content_type
                 f_size = resp.content_length
                 f_enc = resp.content_encoding
