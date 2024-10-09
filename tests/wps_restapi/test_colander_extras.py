@@ -4,6 +4,9 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`weaver.wps_restapi.swagger_definitions`
 objects.
 """
+
+# pylint: disable=E0241,duplicate-bases
+
 import copy
 import inspect
 import json

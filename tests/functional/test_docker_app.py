@@ -243,7 +243,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 status_url = resp.json["location"]
                 job_id = resp.json["jobID"]
             assert status_url
-            assert job_id
+            assert job_id  # pylint: disable=E0606
 
             if accept == ContentType.APP_XML:
                 wps_out_url = self.settings["weaver.wps_output_url"]
