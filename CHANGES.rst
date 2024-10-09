@@ -27,9 +27,11 @@ Changes:
 - Add support of ``Accept: multipart/*`` and ``Accept: multipart/mixed`` when submitting an execution to obtain
   the results as multiple parts embedded within the response contents. Parts are represented with their default
   data/link representation, unless overridden by corresponding ``transmissionMode`` per output ID.
-- Add ``output_links``/``-oL`` parameter to Python client and CLI to retrieve ``Link`` headers as `Job` results.
-  Due to the multiple ``Link`` headers returned by `Job` results, this cannot be performed automatically without
-  the assumption of which ``rel`` links correspond to actual output IDs to extract.
+- Add ``output_links``/``-oL``/``--output-link`` parameter to Python client and CLI to retrieve ``Link`` headers
+  as `Job` results. Due to the multiple ``Link`` headers returned by `Job` results, this cannot be performed
+  automatically without the assumption of which ``rel`` links correspond to actual output IDs to extract.
+- Add ``output_filter``/``--oF``/``--output-filter`` parameter to Python client and CLI to indicate
+  any ``outputs`` to be filtered when submitting the `Process` execution.
 - Update documentation with a mapping of *Process Execution Results* according to
   submitted ``response`` body parameter (*OGC API - Processes v1.0*),
   the ``Prefer: return`` header (*OGC API - Processes v2.0*), the requested ``Accept`` header,

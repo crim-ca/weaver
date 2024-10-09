@@ -2772,10 +2772,6 @@ def make_parser():
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
     )
-    # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
-    #   Only specified ones are returned, if none specified, return all.
-    # op_execute.add_argument(
-    #    "-O", "--output",
     op_execute.add_argument(
         "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", action="append",
         help=inspect.cleandoc("""
@@ -2794,6 +2790,14 @@ def make_parser():
 
             Example: ``-R output-one -R output-two``
         """)
+    )
+    op_execute.add_argument(
+        "-oF", "--output-filter", metavar="OUTPUT", dest="output_filter", nargs=1, action="append",
+        help=(
+            "Output ID to be omitted in the submitted process execution. "
+            "Subsequent results of the corresponding job will omit the specified output in the responses. "
+            "The option Can be specified multiple times for multiple outputs to be filtered out."
+        )
     )
     op_execute_output_context = op_execute.add_mutually_exclusive_group()
     op_execute_output_context.add_argument(
@@ -2946,8 +2950,10 @@ def make_parser():
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
+    # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
+    #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
     op_results.add_argument(
-        "-oL", "--output-link", dest="output_links", nargs="+",
+        "-oL", "--output-link", dest="output_links",  nargs=1, action="append",
         help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
     )
 
