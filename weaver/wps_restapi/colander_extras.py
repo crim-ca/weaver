@@ -51,6 +51,9 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
+
+# pylint: disable=E0241,duplicate-bases
+
 import copy
 import inspect
 import re

@@ -12,7 +12,10 @@ definitions generated on the exposed endpoints (JSON and Swagger UI).
 The definitions are also employed to generate the `OpenAPI` definitions reported in the documentation published
 on `Weaver`'s `ReadTheDocs` page.
 """
+
 # pylint: disable=C0103,invalid-name
+# pylint: disable=E0241,duplicate-bases
+
 import datetime
 import inspect
 import os
