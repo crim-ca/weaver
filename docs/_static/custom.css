@@ -32,7 +32,7 @@ div[class^="highlight"] {
 }
 
 .table-exec-results thead {
-    background-color: #cccccc;
+    background-color: #CCCCCC;
 }
 
 .table-exec-results thead tr:nth-child(1) > th:nth-child(1),

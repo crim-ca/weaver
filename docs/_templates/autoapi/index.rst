@@ -8,8 +8,6 @@ This page contains reference documentation of the source code.
 .. toctree::
    :titlesonly:
 
-   {% for page in pages %}
-   {% if page.top_level_object and page.display %}
+   {% for page in pages|selectattr("is_top_level_object") %}
    {{ page.include_path }}
-   {% endif %}
    {% endfor %}

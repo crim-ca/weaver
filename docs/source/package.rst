@@ -138,7 +138,7 @@ definitions to the :term:`I/O`, since those will generally be missing descriptiv
     For pure Python scripts not using |python-argparse|_, the |scriptcwl|_ utility can be considered instead.
 
 .. seealso::
-    For Python code embedded in |jupyter-notebooks|_, refer to :ref:`app_pkg_jupyter_notebook` for more details.
+    For Python code embedded in a |jupyter-notebook|_, refer to :ref:`app_pkg_jupyter_notebook` for more details.
 
 .. |python-argparse| replace:: ``argparse``
 .. _python-argparse: https://docs.python.org/3/library/argparse.html
@@ -688,7 +688,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 |                      |                         | ``uri``, ``url``,      |                                            |
 |                      |                         | etc.) [#note5]_        |                                            |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
-| ``File``             | ``BoundingBox``         | :term:`JSON` [#note6]_ | Partial support available[#bbox-note]_.    |
+| ``File``             | ``BoundingBox``         | :term:`JSON` [#note6]_ | Partial support available [#noteBBOX]_.    |
 +----------------------+-------------------------+------------------------+--------------------------------------------+
 | ``File``             | ``Complex``             | :term:`JSON` [#note6]_ | :ref:`File Reference <file_ref_types>`     |
 |                      |                         |                        | with Media-Type validation and staging     |
@@ -722,7 +722,7 @@ specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
 .. [#note6]
     Specific schema required as described in :ref:`oas_json_types`.
 
-.. [#bbox-note]
+.. [#noteBBOX]
     The :term:`WPS` data type ``BoundingBox`` has a schema definition in :term:`WPS` and :term:`OAS` contexts,
     but is not handled natively by :term:`CWL` types. When the conversion to a :term:`CWL` job occurs, an equivalent
     ``Complex`` type using a :term:`CWL` ``File`` with ``format: ogc-bbox`` and the contents stored as :term:`JSON` is
@@ -757,7 +757,7 @@ expected to be a file reference.
     }
 
 A combination of ``supportedCRS`` objects providing ``crs`` references would
-otherwise indicate a ``BoundingBox`` :term:`I/O` (see :ref:`note <bbox-note>`).
+otherwise indicate a ``BoundingBox`` :term:`I/O` (see :ref:`note <noteBBOX>`).
 
 .. code-block:: json
     :caption: WPS BoundingBox Data Type

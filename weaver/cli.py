@@ -742,7 +742,6 @@ class WeaverClient(object):
 
         .. seealso::
             - :ref:`proc_op_deploy`
-            - |ogc-api-proc-part2|_
 
         :param process_id:
             Desired process identifier.

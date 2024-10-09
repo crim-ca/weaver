@@ -408,6 +408,9 @@ Register a New Process (Deploy)
 
 Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
 
+.. seealso::
+    |ogc-api-proc-part2|_ specification.
+
 The request body requires mainly two components:
 
 - | ``processDescription``:
@@ -1994,6 +1997,7 @@ of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint o
 .. seealso::
     Refer to the |oas-rtd|_ of the |exec-req|_ request for all available ``subscribers`` properties.
 
+.. _proc_op_job_status:
 .. _proc_op_status:
 .. _proc_op_monitor:
 
@@ -2033,7 +2037,6 @@ format is employed according to the chosen location.
 .. seealso::
     For the :term:`WPS` endpoint, refer to :ref:`conf_settings`.
 
-.. _proc_op_job_status:
 .. fixme: add example
 .. fixme: describe minimum fields and extra fields
 
