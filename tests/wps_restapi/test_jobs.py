@@ -383,7 +383,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             else:
                 cat = categories["process"]
                 pytest.fail(f"Unknown job grouping 'process' value: {cat}")
-            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
+            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa  # pylint: disable=E0606
 
     def template_get_jobs_valid_grouping_by_service_provider(self, service_or_provider):
         path = get_path_kvp(sd.jobs_service.path, detail="false", groups=service_or_provider)
@@ -413,7 +413,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             else:
                 cat = categories[service_or_provider]
                 pytest.fail(f"Unknown job grouping 'service' value: {cat}")
-            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa
+            self.assert_equal_with_jobs_diffs(grouped_jobs["jobs"], expect)  # noqa  # pylint: disable=E0606
 
     def test_get_jobs_valid_grouping_by_service(self):
         self.template_get_jobs_valid_grouping_by_service_provider("service")

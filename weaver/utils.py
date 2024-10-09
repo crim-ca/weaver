@@ -3240,8 +3240,7 @@ def fetch_files_html(html_data,                         # type: str
             if not _ref.endswith("/"):
                 yield _ref
             else:
-                for _sub_ref in _list_refs(_ref):
-                    yield _sub_ref
+                yield from _list_refs(_ref)
 
     files = list(_list_refs(base_url, html_data))
     return fetch_files_url(
