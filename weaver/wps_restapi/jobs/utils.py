@@ -32,7 +32,13 @@ from weaver.exceptions import (
     ServiceNotAccessible,
     ServiceNotFound
 )
-from weaver.execute import ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode, parse_prefer_header_return
+from weaver.execute import (
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode,
+    parse_prefer_header_return,
+    update_preference_applied_return_header
+)
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
@@ -517,7 +523,8 @@ def get_job_results_response(
     job,                        # type: Job
     *,                          # force named keyword arguments after
     container,                  # type: AnySettingsContainer
-    headers=None,               # type: Optional[AnyHeadersContainer]
+    request_headers=None,       # type: Optional[AnyHeadersContainer]
+    response_headers=None,      # type: Optional[AnyHeadersContainer]
     results_headers=None,       # type: Optional[AnyHeadersContainer]
     results_contents=None,      # type: Optional[JSON]
 ):                              # type: (...) -> AnyResponseType
@@ -554,7 +561,8 @@ def get_job_results_response(
 
     :param job: Job for which to generate the results response, which contains the originally submitted parameters.
     :param container: Application settings.
-    :param headers: Additional headers to provide in the response.
+    :param request_headers: Original headers submitted to the request that leads to this response.
+    :param response_headers: Additional headers to provide in the response.
     :param results_headers: Headers that override originally submitted job parameters when requesting results.
     :param results_contents: Body contents that override originally submitted job parameters when requesting results.
     """
@@ -567,7 +575,6 @@ def get_job_results_response(
     #       - test_execute_single_output_response_document_alt_format_yaml
     #       - test_execute_single_output_multipart_accept_alt_format
 
-    # FIXME: remove any 'refs' not needed anymore
     results, _ = get_results(
         job, container,
         value_key="value",
@@ -577,7 +584,7 @@ def get_job_results_response(
         link_references=False,
     )
 
-    headers = ResponseHeaders(headers or {})
+    headers = ResponseHeaders(response_headers or {})
     headers.pop("Location", None)
     headers.setdefault("Content-Location", job.results_url(container))
     for link in job.links(container, self_link="results"):
@@ -600,6 +607,9 @@ def get_job_results_response(
         not is_rep and ContentType.APP_JSON not in job.accept_type  # alternative way to request 'minimal'/'document'
     )
 
+    headers = update_preference_applied_return_header(job, request_headers, headers)
+
+    # document/minimal response
     if not is_raw and not is_accept_multipart and not is_single_output_minimal:
         try:
             results_schema = sd.ResultsDocument()

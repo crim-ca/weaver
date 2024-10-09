@@ -3604,8 +3604,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -3628,6 +3629,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
             assert status["status"] == Status.SUCCEEDED
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         job_id = status["jobID"]
         results = self.app.get(f"/jobs/{job_id}/results")
@@ -3647,8 +3650,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -3671,6 +3675,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
             assert status["status"] == Status.SUCCEEDED
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -3696,8 +3702,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}; wait=5"  # sync to allow direct content response
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Prefer": prefer_header,
             "Accept": ContentType.ANY,
             "Content-Type": ContentType.APP_JSON,
         }
@@ -3716,6 +3723,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -3745,9 +3754,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
-
+        
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Prefer": prefer_header,
             "Accept": ContentType.APP_JSON,
             "Content-Type": ContentType.APP_JSON,
         }
@@ -3766,6 +3776,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -3810,8 +3822,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Prefer": prefer_header,
             # omitting or specifying 'Accept' any must result the same (default link),
             # but test it is handled explicitly since the header would be "found" when parsing
             "Accept": ContentType.ANY,
@@ -3832,6 +3845,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 204, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -3889,8 +3904,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, wait=5",  # sync to allow direct content response
+            "Prefer": prefer_header,
             "Accept": ContentType.APP_JSON,
             "Content-Type": ContentType.APP_JSON,
         }
@@ -3909,6 +3925,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -3993,8 +4011,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -4013,6 +4032,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4039,8 +4060,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -4059,6 +4081,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4095,8 +4119,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -4115,6 +4140,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4185,6 +4212,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4260,6 +4288,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4333,6 +4362,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4408,6 +4438,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4487,6 +4518,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4569,6 +4601,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4619,10 +4652,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
         #   without 'Accept' using multipart, it is expected that JSON document is used
         #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        prefer_header = "wait=5"
         exec_headers = {
             "Accept": multipart_header,
             "Content-Type": ContentType.APP_JSON,
-            "Prefer": "wait=5",
+            "Prefer": prefer_header,
         }
         exec_content = {
             "inputs": {
@@ -4643,6 +4677,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -4746,10 +4782,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
             "Accept": f"{ContentType.MULTIPART_MIXED}, {ContentType.APP_JSON}",
             "Content-Type": ContentType.APP_JSON,
-            "Prefer": "respond-async",
+            "Prefer": prefer_header,
         }
         exec_content = {
             "inputs": {
@@ -4766,6 +4803,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
             assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
             assert "status" in resp.json, "Expected a JSON Job Status response."
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
     def test_execute_multi_output_prefer_header_return_representation(self):
         proc = "EchoResultsTester"
@@ -4773,8 +4812,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async",
+            "Prefer": prefer_header,
             "Content-Type": ContentType.APP_JSON,
         }
         exec_content = {
@@ -4796,6 +4836,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4845,8 +4887,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -4866,6 +4909,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4923,8 +4968,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -4944,6 +4990,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4998,10 +5046,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
         #   without 'Accept' using multipart, it is expected that JSON document is used
         #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        prefer_header = "wait=5"
         exec_headers = {
             "Accept": ContentType.MULTIPART_MIXED,
             "Content-Type": ContentType.APP_JSON,
-            "Prefer": "wait=5",
+            "Prefer": prefer_header,
         }
         exec_content = {
             "inputs": {
@@ -5019,6 +5068,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
         # rely on location that should be provided to find the job ID
         results_url = get_header("Content-Location", resp.headers)
@@ -5070,8 +5121,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -5092,6 +5144,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -5155,8 +5209,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -5178,6 +5233,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
@@ -5220,8 +5277,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -5244,6 +5302,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
@@ -5293,8 +5353,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
         exec_headers = {
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -5316,6 +5377,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
@@ -5354,8 +5417,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        prefer_header = "respond-async"
         exec_headers = {
-            "Prefer": "respond-async"
+            "Prefer": prefer_header
         }
         exec_headers.update(self.json_headers)
         exec_content = {
@@ -5379,6 +5443,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
             assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)

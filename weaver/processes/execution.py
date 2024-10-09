@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 from time import sleep
@@ -15,7 +16,12 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteControlOption, ExecuteMode, parse_prefer_header_execute_mode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    parse_prefer_header_execute_mode,
+    update_preference_applied_return_header
+)
 from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
@@ -795,6 +801,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         is_execute_async = mode != ExecuteMode.SYNC
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
+    req_headers = copy.deepcopy(headers or {})
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
     subscribers = map_job_subscribers(json_body, settings)
@@ -826,7 +833,12 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
             if job.status == Status.SUCCEEDED:
-                return get_job_results_response(job, headers=resp_headers, container=settings)
+                return get_job_results_response(
+                    job,
+                    request_headers=req_headers,
+                    response_headers=resp_headers,
+                    container=settings,
+                )
             # otherwise return the error status
             body = job.json(container=settings)
             body["location"] = location_url
@@ -849,6 +861,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         "status": map_status(Status.ACCEPTED),
         "location": location_url
     }
+    resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
     resp = get_job_submission_response(body, resp_headers)
     return resp
 

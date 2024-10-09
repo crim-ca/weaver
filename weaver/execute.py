@@ -9,6 +9,7 @@ from weaver.utils import get_header, parse_kvp
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple, Union
 
+    from weaver.datatype import Job
     from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal
 
     ExecutionModeAutoType = Literal["auto"]
@@ -220,3 +221,38 @@ def parse_prefer_header_execute_mode(
         if wait:  # default used, not a supplied preference
             return ExecuteMode.SYNC, wait, {}
     return ExecuteMode.ASYNC, None, {}
+
+
+def update_preference_applied_return_header(
+    job,                # type: Job
+    request_headers,    # type: Optional[AnyHeadersContainer]
+    response_headers,   # type: Optional[AnyHeadersContainer]
+):                      # type: (...) -> AnyHeadersContainer
+    """
+    Updates the ``Preference-Applied`` header according to available information.
+
+    :param job: Job where the desired return preference has be resolved.
+    :param request_headers:
+    :param response_headers:
+    :return:
+    """
+    response_headers = response_headers or {}
+
+    if not request_headers:
+        return response_headers
+
+    request_prefer_return = parse_prefer_header_return(request_headers)
+    if not request_prefer_return:
+        return response_headers
+
+    if job.execution_return != request_prefer_return:
+        return response_headers
+
+    applied_prefer_header = get_header("Preference-Applied", response_headers)
+    if applied_prefer_header:
+        applied_prefer_header = f"return={request_prefer_return}; {applied_prefer_header}"
+    else:
+        applied_prefer_header = f"return={request_prefer_return}"
+
+    response_headers.update({"Preference-Applied": applied_prefer_header})
+    return response_headers

@@ -32,6 +32,8 @@ Changes:
   automatically without the assumption of which ``rel`` links correspond to actual output IDs to extract.
 - Add ``output_filter``/``--oF``/``--output-filter`` parameter to Python client and CLI to indicate
   any ``outputs`` to be filtered when submitting the `Process` execution.
+- Update ``Preference-Applied`` header reported by execution responses to
+  include ``return=minimal`` or ``return=representation`` as applicable by the requested ``Prefer`` header.
 - Update documentation with a mapping of *Process Execution Results* according to
   submitted ``response`` body parameter (*OGC API - Processes v1.0*),
   the ``Prefer: return`` header (*OGC API - Processes v2.0*), the requested ``Accept`` header,
