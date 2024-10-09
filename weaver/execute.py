@@ -232,9 +232,9 @@ def update_preference_applied_return_header(
     Updates the ``Preference-Applied`` header according to available information.
 
     :param job: Job where the desired return preference has be resolved.
-    :param request_headers:
-    :param response_headers:
-    :return:
+    :param request_headers: Original request headers, to look for any ``Prefer: return``.
+    :param response_headers: Already generated response headers, to extend ``Preference-Applied`` header as needed.
+    :return: Updated response headers with any resolved return preference.
     """
     response_headers = response_headers or {}
 
