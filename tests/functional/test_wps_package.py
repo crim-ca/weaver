@@ -3754,7 +3754,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         p_id = self.fully_qualified_test_process_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
-        
+
         prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
         exec_headers = {
             "Prefer": prefer_header,

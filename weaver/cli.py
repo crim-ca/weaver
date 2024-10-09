@@ -2953,7 +2953,7 @@ def make_parser():
     # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
     #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
     op_results.add_argument(
-        "-oL", "--output-link", dest="output_links",  nargs=1, action="append",
+        "-oL", "--output-link", dest="output_links", nargs=1, action="append",
         help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
     )
 
