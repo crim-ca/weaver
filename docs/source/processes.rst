@@ -727,8 +727,8 @@ Execution Mode
 ~~~~~~~~~~~~~~~~~~~~~
 
 In order to select how to execute a :term:`Process`, either |synchronously|_ or |asynchronously|_, the ``Prefer`` header
-should be specified. If omitted, `Weaver` defaults to |asynchronous|_ execution. To execute |asynchronously|_ explicitly,
-``Prefer: respond-async`` should be used. Otherwise, the |synchronous|_ execution can be requested
+should be specified. If omitted, `Weaver` defaults to |asynchronous|_ execution. To execute |asynchronously|_
+explicitly, ``Prefer: respond-async`` should be used. Otherwise, the |synchronous|_ execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
 within that time, or if this value is greater than
 the ``weaver.execute_sync_max_wait`` setting (see :ref:`detail <weaver-execute-sync-max-wait>`), the :term:`Job` will
@@ -1005,7 +1005,7 @@ Following is a detailed listing of the expected response structure according to 
     the :ref:`Multipart Results <job-results-raw-multi>` structure
     using ``multipart`` contents (:rfc:`2046#section-5.1`) is employed by default, unless *all* requested
     outputs resolve to a :ref:`File Reference <file_ref_types>`. In such case, the references will be contained
-    in ``Link`` headers, similar to the |res-ref|_ response, but with multiple links for all requested outputs.
+    in ``Link`` headers, similar to the |res-link|_ response, but with multiple links for all requested outputs.
 
     When resolved as ``multipart``, the representation of each part (as literal data or link reference [#resValRef]_)
     is established by the ``transmissionMode`` parameter combinations, or as applicable according to the ``Accept``
