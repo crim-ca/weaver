@@ -200,8 +200,7 @@ def get_conformance(category, settings):
         # f"{ogcapi_proc_core}/conf/core/job-results-param-outputs",
         # f"{ogcapi_proc_core}/conf/core/job-results-param-outputs-empty",
         f"{ogcapi_proc_core}/conf/core/job-results-param-outputs-omit",
-        # FIXME: https://github.com/crim-ca/weaver/issues/380
-        # f"{ogcapi_proc_core}/conf/core/job-results-param-outputs-response",
+        f"{ogcapi_proc_core}/conf/core/job-results-param-outputs-response",
         f"{ogcapi_proc_core}/conf/core/job-results-success-sync",
         f"{ogcapi_proc_core}/conf/core/job-success",
         f"{ogcapi_proc_core}/conf/core/landingpage-op",

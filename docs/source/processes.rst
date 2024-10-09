@@ -699,27 +699,36 @@ The ``outputs`` section defines, for each ``id`` available from the :term:`Proce
 report the produced outputs from a successful :term:`Job` execution. The method under which each output will
 be returned depends on the negotiated :ref:`proc_exec_mode` and :ref:`proc_exec_results`.
 
-When an output corresponds to a file produced by the :term:`Application Package`, and stored locally, the
-result will typically (unless requested otherwise), be exposed externally using the returned reference :term:`URL`.
+When an output corresponds to a :ref:`File Reference <file_ref_types>` produced by the :term:`Application Package`,
+and stored locally, the result will typically (unless requested otherwise), be exposed externally using the returned
+reference :term:`URL`.
 For outputs that correspond to literal data, such as plain strings or numbers, `Weaver` will typically prefer
 returning the ``value`` directly. However, alternate link representations can also be obtained if specified in the
-execution request.
+execution request, using ``transmissionMode`` overrides for the desired outputs.
 
-When the ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed should return all
-outputs it offers in the created :ref:`Job Results <proc_op_result>`. In such case, because no representation modes
-is specified for individual outputs, `Weaver` automatically selects ``reference`` for files as it makes all outputs
-more easily accessible with distinct :term:`URL` afterwards, and ``values`` for literal data to obtain them directly.
-If the ``outputs`` section is specified, but that one of the ``outputs`` defined in
+When the ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed
+should return *all* outputs it offers in the created :ref:`Job Results <proc_op_result>`.
+If the ``outputs`` section is specified, but that one of the *requested outputs* [#outN]_ defined in
 the :ref:`Process Description <proc_op_describe>` is not specified, this indicates that the :term:`Job` should
-omit this output from the produced results.
+omit this output from the produced results. When *requested outputs* are specified without any ``transmissionMode``,
+the ``reference`` representation is used automatically for :ref:`File Reference <file_ref_types>` as it makes all
+outputs more easily accessible with distinct :term:`URL` afterwards, and ``value`` is used for literal data to
+obtain them directly (inline in the response). Opposite ``value``/``reference`` representations can be requested
+explicitly, for each respective output, using the ``transmissionMode`` as presented below.
 
-.. fixme:
-.. todo::
-    Filtering of ``outputs`` not implemented (everything always available).
-    https://github.com/crim-ca/weaver/issues/380
+.. warning::
+    When using ``outputs`` in the request body, one necessarily introduces filtering indications of results to
+    be returned. If *all* outputs are desired, some of which override ``transmissionMode`` and others letting
+    their representation auto-resolve, explicit ``{}`` mapping must be indicated to avoid filtering them out.
 
-Other parameters presented in the above examples, namely ``mode`` and ``response`` are further detailed in
-the following :ref:`proc_exec_mode` and :ref:`proc_exec_results` sections.
+.. literalinclude:: ../examples/job_execute_outputs_transmission.json
+    :language: json
+    :caption: Requesting Filtered Outputs with Transmission Mode Overrides
+    :name: job-execute-outputs-transmission
+
+When ``transmissionMode`` is specified for a given output, its result representation will override any other
+parameter that would otherwise affect its automatic or "informed" resolution of the output representation.
+These parameters are further detailed in the following :ref:`proc_exec_mode` and :ref:`proc_exec_results` sections.
 
 .. _proc_exec_mode:
 
