@@ -1,3 +1,4 @@
+import io
 from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
@@ -358,6 +359,9 @@ if TYPE_CHECKING:
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
     AnyDatabaseContainer = AnyContainer
+
+    AnyData = Union[str, bytes, bytearray]
+    AnyDataStream = Union[AnyData, io.IOBase]
 
     CookiesType = Dict[str, str]
     HeadersType = Dict[str, str]

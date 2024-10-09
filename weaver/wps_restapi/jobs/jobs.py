@@ -1,9 +1,10 @@
+import os
 from typing import TYPE_CHECKING
 
 from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
-from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
 
 from weaver.database import get_db
 from weaver.datatype import Job
@@ -14,12 +15,16 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
+from weaver.transform.transform import Transform
 from weaver.utils import get_settings
+from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
+    get_all_possible_formats_links,
     get_job,
     get_job_list_links,
+    get_job_possible_output_formats,
     get_job_results_response,
     get_results,
     get_schema_query,
@@ -385,9 +390,103 @@ def get_job_outputs(request):
     schema = get_schema_query(request.params.get("schema"))
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
-    outputs.update({"links": job.links(request, self_link="outputs")})
+    LOGGER.warning("taratata")
+    links = job.links(request, self_link="outputs")
+    f_links = get_all_possible_formats_links(request, job)
+    LOGGER.warning(str(f_links))
+    if len(f_links) > 0:
+        links.extend(f_links)
+
+    outputs.update({"links": links})
     outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)
+
+
+@sd.provider_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProviderResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.process_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProcessResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.job_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    renderer=OutputFormat.JSON,
+    schema=sd.JobResultValueEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.provider_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProviderAnyOutputEndpoint(),
+    response_schemas=sd.get_prov_output_responses
+)
+@sd.process_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.ProcessAnyOutputEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@sd.job_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    renderer=OutputFormat.JSON,
+    schema=sd.JobAnyOutputEndpoint(),
+    response_schemas=sd.FileResponseHeaders
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_output(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve the output values resulting from a job execution.
+    """
+    settings = get_settings(request)
+    output_id = request.matchdict.get("output_id")
+    # Get requested media-type. "*/*" if omit
+    accept = str(request.accept) if request.accept else "*/*"
+
+    job = get_job(request)
+    requested_media_types = get_job_possible_output_formats(job)[0]["alternatives"][0]
+
+    # Filtered by requested output_id
+    result_media_type = [o["mimeType"] for o in job.results if str(o["identifier"]) == output_id][0]
+
+    # if any format requested, we take the resulting one
+    frm = request.params.get("f")
+    if frm is not None:
+        accept = frm
+
+    if accept == "*/*":
+        accept = result_media_type
+
+    # if format requested not in possible mediatypes...
+    if accept not in requested_media_types:
+        raise HTTPUnprocessableEntity(json={
+            "code": "InvalidMimeTypeRequested",
+            "description": "The requested output format is not in the possible output formats",
+            "cause": "Incompatible mime Types",
+            "error": "InvalidMimeTypeRequested",
+            "value": ""
+        })
+
+    # Get resulting file
+    reference = [o["reference"] for o in job.results if str(o["identifier"]) == output_id][0]
+    res_file = os.path.join(get_wps_output_dir(settings), reference)
+    if not os.path.exists(res_file):
+        raise HTTPNotFound({
+            "code": "JobFileNotExists",
+            "description": f"{str(output_id)} - the job result does not exist (anymore)",
+            "cause": "Job File Not Exists",
+            "error": type(HTTPNotFound).__name__,
+            "value": ""
+        })
+
+    # Return resulting file transformed if necessary
+    return Transform(file_path=res_file, current_media_type=result_media_type, wanted_media_type=accept).get()
 
 
 @sd.provider_results_service.get(
@@ -602,7 +701,9 @@ def includeme(config):
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_result_value_service)
     config.add_cornice_service(sd.job_outputs_service)
+    config.add_cornice_service(sd.job_output_service)
     config.add_cornice_service(sd.job_inputs_service)
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
@@ -610,7 +711,9 @@ def includeme(config):
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_result_value_service)
     config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_output_service)
     config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)
@@ -618,7 +721,9 @@ def includeme(config):
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_result_value_service)
     config.add_cornice_service(sd.process_outputs_service)
+    config.add_cornice_service(sd.process_output_service)
     config.add_cornice_service(sd.process_inputs_service)
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)

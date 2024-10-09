@@ -472,6 +472,7 @@ class SchemaRefResolver(JsonSchemaRefResolver):
     """
     # only need to override the remote resolution to add YAML support
     # init overload used to patch invalid typing definition
+
     def __init__(self, base_uri, referrer, *_, **__):
         # type: (str, OpenAPISchema, *Any, **Any) -> None
         super(SchemaRefResolver, self).__init__(base_uri, referrer, *_, **__)  # type: ignore
