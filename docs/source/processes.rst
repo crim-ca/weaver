@@ -22,10 +22,10 @@
 .. |synchronously| replace:: *synchronously*
 .. |asynchronous| replace:: *asynchronous*
 .. |asynchronously| replace:: *asynchronously*
-.. _synchronous: processes.html#execution-mode
-.. _synchronously: processes.html#execution-mode
-.. _asynchronous: processes.html#execution-mode
-.. _asynchronously: processes.html#execution-mode
+.. _synchronous: `proc_exec_mode`_
+.. _synchronously: `proc_exec_mode`_
+.. _asynchronous: `proc_exec_mode`_
+.. _asynchronously: `proc_exec_mode`_
 
 **********
 Processes
@@ -561,8 +561,8 @@ inputs/outputs-level metadata can be updated.
 
 Similarly, the following request would produce a ``MINOR`` revision of ``test-process``. Since both ``PATCH`` and
 ``MINOR`` level contents are defined for update, the higher ``MINOR`` revision is required. In this case ``MINOR`` is
-required because ``jobControlOptions`` (forced to asynchronous execution for following versions) would break any future
-request made by users that would expect the :term:`Process` to run (or support) synchronous execution.
+required because ``jobControlOptions`` (forced to |asynchronous|_ execution for following versions) would break any
+future request made by users that would expect the :term:`Process` to run (or support) |synchronous|_ execution.
 
 Notice that this time, the :term:`Process` reference does not indicate the revision in the path (no ``:1.2.4`` part).
 This automatically resolves to the updated revision ``test-process:1.2.4`` that became the new latest revision following
@@ -919,10 +919,10 @@ Following is a detailed listing of the expected response structure according to 
 .. |res-auto| replace:: *using automatic resolution of data/link representation*
 
 .. |res-data| replace:: Results for a Single Output with Data
-.. _res-data: processes.html#job-results-raw-single-data
+.. _res-data: `job-results-raw-single-data`_
 
 .. |res-link| replace:: Results for a Single Output with Link
-.. _res-link: processes.html#job-results-raw-single-ref
+.. _res-link: `job-results-raw-single-ref`_
 
 .. important::
     Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
@@ -2091,7 +2091,7 @@ simplified data access mechanism without having to deal will all possible combin
 potentially returned by :ref:`proc_exec_results`.
 
 .. |output_netcdf| replace:: ``output_netcdf.nc``
-.. _output_netcdf: processes.html#job-outputs-mapping
+.. _output_netcdf: `job-outputs-mapping`_
 
 .. _proc_op_job_results:
 
