@@ -217,7 +217,7 @@ def parse_content(request=None,                                         # type: 
     except colander.Invalid as exc:
         raise HTTPUnsupportedMediaType(json={
             "title": "Unsupported Media Type",
-            "type": "UnsupportedMediaType",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
             "detail": str(exc),
             "status": HTTPUnsupportedMediaType.code,
             "cause": {"Content-Type": None if content_type is None else str(content_type)},

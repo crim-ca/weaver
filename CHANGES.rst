@@ -12,11 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add missing conformance and requirement references for *OGC API - Processes - Part 2: DRU*.
 
 Fixes:
 ------
-- No change.
+- Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
+  (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
 
 .. _changes_5.9.0:
 
