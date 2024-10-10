@@ -2791,7 +2791,7 @@ def make_parser():
         """)
     )
     op_execute.add_argument(
-        "-oF", "--output-filter", metavar="OUTPUT", dest="output_filter", nargs=1, action="append",
+        "-oF", "--output-filter", metavar="OUTPUT", dest="output_filter", nargs=1,
         help=(
             "Output ID to be omitted in the submitted process execution. "
             "Subsequent results of the corresponding job will omit the specified output in the responses. "
@@ -2952,7 +2952,7 @@ def make_parser():
     # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
     #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
     op_results.add_argument(
-        "-oL", "--output-link", dest="output_links", nargs=1, action="append",
+        "-oL", "--output-link", dest="output_links", nargs=1,
         help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
     )
 
