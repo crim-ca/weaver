@@ -50,16 +50,10 @@ def test_celery_registry_resolution():
     settings = get_settings_from_testapp(webapp)
     wps_url = get_wps_url(settings)
     job_store = get_db(settings).get_store("jobs")
-    job1 = job_store.save_job(
-        task_id="tmp",
-        process="jsonarray2netcdf",
-        inputs={"input": {"href": "http://random-dont-care.com/fake.json"}},
-    )
-    job2 = job_store.save_job(
-        task_id="tmp",
-        process="jsonarray2netcdf",
-        inputs={"input": {"href": "http://random-dont-care.com/fake.json"}},
-    )
+    job1 = job_store.save_job(task_id="tmp", process="jsonarray2netcdf",
+                              inputs={"input": {"href": "http://random-dont-care.com/fake.json"}})
+    job2 = job_store.save_job(task_id="tmp", process="jsonarray2netcdf",
+                              inputs={"input": {"href": "http://random-dont-care.com/fake.json"}})
 
     with contextlib.ExitStack() as stack:
         celery_mongo_broker = f"""mongodb://{settings["mongodb.host"]}:{settings["mongodb.port"]}/celery-test"""

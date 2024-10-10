@@ -10,7 +10,7 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import log_unhandled_exceptions
-from weaver.execute import ExecuteMode
+from weaver.execute import ExecuteMode, parse_prefer_header_execute_mode
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSInvalidParameterValue
 from weaver.processes.execution import validate_process_io
@@ -24,7 +24,7 @@ from weaver.quotation.estimation import (
 )
 from weaver.sort import Sort
 from weaver.store.base import StoreBills, StoreProcesses, StoreQuotes
-from weaver.utils import as_int, get_header, get_settings, parse_prefer_header_execute_mode
+from weaver.utils import as_int, get_header, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.wps_restapi.quotation.utils import get_quote

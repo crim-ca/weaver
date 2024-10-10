@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 from time import sleep
@@ -15,7 +16,12 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import ExecuteControlOption, ExecuteMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    parse_prefer_header_execute_mode,
+    update_preference_applied_return_header
+)
 from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
@@ -43,7 +49,6 @@ from weaver.utils import (
     now,
     parse_kvp,
     parse_number_with_unit,
-    parse_prefer_header_execute_mode,
     raise_on_xml_exception,
     wait_secs
 )
@@ -59,7 +64,7 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_submission_response
+from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_return, get_job_submission_response
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
@@ -72,10 +77,12 @@ if TYPE_CHECKING:
     from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
+    from weaver.execute import AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import StatusType
     from weaver.typedefs import (
         AnyAcceptLanguageHeader,
+        AnyHeadersContainer,
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
@@ -698,7 +705,16 @@ def submit_job(request, reference, tags=None):
         accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
         matched_lang = accepts_lang.lookup(support_lang, default="") or None
         if lang and not matched_lang:
-            raise HTTPNotAcceptable(f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].")
+            raise HTTPNotAcceptable(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": f"Requested language [{lang}] not in supported languages [{sorted(support_lang)}].",
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {"name": "Accept-Language", "in": "headers"},
+                    "value": repr_json(lang, force_string=False),
+                })
+            )
         lang = matched_lang
     elif isinstance(reference, Service):
         service_url = reference.url
@@ -777,22 +793,26 @@ def submit_job_handler(payload,             # type: ProcessExecution
     exec_max_wait = settings.get("weaver.execute_sync_max_wait", settings.get("weaver.exec_sync_max_wait"))
     exec_max_wait = as_int(exec_max_wait, default=20)
     mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
-    get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
         is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
     else:
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
         is_execute_async = mode != ExecuteMode.SYNC
-    exec_resp = json_body.get("response")
-    subscribers = map_job_subscribers(json_body, settings)
+    accept_type = validate_job_accept_header(headers, mode)
+    exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
+    req_headers = copy.deepcopy(headers or {})
+    get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
+    subscribers = map_job_subscribers(json_body, settings)
+    job_inputs = json_body.get("inputs")
+    job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
-                         inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
-                         is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
-                         execute_async=is_execute_async, execute_response=exec_resp,
-                         custom_tags=tags, accept_language=language, subscribers=subscribers)
+                         inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
+                         execute_async=is_execute_async, execute_response=exec_resp, execute_return=exec_return,
+                         custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
+                         accept_type=accept_type, accept_language=language)
     job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
     job = store.update_job(job)
     location_url = job.status_url(settings)
@@ -813,7 +833,12 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
             if job.status == Status.SUCCEEDED:
-                return get_job_results_response(job, settings, headers=resp_headers)
+                return get_job_results_response(
+                    job,
+                    request_headers=req_headers,
+                    response_headers=resp_headers,
+                    container=settings,
+                )
             # otherwise return the error status
             body = job.json(container=settings)
             body["location"] = location_url
@@ -824,7 +849,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # sync not respected, therefore must drop it
             # since both could be provided as alternative preferences, drop only async with limited subset
             prefer = get_header("Preference-Applied", headers, pop=True)
-            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteMode.ASYNC])
+            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteControlOption.ASYNC])
             if async_applied:
                 resp_headers.update(async_applied)
 
@@ -836,8 +861,41 @@ def submit_job_handler(payload,             # type: ProcessExecution
         "status": map_status(Status.ACCEPTED),
         "location": location_url
     }
+    resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
     resp = get_job_submission_response(body, resp_headers)
     return resp
+
+
+def validate_job_accept_header(headers, execution_mode):
+    # type: (AnyHeadersContainer, AnyExecuteMode) -> Optional[str]
+    """
+    Validate that the submitted ``Accept`` header is permitted.
+    """
+    accept = get_header("accept", headers)
+    if not accept:
+        return
+    # compare with 'in' to allow alternate types, one of which must be JSON for async
+    if ContentType.APP_JSON in accept:
+        return ContentType.APP_JSON
+    # anything always allowed in sync, since results returned directly
+    if execution_mode == ExecuteMode.SYNC:
+        return accept
+    if ContentType.ANY in accept:
+        return
+    raise HTTPNotAcceptable(
+        json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+            "type": "NotAcceptable",
+            "title": "Execution request is not acceptable.",
+            "detail": (
+                "When running asynchronously, the Accept header must correspond"
+                "to the Job Status response instead of the desired Result response"
+                "returned when executing synchronously."
+            ),
+            "status": HTTPNotAcceptable.code,
+            "cause": {"name": "Accept", "in": "headers"},
+            "value": repr_json(accept, force_string=False),
+        })
+    )
 
 
 def validate_process_io(process, payload):
@@ -858,8 +916,8 @@ def validate_process_io(process, payload):
     :param payload: Submitted job execution body.
     :raises HTTPException: Corresponding error for detected invalid combination of inputs or outputs.
     """
-    payload_inputs = convert_input_values_schema(payload.get("inputs", {}), JobInputsOutputsSchema.OLD)
-    payload_outputs = convert_output_params_schema(payload.get("outputs", {}), JobInputsOutputsSchema.OLD)
+    payload_inputs = convert_input_values_schema(payload.get("inputs", {}), JobInputsOutputsSchema.OLD) or []
+    payload_outputs = convert_output_params_schema(payload.get("outputs", {}), JobInputsOutputsSchema.OLD) or []
 
     for io_type, io_payload, io_process in [
         ("inputs", payload_inputs, process.inputs),

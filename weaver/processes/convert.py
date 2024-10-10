@@ -126,6 +126,8 @@ if TYPE_CHECKING:
     from requests.models import Response
 
     from weaver.processes.constants import (
+        JobInputsOutputsSchemaAnyOGCType,
+        JobInputsOutputsSchemaAnyOLDType,
         JobInputsOutputsSchemaType,
         ProcessSchemaType,
         WPS_DataType,
@@ -150,6 +152,7 @@ if TYPE_CHECKING:
         ExecutionOutputsList,
         ExecutionOutputsMap,
         JobValueFile,
+        JobValueItem,
         JSON,
         OpenAPISchema,
         OpenAPISchemaArray,
@@ -1865,7 +1868,7 @@ def convert_input_values_schema(inputs, schema):
         raise ValueError(f"Unknown conversion method to schema [{schema}] for inputs of type [{name}]: {inputs}")
     if schema == JobInputsOutputsSchema.OGC:
         input_dict = {}
-        for input_item in inputs:
+        for input_item in inputs:  # type: JobValueItem
             input_id = get_any_id(input_item, pop=True)
             input_val = get_any_value(input_item)
             input_key = get_any_value(input_item, key=True, data=True, file=False)
@@ -1909,18 +1912,18 @@ def convert_input_values_schema(inputs, schema):
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchema.OGC) -> ExecutionOutputsMap
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOGCType) -> Optional[ExecutionOutputsMap]
     ...
 
 
 @overload
 def convert_output_params_schema(inputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchema.OLD) -> ExecutionOutputsList
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOLDType) -> Optional[ExecutionOutputsList]
     ...
 
 
 def convert_output_params_schema(outputs, schema):
-    # type: (ExecutionOutputs, JobInputsOutputsSchemaType) -> ExecutionOutputs
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaType) -> Optional[ExecutionOutputs]
     """
     Convert execution output parameters between equivalent formats.
 
@@ -1936,6 +1939,8 @@ def convert_output_params_schema(outputs, schema):
     :param schema: Desired schema.
     :return: Converted outputs.
     """
+    if outputs is None:
+        return outputs
     if isinstance(schema, str):
         schema = schema.lower().split("+")[0]
     if (
@@ -1952,6 +1957,7 @@ def convert_output_params_schema(outputs, schema):
     if schema == JobInputsOutputsSchema.OGC:
         out_dict = {}
         for out in outputs:
+            out = dict(out)  # type: ignore  # avoid modifying reference
             out_id = get_any_id(out, pop=True)
             out_dict[out_id] = out
         return out_dict
@@ -3383,11 +3389,13 @@ def wps2json_job_payload(wps_request, wps_process):
         else:
             data_output = wps_request.outputs[oid]
         if as_ref:
-            data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
+            data_output["transmissionMode"] = ExecuteTransmissionMode.REFERENCE
         else:
             data_output["transmissionMode"] = ExecuteTransmissionMode.VALUE
         data_output["id"] = oid
         data["outputs"].append(data_output)
+    if not data["outputs"]:
+        data.pop("outputs")  # ensure not 'no output' filter
     return data
 
 

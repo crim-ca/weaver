@@ -769,8 +769,8 @@ class NoContent(ExtendedMappingSchema):
 class FileUploadHeaders(RequestHeaders):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
-        example=f"{ContentType.MULTI_PART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
-        default=ContentType.MULTI_PART_FORM,
+        example=f"{ContentType.MULTIPART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
+        default=ContentType.MULTIPART_FORM,
         description="Desired Content-Type of the file being uploaded.", missing=required)
     content_length = ContentLengthHeader(description="Uploaded file contents size in bytes.")
     content_disposition = ContentDispositionHeader(example="form-data; name=\"file\"; filename=\"desired-name.ext\"",
@@ -2129,7 +2129,8 @@ class TransmissionModeEnum(ExtendedSchemaNode):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/transmissionMode.yaml"
     schema_type = String
     title = "TransmissionMode"
-    default = ExecuteTransmissionMode.VALUE
+    # no default to allow auto-resolution as data/link if omitted
+    # default = ExecuteTransmissionMode.VALUE
     example = ExecuteTransmissionMode.VALUE
     validator = OneOf(ExecuteTransmissionMode.values())
 
@@ -4133,7 +4134,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     #   It is **VERY** important to use 'default={}' and not 'missing=drop' contrary to other optional fields.
     #   Using 'drop' causes and invalid input definition to be ignored/removed and not be validated for expected schema.
     #   We want to ensure format is validated if present to rapidly report the issue and not move on to full execution.
-    #   If 'inputs' are indeed omitted, the default with match against and empty 'ExecuteInputMapValues' schema.
+    #   If 'inputs' are indeed omitted, the default will match against an empty 'ExecuteInputMapValues' schema.
     #   If 'inputs' are explicitly provided as '{}' or '[]', it will also behave the right way for no-inputs process.
     #
     # See tests validating both cases (incorrect schema vs optionals inputs):
@@ -4149,7 +4150,11 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
             "the 'response' type, and the execution 'mode' provided "
             f"(see for more details: {DOC_URL}/processes.html#execution-body)."
         ),
-        default={}
+        # NOTE:
+        #   Explicitly submitted {} or [] means that *no outputs* are requested.
+        #   This must be distinguished from 'all outputs' requested, which is done by omitting 'outputs' field entirely.
+        missing=None,
+        default=None,
     )
 
 
@@ -4174,8 +4179,7 @@ class Execute(ExecuteInputOutputs):
         validator=OneOf(ExecuteMode.values())
     )
     response = JobResponseOptionsEnum(
-        missing=drop,
-        default=ExecuteResponse.DOCUMENT,
+        missing=drop,  # no default to ensure 'Prefer' header vs 'response' body resolution order can be performed
         description=(
             "Indicates the desired representation format of the response. "
             f"(see for more details: {DOC_URL}/processes.html#execution-body)."
@@ -5831,22 +5835,46 @@ class JobOutputReference(ExtendedMappingSchema):
     format = FormatSelection(missing=drop)
 
 
-class JobOutputValue(OneOfKeywordSchema):
+class JobOutputArrayReference(ExtendedSequenceSchema):
+    item = JobOutputReference()
+
+
+class JobOutputQualifiedValueLiteral(Format):
+    value = AnyLiteralType()
+    mediaType = MediaType(missing=drop, example=ContentType.APP_JSON)  # override for optional, others already optional
+    format = FormatSelection(missing=drop)
+
+
+class JobOutputQualifiedDataLiteral(Format):
+    data = AnyLiteralType()
+    mediaType = MediaType(missing=drop, example=ContentType.APP_JSON)  # override for optional, others already optional
+    format = FormatSelection(missing=drop)
+
+
+class JobOutputLiteral(OneOfKeywordSchema):
     _one_of = [
-        JobOutputReference(tilte="JobOutputReference"),
-        AnyLiteralDataType(title="JobOutputLiteral")
+        # AnyLiteralType(),  # NOTE: purposely omit value inline, always embed in 'value' or 'data' for job outputs
+        JobOutputQualifiedDataLiteral(),
+        JobOutputQualifiedValueLiteral(),
     ]
 
 
-class JobOutput(AllOfKeywordSchema):
-    _all_of = [
-        OutputIdentifierType(),
-        JobOutputValue(),
+class JobOutputArrayLiteral(ExtendedSequenceSchema):
+    item = JobOutputLiteral()
+
+
+class JobOutputValueObject(OneOfKeywordSchema):
+    _one_of = [
+        JobOutputReference(),
+        JobOutputLiteral(),
+        # array possible since nested object under 'id'
+        JobOutputArrayReference(),
+        JobOutputArrayLiteral(),
     ]
 
 
 class JobOutputMap(ExtendedMappingSchema):
-    output_id = JobOutputValue(
+    output_id = JobOutputValueObject(
         variable="{output-id}", title="JobOutputData",
         description=(
             "Output data as literal value or file reference. "
@@ -5855,12 +5883,28 @@ class JobOutputMap(ExtendedMappingSchema):
     )
 
 
+class JobOutputFields(OneOfKeywordSchema):
+    _one_of = [
+        JobOutputReference(),
+        JobOutputQualifiedDataLiteral(),
+        JobOutputQualifiedValueLiteral(),
+    ]
+
+
+class JobOutputItem(AllOfKeywordSchema):
+    _all_of = [
+        OutputIdentifierType(),
+        JobOutputFields(),  # cannot be an array directly, since 'id' field needed in this representation
+    ]
+
+
 class JobOutputList(ExtendedSequenceSchema):
     title = "JobOutputList"
-    output = JobOutput(description="Job output result with specific keyword according to represented format.")
+    output = JobOutputItem(description="Job output result with specific keyword according to represented format.")
 
 
 class JobOutputs(OneOfKeywordSchema):
+    description = "Job outputs with many alternate representations according to the specified 'schema' query parameter."
     _one_of = [
         JobOutputMap(),
         JobOutputList(),
@@ -5927,10 +5971,8 @@ class ResultData(OneOfKeywordSchema):
     ]
 
 
-class Result(ExtendedMappingSchema):
-    """
-    Result outputs obtained from a successful process job execution.
-    """
+class ResultsDocument(ExtendedMappingSchema):
+    description = "Results representation as JSON document."
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/results.yaml"
     output_id = ResultData(
         variable="{output-id}", title="ResultData",
@@ -5939,6 +5981,19 @@ class Result(ExtendedMappingSchema):
             "(Note: '{output-id}' is a variable corresponding for each output identifier of the process)"
         )
     )
+
+
+class ResultsContent(ExtendedSchemaNode):
+    description = "Results representation as literal contents."
+    schema_type = String()
+
+
+class ResultsBody(OneOfKeywordSchema):
+    description = "Results obtained from a successful process job execution."
+    _one_of = [
+        ResultsDocument(),
+        ResultsContent(),
+    ]
 
 
 class JobInputsBody(ExecuteInputOutputs):
@@ -7116,7 +7171,7 @@ class PreferenceAppliedHeader(ExtendedSchemaNode):
     description = "Applied preferences from submitted 'Prefer' header after validation."
     name = "Preference-Applied"
     schema_type = String
-    example = "wait=10s, respond-async"
+    example = "wait=10, respond-async"
 
 
 class LocationHeader(URL):
@@ -7243,7 +7298,7 @@ class RedirectResultResponse(ExtendedMappingSchema):
 class OkGetJobResultsResponse(ExtendedMappingSchema):
     _schema = f"{OGC_API_PROC_PART1_RESPONSES}/Results.yaml"
     header = ResponseHeaders()
-    body = Result()
+    body = ResultsBody()
 
 
 class NoContentJobResultsHeaders(NoContent):
@@ -7362,7 +7417,7 @@ class VaultUploadBody(ExtendedSchemaNode):
     schema_type = String
     description = "Multipart file contents for upload to the vault."
     examples = {
-        ContentType.MULTI_PART_FORM: {
+        ContentType.MULTIPART_FORM: {
             "summary": "Upload JSON file to vault as multipart content.",
             "value": EXAMPLES["vault_file_upload.txt"],
         }

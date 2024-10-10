@@ -10,7 +10,7 @@ from werkzeug.datastructures import Headers
 
 from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType, repr_json
 from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
 from weaver.processes.convert import get_cwl_io_type
@@ -188,7 +188,7 @@ class WpsProcessInterface(abc.ABC):
         return job_inputs
 
     def format_outputs(self, job_outputs):
-        # type: (JobOutputs) -> Union[JobOutputs, JobCustomOutputs]
+        # type: (JobOutputs) -> Optional[Union[JobOutputs, JobCustomOutputs]]
         """
         Implementation dependent operations to configure expected outputs for :term:`Job` execution.
 
@@ -199,8 +199,11 @@ class WpsProcessInterface(abc.ABC):
         return job_outputs
 
     @abc.abstractmethod
-    def dispatch(self, process_inputs, process_outputs):
-        # type: (Union[JobInputs, JobCustomInputs], Union[JobOutputs, JobCustomOutputs]) -> JobMonitorReference
+    def dispatch(
+        self,
+        process_inputs,     # type: Union[JobInputs, JobCustomInputs]
+        process_outputs,    # type: Optional[Union[JobOutputs, JobCustomOutputs]]
+    ):                      # type: (...) -> JobMonitorReference
         """
         Implementation dependent operations to dispatch the :term:`Job` execution to the remote :term:`Process`.
 
@@ -443,20 +446,27 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         self.process = process
 
     def format_outputs(self, job_outputs):
-        # type: (JobOutputs) -> JobOutputs
-        for output in job_outputs:
-            output.update({"transmissionMode": ExecuteTransmissionMode.VALUE})
-        return job_outputs
+        # type: (JobOutputs) -> Optional[JobOutputs]
+        # note:
+        #   - Because OGC-API will be requested with 'document'/'minimal' response,
+        #     output transmission mode will auto-resolve as data/link according to type.
+        #   - Because 'job_outputs' originate from CWL 'expected_outputs' in this case,
+        #     only the 'type: File' outputs are listed. Providing these outputs explicitly
+        #     will cause the filter-output mechanism to omit all literals from results.
+        #     Therefore, omit any output indication entirely.
+        #   - Use 'None' instead of '{}' or '[]' to avoid "no output" request.
+        return None
 
     def dispatch(self, process_inputs, process_outputs):
-        # type: (JobInputs, JobOutputs) -> str
+        # type: (JobInputs, Optional[JobOutputs]) -> str
         LOGGER.debug("Execute process %s request for [%s]", self.process_type, self.process)
         execute_body = {
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": process_inputs,
-            "outputs": process_outputs
         }
+        if process_outputs is not None:  # don't insert to avoid filter-output by explicit empty dict/list
+            execute_body["outputs"] = process_outputs
         LOGGER.debug("Execute process %s body for [%s]:\n%s", self.process_type, self.process, repr_json(execute_body))
         request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
         response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
@@ -535,7 +545,11 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         """
         # use '/results' endpoint instead of '/outputs' to ensure support with other
         result_url = f"{monitor_reference}/results"
-        response = self.make_request(method="GET", url=result_url, retry=True)
+        result_headers = {
+            "Accept": ContentType.APP_JSON,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+        }
+        response = self.make_request(method="GET", url=result_url, headers=result_headers, retry=True)
         response.raise_for_status()
         contents = response.json()
 
@@ -551,9 +565,14 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
                 contents = maybe_outputs
 
         # rebuild the expected (old) list format for calling method
-        if isinstance(contents, dict) and all(get_any_value(out) is not None for out in contents.values()):
+        if isinstance(contents, dict) and all(
+            (get_any_value(out) if isinstance(out, dict) else out) is not None
+            for out in contents.values()
+        ):
             outputs = []
             for out_id, out_val in contents.items():
+                if not isinstance(out_val, dict):
+                    out_val = {"value": out_val}
                 out_val.update({"id": out_id})
                 outputs.append(out_val)
             contents = outputs

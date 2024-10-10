@@ -1,0 +1,9 @@
+{
+  "outputs": {
+    "output-file": {
+      "href": "https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output_netcdf.nc",
+      "type": "application/x-netcdf"
+    },
+    "output-data": 3.1416
+  }
+}

@@ -41,6 +41,7 @@ from weaver.utils import get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.utils import get_job_results_document
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -179,7 +180,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      user_id=user_id, execute_async=True, access=access, created=created)
+                                      execute_async=True, user_id=user_id, access=access, created=created)
         job.status = status
         if status != Status.ACCEPTED:
             job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)
@@ -1530,6 +1531,12 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
     def test_jobs_inputs_outputs_validations(self):
         """
         Ensure that inputs/outputs submitted or returned can be represented and validated across various formats.
+
+        .. versionchanged:: 6.0
+            The ``response`` parameter does not use ``document`` by default anymore.
+            Internally, the ``document`` remains the default strategy if none was specified,
+            but allow detecting explicitly when this parameter is omitted, since alternative
+            using the ``Prefer: return`` header can be employed as well.
         """
         default_trans_mode = {"transmissionMode": ExecuteTransmissionMode.VALUE}
 
@@ -1538,9 +1545,9 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         job_none.pop("$id", None)
         assert job_none == {
             "inputs": {},
-            "outputs": {},
+            "outputs": None,
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_in_none = sd.Execute().deserialize({"outputs": {"random": default_trans_mode}})
@@ -1550,7 +1557,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": {},
             "outputs": {"random": default_trans_mode},
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_in_empty_dict = sd.Execute().deserialize({"inputs": {}, "outputs": {"random": default_trans_mode}})
@@ -1560,7 +1567,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": {},
             "outputs": {"random": default_trans_mode},
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_in_empty_list = sd.Execute().deserialize({"inputs": [], "outputs": {"random": default_trans_mode}})
@@ -1570,7 +1577,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": [],
             "outputs": {"random": default_trans_mode},
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_out_none = sd.Execute().deserialize({"inputs": {"random": "ok"}})
@@ -1578,9 +1585,9 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         job_out_none.pop("$id", None)
         assert job_out_none == {
             "inputs": {"random": "ok"},
-            "outputs": {},
+            "outputs": None,
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_out_empty_dict = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": {}})
@@ -1590,7 +1597,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": {"random": "ok"},
             "outputs": {},
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_out_empty_list = sd.Execute().deserialize({"inputs": {"random": "ok"}, "outputs": []})
@@ -1600,7 +1607,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": {"random": "ok"},
             "outputs": [],
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         job_out_defined = sd.Execute().deserialize({
@@ -1613,7 +1620,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             "inputs": {"random": "ok"},
             "outputs": {"random": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
             "mode": ExecuteMode.AUTO,
-            "response": ExecuteResponse.DOCUMENT
+            # "response": ExecuteResponse.DOCUMENT
         }
 
         with self.assertRaises(colander.Invalid):
@@ -1732,3 +1739,49 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         finally:
             if job:
                 self.job_store.delete_job(job.id)
+
+
+@pytest.mark.parametrize(
+    ["results", "expected"],
+    [
+        # cases not handled by the function, expect qualified value representation as input
+        # ({"test": 1}, {"test": 1}),
+        # ({"test": [1, 2, 3]}, {"test": [1, 2, 3]}),
+        (
+            {"test": {"value": 1}},
+            {"test": 1},
+        ),
+        (
+            {"test": {"value": [1, 2, 3]}},
+            {"test": [1, 2, 3]},
+        ),
+        (
+            {"test": [1, {"value": 2}, {"value": 3, "mediaType": ContentType.TEXT_PLAIN}]},
+            {"test": [1, 2, 3]},
+        ),
+        (
+            {"test": [1, {"value": 2, "mediaType": "text/special"}, {"value": 3}]},
+            {"test": [
+                {"value": "1", "mediaType": ContentType.TEXT_PLAIN},
+                {"value": "2", "mediaType": "text/special"},
+                {"value": "3", "mediaType": ContentType.TEXT_PLAIN}
+            ]},
+        ),
+        (
+            {"test": [
+                {"value": 1, "mediaType": ContentType.APP_JSON},
+                {"value": 2, "mediaType": "text/special"},
+                {"value": 3, "mediaType": ContentType.APP_YAML}
+            ]},
+            {"test": [
+                {"value": 1, "mediaType": ContentType.APP_JSON},  # special JSON case, it is loaded inline in document
+                {"value": "2", "mediaType": "text/special"},
+                {"value": "3", "mediaType": ContentType.APP_YAML}
+            ]},
+        ),
+    ]
+)
+def test_get_job_results_document(results, expected):
+    job = Job(task_id="test", outputs={})
+    output = get_job_results_document(job, results, settings={})
+    assert output == expected

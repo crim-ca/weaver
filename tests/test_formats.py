@@ -4,6 +4,7 @@ import inspect
 import itertools
 import os
 import uuid
+from typing import TYPE_CHECKING
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -17,6 +18,9 @@ from requests.exceptions import ConnectionError
 from tests.utils import MockedRequest
 from weaver import formats as f
 from weaver.utils import null, request_extra
+
+if TYPE_CHECKING:
+    from weaver.formats import AnyContentEncoding, FileModeSteamType
 
 _ALLOWED_MEDIA_TYPE_CATEGORIES = [
     "application",
@@ -204,6 +208,7 @@ def test_content_encoding_is_binary(encoding, expect):
     )
 )
 def test_content_encoding_open_parameters(encoding, mode):
+    # type: (AnyContentEncoding, FileModeSteamType) -> None
     result = f.ContentEncoding.open_parameters(encoding, mode)
     if encoding == f.ContentEncoding.UTF_8:
         assert result[0] == mode
@@ -230,9 +235,8 @@ def test_get_format(test_content_type, expected_content_type, expected_content_e
 @pytest.mark.parametrize(
     "test_extension",
     [
-        f.ContentType.APP_OCTET_STREAM,
         f.ContentType.APP_FORM,
-        f.ContentType.MULTI_PART_FORM,
+        f.ContentType.MULTIPART_FORM,
     ]
 )
 def test_get_format_media_type_no_extension(test_extension):
@@ -287,9 +291,8 @@ def test_get_format_media_type_from_schema(test_format, expect_media_type):
     itertools.product(
         ["", None],
         [
-            f.ContentType.APP_OCTET_STREAM,
             f.ContentType.APP_FORM,
-            f.ContentType.MULTI_PART_FORM,
+            f.ContentType.MULTIPART_FORM,
         ]
     )
 )
@@ -297,6 +300,23 @@ def test_get_format_default_no_extension(test_extension, default_content_type):
     fmt = f.get_format(test_extension, default=default_content_type)
     assert fmt == Format(default_content_type, extension=None)
     assert fmt.extension == ""
+
+
+@pytest.mark.parametrize(
+    ["test_extension", "default_extension"],
+    [
+        ("", f.ContentType.APP_OCTET_STREAM),
+        (None, f.ContentType.APP_OCTET_STREAM),
+        (f.ContentType.APP_OCTET_STREAM, None),
+    ]
+)
+def test_get_format_binary_extension(test_extension, default_extension):
+    """
+    .. versionchanged:: 5.10.0
+    """
+    fmt = f.get_format(test_extension, default=default_extension)
+    assert fmt == Format(f.ContentType.APP_OCTET_STREAM, extension=".bin")
+    assert fmt.extension == ".bin"
 
 
 @pytest.mark.parametrize(
@@ -608,23 +628,26 @@ def test_repr_json_default_string():
 
 
 @pytest.mark.parametrize(
-    ["test", "expect", "force_string"],
+    ["test", "expect", "force_string", "extra_params"],
     [
-        ("abc", "abc", True),
-        (123, 123, False),
-        (123, "123", True),
-        ([1, 2], [1, 2], False),
-        ([1, 2], "[1, 2]", True),
-        ("[1, 2]", "[1, 2]", True),
-        ({"a": 1}, {"a": 1}, False),
-        ({"a": 1}, "{\"a\": 1}", True),
-        ("{\"a\": 1}", "{\"a\": 1}", True),
-        (null, str(null), False),
-        (null, str(null), True),
+        ("abc", "abc", True, {}),
+        (123, 123, False, {}),
+        (123, "123", True, {}),
+        ([1, 2], [1, 2], False, {}),
+        ([1, 2], "[1, 2]", True, {}),
+        ("[1, 2]", "[1, 2]", True, {}),
+        ({"a": 1}, {"a": 1}, False, {}),
+        ({"a": 1}, "{\"a\": 1}", True, {}),
+        ({"a": [1, 2]}, "{\"a\":[1,2]}", True, {"separators": (",", ":")}),
+        ("{\"a\": 1}", "{\"a\": 1}", True, {}),
+        ("\t\r\n{\"a\": 1}\r\n", "{\"a\": 1}", True, {}),
+        ("\t\r\n{\"a\": [1, 2]}\r\n", "{\"a\":[1,2]}", True, {"separators": (",", ":")}),
+        (null, str(null), False, {}),
+        (null, str(null), True, {}),
     ]
 )
-def test_repr_json_force_string_handling(test, expect, force_string):
-    result = f.repr_json(test, force_string=force_string, indent=None)
+def test_repr_json_force_string_handling(test, expect, force_string, extra_params):
+    result = f.repr_json(test, force_string=force_string, indent=None, **extra_params)
     assert result == expect
 
 

@@ -1,0 +1,7 @@
+HTTP/1.1 204 No Content
+Host: weaver.example.com
+Content-Length: 0
+Content-Type: application/x-netcdf
+Content-ID: <output@f93a15be-6e16-11ea-b667-08002752172a>
+Content-Location: https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output/output_netcdf.nc
+Link: <https://example.com/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output/output_netcdf.nc>; rel="output"; type="application/x-netcdf"

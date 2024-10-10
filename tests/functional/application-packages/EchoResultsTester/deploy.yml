@@ -1,0 +1,8 @@
+# YAML representation supported by WeaverClient
+processDescription:
+  process:
+    version: "1.0"  # must be string, avoid interpretation as float
+executionUnit:
+  # note: This does not work by itself! The test suite injects the file dynamically.
+  - href: "tests/functional/application-packages/EchoResultsTester/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"

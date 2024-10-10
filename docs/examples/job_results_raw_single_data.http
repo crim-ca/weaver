@@ -1,0 +1,6 @@
+HTTP/1.1 200 OK
+Host: weaver.example.com
+Content-ID: <output@f93a15be-6e16-11ea-b667-08002752172a>
+Content-Type: application/x-netcdf
+
+<netcdf data>

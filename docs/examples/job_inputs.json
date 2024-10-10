@@ -1,0 +1,77 @@
+{
+  "inputs": {
+    "calc": "4.26 * ((C / A) ** 3.94)",
+    "band_a": {
+      "href": "https://example.com/wpsoutputs/weaver/users/23/6f197568-38f5-42f4-851c-0c56d446094c/product/T29SPC_20190601T110621_B02_10m.jp2",
+      "type": "image/jp2"
+    },
+    "band_c": {
+      "href": "https://example.com/wpsoutputs/weaver/users/23/977799a0-bf63-4406-a419-6d686c9a8fc9/product/T29SPC_20190601T110621_B04_10m.jp2",
+      "type": "image/jp2"
+    },
+    "name": "output"
+  },
+  "outputs": {
+    "result": {
+      "transmissionMode": "reference"
+    }
+  },
+  "links": [
+    {
+      "title": "Job status.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96",
+      "type": "application/json",
+      "rel": "status"
+    },
+    {
+      "title": "Job status generic endpoint.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96",
+      "type": "application/json",
+      "rel": "alternate"
+    },
+    {
+      "title": "New job submission endpoint for the corresponding process.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/execution",
+      "type": "application/json",
+      "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute"
+    },
+    {
+      "title": "Submitted job inputs for process execution.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96/inputs",
+      "type": "application/json",
+      "rel": "inputs"
+    },
+    {
+      "title": "Job outputs of successful process execution (extended outputs with metadata).",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96/outputs",
+      "type": "application/json",
+      "rel": "outputs"
+    },
+    {
+      "title": "Job results of successful process execution (direct output values mapping).",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96/results",
+      "type": "application/json",
+      "rel": "http://www.opengis.net/def/rel/ogc/1.0/results"
+    },
+    {
+      "title": "Job statistics collected following process execution.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96/statistics",
+      "type": "application/json",
+      "rel": "statistics"
+    },
+    {
+      "title": "List of collected job logs during process execution.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/weaver/processes/calculate-band/jobs/034151ec-a87e-41ed-8ab4-8afb22b48e96/logs",
+      "type": "application/json",
+      "rel": "logs"
+    }
+  ]
+}

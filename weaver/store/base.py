@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pywps import Process as ProcessWPS
 
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
-    from weaver.execute import AnyExecuteResponse
+    from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference
     from weaver.sort import AnySortType
     from weaver.status import AnyStatusSearch
     from weaver.typedefs import (
@@ -176,11 +176,13 @@ class StoreJobs(StoreInterface):
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
+                 execute_return=None,       # type: Optional[AnyExecuteReturnPreference]
                  custom_tags=None,          # type: Optional[List[str]]
                  user_id=None,              # type: Optional[int]
                  access=None,               # type: Optional[AnyVisibility]
                  context=None,              # type: Optional[str]
                  subscribers=None,          # type: Optional[ExecutionSubscribers]
+                 accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  ):                         # type: (...) -> Job

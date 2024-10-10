@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
+    import io
     import os
     import sys
     import uuid
@@ -112,7 +113,7 @@ if TYPE_CHECKING:
     JSON = Union[Dict[str, Union[_JSON, _JsonItem]], List[Union[_JSON, _JsonItem]], AnyValueType]
 
     Link = TypedDict("Link", {
-        "title": str,
+        "title": NotRequired[str],
         "rel": Required[str],
         "href": Required[str],
         "hreflang": NotRequired[str],
@@ -348,7 +349,8 @@ if TYPE_CHECKING:
     WPS_OutputAsRefMediaType = Tuple[str, Optional[bool], Optional[str]]    # (output_id, as_ref, mime_type)
     WPS_OutputRequested = Union[WPS_OutputAsRef, WPS_OutputAsRefMediaType]
 
-    KVP_Item = Union[ValueType, Sequence[ValueType]]
+    KVP_Value = Optional[str]
+    KVP_Item = Union[KVP_Value, Sequence[KVP_Value]]
     KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
     KVP = Dict[str, List[KVP_Item]]
 
@@ -359,6 +361,8 @@ if TYPE_CHECKING:
     AnyRegistryContainer = AnyContainer
     AnyDatabaseContainer = AnyContainer
 
+    AnyData = Union[str, bytes, bytearray]
+    AnyDataStream = Union[AnyData, io.IOBase]
     CookiesType = Dict[str, str]
     HeadersType = Dict[str, str]
     CookiesTupleType = List[Tuple[str, str]]
@@ -523,6 +527,16 @@ if TYPE_CHECKING:
         "successEmail": NotRequired[str],
         "inProgressEmail": NotRequired[str],
     }, total=True)
+    JobStatusResponse = TypedDict("JobStatusResponse", {
+        "status": Required[AnyStatusType],
+        "type": Required[Literal["process", "provider"]],
+        "id": NotRequired[str],  # TBD alternative to 'jobID' considered by SWG
+        "jobID": Required[str],
+        "processID": Required[str],
+        "providerID": NotRequired[Optional[str]],
+        "links": NotRequired[List[Link]],
+        # many other fields... only listing accessed ones in code
+    }, total=False)
 
     # when schema='weaver.processes.constants.ProcessSchema.OGC'
     ExecutionInputsMap = Dict[str, Union[AnyValueType, JobValueObject, List[JobValueObject]]]
@@ -532,6 +546,7 @@ if TYPE_CHECKING:
 
     ExecutionOutputObject = TypedDict("ExecutionOutputObject", {
         "transmissionMode": AnyExecuteTransmissionMode,  # type: ignore
+        "format": NotRequired[JobValueFormat],
     }, total=False)
     ExecutionOutputItem = TypedDict("ExecutionOutputItem", {
         "id": str,
@@ -549,7 +564,7 @@ if TYPE_CHECKING:
     }, total=False)
     ExecutionResultObjectValue = TypedDict("ExecutionResultObjectValue", {
         "value": Optional[AnyValueType],
-        "type": NotRequired[str],
+        "mediaType": NotRequired[str],
     }, total=False)
     ExecutionResultObject = Union[ExecutionResultObjectRef, ExecutionResultObjectValue]
     ExecutionResultArray = List[ExecutionResultObject]
