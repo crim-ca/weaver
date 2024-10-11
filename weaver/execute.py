@@ -198,7 +198,7 @@ def parse_prefer_header_execute_mode(
         # supported mode is enforced, only indicate if it matches preferences to honour them
         # otherwise, server is allowed to discard preference since it cannot be honoured
         mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
-        wait = None if mode == ExecuteMode.ASYNC else wait_max
+        wait = None if mode == ExecuteMode.ASYNC else wait
         if auto == mode:
             if auto == ExecuteMode.ASYNC:
                 applied_preferences.append("respond-async")

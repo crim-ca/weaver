@@ -9,6 +9,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPrefe
 @pytest.mark.parametrize(
     ["headers", "support", "expected", "extra_prefer"],
     [
+        ({}, [], (ExecuteMode.ASYNC, None, {}), ""),
         # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
         ({}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC], (ExecuteMode.SYNC, 10, {}), ""),
         # only supported async (enforced) - original behaviour
@@ -19,6 +20,9 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPrefe
         for (_headers, _support, _expected), _extra
         in itertools.product(
             [
+                # no mode
+                ({"Prefer": "respond-async, wait=4"}, [],
+                 (ExecuteMode.ASYNC, None, {})),
                 # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
                 ({"Prefer": ""}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
                  (ExecuteMode.SYNC, 10, {})),
@@ -39,7 +43,11 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPrefe
                  (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
                 ({"Prefer": "wait=4"}, [ExecuteControlOption.ASYNC],
                  (ExecuteMode.ASYNC, None, {})),
-
+                # only supported sync (enforced)
+                ({"Prefer": "wait=4"}, [ExecuteControlOption.SYNC],
+                 (ExecuteMode.SYNC, 4, {"Preference-Applied": "wait=4"})),
+                ({"Prefer": "respond-async"}, [ExecuteControlOption.SYNC],
+                 (ExecuteMode.SYNC, 10, {})),  # 10 is weaver default if not configured otherwise
             ],
             [
                 "",
