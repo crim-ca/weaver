@@ -5,8 +5,8 @@ import tempfile
 
 from pyramid.response import FileResponse
 
-from weaver.transform.transform import FAMILIES, Transform
 from tests.resources import TRANSFORM_PATH
+from weaver.transform.transform import FAMILIES, Transform
 
 
 def using_mimes(func):
