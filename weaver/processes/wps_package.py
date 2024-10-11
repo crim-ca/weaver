@@ -2732,9 +2732,13 @@ class WpsPackage(Process):
         # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
         if storage_type == STORE_TYPE.S3:
             # when using S3 storage, the 'prefix' is directly employed with the file name
-            # however, we want results to be nested under their output ID
+            # results should be nested under their output ID to allow arrays and alternate types
             # therefore, preemptively adjust the prefix to do as such
-            storage.prefix = os.path.join(output_prefix, output_id)
+            # however, do not do it for the case of directories, since the output ID is already the directory itself
+            if location_type == PACKAGE_DIRECTORY_TYPE:
+                storage.prefix = output_prefix
+            else:
+                storage.prefix = os.path.join(output_prefix, output_id)
         else:
             # when using other storage than S3, the 'target' is automatically built using a join
             # of 'prefix' and the output ID stored in the parent result object containing this storage

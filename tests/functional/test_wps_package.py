@@ -5611,32 +5611,36 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
         # check that outputs are S3 bucket references
         output_values = {out["id"]: get_any_value(out) for out in outputs["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+        output_files = [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
-        for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
-            output_ref = f"{output_bucket}/{wps_uuid}/{out_file}"
+        for out_id, out_file in output_files:
+            output_ref = f"{output_bucket}/{wps_uuid}/{out_id}/{out_file}"
             output_ref_abbrev = f"s3://{output_ref}"
             output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
             output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
             # validation on outputs path
-            assert output_values[out_key] in output_ref_any
+            assert output_values[out_id] in output_ref_any
             # validation on results path
-            assert results[out_key]["href"] in output_ref_any
+            assert results[out_id]["href"] in output_ref_any
 
         # check that outputs are indeed stored in S3 buckets
         mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
-        for out_file in [input_file_s3, input_file_http]:
-            out_key = f"{job_id}/{out_file}"
+        for out_id, out_file in output_files:
+            out_key = f"{job_id}/{out_id}/{out_file}"
             assert out_key in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
         wps_outdir = self.settings["weaver.wps_output_dir"]
-        for out_file in [input_file_s3, input_file_http]:
+        for out_id, out_file in output_files:
             assert not os.path.exists(os.path.join(wps_outdir, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, out_id, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_id, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_id, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
     @pytest.mark.skip(reason="OAS execute parse/validate values not implemented")
