@@ -6,7 +6,7 @@ import shutil
 import tarfile
 import tempfile
 
-import jinja2
+from markupsafe import escape
 import pandas as pd
 import xmltodict
 import yaml
@@ -134,31 +134,37 @@ def images_to_any(ims, o):
 
 @exception_handler
 def any_to_html(i, o):
-    if not is_image(i):
-        write_content(o, HTML_CONTENT.replace("%CONTENT%", jinja2.escape(get_content(i))))
-    else:
-        jpg = f"{i}.jpg"
-        image_to_any(i, jpg)
-        write_content(o, HTML_CONTENT.replace("%CONTENT%", "<img src=\"data:image/jpeg;base64," + base64.b64encode(
-            get_content(jpg, "rb")) + "\" alt=\"Result\" />"))
+    try:
+        if not is_image(i):
+            content = get_content(i)
+            # Escape and replace content in HTML
+            html_content = HTML_CONTENT.replace("%CONTENT%", escape(content))  # Use escape from markupsafe
+            write_content(o, html_content)
+        else:
+            jpg = f"{i}.jpg"
+            image_to_any(i, jpg)
+            with open(jpg, "rb") as img_file:
+                img_data = base64.b64encode(img_file.read()).decode("utf-8")  # Base64 encode the image content
+            write_content(o, HTML_CONTENT.replace("%CONTENT%", f'<img src="data:image/jpeg;base64,{img_data}" alt="Result" />'))
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")  # Print the error message
+        raise RuntimeError(f"Error processing file {i}: {str(e)}")
+
 
 
 @exception_handler
 def any_to_pdf(i, o):
     image = Image.open(i) if is_image(i) else None
-
     new_pdf = FPDF(orientation='P', unit='pt', format='A4')
-
     if image is None:
-
+        # If input is not an image, treat it as text
         new_pdf.add_page()
         new_pdf.set_font("Arial", size=12)
         new_pdf.multi_cell(0, 10, txt=get_content(i), align='L')
-
     else:
         if is_tiff(i):
             tiff = Tiff(i)
-            ims = tiff.get_images()
+            ims = tiff.get_images()  # For TIFF files with multiple pages
         else:
             ims = [image.convert('RGB')]
 
@@ -172,22 +178,30 @@ def any_to_pdf(i, o):
 
             if image_w > image_h:
                 new_pdf.add_page(orientation='L')
-                _w = pdf_height
-                _h = pdf_width
+                _w, _h = pdf_height, pdf_width
             else:
                 new_pdf.add_page(orientation='P')
-                _h = pdf_height
-                _w = pdf_width
+                _w, _h = pdf_width, pdf_height
 
-            while image_h > _h or image_w > _w:
-                image_h *= 0.999
-                image_w *= 0.999
+            # Scale image down to fit within the PDF page while keeping aspect ratio
+            aspect_ratio = image_w / image_h
+            if image_w > _w:
+                image_w = _w
+                image_h = image_w / aspect_ratio
+            if image_h > _h:
+                image_h = _h
+                image_w = image_h * aspect_ratio
 
-            new_pdf.image(im, x=(_w - image_w) / 2, y=(_h - image_h) / 2, w=image_w, h=image_h)
+            # Center the image on the page
+            x_offset = (_w - image_w) / 2
+            y_offset = (_h - image_h) / 2
+
+            # Add the image to the PDF
+            im_path = os.path.join(tempfile.gettempdir(), "temp_image.jpg")
+            im.save(im_path)  # Save image to temp path for FPDF
+            new_pdf.image(im_path, x=x_offset, y=y_offset, w=image_w, h=image_h)
 
     new_pdf.output(o, 'F')
-
-    # ims[0].save(o, save_all=True, append_images=ims)
 
 
 @exception_handler
