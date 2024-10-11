@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
+  (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
 
 Fixes:
 ------

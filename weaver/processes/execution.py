@@ -12,6 +12,7 @@ from owslib.util import clean_ows_url
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
 from pyramid_celery import celery_app as app
+from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
@@ -34,10 +35,12 @@ from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     apply_number_with_unit,
     as_int,
+    extend_instance,
     fully_qualified_name,
     get_any_id,
     get_any_value,
     get_header,
+    get_path_kvp,
     get_registry,
     get_settings,
     now,
@@ -48,6 +51,7 @@ from weaver.utils import (
     wait_secs
 )
 from weaver.visibility import Visibility
+from weaver.wps.service import get_pywps_service
 from weaver.wps.utils import (
     check_wps_status,
     get_wps_client,
@@ -56,6 +60,7 @@ from weaver.wps.utils import (
     get_wps_output_dir,
     get_wps_output_path,
     get_wps_output_url,
+    get_wps_path,
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
@@ -79,6 +84,7 @@ if TYPE_CHECKING:
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
+        AnyViewResponse,
         AnyValueType,
         CeleryResult,
         HeaderCookiesType,
@@ -116,8 +122,6 @@ def execute_process(task, job_id, wps_url, headers=None):
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
     """
-    from weaver.wps.service import get_pywps_service
-
     LOGGER.debug("Job execute process called.")
 
     task_process = get_celery_process()
@@ -660,8 +664,30 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
-def submit_job(request, reference, tags=None):
-    # type: (Request, Union[Service, Process], Optional[List[str]]) -> AnyResponseType
+def submit_job_dispatch_wps(request, process):
+    # type: (Request, Process) -> AnyViewResponse
+    """
+    Dispatch a :term:`XML` request to the relevant :term:`Process` handler using the :term:`WPS` endpoint.
+
+    Sends the :term:`XML` request to the :term:`WPS` endpoint which knows how to parse it properly.
+    Execution will end up in the same :func:`submit_job_handler` function as for :term:`OGC API` :term:`JSON` execution.
+
+    .. warning::
+        The function assumes that :term:`XML` was pre-validated as present in the :paramref:`request`.
+    """
+    service = get_pywps_service()
+    wps_params = {"version": "1.0.0", "request": "Execute", "service": "WPS", "identifier": process.id}
+    request.path_info = get_wps_path(request)
+    request.query_string = get_path_kvp("", **wps_params)[1:]
+    location = request.application_url + request.path_info + request.query_string
+    LOGGER.warning("Route redirection [%s] -> [%s] for WPS-XML support.", request.url, location)
+    http_request = extend_instance(request, WerkzeugRequest)
+    http_request.shallow = False
+    return service.call(http_request)
+
+
+def submit_job(request, reference, tags=None, process_id=None):
+    # type: (Request, Union[Service, Process], Optional[List[str]], Optional[str]) -> AnyResponseType
     """
     Generates the job submission from details retrieved in the request.
 
@@ -683,13 +709,13 @@ def submit_job(request, reference, tags=None):
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
 
-    provider_id = None  # None OK if local
-    process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
+    prov_id = None  # None OK if local
+    proc_id = None  # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
     tags = tags or []
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        process_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
+        proc_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
@@ -702,8 +728,8 @@ def submit_job(request, reference, tags=None):
         lang = matched_lang
     elif isinstance(reference, Service):
         service_url = reference.url
-        provider_id = reference.id
-        process_id = resolve_process_tag(request)
+        prov_id = reference.id
+        proc_id = process_id or resolve_process_tag(request)
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
@@ -716,7 +742,7 @@ def submit_job(request, reference, tags=None):
     user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     headers = dict(request.headers)
     settings = get_settings(request)
-    return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
+    return submit_job_handler(json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local,
                               visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
@@ -787,28 +813,38 @@ def submit_job_handler(payload,             # type: ProcessExecution
     exec_resp = json_body.get("response")
     subscribers = map_job_subscribers(json_body, settings)
 
+    job_pending_created = payload.get("status") == "create"
+    if job_pending_created:
+        job_status = Status.CREATED
+        job_message = "Job created with pending trigger."
+    else:
+        job_status = Status.ACCEPTED
+        job_message = "Job task submitted for execution."
+
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
+    job = store.save_job(task_id=job_status, process=process, service=provider_id,
                          inputs=json_body.get("inputs"), outputs=json_body.get("outputs"),
                          is_local=is_local, is_workflow=is_workflow, access=visibility, user_id=user, context=context,
                          execute_async=is_execute_async, execute_response=exec_resp,
                          custom_tags=tags, accept_language=language, subscribers=subscribers)
-    job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
+    job.save_log(logger=LOGGER, message=job_message, status=job_status, progress=0)
     job = store.update_job(job)
     location_url = job.status_url(settings)
     resp_headers = {"Location": location_url}
     resp_headers.update(applied)
 
-    wps_url = clean_ows_url(service_url)
-    result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)  # type: CeleryResult
-    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
-    if not is_execute_async:
+    task_result = None  # type: Optional[CeleryResult]
+    if not job_pending_created:
+        wps_url = clean_ows_url(service_url)
+        task_result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)
+        LOGGER.debug("Celery pending task [%s] for job [%s].", task_result.id, job.id)
+    if not job_pending_created and not is_execute_async:
         LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
         try:
-            result.wait(timeout=wait)
+            task_result.wait(timeout=wait)
         except CeleryTaskTimeoutError:
             pass
-        if result.ready():
+        if task_result.ready():
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
@@ -833,8 +869,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
         "jobID": job.id,
         "processID": job.process,
         "providerID": provider_id,  # dropped by validator if not applicable
-        "status": map_status(Status.ACCEPTED),
-        "location": location_url
+        "status": map_status(job_status),
+        "location": location_url,   # for convenience/backward compatibility, but official is Location *header*
     }
     resp = get_job_submission_response(body, resp_headers)
     return resp

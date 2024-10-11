@@ -107,9 +107,6 @@ if TYPE_CHECKING:
     UpdateFields = List[Union[str, UpdateFieldListMethod]]
 
 
-# FIXME:
-#   https://github.com/crim-ca/weaver/issues/215
-#   define common Exception classes that won't require this type of conversion
 def get_process(process_id=None, request=None, settings=None, store=None, revision=True):
     # type: (Optional[str], Optional[PyramidRequest], Optional[SettingsType], Optional[StoreProcesses], bool) -> Process
     """

@@ -3,18 +3,33 @@ from typing import TYPE_CHECKING
 from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
-from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPOk,
+    HTTPPermanentRedirect,
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
+)
 
+from weaver import xml_util
 from weaver.database import get_db
 from weaver.datatype import Job
-from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
-from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
+from weaver.exceptions import JobNotFound, JobStatisticsNotFound, ProcessNotFound, log_unhandled_exceptions
+from weaver.formats import (
+    ContentType,
+    OutputFormat,
+    add_content_type_charset,
+    clean_media_type_format,
+    guess_target_format,
+    repr_json
+)
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_handler
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
-from weaver.utils import get_settings
+from weaver.utils import get_header, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
@@ -23,10 +38,12 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_results_response,
     get_results,
     get_schema_query,
-    raise_job_bad_status,
+    raise_job_bad_status_locked,
+    raise_job_bad_status_success,
     raise_job_dismissed,
     validate_service_process
 )
+from weaver.wps_restapi.providers.utils import get_service
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
@@ -179,6 +196,96 @@ def get_queried_jobs(request):
     return Box(body)
 
 
+@sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=list(ContentType.ANY_XML),
+    schema=sd.PostJobsEndpointXML(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+@sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostJobsEndpointJSON(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+def create_job(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Create a new processing job with advanced management and execution capabilities.
+    """
+    proc_id = None
+    prov_id = None
+    try:
+        ctype = get_header("Content-Type", request.headers, default=ContentType.APP_JSON)
+        ctype = clean_media_type_format(ctype, strip_parameters=True)
+        if ctype == ContentType.APP_JSON and "process" in request.json_body:
+            proc_url = request.json_body["process"]
+            proc_url = sd.ProcessURL().deserialize(proc_url)
+            prov_url, proc_id = proc_url.rsplit("/processes/", 1)
+            prov_parts = prov_url.rsplit("/providers/", 1)
+            prov_id = prov_parts[-1] if len(prov_parts) > 1 else None
+        elif ctype in ContentType.ANY_XML:
+            body_xml = xml_util.fromstring(request.text)
+            proc_id = body_xml.xpath("ows:Identifier", namespaces=body_xml.getroot().nsmap)[0].text
+    except Exception as exc:
+        raise ProcessNotFound(json={
+            "title": "NoSuchProcess",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "detail": "Process URL or identifier reference missing or invalid.",
+            "status": ProcessNotFound.code,
+        }) from exc
+    if not proc_id:
+        raise HTTPUnsupportedMediaType(json={
+            "title": "Unsupported Media Type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "detail": "Process URL or identifier reference missing or invalid.",
+            "status": HTTPUnsupportedMediaType.code,
+            "cause": {"headers": {"Content-Type": ctype}},
+        })
+
+    if ctype in ContentType.ANY_XML:
+        process = get_process(process_id=proc_id)
+        return submit_job_dispatch_wps(request, process)
+
+    if prov_id:
+        ref = get_service(request, provider_id=prov_id)
+    else:
+        ref = get_process(process_id=proc_id)
+        proc_id = None  # ensure ref is used, process ID needed only for provider
+    return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+
+
+@sd.process_results_service.post(
+    tags=[sd.TAG_JOBS, sd.TAG_EXECUTE, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobResultsTriggerExecutionEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_job_results_responses,
+)
+@sd.job_results_service.post(
+    tags=[sd.TAG_JOBS, sd.TAG_EXECUTE, sd.TAG_RESULTS],
+    schema=sd.JobResultsTriggerExecutionEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_job_results_responses,
+)
+def trigger_job_execution(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Trigger the execution of a previously created job.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_locked(job, request)
+    # FIXME: reuse job, adjust function or map parameters from attributes
+    # FIXME: alt 202 code for accepted on async when triggered this way
+    return submit_job_handler(request, job)
+
+
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.ProviderJobEndpoint(),
@@ -209,6 +316,39 @@ def get_job_status(request):
     job = get_job(request)
     job_status = job.json(request)
     return HTTPOk(json=job_status)
+
+
+@sd.provider_job_service.patch(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS],
+    schema=sd.PatchProviderJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_provider_job_responses,
+)
+@sd.process_job_service.patch(
+    tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
+    schema=sd.PatchProcessJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_process_job_responses,
+)
+@sd.job_service.patch(
+    tags=[sd.TAG_JOBS],
+    schema=sd.PatchJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_job_responses,
+)
+def update_job(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Update a previously created job still pending execution.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_locked(job, request)
+
+    raise NotImplementedError  # FIXME
 
 
 @sd.provider_job_service.delete(
@@ -381,7 +521,7 @@ def get_job_outputs(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    raise_job_bad_status(job, request)
+    raise_job_bad_status_success(job, request)
     schema = get_schema_query(request.params.get("schema"))
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}

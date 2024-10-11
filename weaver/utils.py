@@ -120,6 +120,7 @@ if TYPE_CHECKING:
         JSON,
         KVP,
         KVP_Item,
+        Link,
         Literal,
         Number,
         OpenAPISchema,
@@ -1383,6 +1384,44 @@ def get_href_headers(path,                      # type: str
         "Last-Modified": f_modified,
     })
     return headers
+
+
+def make_link_header(
+    href,           # type: Union[str, Link]
+    hreflang=None,  # type: Optional[str]
+    rel=None,       # type: Optional[str]
+    type=None,      # type: Optional[str]  # noqa
+    title=None,     # type: Optional[str]
+    charset=None,   # type: Optional[str]
+):                  # type: (...) -> str
+    """
+    Creates the HTTP Link (:rfc:`8288`) header value from input parameters or a dictionary representation.
+
+    Parameter names are specifically selected to allow direct unpacking from the dictionary representation.
+    Otherwise, a dictionary can be passed as the first parameter, allowing other parameters to act as override values.
+    Alternatively, all parameters can be supplied individually.
+
+    .. note::
+        Parameter :paramref:`rel` is optional to allow unpacking with a single parameter,
+        but its value is required to form a valid ``Link`` header.
+    """
+    if isinstance(href, dict):
+        rel = rel or href.get("rel")
+        type = type or href.get("type")  # noqa
+        title = title or href.get("title")
+        charset = charset or href.get("charset")  # noqa
+        hreflang = hreflang or href.get("hreflang")
+        href = href["href"]
+    link = f"<{href}>; rel=\"{rel}\""
+    if type:
+        link += f"; type=\"{type}\""
+    if charset:
+        link += f"; charset=\"{charset}\""
+    if title:
+        link += f"; title=\"{title}\""
+    if hreflang:
+        link += f"; hreflang={hreflang}"
+    return link
 
 
 def get_base_url(url):

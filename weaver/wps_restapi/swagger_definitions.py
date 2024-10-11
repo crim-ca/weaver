@@ -2143,6 +2143,12 @@ class JobStatusEnum(ExtendedSchemaNode):
     validator = OneOf(JOB_STATUS_CODE_API)
 
 
+class JobStatusCreate(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobStatus"
+    validator = OneOf(["create"])
+
+
 class JobStatusSearchEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobStatusSearch"
@@ -2550,9 +2556,13 @@ class OWSIdentifier(ExtendedSchemaNode, OWSNamespace):
     name = "Identifier"
 
 
-class OWSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
+class OWSProcessIdentifier(ProcessIdentifier, OWSNamespace):
+    pass
+
+
+class OWSProcessIdentifierList(ExtendedSequenceSchema, OWSNamespace):
     name = "Identifiers"
-    item = OWSIdentifier()
+    item = OWSProcessIdentifier()
 
 
 class OWSTitle(ExtendedSchemaNode, OWSNamespace):
@@ -2585,7 +2595,7 @@ class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
     _schema = f"{OGC_WPS_1_SCHEMAS}/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
-    identifier = OWSIdentifierList(
+    identifier = OWSProcessIdentifierList(
         description="Single or comma-separated list of process identifier to describe.",
         example="example"
     )
@@ -2602,7 +2612,7 @@ class WPSExecutePost(WPSOperationPost, WPSNamespace):
     _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_request.xsd"
     name = "Execute"
     title = "Execute"
-    identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
+    identifier = OWSProcessIdentifier(description="Identifier of the process to execute with data inputs.")
     dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
 
 
@@ -2776,7 +2786,7 @@ class ProcessVersion(ExtendedSchemaNode, WPSNamespace):
 class OWSProcessSummary(ExtendedMappingSchema, WPSNamespace):
     version = ProcessVersion(name="processVersion", default="None", example="1.2",
                              description="Version of the corresponding process summary.")
-    identifier = OWSIdentifier(example="example", description="Identifier to refer to the process.")
+    identifier = OWSProcessIdentifier(example="example", description="Identifier to refer to the process.")
     _title = OWSTitle(example="Example Process", description="Title of the process.")
     abstract = OWSAbstract(example="Process for example schema.", description="Detail about the process.")
 
@@ -3014,7 +3024,7 @@ class WPSStatus(ExtendedMappingSchema, WPSNamespace):
 class WPSProcessSummary(ExtendedMappingSchema, WPSNamespace):
     name = "Process"
     title = "Process"
-    identifier = OWSIdentifier()
+    identifier = OWSProcessIdentifier()
     _title = OWSTitle()
     abstract = OWSAbstract(missing=drop)
 
@@ -3328,8 +3338,17 @@ class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobResultsEndpoint(ProviderProcessPath, JobPath):
+class JobResultsEndpoint(JobPath):
     header = RequestHeaders()
+
+
+class JobResultsTriggerExecutionEndpoint(JobResultsEndpoint):
+    header = RequestHeaders()
+    body = NoContent()
+
+
+class ProcessJobResultsTriggerExecutionEndpoint(JobResultsTriggerExecutionEndpoint, LocalProcessPath):
+    pass
 
 
 class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
@@ -4162,6 +4181,14 @@ class Execute(ExecuteInputOutputs):
             "value": EXAMPLES["job_execute.json"],
         },
     }
+    status = JobStatusCreate(
+        description=(
+            "Status to request creation of the job without submitting it to processing queue "
+            "and leave it pending until triggered by another results request to start it "
+            "(see *OGC API - Processes* - Part 4: Job Management)."
+        ),
+        missing=drop,
+    )
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -6444,13 +6471,17 @@ class ExecuteHeadersXML(ExecuteHeadersBase):
     )
 
 
-class PostProcessJobsEndpointJSON(LocalProcessPath):
+class PostJobsEndpointJSON(ExtendedMappingSchema):
     header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
 
 
-class PostProcessJobsEndpointXML(LocalProcessPath):
+class PostProcessJobsEndpointJSON(PostJobsEndpointJSON, LocalProcessPath):
+    pass
+
+
+class PostJobsEndpointXML(ExtendedMappingSchema):
     header = ExecuteHeadersXML()
     querystring = LocalProcessQuery()
     body = WPSExecutePost(
@@ -6465,6 +6496,10 @@ class PostProcessJobsEndpointXML(LocalProcessPath):
             }
         }
     )
+
+
+class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
+    pass
 
 
 class PagingQueries(ExtendedMappingSchema):
@@ -6734,7 +6769,7 @@ class GenericHTMLResponse(ExtendedMappingSchema):
                 "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
                 f"Name '{name}' is invalid."
             )
-        obj = super().__new__(cls)
+        obj = super().__new__(cls)  # type: ExtendedSchemaNode
         obj.__init__(name=name, description=description)
         obj.__class__.__name__ = name
         obj.children = [
@@ -7129,11 +7164,18 @@ class CreatedJobLocationHeader(ResponseHeaders):
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
-    description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
+    description = (
+        "Job successfully submitted. "
+        "Execution should begin when resources are available or when triggered, according to requested execution mode."
+    )
     examples = {
         "JobAccepted": {
-            "summary": "Job accepted for execution.",
+            "summary": "Job accepted for execution asynchronously.",
             "value": EXAMPLES["job_status_accepted.json"]
+        },
+        "JobCreated": {
+            "summary": "Job created for later execution by trigger.",
+            "value": EXAMPLES["job_status_created.json"]
         }
     }
     header = CreatedJobLocationHeader()
@@ -7257,6 +7299,7 @@ class NoContentJobResultsHeaders(NoContent):
 
 
 class NoContentJobResultsResponse(ExtendedMappingSchema):
+    description = "Job completed execution synchronously with results returned in Link headers."
     header = NoContentJobResultsHeaders()
     body = NoContent(default="")
 
@@ -7695,9 +7738,9 @@ post_provider_responses = {
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
-    "200": CompletedJobResponse(description="success"),
-    "201": CreatedLaunchJobResponse(description="success"),
-    "204": NoContentJobResultsResponse(description="success"),
+    "200": CompletedJobResponse(),
+    "201": CreatedLaunchJobResponse(),
+    "204": NoContentJobResultsResponse(),
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
@@ -7705,15 +7748,21 @@ post_provider_process_job_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
-    "200": CompletedJobResponse(description="success"),
-    "201": CreatedLaunchJobResponse(description="success"),
-    "204": NoContentJobResultsResponse(description="success"),
+    "200": CompletedJobResponse(),
+    "201": CreatedLaunchJobResponse(),
+    "204": NoContentJobResultsResponse(),
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+post_jobs_responses = copy(post_process_jobs_responses)
+post_job_results_responses = copy(post_process_jobs_responses)
+post_job_results_responses.pop("201")   # job already created, therefore invalid
+post_job_results_responses.update({
+    "202": CreatedLaunchJobResponse(),  # alternate to '201' for async case since job already exists
+})
 get_all_jobs_responses = {
     "200": OkGetQueriedJobsResponse(description="success", examples={
         "JobListing": {

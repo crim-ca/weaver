@@ -11,6 +11,7 @@ from pyramid.httpexceptions import (
     HTTPCreated,
     HTTPForbidden,
     HTTPInternalServerError,
+    HTTPLocked,
     HTTPNoContent,
     HTTPNotFound,
     HTTPNotImplemented,
@@ -48,7 +49,8 @@ from weaver.utils import (
     get_secure_path,
     get_settings,
     get_weaver_url,
-    is_uuid
+    is_uuid,
+    make_link_header
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
@@ -461,7 +463,7 @@ def get_job_results_response(job, container, headers=None):
     :param headers: Additional headers to provide in the response.
     """
     raise_job_dismissed(job, container)
-    raise_job_bad_status(job, container)
+    raise_job_bad_status_success(job, container)
 
     # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
     # See:
@@ -580,8 +582,18 @@ def get_job_submission_response(body, headers, error=False):
         body["description"] = http_desc
         return http_class(json=body, headerlist=headers)
 
-    body["description"] = sd.CreatedLaunchJobResponse.description
+    if status == Status.CREATED:
+        body["description"] = (
+            "Job successfully submitted for creation. "
+            "Waiting on trigger request to being execution."
+        )
+    else:
+        body["description"] = (
+            "Job successfully submitted to processing queue. "
+            "Execution should begin when resources are available."
+        )
     body = sd.CreatedJobStatusSchema().deserialize(body)
+    headers.setdefault("Location", body["location"])
     return HTTPCreated(json=body, headerlist=headers)
 
 
@@ -663,13 +675,42 @@ def validate_service_process(request):
     return service_name, process_name
 
 
-def raise_job_bad_status(job, container=None):
+def raise_job_bad_status_locked(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> None
+    """
+    Raise the appropriate message for :term:`Job` unable to be modified.
+    """
+    if job.status != Status.CREATED:
+        links = job.links(container=container)
+        headers = [("Link", make_link_header(link)) for link in links]
+        job_reason = ""
+        if job.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
+            job_reason = " It has already finished execution."
+        elif job.status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
+            job_reason = " It is already queued for execution."
+        elif job.status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
+            job_reason = " It is already executing."
+        raise HTTPLocked(
+            headers=headers,
+            json={
+                "title": "Job Locked for Execution",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked",
+                "detail": f"Job cannot be modified.{job_reason}",
+                "status": HTTPLocked.code,
+                "cause": {"status": job.status},
+                "links": links
+            }
+        )
+
+
+def raise_job_bad_status_success(job, container=None):
     # type: (Job, Optional[AnySettingsContainer]) -> None
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
     if job.status != Status.SUCCEEDED:
         links = job.links(container=container)
+        headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
             err_code = None
             err_info = None
@@ -697,26 +738,32 @@ def raise_job_bad_status(job, container=None):
                 err_code = OWSNoApplicableCode.code
                 err_info = "unknown"
             # /req/core/job-results-failed
-            raise HTTPBadRequest(json={
-                "title": "JobResultsFailed",
-                "type": err_code,
-                "detail": "Job results not available because execution failed.",
-                "status": HTTPBadRequest.code,
-                "cause": err_info,
-                "links": links
-            })
+            raise HTTPBadRequest(
+                headers=headers,
+                json={
+                    "title": "JobResultsFailed",
+                    "type": err_code,
+                    "detail": "Job results not available because execution failed.",
+                    "status": HTTPBadRequest.code,
+                    "cause": err_info,
+                    "links": links
+                }
+            )
 
         # /req/core/job-results-exception/results-not-ready
         # must use OWS instead of HTTP class to preserve provided JSON body
         # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
-        raise OWSNotFound(json={
-            "title": "JobResultsNotReady",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
-            "detail": "Job is not ready to obtain results.",
-            "status": HTTPNotFound.code,
-            "cause": {"status": job.status},
-            "links": links
-        })
+        raise OWSNotFound(
+            headers=headers,
+            json={
+                "title": "JobResultsNotReady",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
+                "detail": "Job is not ready to obtain results.",
+                "status": HTTPNotFound.code,
+                "cause": {"status": job.status},
+                "links": links
+            }
+        )
 
 
 def raise_job_dismissed(job, container=None):
@@ -729,7 +776,9 @@ def raise_job_dismissed(job, container=None):
         settings = get_settings(container)
         job_links = job.links(settings)
         job_links = [link for link in job_links if link["rel"] in ["status", "alternate", "collection", "up"]]
+        headers = [("Link", make_link_header(link)) for link in job_links]
         raise JobGone(
+            headers=headers,
             json={
                 "title": "JobDismissed",
                 "type": "JobDismissed",

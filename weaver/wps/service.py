@@ -258,15 +258,17 @@ class WorkerService(ServiceWPS):
     def execute(self, identifier, wps_request, uuid):
         # type: (str, Union[WPSRequest, WorkerRequest], str) -> Union[WPSResponse, HTTPValid]
         """
-        Handles the ``Execute`` KVP/XML request submitted on the WPS endpoint.
+        Handles the ``Execute`` :term:`KVP`/:term:`XML` request submitted on the :term:`WPS` endpoint.
 
-        Submit WPS request to corresponding WPS-REST endpoint and convert back for requested ``Accept`` content-type.
+        Submit :term:`WPS` request to corresponding :term:`WPS-REST` endpoint and convert back for
+        requested ``Accept`` content-type.
 
-        Overrides the original execute operation, that will instead be handled by :meth:`execute_job` following
-        callback from Celery Worker, which handles process job creation and monitoring.
+        Overrides the original execute operation, that will instead be handled by :meth:`execute_job`
+        following callback from :mod:`celery` worker, which handles :term:`Job` creation and monitoring.
 
-        If ``Accept`` is JSON, the result is directly returned from :meth:`_submit_job`.
-        If ``Accept`` is XML or undefined, :class:`WorkerExecuteResponse` converts the received JSON with XML template.
+        If ``Accept`` is :term:`JSON`, the result is directly returned from :meth:`_submit_job`.
+        If ``Accept`` is :term:`XML` or undefined, :class:`WorkerExecuteResponse` converts the
+        received :term:`JSON` with :term:`XML` template.
         """
         result = self._submit_job(wps_request)
         if not isinstance(result, dict):
