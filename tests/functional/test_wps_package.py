@@ -5712,7 +5712,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
             # check that outputs are S3 bucket references
             output_bucket = self.settings["weaver.wps_output_s3_bucket"]
-            output_loc = results["output_dir"]["href"]
+            output_loc = results[output_id]["href"]
             output_ref = f"{output_bucket}/{job_id}/{output_id}/"
             output_key_base = f"{job_id}/{output_id}/"
             output_ref_abbrev = f"s3://{output_ref}"
@@ -5762,3 +5762,114 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 assert not os.path.exists(os.path.join(wps_outdir, job_id, output_id, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, output_id, out_file))
             assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
+
+    @mocked_aws_config
+    @mocked_aws_s3
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
+    def test_execute_with_result_representations(self):
+        """
+        Test that an output file stored in an AWS bucket can be retrieved as per their requested ``transmissionMode``.
+
+        .. versionadded:: 6.0
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        with contextlib.ExitStack() as stack:
+            exec_body = {
+                "mode": ExecuteMode.SYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {"message": "test data in bucket"},
+                "outputs": {
+                    "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+                    "output_text": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                },
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+        # rely on location that should be provided to find the job ID
+        results = resp.json
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        out_path = f"/jobs/{job_id}/outputs"
+        out_params = {"schema": JobInputsOutputsSchema.OGC_STRICT}
+        out_resp = self.app.get(out_path, headers=self.json_headers, params=out_params)
+        outputs = out_resp.json
+
+        # check that outputs by reference are S3 bucket references
+        # for 'outputs' endpoint, reference always expected for File type
+        # for 'results' endpoint, only the output requested by reference 'transmissionMode' is expected
+        for output_id, output_file, outputs_doc in [
+            ("output_text", "result.txt", results),
+            ("output_text", "result.txt", outputs["outputs"]),
+            ("output_json", "result.json", outputs["outputs"]),
+        ]:
+            output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+            output_loc = outputs_doc[output_id]["href"]
+            output_key = f"{job_id}/{output_id}/{output_file}"
+            output_ref = f"{output_bucket}/{output_key}"
+            output_ref_abbrev = f"s3://{output_ref}"
+            output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            assert output_loc in output_ref_any
+
+        # check that result by 'transmissionMode' value is not a reference, but the contents
+        assert "output_json" in results
+        assert "value" in results["output_json"]
+        assert "href" not in results["output_json"]
+        assert results["output_json"]["value"] == {"data": "test data in bucket"}
+        assert results["output_json"]["mediaType"] == ContentType.APP_JSON
+
+        # check that outputs are indeed stored in S3 buckets
+        mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        bucket_file_info = {obj["Key"]: obj for obj in resp_json["Contents"]}
+        expect_out_files = {
+            f"{job_id}/{output_id}/{output_file}": out_type
+            for output_id, output_file, out_type
+            in [
+                ("output_json", "result.json", ContentType.APP_JSON),
+                ("output_text", "result.txt", ContentType.TEXT_PLAIN),
+            ]
+        }
+        assert resp_json["Name"] == output_bucket
+        assert len(bucket_file_info) == len(expect_out_files), "No extra files expected."
+        assert all(out_file in bucket_file_info for out_file in expect_out_files)
+
+        # validate that common file extensions could be detected and auto-populated the Content-Type
+        # (information not available in 'list_objects_v2', so fetch each file individually
+        for out_file, out_type in expect_out_files.items():
+            out_info = mocked_s3.head_object(Bucket=output_bucket, Key=out_file)
+            assert out_info["ContentType"] == out_type
+
+        # check that outputs are NOT copied locally, but that XML status does exist
+        # counter validate path with file always present to ensure outputs are not 'missing' because of wrong dir
+        wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
+        wps_outdir = self.settings["weaver.wps_output_dir"]
+        # NOTE: exception for 'output_json' since by-value representation forces it to retrieve it locally
+        exception_id = ["output_json"]
+        for out_file in list(expect_out_files):
+            out_path, out_name = os.path.split(out_file)
+            _, out_id = os.path.split(out_path)
+            assert not os.path.exists(os.path.join(wps_outdir, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, out_id, out_name))
+            if out_id not in exception_id:
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_id, out_name))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_id, out_name))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))

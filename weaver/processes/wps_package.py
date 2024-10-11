@@ -2610,7 +2610,7 @@ class WpsPackage(Process):
         # Therefore, preemptively override "ComplexOutput._storage" to whichever location according to use case.
         # Override builder per output to allow distinct S3/LocalFile for it and XML status that should remain local.
         storage_type = STORE_TYPE.S3 if s3_bucket else STORE_TYPE.PATH
-        storage = self.make_location_storage(storage_type, result_type)
+        storage = self.make_location_storage(storage_type, result_type, output_id)
         self.response.outputs[output_id]._storage = storage  # noqa: W0212
 
         # pywps will resolve file paths for us using its WPS request UUID
@@ -2703,13 +2703,14 @@ class WpsPackage(Process):
         if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
             output.data_format.validate = format_extension_validator
 
-    def make_location_storage(self, storage_type, location_type):
-        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]
+    def make_location_storage(self, storage_type, location_type, output_id):
+        # type: (STORE_TYPE, PACKAGE_COMPLEX_TYPES, str) -> Union[FileStorage, S3Storage, DirectoryNestedStorage]
         """
         Generates the relevant storage implementation with requested types and references.
 
         :param storage_type: Where to store the outputs.
         :param location_type: Type of output as defined by CWL package type.
+        :param output_id: expected output identifier that will employ this storage.
         :return: Storage implementation.
         """
         if location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.PATH:
@@ -2730,10 +2731,15 @@ class WpsPackage(Process):
         output_prefix = self.job.result_path(job_id=output_job_id)
         # pylint: disable=attribute-defined-outside-init  # references to nested storage dynamically created
         if storage_type == STORE_TYPE.S3:
-            storage.prefix = output_prefix
+            # when using S3 storage, the 'prefix' is directly employed with the file name
+            # however, we want results to be nested under their output ID
+            # therefore, preemptively adjust the prefix to do as such
+            storage.prefix = os.path.join(output_prefix, output_id)
         else:
+            # when using other storage than S3, the 'target' is automatically built using a join
+            # of 'prefix' and the output ID stored in the parent result object containing this storage
             storage.target = os.path.join(storage.target, output_prefix)
-            storage.output_url = os.path.join(storage.output_url, output_prefix)
+            storage.output_url = os.path.join(str(storage.output_url), output_prefix)
             os.makedirs(storage.target, exist_ok=True)  # pywps handles Job UUID dir creation, but not nested dirs
         return storage
 

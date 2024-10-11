@@ -448,6 +448,11 @@ class WpsConfigBase(unittest.TestCase):
         return test_name
 
     @overload
+    def monitor_job(self, status_url, **__):
+        # type: (str, **Any) -> ExecutionResults
+        ...
+
+    @overload
     def monitor_job(self, status_url, return_status=False, **__):
         # type: (str, Literal[True], **Any) -> JobStatusResponse
         ...

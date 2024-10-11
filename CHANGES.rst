@@ -55,6 +55,7 @@ Fixes:
   (fixes `##620 <https://github.com/crim-ca/weaver/issues/620>`_).
 - Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
   (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
+- Fix S3 bucket storage for result file missing the output ID in the path to match local WPS output storage structure.
 
 .. _changes_5.9.0:
 
