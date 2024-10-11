@@ -51,6 +51,10 @@ Fixes:
 - Fix ``transmissionMode: value`` that was ignored for ``response: document`` if the output was represented by default
   as a *complex*  file URL, and ``transmissionMode: reference`` that was ignored if the output was *literal*  data.
   The ``transmissionMode`` will now return the appropriate inline data or URL as requested.
+- Add missing conformance and requirement references for *OGC API - Processes - Part 2: DRU*
+  (fixes `##620 <https://github.com/crim-ca/weaver/issues/620>`_).
+- Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
+  (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
 
 .. _changes_5.9.0:
 

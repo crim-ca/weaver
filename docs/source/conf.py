@@ -451,6 +451,9 @@ linkcheck_ignore = [
     #   - https://github.com/sphinx-doc/sphinx/issues/12030
     #   - https://github.com/orgs/sphinx-doc/discussions/12032
     "https://app.dimensions.ai/details/grant/grant.8105745",
+    # ignore links using archived web pages, which sometimes become unavailable briefly
+    # since using an archive, they are already using "last resort" references
+    "http[s]*://web.archive.org/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
