@@ -570,11 +570,6 @@ def get_job_results_response(
     raise_job_bad_status(job, container)
     settings = get_settings(container)
 
-    # FIXME: apply converters (https://github.com/crim-ca/weaver/pull/548)
-    #       - test_execute_single_output_response_document_alt_format_json
-    #       - test_execute_single_output_response_document_alt_format_yaml
-    #       - test_execute_single_output_multipart_accept_alt_format
-
     results, _ = get_results(
         job, container,
         value_key="value",
