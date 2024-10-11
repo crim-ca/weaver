@@ -368,6 +368,7 @@ class Transform:
             raise
 
     def get(self):
+        # type:(...) -> FileResponse
         try:
             if not os.path.exists(self.output_path):
                 self.process()
@@ -383,11 +384,3 @@ class Transform:
                 "value": ""
             })
 
-    # Used for tests
-    def _get(self):
-        try:
-            if not os.path.exists(self.output_path):
-                self.process()
-            return os.path.exists(self.output_path)
-        except Exception as e:
-            raise RuntimeError(f"Failed to process the output at {self.output_path}") from e

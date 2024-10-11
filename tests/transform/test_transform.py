@@ -6,6 +6,7 @@ import tempfile
 from pyramid.response import FileResponse
 
 from weaver.transform.transform import FAMILIES, Transform
+from tests.resources import TRANSFORM_PATH
 
 
 def using_mimes(func):
@@ -25,18 +26,15 @@ def transform(f, cmt="", wmt=""):
         with tempfile.TemporaryDirectory() as tmp_path:
             shutil.copy(f, os.path.join(tmp_path, os.path.basename(f)))
             f = os.path.join(tmp_path, os.path.basename(f))
-
             t = Transform(file_path=f, current_media_type=cmt, wanted_media_type=wmt)
-
             assert isinstance(t.get(), FileResponse), f"{cmt} -> {wmt} {str(t['error'])}"
             print(f"{cmt} -> {wmt} passed")
             return t.output_path
     except Exception as e:
         print(f"{cmt} -> {wmt} failed")
         assert False, f"{os.path.splitext(f)[1]} -> {f} {str(e)}"
-        pass
 
 
 def test_transformations():
-    for fn in os.listdir("./res/transform"):
-        transform(os.path.join("./res/transform", fn))
+    for fn in os.listdir(TRANSFORM_PATH):
+        transform(os.path.join(TRANSFORM_PATH, fn))

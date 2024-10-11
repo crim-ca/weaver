@@ -817,8 +817,9 @@ class FileResponseHeaders(NoContent):
     content_type = ContentTypeHeader(example=ContentType.APP_JSON)
     content_length = ContentLengthHeader()
     content_disposition = ContentDispositionHeader()
-    date = DateHeader()
-    last_modified = LastModifiedHeader()
+    content_location = ReferenceURL()
+    date = DateHeader(missing=drop)
+    last_modified = LastModifiedHeader(missing=drop)
 
 
 class AccessToken(ExtendedSchemaNode):
@@ -7342,6 +7343,11 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
     body = NoContent(default="")
 
 
+class JobResultsContentResponse(ExtendedMappingSchema):
+    header = FileResponseHeaders()
+    body = ResultData(default="")
+
+
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
@@ -7934,6 +7940,24 @@ get_prov_results_responses = copy(get_job_results_responses)
 get_prov_results_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+
+get_job_result_responses = {
+    "200": JobResultsContentResponse(description="success by value"),
+    "204": NoContentJobResultsResponse(description="success by reference"),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_result_responses = copy(get_job_result_responses)
+get_prov_result_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+
+get_proc_result_responses = get_job_result_responses
+
+
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
         "JobExceptions": {
