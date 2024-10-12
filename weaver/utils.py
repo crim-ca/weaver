@@ -119,10 +119,6 @@ if TYPE_CHECKING:
         HeadersType,
         JSON,
         KVP,
-<<<<<<< HEAD
-        KVP_Item,
-=======
->>>>>>> origin/master
         Link,
         Literal,
         Number,
@@ -1392,8 +1388,6 @@ def make_link_header(
     return link
 
 
-<<<<<<< HEAD
-=======
 def parse_link_header(link_header):
     # type: (str) -> Link
     """
@@ -1411,7 +1405,6 @@ def parse_link_header(link_header):
     return link
 
 
->>>>>>> origin/master
 def get_base_url(url):
     # type: (str) -> str
     """

@@ -696,6 +696,18 @@ class ResponseContentTypeHeader(ContentTypeHeader):
     ])
 
 
+class PreferHeader(ExtendedSchemaNode):
+    summary = "Header that describes job execution parameters."
+    description = (
+        "Header that describes the desired execution mode of the process job and desired results. "
+        "Parameter 'return' indicates the structure and contents how results should be returned. "
+        "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
+        f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
+    )
+    name = "Prefer"
+    schema_type = String
+
+
 class RequestHeaders(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
@@ -2102,6 +2114,11 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
     # no default to enforce required input as per OGC-API schemas
     # default = EXECUTE_MODE_AUTO
     example = ExecuteMode.ASYNC
+    description = (
+        "Desired execution mode specified directly. This is intended for backward compatibility support. "
+        "To obtain more control over execution mode selection, employ the official Prefer header instead "
+        f"(see for more details: {DOC_URL}/processes.html#execution-mode)."
+    )
     validator = OneOf(ExecuteMode.values())
 
 
@@ -2122,6 +2139,10 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
     # no default to enforce required input as per OGC-API schemas
     # default = ExecuteResponse.DOCUMENT
     example = ExecuteResponse.DOCUMENT
+    description = (
+        "Indicates the desired representation format of the response. "
+        f"(see for more details: {DOC_URL}/processes.html#execution-body)."
+    )
     validator = OneOf(ExecuteResponse.values())
 
 
@@ -3258,7 +3279,7 @@ class JobInputsOutputsQuery(ExtendedMappingSchema):
         String(),
         title="JobInputsOutputsQuerySchema",
         example=JobInputsOutputsSchema.OGC,
-        default=JobInputsOutputsSchema.OLD,
+        default=JobInputsOutputsSchema.OGC,
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of submitted job inputs and outputs.",
         description=(
@@ -3281,7 +3302,7 @@ class JobResultsQuery(FormatQuery):
         String(),
         title="JobOutputResultsSchema",
         example=JobInputsOutputsSchema.OGC,
-        default=JobInputsOutputsSchema.OLD,
+        default=JobInputsOutputsSchema.OGC,
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
@@ -4198,20 +4219,9 @@ class Execute(ExecuteInputOutputs):
         missing=drop,
         default=ExecuteMode.AUTO,
         deprecated=True,
-        description=(
-            "Desired execution mode specified directly. This is intended for backward compatibility support. "
-            "To obtain more control over execution mode selection, employ the official Prefer header instead "
-            f"(see for more details: {DOC_URL}/processes.html#execution-mode)."
-        ),
-        validator=OneOf(ExecuteMode.values())
     )
     response = JobResponseOptionsEnum(
         missing=drop,  # no default to ensure 'Prefer' header vs 'response' body resolution order can be performed
-        description=(
-            "Indicates the desired representation format of the response. "
-            f"(see for more details: {DOC_URL}/processes.html#execution-body)."
-        ),
-        validator=OneOf(ExecuteResponse.values())
     )
     notification_email = Email(
         missing=drop,
@@ -6023,7 +6033,34 @@ class ResultsBody(OneOfKeywordSchema):
     ]
 
 
+class WpsOutputContextHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "X-WPS-Output-Context"
+    description = (
+        "Contextual location where to store WPS output results from job execution. ",
+        "When provided, value must be a directory or sub-directories slug. ",
+        "Resulting contextual location will be relative to server WPS outputs when no context is provided.",
+    )
+    schema_type = String
+    missing = drop
+    example = "my-directory/sub-project"
+    default = None
+
+
+class JobExecuteHeaders(ExtendedMappingSchema):
+    description = "Indicates the relevant headers that were supplied for job execution or a null value if omitted."
+    accept = AcceptHeader(missing=None)
+    accept_language = AcceptLanguageHeader(missing=None)
+    content_type = RequestContentTypeHeader(missing=None, default=None)
+    prefer = PreferHeader(missing=None)
+    x_wps_output_context = WpsOutputContextHeader(missing=None)
+
+
 class JobInputsBody(ExecuteInputOutputs):
+    mode = JobExecuteModeEnum(default=ExecuteMode.AUTO)
+    response = JobResponseOptionsEnum(default=None)
+    headers = JobExecuteHeaders(missing={})
     links = LinkList(missing=drop)
 
 
@@ -6492,23 +6529,9 @@ class PutProcessEndpoint(LocalProcessPath):
     body = PutProcessBodySchema()
 
 
-class WpsOutputContextHeader(ExtendedSchemaNode):
-    # ok to use 'name' in this case because target 'key' in the mapping must
-    # be that specific value but cannot have a field named with this format
-    name = "X-WPS-Output-Context"
-    description = (
-        "Contextual location where to store WPS output results from job execution. ",
-        "When provided, value must be a directory or sub-directories slug. ",
-        "Resulting contextual location will be relative to server WPS outputs when no context is provided.",
-    )
-    schema_type = String
-    missing = drop
-    example = "my-directory/sub-project"
-    default = None
-
-
 class ExecuteHeadersBase(RequestHeaders):
     description = "Request headers supported for job execution."
+    prefer = PreferHeader(missing=drop)
     x_wps_output_context = WpsOutputContextHeader()
 
 
@@ -6560,12 +6583,12 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
 class PatchJobBodySchema(Execute):
     description = "Execution request parameters to be updated."
     # all parameters that are not 'missing=drop' must be added to allow partial update
-    inputs = ExecuteInputValues(missing=drop, description=Execute.inputs.description)
-    outputs = ExecuteOutputSpec(missing=drop, description=Execute.outputs.description)
+    inputs = ExecuteInputValues(missing=drop, description="Input values or references to be updated.")
+    outputs = ExecuteOutputSpec(missing=drop, description="Output format and transmission mode to be updated.")
 
 
 class PatchJobEndpoint(JobPath):
-    header = RequestHeaders()
+    header = JobExecuteHeaders()
     querystring = LocalProcessQuery()
     body = PatchJobBodySchema()
 

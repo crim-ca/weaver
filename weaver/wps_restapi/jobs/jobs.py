@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from box import Box
 from celery.utils.log import get_task_logger
@@ -24,6 +24,7 @@ from weaver.formats import (
     guess_target_format,
     repr_json
 )
+from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_handler, update_job_parameters
 from weaver.processes.utils import get_process
@@ -480,19 +481,22 @@ def get_job_inputs(request):
     Retrieve the inputs values and outputs definitions of a job.
     """
     job = get_job(request)
-    schema = get_schema_query(request.params.get("schema"), strict=False)
+    schema = cast(
+        "JobInputsOutputsSchemaType",
+        get_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
+    )
     job_inputs = job.inputs
     job_outputs = job.outputs
     if job.is_local:
         process = get_process(job.process, request=request)
         job_inputs = mask_process_inputs(process.package, job_inputs)
-    if schema:
-        job_inputs = convert_input_values_schema(job_inputs, schema)
-        job_outputs = convert_output_params_schema(job_outputs, schema)
+    job_inputs = convert_input_values_schema(job_inputs, schema)
+    job_outputs = convert_output_params_schema(job_outputs, schema)
     job_headers = {
         "Accept": job.accept_type,
         "Accept-Language": job.accept_language,
-
+        "Prefer": f"return={job.execution_return}" if job.execution_return else None,
+        "X-WPS-Output-Context": job.context,
     }
     body = {
         "mode": job.execution_mode,
@@ -500,8 +504,9 @@ def get_job_inputs(request):
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
+        "subscribers": job.subscribers,
+        "links": job.links(request, self_link="inputs"),
     }
-    body.update({"links": job.links(request, self_link="inputs")})
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)
 
@@ -536,7 +541,7 @@ def get_job_outputs(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     raise_job_bad_status_success(job, request)
-    schema = get_schema_query(request.params.get("schema"))
+    schema = get_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
     outputs.update({"links": job.links(request, self_link="outputs")})

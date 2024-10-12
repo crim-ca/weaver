@@ -279,10 +279,13 @@ def get_job_list_links(job_total, filters, request):
     return links
 
 
-def get_schema_query(schema, strict=True):
-    # type: (Optional[JobInputsOutputsSchemaType], bool) -> Optional[JobInputsOutputsSchemaType]
+def get_schema_query(
+    schema,         # type: Optional[JobInputsOutputsSchemaType]
+    strict=True,    # type: bool
+    default=None,   # type: Optional[JobInputsOutputsSchemaType]
+):                  # type: (...) -> Optional[JobInputsOutputsSchemaType]
     if not schema:
-        return None
+        return default
     # unescape query (eg: "OGC+strict" becomes "OGC string" from URL parsing)
     schema_checked = cast(
         "JobInputsOutputsSchemaType",
