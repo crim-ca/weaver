@@ -21,7 +21,6 @@ from weaver.exceptions import handle_known_exceptions
 from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.convert import wps2json_job_payload
-from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
@@ -197,6 +196,8 @@ class WorkerService(ServiceWPS):
 
         Returns the status response as is if XML, or convert it to JSON, according to request ``Accept`` header.
         """
+        from weaver.processes.execution import submit_job_handler  # pylint: disable=C0415  # circular import error
+
         req = wps_request.http_request  # type: Union[PyramidRequest, WerkzeugRequest]
         pid = wps_request.identifier
         ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
