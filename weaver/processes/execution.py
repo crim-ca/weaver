@@ -10,7 +10,7 @@ from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable, HTTPUnprocessableEntity, HTTPUnsupportedMediaType
 from pyramid_celery import celery_app as app
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
@@ -69,7 +69,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Type, Union
     from uuid import UUID
 
     from celery.app.task import Task
@@ -695,17 +695,7 @@ def submit_job(request, reference, tags=None, process_id=None):
         :func:`submit_job_handler` to provide elements pre-extracted from requests or from other parsing.
     """
     # validate body with expected JSON content and schema
-    if ContentType.APP_JSON not in request.content_type:
-        raise HTTPBadRequest(json={
-            "code": "InvalidHeaderValue",
-            "name": "Content-Type",
-            "description": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' not supported.",
-            "value": str(request.content_type)
-        })
-    try:
-        json_body = request.json_body
-    except Exception as ex:
-        raise HTTPBadRequest(f"Invalid JSON body cannot be decoded for job submission. [{ex}]")
+    json_body = validate_job_json(request)
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
 
@@ -763,23 +753,9 @@ def submit_job_handler(payload,             # type: ProcessExecution
     """
     Submits the job to the Celery worker with provided parameters.
 
-    Assumes that parameters have been pre-fetched and validated, except for the input payload.
+    Assumes that parameters have been pre-fetched and validated, except for the :paramref:`payload`.
     """
-    try:
-        json_body = sd.Execute().deserialize(payload)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest(
-            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
-                "type": "InvalidSchema",
-                "title": "Execute",
-                "detail": "Execution body failed schema validation.",
-                "status": HTTPBadRequest.code,
-                "error": ex.msg,
-                "cause": ex.asdict(),
-                "value": repr_json(ex.value),
-            })
-        )
-
+    json_body = validate_job_schema(payload)
     db = get_db(settings)
 
     # non-local is only a reference, no actual process object to validate
@@ -874,6 +850,67 @@ def submit_job_handler(payload,             # type: ProcessExecution
     }
     resp = get_job_submission_response(body, resp_headers)
     return resp
+
+
+def update_job_parameters(job, request):
+    # type: (Job, Request) -> None
+    """
+    Updates an existing :term:`Job` with new request parameters.
+    """
+    body = validate_job_json(request)
+    body = validate_job_schema(body, sd.PatchJobBodySchema)
+
+    raise NotImplementedError  # FIXME: implement
+
+
+def validate_job_json(request):
+    # type: (Request) -> JSON
+    """
+    Validates that the request contains valid :term:`JSON` conctens, but not ncessary valid against expected schema.
+
+    .. seealso::
+        :func:`validate_job_schema`
+    """
+    if ContentType.APP_JSON not in request.content_type:
+        raise HTTPUnsupportedMediaType(json={
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "title": "Unsupported Media-Type",
+            "detail": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' is not supported.",
+            "code": "InvalidHeaderValue",
+            "name": "Content-Type",
+            "value": str(request.content_type)
+        })
+    try:
+        json_body = request.json_body
+    except Exception as ex:
+        raise HTTPBadRequest(json={
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "title": "Bad Request",
+            "detail": f"Invalid JSON body cannot be decoded for job submission. [{ex}]",
+        })
+    return json_body
+
+
+def validate_job_schema(payload, body_schema=sd.Execute):
+    # type: (Any, Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]) -> ProcessExecution
+    """
+    Validates that the input :term:`Job` payload is valid :term:`JSON` for an execution request.
+    """
+    try:
+        json_body = body_schema().deserialize(payload)
+    except colander.Invalid as ex:
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidSchema",
+                "title": "Invalid Job Execution Schema",
+                "detail": "Execution body failed schema validation.",
+                "status": HTTPBadRequest.code,
+                "error": ex.msg,
+                "cause": ex.asdict(),
+                "value": repr_json(ex.value),
+            })
+        )
+    return json_body
 
 
 def validate_process_io(process, payload):

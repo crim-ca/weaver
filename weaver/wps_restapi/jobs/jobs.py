@@ -6,6 +6,7 @@ from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPOk,
+    HTTPNoContent,
     HTTPPermanentRedirect,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
@@ -24,12 +25,12 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
-from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_handler
+from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_handler, update_job_parameters
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
-from weaver.utils import get_header, get_settings
+from weaver.utils import get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
@@ -288,7 +289,7 @@ def trigger_job_execution(request):
 
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
-    schema=sd.ProviderJobEndpoint(),
+    schema=sd.GetProviderJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_prov_single_job_status_responses,
@@ -302,7 +303,7 @@ def trigger_job_execution(request):
 )
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
-    schema=sd.JobEndpoint(),
+    schema=sd.GetJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
@@ -339,7 +340,7 @@ def get_job_status(request):
     renderer=OutputFormat.JSON,
     response_schemas=sd.patch_job_responses,
 )
-def update_job(request):
+def update_pending_job(request):
     # type: (PyramidRequest) -> AnyResponseType
     """
     Update a previously created job still pending execution.
@@ -347,13 +348,15 @@ def update_job(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     raise_job_bad_status_locked(job, request)
-
-    raise NotImplementedError  # FIXME
+    update_job_parameters(job, request)
+    links = job.links(request, self_link="status")
+    headers = [("Link", make_link_header(link)) for link in links]
+    return HTTPNoContent(headers=headers)
 
 
 @sd.provider_job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS],
-    schema=sd.ProviderJobEndpoint(),
+    schema=sd.DeleteProviderJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.delete_prov_job_responses,
@@ -367,7 +370,7 @@ def update_job(request):
 )
 @sd.job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS],
-    schema=sd.JobEndpoint(),
+    schema=sd.DeleteJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.delete_job_responses,
@@ -486,7 +489,18 @@ def get_job_inputs(request):
     if schema:
         job_inputs = convert_input_values_schema(job_inputs, schema)
         job_outputs = convert_output_params_schema(job_outputs, schema)
-    body = {"inputs": job_inputs, "outputs": job_outputs}
+    job_headers = {
+        "Accept": job.accept_type,
+        "Accept-Language": job.accept_language,
+
+    }
+    body = {
+        "mode": job.execution_mode,
+        "response": job.execution_response,
+        "inputs": job_inputs,
+        "outputs": job_outputs,
+        "headers": job_headers,
+    }
     body.update({"links": job.links(request, self_link="inputs")})
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)

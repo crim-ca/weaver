@@ -705,7 +705,7 @@ class RequestHeaders(ExtendedMappingSchema):
     content_type = RequestContentTypeHeader()
 
 
-class ResponseHeaders(ResponseContentTypeHeader):
+class ResponseHeaders(ExtendedMappingSchema):
     """
     Headers describing resulting response.
     """
@@ -3236,11 +3236,11 @@ class ProcessVisibilityPutEndpoint(LocalProcessPath):
     body = VisibilitySchema()
 
 
-class ProviderJobEndpoint(ProviderProcessPath, JobPath):
+class GetProviderJobEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobEndpoint(JobPath):
+class GetJobEndpoint(JobPath):
     header = RequestHeaders()
 
 
@@ -6502,6 +6502,27 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
 
 
+class PatchJobBodySchema(Execute):
+    description = "Execution request parameters to be updated."
+    # all parameters that are not 'missing=drop' must be added to allow partial update
+    inputs = ExecuteInputValues(missing=drop, description=Execute.inputs.description)
+    outputs = ExecuteOutputSpec(missing=drop, description=Execute.outputs.description)
+
+
+class PatchJobEndpoint(JobPath):
+    header = RequestHeaders()
+    querystring = LocalProcessQuery()
+    body = PatchJobBodySchema()
+
+
+class PatchProcessJobEndpoint(JobPath, ProcessEndpoint):
+    body = PatchJobBodySchema()
+
+
+class PatchProviderJobEndpoint(PatchProcessJobEndpoint):
+    header = RequestHeaders()
+
+
 class PagingQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=10, default=10, validator=Range(min=1, max=1000),
@@ -6595,9 +6616,17 @@ class GetProcessJobEndpoint(LocalProcessPath):
     querystring = LocalProcessQuery()
 
 
-class DeleteProcessJobEndpoint(LocalProcessPath):
+class DeleteJobEndpoint(JobPath):
     header = RequestHeaders()
     querystring = LocalProcessQuery()
+
+
+class DeleteProcessJobEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+
+
+class DeleteProviderJobEndpoint(DeleteProcessJobEndpoint, ProviderProcessPath):
+    pass
 
 
 class BillsEndpoint(ExtendedMappingSchema):
@@ -6846,7 +6875,7 @@ class ConflictRequestResponseSchema(ServerErrorBaseResponseSchema):
 
 
 class UnprocessableEntityResponseSchema(ServerErrorBaseResponseSchema):
-    description = "Wrong format of given parameters."
+    description = "Wrong format or schema of given parameters."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -7230,6 +7259,12 @@ class OkBatchDismissJobsResponseSchema(ExtendedMappingSchema):
 class OkDismissJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
+
+
+class NoContentJobUpdatedResponse(ExtendedMappingSchema):
+    description = "Job detail updated with provided parameters."
+    header = ResponseHeaders()
+    body = NoContent()
 
 
 class OkGetJobStatusResponse(ExtendedMappingSchema):
@@ -7745,6 +7780,8 @@ post_provider_process_job_responses = {
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
@@ -7755,6 +7792,8 @@ post_process_jobs_responses = {
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_jobs_responses = copy(post_process_jobs_responses)
@@ -7808,6 +7847,17 @@ get_prov_single_job_status_responses = copy(get_single_job_status_responses)
 get_prov_single_job_status_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+patch_job_responses = {
+    "204": NoContentJobUpdatedResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+patch_process_job_responses = copy(patch_job_responses)
+patch_provider_job_responses = copy(patch_job_responses)
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success", examples={
         "JobDismissedSuccess": {
