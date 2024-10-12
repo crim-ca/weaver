@@ -7,14 +7,16 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
+
 import contextlib
 import copy
+import inspect
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
-from inspect import cleandoc
 from typing import TYPE_CHECKING
 
 import boto3
@@ -43,7 +45,13 @@ from tests.utils import (
     mocked_wps_output,
     setup_aws_s3_bucket
 )
-from weaver.execute import ExecuteCollectionFormat, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteCollectionFormat,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -61,11 +69,12 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_INLINE_JAVASCRIPT,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SECRETS,
+    JobInputsOutputsSchema,
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, get_path_kvp, load_file
+from weaver.utils import fetch_file, get_any_value, get_header, get_path_kvp, is_uuid, load_file, parse_kvp
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -114,10 +123,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     def setUp(self) -> None:
         self.process_store.clear_processes()
-
-    @classmethod
-    def request(cls, method, url, *args, **kwargs):
-        raise NotImplementedError  # not used
 
     def test_deploy_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
@@ -1917,8 +1922,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 else:
                     # job not even created
                     assert code == 406, f"Error code should indicate not acceptable header for: [{lang}]"
-                    desc = resp.json.get("description")
-                    assert "language" in desc and lang in desc, "Expected error description to indicate bad language"
+                    detail = resp.json.get("detail")
+                    assert "language" in detail and lang in detail, (
+                        "Expected error description to indicate bad language"
+                    )
 
     @mocked_aws_config
     @mocked_aws_s3
@@ -1952,7 +1959,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "listing": [
                         {
                             "entryname": "script.py",
-                            "entry": cleandoc("""
+                            "entry": inspect.cleandoc("""
                                 import json
                                 import os
                                 input = $(inputs)
@@ -2124,7 +2131,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "listing": [
                         {
                             "entryname": "script.py",
-                            "entry": cleandoc("""
+                            "entry": inspect.cleandoc("""
                                 import json
                                 import os
                                 import ast
@@ -2262,7 +2269,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
         assert results
         assert "bboxOutput" in results
-        assert results["bboxOutput"]["value"] == expect_bbox, (
+        assert results["bboxOutput"] == expect_bbox, (
             "Expected the BBOX CRS URI to be interpreted and validated by known WPS definitions."
         )
 
@@ -2397,7 +2404,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
             "inputs": [{"id": "message", "value": "test"}],
-            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}]
         }
         headers = dict(self.json_headers)
 
@@ -3481,7 +3488,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         status_path = os.path.join(resources.FUNCTIONAL_APP_PKG, "Finch_EnsembleGridPointWetdays/status.xml")
         status_url = f"{resources.TEST_REMOTE_SERVER_URL}/status.xml"
-        output_log_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.txt"
+        output_log_url = f"{resources.TEST_REMOTE_SERVER_URL}/result.txt"
         output_zip_url = f"{resources.TEST_REMOTE_SERVER_URL}/output.zip"
         with open(status_path, mode="r", encoding="utf-8") as status_file:
             status_body = status_file.read().format(
@@ -3511,6 +3518,1972 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             results = self.monitor_job(status_url)
 
         assert results
+
+
+@pytest.mark.functional
+class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
+    """
+    Tests to evaluate the various combinations of results response representations.
+
+    .. seealso::
+        - :ref:`proc_exec_results`
+        - :ref:`proc_op_job_results`
+    """
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.settings = {
+            "weaver.wps": True,
+            "weaver.wps_path": "/ows/wps",
+            "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
+        }
+        super(WpsPackageAppTestResultResponses, cls).setUpClass()
+
+    def setUp(self) -> None:
+        self.process_store.clear_processes()
+
+    @staticmethod
+    def remove_result_format(results):
+        """
+        Remove the results ``format`` property to simplify test comparions.
+
+        For backward compatibility, the ``format`` property is inserted in result definitions when represented
+        as :term:`JSON`, on top of the :term:`OGC` compliant ``type``, ``mediaType``, etc. of the "format" schema
+        for qualified values and link references.
+        """
+        if not results or not isinstance(results, dict):
+            return results
+        for result in results.values():
+            if isinstance(result, dict):
+                result.pop("format", None)
+        return results
+
+    @staticmethod
+    def remove_result_multipart_variable(results):
+        # type: (str) -> str
+        """
+        Removes any variable headers from the multipart contents to simplify test comparison.
+        """
+        results = re.sub(r"Date: .*\r\n", "", results)
+        results = re.sub(r"Last-Modified: .*\r\n", "", results)
+        return results.strip()
+
+    @staticmethod
+    def fix_result_multipart_indent(results):
+        # type: (str) -> str
+        """
+        Remove indented whitespace from multipart literal contents.
+
+        This behaves similarly to :func:`inspect.cleandoc`, but handles cases were the nested part contents could
+        themselves contain newlines, leading to inconsistent indents for some lines when injected by string formating,
+        and causing :func:`inspect.cleandoc` to fail removing any indent.
+
+        Also, automatically applies ``\r\n`` characters correction which are critical in parsing multipart contents.
+        This is done to consider that literal newlines will include or not the ``\r`` depending on the OS running tests.
+
+        .. warning::
+            This should be used only for literal test string (i.e.: expected value) for comparison against the result.
+            Result contents obtained from the response should be compared as-is, without any fix for strict checks.
+        """
+        if results.startswith("\n "):
+            results = results[1:]
+        res_dedent = results.lstrip()
+        res_indent = len(results) - len(res_dedent)
+        res_spaces = " " * res_indent
+        res_dedent = res_dedent.replace(f"\n{res_spaces}", "\r\n")  # indented line
+        res_dedent = res_dedent.replace("\n\r\n", "\r\n\r\n")  # empty line (header/body separator)
+        res_dedent = res_dedent.replace("\r\r", "\r")  # in case windows
+        res_dedent = res_dedent.rstrip("\n ")  # last line often indented less because of closing multiline string
+        return res_dedent
+
+    def test_execute_single_output_prefer_header_return_representation_literal(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        job_id = status["jobID"]
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.TEXT_PLAIN)
+        assert results.text == "test"
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_representation_complex(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.status_code == 200, f"Failed with: [{results.status_code}]\nReason:\n{resp.text}"
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.text == "{\"data\":\"test\"}"
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_literal_accept_default(self):
+        """
+        For single requested  output, without ``Accept`` content negotiation, its default format is returned directly.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}; wait=5"  # sync to allow direct content response
+        exec_headers = {
+            "Prefer": prefer_header,
+            "Accept": ContentType.ANY,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.TEXT_PLAIN)
+        assert results.text == "test"
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_literal_accept_json(self):
+        """
+        For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
+        exec_headers = {
+            "Prefer": prefer_header,
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {}  # no 'transmissionMode' to auto-resolve 'value' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_data": "test"
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_complex_accept_default(self):
+        """
+        For single requested  output, without ``Accept`` content negotiation, its default format is returned by link.
+
+        .. note::
+            Because :term:`JSON` ``Accept`` header is **NOT** explicitly requested along the ``Prefer`` header,
+            the response is returned by ``Link`` header. This is different from requesting ``Accept`` :term:`JSON`,
+            which "forces" ``minimal`` to be mapped to ``document`` response. This is because, for a single output
+            combined with ``minimal`` (i.e.: requesting explicitly not to return the contents of the file), a ``Link``
+            becomes required. To force the :term:`JSON` contents of the file to be returned directly, ``representation``
+            must be requested instead.
+
+        .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_json`
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
+        exec_headers = {
+            "Prefer": prefer_header,
+            # omitting or specifying 'Accept' any must result the same (default link),
+            # but test it is handled explicitly since the header would be "found" when parsing
+            "Accept": ContentType.ANY,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {}  # no 'transmissionMode' to auto-resolve 'reference' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 204, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        assert results.status_code == 204, "No contents expected for minimal reference result."
+        assert results.body == b""
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_data", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_prefer_header_return_minimal_complex_accept_json(self):
+        """
+        For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
+
+        .. note::
+            In this test, the selected output just so happens to be :term:`JSON` as well.
+            Since it is the ``Accept`` header that is requesting :term:`JSON`, and not a
+            combination of ``transmissionMode: value`` with :term:`JSON` ``format``, the
+            contents of ``output_json`` file are **NOT** directly returned in the response.
+
+        .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_default`
+              which returns the result by ``Link`` header, which refers to a :term:`JSON` file.
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
+              for case of embedded ``output_json`` file contents in the response using the other ``Prefer`` return.
+            - :func:`test_execute_single_output_response_raw_value_complex`
+              for case of embedded ``output_json`` file contents in the response,
+              using the ``response`` parameter at :term:`Job` execution time, as alternative method to ``Prefer``.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, wait=5"  # sync to allow direct content response
+        exec_headers = {
+            "Prefer": prefer_header,
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {}  # no 'transmissionMode' to auto-resolve 'reference' from 'return=minimal'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_response_raw_value_literal(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Prefer": "respond-async"
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {},  # should use 'transmissionMode: value' by default
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.TEXT_PLAIN)
+        assert results.text == "test"
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_response_raw_value_complex(self):
+        """
+        Since value transmission is requested for a single output, its :term:`JSON` contents are returned directly.
+
+        .. seealso::
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_json`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        out_url = get_wps_output_url(self.settings)
+        job_id = status["jobID"]
+        results = self.app.get(f"/jobs/{job_id}/results")
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {"data": "test"}
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_response_raw_reference_literal(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_data_href = f"{out_url}/{job_id}/output_data/output_data.txt"
+        output_data_args = f"; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
+        output_data_link = f"<{output_data_href}>{output_data_args}"
+        assert results.status_code == 204, "No contents expected for minimal reference result."
+        assert results.body == b""
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_data_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_json", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+        }
+
+    def test_execute_single_output_response_raw_reference_complex(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},  # should use 'transmissionMode: reference' by default
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        assert results.status_code == 204, "No contents expected for single reference result."
+        assert results.body == b""
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_data", "output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_multipart_accept_data(self):
+        """
+        Validate that requesting multipart for a single output is permitted.
+
+        Although somewhat counter-productive to wrap a single output as multipart, this is technically permitted.
+        This can be used to "normalize" the response to always be multipart, regardless of the amount outputs
+        produced by the process job. The output format should be contained within the part.
+
+        .. seealso::
+            - :func:`test_execute_single_output_multipart_accept_link`
+            - :func:`test_execute_single_output_multipart_accept_alt_format`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   no 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # WARNING: force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 15
+
+            {{"data":"test"}}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_single_output_multipart_accept_link(self):
+        """
+        Validate that requesting multipart for a single output is permitted.
+
+        Embedded part contains the link instead of the data contents.
+
+        .. seealso::
+            - :func:`test_execute_single_output_multipart_accept_data`
+            - :func:`test_execute_single_output_multipart_accept_alt_format`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   no 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # WARNING: force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 0
+
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_execute_single_output_multipart_accept_alt_format(self):
+        """
+        Validate the returned contents combining an ``Accept`` header as ``multipart`` and a ``format`` in ``outputs``.
+
+        The main contents of the response should be ``multipart``, but the nested contents should be the transformed
+        output representation, based on the ``format`` definition.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # WARNING: force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # embed in the part contents
+                    "format": {"mediaType": ContentType.APP_YAML},      # request alternate output format
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        output_json_as_yaml = yaml.safe_dump({"data": "test"})
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_YAML}
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 12
+
+            {output_json_as_yaml}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.yml",
+                "type": ContentType.APP_YAML,
+            },
+        }
+
+        # validate the results can be obtained with the "real" representation
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.text == "{\"data\":\"test\"}"
+
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_execute_single_output_response_document_alt_format_yaml(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # embed in the part contents
+                    "format": {"mediaType": ContentType.APP_YAML},      # request alternate output format
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert ContentType.MULTIPART_MIXED in results.content_type
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        output_json_as_yaml = yaml.safe_dump({"data": "test"})
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Type: {ContentType.APP_YAML}
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 12
+
+            {output_json_as_yaml}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/output.yml",
+                "type": ContentType.APP_YAML,
+            },
+        }
+
+        # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+        # validate the results can be obtained with the "real" representation
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.text == "{\"data\":\"test\"}"
+
+    def test_execute_single_output_response_document_alt_format_json_raw_literal(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.APP_JSON,  # response 'document' should be enough to use JSON, but make extra sure
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    # note:
+                    #   Default output format is JSON, but request it as plain text.
+                    #   Ensure the JSON response contents does not revert it back to nested JSON.
+                    #   Expect a literal string containing the embedded JSON.
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # force convert of the file reference
+                    "format": {"mediaType": ContentType.TEXT_PLAIN},    # force output format explicitly
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "mediaType": ContentType.APP_RAW_JSON,  # ensure special type used to distinguish a literal JSON
+                "value": "{\"data\":\"test\"}",
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+        # FIXME: add check of direct request of output (https://github.com/crim-ca/weaver/pull/548)
+        # validate the results can be obtained with the "real" representation
+        # result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        # assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        # assert result_json.content_type == ContentType.APP_JSON
+        # assert result_json.json == {"data": "test"}
+
+    def test_execute_single_output_response_document_default_format_json_special(self):
+        """
+        Validate that a :term:`JSON` output is directly embedded in a ``document`` response also using :term:`JSON`.
+
+        For most types, the data converted from a file reference would be directly embedded as a string
+        nested under a ``value`` property and provide the associated ``mediaType``. However, given the
+        same :term:`JSON` representation is used for the entire response contents and the nested contents,
+        this special case typically expected that the nested :term:`JSON` is not embedded in a string to
+        facilitate directly parsing the entire response contents as :term:`JSON`.
+
+        .. seealso::
+            - :func:`test_execute_single_output_response_document_alt_format_json`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.APP_JSON,  # response 'document' should be enough to use JSON, but make extra sure
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    # note:
+                    #   Technically, 'format' does not necessarily need to be specified for this case since
+                    #   JSON is the default output format for this result, but specify it for clarity
+                    #   (see other test cases that ensure non-JSON by default can be converted).
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # force convert of the file reference
+                    "format": {"mediaType": ContentType.APP_JSON},      # request output format explicitly
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "mediaType": ContentType.APP_JSON,
+                "value": {"data": "test"},
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    @parameterized.expand([
+        ContentType.MULTIPART_ANY,
+        ContentType.MULTIPART_MIXED,
+    ])
+    def test_execute_multi_output_multipart_accept(self, multipart_header):
+        """
+        Requesting ``multipart`` explicitly should return it instead of default :term:`JSON` ``document`` response.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        prefer_header = "wait=5"
+        exec_headers = {
+            "Accept": multipart_header,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": prefer_header,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+                # request multiple outputs, but not 'all', to test filter behavior at the same time
+                # use 1 expected as 'File' and 1 'string' literal to test conversion to raw 'value'
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_data"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-ID: <output_data@{job_id}>
+            Content-Length: 4
+
+            test
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 0
+
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_multipart_accept_async_not_acceptable(self):
+        """
+        When executing the process asynchronously, ``Accept`` with multipart (strictly) is not acceptable.
+
+        Because async requires to respond a Job Status, the ``Accept`` actually refers to that response,
+        rather than a results response as returned directly in sync.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept`
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": "respond-async",
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 406, f"Expected error. Instead got: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
+            assert "Accept header" in resp.json["detail"]
+            assert resp.json["value"] == ContentType.MULTIPART_MIXED
+            assert resp.json["cause"] == {
+                "name": "Accept",
+                "in": "headers",
+            }
+
+    def test_execute_multi_output_multipart_accept_async_alt_acceptable(self):
+        """
+        When executing the process asynchronously, ``Accept`` with multipart and an alternative is acceptable.
+
+        Because async requires to respond a Job Status, the ``Accept`` actually refers to that response,
+        rather than a results response as returned directly in sync.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_multipart_accept`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Accept": f"{ContentType.MULTIPART_MIXED}, {ContentType.APP_JSON}",
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": prefer_header,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
+            assert "status" in resp.json, "Expected a JSON Job Status response."
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+    def test_execute_multi_output_prefer_header_return_representation(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.REPRESENTATION}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header,
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # no 'transmissionMode' to auto-resolve 'value' from 'return=representation'
+                # request multiple outputs, but not 'all', to test filter behavior at the same time
+                # use 1 expected as 'File' and 1 'string' literal to test conversion to raw 'value'
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_data"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-ID: <output_data@{job_id}>
+            Content-Length: 4
+
+            test
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 15
+
+            {{"data":"test"}}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_raw_value(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+                "output_data": {}  # should use 'value' by default
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_data"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-ID: <output_data@{job_id}>
+            Content-Length: 4
+
+            test
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 15
+
+            {{"data":"test"}}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_raw_reference_default_links(self):
+        """
+        All outputs resolved as reference (explicitly or inferred) with raw representation should be all Link headers.
+
+        The multipart representation of the corresponding request must ask for it explicitly.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_response_raw_reference_accept_multipart`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},  # should use 'reference' by default
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_href = f"{self.url}/processes/{p_id}/jobs/{job_id}/results"
+        output_data_href = f"{out_url}/{job_id}/output_data/output_data.txt"
+        output_data_link = f"<{output_data_href}>; rel=\"output_data\"; type=\"{ContentType.TEXT_PLAIN}\""
+        output_json_href = f"{out_url}/{job_id}/output_json/result.json"
+        output_json_link = f"<{output_json_href}>; rel=\"output_json\"; type=\"{ContentType.APP_JSON}\""
+        assert results.status_code == 204, "No contents expected for minimal reference result."
+        assert results.body == b""
+        assert results.content_type is None
+        assert results.headers["Content-Location"] == results_href
+        assert ("Link", output_data_link) in results.headerlist
+        assert ("Link", output_json_link) in results.headerlist
+        assert not any(
+            any(out_id in link[-1] for out_id in ["output_text"])
+            for link in results.headerlist if link[0] == "Link"
+        ), "Filtered outputs should not be found in results response links."
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_raw_reference_accept_multipart(self):
+        """
+        Requesting ``multipart`` explicitly should return it instead of default ``Link`` headers response.
+
+        .. seealso::
+            - :func:`test_execute_multi_output_response_raw_reference_default_links`
+            - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
+            - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        # NOTE:
+        #   No 'response' nor 'Prefer: return' to ensure resolution is done by 'Accept' header
+        #   without 'Accept' using multipart, it is expected that JSON document is used
+        #   Also, use 'Prefer: wait' to avoid 'respond-async', since async always respond with the Job status.
+        prefer_header = "wait=5"
+        exec_headers = {
+            "Accept": ContentType.MULTIPART_MIXED,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": prefer_header,
+        }
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},  # should use 'reference' by default
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        results = self.app.get(f"/jobs/{job_id}/results")
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_data"; filename="output_data.txt"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-Location: {out_url}/{job_id}/output_data/output_data.txt
+            Content-ID: <output_data@{job_id}>
+            Content-Length: 0
+
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 0
+
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_raw_mixed(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.RAW,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_data": {},  # should use 'value' by default
+                "output_text": {},  # should use 'reference' by default
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},  # force 'value'
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            # request status instead of results since not expecting 'document' JSON in this case
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        boundary = parse_kvp(results.headers["Content-Type"])["boundary"][0]
+        results_body = self.fix_result_multipart_indent(f"""
+            --{boundary}
+            Content-Disposition: attachment; name="output_data"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-ID: <output_data@{job_id}>
+            Content-Length: 4
+
+            test
+            --{boundary}
+            Content-Disposition: attachment; name="output_text"; filename="result.txt"
+            Content-Type: {ContentType.TEXT_PLAIN}
+            Content-Location: {out_url}/{job_id}/output_text/result.txt
+            Content-ID: <output_text@{job_id}>
+            Content-Length: 0
+
+            --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.json"
+            Content-Type: {ContentType.APP_JSON}
+            Content-Location: {out_url}/{job_id}/output_json/result.json
+            Content-ID: <output_json@{job_id}>
+            Content-Length: 15
+
+            {{"data":"test"}}
+            --{boundary}--
+        """)
+        results_text = self.remove_result_multipart_variable(results.text)
+        assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
+        assert results_text == results_body
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_text": {
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_prefer_header_return_minimal_defaults(self):
+        """
+        Test ``Prefer: return=minimal`` with default ``transmissionMode`` resolutions for literal/complex outputs.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # no 'transmissionMode' to auto-resolve 'value' based on literal/complex output
+                # request multiple outputs, but not 'all', to test filter behavior at the same time
+                # use 1 expected as 'File' and 1 'string' literal to test respective auto-resolution on their own
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_prefer_header_return_minimal_override_transmission(self):
+        """
+        Test ``Prefer: return=minimal`` with ``transmissionMode`` overrides.
+
+        .. note::
+            From a technical standpoint, this response will not really be "minimal" since the values are
+            embedded inline. However, this respects the *preference* vs *enforced* property requirements.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # force inline data for file instead of minimal link reference
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+                # force reference creation for literal data instead of minimal contents
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                # auto-resolution for this file, to test that 'minimal' still applies with a link reference
+                "output_text": {},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": {
+                "href": f"{out_url}/{job_id}/output_data/output_data.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+            "output_json": {
+                "value": {"data": "test"},
+                "mediaType": ContentType.APP_JSON,
+            },
+            "output_text": {
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+            "output_text": {
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+        }
+
+    def test_execute_multi_output_response_document_defaults(self):
+        """
+        Test ``response: document`` with default ``transmissionMode`` resolutions for literal/complex outputs.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # no 'transmissionMode' to auto-resolve 'value' based on literal/complex output
+                # request multiple outputs, but not 'all', to test filter behavior at the same time
+                # use 1 expected as 'File' and 1 'string' literal to test respective auto-resolution on their own
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+
+    def test_execute_multi_output_response_document_mixed(self):
+        """
+        Test ``response: document`` with ``transmissionMode`` specified to force convertion of literal/complex outputs.
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = "respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                # force inline data for file instead of minimal link reference
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+                # force reference creation for literal data instead of minimal contents
+                "output_data": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                # auto-resolution for this file, to test that 'minimal' still applies with a link reference
+                "output_text": {},
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": {
+                "href": f"{out_url}/{job_id}/output_data/output_data.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+            "output_json": {
+                "value": {"data": "test"},
+                "mediaType": ContentType.APP_JSON,
+            },
+            "output_text": {
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+            "output_text": {
+                "href": f"{out_url}/{job_id}/output_text/result.txt",
+                "type": ContentType.TEXT_PLAIN,
+            },
+        }
 
 
 @pytest.mark.functional
@@ -3615,8 +5588,8 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.VALUE},
-                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.VALUE},
+                {"id": "output_from_http", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                {"id": "output_from_s3", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
             ]
         }
         with contextlib.ExitStack() as stack_exec:
@@ -3638,41 +5611,44 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
         # check that outputs are S3 bucket references
         output_values = {out["id"]: get_any_value(out) for out in outputs["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+        output_files = [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]
         wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
-        for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
-            output_ref = f"{output_bucket}/{wps_uuid}/{out_file}"
+        for out_id, out_file in output_files:
+            output_ref = f"{output_bucket}/{wps_uuid}/{out_id}/{out_file}"
             output_ref_abbrev = f"s3://{output_ref}"
             output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
             output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
             # validation on outputs path
-            assert output_values[out_key] in output_ref_any
+            assert output_values[out_id] in output_ref_any
             # validation on results path
-            assert results[out_key]["href"] in output_ref_any
+            assert results[out_id]["href"] in output_ref_any
 
         # check that outputs are indeed stored in S3 buckets
         mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
-        for out_file in [input_file_s3, input_file_http]:
-            out_key = f"{job_id}/{out_file}"
+        for out_id, out_file in output_files:
+            out_key = f"{job_id}/{out_id}/{out_file}"
             assert out_key in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
         wps_outdir = self.settings["weaver.wps_output_dir"]
-        for out_file in [input_file_s3, input_file_http]:
+        for out_id, out_file in output_files:
             assert not os.path.exists(os.path.join(wps_outdir, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, out_id, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_id, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_id, out_file))
         assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
-    # FIXME: implement
     @pytest.mark.skip(reason="OAS execute parse/validate values not implemented")
     def test_execute_job_with_oas_validation(self):
         """
         Process with :term:`OpenAPI` I/O definitions validates the schema of the submitted :term:`JSON` data.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # FIXME: implement
 
     @mocked_aws_config
     @mocked_aws_s3
@@ -3740,7 +5716,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
             # check that outputs are S3 bucket references
             output_bucket = self.settings["weaver.wps_output_s3_bucket"]
-            output_loc = results["output_dir"]["href"]
+            output_loc = results[output_id]["href"]
             output_ref = f"{output_bucket}/{job_id}/{output_id}/"
             output_key_base = f"{job_id}/{output_id}/"
             output_ref_abbrev = f"s3://{output_ref}"
@@ -3790,3 +5766,114 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 assert not os.path.exists(os.path.join(wps_outdir, job_id, output_id, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, output_id, out_file))
             assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
+
+    @mocked_aws_config
+    @mocked_aws_s3
+    @setup_aws_s3_bucket(bucket="wps-output-test-bucket")
+    def test_execute_with_result_representations(self):
+        """
+        Test that an output file stored in an AWS bucket can be retrieved as per their requested ``transmissionMode``.
+
+        .. versionadded:: 6.0
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_process_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        with contextlib.ExitStack() as stack:
+            exec_body = {
+                "mode": ExecuteMode.SYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {"message": "test data in bucket"},
+                "outputs": {
+                    "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE},
+                    "output_text": {"transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                },
+            }
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+        # rely on location that should be provided to find the job ID
+        results = resp.json
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+
+        out_path = f"/jobs/{job_id}/outputs"
+        out_params = {"schema": JobInputsOutputsSchema.OGC_STRICT}
+        out_resp = self.app.get(out_path, headers=self.json_headers, params=out_params)
+        outputs = out_resp.json
+
+        # check that outputs by reference are S3 bucket references
+        # for 'outputs' endpoint, reference always expected for File type
+        # for 'results' endpoint, only the output requested by reference 'transmissionMode' is expected
+        for output_id, output_file, outputs_doc in [
+            ("output_text", "result.txt", results),
+            ("output_text", "result.txt", outputs["outputs"]),
+            ("output_json", "result.json", outputs["outputs"]),
+        ]:
+            output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+            output_loc = outputs_doc[output_id]["href"]
+            output_key = f"{job_id}/{output_id}/{output_file}"
+            output_ref = f"{output_bucket}/{output_key}"
+            output_ref_abbrev = f"s3://{output_ref}"
+            output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            assert output_loc in output_ref_any
+
+        # check that result by 'transmissionMode' value is not a reference, but the contents
+        assert "output_json" in results
+        assert "value" in results["output_json"]
+        assert "href" not in results["output_json"]
+        assert results["output_json"]["value"] == {"data": "test data in bucket"}
+        assert results["output_json"]["mediaType"] == ContentType.APP_JSON
+
+        # check that outputs are indeed stored in S3 buckets
+        mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        bucket_file_info = {obj["Key"]: obj for obj in resp_json["Contents"]}
+        expect_out_files = {
+            f"{job_id}/{output_id}/{output_file}": out_type
+            for output_id, output_file, out_type
+            in [
+                ("output_json", "result.json", ContentType.APP_JSON),
+                ("output_text", "result.txt", ContentType.TEXT_PLAIN),
+            ]
+        }
+        assert resp_json["Name"] == output_bucket
+        assert len(bucket_file_info) == len(expect_out_files), "No extra files expected."
+        assert all(out_file in bucket_file_info for out_file in expect_out_files)
+
+        # validate that common file extensions could be detected and auto-populated the Content-Type
+        # (information not available in 'list_objects_v2', so fetch each file individually
+        for out_file, out_type in expect_out_files.items():
+            out_info = mocked_s3.head_object(Bucket=output_bucket, Key=out_file)
+            assert out_info["ContentType"] == out_type
+
+        # check that outputs are NOT copied locally, but that XML status does exist
+        # counter validate path with file always present to ensure outputs are not 'missing' because of wrong dir
+        wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
+        wps_outdir = self.settings["weaver.wps_output_dir"]
+        # NOTE: exception for 'output_json' since by-value representation forces it to retrieve it locally
+        exception_id = ["output_json"]
+        for out_file in list(expect_out_files):
+            out_path, out_name = os.path.split(out_file)
+            _, out_id = os.path.split(out_path)
+            assert not os.path.exists(os.path.join(wps_outdir, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_name))
+            assert not os.path.exists(os.path.join(wps_outdir, out_id, out_name))
+            if out_id not in exception_id:
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, out_id, out_name))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_id, out_name))
+        assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))

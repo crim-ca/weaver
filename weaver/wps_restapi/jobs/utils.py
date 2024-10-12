@@ -1,3 +1,4 @@
+import io
 import math
 import os
 import shutil
@@ -14,11 +15,11 @@ from pyramid.httpexceptions import (
     HTTPLocked,
     HTTPNoContent,
     HTTPNotFound,
-    HTTPNotImplemented,
     HTTPOk
 )
-from pyramid.response import FileResponse
 from pyramid_celery import celery_app
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+from webob.headers import ResponseHeaders
 
 from weaver.database import get_db
 from weaver.datatype import Job, Process
@@ -32,14 +33,22 @@ from weaver.exceptions import (
     ServiceNotAccessible,
     ServiceNotFound
 )
-from weaver.execute import ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import ContentType, get_format, repr_json
+from weaver.execute import (
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode,
+    parse_prefer_header_return,
+    update_preference_applied_return_header
+)
+from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    data2str,
+    fetch_file,
     get_any_id,
     get_any_value,
     get_header,
@@ -59,25 +68,39 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+    from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
+    from weaver.formats import AnyContentEncoding
     from weaver.processes.constants import JobInputsOutputsSchemaType
     from weaver.typedefs import (
+        AnyDataStream,
         AnyHeadersContainer,
         AnyRequestType,
         AnyResponseType,
         AnySettingsContainer,
-        AnyUUID,
         AnyValueType,
-        ExecutionResultArray,
         ExecutionResultObject,
         ExecutionResults,
         ExecutionResultValue,
         HeadersTupleType,
+        HeadersType,
+        JobValueFormat,
         JSON,
         PyramidRequest,
         SettingsType
     )
+
+    MultiPartFieldsParamsType = Union[
+        AnyDataStream,
+        # filename, data/io
+        Tuple[Optional[str], AnyDataStream],
+        # filename, data/io, content-type
+        Tuple[Optional[str], AnyDataStream, Optional[str]],
+        # filename, data/io, content-type, headers
+        Tuple[Optional[str], AnyDataStream, Optional[str], HeadersType],
+    ]
+    MultiPartFieldsType = Sequence[Tuple[str, MultiPartFieldsParamsType]]
 
 LOGGER = get_task_logger(__name__)
 
@@ -278,8 +301,15 @@ def get_schema_query(schema, strict=True):
     return schema_checked
 
 
-def make_result_link(result_id, result, job_id, settings):
-    # type: (str, Union[ExecutionResultObject, ExecutionResultArray], AnyUUID, SettingsType) -> List[str]
+def make_result_link(
+    job,                    # type: Job
+    result,                 # type: ExecutionResultValue
+    output_id,              # type: str
+    output_mode,            # type: AnyExecuteTransmissionMode
+    output_format=None,     # type: Optional[JobValueFormat]
+    *,                      # force named keyword arguments after
+    settings,               # type: SettingsType
+):                          # type: (...) -> List[str]
     """
     Convert a result definition as ``value`` into the corresponding ``reference`` for output transmission.
 
@@ -288,32 +318,15 @@ def make_result_link(result_id, result, job_id, settings):
     """
     values = result if isinstance(result, list) else [result]
     suffixes = list(f".{idx}" for idx in range(len(values))) if isinstance(result, list) else [""]
-    wps_url = get_wps_output_url(settings).strip("/")
     links = []
     for suffix, value in zip(suffixes, values):
-        key = get_any_value(result, key=True)
-        if key != "href":
-            # literal data to be converted to link
-            # plain text file must be created containing the raw literal data
-            typ = ContentType.TEXT_PLAIN  # as per '/rec/core/process-execute-sync-document-ref'
-            enc = "UTF-8"
-            out = get_wps_output_dir(settings)
-            val = get_any_value(value, data=True, file=False)
-            loc = os.path.join(str(job_id), f"{result_id}{suffix}.txt")
-            url = f"{wps_url}/{loc}"
-            path = os.path.join(out, loc)
-            path = get_secure_path(path)
-            with open(path, mode="w", encoding=enc) as out_file:
-                out_file.write(val)
-        else:
-            fmt = get_field(result, "format", default={"mediaType": ContentType.TEXT_PLAIN})
-            typ = get_field(fmt, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
-            enc = get_field(fmt, "encoding", search_variations=True, default=None)
-            url = get_any_value(value, data=False, file=True)  # should already include full path
-            if fmt == ContentType.TEXT_PLAIN and not enc:  # only if text, otherwise binary content could differ
-                enc = "UTF-8"  # default both omit/empty
-        encoding = f"; charset={enc}" if enc else ""
-        links.append(f"<{url}>; rel=\"{result_id}{suffix}\"; type={typ}{encoding}")
+        result_id = f"{output_id}{suffix}"
+        headers, _ = generate_or_resolve_result(job, value, result_id, output_id, output_mode, output_format, settings)
+        url = headers["Content-Location"]
+        typ = headers["Content-Type"]
+        enc = headers.get("Content-Encoding", None)
+        link_header = make_link_header(url, rel=result_id, type=typ, charset=enc)
+        links.append(link_header)
     return links
 
 
@@ -351,9 +364,17 @@ def get_results(  # pylint: disable=R1260
     ogc_api = schema == JobInputsOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
-    out_ref = convert_output_params_schema(job.outputs, JobInputsOutputsSchema.OGC) if link_references else {}
     references = {}
     for result in job.results:
+        # Filter outputs not requested, unless 'all' requested by omitting
+        out_id = get_any_id(result)
+        if (
+            (isinstance(job.outputs, dict) and out_id not in job.outputs) or
+            (isinstance(job.outputs, list) and not any(get_any_id(out) == out_id for out in job.outputs))
+        ):
+            LOGGER.debug("Removing [%s] from %s results response because not requested.", out_id, job)
+            continue
+
         # Complex result could contain both 'data' and a reference (eg: JSON file and its direct representation).
         # Literal result is only by itself. Therefore, find applicable field by non 'data' match.
         rtype = "href" if get_any_value(result, key=True, file=True, data=False) else "data"
@@ -367,20 +388,26 @@ def get_results(  # pylint: disable=R1260
             )
         ):
             array = [value]  # array of array such that it iterated as the array of literals directly
-        # Any other type of array implies complex data (bbox or file)
+        # Any other type of array implies complex data (bbox, collection, file, etc.)
         # They must be defined on their own with respective media-type/format details per item.
         else:
             array = value if isinstance(value, list) else [value]
+
         for val_item in array:
             val_data = val_item
             if isinstance(val_item, dict) and isinstance(value, list):
                 rtype = "href" if get_any_value(val_item, key=True, file=True, data=False) else "data"
                 val_data = get_any_value(val_item, file=True, data=False)
+            if not isinstance(val_item, dict):
+                # use the representation that contains all metadata if possible, otherwise rely on literal data only
+                val_item = result if isinstance(result, dict) else {rtype: val_data}
+
             out_key = rtype
-            out_id = get_any_id(result)
-            out_mode = out_ref.get(out_id, {}).get("transmissionMode")
+            is_ref = rtype == "href"
+            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=is_ref)
             as_ref = link_references and out_mode == ExecuteTransmissionMode.REFERENCE
-            if rtype == "href" and isinstance(val_data, str):
+
+            if is_ref and isinstance(val_data, str):
                 # fix paths relative to instance endpoint,
                 # but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
                 if val_data.startswith("/"):
@@ -395,18 +422,17 @@ def get_results(  # pylint: disable=R1260
             output = {out_key: val_data}
 
             # required for the rest to be there, other fields optional
-            if rtype == "href":
-                val_fmt = val_item if isinstance(val_item, dict) else result
-                if "mimeType" not in val_fmt:
-                    val_fmt["mimeType"] = get_format(val_data, default=ContentType.TEXT_PLAIN).mime_type
+            if is_ref:
+                if "mimeType" not in val_item:
+                    val_item["mimeType"] = get_format(val_data, default=ContentType.TEXT_PLAIN).mime_type
                 if ogc_api or not strict:
-                    output["type"] = val_fmt["mimeType"]
+                    output["type"] = val_item["mimeType"]
                 if not ogc_api or not strict or as_ref:
-                    output["format"] = {fmt_key: val_fmt["mimeType"]}
+                    output["format"] = {fmt_key: val_item["mimeType"]}
                     for field in ["encoding", "schema"]:
                         if field in result:
-                            output["format"][field] = val_fmt[field]
-            elif rtype != "href":
+                            output["format"][field] = val_item[field]
+            elif not is_ref:
                 dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
                 if ogc_api:
                     output["dataType"] = {"name": dtype}
@@ -435,51 +461,154 @@ def get_results(  # pylint: disable=R1260
 
     # needed to collect and aggregate outputs of same ID first in case of array
     # convert any requested link references using indices if needed
-    headers = []
-    for out_id, output in references.items():
-        res_links = make_result_link(out_id, output, job.id, settings)
-        headers.extend([("Link", link) for link in res_links])
+    headers = get_job_results_links(job, references, {}, headers=[], settings=settings)
 
     return outputs, headers
 
 
-def get_job_results_response(job, container, headers=None):
-    # type: (Job, AnySettingsContainer, Optional[AnyHeadersContainer]) -> AnyResponseType
+def get_job_return(
+    job=None,       # type: Optional[Job]
+    body=None,      # type: Optional[JSON]
+    headers=None,   # type: Optional[AnyHeadersContainer]
+):                  # type: (...) -> Tuple[AnyExecuteResponse, AnyExecuteReturnPreference]
+    """
+    Obtain the :term:`Job` result representation based on the resolution order of preferences and request parameters.
+
+    Body and header parameters are considered first, in case they provide 'overrides' for the active request.
+    Then, if the :paramref:`job` was already parsed from the original request, and contains pre-resolved return,
+    this format is employed. When doing the initial parsing, ``job=None`` MUST be used.
+    """
+    body = body or {}
+    resp = ExecuteResponse.get(body.get("response"))
+    if resp:
+        return resp, ExecuteReturnPreference.MINIMAL
+
+    pref = parse_prefer_header_return(headers)
+    if pref == ExecuteReturnPreference.MINIMAL:
+        return ExecuteResponse.DOCUMENT, ExecuteReturnPreference.MINIMAL
+    if pref == ExecuteReturnPreference.REPRESENTATION:
+        return ExecuteResponse.RAW, ExecuteReturnPreference.REPRESENTATION
+
+    if not job:
+        return ExecuteResponse.DOCUMENT, ExecuteReturnPreference.MINIMAL
+    return job.execution_response, job.execution_return
+
+
+def get_job_output_transmission(job, output_id, is_reference):
+    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+    """
+    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    """
+    outputs = job.outputs or {}
+    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
+    out = outputs.get(output_id) or {}
+    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
+    out_fmt = cast("JobValueFormat", out.get("format"))
+
+    # raw/representation can change the output transmission mode if they are not overriding it
+    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
+    if (
+        not out_mode and
+        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
+        job.execution_response == ExecuteResponse.RAW
+    ):
+        return ExecuteTransmissionMode.VALUE, out_fmt
+
+    # because mode can be omitted, resolve their default explicitly
+    if not out_mode:
+        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
+    return out_mode, out_fmt
+
+
+def get_job_results_response(
+    job,                        # type: Job
+    *,                          # force named keyword arguments after
+    container,                  # type: AnySettingsContainer
+    request_headers=None,       # type: Optional[AnyHeadersContainer]
+    response_headers=None,      # type: Optional[AnyHeadersContainer]
+    results_headers=None,       # type: Optional[AnyHeadersContainer]
+    results_contents=None,      # type: Optional[JSON]
+):                              # type: (...) -> AnyResponseType
     """
     Generates the :term:`OGC` compliant :term:`Job` results response according to submitted execution parameters.
 
     Parameters that impact the format of the response are:
-        - Amount of outputs to be returned.
-        - Parameter ``response: raw|document``
-        - Parameter ``transmissionMode: value|reference`` per output if ``response: raw``.
+        - Body parameter ``outputs`` with the amount of *requested outputs* to be returned.
+        - Body parameter ``response: raw|document`` for content representation.
+        - Body parameter ``transmissionMode: value|reference`` per output.
+        - Header parameter ``Prefer: return=representation|minimal`` for content representation.
+        - Overrides, for any of the previous parameters, allowing request of an alternate representation.
+
+    Resolution order/priority:
+
+    1. :paramref:`override_contents`
+    2. :paramref:`override_headers`
+    3. :paramref:`job` definitions
+
+    The logic of the resolution order is that any body parameters resolving to an equivalent information provided
+    by header parameters will be more important, since ``Prefer`` are *soft* requirements, whereas body parameters
+    are *hard* requirements. The parameters stored in the :paramref:`job` are defined during :term:`Job` submission,
+    which become the "default" results representation if requested as is. If further parameters are provided to
+    override during the results request, they modify the "default" results representation. In this case, an header
+    provided in the results request overrides the body parameters from the original :term:`Job`, since their results
+    request context is "closer" than the ones at the time of the :term:`Job` submission.
 
     .. seealso::
         More details available for each combination:
         - https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
         - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7
+        - :ref:`proc_op_job_results`
+        - :ref:`proc_exec_results`
 
-    :param job: Job for which to generate the results response.
+    :param job: Job for which to generate the results response, which contains the originally submitted parameters.
     :param container: Application settings.
-    :param headers: Additional headers to provide in the response.
+    :param request_headers: Original headers submitted to the request that leads to this response.
+    :param response_headers: Additional headers to provide in the response.
+    :param results_headers: Headers that override originally submitted job parameters when requesting results.
+    :param results_contents: Body contents that override originally submitted job parameters when requesting results.
     """
     raise_job_dismissed(job, container)
     raise_job_bad_status_success(job, container)
+    settings = get_settings(container)
 
-    # when 'response=document', ignore 'transmissionMode=value|reference', respect it when 'response=raw'
-    # See:
-    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7 (/req/core/job-results-async-document)
-    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
-    is_raw = job.execution_response == ExecuteResponse.RAW
-    results, refs = get_results(job, container, value_key="value",
-                                schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
-                                link_references=is_raw)
-    headers = headers or {}
-    if "location" not in headers:
-        headers["Location"] = job.status_url(container)
+    results, _ = get_results(
+        job, container,
+        value_key="value",
+        schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
+        # no link headers since they are represented differently based on request parameters
+        # leave it up to each following content-type/response specific representation to define them
+        link_references=False,
+    )
 
-    if not is_raw:
+    headers = ResponseHeaders(response_headers or {})
+    headers.pop("Location", None)
+    headers.setdefault("Content-Location", job.results_url(container))
+    for link in job.links(container, self_link="results"):
+        link_header = make_link_header(link)
+        headers.add("Link", link_header)
+
+    # resolve request details to redirect for appropriate response handlers
+    job_resp, job_ret = get_job_return(job, results_contents, results_headers)
+    is_accept_multipart = (
+        isinstance(job.accept_type, str) and
+        any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART)
+    )
+    is_rep = job_ret == ExecuteReturnPreference.REPRESENTATION
+    is_raw = job_resp == ExecuteResponse.RAW
+
+    # if a single output is explicitly requested, the representation must be ignored and return it directly
+    # (single result does not matter for a process generating only one, it is the N output requested that matters)
+    is_single_output_minimal = (
+        job.outputs is not None and len(job.outputs) == 1 and
+        not is_rep and ContentType.APP_JSON not in job.accept_type  # alternative way to request 'minimal'/'document'
+    )
+
+    headers = update_preference_applied_return_header(job, request_headers, headers)
+
+    # document/minimal response
+    if not is_raw and not is_accept_multipart and not is_single_output_minimal:
         try:
-            results_schema = sd.Result()
+            results_schema = sd.ResultsDocument()
             results_json = results_schema.deserialize(results)
             if len(results_json) != len(results):  # pragma: no cover  # ensure no outputs silently dismissed
                 raise colander.Invalid(
@@ -498,69 +627,445 @@ def get_job_results_response(job, container, headers=None):
                     "value": repr_json(exc.value),
                 })
             )
-        # note:
-        #   Cannot add "links" field in response body because variable Output ID keys are directly at the root
-        #   Possible conflict with an output that would be named "links".
+
+        # resolution of 'transmissionMode' for document representation will be done by its own handler function
+        #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#_response_7 (/req/core/job-results-async-document)
+        #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-document
+        # use deserialized contents such that only the applicable fields remain
+        # (simplify compares, this is assumed by the following call)
+        results_json = get_job_results_document(job, results_json, settings=settings)
         return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
         # see:
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
-        refs.extend(headers.items())
-        return HTTPNoContent(headers=refs)
+        #   - https://docs.ogc.org/DRAFTS/18-062.html#req_core_job-results-param-outputs-empty
+        return HTTPNoContent(headers=headers)
 
     # raw response can be data-only value, link-only or a mix of them
-    if results:
-        # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-        out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
-        out_info = out_vals[0][-1]        # type: ExecutionResultValue
-        out_type = get_any_value(out_info, key=True)
-        out_data = get_any_value(out_info)
+    # if raw representation is requested and all requested outputs resolve as links
+    # without explicit 'accept: multipart', then all must use link headers
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
+    res_refs = {
+        out_id: bool(get_any_value(out, key=True, file=True, data=False))
+        for out_id, out in results.items()
+    }
+    out_transmissions = {
+        out_id: get_job_output_transmission(job, out_id, is_ref)
+        for out_id, is_ref in res_refs.items()
+    }
+    if is_raw and not is_rep and all(
+        out_mode == ExecuteTransmissionMode.REFERENCE
+        for out_mode, _ in out_transmissions.values()
+    ):
+        headers = get_job_results_links(job, results, out_transmissions, headers=headers, settings=settings)
+        return HTTPNoContent(headers=headers)
 
-        # FIXME: https://github.com/crim-ca/weaver/issues/376
-        #  implement multipart, both for multi-output IDs and array-output under same ID
-        if len(results) > 1 or (isinstance(out_data, list) and len(out_data) > 1):
-            # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
-            raise HTTPNotImplemented(json={
-                "code": "NotImplemented",
-                "type": "NotImplemented",
-                "detail": "Multipart results with 'transmissionMode=value' and 'response=raw' not implemented.",
-            })
+    # FIXME: support ZIP or similar "container" output (https://github.com/crim-ca/weaver/issues/726)
+    # FIXME: support Metalink - needs by-reference only (https://github.com/crim-ca/weaver/issues/663)
+    # multipart response
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-multi
+    #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
+    #   - https://docs.ogc.org/DRAFTS/18-062.html#per_core_job-results-async-many-other-formats
+    # extract data to see if it happens to be an array (i.e.: 1 output "technically", but needs multipart)
+    out_vals = list(results.items())  # type: List[Tuple[str, ExecutionResultValue]]  # noqa
+    out_info = out_vals[0][-1]  # type: ExecutionResultValue
+    out_data = get_any_value(out_info)
+    if (
+        len(results) > 1 or
+        (isinstance(out_data, list) and len(out_data) > 1) or  # single output is an array, needs multipart
+        is_accept_multipart
+    ):
+        return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
-        # single value only
-        out_data = out_data[0] if isinstance(out_data, list) else out_data
-        if out_type == "href":
-            out_path = map_wps_output_location(out_data, container, exists=True, url=False)
-            out_type = out_info.get("type")  # noqa
-            out_headers = get_href_headers(out_path, download_headers=True, content_headers=True, content_type=out_type)
-            resp = FileResponse(out_path)
-            resp.headers.update(out_headers)
-            resp.headers.update(headers)
+    # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
+    res_id = out_vals[0][0]
+    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
+    #   req_fmt = guess_target_format(container)   where container=request
+    #   out_fmt (see above)
+    #   out_type = result.get("type")
+    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
+    out_fmt = None
+    return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+
+
+def generate_or_resolve_result(
+    job,            # type: Job
+    result,         # type: ExecutionResultObject
+    result_id,      # type: str
+    output_id,      # type: str
+    output_mode,    # type: AnyExecuteTransmissionMode
+    output_format,  # type: Optional[JobValueFormat]  # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    settings,       # type: SettingsType
+):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
+    """
+    Obtains the local file path and the corresponding :term:`URL` reference for a given result, generating it as needed.
+
+    :param job: Job with results details.
+    :param result: The specific output value or reference (could be an item index within an array of a given output).
+    :param result_id: Specific identifier of the result, including any array index as applicable.
+    :param output_id: Generic identifier of the output containing the result.
+    :param output_mode: Desired output transmission mode.
+    :param output_format: Desired output transmission ``format``, with minimally the :term:`Media-Type`.
+    :param settings: Application settings to resolve locations.
+    :return:
+        Resolved headers and data (as applicable) for the result.
+        If only returned by reference, ``None`` data is returned. An empty-data contents would be an empty string.
+        Therefore, the explicit check of ``None`` is important to identify a by-reference result.
+    """
+    is_val = bool(get_any_value(result, key=True, file=False, data=True))
+    is_ref = bool(get_any_value(result, key=True, file=True, data=False))
+    val = get_any_value(result)
+    cid = f"{result_id}@{job.id}"
+    url = None
+    loc = None
+    res_data = None
+    c_length = None
+
+    # NOTE:
+    #   work with local files (since we have them), to avoid unnecessary loopback request
+    #   then, rewrite the locations after generating their headers to obtain the final result URL
+
+    if is_ref:
+        url = val
+        typ = result.get("type")  # expected for typical link, but also check media-type variants in case pre-converted
+        typ = typ or get_field(result, "mime_type", search_variations=True, default=ContentType.APP_OCTET_STREAM)
+        job_out_url = job.result_path(output_id=output_id)
+        wps_out_url = get_wps_output_url(settings)
+        if url.startswith(f"/{job_out_url}/"):  # job "relative" path
+            url = os.path.join(wps_out_url, url[1:])
+        if url.startswith(wps_out_url):
+            loc = map_wps_output_location(url, settings, exists=True, url=False)
+            loc = get_secure_path(loc)
         else:
-            resp = HTTPOk(body=out_data, charset="UTF-8", content_type=ContentType.TEXT_PLAIN, headers=headers)
+            loc = url  # remote storage, S3, etc.
     else:
-        resp = HTTPOk(headers=headers)
-    if refs:
-        # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
-        # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-mixed-multi
-        resp.headerlist.extend(refs)
+        typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+
+    if not url:
+        out_dir = get_wps_output_dir(settings)
+        out_name = f"{result_id}.txt"
+        job_path = job.result_path(output_id=output_id, file_name=out_name)
+        loc = os.path.join(out_dir, job_path)
+        loc = get_secure_path(loc)
+        url = map_wps_output_location(loc, settings, exists=False, url=True)
+    loc = loc[7:] if loc.startswith("file://") else loc
+    is_local = loc.startswith("/")
+
+    if is_val and output_mode == ExecuteTransmissionMode.VALUE:
+        res_data = io.StringIO()
+        c_length = res_data.write(data2str(val))
+
+    if is_val and output_mode == ExecuteTransmissionMode.REFERENCE:
+        if not os.path.isfile(loc):
+            os.makedirs(os.path.dirname(loc), exist_ok=True)
+            with open(loc, mode="w", encoding="utf-8") as out_file:
+                out_file.write(data2str(val))
+
+    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and typ != ContentType.APP_DIR:
+        res_path = loc
+        if not is_local:
+            # reference is a remote file, but by-value requested explicitly
+            # try to retrieve its content locally to return it
+            wps_out_dir = get_wps_output_dir(settings)
+            job_out_dir = job.result_path(output_id=output_id)
+            job_out_dir = os.path.join(wps_out_dir, job_out_dir)
+            os.makedirs(job_out_dir, exist_ok=True)
+            res_path = fetch_file(res_path, job_out_dir, settings=settings)
+        res_data = io.FileIO(res_path, mode="rb")
+
+    res_headers = get_href_headers(
+        loc,
+        download_headers=True,
+        missing_ok=True,        # only basic details if file does not exist
+        content_headers=True,
+        content_type=typ,
+        content_id=cid,
+        content_name=result_id,
+        content_location=url,   # rewrite back the original URL
+        settings=settings,
+    )
+    if output_mode == ExecuteTransmissionMode.VALUE and not res_headers.get("Content-Length") and c_length is not None:
+        res_headers["Content-Length"] = str(c_length)
+    if output_mode == ExecuteTransmissionMode.REFERENCE:
+        res_data = None
+        res_headers["Content-Length"] = "0"
+    if not os.path.exists(loc) and is_local:
+        res_headers.pop("Content-Location", None)
+    return res_headers, res_data
+
+
+def resolve_result_json_literal(
+    result,                 # type: ExecutionResultValue
+    output_format,          # type: Optional[JobValueFormat]
+    content_type=None,      # type: Optional[str]
+    content_encoding=None,  # type: Optional[str]
+):                          # type: (...) -> ExecutionResultValue
+    """
+    Generates a :term:`JSON` literal string or object representation according to requested format and result contents.
+
+    If not a ``value`` structure, the result is returned unmodified. If no output ``format`` is provided, or that
+    the extracted result :term:`Media-Type` does not correspond to a :term:`JSON` value, the result is also unmodified.
+    Otherwise, string/object representation is resolved according to the relevant  :term:`Media-Type`.
+
+    :param result: Container with nested data.
+    :param output_format: Desired output transmission ``format``, with minimally the :term:`Media-Type`.
+    :param content_type: Explicit :term:`Media-Type` to employ instead of an embedded ``mediaType`` result property.
+    :param content_encoding: Explicit data encoding to employ instead of an embedded ``encoding`` result property.
+    :return: Converted :term:`JSON` data or the original result as applicable.
+    """
+    if not result or not isinstance(result, dict) or "value" not in result:
+        return result
+    if not content_type:
+        content_type = get_field(result, "mediaType", default=None, search_variations=True)
+    if not content_encoding:
+        content_encoding = get_field(result, "encoding", default="utf-8", search_variations=True)
+    if content_type == ContentType.APP_JSON and "value" in result:
+        is_ascii = str(content_encoding).lower() == "ascii"
+        out_type = get_field(output_format, "mediaType", default=ContentType.APP_JSON)
+        if out_type == ContentType.APP_JSON:
+            result["value"] = repr_json(result["value"], force_string=False, ensure_ascii=is_ascii)
+        elif out_type in [ContentType.TEXT_PLAIN, ContentType.APP_RAW_JSON]:
+            result["value"] = repr_json(
+                result["value"],
+                force_string=True,
+                ensure_ascii=is_ascii,
+                # following for minimal representation
+                indent=None,
+                separators=(",", ":"),
+            )
+            result["mediaType"] = ContentType.APP_RAW_JSON  # ensure disambiguation from other plain text
+    return result
+
+
+def get_job_results_links(
+    job,            # type: Job
+    references,     # type: Dict[str, ExecutionResultValue]
+    transmissions,  # type: Dict[str, Tuple[AnyExecuteTransmissionMode, JobValueFormat]]
+    headers,        # type: AnyHeadersContainer
+    *,              # force named keyword arguments after
+    settings,       # type: SettingsType
+):                  # type: (...) -> AnyHeadersContainer
+    """
+    Generates ``Link`` headers for all specified result references and adds them to the specified header container.
+    """
+    for out_id, output in references.items():
+        out_trans = transmissions.get(out_id)
+        out_fmt = out_trans[-1] if out_trans else None
+        out_mode = ExecuteTransmissionMode.REFERENCE
+        res_links = make_result_link(job, output, out_id, out_mode, out_fmt, settings=settings)
+        headers.extend([("Link", link) for link in res_links])
+    return headers
+
+
+def get_job_results_single(
+    job,            # type: Job
+    result,         # type: ExecutionResultObject
+    output_id,      # type: str
+    output_format,  # type: Optional[JobValueFormat]
+    headers,        # type: AnyHeadersContainer
+    *,              # force named keyword arguments after
+    settings,       # type: AnySettingsContainer
+):                  # type: (...) -> Union[HTTPOk, HTTPNoContent]
+    """
+    Generates a single result response according to specified or resolved output transmission and format.
+
+    :param job: Job definition to obtain relevant path resolution.
+    :param result: Result to be represented.
+    :param output_id: Identifier of the corresponding result output.
+    :param output_format: Desired output format for convertion, as applicable.
+    :param headers: Additional headers to include in the response.
+    :param settings: Application settings to resolve locations.
+    :return:
+    """
+    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    #   for .../results/{id} transform might need to force 'Prefer' over job preference
+    #   (explicitly request value/link contrary to resolved results/mode from the job)
+
+    is_ref = bool(get_any_value(result, key=True, file=True, data=False))
+    out_data = get_any_value(result, file=is_ref, data=not is_ref)
+    out_mode, out_fmt = get_job_output_transmission(job, output_id, is_ref)
+    output_format = output_format or out_fmt
+    if out_mode == ExecuteTransmissionMode.REFERENCE:
+        link = make_result_link(job, result, output_id, out_mode, output_format, settings=settings)
+        headers.extend([("Link", link[0])])
+        return HTTPNoContent(headers=headers)
+
+    # convert value as needed since reference transmission was not requested/resolved
+    out_headers = {}
+    if is_ref:
+        output_mode = ExecuteTransmissionMode.VALUE
+        out_headers, out_data = generate_or_resolve_result(
+            job,
+            result,
+            output_id,
+            output_id,
+            output_mode,
+            output_format,
+            settings=settings,
+        )
+        headers.update(out_headers)
+
+    ctype = out_headers.get("Content-Type")
+    if not ctype:
+        ctype = get_field(result, "mediaType", search_variations=True, default=ContentType.TEXT_PLAIN)
+    c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
+    out_data = data2str(out_data)
+    out_data = ContentEncoding.encode(out_data, c_enc)
+    return HTTPOk(body=out_data, content_type=ctype, charset=c_enc, headers=headers)
+
+
+def get_job_results_document(job, results, *, settings):
+    # type: (Job, ExecutionResults, Any, SettingsType) -> ExecutionResults
+    """
+    Generates the :term:`Job` results document response from available or requested outputs with necessary conversions.
+
+    Removes nested literal value definitions if qualified value representation is not needed.
+    Qualified value representation is not needed if no other field than ``value`` is provided with the literal data,
+    or when the specified :term:`Media-Type` is simply the plain text default for data literals.
+    The simplification is applied for both literals on their own and nested array of literals.
+    However, when processing an array, the qualified value representation is preserved if any of the items requires
+    the explicit mention of another :term:`Media-Type` than plain text, to return a consistent structure.
+
+    Uses the :paramref:`job` definition and submitted ``headers``
+
+    .. warning::
+        This function assumes that schema deserialization was applied beforehand.
+        Therefore, it will not attempt matching every possible combination of the results representation.
+    """
+
+    def make_result(result, result_id, output_id):
+        # type: (ExecutionResultValue, str, str) -> Union[AnyValueType, ExecutionResultObject]
+        if isinstance(result, dict):
+            is_ref = bool(get_any_value(result, key=True, file=True, data=False))
+            val = get_any_value(result)
+        else:
+            is_ref = False
+            val = result
+            result = {"value": val}
+        out_mode, out_fmt = get_job_output_transmission(job, result_id, is_reference=is_ref)
+        headers, data = generate_or_resolve_result(job, result, result_id, output_id, out_mode, out_fmt, settings)
+        if data is None:
+            ref = {
+                "href": headers["Content-Location"],
+                "type": headers["Content-Type"],
+            }
+            return ref
+
+        c_type = headers.get("Content-Type") or ""
+        c_enc = ContentEncoding.get(headers.get("Content-Encoding"))
+        if not c_type or (
+            # note:
+            #   Explicit content-type check to consider that any additional parameter provided
+            #   with text/plain must be reported. Only "purely" plain/text can be removed.
+            c_type == ContentType.TEXT_PLAIN and not c_enc
+        ):
+            value = val  # use original to avoid string conversion
+        else:
+            value = {"mediaType": c_type}
+            data = data2str(data)
+            if c_enc:
+                data = ContentEncoding.encode(data, c_enc)
+                value["encoding"] = c_enc
+            value["value"] = data
+
+        # special case of nested JSON data within the JSON document
+        value = resolve_result_json_literal(value, out_fmt, c_type, c_enc)
+
+        return value
+
+    out_results = {}
+    for out_id, res_val in results.items():
+        if isinstance(res_val, list):
+            res_data = []
+            for out_idx, item in enumerate(res_val):
+                res_id = f"{out_id}.{out_idx}"
+                out_res = make_result(item, res_id, out_id)
+                res_data.append(out_res)
+
+            # backtrack is not all literals (all qualified or none qualified, but no mix)
+            is_qualified = [isinstance(item, dict) for item in res_data]
+            if not all(is_qualified) and len([item for item in is_qualified if item]):
+                res_data = [
+                    item
+                    if isinstance(item, dict)
+                    else {"value": data2str(item), "mediaType": ContentType.TEXT_PLAIN}
+                    for item in res_data
+                ]
+
+        else:
+            res_data = make_result(res_val, out_id, out_id)
+
+        out_results[out_id] = res_data
+    return out_results
+
+
+def get_job_results_multipart(job, results, *, headers, settings):
+    # type: (Job, ExecutionResults, Any, AnyHeadersContainer, SettingsType) -> HTTPOk
+    """
+    Generates the :term:`Job` results multipart response from available or requested outputs with necessary conversions.
+
+    .. seealso::
+        - Function :func:`get_results` should be used to avoid re-processing all output format combinations.
+        - Details of ``multipart`` (:rfc:`2046#section-5.1`) :term:`Media-Type` family.
+
+    :param job: Job definition with potential metadata about requested outputs.
+    :param results: Pre-filtered and pre-processed results in a normalized format structure.
+    :param headers: Additional headers to include in the response.
+    :param settings: Application settings to resolve locations.
+    """
+
+    def add_result_parts(result_parts):
+        # type: (List[Tuple[str, str, ExecutionResultObject]]) -> MultiPartFieldsType
+        for out_id, res_id, result in result_parts:
+            if isinstance(result, list):
+                sub_parts = [(out_id, f"{out_id}.{out_idx}", data) for out_idx, data in enumerate(result)]
+                sub_parts = add_result_parts(sub_parts)
+                sub_multi = MultipartEncoder(sub_parts, content_type=ContentType.MULTIPART_MIXED)
+                sub_out_url = job.result_path(output_id=out_id)
+                sub_headers = {
+                    "Content-Type": sub_multi.content_type,
+                    "Content-ID": f"<{out_id}@{job.id}>",
+                    "Content-Location": sub_out_url,
+                    "Content-Disposition": f"attachment; name=\"{out_id}\"",
+                }
+                yield res_id, (None, sub_multi, None, sub_headers)
+
+            is_ref = bool(get_any_value(result, key=True, file=True, data=False))
+            out_mode, out_fmt = get_job_output_transmission(job, out_id, is_reference=is_ref)
+            res_headers, res_data = generate_or_resolve_result(job, result, res_id, out_id, out_mode, out_fmt, settings)
+            c_type = res_headers.get("Content-Type")
+            c_loc = res_headers.get("Content-Location")
+            c_fn = os.path.basename(c_loc) if c_loc else None
+            yield res_id, (c_fn, res_data, c_type, res_headers)
+
+    results_parts = [(_res_id, _res_id, _res_val) for _res_id, _res_val in results.items()]
+    results_parts = list(add_result_parts(results_parts))
+    res_multi = MultipartEncoder(results_parts, content_type=ContentType.MULTIPART_MIXED)
+    resp_headers = headers or {}
+    resp_headers.update({"Content-Type": res_multi.content_type})
+    resp = HTTPOk(detail=f"Multipart Response for {job}", headers=resp_headers)
+    resp.body = res_multi.read()
     return resp
 
 
 def get_job_submission_response(body, headers, error=False):
-    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated]
+    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated, HTTPBadRequest]
     """
-    Generates the successful response from contents returned by :term:`Job` submission process.
+    Generates the response contents returned by :term:`Job` submission process.
 
     If :term:`Job` already finished processing within requested ``Prefer: wait=X`` seconds delay (and if allowed by
     the :term:`Process` ``jobControlOptions``), return the successful status immediately instead of created status.
 
+    If the status is not successful, return the failed :term:`Job` status response.
+
     Otherwise, return the status monitoring location of the created :term:`Job` to be monitored asynchronously.
 
     .. seealso::
-        :func:`weaver.processes.execution.submit_job`
-        :func:`weaver.processes.execution.submit_job_handler`
+        - :func:`weaver.processes.execution.submit_job`
+        - :func:`weaver.processes.execution.submit_job_handler`
+        - :ref:`proc_op_job_status`
     """
     # convert headers to pass as list to avoid any duplicate Content-related headers
     # otherwise auto-added by JSON handling when provided by dict-like structure

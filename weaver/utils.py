@@ -33,8 +33,10 @@ from beaker.cache import Cache, cache_managers, cache_region, cache_regions, reg
 from beaker.container import MemoryNamespaceManager
 from beaker.exceptions import BeakerException
 from botocore.config import Config as S3Config
+from botocore.exceptions import ClientError, HTTPClientError
 from bs4 import BeautifulSoup
 from celery.app import Celery
+from dateutil.parser import parse as parse_dt
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -65,7 +67,6 @@ from yaml.scanner import ScannerError
 from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
-from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
@@ -94,11 +95,10 @@ if TYPE_CHECKING:
         TypeVar,
         Union
     )
-    from typing_extensions import NotRequired, TypeAlias, TypedDict, TypeGuard, Unpack
+    from typing_extensions import NotRequired, Required, TypeAlias, TypedDict, TypeGuard, Unpack
 
     from mypy_boto3_s3.client import S3Client
 
-    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.status import Status
     from weaver.typedefs import (
         AnyCallable,
@@ -119,7 +119,10 @@ if TYPE_CHECKING:
         HeadersType,
         JSON,
         KVP,
+<<<<<<< HEAD
         KVP_Item,
+=======
+>>>>>>> origin/master
         Link,
         Literal,
         Number,
@@ -159,9 +162,11 @@ if TYPE_CHECKING:
     MetadataResult = TypedDict("MetadataResult", {
         "Date": str,
         "Last-Modified": str,
-        "Content-Type": NotRequired[str],
+        "Content-ID": NotRequired[str],
+        "Content-Type": Required[str],
         "Content-Length": NotRequired[str],
-        "Content-Location": NotRequired[str],
+        "Content-Encoding": NotRequired[str],
+        "Content-Location": str,
         "Content-Disposition": NotRequired[str],
     }, total=False)
     _OutputMethod = "OutputMethod"  # type: TypeAlias  # pylint: disable=C0103,invalid-name
@@ -710,7 +715,7 @@ def parse_kvp(query,                    # type: str
     """
     Parse key-value pairs using specified separators.
 
-    All values are normalized under a list, whether their have an unique or multi-value definition.
+    All values are normalized under a list, whether they have a unique or multi-value definition.
     When a key is by itself (without separator and value), the resulting value will be an empty list.
 
     When :paramref:`accumulate_keys` is enabled, entries such as ``{key}={val};{key}={val}`` will be joined together
@@ -801,106 +806,6 @@ def parse_kvp(query,                    # type: str
     return kvp
 
 
-def parse_prefer_header_execute_mode(
-    header_container,       # type: AnyHeadersContainer
-    supported_modes=None,   # type: Optional[List[AnyExecuteControlOption]]
-    wait_max=10,            # type: int
-):                          # type: (...) -> Tuple[AnyExecuteMode, Optional[int], HeadersType]
-    """
-    Obtain execution preference if provided in request headers.
-
-    .. seealso::
-        - :term:`OGC API - Processes`: Core, Execution mode <
-          https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode>`_.
-          This defines all conditions how to handle ``Prefer`` against applicable :term:`Process` description.
-        - :rfc:`7240#section-4.1` HTTP Prefer header ``respond-async``
-
-    .. seealso::
-        If ``Prefer`` format is valid, but server decides it cannot be respected, it can be transparently ignored
-        (:rfc:`7240#section-2`). The server must respond with ``Preference-Applied`` indicating preserved preferences
-        it decided to respect.
-
-    :param header_container: Request headers to retrieve preference, if any available.
-    :param supported_modes:
-        Execute modes that are permitted for the operation that received the ``Prefer`` header.
-        Resolved mode will respect this constraint following specification requirements of :term:`OGC API - Processes`.
-    :param wait_max:
-        Maximum wait time enforced by the server. If requested wait time is greater, ``wait`` preference will not be
-        applied and will fall back to asynchronous response.
-    :return:
-        Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
-        Maximum wait time indicates duration until synchronous response should fall back to asynchronous response.
-    :raises HTTPBadRequest: If contents of ``Prefer`` are not valid.
-    """
-
-    prefer = get_header("prefer", header_container)
-    relevant_modes = {ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC}
-    supported_modes = list(set(supported_modes or []).intersection(relevant_modes))
-
-    if not prefer:
-        # /req/core/process-execute-default-execution-mode (A & B)
-        if not supported_modes:
-            return ExecuteMode.ASYNC, None, {}  # Weaver's default
-        if len(supported_modes) == 1:
-            mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
-            wait = None if mode == ExecuteMode.ASYNC else wait_max
-            return mode, wait, {}
-        # /req/core/process-execute-default-execution-mode (C)
-        return ExecuteMode.SYNC, wait_max, {}
-
-    params = parse_kvp(prefer, pair_sep=",", multi_value_sep=None)
-    wait = wait_max
-    if "wait" in params:
-        try:
-            if not len(params["wait"]) == 1:
-                raise ValueError("Too many values.")
-            wait = params["wait"][0]
-            if not str.isnumeric(wait) or "." in wait or wait.startswith("-"):
-                raise ValueError("Invalid integer for 'wait' in seconds.")
-            wait = int(wait)
-        except (TypeError, ValueError) as exc:
-            raise HTTPBadRequest(json={
-                "code": "InvalidParameterValue",
-                "description": "HTTP Prefer header contains invalid 'wait' definition.",
-                "error": type(exc).__name__,
-                "cause": str(exc),
-                "value": str(params["wait"]),
-            })
-
-    if wait > wait_max:
-        LOGGER.info("Requested Prefer wait header too large (%ss > %ss), revert to async execution.", wait, wait_max)
-        return ExecuteMode.ASYNC, None, {}
-
-    auto = ExecuteMode.ASYNC if "respond-async" in params else ExecuteMode.SYNC
-    applied_preferences = []
-    # /req/core/process-execute-auto-execution-mode (A & B)
-    if len(supported_modes) == 1:
-        # supported mode is enforced, only indicate if it matches preferences to honour them
-        # otherwise, server is allowed to discard preference since it cannot be honoured
-        mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
-        wait = None if mode == ExecuteMode.ASYNC else wait_max
-        if auto == mode:
-            if auto == ExecuteMode.ASYNC:
-                applied_preferences.append("respond-async")
-            if wait:
-                applied_preferences.append(f"wait={wait}")
-        # /rec/core/process-execute-honor-prefer (A: async & B: wait)
-        # https://datatracker.ietf.org/doc/html/rfc7240#section-3
-        applied = {}
-        if applied_preferences:
-            applied = {"Preference-Applied": ", ".join(applied_preferences)}
-        return mode, wait, applied
-
-    # Weaver's default, at server's discretion when both mode are supported
-    # /req/core/process-execute-auto-execution-mode (C)
-    if len(supported_modes) == 2:
-        if auto == ExecuteMode.ASYNC:
-            return ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"}
-        if wait:
-            return ExecuteMode.SYNC, wait, {"Preference-Applied": f"wait={wait}"}
-    return ExecuteMode.ASYNC, None, {}
-
-
 def get_url_without_query(url):
     # type: (Union[str, ParseResult]) -> str
     """
@@ -960,7 +865,7 @@ def as_version_major_minor_patch(version):
 def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
     # type: (Optional[AnyVersion], VersionFormat) -> AnyVersion
     """
-    Generates a ``MAJOR.MINOR.PATCH`` version with padded with zeros for any missing parts.
+    Generates a ``MAJOR.MINOR.PATCH`` version with padded zeros for any missing parts.
     """
     if isinstance(version, (str, float, int)):
         ver_parts = list(Version(str(version)).version)
@@ -1286,21 +1191,27 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def get_href_headers(path,                      # type: str
-                     download_headers=False,    # type: bool
-                     location_headers=True,     # type: bool
-                     content_headers=False,     # type: bool
-                     content_type=None,         # type: Optional[str]
-                     settings=None,             # type: Optional[SettingsType]
-                     **option_kwargs,           # type: Unpack[Union[SchemeOptions, RequestOptions]]
-                     ):                         # type: (...) -> MetadataResult
+def get_href_headers(
+    path,                                   # type: str
+    download_headers=False,                 # type: bool
+    location_headers=True,                  # type: bool
+    content_headers=False,                  # type: bool
+    content_type=None,                      # type: Optional[str]
+    content_disposition_type="attachment",  # type: Literal["attachment", "inline"]
+    content_location=None,                  # type: Optional[str]
+    content_name=None,                      # type: Optional[str]
+    content_id=None,                        # type: Optional[str]
+    missing_ok=False,                       # type: bool
+    settings=None,                          # type: Optional[SettingsType]
+    **option_kwargs,                        # type: Unpack[Union[SchemeOptions, RequestOptions]]
+):                                          # type: (...) -> MetadataResult
     """
     Obtain headers applicable for the provided file or directory reference.
 
     :rtype: object
     :param path: File to describe. Either a local path or remote URL.
     :param download_headers:
-        If enabled, add the ``Content-Disposition`` header with attachment filename for downloading the file.
+        If enabled, add the ``Content-Disposition`` header with attachment/inline filename for downloading the file.
         If the reference is a directory, this parameter is ignored, since files must be retrieved individually.
     :param location_headers:
         If enabled, add the ``Content-Location`` header referring to the input location.
@@ -1309,20 +1220,56 @@ def get_href_headers(path,                      # type: str
         Explicit ``Content-Type`` to provide.
         Otherwise, use default guessed by file system (often ``application/octet-stream``).
         If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+        Requires that :paramref:`content_headers` is enabled.
+    :param content_disposition_type:
+        Whether ``inline`` or ``attachment`` should be used.
+        Requires that :paramref:`content_headers` and :paramref:`download_headers` are enabled.
+    :param content_location:
+        Override ``Content-Location`` to include in headers. Otherwise, defaults to the :paramref:`path`.
+        Requires that :paramref:`location_headers` and :paramref:`content_headers` are enabled in each case.
+    :param content_name:
+        Optional ``name`` parameter to assign in the ``Content-Disposition`` header.
+        Requires that :paramref:`content_headers` and :paramref:`download_headers` are enabled.
+    :param content_id:
+        Optional ``Content-ID`` to include in the headers.
+        Requires that :paramref:`content_headers` is enabled.
+        This should be a uniquely identifiable reference *across the server* (not just within a specific response),
+        which can be used for cross-referencing by ``{cid:<>}`` within and between multipart document contents.
+        For a generic ID or field name, employ :paramref:`content_name` instead.
+    :param missing_ok:
+        If the referenced resource does not exist (locally or remotely as applicable), and that content information
+        to describe it cannot be retrieved, either raise an error (default) or resume with the minimal information
+        details that could be resolved.
     :param settings: Application settings to pass down to relevant utility functions.
     :return: Headers for the reference.
     """
     href = path
     if not any(href.startswith(proto) for proto in ["file", "http", "https", "s3"]):
         href = f"file://{os.path.abspath(path)}"
+        href += "/" if (path.endswith("/") and not href.endswith("/")) else ""
     f_enc = None
+    f_size = None
+    f_type = None
+    f_modified = None
 
     # handle directory
     if path.endswith("/"):
         download_headers = False
-        listing = fetch_directory(href, out_dir="", out_method=OutputMethod.META, settings=settings, **option_kwargs)
-        f_modified = sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1]
-        f_size = sum(get_header("Size", meta) for meta in listing)
+        dir_path = path[7:] if path.startswith("file://") else path
+        listing = fetch_directory(
+            href,
+            # files will not be "fetched" under the director since using 'META' output method,
+            # but the actual path is needed to get the file os.stats, to obtain their metadata
+            out_dir=dir_path,
+            out_method=OutputMethod.META,
+            settings=settings,
+            **option_kwargs,
+        )
+        if listing:
+            f_modified = parse_dt(sorted([get_header("Last-Modified", meta, concat=True) for meta in listing])[-1])
+            f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
+        else:  # either empty directory, filtered contents, or failed to retrieve listing
+            f_size = "0"
         f_type = ContentType.APP_DIR
 
     # handle single file
@@ -1332,57 +1279,78 @@ def get_href_headers(path,                      # type: str
         options["http"].update(**configs)
 
         if path.startswith("s3://") or path.startswith("https://s3."):
-            s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-            s3_region = options["s3"].pop("region_name", None)
-            s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
-            s3_bucket, file_key = path[5:].split("/", 1)
-            s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
-            f_type = content_type or s3_file["ResponseMetadata"]["HTTPHeaders"]["ContentType"]
-            f_size = s3_file["ResponseMetadata"]["HTTPHeaders"]["Size"]
-            f_modified = s3_file["ResponseMetadata"]["HTTPHeaders"]["LastModified"]
+            try:
+                s3_region = None
+                if path.startswith("https://s3."):
+                    path, s3_region = resolve_s3_from_http(path)
+                s3_params = resolve_s3_http_options(**options["http"], **kwargs)
+                s3_region = s3_region or options["s3"].pop("region_name", None)
+                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+                s3_bucket, file_key = path[5:].split("/", 1)
+                s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
+                f_type = content_type or s3_file["ContentType"]
+                f_size = s3_file["ContentLength"]
+                f_modified = s3_file["LastModified"]
+            except (ClientError, HTTPClientError):
+                if not missing_ok:
+                    raise
 
         elif path.startswith("http://") or path.startswith("https://"):
             resp = request_extra("HEAD", href, **options["http"])
-            if not resp.status_code == 200:
+            if resp.status_code != 200 and not missing_ok:
                 raise ValueError(f"Could not obtain file reference metadata from [{href}]")
-            f_modified = resp.last_modified
-            f_type = content_type or resp.content_type
-            f_size = resp.content_length
-            f_enc = resp.content_encoding
+            if resp.status_code == 200:
+                f_modified = parse_dt(resp.last_modified)
+                f_type = content_type or resp.content_type
+                f_size = resp.content_length
+                f_enc = resp.content_encoding
 
         else:
-            path = path.split("file://", 1)[-1]
-            stat = os.stat(path)
-            f_type = content_type
-            f_size = stat.st_size
-            f_modified = datetime.fromtimestamp(stat.st_mtime)
+            try:
+                path = path.split("file://", 1)[-1]
+                stat = os.stat(path)
+                f_type = content_type
+                f_size = stat.st_size
+                f_modified = datetime.fromtimestamp(stat.st_mtime)
+            except OSError:
+                if not missing_ok:
+                    raise
 
-    headers = {"Content-Location": href} if location_headers else {}
+    headers = {}
     if content_headers:
+        content_id = content_id.strip("<>") if isinstance(content_id, str) else ""
+        if content_id:
+            headers["Content-ID"] = f"<{content_id}>"
+        if location_headers:
+            headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
-        if not f_type:
+        f_type = f_type or content_type  # in case of error, all above failed, use provided content-type if any
+        if not f_type:  # last resort, guess from file path
             if c_type == ContentType.APP_OCTET_STREAM:  # default
                 f_ext = os.path.splitext(path)[-1]
                 f_type = get_content_type(f_ext, charset="UTF-8", default=ContentType.APP_OCTET_STREAM)
             else:
                 f_type = c_type
-        if not f_enc:
-            f_enc = c_enc
+        f_enc = f_enc or c_enc or ""
         headers.update({
             "Content-Type": f_type,
-            "Content-Encoding": f_enc or "",
-            "Content-Length": str(f_size),
+            "Content-Encoding": f_enc,
         })
+        if f_size is not None:
+            headers["Content-Length"] = str(f_size)
         if download_headers:
-            headers.update({
-                "Content-Disposition": f"attachment; filename=\"{os.path.basename(path)}\"",
-            })
+            if os.path.splitext(path)[-1] in ["", "."]:
+                f_ext = get_extension(f_type, dot=True)
+                path = f"{path}{f_ext}"
+            # set name, then filename, to align with order employed by requests-toolbelt multipart class
+            content_disposition_params = f"name=\"{content_name}\"; "if content_name else ""
+            content_disposition_params += f"filename=\"{os.path.basename(path)}\""
+            headers["Content-Disposition"] = f"{content_disposition_type}; {content_disposition_params}"
     f_current = get_file_header_datetime(now())
-    f_modified = get_file_header_datetime(f_modified)
-    headers.update({
-        "Date": f_current,
-        "Last-Modified": f_modified,
-    })
+    headers["Date"] = f_current
+    if f_modified:
+        f_modified = get_file_header_datetime(f_modified)
+        headers["Last-Modified"] = f_modified
     return headers
 
 
@@ -1424,6 +1392,26 @@ def make_link_header(
     return link
 
 
+<<<<<<< HEAD
+=======
+def parse_link_header(link_header):
+    # type: (str) -> Link
+    """
+    Parses the parameters of the ``Link`` header.
+    """
+    url, params = link_header.split(";", 1)
+    href = url.strip("<>")
+    params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
+    ctype = (params.pop("type", None) or [None])[0]
+    rel = str(params.pop("rel")[0])
+    link = {"href": href, "rel": rel}  # type: Link
+    if ctype and isinstance(ctype, str):
+        link["type"] = ctype
+    link.update({param: value[0] for param, value in params.items() if value})
+    return link
+
+
+>>>>>>> origin/master
 def get_base_url(url):
     # type: (str) -> str
     """
@@ -1533,6 +1521,20 @@ def bytes2str(string):
     return string.decode("UTF-8")
 
 
+def data2str(data):
+    # type: (Union[AnyValueType, io.IOBase]) -> str
+    """
+    Converts literal data to a plain string representation.
+    """
+    if hasattr(data, "seek"):
+        data.seek(0)
+    if hasattr(data, "read"):
+        data = data.read()
+    if not isinstance(data, (str, bytes)):
+        data = str(data)
+    return bytes2str(data)
+
+
 def islambda(func):
     # type: (Any) -> bool
     return isinstance(func, type(lambda: None)) and func.__name__ == (lambda: None).__name__
@@ -1543,7 +1545,7 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, **KVP_Item) -> str
+    # type: (str, str, **AnyValueType) -> str
     """
     Generates the URL with Key-Value-Pairs (:term:`KVP`) query parameters.
 
@@ -2641,7 +2643,7 @@ def fetch_file(file_reference,                      # type: str
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
                **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
-               ):                                   # type: (...) -> str
+               ):                                   # type: (...) -> Path
     """
     Fetches a file from local path, AWS-S3 bucket or remote URL, and dumps its content to the output directory.
 
@@ -2728,7 +2730,7 @@ def fetch_file(file_reference,                      # type: str
 
 
 def adjust_file_local(file_reference, file_outdir, out_method):
-    # type: (str, str, OutputMethod) -> AnyOutputResult
+    # type: (str, str, OutputMethod) -> Path
     """
     Adjusts the input file reference to the output location with the requested handling method.
 
@@ -2966,21 +2968,17 @@ def fetch_files_s3(location,                            # type: str
     s3_files = filter_directory_patterns(s3_files, include, exclude, matcher, key=lambda _file: _file["Key"])
 
     if out_method == OutputMethod.META:
-        # FIXME: extra metadata needed?
-        #   Key/Size/LastModified available from listing directly
-        #   ContentType needs head object additional request per item
-        # s3_meta = (s3_client.head_object(Bucket=s3_bucket, Key=file_key) for file_key in s3_files)
-        # s3_meta = (file_meta["ResponseMetadata"]["HTTPHeaders"] for file_meta in s3_meta)
+        s3_files = list(s3_files)   # ensure generator is not pre-exhausted by following loop
         for file_meta in s3_files:  # type: MetadataResult
             file_key = file_meta.pop("Key")
             file_meta["Content-Location"] = f"{base_url}{file_key}"
-        return list(s3_files)
+        return s3_files
 
     s3_files = [file["Key"] for file in s3_files]
 
     # create directories in advance to avoid potential errors in case many workers try to generate the same one
     base_url = base_url.rstrip("/")
-    sub_dirs = {os.path.split(path)[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
+    sub_dirs = {os.path.split(str(path))[0] for path in s3_files if "://" not in path or path.startswith(base_url)}
     sub_dirs = [os.path.join(out_dir, path.replace(base_url, "").lstrip("/")) for path in sub_dirs]
     for _dir in reversed(sorted(sub_dirs)):
         os.makedirs(_dir, exist_ok=True)
@@ -3901,6 +3899,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
                    rename=None,             # type: Optional[Dict[AnyKey, Any]]
                    remove=None,             # type: Optional[List[AnyKey]]
                    add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   extend=None,             # type: Optional[Dict[AnyKey, Any]]
                    replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
                    replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
                    ):                       # type: (...) -> Dict[str, JSON]
@@ -3923,6 +3922,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     :param rename: rename matched fields key name to the associated value name.
     :param remove: remove matched fields by name.
     :param add: add or override the fields names with associated values.
+    :param extend: add or extend the fields names with associated values.
     :param replace_values: replace matched values by the associated new values regardless of field names.
     :param replace_func:
         Replace values under matched fields by name with the returned value from the associated function.
@@ -3933,6 +3933,7 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     rename = rename or {}
     remove = remove or []
     add = add or {}
+    extend = extend or {}
     replace_values = replace_values or {}
     replace_func = replace_func or {}
 
@@ -3948,6 +3949,17 @@ def transform_json(json_data,               # type: Dict[str, JSON]
     # add
     for k, v in add.items():
         json_data[k] = v
+
+    # extend
+    for k, v in extend.items():
+        v = v if isinstance(v, list) else [v]
+        if k in json_data:
+            if isinstance(json_data[k], list):
+                json_data[k].extend(v)
+            else:
+                json_data[k] = [json_data[k]] + v
+        else:
+            json_data[k] = v
 
     # replace values
     for key, value in json_data.items():

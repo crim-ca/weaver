@@ -116,7 +116,10 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
-    MULTI_PART_FORM = "multipart/form-data"
+    MULTIPART_ANY = "multipart/*"
+    MULTIPART_FORM = "multipart/form-data"      # data/file upload
+    MULTIPART_MIXED = "multipart/mixed"         # content of various types
+    MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
@@ -134,6 +137,7 @@ class ContentType(Constants):
     }
     ANY_CWL = {APP_CWL, APP_CWL_JSON, APP_CWL_YAML, APP_CWL_X}
     ANY_XML = {APP_XML, TEXT_XML}
+    ANY_MULTIPART = {MULTIPART_ANY, MULTIPART_FORM, MULTIPART_MIXED, MULTIPART_RELATED}
     ANY = "*/*"
 
 
@@ -445,14 +449,14 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
-    ContentType.APP_OCTET_STREAM: "",
+    ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
-    ContentType.MULTI_PART_FORM: "",
+    ContentType.MULTIPART_FORM: "",
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
     ContentType.APP_FORM,
-    ContentType.MULTI_PART_FORM,
+    ContentType.MULTIPART_FORM,
 ]
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
@@ -1155,8 +1159,8 @@ def json_default_handler(obj):
     raise TypeError(f"Type {type(obj)} not serializable.")
 
 
-def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
-    # type: (Any, bool, bool, Optional[int], **Any) -> Union[JSON, str, None]
+def repr_json(data, force_string=True, ensure_ascii=False, indent=2, separators=None, **kwargs):
+    # type: (Any, bool, bool, Optional[int], Optional[Tuple[str, str]], **Any) -> Union[JSON, str, None]
     """
     Ensure that the input data can be serialized as JSON to return it formatted representation as such.
 
@@ -1169,8 +1173,18 @@ def repr_json(data, force_string=True, ensure_ascii=False, indent=2, **kwargs):
         default = json_default_handler
     try:
         if isinstance(data, str):
-            return data  # avoid adding additional quotes
-        data_str = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii, default=default, **kwargs)
-        return data_str if force_string else data
+            try:
+                data = json.loads(data)
+            except ValueError:
+                return data.strip()  # avoid adding additional quotes
+        data_str = json.dumps(
+            data,
+            indent=indent,
+            ensure_ascii=ensure_ascii,
+            separators=separators,
+            default=default,
+            **kwargs,
+        )
+        return data_str.strip() if force_string else data
     except Exception:  # noqa: W0703 # nosec: B110
         return str(data)

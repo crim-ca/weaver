@@ -6,11 +6,5 @@
             "id": "files",
             "href": "https://mocked-file-server.com/test-file.txt"
         }
-    ],
-    "outputs": [
-        {
-            "id": "output",
-            "transmissionMode": "value"
-        }
     ]
 }

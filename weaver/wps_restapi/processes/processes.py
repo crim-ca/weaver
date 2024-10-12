@@ -446,6 +446,14 @@ def delete_local_process(request):
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_process_jobs_responses,
 )
+@sd.process_execution_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostProcessJobsEndpointJSON(),
+    # accept=ContentType.APP_JSON,  # allow anything for single-output or multipart combinations, validated downstream
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_process_jobs_responses,
+)
 @sd.process_jobs_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
     content_type=list(ContentType.ANY_XML),
@@ -454,19 +462,11 @@ def delete_local_process(request):
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_process_jobs_responses,
 )
-@sd.process_execution_service.post(
-    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-    content_type=ContentType.APP_JSON,
-    schema=sd.PostProcessJobsEndpointJSON(),
-    accept=ContentType.APP_JSON,
-    renderer=OutputFormat.JSON,
-    response_schemas=sd.post_process_jobs_responses,
-)
 @sd.process_jobs_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
     content_type=ContentType.APP_JSON,
     schema=sd.PostProcessJobsEndpointJSON(),
-    accept=ContentType.APP_JSON,
+    # accept=ContentType.APP_JSON,  # allow anything for single-output or multipart combinations, validated downstream
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_process_jobs_responses,
 )

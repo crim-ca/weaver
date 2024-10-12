@@ -209,10 +209,15 @@ class WorkerService(ServiceWPS):
         args = get_request_args(req)
         tags = args.get("tags", "").split(",") + ["xml", f"wps-{wps_request.version}"]
         data = wps2json_job_payload(wps_request, wps_process)
+        headers = dict(req.headers)
+        headers.update({
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+        })
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
             process=proc, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
-            language=wps_request.language, tags=tags, headers=dict(req.headers), context=ctx
+            language=wps_request.language, tags=tags, headers=headers, context=ctx
         )
         # enforced JSON results with submitted data that includes 'response=document'
         # use 'json_body' to work with any 'response' implementation

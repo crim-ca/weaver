@@ -205,6 +205,10 @@ Glossary
           More recent `Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
           multiple situations and contexts.
 
+        .. seealso::
+            - |iana-link|_
+            - |edam-link|_
+
     OAS
     OpenAPI
         OpenAPI Specification (`OAS`) defines a standard, programming language-agnostic interface description for

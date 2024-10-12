@@ -47,7 +47,6 @@ from tests.utils import (
     setup_test_file_hierarchy
 )
 from weaver import xml_util
-from weaver.execute import ExecuteControlOption, ExecuteMode
 from weaver.formats import ContentEncoding, ContentType, repr_json
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_PYWPS_IDS, STATUS_PYWPS_MAP, Status, StatusCompliant, map_status
 from weaver.utils import (
@@ -82,7 +81,6 @@ from weaver.utils import (
     null,
     parse_kvp,
     parse_number_with_unit,
-    parse_prefer_header_execute_mode,
     pass_http_error,
     request_extra,
     resolve_s3_from_http,
@@ -2112,37 +2110,6 @@ def test_localize_datetime():
 ])
 def test_parse_kvp(query, params, expected):
     result = parse_kvp(query, **params)
-    assert result == expected
-
-
-@pytest.mark.parametrize(["headers", "support", "expected"], [
-    # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
-    ({}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.SYNC, 10, {})),
-    ({"Prefer": ""}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.SYNC, 10, {})),
-    ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
-    ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
-    ({"Prefer": "wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.SYNC, 4, {"Preference-Applied": "wait=4"})),
-    ({"Prefer": "wait=20"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
-     (ExecuteMode.ASYNC, None, {})),  # larger than max time
-    # only supported async (enforced) - original behaviour
-    ({}, [ExecuteControlOption.ASYNC],
-     (ExecuteMode.ASYNC, None, {})),
-    ({"Prefer": ""}, [ExecuteControlOption.ASYNC],
-     (ExecuteMode.ASYNC, None, {})),
-    ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC],
-     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
-    ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC],
-     (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
-    ({"Prefer": "wait=4"}, [ExecuteControlOption.ASYNC],
-     (ExecuteMode.ASYNC, None, {})),
-])
-def test_prefer_header_execute_mode(headers, support, expected):
-    result = parse_prefer_header_execute_mode(headers, support)
     assert result == expected
 
 
