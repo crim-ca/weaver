@@ -28,7 +28,7 @@ from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
 from weaver.processes.builtin import get_builtin_reference_mapping
-from weaver.processes.constants import ProcessSchema
+from weaver.processes.constants import JobInputsOutputsSchema, ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
 from weaver.utils import fully_qualified_name, get_weaver_url, load_file
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
         AnyUUID,
         CWL,
         ExecutionResults,
+        JobStatusResponse,
         JSON,
         ProcessDeployment,
         ProcessDescription,
@@ -433,7 +434,7 @@ class WpsConfigBase(unittest.TestCase):
         return info  # type: ignore
 
     def _try_get_logs(self, status_url):
-        _resp = self.app.get(f"{status_url}/logs", headers=self.json_headers)
+        _resp = self.app.get(f"{status_url}/logs", headers=dict(self.json_headers))
         if _resp.status_code == 200:
             _text = "\n".join(_resp.json)
             return f"Error logs:\n{_text}"
@@ -442,8 +443,19 @@ class WpsConfigBase(unittest.TestCase):
     def fully_qualified_test_process_name(self, name=""):
         extra_name = f"-{name}" if name else ""
         class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}".replace(".", "-")
+        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
         return test_name
+
+    @overload
+    def monitor_job(self, status_url, **__):
+        # type: (str, **Any) -> ExecutionResults
+        ...
+
+    @overload
+    def monitor_job(self, status_url, return_status=False, **__):
+        # type: (str, Literal[True], **Any) -> JobStatusResponse
+        ...
 
     def monitor_job(self,
                     status_url,                         # type: str
@@ -452,7 +464,7 @@ class WpsConfigBase(unittest.TestCase):
                     return_status=False,                # type: bool
                     wait_for_status=None,               # type: Optional[str]
                     expect_failed=False,                # type: bool
-                    ):                                  # type: (...) -> ExecutionResults
+                    ):                                  # type: (...) -> Union[ExecutionResults, JobStatusResponse]
         """
         Job polling of status URL until completion or timeout.
 
@@ -500,12 +512,13 @@ class WpsConfigBase(unittest.TestCase):
         check_job_status(resp)
         if return_status or expect_failed:
             return resp.json
-        resp = self.app.get(f"{status_url}/results", headers=self.json_headers)
+        params = {"schema": JobInputsOutputsSchema.OGC}  # not strict to preserve old 'format' field
+        resp = self.app.get(f"{status_url}/results", params=params, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 
     def get_outputs(self, status_url):
-        resp = self.app.get(f"{status_url}/outputs", headers=self.json_headers)
+        resp = self.app.get(f"{status_url}/outputs", headers=dict(self.json_headers))
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"

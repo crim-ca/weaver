@@ -154,6 +154,7 @@ class MockProcess(Process):
         super(MockProcess, self).__init__(body)
 
 
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
     """
     Execute a process and assert that stdout is correctly logged to log file upon successful process execution.

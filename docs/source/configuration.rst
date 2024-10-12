@@ -325,7 +325,7 @@ they are optional and which default value or operation is applied in each situat
     default. Explicit response media-types can be requested in both cases using either an explicit ``Accept`` header
     of the desired media-type, or their corresponding ``f`` query format.
   |
-  | This option is Only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
+  | This option is only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
     always employed by default.
 
   .. versionadded:: 5.7.0
@@ -695,7 +695,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 
 - | ``weaver.quotation_docker_image = <image-reference>`` [:class:`str`]
   |
-  | Specifies the :term:`Docker` image used as |quote-estimator|_ to evaluate a :term:`Quote`
+  | Specifies the :term:`Docker` image used for :ref:`quote_estimation` to evaluate a :term:`Quote`
     for the eventual :term:`Process` execution.
   |
   | Required if ``weaver.quotation`` is enabled.
@@ -708,7 +708,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 
 - | ``weaver.quotation_docker_username = <username>`` [:class:`str`]
   |
-  | Username to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  | Username to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
   |
   | Only required if the :term:`Docker` image is not accessible publicly or already
     provided through some other means when requested by the :term:`Docker` daemon.
@@ -722,7 +722,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 
 - | ``weaver.quotation_docker_password = <username>`` [:class:`str`]
   |
-  | Password to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  | Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
   |
   | Only required if the :term:`Docker` image is not accessible publicly or already
     provided through some other means when requested by the :term:`Docker` daemon.
@@ -739,7 +739,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
   |
-  | It is up to the specified |quote-estimator|_ algorithm defined by ``weaver.quotation_docker_image`` and
+  | It is up to the specified :ref:`quote_estimation` algorithm defined by ``weaver.quotation_docker_image`` and
     employed by the various :term:`Process` to ensure that the returned :ref:`quote_estimation` cost makes
     sense according to the specified default currency.
   |
@@ -803,7 +803,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
 
 - | ``weaver.quotation_currency_token = <API access token>`` [:class:`str`]
   |
-  | Password to employ for authentication when retrieving the :term:`Docker` image used as |quote-estimator|_.
+  | Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
   |
   | Only required if the :term:`Docker` image is not accessible publicly or already
     provided through some other means when requested by the :term:`Docker` daemon.

@@ -12,14 +12,50 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of ``response: raw`` execution request body parameter as alternative to ``response: document``,
+  which allows directly returning the result contents or ``Link`` headers rather then embedding them in a `JSON`
+  response (fixes `#376 <https://github.com/crim-ca/weaver/issues/376>`_).
+- Add support of ``Prefer: return=minimal`` and ``Prefer: return=representation`` header as alternative method
+  to request the ``response: document`` and ``response: raw`` parameters
+  (fixes `#414 <https://github.com/crim-ca/weaver/issues/414>`_).
+  Minor differences exist according to supplied ``transmissionMode`` and the original data/link results.
+  See `Process Execution <file:///home/francis/dev/weaver/docs/build/html/processes.html#proc-op-execute>`_
+  documentation for details.
+- Add support of ``outputs`` execution request body parameter to filter returned outputs from
+  the ``GET /jobs/{jobId}/results`` (async) or returned directly (sync) from ``POST /processes/{processId}/execution``
+  (fixes `#380 <https://github.com/crim-ca/weaver/issues/380>_`).
+- Add support of ``Accept: multipart/*`` and ``Accept: multipart/mixed`` when submitting an execution to obtain
+  the results as multiple parts embedded within the response contents. Parts are represented with their default
+  data/link representation, unless overridden by corresponding ``transmissionMode`` per output ID.
+- Add ``output_links``/``-oL``/``--output-link`` parameter to Python client and CLI to retrieve ``Link`` headers
+  as `Job` results. Due to the multiple ``Link`` headers returned by `Job` results, this cannot be performed
+  automatically without the assumption of which ``rel`` links correspond to actual output IDs to extract.
+- Add ``output_filter``/``--oF``/``--output-filter`` parameter to Python client and CLI to indicate
+  any ``outputs`` to be filtered when submitting the `Process` execution.
+- Update ``Preference-Applied`` header reported by execution responses to
+  include ``return=minimal`` or ``return=representation`` as applicable by the requested ``Prefer`` header.
+- Update documentation with a mapping of *Process Execution Results* according to
+  submitted ``response`` body parameter (*OGC API - Processes v1.0*),
+  the ``Prefer: return`` header (*OGC API - Processes v2.0*), the requested ``Accept`` header,
+  and any relevant ``transmissionMode`` request body overrides per filtered ``outputs``.
 
 Fixes:
 ------
+- Fix ``GET /jobs/{jobId}/inputs`` contents to correctly return the submitted ``outputs`` definition
+  for `Process` execution (fixes `#715 <https://github.com/crim-ca/weaver/issues/715>`_).
+- Fix missing ``Link`` header with ``rel: monitor`` relationship in the created `Job` responses
+  (fixes `#596 <https://github.com/crim-ca/weaver/issues/596>`_).
+- Fix missing ``/rec/core/link-header`` definition in ``GET /conformance`` response reporting
+  that ``Link`` headers are returned for corresponding references of a given request
+  (fixes `#378 <https://github.com/crim-ca/weaver/issues/378>`_).
+- Fix ``transmissionMode: value`` that was ignored for ``response: document`` if the output was represented by default
+  as a *complex*  file URL, and ``transmissionMode: reference`` that was ignored if the output was *literal*  data.
+  The ``transmissionMode`` will now return the appropriate inline data or URL as requested.
 - Add missing conformance and requirement references for *OGC API - Processes - Part 2: DRU*
   (fixes `##620 <https://github.com/crim-ca/weaver/issues/620>`_).
 - Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
   (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
+- Fix S3 bucket storage for result file missing the output ID in the path to match local WPS output storage structure.
 
 .. _changes_5.9.0:
 

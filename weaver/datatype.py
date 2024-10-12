@@ -19,7 +19,7 @@ from decimal import ConversionSyntax, Decimal
 from io import BytesIO
 from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urljoin, urlparse
 
 import colander
@@ -37,8 +37,14 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, repr_json
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat, repr_json
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -63,6 +69,7 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_date_fmt,
     get_log_fmt,
+    get_path_kvp,
     get_settings,
     now,
     request_extra
@@ -80,7 +87,13 @@ if TYPE_CHECKING:
 
     from owslib.wps import WebProcessingService
 
-    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
+    from weaver.execute import (
+        AnyExecuteControlOption,
+        AnyExecuteMode,
+        AnyExecuteResponse,
+        AnyExecuteReturnPreference,
+        AnyExecuteTransmissionMode
+    )
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.quotation.status import AnyQuoteStatus
@@ -210,11 +223,14 @@ class AutoBase(DictBase):
     """
     def __new__(cls, *args, **kwargs):
         extra_props = set(dir(cls)) - set(dir(DictBase))
-        auto_cls = DictBase.__new__(cls, *args, **kwargs)
+        auto_cls = cast(
+            "AutoBase",
+            DictBase.__new__(cls, *args, **kwargs)
+        )
         for prop in extra_props:
             prop_func = property(
-                lambda self, key: dict.__getitem__(self, key),
-                lambda self, key, value: dict.__setattr__(self, key, value)
+                lambda self, key: dict.__getitem__(self, key),                  # type: ignore
+                lambda self, key, value: dict.__setattr__(self, key, value)     # type: ignore
             )
             default = getattr(auto_cls, prop, None)
             setattr(auto_cls, prop, prop_func)
@@ -898,7 +914,7 @@ class Job(Base, LoggerHandler):
         return "provider"
 
     def _get_inputs(self):
-        # type: () -> Optional[ExecutionInputs]
+        # type: () -> ExecutionInputs
         if self.get("inputs") is None:
             return {}
         return dict.__getitem__(self, "inputs")
@@ -908,19 +924,25 @@ class Job(Base, LoggerHandler):
         self["inputs"] = inputs
 
     # allows to correctly update list by ref using 'job.inputs.extend()'
-    inputs = property(_get_inputs, _set_inputs, doc="Input values and reference submitted for execution.")
+    inputs = property(
+        _get_inputs,  # type: ignore
+        _set_inputs,  # type: ignore
+        doc="Input values and reference submitted for execution.",
+    )
 
     def _get_outputs(self):
         # type: () -> Optional[ExecutionOutputs]
-        if self.get("outputs") is None:
-            return {}
-        return dict.__getitem__(self, "outputs")
+        return self.get("outputs")
 
     def _set_outputs(self, outputs):
         # type: (Optional[ExecutionOutputs]) -> None
         self["outputs"] = outputs
 
-    outputs = property(_get_outputs, _set_outputs, doc="Output transmission modes submitted for execution.")
+    outputs = property(
+        _get_outputs,  # type: ignore
+        _set_outputs,  # type: ignore
+        doc="Output transmission modes submitted for execution.",
+    )
 
     @property
     def user_id(self):
@@ -1002,6 +1024,18 @@ class Job(Base, LoggerHandler):
         self["subscribers"] = subscribers or None
 
     @property
+    def accept_type(self):
+        # type: () -> Optional[str]
+        return self.get("accept_type")
+
+    @accept_type.setter
+    def accept_type(self, content_type):
+        # type: (Optional[Union[str]]) -> None
+        if not isinstance(content_type, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_type'")
+        self["accept_type"] = content_type
+
+    @property
     def accept_language(self):
         # type: () -> Optional[str]
         return self.get("accept_language")
@@ -1059,6 +1093,27 @@ class Job(Base, LoggerHandler):
         self["execution_response"] = exec_resp
 
     @property
+    def execution_return(self):
+        # type: () -> AnyExecuteReturnPreference
+        ret = self.setdefault("execution_return", ExecuteReturnPreference.MINIMAL)  # almost equivalent to 'document'
+        if ret not in ExecuteReturnPreference.values():
+            ret = ExecuteReturnPreference.MINIMAL
+        self["execution_return"] = ret
+        return ret
+
+    @execution_return.setter
+    def execution_return(self, return_preference):
+        # type: (Optional[Union[AnyExecuteReturnPreference, str]]) -> None
+        if return_preference is None:
+            exec_ret = ExecuteReturnPreference.MINIMAL
+        else:
+            exec_ret = ExecuteReturnPreference.get(return_preference)
+        if exec_ret not in ExecuteReturnPreference:
+            return_prefs = list(ExecuteReturnPreference.values())
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_return'. Must be one of {return_prefs}")
+        self["execution_return"] = exec_ret
+
+    @property
     def is_local(self):
         # type: () -> bool
         return self.get("is_local", not self.service)
@@ -1109,7 +1164,7 @@ class Job(Base, LoggerHandler):
     created = LocalizedDateTimeProperty(default_now=True)
     started = LocalizedDateTimeProperty()
     finished = LocalizedDateTimeProperty()
-    updated = LocalizedDateTimeProperty(fget=_get_updated)
+    updated = LocalizedDateTimeProperty(fget=_get_updated)  # type: ignore
 
     @property
     def duration(self):
@@ -1169,7 +1224,11 @@ class Job(Base, LoggerHandler):
         self["results"] = results
 
     # allows to correctly update list by ref using 'job.results.extend()'
-    results = property(_get_results, _set_results, doc="Output values and references that resulted from execution.")
+    results = property(
+        _get_results,  # type: ignore
+        _set_results,  # type: ignore
+        doc="Output values and references that resulted from execution.",
+    )
 
     def _get_exceptions(self):
         # type: () -> List[Union[str, Dict[str, str]]]
@@ -1184,7 +1243,7 @@ class Job(Base, LoggerHandler):
         self["exceptions"] = exceptions
 
     # allows to correctly update list by ref using 'job.exceptions.extend()'
-    exceptions = property(_get_exceptions, _set_exceptions)
+    exceptions = property(_get_exceptions, _set_exceptions)  # type: ignore
 
     def _get_logs(self):
         # type: () -> List[str]
@@ -1199,7 +1258,7 @@ class Job(Base, LoggerHandler):
         self["logs"] = logs
 
     # allows to correctly update list by ref using 'job.logs.extend()'
-    logs = property(_get_logs, _set_logs)
+    logs = property(_get_logs, _set_logs)  # type: ignore
 
     def _get_tags(self):
         # type: () -> List[Optional[str]]
@@ -1214,7 +1273,7 @@ class Job(Base, LoggerHandler):
         self["tags"] = tags
 
     # allows to correctly update list by ref using 'job.tags.extend()'
-    tags = property(_get_tags, _set_tags)
+    tags = property(_get_tags, _set_tags)  # type: ignore
 
     @property
     def access(self):
@@ -1326,6 +1385,32 @@ class Job(Base, LoggerHandler):
         # type: (Optional[AnySettingsContainer]) -> str
         return self.job_url(container=container, extra_path="/results")
 
+    def result_path(self, job_id=None, output_id=None, file_name=None):
+        # type: (Optional[AnyUUID], Optional[str], Optional[str]) -> str
+        """
+        Obtains a *relative* result path, according to requested parameters and the :term:`Job` definition.
+
+        The generated path will automatically apply the relative job context if defined.
+
+        :param job_id: Override ID to employ for the job path. Otherwise, uses the usually job UUID by default.
+            This should be used for cases where the ID is "not yet" established by the job, or that an alternate
+            location based on a UUID established by another source must be employed.
+        :param output_id:
+            Output ID to refer to in the path. If omitted, the path prefix will stop at the job ID fragment.
+        :param file_name:
+            Output file name and extension to apply to the path. If omitted, the path prefix will stop at the output ID.
+        :return: Resolved *relative* result path.
+        """
+        result_job_id = str(job_id or self.id)
+        result_job_path = os.path.join(self.context, result_job_id) if self.context else result_job_id
+        if not output_id:
+            return result_job_path
+        result_job_path = os.path.join(result_job_path, output_id)
+        if not file_name:
+            return result_job_path
+        result_job_path = os.path.join(result_job_path, file_name)
+        return result_job_path
+
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
@@ -1338,6 +1423,7 @@ class Job(Base, LoggerHandler):
         :param self_link: name of a section that represents the current link that will be returned.
         """
         settings = get_settings(container)
+        html_on = settings.get("weaver.wps_restapi_html", True)
         base_url = get_wps_restapi_base_url(settings)
         job_url = self._job_url(base_url)  # full URL
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
@@ -1346,8 +1432,8 @@ class Job(Base, LoggerHandler):
         job_links = [
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
-            {"href": job_path, "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
-            {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+            {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,
+             "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
             {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
              "title": "List of submitted jobs."},
             {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
@@ -1355,6 +1441,19 @@ class Job(Base, LoggerHandler):
             {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
         ]
+        if html_on:
+            job_links.append({
+                "href": get_path_kvp(job_path, f=OutputFormat.HTML),
+                "rel": "alternate",
+                "title": "HTML Job Status",
+                "type": ContentType.TEXT_HTML,
+            })
+        if self_link in ["status", None]:
+            job_links.extend([
+                {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+
+            ])
+
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
             if job_status == Status.SUCCEEDED:
@@ -1388,7 +1487,8 @@ class Job(Base, LoggerHandler):
         job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": ContentType.APP_JSON, "hreflang": AcceptLanguage.EN_CA}
         for link in job_links:
-            link.update(link_meta)
+            for meta, parma in link_meta.items():
+                link.setdefault(meta, parma)
         return job_links
 
     def json(self, container=None):  # pylint: disable=W0221,arguments-differ
@@ -1421,7 +1521,7 @@ class Job(Base, LoggerHandler):
             "estimatedCompletion": None,
             "percentCompleted": self.progress,
             # new name as per OGC-API, enforced integer
-            # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+            # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
@@ -1442,6 +1542,7 @@ class Job(Base, LoggerHandler):
             "status_message": self.status_message,
             "status_location": self.status_location,
             "execution_response": self.execution_response,
+            "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
             "is_workflow": self.is_workflow,
             "created": self.created,
@@ -1459,6 +1560,7 @@ class Job(Base, LoggerHandler):
             "request": self.request,
             "response": self.response,
             "subscribers": self.subscribers,
+            "accept_type": self.accept_type,
             "accept_language": self.accept_language,
         }
 
@@ -1946,9 +2048,11 @@ class Process(Base):
         # type: (str) -> None
         self["id"] = _id
 
-    id = identifier = property(fget=_get_id, fset=_set_id, doc=(
-        "Unique process identifier with optional version number if it corresponds to an older revision."
-    ))
+    id = identifier = property(
+        _get_id,  # type: ignore
+        _set_id,  # type: ignore
+        doc="Unique process identifier with optional version number if it corresponds to an older revision.",
+    )
 
     @classmethod
     def split_version(cls, process_id):
@@ -2021,7 +2125,11 @@ class Process(Base):
         # type: (str) -> None
         self["abstract"] = description
 
-    description = abstract = property(fget=_get_desc, fset=_set_desc, doc="Process description.")
+    description = abstract = property(
+        fget=_get_desc,     # type: ignore
+        fset=_set_desc,     # type: ignore
+        doc="Process description.",
+    )
 
     @property
     def keywords(self):
