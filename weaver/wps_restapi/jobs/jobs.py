@@ -509,7 +509,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    resp = get_job_results_response(job, request)
+    resp = get_job_results_response(job, container=request)
     return resp
 
 

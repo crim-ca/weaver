@@ -8,7 +8,7 @@ bandit
 bump2version
 codacy-coverage
 coverage
-doc8>=0.8.1
+doc8>=1.1.2
 docformatter>=1.5.0     # add support of config file
 flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
 flynt
@@ -28,9 +28,12 @@ pytest-server-fixtures
 pytest-rerunfailures
 pydocstyle
 # FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
-pylint>=2.15.4,<3
+# FIXME: use temporary unofficial version working with pylint>3 (https://github.com/edaniszewski/pylint-quotes/pull/30)
+# pylint>=2.15.4,<3
+# pylint_quotes
+pylint>=3,<4
+pylint_quotes @ git+https://github.com/marekhanus/pylint-quotes.git@0.3.0a2
 pylint-per-file-ignores
-pylint_quotes
 responses
 safety
 stopit

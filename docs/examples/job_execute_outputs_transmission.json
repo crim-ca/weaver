@@ -1,0 +1,8 @@
+{
+  "inputs": {"<...>": "<...>"},
+  "outputs": {
+    "output-default": {},
+    "output-by-value": {"transmissionMode": "value"},
+    "output-by-ref": {"transmissionMode": "reference"}
+  }
+}

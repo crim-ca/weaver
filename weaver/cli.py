@@ -24,7 +24,7 @@ from yaml.scanner import ScannerError
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import PackageRegistrationError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
@@ -51,7 +51,7 @@ from weaver.utils import (
     import_target,
     load_file,
     null,
-    parse_kvp,
+    parse_link_header,
     request_extra,
     setup_loggers
 )
@@ -742,7 +742,6 @@ class WeaverClient(object):
 
         .. seealso::
             - :ref:`proc_op_deploy`
-            - |ogc-api-proc-part2|_
 
         :param process_id:
             Desired process identifier.
@@ -1175,6 +1174,7 @@ class WeaverClient(object):
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
                 output_refs=None,       # type: Optional[Iterable[str]]
+                output_filter=None,     # type: Optional[Sequence[str]]
                 output_context=None,    # type: Optional[str]
                 ):                      # type: (...) -> OperationResult
         """
@@ -1231,6 +1231,8 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_filter:
+            Indicates a list of outputs to omit from the results. If unspecified (default), all outputs are returned.
         :param output_context:
             Specify an output context for which the `Weaver` instance should attempt storing the :term:`Job` results
             under the nested location of its configured :term:`WPS` outputs. Note that the instance is not required
@@ -1252,8 +1254,7 @@ class WeaverClient(object):
             "mode": ExecuteMode.ASYNC,
             "inputs": values,
             "response": ExecuteResponse.DOCUMENT,
-            # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
-            "outputs": {}
+            "outputs": {},
         }
         if subscribers:
             LOGGER.debug("Adding job execution subscribers:\n%s", Lazify(lambda: repr_json(subscribers, indent=2)))
@@ -1268,17 +1269,19 @@ class WeaverClient(object):
         outputs = result.body.get("outputs")
         output_refs = set(output_refs or [])
         for output_id in outputs:
+            if output_filter and output_id in output_filter:
+                continue
             if output_id in output_refs:
                 # If any 'reference' is requested explicitly, must switch to 'response=raw'
                 # since 'response=document' ignores 'transmissionMode' definitions.
                 data["response"] = ExecuteResponse.RAW
                 # Use 'value' to have all outputs reported in body as 'value/href' rather than 'Link' headers.
-                out_mode = ExecuteTransmissionMode.REFERENCE
+                out_mode = {"transmissionMode": ExecuteTransmissionMode.REFERENCE}
             else:
-                # make sure to set value to outputs not requested as reference in case another one needs reference
-                # mode doesn't matter if no output by reference requested since 'response=document' would be used
-                out_mode = ExecuteTransmissionMode.VALUE
-            data["outputs"][output_id] = {"transmissionMode": out_mode}
+                out_mode = {}  # auto-resolution
+            data["outputs"][output_id] = out_mode
+        if not data["outputs"]:
+            data.pop("outputs")  # avoid no-output request
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         desc_url = self._get_process_url(base, process_id, provider_id)
@@ -1691,23 +1694,21 @@ class WeaverClient(object):
         # download links from headers
         LOGGER.debug("%s outputs in results link headers.", "Processing" if len(out_links) else "No")
         for _, link_header in ResponseHeaders(out_links).items():
-            link, params = link_header.split(";", 1)
-            href = link.strip("<>")
-            params = parse_kvp(params, multi_value_sep=None, accumulate_keys=False)
-            ctype = (params.get("type") or [None])[0]  # type: str
-            rel = params["rel"][0].split(".")
+            link = parse_link_header(link_header)
+            rel = link["rel"].rsplit(".", 1)
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
-            ref_path = fetch_reference(href, out_dir, auth=auth,
+            ref_path = fetch_reference(link["href"], out_dir, auth=auth,
                                        out_method=OutputMethod.COPY, out_listing=False)
-            value = {"href": href, "type": ctype, "path": ref_path, "source": "link"}  # type: ExecutionResultObjectRef
+            link = cast("ExecutionResultObjectRef", link)
+            link.update({"path": ref_path, "source": "link"})
             if output in outputs:
                 if isinstance(outputs[output], dict):  # in case 'rel="<output>.<index>"' was not employed
-                    outputs[output] = [outputs[output], value]
+                    outputs[output] = [outputs[output], link]
                 else:
-                    outputs[output].append(value)
+                    outputs[output].append(link)
             else:
-                outputs[output] = [value] if is_array else value
+                outputs[output] = [link] if is_array else link
         return outputs
 
     def results(self,
@@ -1722,6 +1723,7 @@ class WeaverClient(object):
                 request_timeout=None,   # type: Optional[int]
                 request_retries=None,   # type: Optional[int]
                 output_format=None,     # type: Optional[AnyOutputFormat]
+                output_links=None,      # type: Optional[Sequence[str]]
                 ):                      # type: (...) -> OperationResult
         """
         Obtain the results of a successful :term:`Job` execution.
@@ -1741,6 +1743,10 @@ class WeaverClient(object):
         :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
+        :param output_links:
+            Output IDs that are expected in ``Link`` headers, and that should be retrieved (or downloaded) as results.
+            This is not performed automatically since there can be a lot of ``Links`` in responses, and output IDs
+            could have conflicting ``rel`` names with other indicative links.
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -1752,6 +1758,11 @@ class WeaverClient(object):
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
+        headers = headers or {}
+        headers.update({
+            "Accept": ContentType.APP_JSON,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+        })
         resp = self._request("GET", result_url,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -1761,6 +1772,11 @@ class WeaverClient(object):
         outputs = res_out.body
         headers = res_out.headers
         out_links = res_out.links(["Link"])
+        out_links_meta = [(link, parse_link_header(link[-1])) for link in list(out_links.items())]
+        out_links = [
+            link for link, meta in out_links_meta
+            if not meta["href"].startswith(job_url) and meta["rel"] in (output_links or [])
+        ]
         if not res_out.success or not (isinstance(res_out.body, dict) or len(out_links)):  # pragma: no cover
             return OperationResult(False, "Could not retrieve any output results from job.", outputs, headers)
         if not download:
@@ -2758,10 +2774,6 @@ def make_parser():
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
     )
-    # FIXME: allow filtering 'outputs' (https://github.com/crim-ca/weaver/issues/380)
-    #   Only specified ones are returned, if none specified, return all.
-    # op_execute.add_argument(
-    #    "-O", "--output",
     op_execute.add_argument(
         "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", action="append",
         help=inspect.cleandoc("""
@@ -2780,6 +2792,14 @@ def make_parser():
 
             Example: ``-R output-one -R output-two``
         """)
+    )
+    op_execute.add_argument(
+        "-oF", "--output-filter", metavar="OUTPUT", dest="output_filter", nargs=1,
+        help=(
+            "Output ID to be omitted in the submitted process execution. "
+            "Subsequent results of the corresponding job will omit the specified output in the responses. "
+            "The option Can be specified multiple times for multiple outputs to be filtered out."
+        )
     )
     op_execute_output_context = op_execute.add_mutually_exclusive_group()
     op_execute_output_context.add_argument(
@@ -2931,6 +2951,12 @@ def make_parser():
         "-O", "--outdir", dest="out_dir",
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
+    )
+    # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
+    #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
+    op_results.add_argument(
+        "-oL", "--output-link", dest="output_links", nargs=1,
+        help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
     )
 
     op_upload = WeaverArgumentParser(

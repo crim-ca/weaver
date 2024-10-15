@@ -245,7 +245,7 @@ html_theme_options = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-# html_logo = None
+html_logo = "../_static/crim.png"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -313,7 +313,7 @@ html_sidebars = {
 # Sphinx supports the following languages:
 #   'da', 'de', 'en', 'es', 'fi', 'fr', 'hu', 'it', 'ja'
 #   'nl', 'no', 'pt', 'ro', 'ru', 'sv', 'tr'
-# html_search_language = 'en'
+html_search_language = "en"
 
 # A dictionary with options for the search language support, empty by default.
 # Now only 'ja' uses this config value
@@ -451,6 +451,9 @@ linkcheck_ignore = [
     #   - https://github.com/sphinx-doc/sphinx/issues/12030
     #   - https://github.com/orgs/sphinx-doc/discussions/12032
     "https://app.dimensions.ai/details/grant/grant.8105745",
+    # ignore links using archived web pages, which sometimes become unavailable briefly
+    # since using an archive, they are already using "last resort" references
+    "http[s]*://web.archive.org/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

@@ -51,6 +51,9 @@ complementary support of one-another features.
     of generated OpenAPI model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
+
+# pylint: disable=E0241,duplicate-bases
+
 import copy
 import inspect
 import re
@@ -2241,6 +2244,8 @@ class OneOfKeywordSchema(KeywordMapper):
         # not a single valid sub-node was found
         if self.missing is colander.drop:
             return colander.drop
+        if self.missing is None and cstruct in [None, colander.null]:
+            return None
 
         # add the invalid sub-errors to the parent oneOf for reporting each error case individually
         invalid = colander.Invalid(node=self, msg=message, value=cstruct)

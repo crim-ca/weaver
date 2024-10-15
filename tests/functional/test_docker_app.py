@@ -160,7 +160,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                     {"id": "file", "href": tmp_file.name},
                 ],
                 "outputs": [
-                    {"id": self.out_key, "transmissionMode": ExecuteTransmissionMode.VALUE},
+                    {"id": self.out_key, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             for mock_exec in mocked_execute_celery():
@@ -243,7 +243,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 status_url = resp.json["location"]
                 job_id = resp.json["jobID"]
             assert status_url
-            assert job_id
+            assert job_id  # pylint: disable=E0606
 
             if accept == ContentType.APP_XML:
                 wps_out_url = self.settings["weaver.wps_output_url"]
@@ -360,7 +360,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                     {"id": "cost", "value": cost}
                 ],
                 "outputs": [
-                    {"id": "quote", "transmissionMode": ExecuteTransmissionMode.VALUE},
+                    {"id": "quote", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             resp = mocked_sub_requests(self.app, "POST", path, json=body, headers=self.json_headers, only_local=True)
