@@ -39,7 +39,7 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
+from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -107,7 +107,7 @@ LOGGER = get_task_logger(__name__)
 
 def get_job_possible_output_formats(job):
     """
-    Based on job output media-type, retrieve transformer possibilities (conversions)
+    Based on job output media-type, retrieve transformer possibilities (conversions).
     """
     outputs = []
 
@@ -130,7 +130,7 @@ def get_link(output_id, mime_type, url):
 
 def get_all_possible_formats_links(request, job):
     """
-    Get direct links to all outputs in any possible format
+    Get direct links to all outputs in any possible format.
     """
     try:
         links = []
@@ -792,6 +792,15 @@ def generate_or_resolve_result(
             loc = url  # remote storage, S3, etc.
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+
+    out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
+
+    # Apply transform if type is different from desired output
+    if out is not None and out != typ:
+        file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+        typ = out
+        file_transform.get()
+        loc = file_transform.output_path
 
     if not url:
         out_dir = get_wps_output_dir(settings)
