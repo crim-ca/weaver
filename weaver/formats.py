@@ -116,6 +116,7 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
+    IMAGE_SVG_XML = "image/svg+xml"
     MULTIPART_ANY = "multipart/*"
     MULTIPART_FORM = "multipart/form-data"      # data/file upload
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
@@ -452,6 +453,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
+    ContentType.IMAGE_SVG_XML: ".svg",
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
