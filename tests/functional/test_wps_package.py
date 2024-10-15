@@ -3598,6 +3598,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         res_dedent = res_dedent.rstrip("\n ")  # last line often indented less because of closing multiline string
         return res_dedent
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3644,6 +3645,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_representation_complex(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3693,6 +3695,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_minimal_literal_accept_default(self):
         """
         For single requested  output, without ``Accept`` content negotiation, its default format is returned directly.
@@ -3746,6 +3749,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_minimal_literal_accept_json(self):
         """
         For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
@@ -3801,6 +3805,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_minimal_complex_accept_default(self):
         """
         For single requested  output, without ``Accept`` content negotiation, its default format is returned by link.
@@ -3880,6 +3885,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_minimal_complex_accept_json(self):
         """
         For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
@@ -3955,6 +3961,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_value_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -3999,6 +4006,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_value_complex(self):
         """
         Since value transmission is requested for a single output, its :term:`JSON` contents are returned directly.
@@ -4054,6 +4062,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_reference_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4113,6 +4122,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_reference_complex(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4172,6 +4182,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_multipart_accept_data(self):
         """
         Validate that requesting multipart for a single output is permitted.
@@ -4250,6 +4261,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_multipart_accept_link(self):
         """
         Validate that requesting multipart for a single output is permitted.
@@ -4326,6 +4338,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         }
 
     # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.oap_part1
     @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_multipart_accept_alt_format(self):
         """
@@ -4408,6 +4421,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.text == "{\"data\":\"test\"}"
 
     # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    @pytest.mark.oap_part1
     @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_response_document_alt_format_yaml(self):
         proc = "EchoResultsTester"
@@ -4484,6 +4498,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == "{\"data\":\"test\"}"
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_document_alt_format_json_raw_literal(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4555,6 +4570,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # assert result_json.content_type == ContentType.APP_JSON
         # assert result_json.json == {"data": "test"}
 
+    @pytest.mark.oap_part1
     def test_execute_single_output_response_document_default_format_json_special(self):
         """
         Validate that a :term:`JSON` output is directly embedded in a ``document`` response also using :term:`JSON`.
@@ -4631,6 +4647,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     @parameterized.expand([
         ContentType.MULTIPART_ANY,
         ContentType.MULTIPART_MIXED,
@@ -4724,6 +4741,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_multipart_accept_async_not_acceptable(self):
         """
         When executing the process asynchronously, ``Accept`` with multipart (strictly) is not acceptable.
@@ -4766,6 +4784,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "in": "headers",
             }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_multipart_accept_async_alt_acceptable(self):
         """
         When executing the process asynchronously, ``Accept`` with multipart and an alternative is acceptable.
@@ -4806,6 +4825,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_prefer_header_return_representation(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4881,6 +4901,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_value(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4954,6 +4975,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_reference_default_links(self):
         """
         All outputs resolved as reference (explicitly or inferred) with raw representation should be all Link headers.
@@ -5028,6 +5050,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_reference_accept_multipart(self):
         """
         Requesting ``multipart`` explicitly should return it instead of default ``Link`` headers response.
@@ -5115,6 +5138,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_mixed(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -5200,6 +5224,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_prefer_header_return_minimal_defaults(self):
         """
         Test ``Prefer: return=minimal`` with default ``transmissionMode`` resolutions for literal/complex outputs.
@@ -5264,6 +5289,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_prefer_header_return_minimal_override_transmission(self):
         """
         Test ``Prefer: return=minimal`` with ``transmissionMode`` overrides.
@@ -5344,6 +5370,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_document_defaults(self):
         """
         Test ``response: document`` with default ``transmissionMode`` resolutions for literal/complex outputs.
@@ -5408,6 +5435,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part1
     def test_execute_multi_output_response_document_mixed(self):
         """
         Test ``response: document`` with ``transmissionMode`` specified to force convertion of literal/complex outputs.
@@ -5484,6 +5512,18 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "type": ContentType.TEXT_PLAIN,
             },
         }
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_sync(self):
+        raise NotImplementedError  # FIMXE: POST /jobs with 'Prefer: wait=X' and return results directly
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_async(self):
+        raise NotImplementedError  # FIMXE: POST /jobs with 'Prefer: respond-asny' and GET /jobs/{jobId}/results
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_create_trigger(self):
+        raise NotImplementedError  # FIMXE: POST /jobs with 'status:create' and POST /jobs/{jobId}/results to trigger
 
 
 @pytest.mark.functional

@@ -283,6 +283,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             total += grouped_jobs["count"]
         assert total == response.json["total"]
 
+    @pytest.mark.oap_part1
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
@@ -324,6 +325,8 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
 
+    @pytest.mark.html
+    @pytest.mark.oap_part1
     @parameterized.expand([
         ({}, ),  # detail omitted should apply it for HTML, unlike JSON that returns the simplified listing by default
         ({"detail": None}, ),
@@ -349,6 +352,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         jobs = [line for line in resp.text.splitlines() if "job-list-item" in line]
         assert len(jobs) == 6
 
+    @pytest.mark.html
     def test_get_jobs_groups_html_unsupported(self):
         groups = ["process", "service"]
         path = get_path_kvp(sd.jobs_service.path, groups=groups)
@@ -426,6 +430,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         """
         self.template_get_jobs_valid_grouping_by_service_provider("provider")
 
+    @pytest.mark.oap_part1
     def test_get_jobs_links_navigation(self):
         """
         Verifies that relation links update according to context in order to allow natural navigation between responses.
@@ -545,6 +550,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
         assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=0" in links["last"]
 
+    @pytest.mark.oap_part1
     def test_get_jobs_page_out_of_range(self):
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         total = resp.json["total"]
@@ -609,8 +615,8 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         # verify the email is not in plain text
         job = self.job_store.fetch_by_id(job_id)
-        assert job.notification_email != email and job.notification_email is not None
-        assert decrypt_email(job.notification_email, self.settings) == email, "Email should be recoverable."
+        assert job.notification_email != email and job.notification_email is not None  # noqa
+        assert decrypt_email(job.notification_email, self.settings) == email, "Email should be recoverable."  # noqa
 
         # make sure that jobs searched using email are found with encryption transparently for the user
         path = get_path_kvp(sd.jobs_service.path, detail="true", notification_email=email)
@@ -620,6 +626,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.json["total"] == 1, "Should match exactly 1 email with specified literal string as query param."
         assert resp.json["jobs"][0]["jobID"] == job_id
 
+    @pytest.mark.oap_part1
     def test_get_jobs_by_type_process(self):
         path = get_path_kvp(sd.jobs_service.path, type="process")
         resp = self.app.get(path, headers=self.json_headers)
@@ -758,6 +765,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
+    @pytest.mark.oap_part1
     @parameterized.expand([
         get_path_kvp(
             sd.jobs_service.path,
@@ -861,9 +869,9 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
     def test_get_jobs_public_service_private_process_forbidden_access_in_query(self):
         """
-        NOTE:
-            it is up to the remote service to hide private processes
-            if the process is visible, the a job can be executed and it is automatically considered public
+        .. note::
+            It is up to the remote service to hide private processes.
+            If the process is visible, the job can be executed and it is automatically considered public.
         """
         path = get_path_kvp(sd.jobs_service.path,
                             service=self.service_public.name,
@@ -877,9 +885,9 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
     def test_get_jobs_public_service_no_processes(self):
         """
-        NOTE:
-            it is up to the remote service to hide private processes
-            if the process is invisible, no job should have been executed nor can be fetched
+        .. note::
+            It is up to the remote service to hide private processes.
+            If the process is invisible, no job should have been executed nor can be fetched.
         """
         path = get_path_kvp(sd.jobs_service.path,
                             service=self.service_public.name,
@@ -964,6 +972,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                 test_values = {"path": path, "access": access, "user_id": user_id}
                 self.assert_equal_with_jobs_diffs(job_result, job_expect, test_values, index=i)
 
+    @pytest.mark.oap_part1
     def test_jobs_list_with_limit_api(self):
         """
         Test handling of ``limit`` query parameter when listing jobs.
@@ -982,6 +991,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.json["limit"] == limit_parameter
         assert len(resp.json["jobs"]) <= limit_parameter
 
+    @pytest.mark.oap_part1
     def test_jobs_list_schema_not_required_fields(self):
         """
         Test that job listing query parameters for filtering results are marked as optional in OpenAPI schema.
@@ -1104,6 +1114,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             assert date_parser.parse(resp.json["created"]) >= date_parser.parse(datetime_after)
             assert date_parser.parse(resp.json["created"]) <= date_parser.parse(datetime_before)
 
+    @pytest.mark.oap_part1
     def test_get_jobs_datetime_match(self):
         """
         Test that only filtered jobs at a specific time are returned when ``datetime`` query parameter is provided.
@@ -1127,6 +1138,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             assert resp.content_type == ContentType.APP_JSON
             assert date_parser.parse(resp.json["created"]) == date_parser.parse(datetime_match)
 
+    @pytest.mark.oap_part1
     def test_get_jobs_datetime_invalid(self):
         """
         Test that incorrectly formatted ``datetime`` query parameter value is handled.
@@ -1144,6 +1156,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
 
+    @pytest.mark.oap_part1
     def test_get_jobs_datetime_interval_invalid(self):
         """
         Test that invalid ``datetime`` query parameter value is handled.
@@ -1161,6 +1174,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
 
+    @pytest.mark.oap_part1
     def test_get_jobs_datetime_before_invalid(self):
         """
         Test that invalid ``datetime`` query parameter value with a range is handled.
@@ -1177,6 +1191,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
 
+    @pytest.mark.oap_part1
     def test_get_jobs_duration_min_only(self):
         test = {"minDuration": 35}
         path = get_path_kvp(sd.jobs_service.path, **test)
@@ -1203,6 +1218,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         expect_jobs = [self.job_info[i].id for i in [8]]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
+    @pytest.mark.oap_part1
     def test_get_jobs_duration_max_only(self):
         test = {"maxDuration": 30}
         path = get_path_kvp(sd.jobs_service.path, **test)
@@ -1224,6 +1240,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         expect_jobs = [self.job_info[i].id for i in expect_idx]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
+    @pytest.mark.oap_part1
     def test_get_jobs_duration_min_max(self):
         # note: avoid range <35s for this test to avoid sudden dynamic duration of 9, 10 becoming within min/max
         test = {"minDuration": 35, "maxDuration": 60}
@@ -1249,6 +1266,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         result_jobs = resp.json["jobs"]
         assert len(result_jobs) == 0
 
+    @pytest.mark.oap_part1
     def test_get_jobs_duration_min_max_invalid(self):
         test = {"minDuration": 30, "maxDuration": 20}
         path = get_path_kvp(sd.jobs_service.path, **test)
@@ -1270,6 +1288,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422]
 
+    @pytest.mark.oap_part1
     def test_get_jobs_by_status_single(self):
         test = {"status": Status.SUCCEEDED}
         path = get_path_kvp(sd.jobs_service.path, **test)
@@ -1287,6 +1306,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         result_jobs = resp.json["jobs"]
         self.assert_equal_with_jobs_diffs(result_jobs, expect_jobs, test)
 
+    @pytest.mark.oap_part1
     def test_get_jobs_by_status_multi(self):
         test = {"status": f"{Status.SUCCEEDED},{Status.RUNNING}"}
         path = get_path_kvp(sd.jobs_service.path, **test)
@@ -1312,6 +1332,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert resp.json["value"]["status"] == status
         assert "status" in resp.json["cause"]
 
+    @pytest.mark.oap_part1
     def test_get_job_status_response_process_id(self):
         """
         Verify the processID value in the job status response.
@@ -1332,6 +1353,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
         assert resp.json["processID"] == "process-public"
 
+    @pytest.mark.oap_part1
     def test_get_job_invalid_uuid(self):
         """
         Test handling of invalid UUID reference to search job.
@@ -1350,6 +1372,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             assert resp.json["type"].endswith("no-such-job")
             assert "UUID" in resp.json["detail"]
 
+    @pytest.mark.oap_part1
     @mocked_dismiss_process()
     def test_job_dismiss_running_single(self):
         """
@@ -1388,6 +1411,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             assert resp.status_code == 410, "Job cannot be dismissed again."
             assert job.id in resp.json["value"]
 
+    @pytest.mark.oap_part1
     @mocked_dismiss_process()
     def test_job_dismiss_complete_single(self):
         """
@@ -1472,7 +1496,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
     def test_job_results_errors(self):
         """
-        Validate errors returned for a incomplete, failed or dismissed job when requesting its results.
+        Validate errors returned for an incomplete, failed or dismissed job when requesting its results.
         """
         job_accepted = self.make_job(
             task_id="1111-0000-0000-0000", process=self.process_public.identifier, service=None,
@@ -1637,6 +1661,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         with self.assertRaises(colander.Invalid):
             sd.Execute().deserialize({"outputs": {"random": {"transmissionMode": "bad"}}})
 
+    @pytest.mark.oap_part4
     def test_job_logs_formats(self):
         path = f"/jobs/{self.job_info[0].id}/logs"
         resp = self.app.get(path, headers=self.json_headers)
@@ -1703,6 +1728,7 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         assert "Process" in lines[1]
         assert "Complete" in lines[2]
 
+    @pytest.mark.oap_part4
     def test_job_logs_formats_unsupported(self):
         path = f"/jobs/{self.job_info[0].id}/logs"
         resp = self.app.get(path, headers={"Accept": ContentType.IMAGE_GEOTIFF}, expect_errors=True)
@@ -1742,7 +1768,28 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
             if job:
                 self.job_store.delete_job(job.id)
 
+    @pytest.mark.oap_part4
+    def test_job_inputs_response(self):
+        raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/734)
 
+    @pytest.mark.oap_part4
+    def test_job_outputs_response(self):
+        raise NotImplementedError  # FIXME
+
+    @pytest.mark.oap_part4
+    def test_job_run_response(self):
+        raise NotImplementedError  # FIXME
+
+    @pytest.mark.oap_part4
+    def test_job_run_response(self):
+        raise NotImplementedError  # FIXME
+
+    @pytest.mark.oap_part4
+    def test_job_update_response(self):
+        raise NotImplementedError  # FIXME
+
+
+@pytest.mark.oap_part1
 @pytest.mark.parametrize(
     ["results", "expected"],
     [
