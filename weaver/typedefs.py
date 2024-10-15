@@ -1,4 +1,3 @@
-import io
 from typing import TYPE_CHECKING  # pragma: no cover
 
 if TYPE_CHECKING:
