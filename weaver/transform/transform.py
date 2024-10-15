@@ -6,7 +6,6 @@ import shutil
 import tarfile
 import tempfile
 
-from markupsafe import escape
 import pandas as pd
 import xmltodict
 import yaml
@@ -16,6 +15,7 @@ from celery.utils.log import get_task_logger
 from fpdf import FPDF
 from json2xml import json2xml
 from json2xml.utils import readfromjson
+from markupsafe import escape
 from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
@@ -63,124 +63,124 @@ def exception_handler(func):
 
 
 @exception_handler
-def image_to_any(i, o):
+def image_to_any(i, out):
     # exit if no transformation needed
-    if os.path.splitext(i)[1] == os.path.splitext(o)[1]:
-        if not os.path.exists(o):
-            shutil.copy(i, o)
+    if os.path.splitext(i)[1] == os.path.splitext(out)[1]:
+        if not os.path.exists(out):
+            shutil.copy(i, out)
         return
 
     if is_tiff(i):
         tif = Tiff(i)
-        return images_to_any(tif.get_images(), o)
+        return images_to_any(tif.get_images(), out)
 
     if is_gif(i):
-        return images_to_any([Image.open(i).convert('RGB')], o)
+        return images_to_any([Image.open(i).convert("RGB")], out)
 
     if is_svg(i):
         png = f"{i}.png"
-        svg2png(open(i, 'rb').read(), write_to=open(png, 'wb'))
+        svg2png(open(i, "rb").read(), write_to=open(png, "wb"))
         i = png
 
-    return images_to_any([Image.open(i)], o)
+    return images_to_any([Image.open(i)], out)
 
 
-def images_to_any(ims, o):
+def images_to_any(ims, out):
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
-        _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_file_extension(o))
-        for im in ims:
-            clrs = im.getpixel((0, 0))
+        _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_file_extension(out))
+        for img in ims:
+            clrs = img.getpixel((0, 0))
             if not isinstance(clrs, tuple):
-                im = im.convert('RGB')
-                clrs = im.getpixel((0, 0))
+                img = img.convert("RGB")
+                clrs = img.getpixel((0, 0))
             if is_image(_o):
                 if is_png(_o) and len(clrs) == 3:
-                    im.putalpha(0)
-                    im.save(_o)
+                    img.putalpha(0)
+                    img.save(_o)
 
                 if not is_png(_o) and len(clrs) == 4:
-                    im.load()
-                    bg = Image.new("RGB", im.size, (255, 255, 255))
-                    bg.paste(im, mask=im.split()[3])
+                    img.load()
+                    bg = Image.new("RGB", img.size, (255, 255, 255))
+                    bg.paste(img, mask=img.split()[3])
                     bg.save(_o)
                 else:
-                    im.save(_o)
+                    img.save(_o)
 
             elif is_svg(_o):
-                width, height = im.size
+                width, height = img.size
                 basewidth = 300
                 if max(width, height) > basewidth:
-                    wpercent = basewidth / float(im.size[0])
-                    hsize = int((float(im.size[1]) * float(wpercent)))
-                    im = im.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+                    wpercent = basewidth / float(img.size[0])
+                    hsize = int((float(img.size[1]) * float(wpercent)))
+                    img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
                 if len(clrs) == 3:
-                    im.putalpha(0)
+                    img.putalpha(0)
 
-                write_content(_o, rgba_image_to_svg_contiguous(im))
+                write_content(_o, rgba_image_to_svg_contiguous(img))
             ret.append(_o)
 
         if len(ret) == 1:
-            shutil.copy(ret[0], o)
+            shutil.copy(ret[0], out)
         else:
-            if not o.endswith(".tar.gz"):
-                o += ".tar.gz"
+            if not out.endswith(".tar.gz"):
+                out += ".tar.gz"
 
-            with tarfile.open(o, "w:gz") as tar:
+            with tarfile.open(out, "w:gz") as tar:
                 for fn in ret:
                     p = os.path.join(tmp_path, fn)
                     tar.add(p, arcname=fn)
 
 
 @exception_handler
-def any_to_html(i, o):
+def any_to_html(i, out):
     try:
         if not is_image(i):
             content = get_content(i)
             # Escape and replace content in HTML
             html_content = HTML_CONTENT.replace("%CONTENT%", escape(content))  # Use escape from markupsafe
-            write_content(o, html_content)
+            write_content(out, html_content)
         else:
             jpg = f"{i}.jpg"
             image_to_any(i, jpg)
             with open(jpg, "rb") as img_file:
                 img_data = base64.b64encode(img_file.read()).decode("utf-8")  # Base64 encode the image content
-            write_content(o, HTML_CONTENT.replace("%CONTENT%", f'<img src="data:image/jpeg;base64,{img_data}" alt="Result" />'))
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")  # Print the error message
-        raise RuntimeError(f"Error processing file {i}: {str(e)}")
-
+            write_content(out, HTML_CONTENT.replace(
+                "%CONTENT%", f"<img src=\"data:image/jpeg;base64,{img_data}\" alt=\"Result\" />"))
+    except Exception as err:
+        print(f"An error occurred: {str(err)}")  # Print the error message
+        raise RuntimeError(f"Error processing file {i}: {str(err)}")
 
 
 @exception_handler
-def any_to_pdf(i, o):
+def any_to_pdf(i, out):
     image = Image.open(i) if is_image(i) else None
-    new_pdf = FPDF(orientation='P', unit='pt', format='A4')
+    new_pdf = FPDF(orientation="P", unit="pt", format="A4")
     if image is None:
         # If input is not an image, treat it as text
         new_pdf.add_page()
         new_pdf.set_font("Arial", size=12)
-        new_pdf.multi_cell(0, 10, txt=get_content(i), align='L')
+        new_pdf.multi_cell(0, 10, txt=get_content(i), align="L")
     else:
         if is_tiff(i):
             tiff = Tiff(i)
             ims = tiff.get_images()  # For TIFF files with multiple pages
         else:
-            ims = [image.convert('RGB')]
+            ims = [image.convert("RGB")]
 
         new_pdf.set_margins(10, 10)
 
         pdf_width = new_pdf.w - 20
         pdf_height = new_pdf.h - 20
 
-        for im in ims:
-            image_w, image_h = im.size
+        for img in ims:
+            image_w, image_h = img.size
 
             if image_w > image_h:
-                new_pdf.add_page(orientation='L')
+                new_pdf.add_page(orientation="L")
                 _w, _h = pdf_height, pdf_width
             else:
-                new_pdf.add_page(orientation='P')
+                new_pdf.add_page(orientation="P")
                 _w, _h = pdf_width, pdf_height
 
             # Scale image down to fit within the PDF page while keeping aspect ratio
@@ -198,97 +198,97 @@ def any_to_pdf(i, o):
 
             # Add the image to the PDF
             im_path = os.path.join(tempfile.gettempdir(), "temp_image.jpg")
-            im.save(im_path)  # Save image to temp path for FPDF
+            img.save(im_path)  # Save image to temp path for FPDF
             new_pdf.image(im_path, x=x_offset, y=y_offset, w=image_w, h=image_h)
 
-    new_pdf.output(o, 'F')
+    new_pdf.output(out, "F")
 
 
 @exception_handler
-def csv_to_json(i, o):
-    with open(i, encoding='utf-8') as csvf:
+def csv_to_json(i, out):
+    with open(i, encoding="utf-8") as csvf:
         csvReader = csv.DictReader(csvf)
 
-        for i in range(len(csvReader.fieldnames)):
-            if csvReader.fieldnames[i] == "":
-                csvReader.fieldnames[i] = f"unknown_{str(i)}"
+        for x in range(len(csvReader.fieldnames)):
+            if csvReader.fieldnames[x] == "":
+                csvReader.fieldnames[x] = f"unknown_{str(x)}"
 
         ret = []
         for rows in csvReader:
             ret.append({"data": rows})
         # datas = {"datas": ret}
-        write_content(o, {"datas": ret})
+        write_content(out, {"datas": ret})
 
 
 @exception_handler
-def csv_to_xml(i, o):
+def csv_to_xml(i, out):
     p = f"{i}.json"
     csv_to_json(i, p)
     data = readfromjson(p)
-    write_content(o, json2xml.Json2xml(data, item_wrap=False).to_xml())
+    write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
 
 
 @exception_handler
-def json_to_xml(i, o):
+def json_to_xml(i, out):
     data = readfromjson(i)
-    write_content(o, json2xml.Json2xml(data, item_wrap=False).to_xml())
+    write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
 
 
 @exception_handler
-def json_to_yaml(i, o):
-    with open(i, 'r') as file:
+def json_to_yaml(i, out):
+    with open(i, "r") as file:
         configuration = json.load(file)
-    with open(o, 'w') as yaml_file:
+    with open(out, "w") as yaml_file:
         yaml.dump(configuration, yaml_file)
 
 
 @exception_handler
-def yaml_to_json(i, o):
-    with open(i, 'r') as file:
+def yaml_to_json(i, out):
+    with open(i, "r") as file:
         configuration = yaml.safe_load(file)
-    with open(o, 'w') as json_file:
+    with open(out, "w") as json_file:
         json.dump(configuration, json_file)
 
 
 @exception_handler
-def json_to_csv(i, o):
-    with open(i, encoding='utf-8') as inputfile:
+def json_to_csv(i, out):
+    with open(i, encoding="utf-8") as inputfile:
         df = pd.read_json(inputfile)
-        df.to_csv(o, encoding='utf-8', index=False)
+        df.to_csv(out, encoding="utf-8", index=False)
 
 
 @exception_handler
-def xml_to_json(i, o):
-    write_content(o, xmltodict.parse(get_content(i)))
+def xml_to_json(i, out):
+    write_content(out, xmltodict.parse(get_content(i)))
 
 
 @exception_handler
-def html_to_txt(i, o):
-    write_content(o, ' '.join(BeautifulSoup(get_content(i), "html.parser").stripped_strings))
+def html_to_txt(i, out):
+    write_content(out, " ".join(BeautifulSoup(get_content(i), "html.parser").stripped_strings))
 
 
 @exception_handler
-def yaml_to_csv(i, o):
+def yaml_to_csv(i, out):
     yaml_to_json(i, f"{i}.json")
-    json_to_csv(f"{i}.json", o)
+    json_to_csv(f"{i}.json", out)
 
 
 @exception_handler
-def yaml_to_xml(i, o):
+def yaml_to_xml(i, out):
     yaml_to_json(i, f"{i}.json")
-    json_to_xml(f"{i}.json", o)
+    json_to_xml(f"{i}.json", out)
 
 
 @exception_handler
-def xml_to_yaml(i, o):
+def xml_to_yaml(i, out):
     xml_to_json(i, f"{i}.json")
-    json_to_yaml(f"{i}.json", o)
+    json_to_yaml(f"{i}.json", out)
 
 
 @exception_handler
-def csv_to_yaml(i, o):
+def csv_to_yaml(i, out):
     csv_to_json(i, f"{i}.json")
-    json_to_yaml(f"{i}.json", o)
+    json_to_yaml(f"{i}.json", out)
 
 
 class Transform:
@@ -387,14 +387,13 @@ class Transform:
             if not os.path.exists(self.output_path):
                 self.process()
             response = FileResponse(self.output_path)
-            response.headers['Content-Disposition'] = f"attachment;  filename={os.path.basename(self.output_path)}"
+            response.headers["Content-Disposition"] = f"attachment;  filename={os.path.basename(self.output_path)}"
             return response
-        except Exception as e:
+        except Exception as err:
             raise HTTPUnprocessableEntity(json={
                 "code": "JobOutputProcessingError",
                 "description": "An error occured while treating the output data",
-                "cause": str(e),
-                "error": type(e).__name__,
+                "cause": str(err),
+                "error": type(err).__name__,
                 "value": ""
             })
-

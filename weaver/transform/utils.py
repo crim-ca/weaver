@@ -10,7 +10,7 @@ LOGGER = get_task_logger(__name__)
 
 
 def is_image(i):
-    return i.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif', '.bmp', '.gif'))
+    return i.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif"))
 
 
 def is_svg(i):
