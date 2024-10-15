@@ -91,6 +91,7 @@ if TYPE_CHECKING:
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
+        AnySettingsContainer,
         AnyViewResponse,
         AnyValueType,
         CeleryResult,
@@ -754,7 +755,7 @@ def submit_job(request, reference, tags=None, process_id=None):
 
 def submit_job_handler(payload,             # type: ProcessExecution
                        settings,            # type: SettingsType
-                       service_url,         # type: str
+                       wps_url,             # type: str
                        provider=None,       # type: Optional[AnyServiceRef]
                        process=None,        # type: AnyProcessRef
                        is_workflow=False,   # type: bool
@@ -767,9 +768,11 @@ def submit_job_handler(payload,             # type: ProcessExecution
                        context=None,        # type: Optional[str]
                        ):                   # type: (...) -> AnyResponseType
     """
-    Submits the job to the Celery worker with provided parameters.
+    Parses parameters that defines the submitted :term:`Job`, and responds accordingly with the selected execution mode.
 
-    Assumes that parameters have been pre-fetched and validated, except for the :paramref:`payload`.
+    Assumes that parameters have been pre-fetched and validated, except for the :paramref:`payload` containing the
+    desired inputs and outputs from the :term:`Job`. The selected execution mode looks up the various combinations
+    of headers and body parameters available across :term:`API` implementations and revisions.
     """
     json_body = validate_job_schema(payload)
     db = get_db(settings)
@@ -820,25 +823,47 @@ def submit_job_handler(payload,             # type: ProcessExecution
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=job_status, process=process, service=provider_id,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
-                         execute_async=is_execute_async, execute_response=exec_resp, execute_return=exec_return,
+                         execute_async=is_execute_async, execute_wait=wait,
+                         execute_response=exec_resp, execute_return=exec_return,
                          custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
                          accept_type=accept_type, accept_language=language)
     job.save_log(logger=LOGGER, message=job_message, status=job_status, progress=0)
-
+    job.wps_url = wps_url
     job = store.update_job(job)
-    location_url = job.status_url(settings)
+
+    return submit_job_dispatch_task(job, headers=req_headers, container=settings)
+
+
+def submit_job_dispatch_task(
+    job,                # type: Job
+    *,                  # force named keyword arguments after
+    container,          # type: AnySettingsContainer
+    headers=None,       # type: AnyHeadersContainer
+):                      # type: (...) -> AnyResponseType
+    """
+    Submits the :term:`Job` to the :mod:`celery` worker with provided parameters.
+
+    Assumes that parameters have been pre-fetched, validated, and can be resolved from the :term:`Job`.
+    """
+    db = get_db(container)
+    store = db.get_store(StoreJobs)
+
+    location_url = job.status_url(container)
     resp_headers = {"Location": location_url}
-    resp_headers.update(applied)
+    req_headers = copy.deepcopy(headers or {})
 
     task_result = None  # type: Optional[CeleryResult]
+    job_pending_created = job.status == Status.CREATED
     if not job_pending_created:
-        wps_url = clean_ows_url(service_url)
+        wps_url = clean_ows_url(job.wps_url)
         task_result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)
         LOGGER.debug("Celery pending task [%s] for job [%s].", task_result.id, job.id)
-    if not job_pending_created and not is_execute_async:
-        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+
+    execute_sync = not job_pending_created and not job.execute_async
+    if execute_sync:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", job.execution_wait)
         try:
-            task_result.wait(timeout=wait)
+            task_result.wait(timeout=job.execution_wait)
         except CeleryTaskTimeoutError:
             pass
         if task_result.ready():
@@ -846,32 +871,45 @@ def submit_job_handler(payload,             # type: ProcessExecution
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
             if job.status == Status.SUCCEEDED:
+                _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
+                if sync_applied:
+                    resp_headers.update(sync_applied)
                 return get_job_results_response(
                     job,
                     request_headers=req_headers,
                     response_headers=resp_headers,
-                    container=settings,
+                    container=container,
                 )
             # otherwise return the error status
-            body = job.json(container=settings)
+            body = job.json(container=container)
             body["location"] = location_url
             resp = get_job_submission_response(body, resp_headers, error=True)
             return resp
         else:
-            LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
-            # sync not respected, therefore must drop it
-            # since both could be provided as alternative preferences, drop only async with limited subset
-            prefer = get_header("Preference-Applied", headers, pop=True)
-            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteControlOption.ASYNC])
-            if async_applied:
-                resp_headers.update(async_applied)
+            job.save_log(
+                logger=LOGGER,
+                level=logging.WARNING,
+                message=(
+                    f"Job requested as synchronous execution took too long to complete (wait={job.execution_wait}s). "
+                    "Will resume with asynchronous execution."
+                )
+            )
+            job = store.update_job(job)
+            execute_sync = False
+
+    if not execute_sync:
+        # either sync was not respected, therefore must drop it, or it was not requested at all
+        # since both could be provided as alternative preferences, drop only sync with limited subset
+        _, _, async_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.ASYNC])
+        if async_applied:
+            resp_headers.update(async_applied)
 
     LOGGER.debug("Celery task submitted to run async.")
     body = {
         "jobID": job.id,
         "processID": job.process,
-        "providerID": provider_id,  # dropped by validator if not applicable
-        "status": map_status(job_status),
+        "providerID": job.service,  # dropped by validator if not applicable
+        "status": map_status(job.status),
         "location": location_url,   # for convenience/backward compatibility, but official is Location *header*
     }
     resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
@@ -893,7 +931,7 @@ def update_job_parameters(job, request):
 def validate_job_json(request):
     # type: (Request) -> JSON
     """
-    Validates that the request contains valid :term:`JSON` conctens, but not ncessary valid against expected schema.
+    Validates that the request contains valid :term:`JSON` contents, but not necessary valid against expected schema.
 
     .. seealso::
         :func:`validate_job_schema`

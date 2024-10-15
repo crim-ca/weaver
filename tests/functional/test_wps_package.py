@@ -3980,7 +3980,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
 
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
@@ -4031,7 +4031,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4080,7 +4080,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4139,7 +4139,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4211,7 +4211,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4287,7 +4287,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4361,7 +4361,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4403,7 +4403,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == "{\"data\":\"test\"}"
 
@@ -4437,7 +4437,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4480,7 +4480,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == "{\"data\":\"test\"}"
 
@@ -4517,7 +4517,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4600,7 +4600,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" not in resp.headers
 
         # rely on location that should be provided to find the job ID
@@ -4676,7 +4676,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4757,7 +4757,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 406, f"Expected error. Instead got: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 406, f"Expected error. Instead got: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
             assert "Accept header" in resp.json["detail"]
             assert resp.json["value"] == ContentType.MULTIPART_MIXED
@@ -4800,7 +4800,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON, "Expect JSON instead of Multipart because of error."
             assert "status" in resp.json, "Expected a JSON Job Status response."
             assert "Preference-Applied" in resp.headers
@@ -4835,7 +4835,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4908,7 +4908,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4989,7 +4989,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5067,7 +5067,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5143,7 +5143,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5232,7 +5232,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5301,7 +5301,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5376,7 +5376,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5442,7 +5442,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -5598,7 +5598,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             proc_url = f"/processes/{self._testMethodName}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
 
@@ -5708,7 +5708,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             proc_url = f"/processes/{proc}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
-            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
 

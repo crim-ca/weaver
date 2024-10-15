@@ -179,8 +179,10 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                  ):                 # type: (...) -> Job
         if isinstance(created, str):
             created = date_parser.parse(created)
-        job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
-                                      execute_async=True, user_id=user_id, access=access, created=created)
+        job = self.job_store.save_job(
+            task_id=task_id, process=process, service=service, is_workflow=False, execute_async=True, user_id=user_id,
+            access=access, created=created
+            )
         job.status = status
         if status != Status.ACCEPTED:
             job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)

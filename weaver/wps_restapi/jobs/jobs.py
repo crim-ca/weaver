@@ -26,7 +26,13 @@ from weaver.formats import (
 )
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
-from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_handler, update_job_parameters
+from weaver.processes.execution import (
+    submit_job,
+    submit_job_dispatch_task,
+    submit_job_dispatch_wps,
+    submit_job_handler,
+    update_job_parameters
+)
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
@@ -285,7 +291,7 @@ def trigger_job_execution(request):
     raise_job_bad_status_locked(job, request)
     # FIXME: reuse job, adjust function or map parameters from attributes
     # FIXME: alt 202 code for accepted on async when triggered this way
-    return submit_job_handler(request, job)
+    return submit_job_dispatch_task(job, container=request)
 
 
 @sd.provider_job_service.get(

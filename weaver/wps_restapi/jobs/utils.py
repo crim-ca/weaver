@@ -1101,7 +1101,6 @@ def get_job_submission_response(body, headers, error=False):
             "Execution should begin when resources are available."
         )
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    headers.setdefault("Location", body["location"])
     return HTTPCreated(json=body, headerlist=headers)
 
 

@@ -175,6 +175,7 @@ class StoreJobs(StoreInterface):
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
                  execute_async=True,        # type: bool
+                 execute_wait=None,         # type: Optional[int]
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
                  execute_return=None,       # type: Optional[AnyExecuteReturnPreference]
                  custom_tags=None,          # type: Optional[List[str]]

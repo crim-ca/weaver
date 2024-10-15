@@ -770,8 +770,9 @@ class TestWeaverClient(TestWeaverClientBase):
 class TestWeaverCLI(TestWeaverClientBase):
     def setUp(self):
         super(TestWeaverCLI, self).setUp()
-        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process",
-                                      access=Visibility.PUBLIC)
+        job = self.job_store.save_job(
+            task_id="12345678-1111-2222-3333-111122223333", process="fake-process", access=Visibility.PUBLIC
+            )
         job.status = Status.SUCCEEDED
         self.test_job = self.job_store.update_job(job)
 
