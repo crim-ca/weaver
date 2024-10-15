@@ -29,16 +29,16 @@ def is_gif(i):
     return i.lower().endswith(".gif")
 
 
-def get_content(fp, t="r"):
-    with open(fp, t) as f:
+def get_content(file_path, mode="r"):
+    with open(file_path, mode, encoding="utf-8") as f:
         return f.read()
 
 
-def write_content(fp, content):
+def write_content(file_path, content):
     if isinstance(content, dict):
         content = json.dumps(content)
 
-    with open(fp, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
@@ -64,16 +64,17 @@ def write_images(images, output_file, ext="png"):
     with tempfile.TemporaryDirectory() as tmp_path:
         imgs = []
         for i, img in enumerate(images):
-            ip = f"{os.path.join(tmp_path, str(i).zfill(4))}.{ext}"
-            img.save(ip), imgs.append(img)
+            img_path = f"{os.path.join(tmp_path, str(i).zfill(4))}.{ext}"
+            img.save(img_path)
+            imgs.append(img)
 
         if len(imgs) > 1:
             if not output_file.endswith(".tar.gz"):
                 output_file += ".tar.gz"
 
             with tarfile.open(output_file, "w:gz") as tar:
-                for fn in os.listdir(tmp_path):
-                    p = os.path.join(tmp_path, fn)
-                    tar.add(p, arcname=fn)
+                for file_name in os.listdir(tmp_path):
+                    path = os.path.join(tmp_path, file_name)
+                    tar.add(path, arcname=file_name)
         else:
             shutil.copy(imgs[0], output_file)

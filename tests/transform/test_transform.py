@@ -26,15 +26,15 @@ def transform(f, cmt="", wmt=""):
         with tempfile.TemporaryDirectory() as tmp_path:
             shutil.copy(f, os.path.join(tmp_path, os.path.basename(f)))
             f = os.path.join(tmp_path, os.path.basename(f))
-            t = Transform(file_path=f, current_media_type=cmt, wanted_media_type=wmt)
-            assert isinstance(t.get(), FileResponse), f"{cmt} -> {wmt} {str(t['error'])}"
+            trans = Transform(file_path=f, current_media_type=cmt, wanted_media_type=wmt)
+            assert isinstance(trans.get(), FileResponse), f"{cmt} -> {wmt}"
             print(f"{cmt} -> {wmt} passed")
-            return t.output_path
-    except Exception as e:
+            return trans.output_path
+    except Exception as err:
         print(f"{cmt} -> {wmt} failed")
-        assert False, f"{os.path.splitext(f)[1]} -> {f} {str(e)}"
+        assert False, f"{os.path.splitext(f)[1]} -> {f} {str(err)}"
 
 
 def test_transformations():
-    for fn in os.listdir(TRANSFORM_PATH):
-        transform(os.path.join(TRANSFORM_PATH, fn))
+    for file_name in os.listdir(TRANSFORM_PATH):
+        transform(os.path.join(TRANSFORM_PATH, file_name))

@@ -18,14 +18,14 @@ def brighten_band(image_band: np.ndarray, alpha: float = 0.13, beta: float = 0.0
 
 class Tiff:
     def __init__(self, file_path):
-        self.fp = file_path
-        self.dataset = rasterio.open(self.fp)
+        self.file_path = file_path
+        self.dataset = rasterio.open(self.file_path)
 
         self.is_geotiff = self.dataset.crs is not None
 
         if not self.is_geotiff:
             try:
-                self.images = mtif.read_stack(self.fp)
+                self.images = mtif.read_stack(self.file_path)
                 self._images = self.images.copy()
             except Exception as ex:
                 if isinstance(ex, UnidentifiedImageError):
@@ -52,8 +52,8 @@ class Tiff:
             if index in self.range:
                 return self.dataset.read(index)
             return None
-        except KeyError as e:
-            raise RuntimeError(f"Failed to read data at index {index}") from e
+        except KeyError as err:
+            raise RuntimeError(f"Failed to read data at index {index}") from err
 
     def get_images(self, red_band: int = 1, green_band: int = 2, blue_band: int = 3):
         if self.is_geotiff:
@@ -70,8 +70,8 @@ class Tiff:
             return [Image.fromarray(array)]
         else:
             imlist = []
-            for m in self.images.pages:
-                imlist.append(Image.fromarray(m))
+            for page in self.images.pages:
+                imlist.append(Image.fromarray(page))
             return imlist
 
     def convert_to_png(self, output_file, red: int = 1, green: int = 2, blue: int = 3):

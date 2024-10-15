@@ -79,7 +79,10 @@ def image_to_any(i, out):
 
     if is_svg(i):
         png = f"{i}.png"
-        svg2png(open(i, "rb").read(), write_to=open(png, "wb"))
+        with open(i, "rb") as svg_file:
+            svg_data = svg_file.read()
+        with open(png, "wb") as png_file:
+            svg2png(svg_data, write_to=png_file)
         i = png
 
     return images_to_any([Image.open(i)], out)
@@ -101,9 +104,9 @@ def images_to_any(ims, out):
 
                 if not is_png(_o) and len(clrs) == 4:
                     img.load()
-                    bg = Image.new("RGB", img.size, (255, 255, 255))
-                    bg.paste(img, mask=img.split()[3])
-                    bg.save(_o)
+                    rbg = Image.new("RGB", img.size, (255, 255, 255))
+                    rbg.paste(img, mask=img.split()[3])
+                    rbg.save(_o)
                 else:
                     img.save(_o)
 
@@ -127,9 +130,9 @@ def images_to_any(ims, out):
                 out += ".tar.gz"
 
             with tarfile.open(out, "w:gz") as tar:
-                for fn in ret:
-                    p = os.path.join(tmp_path, fn)
-                    tar.add(p, arcname=fn)
+                for file_name in ret:
+                    path = os.path.join(tmp_path, file_name)
+                    tar.add(path, arcname=file_name)
 
 
 @exception_handler
@@ -207,24 +210,22 @@ def any_to_pdf(i, out):
 @exception_handler
 def csv_to_json(i, out):
     with open(i, encoding="utf-8") as csvf:
-        csvReader = csv.DictReader(csvf)
+        csv_reader = csv.DictReader(csvf)
 
-        for x in range(len(csvReader.fieldnames)):
-            if csvReader.fieldnames[x] == "":
-                csvReader.fieldnames[x] = f"unknown_{str(x)}"
-
+        for idx, fieldname in enumerate(csv_reader.fieldnames):
+            if fieldname == "":
+                csv_reader.fieldnames[idx] = f"unknown_{idx}"
         ret = []
-        for rows in csvReader:
+        for rows in csv_reader:
             ret.append({"data": rows})
-        # datas = {"datas": ret}
         write_content(out, {"datas": ret})
 
 
 @exception_handler
 def csv_to_xml(i, out):
-    p = f"{i}.json"
-    csv_to_json(i, p)
-    data = readfromjson(p)
+    file = f"{i}.json"
+    csv_to_json(i, file)
+    data = readfromjson(file)
     write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
 
 
@@ -236,25 +237,25 @@ def json_to_xml(i, out):
 
 @exception_handler
 def json_to_yaml(i, out):
-    with open(i, "r") as file:
+    with open(i, "r", encoding="utf-8") as file:
         configuration = json.load(file)
-    with open(out, "w") as yaml_file:
+    with open(out, "w", encoding="utf-8") as yaml_file:
         yaml.dump(configuration, yaml_file)
 
 
 @exception_handler
 def yaml_to_json(i, out):
-    with open(i, "r") as file:
+    with open(i, "r", encoding="utf-8") as file:
         configuration = yaml.safe_load(file)
-    with open(out, "w") as json_file:
+    with open(out, "w", encoding="utf-8") as json_file:
         json.dump(configuration, json_file)
 
 
 @exception_handler
 def json_to_csv(i, out):
-    with open(i, encoding="utf-8") as inputfile:
-        df = pd.read_json(inputfile)
-        df.to_csv(out, encoding="utf-8", index=False)
+    with open(i, encoding="utf-8") as file:
+        data_file = pd.read_json(file, encoding="utf-8")
+        data_file.to_csv(out, encoding="utf-8", index=False)
 
 
 @exception_handler

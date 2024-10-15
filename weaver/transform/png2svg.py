@@ -5,39 +5,39 @@ from io import StringIO
 from PIL import Image
 
 
-def add_tuple(a, b):
-    return tuple(map(operator.add, a, b))
+def add_tuple(first_tuple, second_tuple):
+    return tuple(map(operator.add, first_tuple, second_tuple))
 
 
-def sub_tuple(a, b):
-    return tuple(map(operator.sub, a, b))
+def sub_tuple(first_tuple, second_tuple):
+    return tuple(map(operator.sub, first_tuple, second_tuple))
 
 
-def neg_tuple(a):
-    return tuple(map(operator.neg, a))
+def neg_tuple(first_tuple):
+    return tuple(map(operator.neg, first_tuple))
 
 
 def direction(edge):
     return sub_tuple(edge[1], edge[0])
 
 
-def magnitude(a):
-    return int(pow(pow(a[0], 2) + pow(a[1], 2), .5))
+def magnitude(tpl):
+    return int(pow(pow(tpl[0], 2) + pow(tpl[1], 2), .5))
 
 
-def normalize(a):
-    mag = magnitude(a)
+def normalize(tpl):
+    mag = magnitude(tpl)
     assert mag > 0, "Cannot normalize a zero-length vector"
-    return tuple(map(operator.truediv, a, [mag] * len(a)))
+    return tuple(map(operator.truediv, tpl, [mag] * len(tpl)))
 
 
 def svg_header(width, height):
-    return """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    return f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="%d" height="%d"
+<svg width="{width}" height="{height}"
      xmlns="http://www.w3.org/2000/svg" version="1.1">
-""" % (width, height)
+"""
 
 
 def joined_edges(assorted_edges, keep_every_point=False):
@@ -77,21 +77,21 @@ def joined_edges(assorted_edges, keep_every_point=False):
     return pieces
 
 
-def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
+def rgba_image_to_svg_contiguous(img, opaque=None, keep_every_point=False):
     # collect contiguous pixel groups
 
     adjacent = ((1, 0), (0, 1), (-1, 0), (0, -1))
-    visited = Image.new("1", im.size, 0)
+    visited = Image.new("1", img.size, 0)
 
     color_pixel_lists = {}
 
-    width, height = im.size
+    width, height = img.size
     for x in range(width):
         for y in range(height):
             here = (x, y)
             if visited.getpixel(here):
                 continue
-            rgba = im.getpixel((x, y))
+            rgba = img.getpixel((x, y))
             if opaque and not rgba[3]:
                 continue
             piece = []
@@ -101,11 +101,11 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
                 here = queue.pop()
                 for offset in adjacent:
                     neighbour = add_tuple(here, offset)
-                    if not (0 <= neighbour[0] < width) or not (0 <= neighbour[1] < height):
+                    if not 0 <= neighbour[0] < width or not 0 <= neighbour[1] < height:
                         continue
                     if visited.getpixel(neighbour):
                         continue
-                    neighbour_rgba = im.getpixel(neighbour)
+                    neighbour_rgba = img.getpixel(neighbour)
                     if neighbour_rgba != rgba:
                         continue
                     queue.append(neighbour)
@@ -158,39 +158,39 @@ def rgba_image_to_svg_contiguous(im, opaque=None, keep_every_point=False):
         for assorted_edges in pieces:
             color_joined_pieces[color].append(joined_edges(assorted_edges, keep_every_point))
 
-    s = StringIO()
-    s.write(svg_header(*im.size))
+    str = StringIO()
+    str.write(svg_header(*img.size))
 
     for color, shapes in color_joined_pieces.items():
         for shape in shapes:
-            s.write(""" <path d=" """)
+            str.write(""" <path d=" """)
             for sub_shape in shape:
                 here = sub_shape.pop(0)[0]
-                s.write(""" M %d,%d """ % here)
+                str.write(f" M {here[0]},{here[1]} ")
                 for edge in sub_shape:
                     here = edge[0]
-                    s.write(""" L %d,%d """ % here)
-                s.write(""" Z """)
-            s.write(
+                    str.write(f" L {here[0]},{here[1]} ")
+                str.write(" Z ")
+            str.write(
                 f""" " style="fill:rgb{color[0:3]}; fill-opacity:{float(color[3]) / 255:.3f}; stroke:none;" />\n""")
 
-    s.write("""</svg>\n""")
-    return s.getvalue()
+    str.write("""</svg>\n""")
+    return str.getvalue()
 
 
-def rgba_image_to_svg_pixels(im, opaque=None):
-    s = StringIO()
-    s.write(svg_header(*im.size))
+def rgba_image_to_svg_pixels(img, opaque=None):
+    str = StringIO()
+    str.write(svg_header(*img.size))
 
-    width, height = im.size
+    width, height = img.size
     for x in range(width):
         for y in range(height):
             here = (x, y)
-            rgba = im.getpixel(here)
+            rgba = img.getpixel(here)
             if opaque and not rgba[3]:
                 continue
-            s.write(
-                """  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s;
-                  fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[0:3], float(rgba[2]) / 255))
-    s.write("""</svg>\n""")
-    return s.getvalue()
+            str.write(
+                    f"""  <rect x="{x}" y="{y}" width="1" height="1" style="fill:rgb{rgba[0:3]};
+                    fill-opacity:{float(rgba[2]) / 255:.3f}; stroke:none;" />\n""")
+    str.write("""</svg>\n""")
+    return str.getvalue()
