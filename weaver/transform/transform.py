@@ -313,74 +313,71 @@ class Transform:
         try:
             if self.output_path != self.file_path:
                 if "text/" in self.cmt:
-                    # Plain
-                    if "plain" in self.cmt:
-                        # to HTML
-                        if "html" in self.wmt:
-                            any_to_html(self.file_path, self.output_path)
-                        # to PDF
-                        if "pdf" in self.wmt:
-                            any_to_pdf(self.file_path, self.output_path)
-                    # HTML
-                    if "html" in self.cmt:
-                        # to Plain
-                        if "plain" in self.wmt:
-                            html_to_txt(self.file_path, self.output_path)
-                    # CSV
-                    if "csv" in self.cmt:
-                        # to JSON
-                        if "json" in self.wmt:
-                            csv_to_json(self.file_path, self.output_path)
-                        # to XML
-                        if "xml" in self.wmt:
-                            csv_to_xml(self.file_path, self.output_path)
-                        # to YAML
-                        if "yaml" in self.wmt:
-                            csv_to_yaml(self.file_path, self.output_path)
+                    self.process_text()
                 elif "application/" in self.cmt:
-
-                    # JSON
-                    if "json" in self.cmt:
-                        # to CSV
-                        if "csv" in self.wmt:
-                            json_to_csv(self.file_path, self.output_path)
-                        # to XML
-                        if "xml" in self.wmt:
-                            json_to_xml(self.file_path, self.output_path)
-                        # to YAML
-                        if "yaml" in self.wmt:
-                            json_to_xml(self.file_path, self.output_path)
-
-                    # YAML
-                    if "yaml" in self.cmt:
-                        # to CSV
-                        if "csv" in self.wmt:
-                            yaml_to_csv(self.file_path, self.output_path)
-                        # to JSON
-                        if "json" in self.wmt:
-                            yaml_to_json(self.file_path, self.output_path)
-                        # to XML
-                        if "xml" in self.wmt:
-                            yaml_to_xml(self.file_path, self.output_path)
-                    # XML
-                    if "xml" in self.cmt:
-                        # to JSON
-                        if "json" in self.wmt:
-                            xml_to_json(self.file_path, self.output_path)
-                        # to YAML
-                        if "yaml" in self.wmt:
-                            xml_to_yaml(self.file_path, self.output_path)
+                    self.process_application()
                 elif "image/" in self.cmt:
-                    # Potential conversion
-                    if "image/" in self.wmt:
-                        image_to_any(self.file_path, self.output_path)
-                        if not os.path.exists(self.output_path) and os.path.exists(f"{self.output_path}.tar.gz"):
-                            self.output_path += ".tar.gz"
-                    # PDF conversion
-                    if "pdf" in self.wmt:
-                        any_to_pdf(self.file_path, self.output_path)
-        except Exception:
-            raise
+                    self.process_image()
+        except Exception as e:
+            raise RuntimeError(f"Error processing file {self.file_path}: {str(e)}")
+
+    def process_text(self):
+        if "plain" in self.cmt:
+            if "html" in self.wmt:
+                any_to_html(self.file_path, self.output_path)
+            if "pdf" in self.wmt:
+                any_to_pdf(self.file_path, self.output_path)
+        if "html" in self.cmt:
+            if "plain" in self.wmt:
+                html_to_txt(self.file_path, self.output_path)
+        if "csv" in self.cmt:
+            self.process_csv()
+
+    def process_csv(self):
+        if "json" in self.wmt:
+            csv_to_json(self.file_path, self.output_path)
+        if "xml" in self.wmt:
+            csv_to_xml(self.file_path, self.output_path)
+        if "yaml" in self.wmt:
+            csv_to_yaml(self.file_path, self.output_path)
+
+    def process_application(self):
+        if "json" in self.cmt:
+            self.process_json()
+        if "yaml" in self.cmt:
+            self.process_yaml()
+        if "xml" in self.cmt:
+            self.process_xml()
+
+    def process_json(self):
+        if "csv" in self.wmt:
+            json_to_csv(self.file_path, self.output_path)
+        if "xml" in self.wmt:
+            json_to_xml(self.file_path, self.output_path)
+        if "yaml" in self.wmt:
+            json_to_yaml(self.file_path, self.output_path)
+
+    def process_yaml(self):
+        if "csv" in self.wmt:
+            yaml_to_csv(self.file_path, self.output_path)
+        if "json" in self.wmt:
+            yaml_to_json(self.file_path, self.output_path)
+        if "xml" in self.wmt:
+            yaml_to_xml(self.file_path, self.output_path)
+
+    def process_xml(self):
+        if "json" in self.wmt:
+            xml_to_json(self.file_path, self.output_path)
+        if "yaml" in self.wmt:
+            xml_to_yaml(self.file_path, self.output_path)
+
+    def process_image(self):
+        if "image/" in self.wmt:
+            image_to_any(self.file_path, self.output_path)
+            if not os.path.exists(self.output_path) and os.path.exists(f"{self.output_path}.tar.gz"):
+                self.output_path += ".tar.gz"
+        if "pdf" in self.wmt:
+            any_to_pdf(self.file_path, self.output_path)
 
     def get(self):
         # type:(...) -> FileResponse

@@ -24,6 +24,7 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_output_transmission,
     get_job_possible_output_formats,
     get_job_results_response,
+    get_job_results_single,
     get_results,
     get_schema_query,
     raise_job_bad_status,
@@ -436,11 +437,11 @@ def get_job_output(request):
     """
     Retrieve the output values resulting from a job execution.
     """
-    # TODO REMOVE settings = get_settings(request)
+    settings = get_settings(request)
     output_id = request.matchdict.get("output_id")
     # Get requested media-type. "*/*" if omit
     accept = str(request.accept) if request.accept else "*/*"
-
+    headers = request.headers
     job = get_job(request)
     possible_media_types = get_job_possible_output_formats(job)[0]["alternatives"][0]
     results = [o for o in job.results if str(o["identifier"]) == output_id]
@@ -470,15 +471,10 @@ def get_job_output(request):
         })
 
     is_reference = bool(get_any_value(result, key=True, file=True))
-    output_mode, output_format = get_job_output_transmission(job, output_id, is_reference)
+    _, output_format = get_job_output_transmission(job, output_id, is_reference)
+    output_format = accept | output_format | result_media_type
 
-    # output_format = en priorite accept | output format | result_media_type
-    # TODO handle appeler get_job_results_single dans la pr ouvert de francis au lieu de generate result
-
-    # res_headers, res_data = generate_or_resolve_result(
-    # job, result, output_id, output_id, output_mode, output_format, request)
-
-    return  # get_job_results_single (modifier pour ajouter flag bypass )
+    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 
 
 @sd.provider_results_service.get(

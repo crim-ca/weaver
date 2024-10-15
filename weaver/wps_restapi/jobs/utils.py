@@ -379,8 +379,6 @@ def make_result_link(
         links.append(link_header)
     return links
 
-# TODO A VOIR
-
 
 def get_results(  # pylint: disable=R1260
     job,                                # type: Job
