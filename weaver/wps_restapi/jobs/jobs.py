@@ -1,4 +1,3 @@
-import os
 from typing import TYPE_CHECKING
 
 from box import Box
@@ -15,15 +14,14 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.store.base import StoreJobs
-from weaver.transform.transform import Transform
-from weaver.utils import get_settings
-from weaver.wps.utils import get_wps_output_dir
+from weaver.utils import get_any_value, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
     get_all_possible_formats_links,
     get_job,
     get_job_list_links,
+    get_job_output_transmission,
     get_job_possible_output_formats,
     get_job_results_response,
     get_results,
@@ -404,39 +402,33 @@ def get_job_outputs(request):
 
 @sd.provider_result_value_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
-    renderer=OutputFormat.JSON,
     schema=sd.ProviderResultValueEndpoint(),
-    response_schemas=sd.FileResponseHeaders
+    response_schemas=sd.get_prov_result_responses
 )
 @sd.process_result_value_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    renderer=OutputFormat.JSON,
     schema=sd.ProcessResultValueEndpoint(),
-    response_schemas=sd.FileResponseHeaders
+    response_schemas=sd.get_proc_result_responses
 )
 @sd.job_result_value_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
-    renderer=OutputFormat.JSON,
     schema=sd.JobResultValueEndpoint(),
-    response_schemas=sd.FileResponseHeaders
+    response_schemas=sd.get_job_result_responses
 )
 @sd.provider_output_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    renderer=OutputFormat.JSON,
     schema=sd.ProviderAnyOutputEndpoint(),
-    response_schemas=sd.get_prov_output_responses
+    response_schemas=sd.get_prov_result_responses
 )
 @sd.process_output_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    renderer=OutputFormat.JSON,
     schema=sd.ProcessAnyOutputEndpoint(),
-    response_schemas=sd.FileResponseHeaders
+    response_schemas=sd.get_proc_result_responses
 )
 @sd.job_output_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    renderer=OutputFormat.JSON,
     schema=sd.JobAnyOutputEndpoint(),
-    response_schemas=sd.FileResponseHeaders
+    response_schemas=sd.get_job_result_responses
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_output(request):
@@ -444,27 +436,31 @@ def get_job_output(request):
     """
     Retrieve the output values resulting from a job execution.
     """
-    settings = get_settings(request)
+    # TODO REMOVE settings = get_settings(request)
     output_id = request.matchdict.get("output_id")
     # Get requested media-type. "*/*" if omit
     accept = str(request.accept) if request.accept else "*/*"
 
     job = get_job(request)
-    requested_media_types = get_job_possible_output_formats(job)[0]["alternatives"][0]
-
-    # Filtered by requested output_id
-    result_media_type = [o["mimeType"] for o in job.results if str(o["identifier"]) == output_id][0]
-
-    # if any format requested, we take the resulting one
-    frm = request.params.get("f")
-    if frm is not None:
-        accept = frm
-
-    if accept == "*/*":
-        accept = result_media_type
+    possible_media_types = get_job_possible_output_formats(job)[0]["alternatives"][0]
+    results = [o for o in job.results if str(o["identifier"]) == output_id]
+    if results:
+        result = results[0]
+    else:
+        raise HTTPNotFound(
+            json={
+                "code": "",
+                "description": "The requested output format is not in the possible output formats",
+                "cause": "Incompatible mime Types",
+                "error": "",
+                "value": ""
+            }
+        )
+    result_media_type = result["mimeType"]
+    result_media_type = guess_target_format(request, default=result_media_type)
 
     # if format requested not in possible mediatypes...
-    if accept not in requested_media_types:
+    if accept not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
             "description": "The requested output format is not in the possible output formats",
@@ -473,20 +469,16 @@ def get_job_output(request):
             "value": ""
         })
 
-    # Get resulting file
-    reference = [o["reference"] for o in job.results if str(o["identifier"]) == output_id][0]
-    res_file = os.path.join(get_wps_output_dir(settings), reference)
-    if not os.path.exists(res_file):
-        raise HTTPNotFound({
-            "code": "JobFileNotExists",
-            "description": f"{str(output_id)} - the job result does not exist (anymore)",
-            "cause": "Job File Not Exists",
-            "error": type(HTTPNotFound).__name__,
-            "value": ""
-        })
+    is_reference = bool(get_any_value(result, key=True, file=True))
+    output_mode, output_format = get_job_output_transmission(job, output_id, is_reference)
 
-    # Return resulting file transformed if necessary
-    return Transform(file_path=res_file, current_media_type=result_media_type, wanted_media_type=accept).get()
+    # output_format = en priorite accept | output format | result_media_type
+    # TODO handle appeler get_job_results_single dans la pr ouvert de francis au lieu de generate result
+
+    # res_headers, res_data = generate_or_resolve_result(
+    # job, result, output_id, output_id, output_mode, output_format, request)
+
+    return  # get_job_results_single (modifier pour ajouter flag bypass )
 
 
 @sd.provider_results_service.get(
