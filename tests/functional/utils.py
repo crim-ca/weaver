@@ -61,7 +61,21 @@ if TYPE_CHECKING:
     ReferenceType = Literal["deploy", "describe", "execute", "package", "quotation", "estimator"]
 
 
-class ResourcesUtil(object):
+class GenericUtils(unittest.TestCase):
+    def fully_qualified_test_name(self, name=""):
+        """
+        Generates a unique name using the current test method full context name and the provided name, if any.
+
+        Normalizes the generated name such that it can be used as a valid :term:`Process` or :term:`Service` ID.
+        """
+        extra_name = f"-{name}" if name else ""
+        class_name = fully_qualified_name(self)
+        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
+        return test_name
+
+
+class ResourcesUtil(GenericUtils):
     @classmethod
     def request(cls, method, url, *args, **kwargs):
         # type: (AnyRequestMethod, str, *Any, **Any) -> AnyResponseType
@@ -271,7 +285,7 @@ class ResourcesUtil(object):
         return proc_names
 
 
-class JobUtils(object):
+class JobUtils(GenericUtils):
     job_store = None
     job_info = None  # type: Iterable[Job]
 
@@ -316,7 +330,7 @@ class JobUtils(object):
         )
 
 
-class WpsConfigBase(unittest.TestCase):
+class WpsConfigBase(GenericUtils):
     json_headers = MappingProxyType({"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON})
     html_headers = MappingProxyType({"Accept": ContentType.TEXT_HTML})
     xml_headers = MappingProxyType({"Content-Type": ContentType.TEXT_XML})
@@ -439,13 +453,6 @@ class WpsConfigBase(unittest.TestCase):
             _text = "\n".join(_resp.json)
             return f"Error logs:\n{_text}"
         return ""
-
-    def fully_qualified_test_process_name(self, name=""):
-        extra_name = f"-{name}" if name else ""
-        class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
-        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
-        return test_name
 
     @overload
     def monitor_job(self, status_url, **__):

@@ -5,7 +5,6 @@ import logging
 import os
 import shutil
 import tempfile
-import unittest
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING
@@ -32,7 +31,7 @@ from tests.utils import (
 )
 from weaver.compat import Version
 from weaver.datatype import Job, Service
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.notify import decrypt_email
 from weaver.processes.wps_testing import WpsTestProcess
@@ -49,14 +48,14 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 
 if TYPE_CHECKING:
-    from typing import Iterable, List, Optional, Tuple, Union
+    from typing import Any, Iterable, List, Optional, Tuple, Union
 
     from weaver.status import AnyStatusType
     from weaver.typedefs import AnyLogLevel, JSON, Number, Statistics
     from weaver.visibility import AnyVisibility
 
 
-class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
+class WpsRestApiJobsTest(JobUtils):
     settings = {}
     config = None
 
@@ -161,13 +160,14 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                       user_id=self.user_editor1_id, status=Status.STARTED, progress=99, access=Visibility.PUBLIC)
 
     def make_job(self,
+                 *,                 # force keyword arguments
                  task_id,           # type: str
                  process,           # type: str
                  service,           # type: Optional[str]
-                 user_id,           # type: Optional[int]
                  status,            # type: AnyStatusType
                  progress,          # type: int
-                 access,            # type: AnyVisibility
+                 access=None,       # type: AnyVisibility
+                 user_id=None,      # type: Optional[int]
                  created=None,      # type: Optional[Union[datetime.datetime, str]]
                  offset=None,       # type: Optional[int]
                  duration=None,     # type: Optional[int]
@@ -176,13 +176,14 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                  statistics=None,   # type: Optional[Statistics]
                  tags=None,         # type: Optional[List[str]]
                  add_info=True,     # type: bool
+                 **job_params,      # type: Any
                  ):                 # type: (...) -> Job
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(
             task_id=task_id, process=process, service=service, is_workflow=False, execute_async=True, user_id=user_id,
-            access=access, created=created
-            )
+            access=access, created=created, **job_params
+        )
         job.status = status
         if status != Status.ACCEPTED:
             job.started = job.created + datetime.timedelta(seconds=offset if offset is not None else 0)
@@ -1770,23 +1771,170 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
 
     @pytest.mark.oap_part4
     def test_job_inputs_response(self):
-        raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/734)
+        path = f"/jobs/{self.job_info[0].id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["inputs"] == {"test": "data"}
+        assert resp.json["outputs"] == {"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
+        assert resp.json["headers"] == {
+            "Accept": None,
+            "Accept-Language": None,
+            "Content-Type": None,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "X-WPS-Output-Context": "public"
+        }
+        assert resp.json["mode"] == ExecuteMode.ASYNC
+        assert resp.json["response"] == ExecuteResponse.DOCUMENT
 
     @pytest.mark.oap_part4
     def test_job_outputs_response(self):
         raise NotImplementedError  # FIXME
 
     @pytest.mark.oap_part4
+    @pytest.mark.xfail(reason="CWL PROV not implemented (https://github.com/crim-ca/weaver/issues/673)")
     def test_job_run_response(self):
-        raise NotImplementedError  # FIXME
+        raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/673)
 
     @pytest.mark.oap_part4
-    def test_job_run_response(self):
-        raise NotImplementedError  # FIXME
+    def test_job_update_locked(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.RUNNING, progress=100, access=Visibility.PUBLIC,
+            inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+        )
+        path = f"/jobs/{new_job.id}"
+        body = {"inputs": {"test": 400}}
+        resp = self.app.patch(path, params=body, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 423
+        assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked"
 
     @pytest.mark.oap_part4
     def test_job_update_response(self):
-        raise NotImplementedError  # FIXME
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.CREATED, progress=100, access=Visibility.PUBLIC,
+            inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+        )
+
+        # check precondition job setup
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["inputs"] == {"test": "data"}
+        assert resp.json["outputs"] == {"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
+        assert resp.json["headers"] == {
+            "Accept": None,
+            "Accept-Language": None,
+            "Content-Type": None,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "X-WPS-Output-Context": None,
+        }
+        assert resp.json["mode"] == ExecuteMode.ASYNC
+        assert resp.json["response"] == ExecuteResponse.DOCUMENT
+
+        # modify job definition
+        path = f"/jobs/{new_job.id}"
+        body = {
+            "inputs": {"test": "modified", "new": 123},
+            "outputs": {"test": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
+        }
+        headers = {
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}; wait=5",
+        }
+        resp = self.app.patch(path, params=body, headers=headers)
+        assert resp.status_code == 204
+
+        # validate changes applied and resolved accordingly
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["inputs"] == {"test": "modified", "new": 123}
+        assert resp.json["outputs"] == {"test": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
+        assert resp.json["headers"] == {
+            "Accept": None,
+            "Accept-Language": None,
+            "Content-Type": None,
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "X-WPS-Output-Context": "public"
+        }
+        assert resp.json["mode"] == ExecuteMode.SYNC, "Should have been modified from 'wait' preference."
+        assert resp.json["response"] == ExecuteResponse.RAW, "Should have been modified from 'return' preference."
+
+    @pytest.mark.oap_part4
+    def test_job_status_alt_openeo_accept_response(self):
+        """
+        Validate retrieval of :term:`Job` status response with alternate value mapping by ``Accept`` header.
+        """
+        assert self.job_info[0].status == Status.SUCCEEDED, "Precondition invalid."
+        headers = {"Accept": "application/json; profile=openeo"}
+        path = f"/jobs/{self.job_info[0].id}"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.FINISHED
+
+        assert self.job_info[0].status == Status.FAILED, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.ERROR
+
+        assert self.job_info[9].status == Status.RUNNING, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.RUNNING
+
+        assert self.job_info[11].status == Status.ACCEPTED, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=headers)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.QUEUED
+
+    @pytest.mark.oap_part4
+    def test_job_status_alt_openeo_profile_response(self):
+        """
+        Validate retrieval of :term:`Job` status response with alternate value mapping by ``profile`` query parameter.
+        """
+        assert self.job_info[0].status == Status.SUCCEEDED, "Precondition invalid."
+        path = f"/jobs/{self.job_info[0].id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.FINISHED
+
+        assert self.job_info[0].status == Status.FAILED, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.ERROR
+
+        assert self.job_info[9].status == Status.RUNNING, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.RUNNING
+
+        assert self.job_info[11].status == Status.ACCEPTED, "Precondition invalid."
+        path = f"/jobs/{self.job_info[1].id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == "application/json; profile=openeo"
+        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["status"] == Status.QUEUED
 
 
 @pytest.mark.oap_part1

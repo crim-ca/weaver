@@ -2240,7 +2240,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     def test_execute_job_with_bbox(self):
         body = self.retrieve_payload("EchoBoundingBox", "deploy", local=True)
-        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        proc = self.fully_qualified_test_name(self._testMethodName)
         self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         data = self.retrieve_payload("EchoBoundingBox", "execute", local=True)
@@ -2276,7 +2276,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_execute_job_with_collection_input_geojson_feature_collection(self):
         name = "EchoFeatures"
         body = self.retrieve_payload(name, "deploy", local=True)
-        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        proc = self.fully_qualified_test_name(self._testMethodName)
         self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         with contextlib.ExitStack() as stack:
@@ -2331,7 +2331,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_execute_job_with_collection_input_ogc_features(self, filter_method, filter_lang, filter_value):
         name = "EchoFeatures"
         body = self.retrieve_payload(name, "deploy", local=True)
-        proc = self.fully_qualified_test_process_name(self._testMethodName)
+        proc = self.fully_qualified_test_name(self._testMethodName)
         self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
 
         with contextlib.ExitStack() as stack:
@@ -3601,7 +3601,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_representation_literal(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3648,7 +3648,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_prefer_header_return_representation_complex(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3701,7 +3701,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         For single requested  output, without ``Accept`` content negotiation, its default format is returned directly.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3755,7 +3755,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         For single requested  output, with ``Accept`` :term:`JSON` content negotiation, document response is returned.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3823,7 +3823,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_single_output_prefer_header_return_representation_complex`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3906,7 +3906,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
               using the ``response`` parameter at :term:`Job` execution time, as alternative method to ``Prefer``.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -3964,7 +3964,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_value_literal(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4015,7 +4015,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_json`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4065,7 +4065,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_reference_literal(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4125,7 +4125,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_response_raw_reference_complex(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4196,7 +4196,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_single_output_multipart_accept_alt_format`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4273,7 +4273,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_single_output_multipart_accept_alt_format`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4348,7 +4348,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output representation, based on the ``format`` definition.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4425,7 +4425,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_response_document_alt_format_yaml(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4501,7 +4501,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_single_output_response_document_alt_format_json_raw_literal(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4585,7 +4585,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_single_output_response_document_alt_format_json`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4661,7 +4661,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4754,7 +4754,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_multi_output_multipart_accept_async_alt_acceptable`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4797,7 +4797,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4828,7 +4828,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_multi_output_prefer_header_return_representation(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4904,7 +4904,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_value(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -4986,7 +4986,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_multi_output_response_raw_reference_accept_multipart`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5061,7 +5061,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             - :func:`test_execute_multi_output_multipart_accept_async_not_acceptable`
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5141,7 +5141,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
     @pytest.mark.oap_part1
     def test_execute_multi_output_response_raw_mixed(self):
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5230,7 +5230,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         Test ``Prefer: return=minimal`` with default ``transmissionMode`` resolutions for literal/complex outputs.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5299,7 +5299,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             embedded inline. However, this respects the *preference* vs *enforced* property requirements.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5376,7 +5376,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         Test ``response: document`` with default ``transmissionMode`` resolutions for literal/complex outputs.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5441,7 +5441,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         Test ``response: document`` with ``transmissionMode`` specified to force convertion of literal/complex outputs.
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
@@ -5514,16 +5514,224 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         }
 
     @pytest.mark.oap_part4
+    def test_execute_mismatch_process(self):
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        proc = "random-other-process"
+        proc_other = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_content = {
+            "process": f"https://localhost/processes/{p_id}",
+            "inputs": {"message": "test"}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{proc_other}/execution"  # mismatch on purpose
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["cause"] == {"name": "process", "in": "body"}
+
+    @pytest.mark.oap_part4
     def test_execute_jobs_sync(self):
-        raise NotImplementedError  # FIMXE: POST /jobs with 'Prefer: wait=X' and return results directly
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {
+            "Accept": ContentType.APP_JSON,  # response 'document' should be enough to use JSON, but make extra sure
+            "Content-Type": ContentType.APP_JSON,
+        }
+        exec_content = {
+            "process": f"https://localhost/processes/{p_id}",
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {
+                    "transmissionMode": ExecuteTransmissionMode.VALUE,  # force convert of the file reference
+                    "format": {"mediaType": ContentType.APP_JSON},      # request output format explicitly
+                }
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" not in resp.headers
+
+        # rely on location that should be provided to find the job ID
+        results_url = get_header("Content-Location", resp.headers)
+        assert results_url, (
+            "Content-Location should have been provided in"
+            "results response pointing at where they can be found."
+        )
+        job_id = results_url.rsplit("/results")[0].rsplit("/jobs/")[-1]
+        assert is_uuid(job_id), f"Failed to retrieve the job ID: [{job_id}] is not a UUID"
+        out_url = get_wps_output_url(self.settings)
+
+        # validate the results based on original execution request
+        results = resp
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results.json == {
+            "output_json": {
+                "mediaType": ContentType.APP_JSON,
+                "value": {"data": "test"},
+            }
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
 
     @pytest.mark.oap_part4
     def test_execute_jobs_async(self):
-        raise NotImplementedError  # FIMXE: POST /jobs with 'Prefer: respond-asny' and GET /jobs/{jobId}/results
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "process": f"https://localhost/processes/{p_id}",
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        job_id = status["jobID"]
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
 
     @pytest.mark.oap_part4
     def test_execute_jobs_create_trigger(self):
-        raise NotImplementedError  # FIMXE: POST /jobs with 'status:create' and POST /jobs/{jobId}/results to trigger
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        prefer_header = f"return={ExecuteReturnPreference.MINIMAL}, respond-async"
+        exec_headers = {
+            "Prefer": prefer_header
+        }
+        exec_headers.update(self.json_headers)
+        exec_content = {
+            "process": f"https://localhost/processes/{p_id}",
+            "status": "create",  # force wait until triggered
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {},
+                "output_data": {}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=exec_headers, only_local=True)
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert "Preference-Applied" in resp.headers
+            assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
+
+            status_url = resp.json["location"]
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.CREATED
+
+            job_id = status["jobID"]
+            res_path = f"/jobs/{job_id}/results"
+            res_headers = {
+                "Accept": ContentType.APP_JSON,
+            }
+            resp = mocked_sub_requests(self.app, "post_json", res_path, timeout=5,
+                                       data={}, headers=res_headers, only_local=True)
+            assert resp.status_code == 202, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+
+            status = self.monitor_job(status_url, return_status=True)
+            assert status["status"] == Status.SUCCEEDED
+
+        out_url = get_wps_output_url(self.settings)
+        results = self.app.get(f"/jobs/{job_id}/results")
+        results_json = self.remove_result_format(results.json)
+        assert results.content_type.startswith(ContentType.APP_JSON)
+        assert results_json == {
+            "output_data": "test",
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
+        outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
+        assert outputs.content_type.startswith(ContentType.APP_JSON)
+        assert outputs.json["outputs"] == {
+            "output_data": {
+                "value": "test"
+            },
+            "output_json": {
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
+            },
+        }
 
 
 @pytest.mark.functional
@@ -5817,7 +6025,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
         .. versionadded:: 6.0
         """
         proc = "EchoResultsTester"
-        p_id = self.fully_qualified_test_process_name(proc)
+        p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 

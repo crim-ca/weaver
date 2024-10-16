@@ -30,7 +30,6 @@ from weaver.processes.execution import (
     submit_job,
     submit_job_dispatch_task,
     submit_job_dispatch_wps,
-    submit_job_handler,
     update_job_parameters
 )
 from weaver.processes.utils import get_process

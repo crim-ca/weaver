@@ -986,7 +986,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             the expected authentication credentials. Re-running this test by itself validates if this case happened.
             Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1031,7 +1031,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         .. seealso::
             :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1073,7 +1073,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1151,7 +1151,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
