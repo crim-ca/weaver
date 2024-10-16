@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference
     from weaver.sort import AnySortType
-    from weaver.status import AnyStatusSearch
+    from weaver.status import AnyStatusSearch, AnyStatusType
     from weaver.typedefs import (
         AnyProcessRef,
         AnyServiceRef,
@@ -186,6 +186,7 @@ class StoreJobs(StoreInterface):
                  accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
+                 status=None,               # type: Optional[AnyStatusType]
                  ):                         # type: (...) -> Job
         raise NotImplementedError
 

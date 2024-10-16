@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from webtest import TestApp
 
+    from weaver.status import AnyStatusType
     from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
     from weaver.typedefs import (
         AnyRequestMethod,
@@ -469,7 +470,7 @@ class WpsConfigBase(GenericUtils):
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
                     return_status=False,                # type: bool
-                    wait_for_status=None,               # type: Optional[str]
+                    wait_for_status=None,               # type: Optional[AnyStatusType]
                     expect_failed=False,                # type: bool
                     ):                                  # type: (...) -> Union[ExecutionResults, JobStatusResponse]
         """
@@ -498,8 +499,11 @@ class WpsConfigBase(GenericUtils):
             # type: (AnyResponseType, bool) -> bool
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            final = Status.FAILED if expect_failed else Status.SUCCEEDED
-            statuses = [Status.ACCEPTED, Status.RUNNING, final] if running else [final]
+            if wait_for_status is None:
+                final_status = Status.FAILED if expect_failed else Status.SUCCEEDED
+            else:
+                final_status = wait_for_status
+            statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
             assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
             assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
             return body["status"] in {wait_for_status, Status.SUCCEEDED, Status.FAILED}  # break condition

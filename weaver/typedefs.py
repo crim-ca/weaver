@@ -377,7 +377,8 @@ if TYPE_CHECKING:
     AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
-    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException, JSON]
+    AnyResponseClass = Union[PyramidResponse, WebobResponse, HTTPException]
+    AnyViewResponse = Union[AnyResponseClass, JSON]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",

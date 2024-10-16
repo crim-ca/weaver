@@ -11,7 +11,14 @@ from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable, HTTPUnprocessableEntity, HTTPUnsupportedMediaType
+from pyramid.httpexceptions import (
+    HTTPAccepted,
+    HTTPBadRequest,
+    HTTPCreated,
+    HTTPNotAcceptable,
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
+)
 from pyramid_celery import celery_app as app
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
@@ -809,7 +816,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     req_headers = copy.deepcopy(headers or {})
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
-    job_pending_created = payload.get("status") == "create"
+    job_pending_created = json_body.get("status") == "create"
     if job_pending_created:
         job_status = Status.CREATED
         job_message = "Job created with pending trigger."
@@ -821,7 +828,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=job_status, process=process, service=provider_id,
+    job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
                          execute_async=is_execute_async, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
@@ -835,11 +842,12 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
 
 def submit_job_dispatch_task(
-    job,                # type: Job
-    *,                  # force named keyword arguments after
-    container,          # type: AnySettingsContainer
-    headers=None,       # type: AnyHeadersContainer
-):                      # type: (...) -> AnyResponseType
+    job,                    # type: Job
+    *,                      # force named keyword arguments after
+    container,              # type: AnySettingsContainer
+    headers=None,           # type: AnyHeadersContainer
+    force_submit=False,     # type: bool
+):                          # type: (...) -> AnyResponseType
     """
     Submits the :term:`Job` to the :mod:`celery` worker with provided parameters.
 
@@ -854,6 +862,16 @@ def submit_job_dispatch_task(
 
     task_result = None  # type: Optional[CeleryResult]
     job_pending_created = job.status == Status.CREATED
+    if job_pending_created and force_submit:
+        # preemptively update job status to avoid next
+        # dispatch steps ignoring submission to the worker
+        job.status = Status.ACCEPTED
+        job = store.update_job(job)
+        job_pending_created = False
+        response_class = HTTPAccepted
+    else:
+        response_class = HTTPCreated
+
     if not job_pending_created:
         wps_url = clean_ows_url(job.wps_url)
         task_result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)
@@ -913,7 +931,7 @@ def submit_job_dispatch_task(
         "location": location_url,   # for convenience/backward compatibility, but official is Location *header*
     }
     resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
-    resp = get_job_submission_response(body, resp_headers)
+    resp = get_job_submission_response(body, resp_headers, response_class=response_class)
     return resp
 
 

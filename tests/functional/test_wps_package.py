@@ -5687,6 +5687,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
+
+            # create the job, with pending status (not in worker processing queue)
             path = "/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
@@ -5695,9 +5697,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
             status_url = resp.json["location"]
-            status = self.monitor_job(status_url, return_status=True)
+            status = self.monitor_job(status_url, return_status=True, wait_for_status=Status.CREATED)
             assert status["status"] == Status.CREATED
 
+            # trigger the execution (submit the task to worker processing queue)
             job_id = status["jobID"]
             res_path = f"/jobs/{job_id}/results"
             res_headers = {
@@ -5706,7 +5709,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post_json", res_path, timeout=5,
                                        data={}, headers=res_headers, only_local=True)
             assert resp.status_code == 202, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.json["status"] == Status.ACCEPTED
 
+            # retrieve the execution status
             status = self.monitor_job(status_url, return_status=True)
             assert status["status"] == Status.SUCCEEDED
 

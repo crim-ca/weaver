@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference
     from weaver.processes.types import AnyProcessType
     from weaver.sort import AnySortType
-    from weaver.status import AnyStatusSearch
+    from weaver.status import AnyStatusSearch, AnyStatusType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import (
         AnyProcess,
@@ -802,6 +802,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
+                 status=None,               # type: Optional[AnyStatusType]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -821,6 +822,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             if not access:
                 access = Visibility.PRIVATE
 
+            status = map_status(Status.get(status, default=Status.ACCEPTED))
             process = process.id if isinstance(process, Process) else process
             service = service.id if isinstance(service, Service) else service
             new_job = Job({
@@ -830,7 +832,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "process": process,     # process identifier (WPS request)
                 "inputs": inputs,
                 "outputs": outputs,
-                "status": map_status(Status.ACCEPTED),
+                "status": status,
                 "execution_mode": execute_mode,
                 "execution_wait": execute_wait,
                 "execution_response": execute_response,

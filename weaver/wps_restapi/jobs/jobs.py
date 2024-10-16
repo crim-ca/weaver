@@ -4,6 +4,7 @@ from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
+    HTTPAccepted,
     HTTPBadRequest,
     HTTPOk,
     HTTPNoContent,
@@ -288,9 +289,7 @@ def trigger_job_execution(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     raise_job_bad_status_locked(job, request)
-    # FIXME: reuse job, adjust function or map parameters from attributes
-    # FIXME: alt 202 code for accepted on async when triggered this way
-    return submit_job_dispatch_task(job, container=request)
+    return submit_job_dispatch_task(job, container=request, force_submit=True)
 
 
 @sd.provider_job_service.get(

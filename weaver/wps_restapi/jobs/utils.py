@@ -68,7 +68,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+    from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding
@@ -77,6 +77,7 @@ if TYPE_CHECKING:
         AnyDataStream,
         AnyHeadersContainer,
         AnyRequestType,
+        AnyResponseClass,
         AnyResponseType,
         AnySettingsContainer,
         AnyValueType,
@@ -1053,8 +1054,12 @@ def get_job_results_multipart(job, results, *, headers, settings):
     return resp
 
 
-def get_job_submission_response(body, headers, error=False):
-    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated, HTTPBadRequest]
+def get_job_submission_response(
+    body,                   # type: JSON
+    headers,                # type: AnyHeadersContainer
+    error=False,            # type: bool
+    response_class=None,    # type: Optional[Type[AnyResponseClass]]
+):                          # type: (...) -> Union[AnyResponseClass, HTTPBadRequest]
     """
     Generates the response contents returned by :term:`Job` submission process.
 
@@ -1083,7 +1088,7 @@ def get_job_submission_response(body, headers, error=False):
             http_class = HTTPBadRequest
             http_desc = sd.FailedSyncJobResponse.description
         else:
-            http_class = HTTPOk
+            http_class = response_class or HTTPOk
             http_desc = sd.CompletedJobResponse.description
             body = sd.CompletedJobStatusSchema().deserialize(body)
 
@@ -1101,7 +1106,8 @@ def get_job_submission_response(body, headers, error=False):
             "Execution should begin when resources are available."
         )
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(json=body, headerlist=headers)
+    http_class = response_class or HTTPCreated
+    return http_class(json=body, headerlist=headers)
 
 
 def validate_service_process(request):
