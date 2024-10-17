@@ -15,6 +15,7 @@ from pyramid.httpexceptions import (
     HTTPAccepted,
     HTTPBadRequest,
     HTTPCreated,
+    HTTPException,
     HTTPNotAcceptable,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
@@ -28,6 +29,7 @@ from weaver.execute import (
     ExecuteControlOption,
     ExecuteMode,
     parse_prefer_header_execute_mode,
+    parse_prefer_header_return,
     update_preference_applied_return_header
 )
 from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
@@ -43,6 +45,7 @@ from weaver.processes.convert import (
     ows2json_output_data
 )
 from weaver.processes.types import ProcessType
+from weaver.processes.utils import get_process
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -943,7 +946,101 @@ def update_job_parameters(job, request):
     body = validate_job_json(request)
     body = validate_job_schema(body, sd.PatchJobBodySchema)
 
-    raise NotImplementedError  # FIXME: implement
+    value = field = loc = None
+    job_process = get_process(job.process)
+    try:
+        loc = "body"
+        if "process" in body:
+            # note: don't use 'get_process' for input process, as it might not even exist!
+            req_process_url = body["process"]
+            req_process_id = body["process"].rsplit("/processes/", 1)[-1]
+            if req_process_id != job_process.id or req_process_url != job_process.processDescriptionURL:
+                raise HTTPBadRequest(
+                    json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                        "type": "InvalidJobUpdate",
+                        "title": "Invalid Job Execution Update",
+                        "detail": "Update of the reference process for the job execution is not permitted.",
+                        "status": HTTPBadRequest.code,
+                        "cause": {"name": "process", "in": loc},
+                        "value": repr_json({
+                            "body.process": body["process"],
+                            "job.process": job_process.processDescriptionURL,
+                        }, force_string=False),
+                    })
+                )
+
+        for node in sd.PatchJobBodySchema().children:
+            field = node.name
+            if not field or field not in body:
+                continue
+            if field in ["subscribers", "notification_email"]:
+                continue  # will be handled simultaneously after
+
+            value = body[field]  # type: ignore
+            if node.name in job:
+                setattr(job, field, value)
+            elif f"execution_{field}" in job:
+                field = f"execution_{field}"
+                if field == "execution_mode" and value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
+                    job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                    if job_ctrl_exec not in job_process.jobControlOptions:
+                        raise HTTPBadRequest(
+                            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                                "type": "InvalidJobUpdate",
+                                "title": "Invalid Job Execution Update",
+                                "detail": "Update of job execution mode is not permitted by process jobControlOptions.",
+                                "status": HTTPBadRequest.code,
+                                "cause": {"name": "mode", "in": loc},
+                                "value": repr_json(
+                                    {
+                                        "process.jobControlOptions": job_process.jobControlOptions,
+                                        "job.mode": job_ctrl_exec,
+                                    }, force_string=False
+                                ),
+                            })
+                        )
+
+                setattr(job, field, value)
+
+        settings = get_settings(request)
+        subscribers = map_job_subscribers(body, settings=settings)
+        if not subscribers and body.get("subscribers") == {}:
+            subscribers = {}  # asking to remove all subscribers explicitly
+        if subscribers is not None:
+            job.subscribers = subscribers
+
+        # for both 'mode' and 'response'
+        # if provided both in body and corresponding 'Prefer' header parameter, the body parameter takes precedence
+        # however, if provided only in header, allow override of the body parameter considered as "higher priority"
+        loc = "header"
+        if "mode" not in body:
+            mode, wait, _ = parse_prefer_header_execute_mode(request.headers, job_process.jobControlOptions)
+            job.execution_mode = mode
+            job.execution_wait = wait
+        if "response" in body:
+            job_return = parse_prefer_header_return(request.headers)
+            if job_return:
+                job.execution_return = job_return
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidJobUpdate",
+                "title": "Invalid Job Execution Update",
+                "detail": "Could not update the job execution definition using specified parameters.",
+                "status": HTTPUnprocessableEntity.code,
+                "error": type(exc),
+                "cause": {"name": field, "in": loc},
+                "value": repr_json(value, force_string=False),
+            })
+        )
+
+    LOGGER.info("Updating %s", job)
+    db = get_db(request)
+    store = db.get_store(StoreJobs)
+    store.update_job(job)
 
 
 def validate_job_json(request):

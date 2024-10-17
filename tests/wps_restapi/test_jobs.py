@@ -30,7 +30,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.compat import Version
-from weaver.datatype import Job, Service
+from weaver.datatype import Job, Process, Service
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.notify import decrypt_email
@@ -1804,7 +1804,7 @@ class WpsRestApiJobsTest(JobUtils):
         )
         path = f"/jobs/{new_job.id}"
         body = {"inputs": {"test": 400}}
-        resp = self.app.patch(path, params=body, headers=self.json_headers, expect_errors=True)
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 423
         assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked"
 
@@ -1812,8 +1812,9 @@ class WpsRestApiJobsTest(JobUtils):
     def test_job_update_response(self):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
-            status=Status.CREATED, progress=100, access=Visibility.PUBLIC,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
             inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+            subscribers={"successUri": "https://example.com/random"},
         )
 
         # check precondition job setup
@@ -1837,29 +1838,61 @@ class WpsRestApiJobsTest(JobUtils):
         body = {
             "inputs": {"test": "modified", "new": 123},
             "outputs": {"test": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}},
+            "subscribers": {
+                "successUri": "https://example.com/success",
+                "failedUri": "https://example.com/failed",
+            },
         }
         headers = {
             "Accept": ContentType.APP_JSON,
             "Content-Type": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}; wait=5",
         }
-        resp = self.app.patch(path, params=body, headers=headers)
+        resp = self.app.patch_json(path, params=body, headers=headers)
         assert resp.status_code == 204
 
         # validate changes applied and resolved accordingly
+        path = f"/jobs/{new_job.id}/inputs"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "modified", "new": 123}
         assert resp.json["outputs"] == {"test": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
+        assert resp.json["subscribers"] == {
+            "successUri": "https://example.com/success",
+            "failedUri": "https://example.com/failed",
+        }
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
             "Content-Type": None,
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}; wait=5",
             "X-WPS-Output-Context": "public"
         }
         assert resp.json["mode"] == ExecuteMode.SYNC, "Should have been modified from 'wait' preference."
         assert resp.json["response"] == ExecuteResponse.RAW, "Should have been modified from 'return' preference."
+
+    @pytest.mark.oap_part4
+    def test_job_update_response_process_disallowed(self):
+        proc_id = self.fully_qualified_test_name()
+        process = WpsTestProcess(identifier=proc_id)
+        process = Process.from_wps(process)
+        process["processDescriptionURL"] = f"https://localhost/processes/{proc_id}"
+        self.process_store.save_process(process)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=proc_id, service=None,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{new_job.id}"
+        body = {"process": "https://localhost/processes/random"}
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["cause"] == {"name": "process", "in": "body"}
+        assert resp.json["value"] == {
+            "body.process": "https://localhost/processes/random",
+            "job.process": f"https://localhost/processes/{proc_id}",
+        }
 
     @pytest.mark.oap_part4
     def test_job_status_alt_openeo_accept_response(self):

@@ -984,6 +984,7 @@ if TYPE_CHECKING:
     }, total=True)
 
     ProcessExecution = TypedDict("ProcessExecution", {
+        "process": NotRequired[str],
         "status": NotRequired[Literal["create"]],
         "mode": NotRequired[AnyExecuteMode],
         "response": NotRequired[AnyExecuteResponse],

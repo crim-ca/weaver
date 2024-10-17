@@ -4210,6 +4210,13 @@ class Execute(ExecuteInputOutputs):
             "value": EXAMPLES["job_execute.json"],
         },
     }
+    process = ProcessURL(
+        missing=drop,
+        description=(
+            "Process reference to be executed. "
+            "This parameter is required if the process cannot be inferred from the request endpoint."
+        ),
+    )
     status = JobStatusCreate(
         description=(
             "Status to request creation of the job without submitting it to processing queue "
@@ -6061,9 +6068,13 @@ class JobExecuteHeaders(ExtendedMappingSchema):
 
 
 class JobInputsBody(ExecuteInputOutputs):
+    # note:
+    #  following definitions do not employ 'missing=drop' to explicitly indicate the fields
+    #  this makes it easier to consider everything that could be implied when executing the job
     mode = JobExecuteModeEnum(default=ExecuteMode.AUTO)
     response = JobResponseOptionsEnum(default=None)
     headers = JobExecuteHeaders(missing={})
+    subscribers = JobExecuteSubscribers(missing={})
     links = LinkList(missing=drop)
 
 
@@ -6584,13 +6595,25 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
 
 
 class PatchJobBodySchema(Execute):
-    description = "Execution request parameters to be updated."
+    description = "Execution request contents to be updated."
     # all parameters that are not 'missing=drop' must be added to allow partial update
     inputs = ExecuteInputValues(missing=drop, description="Input values or references to be updated.")
     outputs = ExecuteOutputSpec(missing=drop, description="Output format and transmission mode to be updated.")
 
 
 class PatchJobEndpoint(JobPath):
+    summary = "Execution request parameters to be updated."
+    description = (
+        "Execution request parameters to be updated. "
+        "If parameters are omitted, they will be left unmodified. "
+        "If provided, parameters will override existing definitions integrally. "
+        "Therefore, if only a partial update of certain nested elements in a mapping or list is desired, "
+        "all elements under the corresponding parameters must be resubmitted entirely with the applied changes. "
+        "In the case of certain parameters, equivalent definitions can cause conflicting definitions between "
+        "headers and contents "
+        f"(see for more details: {DOC_URL}/processes.html#execution-body and {DOC_URL}/processes.html#execution-mode). "
+        "To verify the resulting parameterization of any pending job, consider using the `GET /jobs/{jobId}/inputs`."
+    )
     header = JobExecuteHeaders()
     querystring = LocalProcessQuery()
     body = PatchJobBodySchema()
@@ -6895,11 +6918,6 @@ class GenericHTMLResponse(ExtendedMappingSchema):
         return GenericHTMLResponse(name=self.name, description=self.description, children=self.children)
 
 
-class ErrorDetail(ExtendedMappingSchema):
-    code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
-    status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
-
-
 class OWSErrorCode(ExtendedSchemaNode):
     schema_type = String
     example = "InvalidParameterValue"
@@ -6918,6 +6936,18 @@ class OWSExceptionResponse(ExtendedMappingSchema):
                                  description="Specific description of the error.")
 
 
+class ErrorDetail(ExtendedMappingSchema):
+    code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
+    status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
+
+
+class ErrorSource(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), description="Error name or description."),
+        ErrorDetail(description="Detailed error representation.")
+    ]
+
+
 class ErrorCause(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(String(), description="Error message from exception or cause of failure."),
@@ -6934,7 +6964,7 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     status = ExtendedSchemaNode(Integer(), description="Error status code.", example=500, missing=drop)
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
-    error = ErrorDetail(missing=drop)
+    error = ErrorSource(missing=drop)
     instance = URI(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
