@@ -894,6 +894,14 @@ if TYPE_CHECKING:
         "schema": NotRequired[Union[str, OpenAPISchema]],
         "default": NotRequired[bool],
     }, total=False)
+    LiteralDataDomainDataType = TypedDict("LiteralDataDomainDataType", {
+        "name": Required[str]
+    })
+    LiteralDataDomainType = TypedDict("LiteralDataDomainType", {
+        "dataType": Required[LiteralDataDomainDataType],
+        "valueDefinition": NotRequired[AnyValueType],
+        "defaultValue": NotRequired[AnyValueType],
+    }, total=False)
     ProcessInputOutputItem = TypedDict("ProcessInputOutputItem", {
         "id": str,
         "title": NotRequired[str],
@@ -902,6 +910,7 @@ if TYPE_CHECKING:
         "metadata": NotRequired[List[Metadata]],
         "schema": NotRequired[OpenAPISchema],
         "formats": NotRequired[List[FormatMediaType]],
+        "literalDataDomains": NotRequired[List[LiteralDataDomainType]],
         "minOccurs": int,
         "maxOccurs": Union[int, Literal["unbounded"]],
     }, total=False)

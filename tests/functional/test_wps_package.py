@@ -83,7 +83,14 @@ if TYPE_CHECKING:
 
     from responses import RequestsMock
 
-    from weaver.typedefs import CWL_AnyRequirements, CWL_RequirementsDict, JSON, Number
+    from weaver.typedefs import (
+        CWL_AnyRequirements,
+        CWL_RequirementsDict,
+        JSON,
+        Number,
+        ProcessOfferingMapping,
+        ProcessOfferingListing
+    )
 
 EDAM_PLAIN = f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}"
 OGC_NETCDF = f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}"
@@ -169,7 +176,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         # even if deployed as OGC schema, OLD schema can be converted back
         desc = self.describe_process(self._testMethodName, ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert "inputs" in proc and isinstance(proc["inputs"], list) and len(proc["inputs"]) == 1
         assert "outputs" in proc and isinstance(proc["outputs"], list) and len(proc["outputs"]) == 1
         assert proc["inputs"][0]["id"] == "url"
@@ -608,7 +615,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -707,7 +714,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -865,7 +872,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         assert proc["inputs"][0]["id"] == "wps_only_format_exists"
         assert len(proc["inputs"][0]["formats"]) == 1
@@ -989,7 +996,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             }]
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert proc["inputs"][0]["id"] == "wps_format_mimeType"
         assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["inputs"][1]["id"] == "wps_format_mediaType"
@@ -1418,7 +1425,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         # process description input validation
         assert proc["inputs"][0]["id"] == "single_value_single_format"
@@ -1660,7 +1667,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         assert proc["inputs"][0]["id"] == "required_literal"
         assert proc["inputs"][0]["minOccurs"] == 1
@@ -1795,7 +1802,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
 
         inputs = body["processDescription"]["inputs"]  # type: List[JSON]
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert isinstance(proc["inputs"], list)
         assert len(proc["inputs"]) == len(inputs)
         for i, process_input in enumerate(inputs):
@@ -1843,23 +1850,24 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        proc = desc  # type: ProcessOfferingMapping
 
-        assert isinstance(desc["inputs"], dict)
-        assert len(desc["inputs"]) == len(body["processDescription"]["process"]["inputs"])
-        assert isinstance(desc["outputs"], dict)
-        assert len(desc["outputs"]) == len(body["processDescription"]["process"]["outputs"])
+        assert isinstance(proc["inputs"], dict)
+        assert len(proc["inputs"]) == len(body["processDescription"]["process"]["inputs"])
+        assert isinstance(proc["outputs"], dict)
+        assert len(proc["outputs"]) == len(body["processDescription"]["process"]["outputs"])
 
         # following inputs metadata were correctly parsed from WPS mapping entries if defined and not using defaults
-        assert desc["inputs"]["input_num"]["title"] == "Input numbers"
-        assert desc["inputs"]["input_num"]["maxOccurs"] == 20
-        assert desc["inputs"]["input_num"]["literalDataDomains"][0]["dataType"]["name"] == "float"
-        assert desc["inputs"]["input_file"]["title"] == "Test File"
-        assert desc["inputs"]["input_file"]["formats"][0]["mediaType"] == ContentType.APP_ZIP
-        assert desc["outputs"]["values"]["title"] == "Test Output"
-        assert desc["outputs"]["values"]["description"] == "CSV raw values"
-        assert desc["outputs"]["values"]["literalDataDomains"][0]["dataType"]["name"] == "string"
-        assert desc["outputs"]["out_file"]["title"] == "Result File"
-        assert desc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
+        assert proc["inputs"]["input_num"]["title"] == "Input numbers"
+        assert proc["inputs"]["input_num"]["maxOccurs"] == 20
+        assert proc["inputs"]["input_num"]["literalDataDomains"][0]["dataType"]["name"] == "float"
+        assert proc["inputs"]["input_file"]["title"] == "Test File"
+        assert proc["inputs"]["input_file"]["formats"][0]["mediaType"] == ContentType.APP_ZIP
+        assert proc["outputs"]["values"]["title"] == "Test Output"
+        assert proc["outputs"]["values"]["description"] == "CSV raw values"
+        assert proc["outputs"]["values"]["literalDataDomains"][0]["dataType"]["name"] == "string"
+        assert proc["outputs"]["out_file"]["title"] == "Result File"
+        assert proc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
 
     def test_execute_job_with_accept_languages(self):
         """
@@ -3014,7 +3022,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
         assert proc["description"] == "this is a test"
@@ -3111,7 +3119,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
 
         assert proc["id"] == self._testMethodName
         assert proc["title"] == "some title"
@@ -3185,7 +3193,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert proc["id"] == self._testMethodName
 
         # package I/O validation
@@ -3278,7 +3286,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        proc = desc["process"]
+        proc = desc["process"]  # type: ProcessOfferingListing
         assert proc["id"] == self._testMethodName
 
         # package I/O validation

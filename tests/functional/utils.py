@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from webtest import TestApp
 
+    from weaver.processes.constants import ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaType
     from weaver.status import AnyStatusType
     from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
     from weaver.typedefs import (
@@ -378,7 +379,7 @@ class WpsConfigBase(GenericUtils):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OGC]  # noqa
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOGCType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionMapping, CWL]
@@ -389,7 +390,7 @@ class WpsConfigBase(GenericUtils):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OLD]  # noqa
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOLDType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionListing, CWL]
@@ -399,7 +400,7 @@ class WpsConfigBase(GenericUtils):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchema
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescription, CWL]
