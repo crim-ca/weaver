@@ -860,6 +860,25 @@ class Job(Base, LoggerHandler):
         self["wps_id"] = wps_id
 
     @property
+    def wps_url(self):
+        # type: () -> Optional[str]
+        """
+        Service URL reference for :term:`WPS` interface.
+
+        .. seealso::
+            - :attr:`Process.processEndpointWPS1`
+            - :attr:`Service.url`
+        """
+        return self.get("wps_url", None)
+
+    @wps_url.setter
+    def wps_url(self, service):
+        # type: (Optional[str]) -> None
+        if not isinstance(service, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.wps_url'")
+        self["wps_url"] = service
+
+    @property
     def service(self):
         # type: () -> Optional[str]
         """
@@ -1070,6 +1089,23 @@ class Job(Base, LoggerHandler):
             modes = list(ExecuteMode.values())
             raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
+
+    @property
+    def execution_wait(self):
+        # type: () -> Optional[int]
+        """
+        Execution time (in seconds) to wait for a synchronous response.
+        """
+        if not self.execute_sync:
+            return None
+        return self.get("execution_wait")
+
+    @execution_wait.setter
+    def execution_wait(self, wait):
+        # type: (Optional[int]) -> None
+        if wait is not None or not isinstance(wait, int):
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_wait'. Must be None or an integer.")
+        self["execution_wait"] = wait
 
     @property
     def execution_response(self):
@@ -1533,6 +1569,7 @@ class Job(Base, LoggerHandler):
             "id": self.id,
             "task_id": self.task_id,
             "wps_id": self.wps_id,
+            "wps_url": self.wps_url,
             "service": self.service,
             "process": self.process,
             "inputs": self.inputs,
@@ -1544,6 +1581,7 @@ class Job(Base, LoggerHandler):
             "execution_response": self.execution_response,
             "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
+            "execution_wait": self.execution_wait,
             "is_workflow": self.is_workflow,
             "created": self.created,
             "started": self.started,

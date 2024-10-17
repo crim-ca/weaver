@@ -21,7 +21,6 @@ from weaver.exceptions import handle_known_exceptions
 from weaver.formats import ContentType, guess_target_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.convert import wps2json_job_payload
-from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
@@ -197,6 +196,8 @@ class WorkerService(ServiceWPS):
 
         Returns the status response as is if XML, or convert it to JSON, according to request ``Accept`` header.
         """
+        from weaver.processes.execution import submit_job_handler  # pylint: disable=C0415  # circular import error
+
         req = wps_request.http_request  # type: Union[PyramidRequest, WerkzeugRequest]
         pid = wps_request.identifier
         ctx = get_wps_output_context(req)  # re-validate here in case submitted via WPS endpoint instead of REST-API
@@ -263,15 +264,17 @@ class WorkerService(ServiceWPS):
     def execute(self, identifier, wps_request, uuid):
         # type: (str, Union[WPSRequest, WorkerRequest], str) -> Union[WPSResponse, HTTPValid]
         """
-        Handles the ``Execute`` KVP/XML request submitted on the WPS endpoint.
+        Handles the ``Execute`` :term:`KVP`/:term:`XML` request submitted on the :term:`WPS` endpoint.
 
-        Submit WPS request to corresponding WPS-REST endpoint and convert back for requested ``Accept`` content-type.
+        Submit :term:`WPS` request to corresponding :term:`WPS-REST` endpoint and convert back for
+        requested ``Accept`` content-type.
 
-        Overrides the original execute operation, that will instead be handled by :meth:`execute_job` following
-        callback from Celery Worker, which handles process job creation and monitoring.
+        Overrides the original execute operation, that will instead be handled by :meth:`execute_job`
+        following callback from :mod:`celery` worker, which handles :term:`Job` creation and monitoring.
 
-        If ``Accept`` is JSON, the result is directly returned from :meth:`_submit_job`.
-        If ``Accept`` is XML or undefined, :class:`WorkerExecuteResponse` converts the received JSON with XML template.
+        If ``Accept`` is :term:`JSON`, the result is directly returned from :meth:`_submit_job`.
+        If ``Accept`` is :term:`XML` or undefined, :class:`WorkerExecuteResponse` converts the
+        received :term:`JSON` with :term:`XML` template.
         """
         result = self._submit_job(wps_request)
         if not isinstance(result, dict):

@@ -11,7 +11,7 @@ from weaver.store.base import StoreServices
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Tuple
+    from typing import Any, Callable, List, Optional
 
     from weaver.datatype import Service
     from weaver.typedefs import AnyRequestType, AnySettingsContainer
@@ -68,15 +68,15 @@ def check_provider_requirements(func):
     return forbid_local
 
 
-def get_service(request):
-    # type: (AnyRequestType) -> Tuple[Service, StoreServices]
+def get_service(request, provider_id=None):
+    # type: (AnyRequestType, Optional[str]) -> Service
     """
     Get the request service using provider_id from the service store.
     """
     store = get_db(request).get_store(StoreServices)
-    provider_id = request.matchdict.get("provider_id")
+    prov_id = provider_id or request.matchdict.get("provider_id")
     try:
-        service = store.fetch_by_name(provider_id)
+        service = store.fetch_by_name(prov_id)
     except ServiceNotFound:
-        raise HTTPNotFound(f"Provider {provider_id} cannot be found.")
-    return service, store
+        raise HTTPNotFound(f"Provider {prov_id} cannot be found.")
+    return service

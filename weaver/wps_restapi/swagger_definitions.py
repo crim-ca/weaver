@@ -221,6 +221,9 @@ OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
 OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
+OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
+OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
+
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
 
@@ -696,6 +699,18 @@ class ResponseContentTypeHeader(ContentTypeHeader):
     ])
 
 
+class PreferHeader(ExtendedSchemaNode):
+    summary = "Header that describes job execution parameters."
+    description = (
+        "Header that describes the desired execution mode of the process job and desired results. "
+        "Parameter 'return' indicates the structure and contents how results should be returned. "
+        "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
+        f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
+    )
+    name = "Prefer"
+    schema_type = String
+
+
 class RequestHeaders(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
@@ -705,7 +720,7 @@ class RequestHeaders(ExtendedMappingSchema):
     content_type = RequestContentTypeHeader()
 
 
-class ResponseHeaders(ResponseContentTypeHeader):
+class ResponseHeaders(ExtendedMappingSchema):
     """
     Headers describing resulting response.
     """
@@ -2102,6 +2117,11 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
     # no default to enforce required input as per OGC-API schemas
     # default = EXECUTE_MODE_AUTO
     example = ExecuteMode.ASYNC
+    description = (
+        "Desired execution mode specified directly. This is intended for backward compatibility support. "
+        "To obtain more control over execution mode selection, employ the official Prefer header instead "
+        f"(see for more details: {DOC_URL}/processes.html#execution-mode)."
+    )
     validator = OneOf(ExecuteMode.values())
 
 
@@ -2122,6 +2142,10 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
     # no default to enforce required input as per OGC-API schemas
     # default = ExecuteResponse.DOCUMENT
     example = ExecuteResponse.DOCUMENT
+    description = (
+        "Indicates the desired representation format of the response. "
+        f"(see for more details: {DOC_URL}/processes.html#execution-body)."
+    )
     validator = OneOf(ExecuteResponse.values())
 
 
@@ -2142,6 +2166,12 @@ class JobStatusEnum(ExtendedSchemaNode):
     default = Status.ACCEPTED
     example = Status.ACCEPTED
     validator = OneOf(JOB_STATUS_CODE_API)
+
+
+class JobStatusCreate(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobStatus"
+    validator = OneOf(["create"])
 
 
 class JobStatusSearchEnum(ExtendedSchemaNode):
@@ -2551,9 +2581,13 @@ class OWSIdentifier(ExtendedSchemaNode, OWSNamespace):
     name = "Identifier"
 
 
-class OWSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
+class OWSProcessIdentifier(ProcessIdentifier, OWSNamespace):
+    pass
+
+
+class OWSProcessIdentifierList(ExtendedSequenceSchema, OWSNamespace):
     name = "Identifiers"
-    item = OWSIdentifier()
+    item = OWSProcessIdentifier()
 
 
 class OWSTitle(ExtendedSchemaNode, OWSNamespace):
@@ -2586,7 +2620,7 @@ class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
     _schema = f"{OGC_WPS_1_SCHEMAS}/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
     title = "DescribeProcess"
-    identifier = OWSIdentifierList(
+    identifier = OWSProcessIdentifierList(
         description="Single or comma-separated list of process identifier to describe.",
         example="example"
     )
@@ -2603,7 +2637,7 @@ class WPSExecutePost(WPSOperationPost, WPSNamespace):
     _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_request.xsd"
     name = "Execute"
     title = "Execute"
-    identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
+    identifier = OWSProcessIdentifier(description="Identifier of the process to execute with data inputs.")
     dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
 
 
@@ -2777,7 +2811,7 @@ class ProcessVersion(ExtendedSchemaNode, WPSNamespace):
 class OWSProcessSummary(ExtendedMappingSchema, WPSNamespace):
     version = ProcessVersion(name="processVersion", default="None", example="1.2",
                              description="Version of the corresponding process summary.")
-    identifier = OWSIdentifier(example="example", description="Identifier to refer to the process.")
+    identifier = OWSProcessIdentifier(example="example", description="Identifier to refer to the process.")
     _title = OWSTitle(example="Example Process", description="Title of the process.")
     abstract = OWSAbstract(example="Process for example schema.", description="Detail about the process.")
 
@@ -3015,7 +3049,7 @@ class WPSStatus(ExtendedMappingSchema, WPSNamespace):
 class WPSProcessSummary(ExtendedMappingSchema, WPSNamespace):
     name = "Process"
     title = "Process"
-    identifier = OWSIdentifier()
+    identifier = OWSProcessIdentifier()
     _title = OWSTitle()
     abstract = OWSAbstract(missing=drop)
 
@@ -3227,11 +3261,11 @@ class ProcessVisibilityPutEndpoint(LocalProcessPath):
     body = VisibilitySchema()
 
 
-class ProviderJobEndpoint(ProviderProcessPath, JobPath):
+class GetProviderJobEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobEndpoint(JobPath):
+class GetJobEndpoint(JobPath):
     header = RequestHeaders()
 
 
@@ -3248,7 +3282,7 @@ class JobInputsOutputsQuery(ExtendedMappingSchema):
         String(),
         title="JobInputsOutputsQuerySchema",
         example=JobInputsOutputsSchema.OGC,
-        default=JobInputsOutputsSchema.OLD,
+        default=JobInputsOutputsSchema.OGC,
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of submitted job inputs and outputs.",
         description=(
@@ -3271,7 +3305,7 @@ class JobResultsQuery(FormatQuery):
         String(),
         title="JobOutputResultsSchema",
         example=JobInputsOutputsSchema.OGC,
-        default=JobInputsOutputsSchema.OLD,
+        default=JobInputsOutputsSchema.OGC,
         validator=OneOfCaseInsensitive(JobInputsOutputsSchema.values()),
         summary="Selects the schema employed for representation of job outputs.",
         description=(
@@ -3329,8 +3363,17 @@ class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class JobResultsEndpoint(ProviderProcessPath, JobPath):
+class JobResultsEndpoint(JobPath):
     header = RequestHeaders()
+
+
+class JobResultsTriggerExecutionEndpoint(JobResultsEndpoint):
+    header = RequestHeaders()
+    body = NoContent()
+
+
+class ProcessJobResultsTriggerExecutionEndpoint(JobResultsTriggerExecutionEndpoint, LocalProcessPath):
+    pass
 
 
 class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
@@ -4167,24 +4210,28 @@ class Execute(ExecuteInputOutputs):
             "value": EXAMPLES["job_execute.json"],
         },
     }
+    process = ProcessURL(
+        missing=drop,
+        description=(
+            "Process reference to be executed. "
+            "This parameter is required if the process cannot be inferred from the request endpoint."
+        ),
+    )
+    status = JobStatusCreate(
+        description=(
+            "Status to request creation of the job without submitting it to processing queue "
+            "and leave it pending until triggered by another results request to start it "
+            "(see *OGC API - Processes* - Part 4: Job Management)."
+        ),
+        missing=drop,
+    )
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
         deprecated=True,
-        description=(
-            "Desired execution mode specified directly. This is intended for backward compatibility support. "
-            "To obtain more control over execution mode selection, employ the official Prefer header instead "
-            f"(see for more details: {DOC_URL}/processes.html#execution-mode)."
-        ),
-        validator=OneOf(ExecuteMode.values())
     )
     response = JobResponseOptionsEnum(
         missing=drop,  # no default to ensure 'Prefer' header vs 'response' body resolution order can be performed
-        description=(
-            "Indicates the desired representation format of the response. "
-            f"(see for more details: {DOC_URL}/processes.html#execution-body)."
-        ),
-        validator=OneOf(ExecuteResponse.values())
     )
     notification_email = Email(
         missing=drop,
@@ -5996,7 +6043,38 @@ class ResultsBody(OneOfKeywordSchema):
     ]
 
 
+class WpsOutputContextHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "X-WPS-Output-Context"
+    description = (
+        "Contextual location where to store WPS output results from job execution. ",
+        "When provided, value must be a directory or sub-directories slug. ",
+        "Resulting contextual location will be relative to server WPS outputs when no context is provided.",
+    )
+    schema_type = String
+    missing = drop
+    example = "my-directory/sub-project"
+    default = None
+
+
+class JobExecuteHeaders(ExtendedMappingSchema):
+    description = "Indicates the relevant headers that were supplied for job execution or a null value if omitted."
+    accept = AcceptHeader(missing=None)
+    accept_language = AcceptLanguageHeader(missing=None)
+    content_type = RequestContentTypeHeader(missing=None, default=None)
+    prefer = PreferHeader(missing=None)
+    x_wps_output_context = WpsOutputContextHeader(missing=None)
+
+
 class JobInputsBody(ExecuteInputOutputs):
+    # note:
+    #  following definitions do not employ 'missing=drop' to explicitly indicate the fields
+    #  this makes it easier to consider everything that could be implied when executing the job
+    mode = JobExecuteModeEnum(default=ExecuteMode.AUTO)
+    response = JobResponseOptionsEnum(default=None)
+    headers = JobExecuteHeaders(missing={})
+    subscribers = JobExecuteSubscribers(missing={})
     links = LinkList(missing=drop)
 
 
@@ -6465,23 +6543,9 @@ class PutProcessEndpoint(LocalProcessPath):
     body = PutProcessBodySchema()
 
 
-class WpsOutputContextHeader(ExtendedSchemaNode):
-    # ok to use 'name' in this case because target 'key' in the mapping must
-    # be that specific value but cannot have a field named with this format
-    name = "X-WPS-Output-Context"
-    description = (
-        "Contextual location where to store WPS output results from job execution. ",
-        "When provided, value must be a directory or sub-directories slug. ",
-        "Resulting contextual location will be relative to server WPS outputs when no context is provided.",
-    )
-    schema_type = String
-    missing = drop
-    example = "my-directory/sub-project"
-    default = None
-
-
 class ExecuteHeadersBase(RequestHeaders):
     description = "Request headers supported for job execution."
+    prefer = PreferHeader(missing=drop)
     x_wps_output_context = WpsOutputContextHeader()
 
 
@@ -6499,13 +6563,17 @@ class ExecuteHeadersXML(ExecuteHeadersBase):
     )
 
 
-class PostProcessJobsEndpointJSON(LocalProcessPath):
+class PostJobsEndpointJSON(ExtendedMappingSchema):
     header = ExecuteHeadersJSON()
     querystring = LocalProcessQuery()
     body = Execute()
 
 
-class PostProcessJobsEndpointXML(LocalProcessPath):
+class PostProcessJobsEndpointJSON(PostJobsEndpointJSON, LocalProcessPath):
+    pass
+
+
+class PostJobsEndpointXML(ExtendedMappingSchema):
     header = ExecuteHeadersXML()
     querystring = LocalProcessQuery()
     body = WPSExecutePost(
@@ -6520,6 +6588,43 @@ class PostProcessJobsEndpointXML(LocalProcessPath):
             }
         }
     )
+
+
+class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
+    pass
+
+
+class PatchJobBodySchema(Execute):
+    description = "Execution request contents to be updated."
+    # all parameters that are not 'missing=drop' must be added to allow partial update
+    inputs = ExecuteInputValues(missing=drop, description="Input values or references to be updated.")
+    outputs = ExecuteOutputSpec(missing=drop, description="Output format and transmission mode to be updated.")
+
+
+class PatchJobEndpoint(JobPath):
+    summary = "Execution request parameters to be updated."
+    description = (
+        "Execution request parameters to be updated. "
+        "If parameters are omitted, they will be left unmodified. "
+        "If provided, parameters will override existing definitions integrally. "
+        "Therefore, if only a partial update of certain nested elements in a mapping or list is desired, "
+        "all elements under the corresponding parameters must be resubmitted entirely with the applied changes. "
+        "In the case of certain parameters, equivalent definitions can cause conflicting definitions between "
+        "headers and contents "
+        f"(see for more details: {DOC_URL}/processes.html#execution-body and {DOC_URL}/processes.html#execution-mode). "
+        "To verify the resulting parameterization of any pending job, consider using the `GET /jobs/{jobId}/inputs`."
+    )
+    header = JobExecuteHeaders()
+    querystring = LocalProcessQuery()
+    body = PatchJobBodySchema()
+
+
+class PatchProcessJobEndpoint(JobPath, ProcessEndpoint):
+    body = PatchJobBodySchema()
+
+
+class PatchProviderJobEndpoint(PatchProcessJobEndpoint):
+    header = RequestHeaders()
 
 
 class PagingQueries(ExtendedMappingSchema):
@@ -6615,9 +6720,17 @@ class GetProcessJobEndpoint(LocalProcessPath):
     querystring = LocalProcessQuery()
 
 
-class DeleteProcessJobEndpoint(LocalProcessPath):
+class DeleteJobEndpoint(JobPath):
     header = RequestHeaders()
     querystring = LocalProcessQuery()
+
+
+class DeleteProcessJobEndpoint(LocalProcessPath):
+    header = RequestHeaders()
+
+
+class DeleteProviderJobEndpoint(DeleteProcessJobEndpoint, ProviderProcessPath):
+    pass
 
 
 class BillsEndpoint(ExtendedMappingSchema):
@@ -6789,7 +6902,7 @@ class GenericHTMLResponse(ExtendedMappingSchema):
                 "New schema name must be provided to avoid invalid mixed use of $ref pointers. "
                 f"Name '{name}' is invalid."
             )
-        obj = super().__new__(cls)
+        obj = super().__new__(cls)  # type: ExtendedSchemaNode
         obj.__init__(name=name, description=description)
         obj.__class__.__name__ = name
         obj.children = [
@@ -6803,11 +6916,6 @@ class GenericHTMLResponse(ExtendedMappingSchema):
     def __deepcopy__(self, *args, **kwargs):
         # type: (*Any, *Any) -> GenericHTMLResponse
         return GenericHTMLResponse(name=self.name, description=self.description, children=self.children)
-
-
-class ErrorDetail(ExtendedMappingSchema):
-    code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
-    status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
 
 
 class OWSErrorCode(ExtendedSchemaNode):
@@ -6828,6 +6936,18 @@ class OWSExceptionResponse(ExtendedMappingSchema):
                                  description="Specific description of the error.")
 
 
+class ErrorDetail(ExtendedMappingSchema):
+    code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
+    status = ExtendedSchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
+
+
+class ErrorSource(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), description="Error name or description."),
+        ErrorDetail(description="Detailed error representation.")
+    ]
+
+
 class ErrorCause(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(String(), description="Error message from exception or cause of failure."),
@@ -6844,7 +6964,7 @@ class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     status = ExtendedSchemaNode(Integer(), description="Error status code.", example=500, missing=drop)
     cause = ErrorCause(missing=drop)
     value = ErrorCause(missing=drop)
-    error = ErrorDetail(missing=drop)
+    error = ErrorSource(missing=drop)
     instance = URI(missing=drop)
     exception = OWSExceptionResponse(missing=drop)
 
@@ -6866,7 +6986,7 @@ class ConflictRequestResponseSchema(ServerErrorBaseResponseSchema):
 
 
 class UnprocessableEntityResponseSchema(ServerErrorBaseResponseSchema):
-    description = "Wrong format of given parameters."
+    description = "Wrong format or schema of given parameters."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -7184,11 +7304,18 @@ class CreatedJobLocationHeader(ResponseHeaders):
 
 
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
-    description = "Job successfully submitted to processing queue. Execution should begin when resources are available."
+    description = (
+        "Job successfully submitted. "
+        "Execution should begin when resources are available or when triggered, according to requested execution mode."
+    )
     examples = {
         "JobAccepted": {
-            "summary": "Job accepted for execution.",
+            "summary": "Job accepted for execution asynchronously.",
             "value": EXAMPLES["job_status_accepted.json"]
+        },
+        "JobCreated": {
+            "summary": "Job created for later execution by trigger.",
+            "value": EXAMPLES["job_status_created.json"]
         }
     }
     header = CreatedJobLocationHeader()
@@ -7243,6 +7370,12 @@ class OkBatchDismissJobsResponseSchema(ExtendedMappingSchema):
 class OkDismissJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
+
+
+class NoContentJobUpdatedResponse(ExtendedMappingSchema):
+    description = "Job detail updated with provided parameters."
+    header = ResponseHeaders()
+    body = NoContent()
 
 
 class OkGetJobStatusResponse(ExtendedMappingSchema):
@@ -7312,6 +7445,7 @@ class NoContentJobResultsHeaders(NoContent):
 
 
 class NoContentJobResultsResponse(ExtendedMappingSchema):
+    description = "Job completed execution synchronously with results returned in Link headers."
     header = NoContentJobResultsHeaders()
     body = NoContent(default="")
 
@@ -7750,25 +7884,35 @@ post_provider_responses = {
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
-    "200": CompletedJobResponse(description="success"),
-    "201": CreatedLaunchJobResponse(description="success"),
-    "204": NoContentJobResultsResponse(description="success"),
+    "200": CompletedJobResponse(),
+    "201": CreatedLaunchJobResponse(),
+    "204": NoContentJobResultsResponse(),
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
-    "200": CompletedJobResponse(description="success"),
-    "201": CreatedLaunchJobResponse(description="success"),
-    "204": NoContentJobResultsResponse(description="success"),
+    "200": CompletedJobResponse(),
+    "201": CreatedLaunchJobResponse(),
+    "204": NoContentJobResultsResponse(),
     "400": InvalidJobParametersResponse(),
     "403": ForbiddenProviderAccessResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
+post_jobs_responses = copy(post_process_jobs_responses)
+post_job_results_responses = copy(post_process_jobs_responses)
+post_job_results_responses.pop("201")   # job already created, therefore invalid
+post_job_results_responses.update({
+    "202": CreatedLaunchJobResponse(),  # alternate to '201' for async case since job already exists
+})
 get_all_jobs_responses = {
     "200": OkGetQueriedJobsResponse(description="success", examples={
         "JobListing": {
@@ -7814,6 +7958,17 @@ get_prov_single_job_status_responses = copy(get_single_job_status_responses)
 get_prov_single_job_status_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+patch_job_responses = {
+    "204": NoContentJobUpdatedResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "415": UnsupportedMediaTypeResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+patch_process_job_responses = copy(patch_job_responses)
+patch_provider_job_responses = copy(patch_job_responses)
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success", examples={
         "JobDismissedSuccess": {

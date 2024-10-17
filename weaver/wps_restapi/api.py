@@ -97,6 +97,7 @@ def get_conformance(category, settings):
     ogcapi_proc_core = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
     ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
     ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
+    ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -366,12 +367,18 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core}/conf/ogc-process-description",
         f"{ogcapi_proc_core}/req/json",
         f"{ogcapi_proc_core}/req/json/definition",
+        f"{ogcapi_proc_core}/req/job-list/datetime-definition",
+        f"{ogcapi_proc_core}/req/job-list/datetime-response",
+        f"{ogcapi_proc_core}/req/job-list/duration-definition",
+        f"{ogcapi_proc_core}/req/job-list/duration-response",
         f"{ogcapi_proc_core}/req/job-list/links",
         f"{ogcapi_proc_core}/req/job-list/jl-limit-definition",
         f"{ogcapi_proc_core}/req/job-list/job-list-op",
         f"{ogcapi_proc_core}/req/job-list/processID-definition",
         f"{ogcapi_proc_core}/req/job-list/processID-mandatory",
         f"{ogcapi_proc_core}/req/job-list/processid-response",
+        f"{ogcapi_proc_core}/req/job-list/status-definition",
+        f"{ogcapi_proc_core}/req/job-list/status-response",
         f"{ogcapi_proc_core}/req/job-list/type-definition",
         f"{ogcapi_proc_core}/req/job-list/type-response",
         # FIXME: KVP exec (https://github.com/crim-ca/weaver/issues/607, https://github.com/crim-ca/weaver/issues/445)
@@ -514,6 +521,18 @@ def get_conformance(category, settings):
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part3}/conf/openeo-workflows",
         # f"{ogcapi_proc_part3}/req/openeo-workflows",
+        f"{ogcapi_proc_part4}/conf/jm/create/post-op",
+        f"{ogcapi_proc_part4}/per/job-management/additional-status-codes",  # see 'weaver.status.map_status'
+        f"{ogcapi_proc_part4}/per/job-management/create-body",              # Weaver has XML for WPS
+        f"{ogcapi_proc_part4}/per/job-management/create-content-schema",
+        f"{ogcapi_proc_part4}/per/job-management/update-body",
+        f"{ogcapi_proc_part4}/per/job-management/update-content-schema",
+        # FIXME: support part 3: Nested Workflow Execution request (https://github.com/crim-ca/weaver/issues/412)
+        # f"{ogcapi_proc_part4}/rec/job-management/create-body-ogcapi-processes",
+        # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
+        # f"{ogcapi_proc_part4}/rec/job-management/create-body-openeo",
+        f"{ogcapi_proc_part4}/req/job-management/create/post-op",
+        f"{ogcapi_proc_part4}/req/job-management/update/response-locked",
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing

@@ -19,16 +19,14 @@ from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.constants import ProcessSchema
-from weaver.utils import fully_qualified_name
+
+from tests.functional.utils import GenericUtils
 
 
-class WpsProviderBase(unittest.TestCase):
+class WpsProviderBase(GenericUtils):
     remote_provider_name = None
     settings = {}
     config = None
-
-    def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace(".", "-")
 
     def register_provider(self, clear=True, error=False, data=None):
         if clear:

@@ -1,0 +1,7 @@
+{
+  "description": "Job successfully submitted for creation. Waiting on trigger request to being execution.",
+  "jobID": "797c0c5e-9bc2-4bf3-ab73-5f3df32044a8",
+  "processID": "Echo",
+  "status": "created",
+  "location": "http://schema-example.com/processes/Echo/jobs/797c0c5e-9bc2-4bf3-ab73-5f3df32044a8"
+}
