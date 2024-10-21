@@ -111,6 +111,7 @@ if TYPE_CHECKING:
         ExecutionInputs,
         ExecutionOutputs,
         ExecutionSubscribers,
+        JobResults,
         JSON,
         Link,
         Metadata,
@@ -1079,7 +1080,7 @@ class Job(Base, LoggerHandler):
     @property
     def execution_mode(self):
         # type: () -> AnyExecuteMode
-        return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.ASYNC)
+        return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.AUTO)
 
     @execution_mode.setter
     def execution_mode(self, mode):
@@ -1103,7 +1104,7 @@ class Job(Base, LoggerHandler):
     @execution_wait.setter
     def execution_wait(self, wait):
         # type: (Optional[int]) -> None
-        if wait is not None or not isinstance(wait, int):
+        if not (wait is None or isinstance(wait, int)):
             raise ValueError(f"Invalid value for '{self.__name__}.execution_wait'. Must be None or an integer.")
         self["execution_wait"] = wait
 
@@ -1248,13 +1249,13 @@ class Job(Base, LoggerHandler):
         self["statistics"] = stats
 
     def _get_results(self):
-        # type: () -> List[Optional[Dict[str, JSON]]]
+        # type: () -> JobResults
         if self.get("results") is None:
             self["results"] = []
         return dict.__getitem__(self, "results")
 
     def _set_results(self, results):
-        # type: (List[Optional[Dict[str, JSON]]]) -> None
+        # type: (JobResults) -> None
         if not isinstance(results, list):
             raise TypeError(f"Type 'list' is required for '{self.__name__}.results'")
         self["results"] = results
@@ -1465,7 +1466,7 @@ class Job(Base, LoggerHandler):
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
         job_exec = f"{job_url.rsplit('/', 1)[0]}/execution"
         job_list = base_url + sd.jobs_service.path
-        job_links = [
+        job_links = [  # type: List[Link]
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
             {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,

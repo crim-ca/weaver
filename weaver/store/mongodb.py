@@ -63,7 +63,7 @@ if TYPE_CHECKING:
 
     from pymongo.collection import Collection
 
-    from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference
+    from weaver.execute import AnyExecuteMode, AnyExecuteResponse, AnyExecuteReturnPreference
     from weaver.processes.types import AnyProcessType
     from weaver.sort import AnySortType
     from weaver.status import AnyStatusSearch, AnyStatusType
@@ -790,7 +790,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
-                 execute_async=True,        # type: bool
+                 execute_mode=None,         # type: Optional[AnyExecuteMode]
                  execute_wait=None,         # type: Optional[int]
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
                  execute_return=None,       # type: Optional[AnyExecuteReturnPreference]
@@ -814,10 +814,10 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 tags.append(ProcessType.WORKFLOW)
             else:
                 tags.append(ProcessType.APPLICATION)
-            if execute_async in [None, False] and execute_wait:
+            if execute_mode != ExecuteMode.ASYNC and execute_wait is not None:
                 execute_mode = ExecuteMode.SYNC
-            else:
-                execute_mode = ExecuteMode.ASYNC
+            if execute_mode is None:
+                execute_mode = ExecuteMode.AUTO
             tags.append(execute_mode)
             if not access:
                 access = Visibility.PRIVATE

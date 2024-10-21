@@ -5521,26 +5521,25 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    @pytest.mark.oap_part4
     def test_execute_mismatch_process(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_name(proc)
         body = self.retrieve_payload(proc, "deploy", local=True)
         self.deploy_process(body, process_id=p_id)
 
+        # use non-existing process to ensure this particular situation is handled as well
+        # a missing process reference must not cause an early "not-found" response
         proc = "random-other-process"
         proc_other = self.fully_qualified_test_name(proc)
-        body = self.retrieve_payload(proc, "deploy", local=True)
-        self.deploy_process(body, process_id=p_id)
 
         exec_content = {
-            "process": f"https://localhost/processes/{p_id}",
+            "process": f"https://localhost/processes/{proc_other}",
             "inputs": {"message": "test"}
         }
         with contextlib.ExitStack() as stack:
             for mock_exec in mocked_execute_celery():
                 stack.enter_context(mock_exec)
-            path = f"/processes/{proc_other}/execution"  # mismatch on purpose
+            path = f"/processes/{p_id}/execution"  # mismatch on purpose
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=self.json_headers, only_local=True)
             assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"

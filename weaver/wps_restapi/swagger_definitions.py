@@ -2242,13 +2242,16 @@ class JobExecuteSubscribers(ExtendedMappingSchema):
     success_uri = URL(
         name="successUri",
         description="Location where to POST the job results on successful completion.",
+        # allow omitting against official schema to support partial use/update
+        # (see https://github.com/opengeospatial/ogcapi-processes/issues/460)
+        missing=drop,
     )
-    failure_uri = URL(
+    failed_uri = URL(
         name="failedUri",
         description="Location where to POST the job status if it fails execution.",
         missing=drop,
     )
-    started_uri = URL(
+    in_progress_uri = URL(
         name="inProgressUri",
         description="Location where to POST the job status once it starts execution.",
         missing=drop,
@@ -2259,12 +2262,12 @@ class JobExecuteSubscribers(ExtendedMappingSchema):
         description="Email recipient to send a notification on successful job completion.",
         missing=drop,
     )
-    failure_email = Email(
+    failed_email = Email(
         name="failedEmail",
         description="Email recipient to send a notification on failed job completion.",
         missing=drop,
     )
-    started_email = Email(
+    in_progress_email = Email(
         name="inProgressEmail",
         description="Email recipient to send a notification of job status once it starts execution.",
         missing=drop,
@@ -6073,8 +6076,7 @@ class JobInputsBody(ExecuteInputOutputs):
     #  this makes it easier to consider everything that could be implied when executing the job
     mode = JobExecuteModeEnum(default=ExecuteMode.AUTO)
     response = JobResponseOptionsEnum(default=None)
-    headers = JobExecuteHeaders(missing={})
-    subscribers = JobExecuteSubscribers(missing={})
+    headers = JobExecuteHeaders(missing={}, default={})
     links = LinkList(missing=drop)
 
 

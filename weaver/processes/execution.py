@@ -28,6 +28,8 @@ from weaver.datatype import Process, Service
 from weaver.execute import (
     ExecuteControlOption,
     ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
     parse_prefer_header_execute_mode,
     parse_prefer_header_return,
     update_preference_applied_return_header
@@ -794,6 +796,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         process = proc_store.fetch_by_id(process)
     if process and is_local:
         validate_process_io(process, json_body)
+        validate_process_id(process, json_body)
     else:
         LOGGER.warning(
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
@@ -809,11 +812,11 @@ def submit_job_handler(payload,             # type: ProcessExecution
     exec_max_wait = as_int(exec_max_wait, default=20)
     mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
-        is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
+        execute_mode = ExecuteMode.get(json_body.get("mode"), default=ExecuteMode.AUTO)
     else:
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
-        is_execute_async = mode != ExecuteMode.SYNC
+        execute_mode = mode
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
@@ -833,7 +836,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     store = db.get_store(StoreJobs)  # type: StoreJobs
     job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
-                         execute_async=is_execute_async, execute_wait=wait,
+                         execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
                          custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
                          accept_type=accept_type, accept_language=language)
@@ -950,24 +953,7 @@ def update_job_parameters(job, request):
     job_process = get_process(job.process)
     try:
         loc = "body"
-        if "process" in body:
-            # note: don't use 'get_process' for input process, as it might not even exist!
-            req_process_url = body["process"]
-            req_process_id = body["process"].rsplit("/processes/", 1)[-1]
-            if req_process_id != job_process.id or req_process_url != job_process.processDescriptionURL:
-                raise HTTPBadRequest(
-                    json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
-                        "type": "InvalidJobUpdate",
-                        "title": "Invalid Job Execution Update",
-                        "detail": "Update of the reference process for the job execution is not permitted.",
-                        "status": HTTPBadRequest.code,
-                        "cause": {"name": "process", "in": loc},
-                        "value": repr_json({
-                            "body.process": body["process"],
-                            "job.process": job_process.processDescriptionURL,
-                        }, force_string=False),
-                    })
-                )
+        validate_process_id(job_process, body)
 
         for node in sd.PatchJobBodySchema().children:
             field = node.name
@@ -1013,14 +999,18 @@ def update_job_parameters(job, request):
         # if provided both in body and corresponding 'Prefer' header parameter, the body parameter takes precedence
         # however, if provided only in header, allow override of the body parameter considered as "higher priority"
         loc = "header"
-        if "mode" not in body:
+        if ExecuteMode.get(body.get("mode"), default=ExecuteMode.AUTO) == ExecuteMode.AUTO:
             mode, wait, _ = parse_prefer_header_execute_mode(request.headers, job_process.jobControlOptions)
             job.execution_mode = mode
             job.execution_wait = wait
-        if "response" in body:
+        if "response" not in body:
             job_return = parse_prefer_header_return(request.headers)
             if job_return:
                 job.execution_return = job_return
+                if job_return == ExecuteReturnPreference.REPRESENTATION:
+                    job.execution_response = ExecuteResponse.RAW
+                else:
+                    job.execution_response = ExecuteResponse.DOCUMENT
 
     except HTTPException:
         raise
@@ -1123,6 +1113,37 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_process_id(job_process, payload):
+    # type: (Process, ProcessExecution) -> None
+    """
+    Validates that the specified ``process`` in the payload corresponds to the referenced :term:`Job` :term:`Process`.
+
+    :raises HTTPException: Corresponding error for detected invalid combination of process references.
+    """
+    if "process" in payload:
+        # note: don't use 'get_process' for input process, as it might not even exist!
+        req_process_url = payload["process"]
+        req_process_id = payload["process"].rsplit("/processes/", 1)[-1]
+        if req_process_id != job_process.id or req_process_url != job_process.processDescriptionURL:
+            raise HTTPBadRequest(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                    {
+                        "type": "InvalidJobUpdate",
+                        "title": "Invalid Job Execution Update",
+                        "detail": "Update of the reference process for the job execution is not permitted.",
+                        "status": HTTPBadRequest.code,
+                        "cause": {"name": "process", "in": "body"},
+                        "value": repr_json(
+                            {
+                                "body.process": payload["process"],
+                                "job.process": job_process.processDescriptionURL,
+                            }, force_string=False
+                        ),
+                    }
+                )
+            )
 
 
 def validate_process_io(process, payload):

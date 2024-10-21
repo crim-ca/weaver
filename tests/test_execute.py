@@ -20,12 +20,16 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPrefe
         for (_headers, _support, _expected), _extra
         in itertools.product(
             [
-                # no mode
+                # no mode (API-wide default async)
                 ({"Prefer": "respond-async, wait=4"}, [],
                  (ExecuteMode.ASYNC, None, {})),
                 # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
+                ({"Prefer": ""}, None,  # explicit 'None' or omitting the parameter entirely means "any" mode
+                 (ExecuteMode.SYNC, 10, {})),
                 ({"Prefer": ""}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
                  (ExecuteMode.SYNC, 10, {})),
+                ({"Prefer": "respond-async"}, None,
+                 (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
                 ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
                  (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
                 ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],

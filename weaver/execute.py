@@ -119,6 +119,7 @@ def parse_prefer_header_execute_mode(
     header_container,       # type: AnyHeadersContainer
     supported_modes=None,   # type: Optional[List[AnyExecuteControlOption]]
     wait_max=10,            # type: int
+    return_auto=False,      # type: bool
 ):                          # type: (...) -> Tuple[AnyExecuteMode, Optional[int], HeadersType]
     """
     Obtain execution preference if provided in request headers.
@@ -141,6 +142,10 @@ def parse_prefer_header_execute_mode(
     :param wait_max:
         Maximum wait time enforced by the server. If requested wait time is greater, ``wait`` preference will not be
         applied and will fall back to asynchronous response.
+    :param return_auto:
+        If the resolution ends up being an "auto" selection, the auto-resolved mode, wait-time, etc. are returned
+        by default. Using this option, the "auto" mode will be explicitly returned instead, allowing a mixture of
+        execution mode to be "auto" handled at another time. This is mostly for reporting purposes.
     :return:
         Tuple of resolved execution mode, wait time if specified, and header of applied preferences if possible.
         Maximum wait time indicates duration until synchronous response should fall back to asynchronous response.
@@ -148,8 +153,9 @@ def parse_prefer_header_execute_mode(
     """
 
     prefer = get_header("prefer", header_container)
-    relevant_modes = {ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC}
-    supported_modes = list(set(supported_modes or []).intersection(relevant_modes))
+    relevant_modes = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]  # order important, async default
+    supported_modes = relevant_modes if supported_modes is None else supported_modes
+    supported_modes = [mode for mode in supported_modes if mode in relevant_modes]
 
     if not prefer:
         # /req/core/process-execute-default-execution-mode (A & B)
@@ -191,7 +197,7 @@ def parse_prefer_header_execute_mode(
         LOGGER.info("Requested Prefer wait header too large (%ss > %ss), revert to async execution.", wait, wait_max)
         return ExecuteMode.ASYNC, None, {}
 
-    auto = ExecuteMode.ASYNC if "respond-async" in params else ExecuteMode.SYNC
+    auto = ExecuteMode.ASYNC if "respond-async" in params else ExecuteMode.AUTO
     applied_preferences = []
     # /req/core/process-execute-auto-execution-mode (A & B)
     if len(supported_modes) == 1:
@@ -199,7 +205,7 @@ def parse_prefer_header_execute_mode(
         # otherwise, server is allowed to discard preference since it cannot be honoured
         mode = ExecuteMode.ASYNC if supported_modes[0] == ExecuteControlOption.ASYNC else ExecuteMode.SYNC
         wait = None if mode == ExecuteMode.ASYNC else wait
-        if auto == mode:
+        if auto in [mode, ExecuteMode.AUTO]:
             if auto == ExecuteMode.ASYNC:
                 applied_preferences.append("respond-async")
             if wait and "wait" in params:
@@ -218,9 +224,34 @@ def parse_prefer_header_execute_mode(
             return ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"}
         if wait and "wait" in params:
             return ExecuteMode.SYNC, wait, {"Preference-Applied": f"wait={wait}"}
+        if auto == ExecuteMode.AUTO and return_auto:
+            return ExecuteMode.AUTO, None, {}
         if wait:  # default used, not a supplied preference
             return ExecuteMode.SYNC, wait, {}
     return ExecuteMode.ASYNC, None, {}
+
+
+def rebuild_prefer_header(job):
+    # type: (Job) -> Optional[str]
+    """
+    Rebuilds the expected ``Prefer`` header value from :term:`Job` parameters.
+    """
+    def append_header(header_value, new_value):
+        # type: (str, str) -> str
+        if header_value and new_value:
+            header_value += "; "
+        header_value += new_value
+        return header_value
+
+    header = ""
+    if job.execution_return:
+        header = append_header(header, f"return={job.execution_return}")
+    if job.execution_wait:
+        header = append_header(header, f"wait={job.execution_wait}")
+    if job.execute_async:
+        header = append_header(header, "respond-async")
+
+    return header or None
 
 
 def update_preference_applied_return_header(

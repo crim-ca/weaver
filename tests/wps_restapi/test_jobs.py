@@ -31,7 +31,13 @@ from tests.utils import (
 )
 from weaver.compat import Version
 from weaver.datatype import Job, Process, Service
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import ContentType
 from weaver.notify import decrypt_email
 from weaver.processes.wps_testing import WpsTestProcess
@@ -51,7 +57,7 @@ if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Tuple, Union
 
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyLogLevel, JSON, Number, Statistics
+    from weaver.typedefs import AnyLogLevel, JobResults, JSON, Number, Statistics
     from weaver.visibility import AnyVisibility
 
 
@@ -86,6 +92,9 @@ class WpsRestApiJobsTest(JobUtils):
         self.process_public = WpsTestProcess(identifier="process-public")
         self.process_store.save_process(self.process_public)
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
+        proc_pub = self.process_store.fetch_by_id("process-public")
+        proc_pub["jobControlOptions"] = [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
+        self.process_store.save_process(proc_pub)
         self.process_private = WpsTestProcess(identifier="process-private")
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
@@ -174,6 +183,7 @@ class WpsRestApiJobsTest(JobUtils):
                  exceptions=None,   # type: Optional[List[JSON]]
                  logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
                  statistics=None,   # type: Optional[Statistics]
+                 results=None,      # type: Optional[JobResults]
                  tags=None,         # type: Optional[List[str]]
                  add_info=True,     # type: bool
                  **job_params,      # type: Any
@@ -181,7 +191,7 @@ class WpsRestApiJobsTest(JobUtils):
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(
-            task_id=task_id, process=process, service=service, is_workflow=False, execute_async=True, user_id=user_id,
+            task_id=task_id, process=process, service=service, is_workflow=False, user_id=user_id,
             access=access, created=created, **job_params
         )
         job.status = status
@@ -201,6 +211,8 @@ class WpsRestApiJobsTest(JobUtils):
             job.exceptions = exceptions
         if statistics is not None:
             job.statistics = statistics
+        if results is not None:
+            job.results = results
         if tags is not None:
             job.tags = tags
         job = self.job_store.update_job(job)
@@ -1771,7 +1783,13 @@ class WpsRestApiJobsTest(JobUtils):
 
     @pytest.mark.oap_part4
     def test_job_inputs_response(self):
-        path = f"/jobs/{self.job_info[0].id}/inputs"
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
+            inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+        )
+
+        path = f"/jobs/{new_job.id}/inputs"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "data"}
@@ -1781,14 +1799,24 @@ class WpsRestApiJobsTest(JobUtils):
             "Accept-Language": None,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
-            "X-WPS-Output-Context": "public"
+            "X-WPS-Output-Context": "test/context",
         }
+        assert resp.json["subscribers"] == {}
         assert resp.json["mode"] == ExecuteMode.ASYNC
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
 
     @pytest.mark.oap_part4
     def test_job_outputs_response(self):
-        raise NotImplementedError  # FIXME
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.SUCCEEDED, progress=100, access=Visibility.PRIVATE, context="test/context",
+            results=[{"id": "test", "value": "data"}],
+        )
+
+        path = f"/jobs/{new_job.id}/outputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["outputs"] == {"test": {"value": "data"}}
 
     @pytest.mark.oap_part4
     @pytest.mark.xfail(reason="CWL PROV not implemented (https://github.com/crim-ca/weaver/issues/673)")
@@ -1830,7 +1858,7 @@ class WpsRestApiJobsTest(JobUtils):
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": None,
         }
-        assert resp.json["mode"] == ExecuteMode.ASYNC
+        assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
 
         # modify job definition
@@ -1857,19 +1885,24 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "modified", "new": 123}
         assert resp.json["outputs"] == {"test": {"transmissionMode": ExecuteTransmissionMode.REFERENCE}}
-        assert resp.json["subscribers"] == {
-            "successUri": "https://example.com/success",
-            "failedUri": "https://example.com/failed",
-        }
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}; wait=5",
-            "X-WPS-Output-Context": "public"
+            "X-WPS-Output-Context": None
         }
         assert resp.json["mode"] == ExecuteMode.SYNC, "Should have been modified from 'wait' preference."
         assert resp.json["response"] == ExecuteResponse.RAW, "Should have been modified from 'return' preference."
+
+        assert "subscribers" not in resp.json, "Subscribers must not be exposed due to potentially sensible data"
+        test_job = self.job_store.fetch_by_id(new_job.id)
+        assert test_job.subscribers == {
+            "callbacks": {
+                Status.SUCCEEDED: "https://example.com/success",
+                Status.FAILED: "https://example.com/failed",
+            }
+        }
 
     @pytest.mark.oap_part4
     def test_job_update_response_process_disallowed(self):

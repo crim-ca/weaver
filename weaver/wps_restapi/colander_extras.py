@@ -1422,6 +1422,10 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
             return cstruct
         if not getattr(self, SchemaRefMappingSchema._extension, False):
             return cstruct
+        # don't inject the schema meta/id if the mapping is empty
+        # this is to avoid creating a non-empty mapping, which often as a "special" meaning
+        if not cstruct:
+            return cstruct
 
         schema_result = {}
         schema_fields = [("schema", schema_meta), ("id", schema_id)]

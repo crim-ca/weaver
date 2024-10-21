@@ -1,10 +1,9 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
-    HTTPAccepted,
     HTTPBadRequest,
     HTTPOk,
     HTTPNoContent,
@@ -17,6 +16,7 @@ from weaver import xml_util
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, ProcessNotFound, log_unhandled_exceptions
+from weaver.execute import parse_prefer_header_execute_mode, rebuild_prefer_header
 from weaver.formats import (
     ContentType,
     OutputFormat,
@@ -485,30 +485,28 @@ def get_job_inputs(request):
     Retrieve the inputs values and outputs definitions of a job.
     """
     job = get_job(request)
-    schema = cast(
-        "JobInputsOutputsSchemaType",
-        get_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
-    )
+    schema = get_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
     job_inputs = job.inputs
     job_outputs = job.outputs
     if job.is_local:
         process = get_process(job.process, request=request)
         job_inputs = mask_process_inputs(process.package, job_inputs)
     job_inputs = convert_input_values_schema(job_inputs, schema)
-    job_outputs = convert_output_params_schema(job_outputs, schema)
+    job_outputs = convert_output_params_schema(job_outputs, schema)  # type: ignore
+    job_prefer = rebuild_prefer_header(job)
+    job_mode, _, _ = parse_prefer_header_execute_mode({"Prefer": job_prefer}, return_auto=True)
     job_headers = {
         "Accept": job.accept_type,
         "Accept-Language": job.accept_language,
-        "Prefer": f"return={job.execution_return}" if job.execution_return else None,
+        "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }
     body = {
-        "mode": job.execution_mode,
+        "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
-        "subscribers": job.subscribers,
         "links": job.links(request, self_link="inputs"),
     }
     body = sd.JobInputsBody().deserialize(body)
