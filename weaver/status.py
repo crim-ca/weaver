@@ -62,8 +62,7 @@ JOB_STATUS_CATEGORIES = {
         Status.STARTED,     # running
         Status.SUCCEEDED,
         Status.FAILED,
-        Status.PAUSED,
-        Status.EXCEPTION
+        Status.PAUSED
     ]),
     StatusCompliant.OWSLIB: frozenset([
         Status.ACCEPTED,
@@ -204,12 +203,12 @@ def map_status(wps_status, compliant=StatusCompliant.OGC):
             job_status = Status.SUCCEEDED
 
     elif compliant == StatusCompliant.PYWPS:
-        if job_status in Status.RUNNING:
+        if job_status in [Status.RUNNING]:
             job_status = Status.STARTED
         elif job_status in [Status.DISMISSED, Status.CANCELED]:
             job_status = Status.FAILED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]:
-            job_status = Status.EXCEPTION
+            job_status = Status.FAILED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
             job_status = Status.PAUSED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
