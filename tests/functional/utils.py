@@ -31,7 +31,7 @@ from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import JobInputsOutputsSchema, ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_weaver_url, load_file, get_path_kvp
+from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:

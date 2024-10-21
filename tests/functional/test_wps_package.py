@@ -88,8 +88,8 @@ if TYPE_CHECKING:
         CWL_RequirementsDict,
         JSON,
         Number,
-        ProcessOfferingMapping,
-        ProcessOfferingListing
+        ProcessOfferingListing,
+        ProcessOfferingMapping
     )
 
 EDAM_PLAIN = f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}"

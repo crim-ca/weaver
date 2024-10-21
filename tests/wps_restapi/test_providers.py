@@ -3,6 +3,7 @@ import pytest
 from pyramid.httpexceptions import HTTPNotFound
 
 from tests import resources
+from tests.functional.utils import GenericUtils
 from tests.utils import (
     get_test_weaver_app,
     mocked_remote_server_requests_wps1,
@@ -17,8 +18,6 @@ from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.constants import ProcessSchema
-
-from tests.functional.utils import GenericUtils
 
 
 class WpsProviderBase(GenericUtils):
