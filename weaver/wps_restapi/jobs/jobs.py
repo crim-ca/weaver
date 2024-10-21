@@ -238,7 +238,7 @@ def create_job(request):
             prov_id = prov_parts[-1] if len(prov_parts) > 1 else None
         elif ctype in ContentType.ANY_XML:
             body_xml = xml_util.fromstring(request.text)
-            proc_id = body_xml.xpath("ows:Identifier", namespaces=body_xml.getroot().nsmap)[0].text
+            proc_id = body_xml.xpath("ows:Identifier", namespaces=body_xml.getroottree().nsmap)[0].text
     except Exception as exc:
         raise ProcessNotFound(json={
             "title": "NoSuchProcess",

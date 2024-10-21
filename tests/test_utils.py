@@ -412,8 +412,9 @@ def test_map_status_compliant(compliance, status):
 
 
 def test_map_status_back_compatibility_and_special_cases():
-    for c in StatusCompliant:
+    for c in (set(StatusCompliant.values()) - {StatusCompliant.OPENEO}):  # type: ignore
         assert map_status("successful", c) == Status.SUCCEEDED
+    assert map_status("successful", StatusCompliant.OPENEO) == Status.FINISHED
 
 
 def test_map_status_pywps_compliant_as_int_statuses():
