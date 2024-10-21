@@ -494,20 +494,16 @@ class WpsConfigBase(GenericUtils):
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
-        wait_for_status = wait_for_status or Status.SUCCEEDED
+        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCEEDED)
 
         def check_job_status(_resp, running=False):
             # type: (AnyResponseType, bool) -> bool
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            if wait_for_status is None:
-                final_status = Status.FAILED if expect_failed else Status.SUCCEEDED
-            else:
-                final_status = wait_for_status
             statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
             assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
             assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
-            return body["status"] in {wait_for_status, Status.SUCCEEDED, Status.FAILED}  # break condition
+            return body["status"] in {final_status, Status.SUCCEEDED, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout

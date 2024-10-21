@@ -210,7 +210,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 201
 
         job_url = resp.json["location"]
-        job_res = self.monitor_job(job_url, expect_failed=True)
+        job_res = self.monitor_job(job_url, expect_failed=True, return_status=True)
         assert job_res["status"] == Status.FAILED
         job_logs = self.app.get(f"{job_url}/logs").json
         assert any("ValueError: Not a valid file URL reference" in log for log in job_logs)
