@@ -31,7 +31,7 @@ from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import JobInputsOutputsSchema, ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_weaver_url, load_file
+from weaver.utils import fully_qualified_name, get_weaver_url, load_file, get_path_kvp
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -530,7 +530,8 @@ class WpsConfigBase(GenericUtils):
         return resp.json
 
     def get_outputs(self, status_url):
-        resp = self.app.get(f"{status_url}/outputs", headers=dict(self.json_headers))
+        path = get_path_kvp(f"{status_url}/outputs", schema=JobInputsOutputsSchema.OLD)
+        resp = self.app.get(path, headers=dict(self.json_headers))
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"

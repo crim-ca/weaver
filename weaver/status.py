@@ -164,7 +164,7 @@ if TYPE_CHECKING:
     ]
 
 
-def map_status(wps_status, compliant=StatusCompliant.OGC):
+def map_status(wps_status, compliant=StatusCompliant.OGC):  # pylint: disable=R1260
     # type: (AnyStatusType, StatusCompliant) -> StatusType
     """
     Maps WPS execution statuses to between compatible values of different implementations.

@@ -266,6 +266,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,  # by value/reference doesn't matter because of this
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
             })
@@ -306,6 +307,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 # NOTE: quantity of outputs important as well
                 #       since single output, content-type is directly that output (otherwise should be multipart)
@@ -352,6 +354,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],  # Link header
             })

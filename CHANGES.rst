@@ -14,6 +14,9 @@ Changes:
 --------
 - Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
   (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
+- Align ``GET /jobs/{jobID}/outputs`` with requirements of *OGC API - Processes - Part 4: Job Management* endpoints
+  such that omitting the ``schema`` query parameter will automatically apply the `OGC` mapping representation by
+  default. Previous behavior was to return whichever representation that was used by the internal `Process` interface.
 - Add support of ``response: raw`` execution request body parameter as alternative to ``response: document``,
   which allows directly returning the result contents or ``Link`` headers rather then embedding them in a `JSON`
   response (fixes `#376 <https://github.com/crim-ca/weaver/issues/376>`_).
