@@ -1929,6 +1929,7 @@ class WpsRestApiJobsTest(JobUtils):
         }
 
     @pytest.mark.oap_part4
+    @pytest.mark.openeo
     def test_job_status_alt_openeo_accept_response(self):
         """
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``Accept`` header.
@@ -1967,6 +1968,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["status"] == Status.QUEUED
 
     @pytest.mark.oap_part4
+    @pytest.mark.openeo
     def test_job_status_alt_openeo_profile_response(self):
         """
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``profile`` query parameter.

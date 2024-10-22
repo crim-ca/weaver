@@ -1911,14 +1911,22 @@ def convert_input_values_schema(inputs, schema):
 
 
 @overload
-def convert_output_params_schema(inputs, schema):
+def convert_output_params_schema(outputs, schema):
     # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOGCType) -> Optional[ExecutionOutputsMap]
     ...
 
 
 @overload
-def convert_output_params_schema(inputs, schema):
+def convert_output_params_schema(outputs, schema):
     # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaAnyOLDType) -> Optional[ExecutionOutputsList]
+    ...
+
+
+# FIXME: workaround typing duplicate
+# (https://youtrack.jetbrains.com/issue/PY-76786/Typing-literal-with-overload-fails-to-consider-non-overloaded-type)
+@overload
+def convert_output_params_schema(outputs, schema):
+    # type: (Optional[ExecutionOutputs], JobInputsOutputsSchemaType) -> Optional[ExecutionOutputs]
     ...
 
 

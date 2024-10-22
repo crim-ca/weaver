@@ -52,9 +52,9 @@ JOB_STATUS_CATEGORIES = {
         Status.CREATED,     # Part 4: Job Management
         Status.ACCEPTED,
         Status.RUNNING,
-        Status.SUCCEEDED,   # old (keep it because it matches existing ADES/EMS and other providers)
+        Status.SUCCEEDED,   # new
         Status.FAILED,
-        Status.SUCCESSFUL,  # new
+        Status.SUCCESSFUL,  # old (keep it because it matches existing ADES/EMS and other providers)
         Status.DISMISSED    # new
     ]),
     StatusCompliant.PYWPS: frozenset([

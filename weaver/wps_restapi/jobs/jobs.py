@@ -1,3 +1,4 @@
+from moto.batch.utils import JobStatus
 from typing import TYPE_CHECKING
 
 from box import Box
@@ -25,7 +26,7 @@ from weaver.formats import (
     guess_target_format,
     repr_json
 )
-from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.processes.execution import (
     submit_job,
@@ -35,7 +36,7 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
@@ -45,7 +46,8 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_list_links,
     get_job_results_response,
     get_results,
-    get_schema_query,
+    get_job_io_schema_query,
+    get_job_status_schema,
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
     raise_job_dismissed,
@@ -320,8 +322,11 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    job_status = job.json(request)
-    return HTTPOk(json=job_status)
+    job_body = job.json(request)
+    schema = get_job_status_schema(request)
+    if schema == JobStatusSchema.OPENEO:
+        job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
+    return HTTPOk(json=job_body)
 
 
 @sd.provider_job_service.patch(
@@ -485,14 +490,14 @@ def get_job_inputs(request):
     Retrieve the inputs values and outputs definitions of a job.
     """
     job = get_job(request)
-    schema = get_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
+    schema = get_job_io_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
     job_inputs = job.inputs
     job_outputs = job.outputs
     if job.is_local:
         process = get_process(job.process, request=request)
         job_inputs = mask_process_inputs(process.package, job_inputs)
     job_inputs = convert_input_values_schema(job_inputs, schema)
-    job_outputs = convert_output_params_schema(job_outputs, schema)  # type: ignore
+    job_outputs = convert_output_params_schema(job_outputs, schema)
     job_prefer = rebuild_prefer_header(job)
     job_mode, _, _ = parse_prefer_header_execute_mode({"Prefer": job_prefer}, return_auto=True)
     job_headers = {
@@ -543,7 +548,7 @@ def get_job_outputs(request):
     job = get_job(request)
     raise_job_dismissed(job, request)
     raise_job_bad_status_success(job, request)
-    schema = get_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
+    schema = get_job_io_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
     outputs.update({"links": job.links(request, self_link="outputs")})

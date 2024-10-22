@@ -3,7 +3,7 @@ import math
 import os
 import shutil
 from copy import deepcopy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, overload
 
 import colander
 from celery.utils.log import get_task_logger
@@ -42,7 +42,7 @@ from weaver.execute import (
 )
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -54,12 +54,14 @@ from weaver.utils import (
     get_header,
     get_href_headers,
     get_path_kvp,
+    get_request_args,
     get_sane_name,
     get_secure_path,
     get_settings,
     get_weaver_url,
     is_uuid,
-    make_link_header
+    make_link_header,
+    parse_kvp
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
@@ -72,7 +74,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
@@ -280,8 +282,17 @@ def get_job_list_links(job_total, filters, request):
     return links
 
 
-def get_schema_query(
-    schema,         # type: Optional[JobInputsOutputsSchemaType]
+@overload
+def get_job_io_schema_query(
+    schema,         # type: Optional[str]
+    strict=True,    # type: bool
+    default=None,   # type: JobInputsOutputsSchemaType
+):                  # type: (...) -> JobInputsOutputsSchemaType
+    ...
+
+
+def get_job_io_schema_query(
+    schema,         # type: Optional[str]
     strict=True,    # type: bool
     default=None,   # type: Optional[JobInputsOutputsSchemaType]
 ):                  # type: (...) -> Optional[JobInputsOutputsSchemaType]
@@ -303,6 +314,29 @@ def get_schema_query(
     if not strict:
         return schema_checked.split("+", 1)[0]
     return schema_checked
+
+
+def get_job_status_schema(request):
+    # type: (AnyRequestType) -> JobStatusSchemaType
+    """
+    Identifies if a :term:`Job` status response schema applies for the request.
+    """
+    params = get_request_args(request)
+    schema = JobStatusSchema.get(params.get("schema"))
+    if schema:
+        return schema
+    ctype = get_header("Content-Type", request.headers)
+    if not ctype:
+        return JobStatusSchema.OGC
+    params = parse_kvp(ctype)
+    profile = params.get("profile")
+    if not profile:
+        return JobStatusSchema.OGC
+    schema = cast(
+        "JobStatusSchemaType",
+        JobStatusSchema.get(profile, default=JobStatusSchema.OGC)
+    )
+    return schema
 
 
 def make_result_link(

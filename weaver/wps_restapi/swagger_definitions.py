@@ -102,6 +102,7 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
+    JobStatusSchema,
     ProcessSchema
 )
 from weaver.quotation.status import QuoteStatus
@@ -3264,12 +3265,26 @@ class ProcessVisibilityPutEndpoint(LocalProcessPath):
     body = VisibilitySchema()
 
 
+class GetJobQuery(ExtendedMappingSchema):
+    schema = ExtendedSchemaNode(
+        String(),
+        title="JobStatusQuerySchema",
+        example=JobStatusSchema.OGC,
+        default=JobStatusSchema.OGC,
+        validator=OneOfCaseInsensitive(JobStatusSchema.values()),
+        summary="Job status schema representation.",
+        description="Selects the schema employed for representation of returned job status response.",
+    )
+
+
 class GetProviderJobEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
+    querystring = GetJobQuery()
 
 
 class GetJobEndpoint(JobPath):
     header = RequestHeaders()
+    querystring = GetJobQuery()
 
 
 class ProcessInputsEndpoint(LocalProcessPath, JobPath):
@@ -6717,9 +6732,13 @@ class DeleteProviderJobsEndpoint(DeleteJobsEndpoint, ProviderProcessPath):
     pass
 
 
+class GetProcessJobQuery(LocalProcessQuery, GetJobQuery):
+    pass
+
+
 class GetProcessJobEndpoint(LocalProcessPath):
     header = RequestHeaders()
-    querystring = LocalProcessQuery()
+    querystring = GetProcessJobQuery()
 
 
 class DeleteJobEndpoint(JobPath):
