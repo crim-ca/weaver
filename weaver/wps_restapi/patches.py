@@ -4,13 +4,15 @@ Helpers to work around some default view configurations that are not desired.
 import contextlib
 from typing import TYPE_CHECKING
 
-from cornice import Service as ServiceAutoGetHead
+from cornice import Service as CorniceService
 from pyramid.config import Configurator as PyramidConfigurator
 from pyramid.predicates import RequestMethodPredicate
 from pyramid.util import as_sorted_tuple
 
 if TYPE_CHECKING:
-    from typing import Any, Tuple, Union
+    from typing import Any, Callable, Optional, Sequence, Tuple, Union
+
+    from weaver.typedefs import AnyViewCallable, RequestMethod
 
 
 class Configurator(PyramidConfigurator):
@@ -68,7 +70,33 @@ class NoAutoHeadList(list):
         super(NoAutoHeadList, self).append(__object)
 
 
-class ServiceOnlyExplicitGetHead(ServiceAutoGetHead):
+class ServiceAutoAcceptDecorator(CorniceService):
+    """
+    Extends the view :meth:`decorator` to allow multiple ``accept`` headers provided all at once.
+
+    The base :class:`CorniceService` only allows a single ``accept`` header value, which forces repeating the entire
+    parameters over multiple separate decorator calls.
+    """
+
+    def decorator(self, method, accept=None, **kwargs):
+        # type: (RequestMethod, Optional[str, Sequence[str]], Any) -> Callable[[AnyViewCallable], AnyViewCallable]
+        if isinstance(accept, str) or accept is None:
+            return super().decorator(method, accept=accept, **kwargs)
+
+        if not hasattr(accept, "__iter__") or not all(isinstance(header, str) for header in accept):
+            raise ValueError("Service decorator parameter 'accept' must be a single string or a sequence of strings.")
+
+        def wrapper(view):
+            # type: (AnyViewCallable) -> AnyViewCallable
+            for header in accept:
+                wrap_view = CorniceService.decorator(self, method, accept=header, **kwargs)
+                wrap_view(view)
+            return view
+
+        return wrapper
+
+
+class ServiceOnlyExplicitGetHead(CorniceService):
     """
     Service that disallow the auto-insertion of HTTP HEAD method view when HTTP GET view is defined.
 
@@ -97,6 +125,12 @@ class ServiceOnlyExplicitGetHead(ServiceAutoGetHead):
             self.definitions.allow_once = True
             self.defined_methods.allow_once = True
         super(ServiceOnlyExplicitGetHead, self).add_view(method, view, **kwargs)
+
+
+class WeaverService(ServiceAutoAcceptDecorator, ServiceOnlyExplicitGetHead):
+    """
+    Service that combines all respective capabilities required by :mod:`weaver`.
+    """
 
 
 class RequestMethodPredicateNoGetHead(RequestMethodPredicate):

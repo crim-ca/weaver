@@ -379,6 +379,9 @@ if TYPE_CHECKING:
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyResponseClass = Union[PyramidResponse, WebobResponse, HTTPException]
     AnyViewResponse = Union[AnyResponseClass, JSON]
+    AnyViewCallableContextRequest = Callable[[Any, AnyRequestType], AnyViewResponse]
+    AnyViewCallableRequestOnly = Callable[[AnyRequestType], AnyViewResponse]
+    AnyViewCallable = Union[AnyViewCallableContextRequest, AnyViewCallableRequestOnly]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",

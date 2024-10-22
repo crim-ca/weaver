@@ -40,7 +40,7 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
+from weaver.formats import ContentEncoding, ContentType, get_format, repr_json, clean_media_type_format
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -317,26 +317,41 @@ def get_job_io_schema_query(
 
 
 def get_job_status_schema(request):
-    # type: (AnyRequestType) -> JobStatusSchemaType
+    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
     """
     Identifies if a :term:`Job` status response schema applies for the request.
     """
+    def make_headers(resolved_schema):
+        content_accept = request.accept.header_value or ContentType.APP_JSON
+        content_type = clean_media_type_format(content_accept, strip_parameters=True)
+        content_profile = f"{content_type}; profile={resolved_schema}"
+        content_headers = {"Content-Type": content_profile}
+        if resolved_schema == JobStatusSchema.OGC:
+            content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
+        elif resolved_schema == JobStatusSchema.OPENEO:
+            content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        return content_headers
+
     params = get_request_args(request)
-    schema = JobStatusSchema.get(params.get("schema"))
+    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
     if schema:
-        return schema
-    ctype = get_header("Content-Type", request.headers)
+        headers = make_headers(schema)
+        return schema, headers
+    ctype = get_header("Accept", request.headers)
     if not ctype:
-        return JobStatusSchema.OGC
+        return JobStatusSchema.OGC, {}
     params = parse_kvp(ctype)
     profile = params.get("profile")
     if not profile:
-        return JobStatusSchema.OGC
+        schema = JobStatusSchema.OGC
+        headers = make_headers(schema)
+        return schema, headers
     schema = cast(
         "JobStatusSchemaType",
-        JobStatusSchema.get(profile, default=JobStatusSchema.OGC)
+        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
     )
-    return schema
+    headers = make_headers(schema)
+    return schema, headers
 
 
 def make_result_link(

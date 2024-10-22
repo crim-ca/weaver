@@ -297,21 +297,30 @@ def trigger_job_execution(request):
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_prov_single_job_status_responses,
 )
 @sd.process_job_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetProcessJobEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetJobEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -323,10 +332,10 @@ def get_job_status(request):
     """
     job = get_job(request)
     job_body = job.json(request)
-    schema = get_job_status_schema(request)
+    schema, headers = get_job_status_schema(request)
     if schema == JobStatusSchema.OPENEO:
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
-    return HTTPOk(json=job_body)
+    return HTTPOk(json=job_body, headers=headers)
 
 
 @sd.provider_job_service.patch(

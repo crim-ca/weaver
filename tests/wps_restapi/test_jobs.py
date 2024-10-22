@@ -1934,33 +1934,37 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``Accept`` header.
         """
-        assert self.job_info[0].status == Status.SUCCEEDED, "Precondition invalid."
+        job = self.job_info[0]
+        assert job.status == Status.SUCCEEDED, "Precondition invalid."
         headers = {"Accept": "application/json; profile=openeo"}
-        path = f"/jobs/{self.job_info[0].id}"
+        path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.FINISHED
 
-        assert self.job_info[0].status == Status.FAILED, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
+        job = self.job_info[1]
+        assert job.status == Status.FAILED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.ERROR
 
-        assert self.job_info[9].status == Status.RUNNING, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
+        job = self.job_info[9]
+        assert job.status == Status.RUNNING, "Precondition invalid."
+        path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.RUNNING
 
-        assert self.job_info[11].status == Status.ACCEPTED, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
+        job = self.job_info[11]
+        assert job.status == Status.ACCEPTED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
@@ -1973,33 +1977,37 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``profile`` query parameter.
         """
-        assert self.job_info[0].status == Status.SUCCEEDED, "Precondition invalid."
-        path = f"/jobs/{self.job_info[0].id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        job = self.job_info[0]
+        assert job.status == Status.SUCCEEDED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.FINISHED
 
-        assert self.job_info[0].status == Status.FAILED, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        job = self.job_info[1]
+        assert job.status == Status.FAILED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.ERROR
 
-        assert self.job_info[9].status == Status.RUNNING, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        job = self.job_info[9]
+        assert job.status == Status.RUNNING, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.RUNNING
 
-        assert self.job_info[11].status == Status.ACCEPTED, "Precondition invalid."
-        path = f"/jobs/{self.job_info[1].id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"profile": "openeo"})
+        job = self.job_info[11]
+        assert job.status == Status.ACCEPTED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == "application/json; profile=openeo"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL

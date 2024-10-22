@@ -139,7 +139,7 @@ from weaver.wps_restapi.colander_extras import (
     XMLObject
 )
 from weaver.wps_restapi.constants import ConformanceCategory
-from weaver.wps_restapi.patches import ServiceOnlyExplicitGetHead as Service  # warning: don't use 'cornice.Service'
+from weaver.wps_restapi.patches import WeaverService as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Type, Union
@@ -221,6 +221,8 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
 OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
 OGC_API_BBOX_EPSG = "EPSG:4326"
+
+OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
 
 OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
 OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
@@ -3265,16 +3267,19 @@ class ProcessVisibilityPutEndpoint(LocalProcessPath):
     body = VisibilitySchema()
 
 
+class JobStatusQueryProfileSchema(ExtendedSchemaNode):
+    summary = "Job status schema representation."
+    description = "Selects the schema employed for representation of returned job status response."
+    schema_type = String
+    title = "JobStatusQuerySchema"
+    example = JobStatusSchema.OGC
+    default = JobStatusSchema.OGC
+    validator = OneOfCaseInsensitive(JobStatusSchema.values())
+
+
 class GetJobQuery(ExtendedMappingSchema):
-    schema = ExtendedSchemaNode(
-        String(),
-        title="JobStatusQuerySchema",
-        example=JobStatusSchema.OGC,
-        default=JobStatusSchema.OGC,
-        validator=OneOfCaseInsensitive(JobStatusSchema.values()),
-        summary="Job status schema representation.",
-        description="Selects the schema employed for representation of returned job status response.",
-    )
+    schema = JobStatusQueryProfileSchema(missing=drop)
+    profile = JobStatusQueryProfileSchema(missing=drop)
 
 
 class GetProviderJobEndpoint(ProviderProcessPath, JobPath):
@@ -3735,7 +3740,7 @@ class DurationISO(ExtendedSchemaNode):
 
 
 class JobStatusInfo(ExtendedMappingSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+    _schema = OGC_API_SCHEMA_JOB_STATUS_URL
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
