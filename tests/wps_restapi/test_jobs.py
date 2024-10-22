@@ -1801,9 +1801,10 @@ class WpsRestApiJobsTest(JobUtils):
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": "test/context",
         }
-        assert resp.json["subscribers"] == {}
         assert resp.json["mode"] == ExecuteMode.ASYNC
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
+
+        assert "subscribers" not in resp.json, "Subscribers must not be exposed due to potentially sensible data"
 
     @pytest.mark.oap_part4
     def test_job_outputs_response(self):

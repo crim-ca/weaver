@@ -814,8 +814,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 tags.append(ProcessType.WORKFLOW)
             else:
                 tags.append(ProcessType.APPLICATION)
-            if execute_mode != ExecuteMode.ASYNC and execute_wait is not None:
-                execute_mode = ExecuteMode.SYNC
             if execute_mode is None:
                 execute_mode = ExecuteMode.AUTO
             tags.append(execute_mode)

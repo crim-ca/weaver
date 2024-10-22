@@ -1097,7 +1097,7 @@ class Job(Base, LoggerHandler):
         """
         Execution time (in seconds) to wait for a synchronous response.
         """
-        if not self.execute_sync:
+        if self.execute_async:
             return None
         return self.get("execution_wait")
 

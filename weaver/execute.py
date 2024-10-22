@@ -166,7 +166,8 @@ def parse_prefer_header_execute_mode(
             wait = None if mode == ExecuteMode.ASYNC else wait_max
             return mode, wait, {}
         # /req/core/process-execute-default-execution-mode (C)
-        return ExecuteMode.SYNC, wait_max, {}
+        mode = ExecuteMode.AUTO if return_auto else ExecuteMode.SYNC
+        return mode, wait_max, {}
 
     # allow both listing of multiple 'Prefer' headers and single 'Prefer' header with multi-param ';' separated
     params = parse_kvp(prefer.replace(";", ","), pair_sep=",", multi_value_sep=None)

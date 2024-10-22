@@ -810,7 +810,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         job_ctl_opts = ExecuteControlOption.values()
     exec_max_wait = settings.get("weaver.execute_sync_max_wait", settings.get("weaver.exec_sync_max_wait"))
     exec_max_wait = as_int(exec_max_wait, default=20)
-    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
+    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait, return_auto=True)
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
         execute_mode = ExecuteMode.get(json_body.get("mode"), default=ExecuteMode.AUTO)
     else:
@@ -1119,6 +1119,9 @@ def validate_process_id(job_process, payload):
     # type: (Process, ProcessExecution) -> None
     """
     Validates that the specified ``process`` in the payload corresponds to the referenced :term:`Job` :term:`Process`.
+
+    If not ``process```is specified, no check is performed. The :term:`Job` is assumed to have pre-validated that
+    the :term:`Process` is appropriate from another reference, such as using the ID from the path or a query parameter.
 
     :raises HTTPException: Corresponding error for detected invalid combination of process references.
     """
