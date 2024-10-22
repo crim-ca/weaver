@@ -1043,7 +1043,7 @@ def validate_job_json(request):
     """
     if ContentType.APP_JSON not in request.content_type:
         raise HTTPUnsupportedMediaType(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
             "title": "Unsupported Media-Type",
             "detail": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' is not supported.",
             "code": "InvalidHeaderValue",
@@ -1054,7 +1054,7 @@ def validate_job_json(request):
         json_body = request.json_body
     except Exception as ex:
         raise HTTPBadRequest(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
             "title": "Bad Request",
             "detail": f"Invalid JSON body cannot be decoded for job submission. [{ex}]",
         })

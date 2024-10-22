@@ -529,10 +529,27 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/per/job-management/update-content-schema",
         # FIXME: support part 3: Nested Workflow Execution request (https://github.com/crim-ca/weaver/issues/412)
         # f"{ogcapi_proc_part4}/rec/job-management/create-body-ogcapi-processes",
+        # f"{ogcapi_proc_part4}/rec/job-management/update-body-ogcapi-processes",
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part4}/rec/job-management/create-body-openeo",
-        f"{ogcapi_proc_part4}/req/job-management/create/post-op",
-        f"{ogcapi_proc_part4}/req/job-management/update/response-locked",
+        # f"{ogcapi_proc_part4}/rec/job-management/update-body-openeo",
+        f"{ogcapi_proc_part4}/req/job-management/create-post-op",
+        f"{ogcapi_proc_part4}/req/job-management/create-content-type",
+        f"{ogcapi_proc_part4}/req/job-management/create-response-body",
+        f"{ogcapi_proc_part4}/req/job-management/create-response-jobid",
+        f"{ogcapi_proc_part4}/req/job-management/create-response-success",
+        # f"{ogcapi_proc_part4}/req/job-management/create-unsupported-schema",
+        f"{ogcapi_proc_part4}/req/job-management/create-unsupported-media-type",
+        f"{ogcapi_proc_part4}/req/job-management/definition-get-op",
+        f"{ogcapi_proc_part4}/req/job-management/definition-response-body",
+        f"{ogcapi_proc_part4}/req/job-management/definition-response-success",
+        f"{ogcapi_proc_part4}/req/job-management/start-post-op",
+        f"{ogcapi_proc_part4}/req/job-management/start-response",
+        f"{ogcapi_proc_part4}/req/job-management/update-body",
+        f"{ogcapi_proc_part4}/req/job-management/update-content-type",
+        f"{ogcapi_proc_part4}/req/job-management/update-patch-op",
+        f"{ogcapi_proc_part4}/req/job-management/update-response",
+        f"{ogcapi_proc_part4}/req/job-management/update-response-locked",
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing

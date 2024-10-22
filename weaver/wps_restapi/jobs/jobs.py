@@ -251,7 +251,7 @@ def create_job(request):
     if not proc_id:
         raise HTTPUnsupportedMediaType(json={
             "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
             "detail": "Process URL or identifier reference missing or invalid.",
             "status": HTTPUnsupportedMediaType.code,
             "cause": {"headers": {"Content-Type": ctype}},

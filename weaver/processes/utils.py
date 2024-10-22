@@ -17,9 +17,11 @@ from pyramid.httpexceptions import (
     HTTPCreated,
     HTTPException,
     HTTPForbidden,
+    HTTPInternalServerError,
     HTTPNotFound,
     HTTPOk,
-    HTTPUnprocessableEntity
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
 )
 from pyramid.settings import asbool
 
@@ -70,7 +72,7 @@ from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_content
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -326,6 +328,65 @@ def resolve_cwl_graph(package):
     return package
 
 
+def parse_process_deploy_content(
+    request=None,                                       # type: Optional[AnyRequestType]
+    content=None,                                       # type: Optional[Union[JSON, str]]
+    content_schema=None,                                # type: Optional[colander.SchemaNode]
+    content_type=sd.RequestContentTypeHeader.default,   # type: Optional[ContentType]
+    content_type_schema=sd.RequestContentTypeHeader,    # type: Optional[colander.SchemaNode]
+):                                                      # type: (...) -> Union[JSON, CWL]
+    """
+    Load the request content with validation of expected content type and their schema.
+    """
+    if request is None and content is None:  # pragma: no cover  # safeguard for early detect invalid implementation
+        raise HTTPInternalServerError(json={
+            "title": "Internal Server Error",
+            "type": "InternalServerError",
+            "detail": "Cannot parse undefined contents.",
+            "status": HTTPInternalServerError.code,
+            "cause": "Request content and content argument are undefined.",
+        })
+    try:
+        if request is not None:
+            content = request.text
+            content_type = request.content_type
+        if content_type is not None and content_type_schema is not None:
+            content_type = content_type_schema().deserialize(content_type)
+        if isinstance(content, str):
+            content = yaml.safe_load(content)
+        if not isinstance(content, dict):
+            raise TypeError("Not a valid JSON body for process deployment.")
+    except colander.Invalid as exc:
+        raise HTTPUnsupportedMediaType(json={
+            "title": "Unsupported Media Type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+            "detail": str(exc),
+            "status": HTTPUnsupportedMediaType.code,
+            "cause": {"Content-Type": None if content_type is None else str(content_type)},
+        })
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "title": "Bad Request",
+            "type": "BadRequest",
+            "detail": "Unable to parse contents.",
+            "status": HTTPBadRequest.code,
+            "cause": str(exc),
+        })
+    try:
+        if content_schema is not None:
+            content = content_schema().deserialize(content)
+    except colander.Invalid as exc:
+        raise HTTPUnprocessableEntity(json={
+            "type": "InvalidParameterValue",
+            "title": "Failed schema validation.",
+            "status": HTTPUnprocessableEntity.code,
+            "error": colander.Invalid.__name__,
+            "cause": exc.msg,
+            "value": repr_json(exc.value, force_string=False),
+        })
+    return content
+
+
 def deploy_process_from_payload(payload, container, overwrite=False):  # pylint: disable=R1260,too-complex
     # type: (Union[JSON, str], Union[AnySettingsContainer, AnyRequestType], Union[bool, Process]) -> HTTPException
     """
@@ -351,7 +412,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     c_type = ContentType.get(get_header("Content-Type", headers), default=ContentType.APP_OGC_PKG_JSON)
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
-    payload = parse_content(
+    payload = parse_process_deploy_content(
         request=None,
         content=payload,
         content_type=c_type,
@@ -836,7 +897,7 @@ def update_process_metadata(request):
     Desired new version can be eiter specified explicitly in request payload, or will be guessed accordingly to
     detected changes to be applied.
     """
-    data = parse_content(request, content_schema=sd.PatchProcessBodySchema)
+    data = parse_process_deploy_content(request, content_schema=sd.PatchProcessBodySchema)
     old_process = get_process(request=request)
     new_process = copy.deepcopy(old_process)
     update_level = _apply_process_metadata(new_process, data)

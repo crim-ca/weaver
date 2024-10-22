@@ -6,34 +6,21 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import colander
-import yaml
 from box import Box
 from pyramid.events import BeforeRender, subscriber
-from pyramid.httpexceptions import (
-    HTTPBadRequest,
-    HTTPInternalServerError,
-    HTTPSuccessful,
-    HTTPUnprocessableEntity,
-    HTTPUnsupportedMediaType,
-    status_map
-)
+from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, status_map
 
 from weaver import __meta__
-from weaver.formats import repr_json
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Optional
 
-    from weaver.formats import ContentType
     from weaver.typedefs import (
         AnyCallableWrapped,
-        AnyRequestType,
         AnySettingsContainer,
-        CWL,
         HeadersType,
-        JSON,
         Params,
         Return,
         SettingsType
@@ -185,64 +172,6 @@ def handle_schema_validation(schema=None):
                 raise HTTPBadRequest(json=data)
         return wrapped
     return decorator
-
-
-def parse_content(request=None,                                         # type: Optional[AnyRequestType]
-                  content=None,                                         # type: Optional[Union[JSON, str]]
-                  content_schema=None,                                  # type: Optional[colander.SchemaNode]
-                  content_type=sd.RequestContentTypeHeader.default,     # type: Optional[ContentType]
-                  content_type_schema=sd.RequestContentTypeHeader,      # type: Optional[colander.SchemaNode]
-                  ):                                                    # type: (...) -> Union[JSON, CWL]
-    """
-    Load the request content with validation of expected content type and their schema.
-    """
-    if request is None and content is None:  # pragma: no cover  # safeguard for early detect invalid implementation
-        raise HTTPInternalServerError(json={
-            "title": "Internal Server Error",
-            "type": "InternalServerError",
-            "detail": "Cannot parse undefined contents.",
-            "status": HTTPInternalServerError.code,
-            "cause": "Request content and content argument are undefined.",
-        })
-    try:
-        if request is not None:
-            content = request.text
-            content_type = request.content_type
-        if content_type is not None and content_type_schema is not None:
-            content_type = content_type_schema().deserialize(content_type)
-        if isinstance(content, str):
-            content = yaml.safe_load(content)
-        if not isinstance(content, dict):
-            raise TypeError("Not a valid JSON body for process deployment.")
-    except colander.Invalid as exc:
-        raise HTTPUnsupportedMediaType(json={
-            "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
-            "detail": str(exc),
-            "status": HTTPUnsupportedMediaType.code,
-            "cause": {"Content-Type": None if content_type is None else str(content_type)},
-        })
-    except Exception as exc:
-        raise HTTPBadRequest(json={
-            "title": "Bad Request",
-            "type": "BadRequest",
-            "detail": "Unable to parse contents.",
-            "status": HTTPBadRequest.code,
-            "cause": str(exc),
-        })
-    try:
-        if content_schema is not None:
-            content = content_schema().deserialize(content)
-    except colander.Invalid as exc:
-        raise HTTPUnprocessableEntity(json={
-            "type": "InvalidParameterValue",
-            "title": "Failed schema validation.",
-            "status": HTTPUnprocessableEntity.code,
-            "error": colander.Invalid.__name__,
-            "cause": exc.msg,
-            "value": repr_json(exc.value, force_string=False),
-        })
-    return content
 
 
 @subscriber(BeforeRender)
