@@ -58,6 +58,7 @@ gunicorn>=22
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
 json2xml==4.1.0
 jsonschema>=3.0.1
+
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -124,5 +125,16 @@ urllib3==1.26.19 ; python_version < "3.10"  # pyup: ignore
 urlmatch
 xmltodict
 webob
+werkzeug>2
+
+# transformer
+fpdf
+Pillow
+pandas
+cairosvg
+multipagetiff
+# gdal
+rasterio
+python-magic
 werkzeug>=3.0.3,<3.1
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

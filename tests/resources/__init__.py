@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import JSON
 
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
+TRANSFORM_PATH = os.path.join(RESOURCES_PATH, "transform")
 EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
 FUNCTIONAL_APP_PKG = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/application-packages"))
 
@@ -61,6 +62,8 @@ WPS_NO_INPUTS_XML = os.path.join(RESOURCES_PATH, "wps_no_inputs.xml")
 WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, WPS_NO_INPUTS_ID
 )
+
+WPS_transform_RESSOURCES = os.path.join(RESOURCES_PATH, "transform")
 
 
 def _load_path(file_path, text=False, xml=False):
