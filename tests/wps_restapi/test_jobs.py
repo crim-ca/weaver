@@ -1802,7 +1802,7 @@ class WpsRestApiJobsTest(JobUtils):
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": "test/context",
         }
-        assert resp.json["mode"] == ExecuteMode.ASYNC
+        assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
 
         assert "subscribers" not in resp.json, "Subscribers must not be exposed due to potentially sensible data"

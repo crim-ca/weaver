@@ -80,10 +80,11 @@ class ServiceAutoAcceptDecorator(CorniceService):
 
     def decorator(self, method, accept=None, **kwargs):
         # type: (RequestMethod, Optional[str, Sequence[str]], Any) -> Callable[[AnyViewCallable], AnyViewCallable]
-        if isinstance(accept, str) or accept is None:
+        if not accept:
+            return super().decorator(method, **kwargs)  # don't inject 'accept=None', causes cornice-swagger error
+        if isinstance(accept, str):
             return super().decorator(method, accept=accept, **kwargs)
-
-        if not hasattr(accept, "__iter__") or not all(isinstance(header, str) for header in accept):
+        if not hasattr(accept, "__iter__") or not all(isinstance(header, str) for header in accept):  # type: ignore
             raise ValueError("Service decorator parameter 'accept' must be a single string or a sequence of strings.")
 
         def wrapper(view):

@@ -1,4 +1,3 @@
-from moto.batch.utils import JobStatus
 from typing import TYPE_CHECKING
 
 from box import Box
