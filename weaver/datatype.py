@@ -319,6 +319,8 @@ class LocalizedDateTimeProperty(property):
         if instance is None:
             # allow access to the descriptor as class attribute 'getattr(type(instance), property-name)'
             return self  # noqa
+        if self.fget != self.__get__:  # ensure that any 'fget' specified at property creation is employed
+            return self.fget(instance)
         dt = instance.get(self.name, None)
         if not dt:
             if self.default_now:
@@ -330,7 +332,9 @@ class LocalizedDateTimeProperty(property):
 
     def __set__(self, instance, value):
         # type: (Any, Union[datetime, str]) -> None
-        if isinstance(str, datetime):
+        if self.fset != self.__set__:  # ensure that any 'fset' specified at property creation is employed
+            return self.fset(instance, value)
+        if isinstance(value, str):
             value = dt_parse(value)
         if not isinstance(value, datetime):
             name = fully_qualified_name(instance)
@@ -966,14 +970,14 @@ class Job(Base, LoggerHandler):
 
     @property
     def user_id(self):
-        # type: () -> Optional[str]
+        # type: () -> Optional[Union[AnyUUID, int]]
         return self.get("user_id", None)
 
     @user_id.setter
     def user_id(self, user_id):
-        # type: (Optional[str]) -> None
-        if not isinstance(user_id, int) or user_id is None:
-            raise TypeError(f"Type 'int' is required for '{self.__name__}.user_id'")
+        # type: (Optional[Union[AnyUUID, int]]) -> None
+        if not isinstance(user_id, (int, str, uuid.UUID)) or user_id is None:
+            raise TypeError(f"Type 'int', 'str' or a UUID is required for '{self.__name__}.user_id'")
         self["user_id"] = user_id
 
     @property
