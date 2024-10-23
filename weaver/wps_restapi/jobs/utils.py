@@ -40,7 +40,7 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, get_format, repr_json, clean_media_type_format
+from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field

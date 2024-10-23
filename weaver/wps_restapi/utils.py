@@ -17,14 +17,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
-    from weaver.typedefs import (
-        AnyCallableWrapped,
-        AnySettingsContainer,
-        HeadersType,
-        Params,
-        Return,
-        SettingsType
-    )
+    from weaver.typedefs import AnyCallableWrapped, AnySettingsContainer, HeadersType, Params, Return, SettingsType
 
 LOGGER = logging.getLogger(__name__)
 

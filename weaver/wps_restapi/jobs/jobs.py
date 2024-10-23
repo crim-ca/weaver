@@ -42,11 +42,11 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
     get_job,
+    get_job_io_schema_query,
     get_job_list_links,
     get_job_results_response,
-    get_results,
-    get_job_io_schema_query,
     get_job_status_schema,
+    get_results,
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
     raise_job_dismissed,
