@@ -321,8 +321,8 @@ def get_job_status_schema(request):
     """
     Identifies if a :term:`Job` status response schema applies for the request.
     """
+
     def make_headers(resolved_schema):
-        content_accept = request.accept.header_value or ContentType.APP_JSON
         content_type = clean_media_type_format(content_accept, strip_parameters=True)
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
@@ -331,6 +331,10 @@ def get_job_status_schema(request):
         elif resolved_schema == JobStatusSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
+
+    content_accept = request.accept.header_value or ContentType.APP_JSON
+    if content_accept == ContentType.ANY:
+        content_accept = ContentType.APP_JSON
 
     params = get_request_args(request)
     schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))

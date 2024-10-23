@@ -1095,7 +1095,7 @@ def validate_job_accept_header(headers, execution_mode):
     if ContentType.APP_JSON in accept:
         return ContentType.APP_JSON
     # anything always allowed in sync, since results returned directly
-    if execution_mode == ExecuteMode.SYNC:
+    if execution_mode in [ExecuteMode.SYNC, ExecuteMode.AUTO]:
         return accept
     if ContentType.ANY in accept:
         return
