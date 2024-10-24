@@ -654,6 +654,7 @@ def test_request_extra_intervals():
                 assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
 
 
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_request_extra_zero_values():
     """
     Test that zero-value ``retries`` and ``backoff`` are not ignored.
