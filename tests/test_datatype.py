@@ -1,11 +1,11 @@
 import uuid
 from copy import deepcopy
-
 from datetime import datetime, timedelta
+
 import pytest
+from visibility import Visibility
 
 from tests import resources
-from visibility import Visibility
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Job, Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType

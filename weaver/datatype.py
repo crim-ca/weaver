@@ -319,7 +319,8 @@ class LocalizedDateTimeProperty(property):
         if instance is None:
             # allow access to the descriptor as class attribute 'getattr(type(instance), property-name)'
             return self  # noqa
-        if self.fget != self.__get__:  # ensure that any 'fget' specified at property creation is employed
+        # ensure that any 'fget' specified at property creation is employed
+        if self.fget != self.__get__:  # pylint: disable=W0143
             return self.fget(instance)
         dt = instance.get(self.name, None)
         if not dt:
@@ -332,7 +333,8 @@ class LocalizedDateTimeProperty(property):
 
     def __set__(self, instance, value):
         # type: (Any, Union[datetime, str]) -> None
-        if self.fset != self.__set__:  # ensure that any 'fset' specified at property creation is employed
+        # ensure that any 'fset' specified at property creation is employed
+        if self.fset != self.__set__:  # pylint: disable=W0143
             return self.fset(instance, value)
         if isinstance(value, str):
             value = dt_parse(value)
