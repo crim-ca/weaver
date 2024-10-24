@@ -1907,6 +1907,45 @@ class WpsRestApiJobsTest(JobUtils):
         }
 
     @pytest.mark.oap_part4
+    @pytest.mark.openeo
+    def test_job_update_title(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert "title" not in resp.json
+
+        title = "The new title!"
+        body = {"title": title}
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code == 204
+
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["title"] == title
+
+        body = {"title": None}
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code == 204
+
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert "title" not in resp.json
+
+        body = {"title": ""}
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert "title.JobTitle" in resp.json["cause"]
+
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert "title" not in resp.json
+
+    @pytest.mark.oap_part4
     def test_job_update_response_process_disallowed(self):
         proc_id = self.fully_qualified_test_name()
         process = WpsTestProcess(identifier=proc_id)

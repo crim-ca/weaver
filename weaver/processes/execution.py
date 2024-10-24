@@ -1074,7 +1074,7 @@ def validate_job_schema(payload, body_schema=sd.Execute):
                 "type": "InvalidSchema",
                 "title": "Invalid Job Execution Schema",
                 "detail": "Execution body failed schema validation.",
-                "status": HTTPBadRequest.code,
+                "status": HTTPUnprocessableEntity.code,
                 "error": ex.msg,
                 "cause": ex.asdict(),
                 "value": repr_json(ex.value),

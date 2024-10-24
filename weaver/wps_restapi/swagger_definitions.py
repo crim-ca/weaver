@@ -2194,6 +2194,12 @@ class JobTypeEnum(ExtendedSchemaNode):
     validator = OneOf(["process", "provider", "service"])
 
 
+class JobTitle(ExtendedSchemaNode):
+    schema_type = String
+    description = "Title assigned to the job for user-readable identification."
+    validator = Length(min=1)
+
+
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobSortingMethod"
@@ -3747,6 +3753,7 @@ class JobStatusInfo(ExtendedMappingSchema):
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
+    title = JobTitle(missing=drop)
     status = JobStatusEnum(description="Last updated status.")
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
@@ -4240,6 +4247,7 @@ class Execute(ExecuteInputOutputs):
             "This parameter is required if the process cannot be inferred from the request endpoint."
         ),
     )
+    title = JobTitle(missing=drop)
     status = JobStatusCreate(
         description=(
             "Status to request creation of the job without submitting it to processing queue "
@@ -6616,9 +6624,19 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
 
 
+class JobTitleNullable(OneOfKeywordSchema):
+    description = "Job title to update, or unset if 'null'."
+    _one_of = [
+        JobTitle(),
+        ExtendedSchemaNode(NoneType(), name="null"),
+    ]
+
+
 class PatchJobBodySchema(Execute):
     description = "Execution request contents to be updated."
-    # all parameters that are not 'missing=drop' must be added to allow partial update
+    # allow explicit 'title: null' do unset a predefined title
+    title = JobTitleNullable(missing=null)  # 'null' ensures that, if provided, oneOf evaluates rather than drop invalid
+    # all parameters that are not 'missing=drop' in original 'Execute' definition must be added to allow partial update
     inputs = ExecuteInputValues(missing=drop, description="Input values or references to be updated.")
     outputs = ExecuteOutputSpec(missing=drop, description="Output format and transmission mode to be updated.")
 

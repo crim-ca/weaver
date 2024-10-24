@@ -323,6 +323,7 @@ def get_job_status_schema(request):
     """
 
     def make_headers(resolved_schema):
+        # type: (JobStatusSchemaType) -> HeadersType
         content_type = clean_media_type_format(content_accept, strip_parameters=True)
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}

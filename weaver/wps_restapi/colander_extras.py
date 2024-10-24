@@ -598,7 +598,7 @@ class NoneType(colander.SchemaType):
         raise colander.Invalid(
             node,
             colander._(
-                "${val} cannot be serialized: ${err}",
+                "${val} cannot be processed: ${err}",
                 mapping={"val": appstruct, "err": "Not 'null'."},
             ),
         )
@@ -788,7 +788,7 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
         # results: {'s2': {'field': 'ok'}}
 
-    .. seealso:
+    .. seealso::
         - https://github.com/Pylons/colander/issues/276
         - https://github.com/Pylons/colander/issues/299
 

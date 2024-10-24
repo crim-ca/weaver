@@ -27,6 +27,10 @@ Changes:
 - Align ``GET /jobs/{jobID}/outputs`` with requirements of *OGC API - Processes - Part 4: Job Management* endpoints
   such that omitting the ``schema`` query parameter will automatically apply the `OGC` mapping representation by
   default. Previous behavior was to return whichever representation that was used by the internal `Process` interface.
+- Align `Job` status and update operations with some of the `openEO` behaviors, such as supporting a `Job` ``title``
+  and allowing ``status`` to return `openEO` values when using ``profile=openeo`` in the ``Content-Type`` or using
+  the query parameter ``profile``/``schema``. The ``Content-Schema`` will also reflect the resolved representation
+  in the `Job` status response.
 - Add support of ``response: raw`` execution request body parameter as alternative to ``response: document``,
   which allows directly returning the result contents or ``Link`` headers rather then embedding them in a `JSON`
   response (fixes `#376 <https://github.com/crim-ca/weaver/issues/376>`_).

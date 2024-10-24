@@ -937,6 +937,18 @@ class Job(Base, LoggerHandler):
             return "process"
         return "provider"
 
+    @property
+    def title(self):
+        # type: () -> Optional[str]
+        return self.get("title", None)
+
+    @title.setter
+    def title(self, title):
+        # type: (Optional[str]) -> None
+        if not (isinstance(title, str) or not title):  # disallow empty title as well
+            raise TypeError(f"Type 'str' or 'None' is required for '{self.__name__}.title'")
+        self["title"] = title
+
     def _get_inputs(self):
         # type: () -> ExecutionInputs
         if self.get("inputs") is None:
@@ -1547,6 +1559,7 @@ class Job(Base, LoggerHandler):
             "processID": self.process,
             "providerID": self.service,
             "type": self.type,
+            "title": self.title,
             "status": map_status(self.status),
             "message": self.status_message,
             "created": self.created,
@@ -1577,6 +1590,7 @@ class Job(Base, LoggerHandler):
             "wps_url": self.wps_url,
             "service": self.service,
             "process": self.process,
+            "title": self.title,
             "inputs": self.inputs,
             "outputs": self.outputs,
             "user_id": self.user_id,
