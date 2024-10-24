@@ -1840,7 +1840,24 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked"
 
     @pytest.mark.oap_part4
-    def test_job_update_response(self):
+    def test_job_update_unsupported_media_type(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
+        )
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.patch(path, params="data", expect_errors=True)
+        assert resp.status_code == 415
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["type"] == (
+            "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type"
+        )
+
+    @pytest.mark.oap_part4
+    def test_job_update_response_contents(self):
+        """
+        Validate that :term:`Job` metadata and responses are updated with contents as requested.
+        """
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
@@ -1906,6 +1923,89 @@ class WpsRestApiJobsTest(JobUtils):
                 Status.FAILED: "https://example.com/failed",
             }
         }
+
+    @pytest.mark.oap_part4
+    def test_job_update_execution_parameters(self):
+        """
+        Test modification of the execution ``return`` and ``response`` options, going back-and-forth between approaches.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
+            execute_mode=ExecuteMode.AUTO,
+            execute_response=ExecuteResponse.DOCUMENT,
+        )
+
+        body = {}
+        path = f"/jobs/{new_job.id}"
+        headers = {
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}",
+        }
+        resp = self.app.patch_json(path, params=body, headers=headers)
+        assert resp.status_code == 204
+
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["mode"] == ExecuteMode.AUTO
+        assert resp.json["response"] == ExecuteResponse.RAW
+        assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+
+        body = {"response": ExecuteResponse.DOCUMENT}
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code == 204
+
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["mode"] == ExecuteMode.AUTO
+        assert resp.json["response"] == ExecuteResponse.DOCUMENT
+        assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.MINIMAL}"
+
+        body = {}
+        headers = {
+            "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}",
+        }
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.patch_json(path, params=body, headers=headers)
+        assert resp.status_code == 204
+
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["mode"] == ExecuteMode.AUTO
+        assert resp.json["response"] == ExecuteResponse.RAW
+        assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+
+        body = {"response": ExecuteResponse.RAW}
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code == 204
+
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["mode"] == ExecuteMode.AUTO
+        assert resp.json["response"] == ExecuteResponse.RAW
+        assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+
+    @pytest.mark.oap_part4
+    def test_job_update_subscribers(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
+            subscribers={"successUri": "https://example.com/random"},
+        )
+
+        # check that subscribers can be removed even if not communicated in job status responses
+        body = {"subscribers": {}}
+        path = f"/jobs/{new_job.id}"
+        resp = self.app.patch_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code == 204
+
+        test_job = self.job_store.fetch_by_id(new_job.id)
+        assert test_job.subscribers is None
 
     @pytest.mark.oap_part4
     @pytest.mark.openeo

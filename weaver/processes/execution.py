@@ -15,7 +15,6 @@ from pyramid.httpexceptions import (
     HTTPAccepted,
     HTTPBadRequest,
     HTTPCreated,
-    HTTPException,
     HTTPNotAcceptable,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
@@ -951,9 +950,13 @@ def update_job_parameters(job, request):
 
     value = field = loc = None
     job_process = get_process(job.process)
+    validate_process_id(job_process, body)
     try:
         loc = "body"
-        validate_process_id(job_process, body)
+
+        # used to avoid possible attribute name conflict
+        # (e.g.: 'job.response' vs 'job.execution_response')
+        execution_fields = ["response", "mode"]
 
         for node in sd.PatchJobBodySchema().children:
             field = node.name
@@ -963,28 +966,44 @@ def update_job_parameters(job, request):
                 continue  # will be handled simultaneously after
 
             value = body[field]  # type: ignore
-            if node.name in job:
+            if field not in execution_fields and field in job:
                 setattr(job, field, value)
-            elif f"execution_{field}" in job:
+            elif field in execution_fields:
                 field = f"execution_{field}"
-                if field == "execution_mode" and value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
-                    job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
-                    if job_ctrl_exec not in job_process.jobControlOptions:
-                        raise HTTPBadRequest(
-                            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
-                                "type": "InvalidJobUpdate",
-                                "title": "Invalid Job Execution Update",
-                                "detail": "Update of job execution mode is not permitted by process jobControlOptions.",
-                                "status": HTTPBadRequest.code,
-                                "cause": {"name": "mode", "in": loc},
-                                "value": repr_json(
-                                    {
-                                        "process.jobControlOptions": job_process.jobControlOptions,
-                                        "job.mode": job_ctrl_exec,
-                                    }, force_string=False
-                                ),
-                            })
-                        )
+                if field == "execution_mode":
+                    if value == ExecuteMode.AUTO:
+                        continue  # don't override previously set value that resolved with default value by omission
+                    if value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
+                        job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                        if job_ctrl_exec not in job_process.jobControlOptions:
+                            raise HTTPBadRequest(
+                                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                                    "type": "InvalidJobUpdate",
+                                    "title": "Invalid Job Execution Update",
+                                    "detail": (
+                                        "Update of the job execution mode is not permitted "
+                                        "by supported jobControlOptions of the process description."
+                                    ),
+                                    "status": HTTPBadRequest.code,
+                                    "cause": {"name": "mode", "in": loc},
+                                    "value": repr_json(
+                                        {
+                                            "process.jobControlOptions": job_process.jobControlOptions,
+                                            "job.mode": job_ctrl_exec,
+                                        }, force_string=False
+                                    ),
+                                })
+                            )
+
+                # 'response' will take precedence, but (somewhat) align 'Prefer: return' value to match intention
+                # they are not 100% compatible because output 'transmissionMode' must be considered when
+                # resolving 'response', but given both 'response' and 'transmissionMode' override 'Prefer',
+                # this is an "acceptable" compromise (see docs 'Execution Response' section for more details)
+                if field == "execution_response":
+                    if value == ExecuteResponse.RAW:
+                        job.execution_return = ExecuteReturnPreference.REPRESENTATION
+                    else:
+                        job.execution_return = ExecuteReturnPreference.MINIMAL
 
                 setattr(job, field, value)
 
@@ -996,13 +1015,18 @@ def update_job_parameters(job, request):
             job.subscribers = subscribers
 
         # for both 'mode' and 'response'
-        # if provided both in body and corresponding 'Prefer' header parameter, the body parameter takes precedence
+        # if provided both in body and corresponding 'Prefer' header parameter,
+        # the body parameter takes precedence (set in code above)
         # however, if provided only in header, allow override of the body parameter considered as "higher priority"
         loc = "header"
         if ExecuteMode.get(body.get("mode"), default=ExecuteMode.AUTO) == ExecuteMode.AUTO:
-            mode, wait, _ = parse_prefer_header_execute_mode(request.headers, job_process.jobControlOptions)
+            mode, wait, _ = parse_prefer_header_execute_mode(
+                request.headers,
+                job_process.jobControlOptions,
+                return_auto=True,
+            )
             job.execution_mode = mode
-            job.execution_wait = wait
+            job.execution_wait = wait if mode == ExecuteMode.SYNC else job.execution_wait
         if "response" not in body:
             job_return = parse_prefer_header_return(request.headers)
             if job_return:
@@ -1012,8 +1036,6 @@ def update_job_parameters(job, request):
                 else:
                     job.execution_response = ExecuteResponse.DOCUMENT
 
-    except HTTPException:
-        raise
     except ValueError as exc:
         raise HTTPUnprocessableEntity(
             json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
