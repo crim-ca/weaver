@@ -4,7 +4,7 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 import copy
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pymongo
 from pymongo.collation import Collation
@@ -63,10 +63,10 @@ if TYPE_CHECKING:
 
     from pymongo.collection import Collection
 
-    from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference
+    from weaver.execute import AnyExecuteMode, AnyExecuteResponse, AnyExecuteReturnPreference
     from weaver.processes.types import AnyProcessType
     from weaver.sort import AnySortType
-    from weaver.status import AnyStatusSearch
+    from weaver.status import AnyStatusSearch, AnyStatusType
     from weaver.store.base import DatetimeIntervalType, JobGroupCategory, JobSearchResult
     from weaver.typedefs import (
         AnyProcess,
@@ -790,7 +790,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  outputs=None,              # type: Optional[ExecutionOutputs]
                  is_workflow=False,         # type: bool
                  is_local=False,            # type: bool
-                 execute_async=True,        # type: bool
+                 execute_mode=None,         # type: Optional[AnyExecuteMode]
+                 execute_wait=None,         # type: Optional[int]
                  execute_response=None,     # type: Optional[AnyExecuteResponse]
                  execute_return=None,       # type: Optional[AnyExecuteReturnPreference]
                  custom_tags=None,          # type: Optional[List[str]]
@@ -801,6 +802,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
+                 status=None,               # type: Optional[AnyStatusType]
                  ):                         # type: (...) -> Job
         """
         Creates a new :class:`Job` and stores it in mongodb.
@@ -812,13 +814,13 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 tags.append(ProcessType.WORKFLOW)
             else:
                 tags.append(ProcessType.APPLICATION)
-            if execute_async:
-                tags.append(ExecuteMode.ASYNC)
-            else:
-                tags.append(ExecuteMode.SYNC)
+            if execute_mode is None:
+                execute_mode = ExecuteMode.AUTO
+            tags.append(execute_mode)
             if not access:
                 access = Visibility.PRIVATE
 
+            status = map_status(Status.get(status, default=Status.ACCEPTED))
             process = process.id if isinstance(process, Process) else process
             service = service.id if isinstance(service, Service) else service
             new_job = Job({
@@ -828,8 +830,9 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "process": process,     # process identifier (WPS request)
                 "inputs": inputs,
                 "outputs": outputs,
-                "status": map_status(Status.ACCEPTED),
-                "execute_async": execute_async,
+                "status": status,
+                "execution_mode": execute_mode,
+                "execution_wait": execute_wait,
                 "execution_response": execute_response,
                 "execution_return": execute_return,
                 "is_workflow": is_workflow,
@@ -1047,6 +1050,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         items = found[0]["items"]
         # convert to Job object where applicable, since pipeline result contains (category, jobs, count)
         items = [{k: (v if k != "jobs" else [Job(j) for j in v]) for k, v in i.items()} for i in items]
+        items = cast("JobGroupCategory", items)
         if has_provider:
             for group_result in items:
                 group_service = group_result["category"].pop("service", None)
@@ -1147,13 +1151,14 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             statuses = set()
             for _status in status:
                 if _status in StatusCategory:
-                    category_status = JOB_STATUS_CATEGORIES[StatusCategory[_status]]
-                    statuses = statuses.union(category_status)
+                    status_cat = StatusCategory.get(_status)
+                    category_statuses = JOB_STATUS_CATEGORIES[status_cat]
+                    statuses = statuses.union(category_statuses)
                 else:
                     statuses.add(_status)
             search_filters["status"] = {"$in": list(statuses)}  # type: ignore
         elif status:
-            search_filters["status"] = status[0]
+            search_filters["status"] = str(status[0])
         return search_filters
 
     @staticmethod

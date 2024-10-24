@@ -365,6 +365,9 @@ JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
 JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
 JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
 JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
+JobStatusSchemaType_OGC = Literal["OGC", "ogc"]
+JobStatusSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
+JobStatusSchemaType = Union[JobStatusSchemaType_OGC, JobStatusSchemaType_OpenEO]
 
 
 class ProcessSchema(Constants):
@@ -384,6 +387,14 @@ class JobInputsOutputsSchema(Constants):
     OLD_STRICT = "old+strict"   # type: JobInputsOutputsSchemaType_OLD_STRICT
     OGC = "ogc"                 # type: JobInputsOutputsSchemaType_OGC
     OLD = "old"                 # type: JobInputsOutputsSchemaType_OLD
+
+
+class JobStatusSchema(Constants):
+    """
+    Schema selector to represent a :term:`Job` status response.
+    """
+    OGC = "ogc"         # type: JobStatusSchemaType_OGC
+    OPENEO = "openeo"   # type: JobStatusSchemaType_OpenEO
 
 
 if TYPE_CHECKING:

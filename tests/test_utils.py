@@ -109,6 +109,8 @@ AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
 AWS_S3_REGION_NON_DEFAULT = list(AWS_S3_REGION_SUBSET_WITH_MOCK - {MOCK_AWS_REGION})[0]
 
+KNOWN_STATUSES = set(Status.values()) - {Status.UNKNOWN}
+
 # pylint: disable=R1732,W1514  # not using with open + encoding
 
 
@@ -389,37 +391,30 @@ def test_pass_http_error_raises_other_error_with_multi_pyramid_error():
             pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
 
 
-def get_status_variations(status_value):
-    return [status_value.lower(),
-            status_value.upper(),
-            status_value.capitalize(),
-            f"Process{status_value.capitalize()}"]
-
-
-def test_map_status_ogc_compliant():
-    known_statuses = set(Status.values()) - {Status.UNKNOWN}
-    for sv in known_statuses:
-        for s in get_status_variations(sv):
-            assert map_status(s, StatusCompliant.OGC) in JOB_STATUS_CATEGORIES[StatusCompliant.OGC]
-
-
-def test_map_status_pywps_compliant():
-    known_statuses = set(Status.values()) - {Status.UNKNOWN}
-    for sv in known_statuses:
-        for s in get_status_variations(sv):
-            assert map_status(s, StatusCompliant.PYWPS) in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
-
-
-def test_map_status_owslib_compliant():
-    known_statuses = set(Status.values()) - {Status.UNKNOWN}
-    for sv in known_statuses:
-        for s in get_status_variations(sv):
-            assert map_status(s, StatusCompliant.OWSLIB) in JOB_STATUS_CATEGORIES[StatusCompliant.OWSLIB]
+@pytest.mark.parametrize(
+    ["compliance", "status"],
+    itertools.product(
+        list(StatusCompliant),
+        itertools.chain.from_iterable(
+            [
+                status.lower(),
+                status.upper(),
+                status.capitalize(),
+                f"Process{status.capitalize()}"
+            ]
+            for status in KNOWN_STATUSES
+        )
+    )
+)
+def test_map_status_compliant(compliance, status):
+    # type: (StatusCompliant, str) -> None
+    assert map_status(status, compliance) in JOB_STATUS_CATEGORIES[compliance]
 
 
 def test_map_status_back_compatibility_and_special_cases():
-    for c in StatusCompliant:
+    for c in (set(StatusCompliant.values()) - {StatusCompliant.OPENEO}):  # type: ignore
         assert map_status("successful", c) == Status.SUCCEEDED
+    assert map_status("successful", StatusCompliant.OPENEO) == Status.FINISHED
 
 
 def test_map_status_pywps_compliant_as_int_statuses():
@@ -659,6 +654,7 @@ def test_request_extra_intervals():
                 assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
 
 
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_request_extra_zero_values():
     """
     Test that zero-value ``retries`` and ``backoff`` are not ignored.

@@ -613,6 +613,11 @@ Execution of a Process (Execute)
     For backward compatibility, the |exec-req-job|_ request is also supported as alias to the above
     :term:`OGC API - Processes` compliant endpoint.
 
+.. seealso::
+    Alternatively, the |job-exec-req|_ request can also be used to submit a :term:`Job` for later execution,
+    as well as enabling other advanced :ref:`proc_job_management` capabilities.
+    See :ref:`proc_op_job_create` for more details.
+
 This section will first describe the basics of this request format (:ref:`proc_exec_body`), and after go into
 further details for specific use cases and parametrization of various input/output combinations
 (:ref:`proc_exec_mode`, :ref:`proc_exec_results`, etc.).
@@ -1694,7 +1699,7 @@ the ``POST /search`` or the ``POST /collections/dataset-features/search`` could 
 
 Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process` while targeting
 the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
-potentially be retrieved as input for the :term:`Process Execution <proc_op_execute>`.
+potentially be retrieved as input for the :ref:`Process Execution <proc_op_execute>`.
 
 In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
 the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
@@ -1997,17 +2002,93 @@ of the polling-based method on the :ref:`Job Status <proc_op_status>` endpoint o
 .. seealso::
     Refer to the |oas-rtd|_ of the |exec-req|_ request for all available ``subscribers`` properties.
 
+.. _proc_job_management:
+
+Job Management
+==================================================
+
+This section presents capabilities related to :term:`Job` management.
+The endpoints and related operations are defined in a mixture of |ogc-api-proc|_ *Core* requirements,
+some official extensions, and further `Weaver`-specific capabilities.
+
+.. seealso::
+    - |ogc-api-proc-part1-spec-html|_
+    - |ogc-api-proc-part4|_
+
+.. _proc_op_job_create:
+
+Submitting a Job Creation
+---------------------------------------------------------------------
+
+.. important::
+    All concepts introduced in the :ref:`Execution of a Process <proc_op_execute>` also apply in this section.
+    Consider reading the subsections for more specific details.
+
+    This section will only cover *additional* concepts and parameters applicable only for this feature.
+
+Rather than using the |exec-req|_ request, the |job-exec-req|_ request can be used to submit a :term:`Job`.
+When doing so, all parameters typically required for :term:`Process` execution must also be provided, including
+any relevant :ref:`proc_exec_body` contents (:term:`I/O`), the desired :ref:`proc_exec_mode`, and
+the :ref:`proc_exec_results` options. However, an *additional* ``process`` :term:`URL` in the request body is required,
+to indicate which :term:`Process` should be executed by the :term:`Job`.
+
+The |job-exec-req|_ operation allows interoperability alignement with other execution strategies, such as defined
+by the |openeo-api|_ and the |ogc-tb20-gdc|_ *GDC API Profile*. It also opens the door for advanced :term:`Workflow`
+definitions from a common :term:`Job` endpoint interface, as described by the |ogc-api-proc-part4|_ extension.
+
+Furthermore, an optional ``"status": "create"`` request body parameter can be supplied to indicate to the :term:`Job`
+that it should remain in *pending* state, until a later :ref:`Job Execution Trigger <proc_op_job_trigger>` is performed
+to start its execution. This allows the user to apply any desired :ref:`Job Updates <proc_op_job_update>` or reviewing
+the resolved :ref:`proc_op_job_inputs` prior to submitting the :term:`Job`. This acts in contrast to
+the *Core* |exec-req|_ operation that *immediately* places the :term:`Job` in queue, locking it from any update.
+
+.. _proc_op_job_update:
+
+Updating a Job
+---------------------------------------------------------------------
+
+The |job-update-req|_ request allows updating the :term:`Job` and its underlying parameters prior to execution.
+For this reason, it has for pre-requirement to be in ``created`` :ref:`Job Status <proc_op_job_status>`, such that
+it is pending a :ref:`Job Execution Trigger <proc_op_job_trigger>` before being sent to the worker execution queue.
+For any other ``status`` than ``created``, attempts to modify the :term:`Job` will return an *HTTP 423 Locked* error
+response.
+
+Potential parameters that can be updated are:
+
+- Submitted :term:`Process` ``inputs``
+- Desired ``outputs`` formats and representations, as per :ref:`proc_exec_results`
+- Applicable ``headers``, ``response`` and ``mode`` options as per :ref:`proc_exec_mode`
+- Additional metadata such as a custom :term:`Job` ``title``
+
+After updating the :term:`Job`, the :ref:`Job Status <proc_op_job_status>` and :ref:`Job Inputs <proc_op_job_inputs>`
+operations can further be performed to review the *pending* :term:`Job` state. Using all those operations allows the
+user to iteratively adjust the :term:`Job` until it is ready for execution, for which
+the :ref:`Job Execution Trigger <proc_op_job_trigger>` would then be employed.
+
+.. _proc_op_job_trigger:
+
+Triggering Job Execution
+---------------------------------------------------------------------
+
+The |job-trigger-req|_ request allows submitting a *pending* :term:`Job` to the worker execution queue. Once performed,
+the typical :ref:`proc_op_monitor` operation can be employed, until eventual success or failure of the :term:`Job`.
+
+If the :term:`Job` was already submitted, is already in queue, is actively running, or already finished execution,
+this operation will return a *HTTP 423 Locked* error response.
+
 .. _proc_op_job_status:
 .. _proc_op_status:
 .. _proc_op_monitor:
 
-Monitoring of a Process Execution (GetStatus)
+Monitoring a Job Execution (GetStatus)
 ---------------------------------------------------------------------
 
 Monitoring the execution of a :term:`Job` consists of polling the status ``Location`` provided from the
-:ref:`Execute <proc_op_execute>` operation and verifying the indicated ``status`` for the expected result.
-The ``status`` can correspond to any of the value defined by :data:`weaver.status.JOB_STATUS_VALUES`
-accordingly to the internal state of the workers processing their execution.
+:ref:`Execute <proc_op_execute>` or :ref:`Trigger <proc_op_job_trigger>` operation and verifying the
+indicated ``status`` for the expected result.
+The ``status`` can correspond to any of the value defined by :class:`weaver.status.Status`
+accordingly to the internal state of the workers processing their execution, and the
+negotiated :ref:`proc_op_job_status_alt` representation.
 
 When targeting a :term:`Job` submitted to a `Weaver` instance, monitoring is usually accomplished through
 the :term:`OGC API - Processes` endpoint using |status-req|_, which will return a :term:`JSON` body.
@@ -2029,21 +2110,58 @@ format is employed according to the chosen location.
       - Location
     * - :term:`OGC API - Processes`
       - :term:`JSON`
-      - ``{WEAVER_URL}/jobs/{JobUUID}``
+      - ``{WEAVER_URL}/jobs/{jobID}``
     * - :term:`WPS`
       - :term:`XML`
-      - ``{WEAVER_WPS_OUTPUTS}/{JobUUID}.xml``
+      - ``{WEAVER_WPS_OUTPUTS}/{jobID}.xml``
 
 .. seealso::
     For the :term:`WPS` endpoint, refer to :ref:`conf_settings`.
 
-.. fixme: add example
-.. fixme: describe minimum fields and extra fields
+Following are examples for both representations. Note that results might vary according to other parameters such
+as when using :ref:`proc_op_job_status_alt`, or when different :term:`Process` references or :term:`Workflow`
+definitions are involved.
+
+.. literalinclude:: ../examples/job_status_ogcapi.json
+    :language: json
+    :caption: :term:`Job` Status in :term:`JSON` using the :term:`OGC API - Processes` interface
+    :name: job-status-ogcapi
+
+.. literalinclude:: ../examples/job_status_wps.xml
+    :language: xml
+    :caption: :term:`Job` Status in :term:`XML` using the :term:`WPS` interface
+    :name: job-status-wps
+
+.. _proc_op_job_status_alt:
+
+Alternate Job Status
+~~~~~~~~~~~~~~~~~~~~
+
+In order to support alternate :term:`Job` status representations, the following approaches can be used when performing
+the |status-req|_ request.
+
+- Specify either a ``profile`` or ``schema`` query parameter (e.g.: ``/jobs/{jobID}?profile=openeo``).
+- Specify a ``profile`` parameter within the ``Accept`` header (e.g.: ``Accept: application/json; profile=openeo``).
+
+Using the |openeo|_ profile for example, will allow returning ``status`` values that are appropriate
+as per the |openeo-api|_ definition.
+
+When performing :ref:`Job Status <proc_op_job_status>` requests, the received response should
+contain a ``Content-Schema`` header indicating which of the applied ``profile`` is being represented.
+This header is employed because multiple ``Content-Type: application/json`` headers are applicable
+across multiple :term:`API` implementations and status representations.
 
 .. _proc_op_result:
+.. _proc_op_job_detail:
 
-Obtaining Job Outputs, Results, Logs or Errors
----------------------------------------------------------------------
+Obtaining Job Details and Metadata
+----------------------------------
+
+All endpoints to retrieve any of the following information about a :term:`Job` can either be requested directly
+(i.e.: ``/jobs/{jobID}/...``) or with equivalent :term:`Provider` and/or :term:`Process` prefixed endpoints,
+if the requested :term:`Job` did refer to those :term:`Provider` and/or :term:`Process`.
+A *local* :term:`Process` would have its :term:`Job` references as ``/processes/{processId}/jobs/{jobID}/...``
+while a :ref:`proc_remote_provider` will use ``/provider/{providerName}/processes/{processId}/jobs/{jobID}/...``.
 
 .. _proc_op_job_outputs:
 
@@ -2219,7 +2337,8 @@ Job Inputs
 In order to better understand the parameters that were *originally* submitted during :term:`Job` creation,
 the |inputs-req|_ can be employed. This will return both the data and reference ``inputs`` that were submitted,
 as well as the *requested* ``outputs`` [#outN]_ to retrieve any relevant ``transmissionMode``, ``format``, etc.
-parameters that where specified during submission of the :ref:`proc_exec_body`.
+parameters that where specified during submission of the :ref:`proc_exec_body`, and any other relevant ``headers``
+that can affect the :ref:`proc_exec_mode` and :ref:`proc_exec_results`.
 For convenience, this endpoint also returns relevant ``links`` applicable for the requested :term:`Job`.
 
 .. literalinclude:: ../examples/job_inputs.json
@@ -2229,6 +2348,9 @@ For convenience, this endpoint also returns relevant ``links`` applicable for th
 
 .. note::
     The ``links`` presented above are not an exhaustive list to keep the example relatively small.
+
+If the :term:`Job` is still pending execution, the parameters returned by this endpoint can be modified
+using the :ref:`proc_op_job_update` operation before submitting it.
 
 .. _proc_op_job_error:
 .. _proc_op_job_exceptions:
@@ -2278,12 +2400,33 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
     :caption: Example :term:`JSON` Representation of :term:`Job` Logs Response
     :name: job-logs
 
+.. _proc_op_job_prov:
+
+Job Provenance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. fixme: CWL and Job Prov (https://github.com/crim-ca/weaver/issues/673)
+.. todo::
+    implement ``GET /jobs/{jobID}/run`` and/or ``GET /jobs/{jobID}/prov``
+    (see https://github.com/crim-ca/weaver/issues/673)
+
+.. _proc_op_job_stats:
+
+Job Statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. note::
-    All endpoints to retrieve any of the above information about a :term:`Job` can either be requested directly
-    (i.e.: ``/jobs/{jobID}/...``) or with  equivalent :term:`Provider` and/or :term:`Process` prefixed endpoints,
-    if the requested :term:`Job` did refer to those :term:`Provider` and/or :term:`Process`.
-    A *local* :term:`Process` would have its :term:`Job` references as ``/processes/{processId}/jobs/{jobID}/...``
-    while a :ref:`proc_remote_provider` will use ``/provider/{providerName}/processes/{processId}/jobs/{jobID}/...``.
+    This feature is specific to `Weaver`.
+
+The |job-stats-req|_ request can be performed to obtain runtime statistics from the :term:`Job`.
+This content is only available when a :term:`Job` has successfully completed.
+Below is a sample of possible response. Some parts might be omitted according to the
+internal :term:`Application Package` of the :term:`Process` represented by the :term:`Job` execution.
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_statistics.json
+    :language: json
+    :caption: Example :term:`JSON` of :term:`Job` Statistics Response
+    :name: job-statistics
 
 .. _vault_upload:
 

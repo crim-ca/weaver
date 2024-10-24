@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml",
+  "jobID": "a305ef3e-3220-4d43-b1be-301f5ef13c23",
+  "processID": "example-process",
+  "providerID": null,
+  "type": "process",
+  "status": "succeeded",
+  "message": "Job succeeded.",
+  "created": "2024-10-02T14:21:12.380000+00:00",
+  "started": "2024-10-02T14:21:12.990000+00:00",
+  "finished": "2024-10-02T14:21:23.629000+00:00",
+  "updated": "2024-10-02T14:21:23.630000+00:00",
+  "duration": "00:00:10",
+  "runningDuration": "PT11S",
+  "runningSeconds": 10.639,
+  "percentCompleted": 100,
+  "progress": 100,
+  "links": [
+    {
+      "title": "Job status.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/processes/download-band-sentinel2-product-safe/jobs/a305ef3e-3220-4d43-b1be-301f5ef13c23",
+      "type": "application/json",
+      "rel": "status"
+    },
+    {
+      "title": "Job monitoring location.",
+      "hreflang": "en-CA",
+      "href": "https://example.com/processes/download-band-sentinel2-product-safe/jobs/a305ef3e-3220-4d43-b1be-301f5ef13c23",
+      "type": "application/json",
+      "rel": "monitor"
+    },
+    {
+      "title": "Job results of successful process execution (direct output values mapping).",
+      "hreflang": "en-CA",
+      "href": "https://example.com/processes/download-band-sentinel2-product-safe/jobs/a305ef3e-3220-4d43-b1be-301f5ef13c23/results",
+      "type": "application/json",
+      "rel": "http://www.opengis.net/def/rel/ogc/1.0/results"
+    }
+  ]
+}

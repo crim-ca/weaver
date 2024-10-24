@@ -194,7 +194,7 @@ When the above code is saved in a |jupyter-notebook|_ and committed to a Git rep
 utility can automatically clone the repository, parse the Python code, extract the :term:`CWL` annotations, and
 generate the :term:`Application Package` with a :term:`Docker` container containing all of their respective definitions.
 All of this is accomplished with a single call to obtain a deployable :term:`CWL` in `Weaver`, which can then take over
-from the :ref:`Process Deployment <proc_op_deploy>` to obtain an :term:`OGC API - Process` definition.
+from the :ref:`Process Deployment <proc_op_deploy>` to obtain an :term:`OGC API - Processes` definition.
 
 Jupyter Notebook to CWL Example: NCML to STAC Application
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1408,7 +1408,7 @@ However, the :term:`Vault` approach as potential drawbacks.
 
 .. note::
     For more details about the :term:`Vault`, refer to sections :ref:`file_vault_inputs`, :ref:`vault_upload`,
-    and the corresponding capabilities in :term:`cli_example_upload`.
+    and the corresponding capabilities in :ref:`cli_example_upload`.
 
 .. _app_pkg_secret_cwltool:
 
