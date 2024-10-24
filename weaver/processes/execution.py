@@ -689,7 +689,8 @@ def submit_job_dispatch_wps(request, process):
     Dispatch a :term:`XML` request to the relevant :term:`Process` handler using the :term:`WPS` endpoint.
 
     Sends the :term:`XML` request to the :term:`WPS` endpoint which knows how to parse it properly.
-    Execution will end up in the same :func:`submit_job_handler` function as for :term:`OGC API` :term:`JSON` execution.
+    Execution will end up in the same :func:`submit_job_handler` function as for :term:`OGC API - Processes`
+    :term:`JSON` execution.
 
     .. warning::
         The function assumes that :term:`XML` was pre-validated as present in the :paramref:`request`.
