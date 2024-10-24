@@ -1826,10 +1826,11 @@ class WpsRestApiJobsTest(JobUtils):
         raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/673)
 
     @pytest.mark.oap_part4
-    def test_job_update_locked(self):
+    @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCEEDED])
+    def test_job_update_locked(self, status):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
-            status=Status.RUNNING, progress=100, access=Visibility.PUBLIC,
+            status=status, progress=100, access=Visibility.PUBLIC,
             inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
         )
         path = f"/jobs/{new_job.id}"
