@@ -15,7 +15,7 @@ from pyramid.httpexceptions import (
 from weaver import xml_util
 from weaver.database import get_db
 from weaver.datatype import Job
-from weaver.exceptions import JobNotFound, JobStatisticsNotFound, ProcessNotFound, log_unhandled_exceptions
+from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.execute import parse_prefer_header_execute_mode, rebuild_prefer_header
 from weaver.formats import (
     ContentType,
@@ -226,6 +226,8 @@ def create_job(request):
     """
     Create a new processing job with advanced management and execution capabilities.
     """
+    proc_key = "process"
+    proc_url = None
     proc_id = None
     prov_id = None
     try:
@@ -238,23 +240,17 @@ def create_job(request):
             prov_parts = prov_url.rsplit("/providers/", 1)
             prov_id = prov_parts[-1] if len(prov_parts) > 1 else None
         elif ctype in ContentType.ANY_XML:
+            proc_key = "ows:Identifier"
             body_xml = xml_util.fromstring(request.text)
-            proc_id = body_xml.xpath("ows:Identifier", namespaces=body_xml.getroottree().nsmap)[0].text
+            proc_id = body_xml.xpath(proc_key, namespaces=body_xml.getroottree().nsmap)[0].text
     except Exception as exc:
-        raise ProcessNotFound(json={
+        raise HTTPBadRequest(json={
             "title": "NoSuchProcess",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
-            "detail": "Process URL or identifier reference missing or invalid.",
-            "status": ProcessNotFound.code,
+            "detail": "Process URL or identifier reference could not be parsed.",
+            "status": HTTPBadRequest.code,
+            "cause": {"in": "body", proc_key: repr_json(proc_url, force_string=False)}
         }) from exc
-    if not proc_id:
-        raise HTTPUnsupportedMediaType(json={
-            "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
-            "detail": "Process URL or identifier reference missing or invalid.",
-            "status": HTTPUnsupportedMediaType.code,
-            "cause": {"headers": {"Content-Type": ctype}},
-        })
 
     if ctype in ContentType.ANY_XML:
         process = get_process(process_id=proc_id)
@@ -266,6 +262,34 @@ def create_job(request):
         ref = get_process(process_id=proc_id)
         proc_id = None  # ensure ref is used, process ID needed only for provider
     return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+
+
+@sd.jobs_service.post()
+def create_job_unsupported_media_type(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Handle the case where no ``content_type`` was matched for decorated service handlers on :func:`create_job`.
+
+    This operation must be defined with a separate service decorator allowing "any" ``content_type`` because
+    match by ``content_type`` is performed prior to invoking the applicable decorated view function.
+    Therefore, using a custom ``error_handler`` on the decorators of :func:`create_job` would never be invoked
+    since their preconditions would never be encountered. Decorated views that provide a ``content_type`` explicitly
+    are prioritized. Therefore, this will match any fallback ``content_type`` not already defined by another decorator.
+
+    .. warning::
+        It is very important that this is defined after :func:`create_job` such that its docstring is employed for
+        rendering the :term:`OpenAPI` definition instead of this docstring.
+    """
+    ctype = get_header("Content-Type", request.headers)
+    return HTTPUnsupportedMediaType(
+        json={
+            "title": "Unsupported Media Type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "detail": "Process URL or identifier reference missing or invalid.",
+            "status": HTTPUnsupportedMediaType.code,
+            "cause": {"in": "headers", "name": "Content-Type", "value": ctype},
+        }
+    )
 
 
 @sd.process_results_service.post(

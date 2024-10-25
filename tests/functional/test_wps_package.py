@@ -5745,6 +5745,84 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
+    @pytest.mark.oap_part4
+    def test_execute_jobs_process_not_found(self):
+        # use non-existing process to ensure this particular situation is handled as well
+        # a missing process reference must not cause an early "not-found" response
+        proc = "random-other-process"
+        proc = self.fully_qualified_test_name(proc)
+
+        exec_content = {
+            "process": f"https://localhost/processes/{proc}",
+            "inputs": {"message": "test"}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 404, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_process_malformed_json(self):
+        exec_content = {
+            "process": "xyz",
+            "inputs": {"message": "test"}
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
+                                       data=exec_content, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+            assert resp.json["cause"] == {"in": "body", "process": "xyz"}
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_process_malformed_xml(self):
+        exec_content = """
+        <xml>
+            <ows:Identifier></ows:Identifier>
+        </xml>
+        """
+        headers = {
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_XML,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post", path, timeout=5,
+                                       data=exec_content, headers=headers, only_local=True)
+            assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+            assert resp.json["cause"] == {"in": "body", "ows:Identifier": None}
+
+    @pytest.mark.oap_part4
+    def test_execute_jobs_unsupported_media_type(self):
+        headers = {
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.TEXT_PLAIN,
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = "/jobs"
+            resp = mocked_sub_requests(self.app, "post", path, timeout=5, data="", headers=headers, only_local=True)
+            assert resp.status_code == 415, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["type"] == (
+                "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type"
+            )
+            assert resp.json["cause"] == {"in": "headers", "name": "Content-Type", "value": ContentType.TEXT_PLAIN}
+
 
 @pytest.mark.functional
 class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):

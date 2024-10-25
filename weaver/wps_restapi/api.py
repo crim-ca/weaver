@@ -1075,9 +1075,14 @@ def ows_json_format(function):
         http_headers = get_header("Content-Type", http_response.headers) or []
         req_headers = get_header("Accept", request.headers) or []
         if any([ContentType.APP_JSON in http_headers, ContentType.APP_JSON in req_headers]):
+            req_detail = get_request_info(request)
+            # return the response instead of generate less detailed one if it was already formed with JSON error details
+            # this can happen when a specific code like 404 triggers a pyramid lookup against other route/view handlers
+            if isinstance(response, HTTPException) and isinstance(req_detail, dict):
+                return response
             body = OWSException.json_formatter(http_response.status, response.message or "",
                                                http_response.title, request.environ)
-            body["detail"] = get_request_info(request)
+            body["detail"] = req_detail
             http_response._json = body
         if http_response.status_code != response.status_code:
             raise http_response  # re-raise if code was fixed
