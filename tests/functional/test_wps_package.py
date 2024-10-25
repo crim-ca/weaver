@@ -4325,8 +4325,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
-    @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_multipart_accept_alt_format(self):
         """
         Validate the returned contents combining an ``Accept`` header as ``multipart`` and a ``format`` in ``outputs``.
@@ -4381,23 +4379,25 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.yml"
             Content-Type: {ContentType.APP_YAML}
+            Content-Location: {out_url}/{job_id}/output_json/result.yml
             Content-ID: <output_json@{job_id}>
-            Content-Length: 12
+            Content-Length: 11
 
             {output_json_as_yaml}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results_text == results_body
+        for line1, line2 in zip(results_text.splitlines(), results_body.splitlines()):
+            assert line1 == line2
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.yml",
-                "type": ContentType.APP_YAML,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
@@ -4407,8 +4407,6 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == "{\"data\":\"test\"}"
 
-    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
-    @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_response_document_alt_format_yaml(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_process_name(proc)
@@ -4457,27 +4455,29 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.yml"
             Content-Type: {ContentType.APP_YAML}
+            Content-Location: {out_url}/{job_id}/output_json/result.yml
             Content-ID: <output_json@{job_id}>
-            Content-Length: 12
+            Content-Length: 11
 
             {output_json_as_yaml}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results_text == results_body
+        for line1, line2 in zip(results_text.splitlines(), results_body.splitlines()):
+            assert line1 == line2
+
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.yml",
-                "type": ContentType.APP_YAML,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
-        # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
@@ -4548,12 +4548,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-        # FIXME: add check of direct request of output (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
-        # result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        # assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
-        # assert result_json.content_type == ContentType.APP_JSON
-        # assert result_json.json == {"data": "test"}
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.json == {"data": "test"}
 
     def test_execute_single_output_response_document_default_format_json_special(self):
         """
