@@ -1207,6 +1207,7 @@ class WeaverClient(object):
     def _prepare_outputs(
         self,
         body,                   # type: JSON
+        output_ids,             # type: List[str]
         output_refs=None,       # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
         output_filter=None,     # type: Optional[Sequence[str]]
@@ -1215,9 +1216,8 @@ class WeaverClient(object):
         Performs inplace replacement or update of :term:`Job` outputs according to predefined and requested conditions.
         """
         LOGGER.debug("Preparing job outputs...")
-        outputs = body.get("outputs") or {}
         output_refs = set(output_refs or [])
-        for output_id in outputs:
+        for output_id in output_ids:
             if output_filter and output_id in output_filter:
                 continue
             if output_id in output_refs:
@@ -1354,8 +1354,10 @@ class WeaverClient(object):
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
 
+        output_ids = list(result.body.get("outputs") or {})
         exec_data = self._prepare_outputs(
             exec_data,
+            output_ids=output_ids,
             output_refs=output_refs,
             output_filter=output_filter,
         )
@@ -1516,8 +1518,19 @@ class WeaverClient(object):
             update_headers.update(auth_headers)
             update_data["inputs"] = values
         if output_refs or output_filter:
+            LOGGER.debug("Retrieving job details to identify reference process: [%s]", job_id)
+            job_result = self.status(job_url, url=url, auth=auth)
+            if not job_result.success:
+                return job_result
+            proc_ref = job_result.body.get("process") or job_result.body.get("processID")
+            LOGGER.debug("Retrieving process details to validate applicable outputs: [%s]", proc_ref)
+            proc_result = self.describe(proc_ref, url=url, auth=auth)
+            if not proc_result.success:
+                return proc_result
+            proc_outputs = list(proc_result.body.get("outputs"))
             update_data = self._prepare_outputs(
                 update_data,
+                output_ids=proc_outputs,
                 output_refs=output_refs,
                 output_filter=output_filter,
             )
