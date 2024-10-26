@@ -1525,7 +1525,7 @@ class WeaverClient(object):
             update_data["subscribers"] = subscribers
         if output_context:
             update_headers["X-WPS-Output-Context"] = str(output_context)
-        resp = self._request("POST", job_res_url, json=update_data,
+        resp = self._request("PATCH", job_res_url, json=update_data,
                              headers=update_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         result = self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
