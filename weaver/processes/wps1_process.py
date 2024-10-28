@@ -52,12 +52,13 @@ class Wps1RemoteJobProgress(RemoteJobProgress):
 
 
 class Wps1Process(WpsProcessInterface):
-    def __init__(self,
-                 provider,          # type: str
-                 process,           # type: str
-                 request,           # type: WorkerRequest
-                 update_status,     # type: UpdateStatusPartialFunction
-                 ):                 # type: (...) -> None
+    def __init__(
+        self,
+        provider,       # type: str
+        process,        # type: str
+        request,        # type: Optional[WorkerRequest]
+        update_status,  # type: UpdateStatusPartialFunction
+    ):                  # type: (...) -> None
         self.provider = provider
         self.process = process
         # following are defined after 'prepare' step

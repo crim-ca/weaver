@@ -94,7 +94,7 @@ class WpsProcessInterface(abc.ABC):
     """
 
     def __init__(self, request, update_status):
-        # type: (WorkerRequest, UpdateStatusPartialFunction) -> None
+        # type: (Optional[WorkerRequest], UpdateStatusPartialFunction) -> None
         self.request = request
         self.headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self.settings = get_settings()
@@ -433,7 +433,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
     def __init__(self,
                  step_payload,      # type: JSON
                  process,           # type: str
-                 request,           # type: WorkerRequest
+                 request,           # type: Optional[WorkerRequest]
                  update_status,     # type: UpdateStatusPartialFunction
                  ):                 # type: (...) -> None
         super(OGCAPIRemoteProcessBase, self).__init__(

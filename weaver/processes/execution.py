@@ -47,6 +47,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
+from weaver.processes.wps_process_base import OGCAPIRemoteProcessBase
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -98,6 +99,7 @@ if TYPE_CHECKING:
     from weaver.status import StatusType
     from weaver.typedefs import (
         AnyAcceptLanguageHeader,
+        AnyDatabaseContainer,
         AnyHeadersContainer,
         AnyProcessRef,
         AnyResponseType,
@@ -112,7 +114,8 @@ if TYPE_CHECKING:
         JSON,
         ProcessExecution,
         SettingsType,
-        Statistics
+        Statistics,
+        UpdateStatusPartialFunction
     )
     from weaver.visibility import AnyVisibility
 
@@ -180,7 +183,7 @@ def execute_process(task, job_id, wps_url, headers=None):
         # prepare inputs
         job.progress = JobProgress.GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
-        wps_inputs = parse_wps_inputs(wps_process, job)
+        wps_inputs = parse_wps_inputs(wps_process, job, database=db)
 
         # prepare outputs
         job.progress = JobProgress.GET_OUTPUTS
@@ -510,8 +513,35 @@ def parse_wps_input_literal(input_value):
     return str(input_value)
 
 
-def parse_wps_inputs(wps_process, job):
-    # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
+def log_and_save_update_status_handler(
+    job,        # type: Job
+    container,  # type: AnyDatabaseContainer
+):              # type: (...) -> UpdateStatusPartialFunction
+    """
+    Creates a :term:`Job` status update function that will immediately reflect the log message in the database.
+
+    When log messages are generated and saved in the :term:`Job`, those details are not persisted to the database
+    until the updated :term:`Job` is entirely pushed to the database store. This causes clients querying the :term:`Job`
+    endpoints to not receive any latest update from performed operations until the execution returns to the main worker
+    monitoring loop, which will typically perform a :term:`Job` update "at some point".
+
+    Using this handler, each time a message is pushed to the :term:`Job`, that update is also persisted by maintaining
+    a local database connection handle. However, because updating the entire :term:`Job` each time can become costly
+    and inefficient for multiple subsequent logs, this operation should be applied only on "important milestones" of
+    the execution steps. Any intermediate/subsequent logs should use the usual :meth:`Job.save_log` to "accumulate" the
+    log messages for a following "batch update" of the :term:`Job`.
+    """
+    db = get_db(container)
+    store = db.get_store(StoreJobs)
+
+    def log_and_update_status(message, progress, status, *_, **kwargs):
+        job.save_log(message=message, progress=progress, status=status, **kwargs)
+        store.update_job(job)
+    return log_and_update_status
+
+
+def parse_wps_inputs(wps_process, job, container=None):
+    # type: (ProcessOWS, Job, Optional[AnyDatabaseContainer]) -> List[Tuple[str, OWS_Input_Type]]
     """
     Parses expected :term:`WPS` process inputs against submitted job input values considering supported definitions.
 
@@ -527,6 +557,7 @@ def parse_wps_inputs(wps_process, job):
         elif process_input.dataType == WPS_BOUNDINGBOX_DATA:
             bbox_inputs[process_input.identifier] = process_input
 
+    job_log_update_status_func = log_and_save_update_status_handler(job, container)
     try:
         wps_inputs = []
         # parse both dict and list type inputs
@@ -574,6 +605,34 @@ def parse_wps_inputs(wps_process, job):
                         )
                         for col_file in col_files
                     ])
+                elif isinstance(input_value, dict) and "process" in input_value:
+                    proc_uri = input_value["process"]
+                    job_log_update_status_func(
+                        message=(
+                            f"Dispatching execution of nested process [{proc_uri}] "
+                            f"for input [{input_id}] of [{job.process}]."
+                        ),
+                        logger=LOGGER,
+                    )
+                    process = OGCAPIRemoteProcessBase(
+                        input_value,
+                        proc_uri,
+                        request=None,
+                        update_status=job_log_update_status_func,
+                    )
+                    out_dir = os.path.join(job.tmpdir, "inputs")
+                    results = process.execute(input_value.get("inputs"), out_dir, input_value.get("outputs"))
+                    if not results:
+                        raise ValueError(
+                            f"Abort execution. Cannot map empty outputs from {proc_uri} "
+                            f"to input [{input_id}] of [{job.process}]."
+                        )
+                    if len(results) != 1:
+                        raise ValueError(
+                            f"Abort execution. Cannot map multiple outputs from {proc_uri} "
+                            f"to input [{input_id}] of [{job.process}]."
+                        )
+                    resolved_inputs.append((results[0], input_info))
                 else:
                     resolved_inputs.append((input_value, input_info))
 
@@ -595,7 +654,7 @@ def parse_wps_inputs(wps_process, job):
 
                 # re-validate the resolved data as applicable
                 if input_data is None:
-                    job.save_log(
+                    job_log_update_status_func(
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
                         logger=LOGGER, level=logging.WARNING,
                     )

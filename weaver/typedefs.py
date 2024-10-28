@@ -78,6 +78,7 @@ if TYPE_CHECKING:
     from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.database.base import DatabaseInterface
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -359,7 +360,7 @@ if TYPE_CHECKING:
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
-    AnyDatabaseContainer = AnyContainer
+    AnyDatabaseContainer = Union[AnyContainer, DatabaseInterface]
 
     AnyData = Union[str, bytes, bytearray]
     AnyDataStream = Union[AnyData, io.IOBase]
