@@ -122,6 +122,7 @@ class ContentType(Constants):
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
     MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
+    TEXT_CSV = "text/csv"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"

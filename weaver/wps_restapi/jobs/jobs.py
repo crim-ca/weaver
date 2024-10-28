@@ -389,7 +389,6 @@ def get_job_outputs(request):
     schema = get_schema_query(request.params.get("schema"))
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
-    LOGGER.warning("taratata")
     links = job.links(request, self_link="outputs")
     f_links = get_all_possible_formats_links(request, job)
     LOGGER.warning(str(f_links))
@@ -437,13 +436,17 @@ def get_job_output(request):
     """
     Retrieve the output values resulting from a job execution.
     """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status(job, request)
     settings = get_settings(request)
     output_id = request.matchdict.get("output_id")
     # Get requested media-type. "*/*" if omit
     accept = str(request.accept) if request.accept else "*/*"
     headers = request.headers
-    job = get_job(request)
-    possible_media_types = get_job_possible_output_formats(job)[0]["alternatives"][0]
+    possible_media_types = get_job_possible_output_formats(job)
+    possible_media_types = next((o["alternatives"] for o in possible_media_types
+                                if str(o["output_id"]) == output_id), None)
     results = [o for o in job.results if str(o["identifier"]) == output_id]
     if results:
         result = results[0]
@@ -460,8 +463,8 @@ def get_job_output(request):
     result_media_type = result["mimeType"]
     result_media_type = guess_target_format(request, default=result_media_type)
 
-    # if format requested not in possible mediatypes...
-    if accept not in possible_media_types:
+    # if format requested not equal to result media type and not in possible mediatypes...
+    if accept != result_media_type and accept not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
             "description": "The requested output format is not in the possible output formats",
@@ -472,7 +475,7 @@ def get_job_output(request):
 
     is_reference = bool(get_any_value(result, key=True, file=True))
     _, output_format = get_job_output_transmission(job, output_id, is_reference)
-    output_format = accept | output_format | result_media_type
+    output_format = accept or output_format or result_media_type
 
     return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 

@@ -20,7 +20,7 @@ from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
-from weaver.formats import get_extension
+from weaver.formats import ContentType, get_extension
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
 from weaver.transform.utils import (
@@ -42,11 +42,29 @@ HTML_CONTENT = """<html>
     </html>"""
 
 
-FAMILIES = [
-    ["text/plain", "text/html", "application/pdf"],
-    ["image/png", "image/gif", "image/jpeg", "image/tiff", "image/svg+xml", "application/pdf"],
-    ["text/csv", "application/xml", "application/x-yaml", "application/json"]
-]
+CONVERSION_DICT = {
+    ContentType.TEXT_PLAIN: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
+    ContentType.TEXT_HTML: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
+    ContentType.APP_PDF: [ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ContentType.IMAGE_PNG,
+                          ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
+                          ContentType.IMAGE_SVG_XML],
+
+    ContentType.IMAGE_PNG: [ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
+                            ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
+    ContentType.IMAGE_GIF: [ContentType.IMAGE_PNG, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
+                            ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
+    ContentType.IMAGE_JPEG: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_TIFF,
+                             ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
+    ContentType.IMAGE_TIFF: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG,
+                             ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
+    ContentType.IMAGE_SVG_XML: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG,
+                                ContentType.IMAGE_TIFF, ContentType.APP_PDF],
+
+    ContentType.TEXT_CSV: [ContentType.APP_XML, ContentType.APP_YAML, ContentType.APP_JSON],
+    ContentType.APP_XML: [ContentType.TEXT_CSV, ContentType.APP_YAML, ContentType.APP_JSON],
+    ContentType.APP_YAML: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_JSON],
+    ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML]
+}
 
 
 def exception_handler(func):
@@ -236,6 +254,14 @@ def json_to_xml(i, out):
 
 
 @exception_handler
+def json_to_txt(i, out):
+    with open(i, "r", encoding="utf-8") as file:
+        data = json.load(file)
+    with open(out, "w", encoding="utf-8") as txt_file:
+        json.dump(data, txt_file, indent=4)
+
+
+@exception_handler
 def json_to_yaml(i, out):
     with open(i, "r", encoding="utf-8") as file:
         configuration = json.load(file)
@@ -302,12 +328,13 @@ class Transform:
         self.ext = get_extension(self.wmt)
 
         if self.cmt != self.wmt:
-            self.output_path = self.file_path + self.ext
+            base_path, _ = os.path.splitext(self.file_path)
+            self.output_path = base_path + self.ext
             if os.path.exists(self.output_path):
                 try:
                     os.remove(self.output_path)
                 except OSError as exc:
-                    LOGGER.warning("Failed to delete [%s]", os.path.basename(self.output_path), exc)
+                    LOGGER.warning("Failed to delete [%s] err: %s", os.path.basename(self.output_path), exc)
 
     def process(self):
         try:
@@ -336,10 +363,12 @@ class Transform:
     def process_csv(self):
         if "json" in self.wmt:
             csv_to_json(self.file_path, self.output_path)
-        if "xml" in self.wmt:
+        elif "xml" in self.wmt:
             csv_to_xml(self.file_path, self.output_path)
-        if "yaml" in self.wmt:
+        elif "yaml" in self.wmt:
             csv_to_yaml(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from CSV to {self.wmt} is not supported.")
 
     def process_application(self):
         if "json" in self.cmt:
@@ -352,32 +381,42 @@ class Transform:
     def process_json(self):
         if "csv" in self.wmt:
             json_to_csv(self.file_path, self.output_path)
-        if "xml" in self.wmt:
+        elif "xml" in self.wmt:
             json_to_xml(self.file_path, self.output_path)
-        if "yaml" in self.wmt:
+        elif "yaml" in self.wmt:
             json_to_yaml(self.file_path, self.output_path)
+        elif "plain" in self.wmt:
+            json_to_txt(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from JSON to {self.wmt} is not supported.")
 
     def process_yaml(self):
         if "csv" in self.wmt:
             yaml_to_csv(self.file_path, self.output_path)
-        if "json" in self.wmt:
+        elif "json" in self.wmt:
             yaml_to_json(self.file_path, self.output_path)
-        if "xml" in self.wmt:
+        elif "xml" in self.wmt:
             yaml_to_xml(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from YAML to {self.wmt} is not supported.")
 
     def process_xml(self):
         if "json" in self.wmt:
             xml_to_json(self.file_path, self.output_path)
-        if "yaml" in self.wmt:
+        elif "yaml" in self.wmt:
             xml_to_yaml(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from XML to {self.wmt} is not supported.")
 
     def process_image(self):
         if "image/" in self.wmt:
             image_to_any(self.file_path, self.output_path)
             if not os.path.exists(self.output_path) and os.path.exists(f"{self.output_path}.tar.gz"):
                 self.output_path += ".tar.gz"
-        if "pdf" in self.wmt:
+        elif "pdf" in self.wmt:
             any_to_pdf(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from img to {self.wmt} is not supported.")
 
     def get(self):
         # type:(...) -> FileResponse

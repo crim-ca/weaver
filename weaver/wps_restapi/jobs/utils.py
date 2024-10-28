@@ -110,13 +110,13 @@ def get_job_possible_output_formats(job):
     Based on job output media-type, retrieve transformer possibilities (conversions).
     """
     outputs = []
-
     for o in job.results:
+        mime_type = get_field(o, "mime_type", search_variations=True, default="")
+        identifier = get_any_id(o)
         outputs.append({
-            "output_id": o["identifier"],
-            "default_type": o["mimeType"],
-            "alternatives": [f for f in [fam for fam in transform.FAMILIES if
-                                         o["mimeType"] in fam and "/pdf" not in o["mimeType"]]]
+            "output_id": identifier,
+            "default_type": mime_type,
+            "alternatives": transform.CONVERSION_DICT.get(mime_type, [])
         })
     return outputs
 
@@ -145,8 +145,8 @@ def get_all_possible_formats_links(request, job):
             # Default one
             links.append(get_link(o["identifier"], mt, url))
             # Get the others
-            for fs in [fam for fam in transform.FAMILIES if mt in fam and "/pdf" not in mt]:
-                links.extend([get_link(o["identifier"], f, url) for f in fs if f != mt])
+            possible_formats = [f for f in transform.CONVERSION_DICT.get(mt, []) if "/pdf" not in f]
+            links.extend([get_link(o["identifier"], f, url) for f in possible_formats])
 
         return links
     except Exception as ex:
@@ -795,12 +795,20 @@ def generate_or_resolve_result(
 
     out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
-    # Apply transform if type is different from desired output
-    if out is not None and out != typ:
+    # Apply transform if type is different from desired output and desired output is different from plain
+
+    excluded_types = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
+    if out and out not in excluded_types and out != typ:
+
+        LOGGER.debug("path is [%s] ", loc)
+        LOGGER.debug("TRYING TO TRANSFORM USING CURREND MEDIA %s wanted media %s ", typ, out)
         file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+        LOGGER.debug("transform start")
         typ = out
         file_transform.get()
+        LOGGER.debug("transform end, output path is %s", file_transform.output_path)
         loc = file_transform.output_path
+        url = map_wps_output_location(loc, settings, exists=True, url=True)
 
     if not url:
         out_dir = get_wps_output_dir(settings)

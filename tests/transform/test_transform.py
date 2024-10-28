@@ -6,16 +6,15 @@ import tempfile
 from pyramid.response import FileResponse
 
 from tests.resources import TRANSFORM_PATH
-from weaver.transform.transform import FAMILIES, Transform
+from weaver.transform.transform import CONVERSION_DICT, Transform
 
 
 def using_mimes(func):
     def wrapper(*args, **kwargs):
         cmt = mimetypes.guess_type(args[0])[0]
-        for family in FAMILIES:
-            if cmt in family:
-                for wmt in [f for f in family if f != cmt]:
-                    func(args[0], cmt, wmt)
+        if cmt in CONVERSION_DICT:
+            for wmt in CONVERSION_DICT[cmt]:
+                func(args[0], cmt, wmt)
 
     return wrapper
 
