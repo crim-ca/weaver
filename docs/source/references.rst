@@ -150,8 +150,7 @@
 .. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
-.. fixme: replace by draft location when available
-.. _ogc-api-proc-part4: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/job_management
+.. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
 .. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
 .. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
