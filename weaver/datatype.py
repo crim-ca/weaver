@@ -58,6 +58,7 @@ from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
+from weaver.transform import transform
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,
@@ -2688,7 +2689,7 @@ class Process(Base):
         if schema == ProcessSchema.WPS:
             return self.xml(request)
 
-        process = self.dict()
+        process = copy.deepcopy(self.dict())
         links = self.links()
         process.update({
             "deploymentProfile": self.deployment_profile,
@@ -2709,6 +2710,22 @@ class Process(Base):
             # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
+                if io_type == "outputs":
+                    formats = io_def["formats"]
+                    default_format = get_field(formats[0], "mediaType", search_variations=True)
+                    # All current media_types
+                    existing_media_types = {get_field(format_entry, "mediaType", search_variations=True)
+                                            for format_entry in formats}
+                    # Possible alternate format
+                    alternate_format = transform.CONVERSION_DICT.get(default_format, [])
+                    for alt_format in alternate_format:
+                        if alt_format not in existing_media_types:
+                            formats.append(
+                                {
+                                    "mediaType": alt_format
+                                }
+                            )
+                    io_def["formats"] = formats
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)
