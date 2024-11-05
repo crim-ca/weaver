@@ -18,7 +18,6 @@ from weaver.utils import get_any_value, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
-    get_all_possible_formats_links,
     get_job,
     get_job_list_links,
     get_job_output_transmission,
@@ -390,11 +389,6 @@ def get_job_outputs(request):
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
     links = job.links(request, self_link="outputs")
-    f_links = get_all_possible_formats_links(request, job)
-    LOGGER.warning(str(f_links))
-    if len(f_links) > 0:
-        links.extend(f_links)
-
     outputs.update({"links": links})
     outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)

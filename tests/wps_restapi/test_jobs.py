@@ -1644,10 +1644,11 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         path = f"/jobs/{self.job_info[0].id}/outputs"
         resp = self.app.get(path, headers=self.json_headers)
         for link in resp.json["links"]:
-            header = {"Accept": link["type"]}
-            resp = self.app.get(link, headers=header)
-            assert resp.status_code == 200
-            assert link["type"] in resp.content_type or "application/gzip" in resp.content_type
+            if link["rel"] == "outputs":
+                header = {"Accept": link["type"]}
+                resp = self.app.get(link["href"], headers=header)
+                assert resp.status_code == 200
+                assert link["type"] in resp.content_type or "application/gzip" in resp.content_type
 
     def test_job_logs_formats(self):
         path = f"/jobs/{self.job_info[0].id}/logs"
