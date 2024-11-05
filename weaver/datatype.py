@@ -2711,21 +2711,19 @@ class Process(Base):
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
                 if io_type == "outputs":
-                    formats = io_def["formats"]
-                    default_format = get_field(formats[0], "mediaType", search_variations=True)
-                    # All current media_types
-                    existing_media_types = {get_field(format_entry, "mediaType", search_variations=True)
-                                            for format_entry in formats}
-                    # Possible alternate format
-                    alternate_format = transform.CONVERSION_DICT.get(default_format, [])
-                    for alt_format in alternate_format:
-                        if alt_format not in existing_media_types:
-                            formats.append(
-                                {
-                                    "mediaType": alt_format
-                                }
-                            )
-                    io_def["formats"] = formats
+                    formats = io_def.get("formats", [])
+                    if formats and isinstance(formats[0], dict):
+                        default_format = get_field(formats[0], "mediaType", search_variations=True)
+                        # All current media_types
+                        existing_media_types = {get_field(format_entry, "mediaType", search_variations=True)
+                                                for format_entry in formats
+                                                if isinstance(format_entry, dict)}
+                        # Possible alternate format
+                        alternate_format = transform.CONVERSION_DICT.get(default_format, [])
+                        for alt_format in alternate_format:
+                            if alt_format not in existing_media_types:
+                                formats.append({"mediaType": alt_format})
+                        io_def["formats"] = formats
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)

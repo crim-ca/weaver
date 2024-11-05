@@ -560,6 +560,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["formats"][0]["default"] = False
         expect_outputs["file"]["formats"][1]["default"] = True
         expect_outputs["file"]["formats"][2]["default"] = False
+        # Alternate type added automatically in offering.
+        alternative_formats = [
+            {"mediaType": "image/gif"},
+            {"mediaType": "image/tiff"},
+            {"mediaType": "image/svg+xml"},
+            {"mediaType": "application/pdf"}
+        ]
+        expect_outputs["file"]["formats"].extend(alternative_formats)
         expect_outputs["file"]["schema"] = {
             "oneOf": [
                 {"type": "string", "format": "binary",
@@ -1501,11 +1509,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 # assert "default" not in format_spec
 
         assert proc["outputs"][0]["id"] == "single_value_single_format"
-        assert len(proc["outputs"][0]["formats"]) == 1
+        assert len(proc["outputs"][0]["formats"]) == 4  # Alternative format added in process
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][0]["formats"][0]["default"] is True
         assert proc["outputs"][1]["id"] == "single_value_multi_format"
-        assert len(proc["outputs"][1]["formats"]) == 3
+        assert len(proc["outputs"][1]["formats"]) == 6  # Alternative format added in process
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
@@ -3034,7 +3042,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
         assert isinstance(proc["outputs"][0]["formats"], list)
-        assert len(proc["outputs"][0]["formats"]) == 1
+        assert len(proc["outputs"][0]["formats"]) == 2
         assert isinstance(proc["outputs"][0]["formats"][0], dict)
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
@@ -3137,13 +3145,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(proc["outputs"], list)
         assert len(proc["outputs"]) == 2
         assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
-        assert len(proc["outputs"][0]["formats"]) == 1, \
-            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert len(proc["outputs"][0]["formats"]) == 2, \
+            "Default format and alternate formats should be added" \
+            "to process definition when omitted from both CWL and WPS"
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
         assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
-        assert len(proc["outputs"][1]["formats"]) == 1, \
-            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert len(proc["outputs"][1]["formats"]) == 2, \
+            "Default format and alternate formats should be added" \
+            "to process definition when omitted from both CWL and WPS"
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
@@ -3263,7 +3273,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][1]["description"] == "Collected logs during process run."
         assert "minOccurs" not in proc["outputs"][1]
         assert "maxOccurs" not in proc["outputs"][1]
-        assert len(proc["outputs"][1]["formats"]) == 1
+        assert len(proc["outputs"][1]["formats"]) == 2
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
 
