@@ -3953,6 +3953,13 @@ class ExecuteNestedProcessInput(ExtendedMappingSchema):
     # 'process' is required for a nested definition, otherwise it will not even be detected as one!
     process = ProcessURL(description="Process reference to be executed.")
 
+    @colander.deferred
+    @staticmethod
+    def get_field(field):
+        return getattr(ExecuteInputValues(), field).clone()
+
+    inputs = get_field
+
     def deserialize(self, cstruct):
         """
         Defer deserialization validation to the class that contains the set of expected properties.
@@ -3960,19 +3967,21 @@ class ExecuteNestedProcessInput(ExtendedMappingSchema):
         Additional properties that are added dynamically should "align" to reflect the :term:`OpenAPI` definition,
         although correspondance is not explicitly ensured.
         """
-        local_result = super().deserialize(cstruct)
-        defer_result = ExecuteParameters().deserialize(cstruct)
-        local_result.update(defer_result or {})
-        return local_result
+        self.bind()
+        return ExtendedMappingSchema.deserialize(self, cstruct)
+    #     local_result = super().deserialize(cstruct)
+    #     defer_result = ExecuteParameters().deserialize(cstruct)
+    #     local_result.update(defer_result or {})
+    #     return local_result
     
-    def convert_type(self, cstruct, dispatcher):
-        defer_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(ExecuteParameters())
-        local_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(self)
-        # local definitions take precedence to reflect alternate requirements
-        # defer the missing properties from the other schema (but only properties, to not override requirements)
-        defer_schema = {field: schema for field, schema in defer_schema.items() if "properties" in field.lower()}
-        local_schema.update(defer_schema)
-        return local_schema
+    # def convert_type(self, cstruct, dispatcher):
+    #     defer_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(ExecuteParameters())
+    #     local_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(self)
+    #     # local definitions take precedence to reflect alternate requirements
+    #     # defer the missing properties from the other schema (but only properties, to not override requirements)
+    #     defer_schema = {field: schema for field, schema in defer_schema.items() if "properties" in field.lower()}
+    #     local_schema.update(defer_schema)
+    #     return local_schema
 
 
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
