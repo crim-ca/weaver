@@ -266,7 +266,7 @@ class ResourcesUtil(GenericUtils):
                         with open(path_ext, mode="r", encoding="utf-8") as f:
                             json_payload = yaml.safe_load(f)  # both JSON/YAML
                             return json_payload
-                    if urlparse(path_ext).scheme != "":
+                    if urlparse(path_ext).scheme.startswith("http"):
                         if ref_found:
                             return path
                         resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
