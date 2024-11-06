@@ -992,19 +992,19 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "id": "output",
             "title": "output",
             "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
-                },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "contentMediaType": "text/plain"
+                    },
+                    {
+                        "typse": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/pdf",
+                        "contentEncoding": "base64"
+                    }
+                ]
+            },
             "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
         }]
         return cwl, desc  # type: ignore
@@ -1094,24 +1094,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["id"] == p_id
             assert proc["inputs"] == []
             assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
+                "id": "output",
+                "title": "output",
+                "schema": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "contentMediaType": "text/plain"
+                        },
+                        {
+                            "typse": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/pdf",
+                            "contentEncoding": "base64"
+                        }
+                    ]
                 },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
-            "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
-        }]
+                "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
+            }]
 
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         with contextlib.ExitStack() as stack:
@@ -1147,24 +1147,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["id"] == p_id
             assert proc["inputs"] == []
             assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
+                "id": "output",
+                "title": "output",
+                "schema": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "contentMediaType": "text/plain"
+                        },
+                        {
+                            "typse": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/pdf",
+                            "contentEncoding": "base64"
+                        }
+                    ]
                 },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
-            "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
-        }]
+                "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
+            }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         with contextlib.ExitStack() as stack:
@@ -1198,24 +1198,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["id"] == p_id
             assert proc["inputs"] == []
             assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
+                "id": "output",
+                "title": "output",
+                "schema": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "contentMediaType": "text/plain"
+                        },
+                        {
+                            "typse": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/pdf",
+                            "contentEncoding": "base64"
+                        }
+                    ]
                 },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
-            "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
-        }]
+                "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
+            }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit_DirectUnit(self):
         with contextlib.ExitStack() as stack:
@@ -1249,24 +1249,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["id"] == p_id
             assert proc["inputs"] == []
             assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
+                "id": "output",
+                "title": "output",
+                "schema": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "contentMediaType": "text/plain"
+                        },
+                        {
+                            "typse": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/pdf",
+                            "contentEncoding": "base64"
+                        }
+                    ]
                 },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
-            "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
-        }]
+                "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
+            }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit_UnitWithMediaType(self):
         with contextlib.ExitStack() as stack:
@@ -1300,24 +1300,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["id"] == p_id
             assert proc["inputs"] == []
             assert proc["outputs"] == [{
-            "id": "output",
-            "title": "output",
-            "schema": {
-            "oneOf": [
-                {
-                    "type": "string",
-                    "contentMediaType": "text/plain"
+                "id": "output",
+                "title": "output",
+                "schema": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "contentMediaType": "text/plain"
+                        },
+                        {
+                            "typse": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/pdf",
+                            "contentEncoding": "base64"
+                        }
+                    ]
                 },
-                {
-                    "type": "string",
-                    "format": "binary",
-                    "contentMediaType": "application/pdf",
-                    "contentEncoding": "base64"
-                }
-            ]
-        },
-            "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
-        }]
+                "formats": [{"default": True, "mediaType": "text/plain"}, {"mediaType": "application/pdf"}]
+            }]
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_CUDA_NAME], indirect=True)
