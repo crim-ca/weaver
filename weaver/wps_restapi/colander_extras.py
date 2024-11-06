@@ -1360,6 +1360,10 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     ``schema_include_deserialize``, ``schema_include_convert_type`` and ``schema_meta_include_convert_type`` can be
     used to control individually each schema inclusion during either the type conversion context (:term:`JSON` schema)
     or the deserialization context (:term:`JSON` data validation).
+
+    Additionally, the ``_schema_extra`` attribute and the corresponding ``schema_extra`` initialization parameter can
+    be specified to inject further :term:`OpenAPI` schema definitions into the generated schema. Note that duplicate
+    properties specified by this extra definition will override any automatically generated schema properties.
     """
     _extension = "_ext_schema_ref"
     _ext_schema_options = [
@@ -1370,8 +1374,9 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         "_schema_include",
         "_schema_include_deserialize",
         "_schema_include_convert_type",
+        "_schema_extra",
     ]
-    _ext_schema_fields = ["_id", "_schema"]
+    _ext_schema_fields = ["_id", "_schema", "_schema_extra"]
 
     # typings and attributes to help IDEs flag that the field is available/overridable
 
@@ -1383,6 +1388,8 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     _schema_include = True                      # type: bool
     _schema_include_deserialize = True          # type: bool
     _schema_include_convert_type = True         # type: bool
+
+    _schema_extra = None  # type: Optional[OpenAPISchema]
 
     def __init__(self, *args, **kwargs):
         for schema_key in self._schema_options:
@@ -1413,8 +1420,8 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
     def _schema_fields(self):
         return getattr(self, "_ext_schema_fields", SchemaRefMappingSchema._ext_schema_fields)
 
-    def _schema_deserialize(self, cstruct, schema_meta, schema_id):
-        # type: (OpenAPISchema, Optional[str], Optional[str]) -> OpenAPISchema
+    def _schema_deserialize(self, cstruct, schema_meta=None, schema_id=None, schema_extra=None):
+        # type: (OpenAPISchema, Optional[str], Optional[str], Optional[OpenAPISchema]) -> OpenAPISchema
         """
         Applies the relevant schema references and properties depending on :term:`JSON` schema/data conversion context.
         """
@@ -1439,6 +1446,7 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
                 schema_result[schema_field] = schema.deserialize(cstruct.get(schema_field))
 
         schema_result.update(cstruct)
+        schema_result.update(schema_extra or {})
         return schema_result
 
     def _deserialize_impl(self, cstruct):  # pylint: disable=W0222,signature-differs
@@ -1463,8 +1471,8 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
             return self._schema_deserialize(cstruct, schema_id, None)
         return cstruct
 
-    def convert_type(self, cstruct):  # pylint: disable=W0222,signature-differs
-        # type: (OpenAPISchema) -> OpenAPISchema
+    def convert_type(self, cstruct, dispatcher=None):  # noqa  # parameter to allow forwarding ref for override schemas
+        # type: (OpenAPISchema, Optional[TypeConversionDispatcher]) -> OpenAPISchema
         """
         Converts the node to obtain the :term:`JSON` schema definition.
         """
@@ -1473,12 +1481,13 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         schema_id_include_convert_type = getattr(self, "_schema_include_convert_type", False)
         schema_meta_include = getattr(self, "_schema_meta_include", False)
         schema_meta_include_convert_type = getattr(self, "_schema_meta_include_convert_type", False)
+        schema_extra = getattr(self, "_schema_extra", None)
         if schema_id_include and schema_id_include_convert_type:
             schema_id = getattr(self, "_schema", None)
         if schema_meta_include and schema_meta_include_convert_type:
             schema_meta = getattr(self, "_schema_meta", None)
-        if schema_id or schema_meta:
-            return self._schema_deserialize(cstruct, schema_meta, schema_id)
+        if schema_id or schema_meta or schema_extra:
+            return self._schema_deserialize(cstruct, schema_meta, schema_id, schema_extra)
         return cstruct
 
     @staticmethod
@@ -2532,7 +2541,8 @@ class SchemaRefConverter(TypeConverter):
         result = super(SchemaRefConverter, self).convert_type(schema_node)
         if isinstance(schema_node, SchemaRefMappingSchema):
             # apply any resolved schema references at the top of the definition
-            result_ref = SchemaRefMappingSchema.convert_type(schema_node, {})
+            converter = getattr(type(schema_node), "convert_type", SchemaRefMappingSchema.convert_type)
+            result_ref = converter(schema_node, {}, dispatcher=self.dispatcher)
             result_ref.update(result)
             result = result_ref
         return result

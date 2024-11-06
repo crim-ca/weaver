@@ -122,6 +122,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedFloat as Float,
     ExtendedInteger as Integer,
     ExtendedMappingSchema,
+    ExtendedObjectTypeConverter,
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
     ExtendedString as String,
@@ -3935,6 +3936,45 @@ class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema
     )
 
 
+class ExecuteNestedProcessInput(ExtendedMappingSchema):
+    """
+    Dynamically defines the nested process input.
+
+    This class must create the nested properties dynamically because the required classes are not yet defined, and
+    those required definitions also depend on this class to define the nested process as a possible input value.
+
+    .. note::
+        This class acts as a :class:`colander.SchemaNode` and a `cornice.TypeConverter` simultaneously through
+        a dual interface invoked through :class:`weaver.wps_restapi.colander_extras.SchemaRefConverter`.
+    """
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    description = "Nested process to execute, for which the selected output will become the input of the parent call."
+
+    # 'process' is required for a nested definition, otherwise it will not even be detected as one!
+    process = ProcessURL(description="Process reference to be executed.")
+
+    def deserialize(self, cstruct):
+        """
+        Defer deserialization validation to the class that contains the set of expected properties.
+
+        Additional properties that are added dynamically should "align" to reflect the :term:`OpenAPI` definition,
+        although correspondance is not explicitly ensured.
+        """
+        local_result = super().deserialize(cstruct)
+        defer_result = ExecuteParameters().deserialize(cstruct)
+        local_result.update(defer_result or {})
+        return local_result
+    
+    def convert_type(self, cstruct, dispatcher):
+        defer_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(ExecuteParameters())
+        local_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(self)
+        # local definitions take precedence to reflect alternate requirements
+        # defer the missing properties from the other schema (but only properties, to not override requirements)
+        defer_schema = {field: schema for field, schema in defer_schema.items() if "properties" in field.lower()}
+        local_schema.update(defer_schema)
+        return local_schema
+
+
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
 # both for literal values and link references, for inputs submitted as list-items.
 # Also allows the explicit 'href' (+ optional format) reference for a link.
@@ -3962,6 +4002,8 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
         ExecuteReference(),
         # HTTP reference to a 'collection' with optional processing arguments
         ExecuteCollectionInput(),
+        # Nested Process with its own inputs and outputs
+        ExecuteNestedProcessInput(),
     ]
 
 
@@ -4149,7 +4191,7 @@ class ExecuteInputInlineOrRefData(OneOfKeywordSchema):
         ExecuteInputQualifiedValue(),       # {"value": <anything>, "mediaType": "<>", "schema": <OAS link or object>}
         ExecuteInputFile(),                 # 'href' with either 'type' (OGC) or 'format' (OLD)
         ExecuteCollectionInput(),           # 'collection' with optional processing operations
-        # FIXME: 'nested process' (https://github.com/crim-ca/weaver/issues/412)
+        ExecuteNestedProcessInput(),        # 'process' with nested 'inputs', 'outputs', etc.
     ]
 
 
@@ -4231,8 +4273,12 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     )
 
 
-class Execute(ExecuteInputOutputs):
-    # OGC 'execute.yaml' does not enforce any required item
+class ExecuteParameters(ExecuteInputOutputs):
+    """
+    Basic execution parameters that can be submitted to run a process.
+
+    These parameters can be either for a top-level process job, or any nested process call.
+    """
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
     examples = {
         "ExecuteJSON": {
@@ -4240,22 +4286,7 @@ class Execute(ExecuteInputOutputs):
             "value": EXAMPLES["job_execute.json"],
         },
     }
-    process = ProcessURL(
-        missing=drop,
-        description=(
-            "Process reference to be executed. "
-            "This parameter is required if the process cannot be inferred from the request endpoint."
-        ),
-    )
     title = JobTitle(missing=drop)
-    status = JobStatusCreate(
-        description=(
-            "Status to request creation of the job without submitting it to processing queue "
-            "and leave it pending until triggered by another results request to start it "
-            "(see *OGC API - Processes* - Part 4: Job Management)."
-        ),
-        missing=drop,
-    )
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -4273,6 +4304,32 @@ class Execute(ExecuteInputOutputs):
         )
     )
     subscribers = JobExecuteSubscribers(missing=drop)
+
+
+class Execute(ExecuteParameters):
+    """
+    Main execution parameters that can be submitted to run a process.
+
+    Additional parameters are only applicable to the top-most process in a nested definition.
+    """
+    # OGC 'execute.yaml' does not enforce any required item
+    description = "Process execution parameters."
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    process = ProcessURL(
+        missing=drop,
+        description=(
+            "Process reference to be executed. "
+            "This parameter is required if the process cannot be inferred from the request endpoint."
+        ),
+    )
+    status = JobStatusCreate(
+        description=(
+            "Status to request creation of the job without submitting it to processing queue "
+            "and leave it pending until triggered by another results request to start it "
+            "(see *OGC API - Processes* - Part 4: Job Management)."
+        ),
+        missing=drop,
+    )
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):
