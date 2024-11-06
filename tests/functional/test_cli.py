@@ -447,7 +447,7 @@ class TestWeaverClient(TestWeaverClientBase):
             out_fmt.pop("$schema", None)
             out_fmt.pop("$id", None)
         assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                                  {'mediaType': 'application/pdf'}]
+                                  {"mediaType": "application/pdf"}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert result.body["description"] == (
             "Dummy process that simply echo's back the input message for testing purposes."
