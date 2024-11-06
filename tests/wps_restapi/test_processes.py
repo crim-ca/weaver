@@ -998,7 +998,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         "contentMediaType": "text/plain"
                     },
                     {
-                        "typse": "string",
+                        "type": "string",
                         "format": "binary",
                         "contentMediaType": "application/pdf",
                         "contentEncoding": "base64"
@@ -1103,7 +1103,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                             "contentMediaType": "text/plain"
                         },
                         {
-                            "typse": "string",
+                            "type": "string",
                             "format": "binary",
                             "contentMediaType": "application/pdf",
                             "contentEncoding": "base64"
@@ -1156,7 +1156,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                             "contentMediaType": "text/plain"
                         },
                         {
-                            "typse": "string",
+                            "type": "string",
                             "format": "binary",
                             "contentMediaType": "application/pdf",
                             "contentEncoding": "base64"
@@ -1207,7 +1207,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                             "contentMediaType": "text/plain"
                         },
                         {
-                            "typse": "string",
+                            "type": "string",
                             "format": "binary",
                             "contentMediaType": "application/pdf",
                             "contentEncoding": "base64"
@@ -1258,7 +1258,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                             "contentMediaType": "text/plain"
                         },
                         {
-                            "typse": "string",
+                            "type": "string",
                             "format": "binary",
                             "contentMediaType": "application/pdf",
                             "contentEncoding": "base64"
@@ -1309,7 +1309,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                             "contentMediaType": "text/plain"
                         },
                         {
-                            "typse": "string",
+                            "type": "string",
                             "format": "binary",
                             "contentMediaType": "application/pdf",
                             "contentEncoding": "base64"
