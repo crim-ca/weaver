@@ -62,6 +62,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 import colander
+from beaker.util import deserialize
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
 from cornice_swagger.converters.parameters import (
     BodyParameterConverter,
@@ -1917,6 +1918,36 @@ class KeywordMapper(ExtendedMappingSchema):
         for node in children:
             ExtendedSchemaBase._validate(node)
 
+    def _bind(self, kw):
+        """
+        Applies the bindings to the children nodes.
+
+        Based on :meth:`colander._SchemaNode._bind` except that `children` are obtained from the keyword.
+        """
+        self.bindings = kw
+        children = self.get_keyword_items()
+        for child in children:
+            child._bind(kw)
+        names = dir(self)
+        for k in names:
+            v = getattr(self, k)
+            if isinstance(v, colander.deferred):
+                v = v(self, kw)
+                if isinstance(v, colander.SchemaNode):
+                    if not v.name:
+                        v.name = k
+                    if v.raw_title is colander._marker:
+                        v.title = k.replace("_", " ").title()
+                    for idx, node in enumerate(list(children)):
+                        if node.name == v.name:
+                            children[idx] = v
+                        else:
+                            children.append(v)
+                else:
+                    setattr(self, k, v)
+        if getattr(self, "after_bind", None):
+            self.after_bind(self, kw)
+
     @abstractmethod
     def _deserialize_keyword(self, cstruct):
         """
@@ -1956,6 +1987,17 @@ class KeywordMapper(ExtendedMappingSchema):
             node.name = _get_node_name(node, schema_name=True) or str(index)
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
+
+        # call the specific method defined by the schema if overridden
+        # this is to allow the nested schema under the keyword to apply additional logic
+        # it is up to that schema to do the 'super().deserialize()' call to run the usual logic
+        deserialize_override = getattr(type(node), "deserialize", None)
+        if deserialize_override not in [
+            ExtendedMappingSchema.deserialize,
+            ExtendedSequenceSchema.deserialize,
+            ExtendedSchemaNode.deserialize,
+        ]:
+            return deserialize_override(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
 
     def deserialize(self, cstruct):  # pylint: disable=W0222,signature-differs
