@@ -53,6 +53,7 @@ complementary support of one-another features.
 """
 
 # pylint: disable=E0241,duplicate-bases
+# pylint: disable=C0209,consider-using-f-string
 
 import copy
 import inspect
@@ -62,7 +63,6 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 import colander
-from beaker.util import deserialize
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
 from cornice_swagger.converters.parameters import (
     BodyParameterConverter,
@@ -75,8 +75,13 @@ from cornice_swagger.converters.parameters import (
 from cornice_swagger.converters.schema import (
     STRING_FORMATTERS,
     BaseStringTypeConverter,
+    BooleanTypeConverter,
+    DateTimeTypeConverter,
+    DateTypeConverter,
+    IntegerTypeConverter,
     NumberTypeConverter,
     ObjectTypeConverter,
+    TimeTypeConverter,
     TypeConversionDispatcher,
     TypeConverter,
     ValidatorConversionDispatcher,
@@ -120,7 +125,57 @@ try:
 except AttributeError:  # Python 3.6 backport  # pragma: no cover
     RegexPattern = type(re.compile("_"))
 
-# pylint: disable=C0209,consider-using-f-string
+
+class MetadataTypeConverter(TypeConverter):
+    """
+    Converter that applies :term:`OpenAPI` schema metadata properties defined in the schema node.
+    """
+    def convert_type(self, schema_node):
+        result = super(MetadataTypeConverter, self).convert_type(schema_node)
+        deprecated = getattr(schema_node, "deprecated", False)
+        if deprecated:
+            result["deprecated"] = True
+        return result
+
+
+class ExtendedStringTypeConverter(MetadataTypeConverter, BaseStringTypeConverter):
+    pass
+
+
+class ExtendedDateTypeConverter(MetadataTypeConverter, DateTypeConverter):
+    pass
+
+
+class ExtendedTimeTypeConverter(MetadataTypeConverter, TimeTypeConverter):
+    pass
+
+
+class ExtendedDateTimeTypeConverter(MetadataTypeConverter, DateTimeTypeConverter):
+    pass
+
+
+class ExtendedBooleanTypeConverter(MetadataTypeConverter, BooleanTypeConverter):
+    pass
+
+
+class ExtendedIntegerTypeConverter(MetadataTypeConverter, IntegerTypeConverter):
+    pass
+
+
+class ExtendedNumberTypeConverter(MetadataTypeConverter, NumberTypeConverter):
+    pass
+
+
+class ExtendedFloatTypeConverter(ExtendedNumberTypeConverter):
+    format = "float"
+
+
+class ExtendedDecimalTypeConverter(ExtendedNumberTypeConverter):
+    format = "decimal"
+
+
+class ExtendedMoneyTypeConverter(ExtendedDecimalTypeConverter):
+    pass
 
 
 LITERAL_SCHEMA_TYPES = frozenset([
@@ -142,9 +197,12 @@ FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI 
 URI_REGEX = rf"{URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
 URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
-    "uri": {"converter": BaseStringTypeConverter, "validator": URI},
-    "url": {"converter": BaseStringTypeConverter, "validator": URL},
-    "file": {"converter": BaseStringTypeConverter, "validator": FILE_URI},
+    "uri": {"converter": ExtendedStringTypeConverter, "validator": URI},
+    "url": {"converter": ExtendedStringTypeConverter, "validator": URL},
+    "file": {"converter": ExtendedStringTypeConverter, "validator": FILE_URI},
+    "date": {"converter": ExtendedDateTimeTypeConverter},
+    "time": {"converter": ExtendedDateTimeTypeConverter},
+    "date-time": {"converter": ExtendedDateTimeTypeConverter},
 })
 
 
@@ -1844,6 +1902,7 @@ class KeywordMapper(ExtendedMappingSchema):
     _keyword_map = {_kw: _kw.replace("_of", "Of").replace("_", "") for _kw in _keywords}  # kw->name
     _keyword_inv = {_kn: _kw for _kw, _kn in _keyword_map.items()}                        # name->kw
     _keyword = None  # type: str
+    keywords = frozenset(_keyword_map.values())
 
     def __init__(self, *args, **kwargs):
         super(KeywordMapper, self).__init__(*args, **kwargs)
@@ -2758,7 +2817,7 @@ class VariableObjectTypeConverter(ExtendedObjectTypeConverter):
         return converted
 
 
-class DecimalTypeConverter(NumberTypeConverter):
+class DecimalTypeConverter(MetadataTypeConverter, NumberTypeConverter):
     format = "decimal"
 
     def convert_type(self, schema_node):
@@ -2775,11 +2834,11 @@ class MoneyTypeConverter(DecimalTypeConverter):
     )
 
 
-class NoneTypeConverter(TypeConverter):
+class NoneTypeConverter(ExtendedTypeConverter):
     type = "null"
 
 
-class AnyTypeConverter(TypeConverter):
+class AnyTypeConverter(ExtendedTypeConverter):
     def convert_type(self, schema_node):
         converted = super().convert_type(schema_node)
         converted.pop("type", None)
@@ -2810,8 +2869,16 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         #   user custom converters can override everything, but they must use extended classes to use extra features
         extended_converters = {
             colander.Mapping: VariableObjectTypeConverter,
-            colander.Decimal: DecimalTypeConverter,
-            colander.Money: MoneyTypeConverter,
+            colander.Decimal: ExtendedDecimalTypeConverter,
+            colander.Money: ExtendedMoneyTypeConverter,
+            colander.Float: ExtendedFloatTypeConverter,
+            colander.Number: ExtendedNumberTypeConverter,
+            colander.Integer: ExtendedIntegerTypeConverter,
+            colander.Boolean: ExtendedBooleanTypeConverter,
+            colander.DateTime: ExtendedDateTimeTypeConverter,
+            colander.Date: ExtendedDateTypeConverter,
+            colander.Time: ExtendedTimeTypeConverter,
+            colander.String: ExtendedStringTypeConverter,
             NoneType: NoneTypeConverter,
             AnyType: AnyTypeConverter,
         }
@@ -2981,8 +3048,13 @@ class OAS3DefinitionHandler(DefinitionHandler):
         return schema_ret
 
     def _ref_recursive(self, schema, depth, base_name=None):
-        # avoid key error if dealing with 'AnyType'
-        if not schema or not schema.get("type"):
+        # avoid key error if dealing with "any" type
+        # note:
+        #   It is important to consider that keyword mappings will not have a 'type',
+        #   but their child nodes must be iterated to generate '$ref'. We only want to
+        #   avoid the error if the 'type' happens to be explicitly set to an 'any' value, or
+        #   that it is omitted for a generic JSON schema object that does not have a keyword.
+        if not schema or (not schema.get("type") and not any(kw in schema for kw in KeywordMapper.keywords)):
             return schema or {}
         return super()._ref_recursive(schema, depth, base_name=base_name)
 

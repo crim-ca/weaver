@@ -114,6 +114,7 @@ from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
+    AnyType,
     BoundedRange,
     CommaSeparated,
     EmptyMappingSchema,
@@ -127,6 +128,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedString as String,
     NoneType,
     NotKeywordSchema,
+    OAS3DefinitionHandler,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
@@ -3936,6 +3938,7 @@ class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema
 
 
 class ExecuteNestedProcessReference(ExtendedMappingSchema):
+    title = "ExecuteNestedProcessReference"
     # 'process' is required for a nested definition, otherwise it will not even be detected as one!
     process = ProcessURL(description="Process reference to be executed.")
 
@@ -3950,12 +3953,18 @@ class ExecuteNestedProcessParameters(ExtendedMappingSchema):
     .. seealso::
         - https://docs.pylonsproject.org/projects/colander/en/latest/binding.html
     """
+    title = "ExecuteNestedProcessParameters"
     _sort_first = ["process", "inputs", "outputs", "properties", "mode", "response"]
+    _schema_extra = {
+        "type": null,
+        "title": "ExecuteNestedProcessParameters",
+        "$ref": f"{OAS3DefinitionHandler.json_pointer}ExecuteProcessParameters"
+    }
 
     @colander.deferred
     def _children(self, __bindings):
         # type: (Dict[str, Any]) -> List[colander.SchemaNode]
-        self.children = [node.clone() for node in ExecuteParameters().children]
+        self.children = [node.clone() for node in ExecuteProcessParameters().children]
         for child in self.children:
             # avoid inserting nested default properties that were omitted (ie: mode/response)
             # they should be included explicitly only on the top-most process by 'Execute(ExecuteParameters)' schema
@@ -3983,6 +3992,7 @@ class ExecuteNestedProcessParameters(ExtendedMappingSchema):
 
 class ExecuteNestedProcessInput(AllOfKeywordSchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    title = "ExecuteNestedProcessInput"
     description = "Nested process to execute, for which the selected output will become the input of the parent call."
 
     _all_of = [
@@ -4002,6 +4012,7 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
     """
     Permissive variants that we attempt to parse automatically.
     """
+    title = "ExecuteInputAnyType"
     _one_of = [
         # Array of literal data with 'data' key
         ArrayLiteralDataType(),
@@ -4023,12 +4034,16 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
     ]
 
 
-class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
+class ExecuteInputItem(AllOfKeywordSchema):
     description = (
         "Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard. "
         "Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href' "
         "are also looked for to remain back-compatible."
     )
+    _all_of = [
+        ExecuteInputDataType(),
+        ExecuteInputAnyType(),
+    ]
 
 
 # backward compatible definition:
@@ -4296,13 +4311,6 @@ class ExecuteParameters(ExecuteInputOutputs):
     These parameters can be either for a top-level process job, or any nested process call.
     """
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
-    examples = {
-        "ExecuteJSON": {
-            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
-            "value": EXAMPLES["job_execute.json"],
-        },
-    }
-    title = JobTitle(missing=drop)
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -4322,22 +4330,32 @@ class ExecuteParameters(ExecuteInputOutputs):
     subscribers = JobExecuteSubscribers(missing=drop)
 
 
-class Execute(ExecuteParameters):
-    """
-    Main execution parameters that can be submitted to run a process.
-
-    Additional parameters are only applicable to the top-most process in a nested definition.
-    """
-    # OGC 'execute.yaml' does not enforce any required item
-    description = "Process execution parameters."
+class ExecuteProcessParameters(ExecuteParameters):
+    title = "ExecuteProcessParameters"
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    _sort_first = [
+        "title",
+        "process",
+        "inputs",
+        "outputs",
+        "properties",
+        "mode",
+        "response",
+        "subscribers",
+    ]
+    _title = JobTitle(name="title", missing=drop)
     process = ProcessURL(
         missing=drop,
         description=(
             "Process reference to be executed. "
             "This parameter is required if the process cannot be inferred from the request endpoint."
         ),
+        example="https://example.com/processes/example"
     )
+
+
+class ExecuteJobParameters(ExtendedMappingSchema):
+    _title = JobTitle(name="title", missing=drop)
     status = JobStatusCreate(
         description=(
             "Status to request creation of the job without submitting it to processing queue "
@@ -4346,6 +4364,38 @@ class Execute(ExecuteParameters):
         ),
         missing=drop,
     )
+
+
+class Execute(AllOfKeywordSchema):
+    """
+    Main execution parameters that can be submitted to run a process.
+
+    Additional parameters are only applicable to the top-most process in a nested definition.
+    """
+    # OGC 'execute.yaml' does not enforce any required item
+    description = "Process execution parameters."
+    examples = {
+        "ExecuteJSON": {
+            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
+            "value": EXAMPLES["job_execute.json"],
+        },
+    }
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    _sort_first = [
+        "title",
+        "status",
+        "process",
+        "inputs",
+        "outputs",
+        "properties",
+        "mode",
+        "response",
+        "subscribers",
+    ]
+    _all_of = [
+        ExecuteJobParameters(),
+        ExecuteProcessParameters(),
+    ]
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):

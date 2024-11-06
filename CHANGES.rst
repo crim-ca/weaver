@@ -75,6 +75,7 @@ Fixes:
 - Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
   (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
 - Fix S3 bucket storage for result file missing the output ID in the path to match local WPS output storage structure.
+- Fix rendering of the ``deprecated`` property in `OpenAPI` representation.
 
 .. _changes_5.9.0:
 
