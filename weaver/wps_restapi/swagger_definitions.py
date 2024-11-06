@@ -114,6 +114,7 @@ from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
     AllOfKeywordSchema,
     AnyOfKeywordSchema,
+    AnyType,
     BoundedRange,
     CommaSeparated,
     EmptyMappingSchema,
@@ -128,6 +129,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedString as String,
     NoneType,
     NotKeywordSchema,
+    OAS3DefinitionHandler,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
@@ -143,7 +145,7 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import WeaverService as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Type, Union
+    from typing import Any, Dict, List, Type, Union
     from typing_extensions import TypedDict
 
     from pygeofilter.ast import AstType as FilterAstType
@@ -3936,43 +3938,66 @@ class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema
     )
 
 
-class ExecuteNestedProcessInput(ExtendedMappingSchema):
-    """
-    Dynamically defines the nested process input.
-
-    This class must create the nested properties dynamically because the required classes are not yet defined, and
-    those required definitions also depend on this class to define the nested process as a possible input value.
-
-    .. note::
-        This class acts as a :class:`colander.SchemaNode` and a `cornice.TypeConverter` simultaneously through
-        a dual interface invoked through :class:`weaver.wps_restapi.colander_extras.SchemaRefConverter`.
-    """
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
-    description = "Nested process to execute, for which the selected output will become the input of the parent call."
-
+class ExecuteNestedProcessReference(ExtendedMappingSchema):
+    title = "ExecuteNestedProcessReference"
     # 'process' is required for a nested definition, otherwise it will not even be detected as one!
     process = ProcessURL(description="Process reference to be executed.")
+
+
+class ExecuteNestedProcessParameters(ExtendedMappingSchema):
+    """
+    Dynamically defines the nested process parameters with recursive schema handling.
+    This class must create the nested properties dynamically because the required classes are not yet defined, and
+    those required definitions also depend on this class to define the nested process as a possible input value.
+    .. seealso::
+        - https://docs.pylonsproject.org/projects/colander/en/latest/binding.html
+    """
+    title = "ExecuteNestedProcessParameters"
+    _sort_first = ["process", "inputs", "outputs", "properties", "mode", "response"]
+    _schema_extra = {
+        "type": null,
+        "title": "ExecuteNestedProcessParameters",
+        "$ref": f"{OAS3DefinitionHandler.json_pointer}ExecuteProcessParameters"
+    }
+
+    @colander.deferred
+    def _children(self, __bindings):
+        # type: (Dict[str, Any]) -> List[colander.SchemaNode]
+        self.children = [node.clone() for node in ExecuteProcessParameters().children]
+        for child in self.children:
+            # avoid inserting nested default properties that were omitted (ie: mode/response)
+            # they should be included explicitly only on the top-most process by 'Execute(ExecuteParameters)' schema
+            child.default = null
+        return self.children
+
+    # calling 'bind' method will initialize this
+    # schema node attribute from the deferred method
+    children = _children
+    children_bound = False  # only for optimization
 
     def deserialize(self, cstruct):
         """
         Defer deserialization validation to the class that contains the set of expected properties.
 
         Additional properties that are added dynamically should "align" to reflect the :term:`OpenAPI` definition,
-        although correspondance is not explicitly ensured.
+        although correspondence is not explicitly ensured.
         """
-        local_result = super().deserialize(cstruct)
-        defer_result = ExecuteParameters().deserialize(cstruct)
-        local_result.update(defer_result or {})
-        return local_result
-    
-    def convert_type(self, cstruct, dispatcher):
-        defer_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(ExecuteParameters())
-        local_schema = ExtendedObjectTypeConverter(dispatcher).convert_type(self)
-        # local definitions take precedence to reflect alternate requirements
-        # defer the missing properties from the other schema (but only properties, to not override requirements)
-        defer_schema = {field: schema for field, schema in defer_schema.items() if "properties" in field.lower()}
-        local_schema.update(defer_schema)
-        return local_schema
+        node = self
+        if not self.children_bound:
+            node = self.bind()          # ensure bindings are applied to generate children recursive references
+            node.children_bound = True  # avoid doing the binding to resolve children on each recursive resolution
+        return ExtendedMappingSchema.deserialize(node, cstruct)
+
+
+class ExecuteNestedProcessInput(AllOfKeywordSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    title = "ExecuteNestedProcessInput"
+    description = "Nested process to execute, for which the selected output will become the input of the parent call."
+
+    _all_of = [
+        ExecuteNestedProcessReference(),
+        ExecuteNestedProcessParameters(),
+    ]
 
 
 # Backward compatible data-input that allows values to be nested under 'data' or 'value' fields,
@@ -3986,6 +4011,7 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
     """
     Permissive variants that we attempt to parse automatically.
     """
+    title = "ExecuteInputAnyType"
     _one_of = [
         # Array of literal data with 'data' key
         ArrayLiteralDataType(),
@@ -4007,12 +4033,16 @@ class ExecuteInputAnyType(OneOfKeywordSchema):
     ]
 
 
-class ExecuteInputItem(ExecuteInputDataType, ExecuteInputAnyType):
+class ExecuteInputItem(AllOfKeywordSchema):
     description = (
         "Default value to be looked for uses key 'value' to conform to older drafts of OGC-API standard. "
         "Even older drafts that allowed other fields 'data' instead of 'value' and 'reference' instead of 'href' "
         "are also looked for to remain back-compatible."
     )
+    _all_of = [
+        ExecuteInputDataType(),
+        ExecuteInputAnyType(),
+    ]
 
 
 # backward compatible definition:
@@ -4280,13 +4310,6 @@ class ExecuteParameters(ExecuteInputOutputs):
     These parameters can be either for a top-level process job, or any nested process call.
     """
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
-    examples = {
-        "ExecuteJSON": {
-            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
-            "value": EXAMPLES["job_execute.json"],
-        },
-    }
-    title = JobTitle(missing=drop)
     mode = JobExecuteModeEnum(
         missing=drop,
         default=ExecuteMode.AUTO,
@@ -4306,22 +4329,32 @@ class ExecuteParameters(ExecuteInputOutputs):
     subscribers = JobExecuteSubscribers(missing=drop)
 
 
-class Execute(ExecuteParameters):
-    """
-    Main execution parameters that can be submitted to run a process.
-
-    Additional parameters are only applicable to the top-most process in a nested definition.
-    """
-    # OGC 'execute.yaml' does not enforce any required item
-    description = "Process execution parameters."
+class ExecuteProcessParameters(ExecuteParameters):
+    title = "ExecuteProcessParameters"
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    _sort_first = [
+        "title",
+        "process",
+        "inputs",
+        "outputs",
+        "properties",
+        "mode",
+        "response",
+        "subscribers",
+    ]
+    _title = JobTitle(name="title", missing=drop)
     process = ProcessURL(
         missing=drop,
         description=(
             "Process reference to be executed. "
             "This parameter is required if the process cannot be inferred from the request endpoint."
         ),
+        example="https://example.com/processes/example"
     )
+
+
+class ExecuteJobParameters(ExtendedMappingSchema):
+    _title = JobTitle(name="title", missing=drop)
     status = JobStatusCreate(
         description=(
             "Status to request creation of the job without submitting it to processing queue "
@@ -4330,6 +4363,38 @@ class Execute(ExecuteParameters):
         ),
         missing=drop,
     )
+
+
+class Execute(AllOfKeywordSchema):
+    """
+    Main execution parameters that can be submitted to run a process.
+
+    Additional parameters are only applicable to the top-most process in a nested definition.
+    """
+    # OGC 'execute.yaml' does not enforce any required item
+    description = "Process execution parameters."
+    examples = {
+        "ExecuteJSON": {
+            "summary": "Execute a process job using REST JSON payload with OGC API schema.",
+            "value": EXAMPLES["job_execute.json"],
+        },
+    }
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
+    _sort_first = [
+        "title",
+        "status",
+        "process",
+        "inputs",
+        "outputs",
+        "properties",
+        "mode",
+        "response",
+        "subscribers",
+    ]
+    _all_of = [
+        ExecuteJobParameters(),
+        ExecuteProcessParameters(),
+    ]
 
 
 class QuoteStatusSchema(ExtendedSchemaNode):

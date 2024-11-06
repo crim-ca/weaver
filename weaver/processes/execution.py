@@ -38,6 +38,7 @@ from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.builtin.collection_processor import process_collection
+from weaver.processes.builtin.properties_processor import process_properties
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -595,16 +596,20 @@ def parse_wps_inputs(wps_process, job, container=None):
                     # this could refer to the desired collection ID rather than the input ID being mapped
                     input_info = dict(input_info)  # not 'deepcopy' to avoid 'data' or 'value' copy that could be large
                     input_info["id"] = input_id
+
+                # collection reference
                 if isinstance(input_value, dict) and "collection" in input_value:
                     col_path = os.path.join(job.tmpdir, "inputs", input_id)
                     col_files = process_collection(input_value, input_info, col_path, logger=job)
-                    resolved_inputs.extend([
+                    resolved_input_values = [
                         (
                             {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])},
                             input_info
                         )
                         for col_file in col_files
-                    ])
+                    ]
+
+                # nested process reference
                 elif isinstance(input_value, dict) and "process" in input_value:
                     proc_uri = input_value["process"]
                     job_log_update_status_func(
@@ -632,9 +637,23 @@ def parse_wps_inputs(wps_process, job, container=None):
                             f"Abort execution. Cannot map multiple outputs from {proc_uri} "
                             f"to input [{input_id}] of [{job.process}]."
                         )
-                    resolved_inputs.append((results[0], input_info))
+                    resolved_input_values = [(results[0], input_info)]
+
+                # typical file/data
                 else:
-                    resolved_inputs.append((input_value, input_info))
+                    resolved_input_values = [(input_value, input_info)]
+
+                # post-handling of properties
+                properties = input_value.get("properties") if isinstance(input_value, dict) else None
+                if properties:
+                    input_prop_path = os.path.join(job.tmpdir, "inputs", input_id)
+                    input_prop_values = {input_id: resolved_input_values}  # FIXME: handle other cross-input refs?
+                    resolved_input_values = process_properties(
+                        properties,
+                        input_prop_values,
+                        input_prop_path,
+                    )
+                resolved_inputs.extend(resolved_input_values)
 
             for input_value, input_info in resolved_inputs:
                 # if already resolved, skip parsing

@@ -1,5 +1,4 @@
 #! /usr/bin/env cwl-runner
-# based on: https://github.com/opengeospatial/ogcapi-processes/blob/8c41db3f/core/examples/json/ProcessDescription.json
 cwlVersion: v1.0
 class: CommandLineTool
 id: collection_processor

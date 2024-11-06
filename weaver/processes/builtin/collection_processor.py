@@ -266,7 +266,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
 def process_cwl(collection_input, input_definition, output_dir):
     # type: (JobValueCollection, ProcessInputOutputItem, Path) -> CWL_IO_ValueMap
     files = process_collection(collection_input, input_definition, output_dir)
-    outputs = {"outputs": files}  # 'outputs' must match ID used in CWL definition
+    outputs = {"referenceOutput": files}  # output ID must match the one used in CWL definition
     with open(os.path.join(output_dir, OUTPUT_CWL_JSON), mode="w", encoding="utf-8") as file:
         json.dump(outputs, file)
     return outputs
