@@ -844,7 +844,6 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 	docker rmi -f "$(APP_NAME):latest" || true
 	docker rmi -f "$(APP_NAME):base" || true
 
-
 ## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
 .PHONY: start

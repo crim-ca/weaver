@@ -598,8 +598,9 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert outputs[0]["formats"][1]["default"] is False
         assert "maximumMegabytes" not in outputs[0]["formats"][1]  # never applies, even with OWSLib update
         assert outputs[1]["id"] == "output_log"
-        assert len(outputs[1]["formats"]) == 1
+        assert len(outputs[1]["formats"]) == 2
         assert outputs[1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
+        assert outputs[1]["formats"][1]["mediaType"] == ContentType.APP_PDF
         assert "encoding" not in outputs[1]["formats"][0]
         assert outputs[1]["formats"][0]["default"] is True
         assert "maximumMegabytes" not in outputs[1]["formats"][0]  # never applies, even with OWSLib update
