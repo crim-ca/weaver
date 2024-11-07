@@ -150,10 +150,11 @@ class WpsProviderTest(WpsConfigBase):
         assert "outputs" in body and len(body["outputs"]) == 1
         assert "output" in body["outputs"]
         assert "formats" in body["outputs"]["output"]
-        assert len(body["outputs"]["output"]["formats"]) == 2
+        assert len(body["outputs"]["output"]["formats"]) == 3
         assert body["outputs"]["output"]["formats"][0]["default"] is True
         assert body["outputs"]["output"]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
-        assert body["outputs"]["output"]["formats"][1]["mediaType"] == ContentType.APP_PDF
+        assert body["outputs"]["output"]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert body["outputs"]["output"]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert "literalDataDomains" not in body["outputs"]["output"]
 
         assert body["processDescriptionURL"] == proc_desc_url

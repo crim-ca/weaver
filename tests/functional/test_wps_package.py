@@ -3042,10 +3042,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
         assert isinstance(proc["outputs"][0]["formats"], list)
-        assert len(proc["outputs"][0]["formats"]) == 2
+        assert len(proc["outputs"][0]["formats"]) == 3
         assert isinstance(proc["outputs"][0]["formats"][0], dict)
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_PDF
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
         fields = set(proc.keys()) - expect
         assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
@@ -3145,17 +3147,21 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(proc["outputs"], list)
         assert len(proc["outputs"]) == 2
         assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
-        assert len(proc["outputs"][0]["formats"]) == 2, \
-            "Default format and alternate formats should be added" \
+        assert len(proc["outputs"][0]["formats"]) == 3, \
+            "Default format and alternate formats should be added " \
             "to process definition when omitted from both CWL and WPS"
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
-        assert len(proc["outputs"][1]["formats"]) == 2, \
-            "Default format and alternate formats should be added" \
+        assert len(proc["outputs"][1]["formats"]) == 3, \
+            "Default format and alternate formats should be added " \
             "to process definition when omitted from both CWL and WPS"
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
 
@@ -3273,9 +3279,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][1]["description"] == "Collected logs during process run."
         assert "minOccurs" not in proc["outputs"][1]
         assert "maxOccurs" not in proc["outputs"][1]
-        assert len(proc["outputs"][1]["formats"]) == 2
+        assert len(proc["outputs"][1]["formats"]) == 3
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_PDF
 
     def test_deploy_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {

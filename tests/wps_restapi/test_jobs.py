@@ -161,22 +161,22 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
                       user_id=self.user_editor1_id, status=Status.STARTED, progress=99, access=Visibility.PUBLIC)
 
     def make_job(self,
-                 task_id,  # type: str
-                 process,  # type: str
-                 service,  # type: Optional[str]
-                 user_id,  # type: Optional[int]
-                 status,  # type: AnyStatusType
-                 progress,  # type: int
-                 access,  # type: AnyVisibility
-                 created=None,  # type: Optional[Union[datetime.datetime, str]]
-                 offset=None,  # type: Optional[int]
-                 duration=None,  # type: Optional[int]
-                 exceptions=None,  # type: Optional[List[JSON]]
-                 logs=None,  # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
-                 statistics=None,  # type: Optional[Statistics]
-                 tags=None,  # type: Optional[List[str]]
-                 add_info=True,  # type: bool
-                 ):  # type: (...) -> Job
+                 task_id,           # type: str
+                 process,           # type: str
+                 service,           # type: Optional[str]
+                 user_id,           # type: Optional[int]
+                 status,            # type: AnyStatusType
+                 progress,          # type: int
+                 access,            # type: AnyVisibility
+                 created=None,      # type: Optional[Union[datetime.datetime, str]]
+                 offset=None,       # type: Optional[int]
+                 duration=None,     # type: Optional[int]
+                 exceptions=None,   # type: Optional[List[JSON]]
+                 logs=None,         # type: Optional[List[Union[str, Tuple[str, AnyLogLevel, AnyStatusType, Number]]]]
+                 statistics=None,   # type: Optional[Statistics]
+                 tags=None,         # type: Optional[List[str]]
+                 add_info=True,     # type: bool
+                 ):                 # type: (...) -> Job
         if isinstance(created, str):
             created = date_parser.parse(created)
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
@@ -916,43 +916,37 @@ class WpsRestApiJobsTest(unittest.TestCase, JobUtils):
         path_jobs_user_req_tests = [
             # pylint: disable=C0301,line-too-long
             # URI               ACCESS              USER                    EXPECTED JOBS
-            (uri_direct_jobs, None, None, public_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, None, self.user_editor1_id, editor1_all_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, None, self.user_admin_id, self.job_info),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PRIVATE, None, public_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PRIVATE, self.user_editor1_id, editor1_private_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PRIVATE, self.user_admin_id, admin_private_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PUBLIC, None, public_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PUBLIC, self.user_editor1_id, editor1_public_jobs),  # noqa: E241,E501
-            (uri_direct_jobs, Visibility.PUBLIC, self.user_admin_id, admin_public_jobs),  # noqa: E241,E501
+            (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241,E501
+            (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),                             # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, self.user_editor1_id,   editor1_private_jobs),                      # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PRIVATE, self.user_admin_id,     admin_private_jobs),                        # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  None,                   public_jobs),                               # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  self.user_editor1_id,   editor1_public_jobs),                       # noqa: E241,E501
+            (uri_direct_jobs,   Visibility.PUBLIC,  self.user_admin_id,     admin_public_jobs),                         # noqa: E241,E501
             # ---
-            (uri_process_jobs, None, None, filter_process(public_jobs)),  # noqa: E241,E501
-            (uri_process_jobs, None, self.user_editor1_id, filter_process(editor1_all_jobs)),  # noqa: E241,E501
-            (uri_process_jobs, None, self.user_admin_id, filter_process(self.job_info)),  # noqa: E241,E501
-            (uri_process_jobs, Visibility.PRIVATE, None, filter_process(public_jobs)),  # noqa: E241,E501
-            (uri_process_jobs, Visibility.PRIVATE, self.user_editor1_id, filter_process(editor1_private_jobs)),
-            # noqa: E241,E501
-            (uri_process_jobs, Visibility.PRIVATE, self.user_admin_id, filter_process(admin_private_jobs)),
-            # noqa: E241,E501
-            (uri_process_jobs, Visibility.PUBLIC, None, filter_process(public_jobs)),  # noqa: E241,E501
-            (uri_process_jobs, Visibility.PUBLIC, self.user_editor1_id, filter_process(editor1_public_jobs)),
-            # noqa: E241,E501
-            (uri_process_jobs, Visibility.PUBLIC, self.user_admin_id, filter_process(public_jobs)),  # noqa: E241,E501
+            (uri_process_jobs,  None,               None,                   filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  None,               self.user_editor1_id,   filter_process(editor1_all_jobs)),          # noqa: E241,E501
+            (uri_process_jobs,  None,               self.user_admin_id,     filter_process(self.job_info)),             # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, None,                   filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),      # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),        # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  None,                   filter_process(public_jobs)),               # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),       # noqa: E241,E501
+            (uri_process_jobs,  Visibility.PUBLIC,  self.user_admin_id,     filter_process(public_jobs)),               # noqa: E241,E501
             # ---
-            (uri_provider_jobs, None, None, filter_service(public_jobs)),  # noqa: E241,E501
-            (uri_provider_jobs, None, self.user_editor1_id, filter_service(editor1_all_jobs)),  # noqa: E241,E501
-            (uri_provider_jobs, None, self.user_admin_id, filter_service(self.job_info)),  # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PRIVATE, None, filter_service(public_jobs)),  # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PRIVATE, self.user_editor1_id, filter_service(editor1_private_jobs)),
-            # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PRIVATE, self.user_admin_id, filter_service(admin_private_jobs)),
-            # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PUBLIC, None, filter_service(public_jobs)),  # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PUBLIC, self.user_editor1_id, filter_service(editor1_public_jobs)),
-            # noqa: E241,E501
-            (uri_provider_jobs, Visibility.PUBLIC, self.user_admin_id, filter_service(public_jobs)),  # noqa: E241,E501
+            (uri_provider_jobs, None,               None,                   filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, None,               self.user_editor1_id,   filter_service(editor1_all_jobs)),          # noqa: E241,E501
+            (uri_provider_jobs, None,               self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, None,                   filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),      # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),        # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  None,                   filter_service(public_jobs)),               # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
+            (uri_provider_jobs, Visibility.PUBLIC,  self.user_admin_id,     filter_service(public_jobs)),               # noqa: E241,E501
 
-        ]  # type: List[Tuple[str, str, Union[None, int], List[Job]]]
+        ]   # type: List[Tuple[str, str, Union[None, int], List[Job]]]
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
             with contextlib.ExitStack() as stack:

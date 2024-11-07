@@ -47,6 +47,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_sta
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.transform import transform
 from weaver.utils import (
+    create_content_id,
     data2str,
     fetch_file,
     get_any_id,
@@ -119,39 +120,6 @@ def get_job_possible_output_formats(job):
             "alternatives": transform.CONVERSION_DICT.get(mime_type, [])
         })
     return outputs
-
-
-def get_link(output_id, mime_type, url):
-    return {
-        "href": f"{url}/{output_id}?f={mime_type}", "rel": f"output:{output_id}",
-        "type": mime_type, "title": f"Link to job {output_id} result in {mime_type}"
-    }
-
-
-def get_all_possible_formats_links(request, job):
-    """
-    Get direct links to all outputs in any possible format.
-    """
-    try:
-        links = []
-        url = request.url
-        links.append({
-            "href": f"{url[:url.rfind('/')]}/transforms", "rel": "up",
-            "type": ContentType.APP_JSON, "title": "List of possible output formats."
-        })
-
-        for o in job.results:
-            mt = o["mimeType"]
-            # Default one
-            links.append(get_link(o["identifier"], mt, url))
-            # Get the others
-            possible_formats = [f for f in transform.CONVERSION_DICT.get(mt, []) if "/pdf" not in f]
-            links.extend([get_link(o["identifier"], f, url) for f in possible_formats])
-
-        return links
-    except Exception as ex:
-        print(ex)
-        return []
 
 
 def get_job(request):
@@ -746,7 +714,7 @@ def generate_or_resolve_result(
     result_id,      # type: str
     output_id,      # type: str
     output_mode,    # type: AnyExecuteTransmissionMode
-    output_format,  # type: Optional[JobValueFormat]  # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    output_format,  # type: Optional[JobValueFormat]
     settings,       # type: SettingsType
 ):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
@@ -767,7 +735,7 @@ def generate_or_resolve_result(
     is_val = bool(get_any_value(result, key=True, file=False, data=True))
     is_ref = bool(get_any_value(result, key=True, file=True, data=False))
     val = get_any_value(result)
-    cid = f"{result_id}@{job.id}"
+    cid = create_content_id(result_id, job.id)
     url = None
     loc = None
     res_data = None
@@ -800,13 +768,9 @@ def generate_or_resolve_result(
     excluded_types = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
     if out and out not in excluded_types and out != typ:
 
-        LOGGER.debug("path is [%s] ", loc)
-        LOGGER.debug("TRYING TO TRANSFORM USING CURREND MEDIA %s wanted media %s ", typ, out)
         file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
-        LOGGER.debug("transform start")
         typ = out
         file_transform.get()
-        LOGGER.debug("transform end, output path is %s", file_transform.output_path)
         loc = file_transform.output_path
         url = map_wps_output_location(loc, settings, exists=True, url=True)
 
