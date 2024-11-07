@@ -46,9 +46,9 @@ from weaver.processes.convert import (
     get_field,
     ows2json_output_data
 )
+from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
-from weaver.processes.wps_process_base import OGCAPIRemoteProcessBase
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -184,7 +184,7 @@ def execute_process(task, job_id, wps_url, headers=None):
         # prepare inputs
         job.progress = JobProgress.GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
-        wps_inputs = parse_wps_inputs(wps_process, job, database=db)
+        wps_inputs = parse_wps_inputs(wps_process, job, container=db)
 
         # prepare outputs
         job.progress = JobProgress.GET_OUTPUTS
@@ -535,7 +535,7 @@ def log_and_save_update_status_handler(
     db = get_db(container)
     store = db.get_store(StoreJobs)
 
-    def log_and_update_status(message, progress, status, *_, **kwargs):
+    def log_and_update_status(message, progress=None, status=None, *_, **kwargs):
         job.save_log(message=message, progress=progress, status=status, **kwargs)
         store.update_job(job)
     return log_and_update_status
@@ -619,7 +619,7 @@ def parse_wps_inputs(wps_process, job, container=None):
                         ),
                         logger=LOGGER,
                     )
-                    process = OGCAPIRemoteProcessBase(
+                    process = OGCAPIRemoteProcess(
                         input_value,
                         proc_uri,
                         request=None,
@@ -675,7 +675,8 @@ def parse_wps_inputs(wps_process, job, container=None):
                 if input_data is None:
                     job_log_update_status_func(
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
-                        logger=LOGGER, level=logging.WARNING,
+                        logger=LOGGER,
+                        level=logging.WARNING,
                     )
                 else:
                     wps_inputs.append((input_id, input_data))

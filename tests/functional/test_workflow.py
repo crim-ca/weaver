@@ -1091,6 +1091,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_OPTIONAL,
+        WorkflowProcesses.APP_ECHO_RESULTS_TESTER,
         WorkflowProcesses.APP_ECHO_SECRETS,
         WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.APP_READ_FILE,
@@ -1628,21 +1629,24 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             data = out_file.read().strip()
         assert data == "test-message", "output from workflow should match the default resolved from input omission"
 
+    @pytest.mark.oap_part3
     def test_workflow_ad_hoc_nested_process(self):
         passthrough_process_info = self.prepare_process(WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS)
         echo_result_process_info = self.prepare_process(WorkflowProcesses.APP_ECHO_RESULTS_TESTER)
 
         workflow_exec = {
-            "process": passthrough_process_info.path,
+            "process": f"{self.WEAVER_RESTAPI_URL}{passthrough_process_info.path}",
             "inputs": {
                 "message": {
-                    "process": passthrough_process_info.path,
+                    "process": f"{self.WEAVER_RESTAPI_URL}{passthrough_process_info.path}",
                     "inputs": {
-                        "process": echo_result_process_info.path,
-                        "inputs": {
-                            "message": "test"
-                        },
-                        "outputs": {"output_data": {}}
+                        "message": {
+                            "process": f"{self.WEAVER_RESTAPI_URL}{echo_result_process_info.path}",
+                            "inputs": {
+                                "message": "test"
+                            },
+                            "outputs": {"output_data": {}}
+                        }
                     },
                     "outputs": {"message": {}}
                 },
