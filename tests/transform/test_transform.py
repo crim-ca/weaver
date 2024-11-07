@@ -8,6 +8,9 @@ from pyramid.response import FileResponse
 from tests.resources import TRANSFORM_PATH
 from weaver.transform.transform import CONVERSION_DICT, Transform
 
+# Register the MIME type for .yaml files
+mimetypes.add_type("application/x-yaml", ".yaml")
+
 
 def using_mimes(func):
     def wrapper(*args, **kwargs):

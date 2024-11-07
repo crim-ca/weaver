@@ -43,12 +43,8 @@ HTML_CONTENT = """<html>
 
 
 CONVERSION_DICT = {
-    ContentType.TEXT_PLAIN: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
+    ContentType.TEXT_PLAIN: [ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ContentType.APP_PDF],
     ContentType.TEXT_HTML: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
-    ContentType.APP_PDF: [ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ContentType.IMAGE_PNG,
-                          ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
-                          ContentType.IMAGE_SVG_XML],
-
     ContentType.IMAGE_PNG: [ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
                             ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
     ContentType.IMAGE_GIF: [ContentType.IMAGE_PNG, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
@@ -59,9 +55,8 @@ CONVERSION_DICT = {
                              ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
     ContentType.IMAGE_SVG_XML: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG,
                                 ContentType.IMAGE_TIFF, ContentType.APP_PDF],
-
     ContentType.TEXT_CSV: [ContentType.APP_XML, ContentType.APP_YAML, ContentType.APP_JSON],
-    ContentType.APP_XML: [ContentType.TEXT_CSV, ContentType.APP_YAML, ContentType.APP_JSON],
+    ContentType.APP_XML: [ContentType.APP_YAML, ContentType.APP_JSON],
     ContentType.APP_YAML: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_JSON],
     ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML]
 }

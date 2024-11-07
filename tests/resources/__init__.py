@@ -63,8 +63,6 @@ WPS_NO_INPUTS_URL = DESCRIBE_PROCESS_TEMPLATE_URL.format(
     TEST_REMOTE_SERVER_URL, WPS_NO_INPUTS_ID
 )
 
-WPS_transform_RESSOURCES = os.path.join(RESOURCES_PATH, "transform")
-
 
 def _load_path(file_path, text=False, xml=False):
     # type: (str, bool, bool) -> Union[JSON, xml_util.XML, str]
