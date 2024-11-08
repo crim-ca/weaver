@@ -764,9 +764,7 @@ def generate_or_resolve_result(
     out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
     # Apply transform if type is different from desired output and desired output is different from plain
-
-    excluded_types = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
-    if out and out not in excluded_types and out != typ:
+    if out and out not in transform.EXCLUDED_TYPES and out != typ:
 
         file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
         typ = out

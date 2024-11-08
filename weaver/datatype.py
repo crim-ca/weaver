@@ -1420,18 +1420,18 @@ class Job(Base, LoggerHandler):
         try:
             links = []
             for result in results:
-                media_type = get_field(result, "mediaType", search_variations=True)
-                possible_formats = transform.CONVERSION_DICT.get(media_type, [])
-                id = get_field(result, "identifier", search_variations=True)
-                links.extend([
-                    {
-                        "href": f"{url}/{id}?f={media_type}",
-                        "rel": create_content_id(id, self.id),
-                        "type": media_type,
-                        "title": f"Link to job {id} result in alternate {media_type}"
-                    }
-                    for media_type in possible_formats])
-
+                media_type = get_field(result, "mimeType", search_variations=True)
+                if media_type and media_type not in transform.EXCLUDED_TYPES:
+                    possible_formats = transform.CONVERSION_DICT.get(media_type, [])
+                    id = get_field(result, "identifier", search_variations=True)
+                    links.extend([
+                        {
+                            "href": f"{url}/{id}?f={media_type}",
+                            "rel": create_content_id(id, self.id),
+                            "type": media_type,
+                            "title": f"Link to job {id} result in alternate {media_type}"
+                        }
+                        for media_type in possible_formats])
             return links
         except Exception as ex:
             print(ex)
@@ -1491,11 +1491,7 @@ class Job(Base, LoggerHandler):
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
                 ])
-                results = self.results
-                LOGGER.debug("ADDING ADDITIONAL LINKS for results %s", results)
-                LOGGER.debug("job url is %s", job_url)
-                f_links = self.get_all_possible_formats_links(url=job_url, results=results)
-                LOGGER.debug("all possible formats link that can be added are %s", f_links)
+                f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
                 if len(f_links) > 0:
                     job_links.extend(f_links)
             else:
