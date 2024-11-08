@@ -1386,9 +1386,9 @@ def make_link_header(
         title = title or href.get("title")
         charset = charset or href.get("charset")  # noqa
         hreflang = hreflang or href.get("hreflang")
-        href = href["href"]
         params = {key: val for key, val in href.items() if val and isinstance(val, str)}
         kwargs.update(params)
+        href = href["href"]
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""
