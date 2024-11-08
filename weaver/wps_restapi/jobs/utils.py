@@ -343,8 +343,9 @@ def make_result_link(
         url = headers["Content-Location"]
         typ = headers["Content-Type"]
         enc = headers.get("Content-Encoding", None)
-        link_header = make_link_header(url, rel=result_id, type=typ, charset=enc)
-        links.append(link_header)
+        link_header_result = make_link_header(url, rel=result_id, type=typ, charset=enc)
+        link_header_output = make_link_header(url, rel="output", type=typ, charset=enc, id=result_id)
+        links.extend([link_header_result, link_header_output])
     return links
 
 

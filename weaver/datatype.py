@@ -65,7 +65,6 @@ from weaver.utils import (
     VersionFormat,
     apply_number_with_unit,
     as_version_major_minor_patch,
-    create_content_id,
     extend_instance,
     fully_qualified_name,
     get_job_log_msg,
@@ -1427,7 +1426,8 @@ class Job(Base, LoggerHandler):
                     links.extend([
                         {
                             "href": f"{url}/{id}?f={media_type}",
-                            "rel": create_content_id(id, self.id),
+                            "rel": "output",
+                            "id": id,
                             "type": media_type,
                             "title": f"Link to job {id} result in alternate {media_type}"
                         }

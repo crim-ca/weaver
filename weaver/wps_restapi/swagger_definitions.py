@@ -431,11 +431,11 @@ class URL(ExtendedSchemaNode):
     format = "url"
 
 
-class NRST(ExtendedSchemaNode):
+class URN(ExtendedSchemaNode):
     schema_type = String
-    description = "Linked to an output pattern."
-    example = "some-object-slug-name"
-    pattern = re.compile(r"^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*:[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$")
+    description = "Universal ressource name."
+    example = "urn:ogc:def:objectType:authority:version:code"
+    pattern = re.compile(r"^urn\:[A-Za-z0-9]+(:[A-Za-z0-9]+)+$")
 
 
 class URI(ExtendedSchemaNode):
@@ -875,8 +875,13 @@ class LinkRelationshipType(OneOfKeywordSchema):
             "This should be one item amongst registered relations https://www.iana.org/assignments/link-relations/."
         )),
         URL(description="Fully qualified extension link relation to the current content."),
-        NRST(description="Link to Job output_id.")  # NamespacedRelationshipType
     ]
+
+
+class LinkId(ExtendedMappingSchema):
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4 (Target Attributes)
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4.2 (Extension Attributes)
+    id = SLUG(name="id", missing=drop)
 
 
 class LinkRelationship(ExtendedMappingSchema):
@@ -888,7 +893,8 @@ class LinkBase(LinkLanguage, MetadataBase):
     type = MediaType(description="IANA identifier of content-type located at the link.", missing=drop)
 
 
-class Link(LinkRelationship, LinkBase):
+class Link(LinkRelationship, LinkBase, LinkId):
+    # https://datatracker.ietf.org/doc/html/rfc2068#section-19.6.2.4 (Link Header)
     _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/link.json"
     _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 

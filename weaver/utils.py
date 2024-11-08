@@ -1367,6 +1367,7 @@ def make_link_header(
     type=None,      # type: Optional[str]  # noqa
     title=None,     # type: Optional[str]
     charset=None,   # type: Optional[str]
+    **kwargs,       # type: Optional[str]
 ):                  # type: (...) -> str
     """
     Creates the HTTP Link (:rfc:`8288`) header value from input parameters or a dictionary representation.
@@ -1386,6 +1387,8 @@ def make_link_header(
         charset = charset or href.get("charset")  # noqa
         hreflang = hreflang or href.get("hreflang")
         href = href["href"]
+        params = {key: val for key, val in href.items() if val and isinstance(val, str)}
+        kwargs.update(params)
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""
@@ -1395,6 +1398,9 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
+    if kwargs:
+        for key, val in kwargs.items():
+            link += f"; {key}={val}"
     return link
 
 
