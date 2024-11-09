@@ -65,7 +65,6 @@ if TYPE_CHECKING:
         Iterable,
         List,
         Literal,
-        Mapping,
         Optional,
         Sequence,
         Set,
@@ -84,6 +83,7 @@ if TYPE_CHECKING:
             AnyRequestMethod,
             AnyRequestType,
             AnyResponseType,
+            CookiesType,
             CWL,
             CWL_IO_ValueMap,
             ExecutionInputs,
@@ -101,6 +101,7 @@ if TYPE_CHECKING:
         # avoid linter issue
         AnyRequestMethod = str
         AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
+        CookiesType = Dict[str, str]
         CWL = JSON = Dict[str, Any]
         CWL_IO_ValueMap = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = SettingsType = JSON
         ExecutionInputs = Union[JSON, List[JSON]]
@@ -375,9 +376,20 @@ class CookieAuthHandler(RequestAuthHandler):
     Adds the ``Cookie`` header formed from the authentication bearer token from the underlying request.
     """
 
+    def __init__(
+        self,
+        identity=None,  # type: Optional[str]
+        password=None,  # type: Optional[str]
+        url=None,       # type: Optional[str]
+        method="GET",   # type: AnyRequestMethod
+        headers=None,   # type: Optional[AnyHeadersContainer]
+        token=None,     # type: Optional[Union[str, CookiesType]]
+    ):                  # type: (...) -> None
+        super().__init__(identity=identity, password=password, url=url, method=method, headers=headers, token=token)
+
     @staticmethod
     def parse_token(token):
-        # type: (Union[str, Mapping[str, str]]) -> str
+        # type: (Union[str, CookiesType]) -> str
         """
         Convert token to a form that can be included in a request header.
 
@@ -1229,8 +1241,8 @@ class WeaverClient(object):
             else:
                 out_mode = {}  # auto-resolution
             body["outputs"][output_id] = out_mode
-        if not body["outputs"]:
-            body.pop("outputs")  # avoid no-output request
+        if not body.get("outputs"):
+            body.pop("outputs", None)  # avoid no-output request
         return body
 
     def execute(
@@ -1504,7 +1516,6 @@ class WeaverClient(object):
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
         LOGGER.info("Attempting job trigger: [%s]", job_id)
-        job_res_url = f"{job_url}/results"
         update_data = {}
         update_headers = {}
         update_headers.update(self._headers)
@@ -1538,7 +1549,7 @@ class WeaverClient(object):
             update_data["subscribers"] = subscribers
         if output_context:
             update_headers["X-WPS-Output-Context"] = str(output_context)
-        resp = self._request("PATCH", job_res_url, json=update_data,
+        resp = self._request("PATCH", job_url, json=update_data,
                              headers=update_headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         result = self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
@@ -1806,22 +1817,22 @@ class WeaverClient(object):
         return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
 
     @copy_doc(_job_info)
-    def inputs(self, **kwargs):
-        return self._job_info("/inputs", **kwargs)
+    def inputs(self, *args, **kwargs):
+        return self._job_info("/inputs", *args, **kwargs)
 
     @copy_doc(_job_info)
-    def logs(self, **kwargs):
-        return self._job_info("/logs", **kwargs)
+    def logs(self, *args, **kwargs):
+        return self._job_info("/logs", *args, **kwargs)
 
     @copy_doc(_job_info)
-    def exceptions(self, **kwargs):
-        return self._job_info("/exceptions", **kwargs)
+    def exceptions(self, *args, **kwargs):
+        return self._job_info("/exceptions", *args, **kwargs)
 
     errors = exceptions  # alias
 
     @copy_doc(_job_info)
-    def statistics(self, **kwargs):
-        return self._job_info("/statistics", **kwargs)
+    def statistics(self, *args, **kwargs):
+        return self._job_info("/statistics", *args, **kwargs)
 
     stats = statistics  # alias
 

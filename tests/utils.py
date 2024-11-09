@@ -456,7 +456,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app,                # type: TestApp
-                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any], MockReturnType]]
+                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any, ...], MockReturnType]]
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
