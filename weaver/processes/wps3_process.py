@@ -107,7 +107,7 @@ class Wps3Process(OGCAPIRemoteProcessBase):
             raise PackageExecutionError(f"Failed resolution of {self.process_type} process data source: [{exc!r}]")
 
         self.provider = data_source  # fix immediately for below `update_status` call
-        self.update_status(f"Provider {data_source} is selected {reason}.",
+        self.update_status(f"Provider [{data_source}] is selected {reason}.",
                            Wps3RemoteJobProgress.SETUP, Status.RUNNING)
 
         return data_source, url, deploy_body

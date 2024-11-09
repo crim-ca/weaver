@@ -333,7 +333,7 @@ if TYPE_CHECKING:
     CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
         "type": Literal["File", "Directory", "string"],
         "glob": str,
-    }, total=True)
+    }, total=False)
     CWL_ExpectedOutputs = Dict[str, CWL_ExpectedOutputDef]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
@@ -457,6 +457,7 @@ if TYPE_CHECKING:
         "filter-lang": Optional[str],
         "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
     }, total=False)
+    JobValueNestedProcess = "ProcessExecution"  # type: TypeAlias
     JobValueData = TypedDict("JobValueData", {
         "data": Required[AnyValueType],
     }, total=False)
@@ -470,6 +471,7 @@ if TYPE_CHECKING:
         JobValueBbox,
         JobValueFile,
         JobValueCollection,
+        JobValueNestedProcess,
     ]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
@@ -512,14 +514,16 @@ if TYPE_CHECKING:
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobCustomInputs = TypeVar(
-        "JobCustomInputs",
-        bound=Any,
+    JobCustomInputObject = TypeVar(
+        "JobCustomInputObject",
+        bound=CWL_RuntimeInput,
     )
-    JobCustomOutputs = TypeVar(
-        "JobCustomOutputs",
-        bound=Any,
+    JobCustomInputs = Dict[str, JobCustomInputObject]
+    JobCustomOutputObject = TypeVar(
+        "JobCustomOutputObject",
+        bound=CWL_ExpectedOutputDef,  # custom output can have additional parameters, but CWL minimum fields are needed
     )
+    JobCustomOutputs = Dict[str, JobCustomOutputObject]
     JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
         "JobMonitorReference",
         bound=Any,

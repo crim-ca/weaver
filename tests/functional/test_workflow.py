@@ -70,6 +70,7 @@ if TYPE_CHECKING:
         ExecutionInputsMap,
         ExecutionResults,
         HeadersType,
+        JSON,
         ProcessDeployment,
         ProcessExecution,
         SettingsType
@@ -925,7 +926,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         override_execute_body=None,     # type: Optional[ProcessExecution]
         override_execute_path=None,     # type: Optional[str]
         detailed_results=True,          # type: Literal[True]
-    ):
+    ):                                  # type: (...) -> Union[JSON, DetailedExecutionResults]
         with contextlib.ExitStack() as stack_exec:
             for data_source_use in [
                 "weaver.processes.sources.get_data_source_from_url",
@@ -1040,6 +1041,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 if detailed_results:
                     details[job_id] = self.extract_job_details(workflow_job_url, workflow_logs)
                 log_matches = set(re.findall(r".*(https?://.+/jobs/.+(?:/logs)?).*", workflow_logs))
+                log_matches = {url.strip("[]") for url in log_matches}
                 log_matches -= {workflow_job_url}
                 log_matches = {url if url.rstrip("/").endswith("/logs") else f"{url}/logs" for url in log_matches}
                 for log_url in log_matches:
@@ -1630,7 +1632,15 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         assert data == "test-message", "output from workflow should match the default resolved from input omission"
 
     @pytest.mark.oap_part3
-    def test_workflow_ad_hoc_nested_process(self):
+    def test_workflow_ad_hoc_nested_process_chaining(self):
+        """
+        Validate the execution of an ad-hoc workflow directly submitted for execution with nested process references.
+
+        The test purposely uses two different processes that have different input requirements, but that happen to have
+        similarly named inputs/outputs, such that we can validate nesting chains the correct parameters at each level.
+        Similarly, the same process is reused more than once in a nested fashion to make sure they don't get mixed.
+        Finally, output selection is defined using multi-output processes to make sure filtering is applied inline.
+        """
         passthrough_process_info = self.prepare_process(WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS)
         echo_result_process_info = self.prepare_process(WorkflowProcesses.APP_ECHO_RESULTS_TESTER)
 
@@ -1646,23 +1656,79 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                                 "message": "test"
                             },
                             "outputs": {"output_data": {}}
-                        }
+                        },
+                        "code": 123,
                     },
                     "outputs": {"message": {}}
                 },
                 "code": 456,
             }
         }
-        results = self.execute_monitor_process(
+        details = self.execute_monitor_process(
             passthrough_process_info,
             override_execute_body=workflow_exec,
             override_execute_path="/jobs",
         )
+
+        # note:
+        #   Because we are running an ad-hoc nested chaining of processes rather than the typical 'workflow'
+        #   approach that has all execution steps managed by CWL, each nested call is performed on its own.
+        #   Therefore, the collected details will only contain the logs from the top-most process and its directly
+        #   nested process. Further nested processes will not be embedded within those logs, as the entire nested
+        #   operation is dispatched as a "single process". Retrieve the logs iteratively digging in the nested jobs.
+        details_to_process = list(details.values())
+        while details_to_process:
+            active_detail = details_to_process.pop(0)
+            if active_detail["inputs"] == workflow_exec["inputs"]:
+                continue  # top-most process, already got all logs
+            nested_job_id = active_detail["job"]
+            nested_job_proc = active_detail["process"]
+            nested_job_url = f"/processes/{nested_job_proc}/jobs/{nested_job_id}"
+            _, nested_details = self.try_retrieve_logs(nested_job_url, True)
+            for job_id, job_detail in nested_details.items():
+                if job_id not in details:
+                    details[job_id] = job_detail
+                    details_to_process.append(job_detail)
+
         self.assert_test(
-            lambda: results == {
+            lambda: len(details) == 3,
+            "Jobs amount should match the number of involved nested processes.",
+        )
+
+        # heuristic:
+        # since all nested processes contain all other definitions as input, we can sort by size deepest->highest
+        job_details = sorted(details.values(), key=lambda info: len(str(info["inputs"])))
+
+        self.assert_test(
+            lambda: job_details[0]["outputs"] == {
+                "output_data": {"value": "test"}
+            }
+        )
+        self.assert_test(
+            lambda: job_details[1]["outputs"] == {
+                "message": {"value": "test"},
+            }
+        )
+        self.assert_test(
+            lambda: job_details[2]["outputs"] == {
                 "message": {"value": "test"},
                 "code": {"value": 456},
                 "number": {"value": 3.1416},
                 "integer": {"value": 3},
             }
         )
+
+        for job_detail in job_details:
+            job_progresses = [
+                float(progress) for progress in
+                re.findall(
+                    # Extra '.*\n' is to make sure we match only the first percent of the current job log per line.
+                    # Because of nested processes and cwl operations, there can be sub-progress percentages as well.
+                    r"([0-9]+(?:\.[0-9]+)?)%.*\n",
+                    job_detail["logs"],
+                )
+            ]
+            self.assert_test(
+                lambda: sorted(job_progresses) == job_progresses,
+                "Job log progress values should be in sequential order even when involving a nested process execution."
+            )

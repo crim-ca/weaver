@@ -48,7 +48,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
 from weaver.processes.types import ProcessType
-from weaver.processes.utils import get_process
+from weaver.processes.utils import get_process, map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -87,7 +87,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
     from uuid import UUID
 
     from celery.app.task import Task
@@ -97,7 +97,7 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.execute import AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
-    from weaver.status import StatusType
+    from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
         AnyAcceptLanguageHeader,
         AnyDatabaseContainer,
@@ -113,6 +113,7 @@ if TYPE_CHECKING:
         HeadersType,
         JobValueBbox,
         JSON,
+        Number,
         ProcessExecution,
         SettingsType,
         Statistics,
@@ -128,11 +129,11 @@ class JobProgress(object):
     SETUP = 1
     DESCRIBE = 2
     GET_INPUTS = 3
-    GET_OUTPUTS = 4
-    EXECUTE_REQUEST = 5
-    EXECUTE_STATUS_LOCATION = 6
-    EXECUTE_MONITOR_START = 7
-    EXECUTE_MONITOR_LOOP = 8
+    GET_OUTPUTS = 10  # extra delta from inputs retrieval for more granular range by nested processes and collections
+    EXECUTE_REQUEST = 11
+    EXECUTE_STATUS_LOCATION = 12
+    EXECUTE_MONITOR_START = 13
+    EXECUTE_MONITOR_LOOP = 14
     EXECUTE_MONITOR_DONE = 96
     EXECUTE_MONITOR_END = 98
     NOTIFY = 99
@@ -515,9 +516,11 @@ def parse_wps_input_literal(input_value):
 
 
 def log_and_save_update_status_handler(
-    job,        # type: Job
-    container,  # type: AnyDatabaseContainer
-):              # type: (...) -> UpdateStatusPartialFunction
+    job,                    # type: Job
+    container,              # type: AnyDatabaseContainer
+    update_status=None,     # type: Callable[[AnyStatusType], StatusType]
+    update_progress=None,   # type: Callable[[Number], Number]
+):                          # type: (...) -> UpdateStatusPartialFunction
     """
     Creates a :term:`Job` status update function that will immediately reflect the log message in the database.
 
@@ -531,11 +534,21 @@ def log_and_save_update_status_handler(
     and inefficient for multiple subsequent logs, this operation should be applied only on "important milestones" of
     the execution steps. Any intermediate/subsequent logs should use the usual :meth:`Job.save_log` to "accumulate" the
     log messages for a following "batch update" of the :term:`Job`.
+
+    :param job: Reference :term:`Job` for which the status will be updated and saved with uncommitted log entries.
+    :param container: Container to retrieve the database connection.
+    :param update_status: Function to apply last-minute status update operations. Skipped if omitted.
+    :param update_progress: Function to apply last-minute progress update operations. Skipped if omitted.
     """
     db = get_db(container)
     store = db.get_store(StoreJobs)
 
     def log_and_update_status(message, progress=None, status=None, *_, **kwargs):
+        # type: (str, Optional[Number], Optional[AnyStatusType], Any, Any) -> None
+        if update_status and status:
+            status = update_status(status)
+        if update_progress and progress is not None:
+            progress = update_progress(progress)
         job.save_log(message=message, progress=progress, status=status, **kwargs)
         store.update_job(job)
     return log_and_update_status
@@ -558,7 +571,18 @@ def parse_wps_inputs(wps_process, job, container=None):
         elif process_input.dataType == WPS_BOUNDINGBOX_DATA:
             bbox_inputs[process_input.identifier] = process_input
 
-    job_log_update_status_func = log_and_save_update_status_handler(job, container)
+    job_log_update_status_func = log_and_save_update_status_handler(
+        job,
+        container,
+        # Because the operations that will be executed with this status handler can involve a nested process execution,
+        # successful execution of that nested process will log a 'succeeded' entry within this ongoing execution.
+        # Because it is a nested process, it is expected that further operations from the 'parent' process using it will
+        # log many more steps afterwards. Therefore, avoid the ambiguous entry within the context of the parent process.
+        update_status=lambda _status: Status.RUNNING if _status == Status.SUCCEEDED else _status,
+        # Similarly, progress of the current job will be constraint within inputs retrieval and the following outputs
+        # retrieval for the nested progress execution. Mapping the progress will ensure overall gradual percent values.
+        update_progress=lambda _progress: map_progress(_progress, JobProgress.GET_INPUTS, JobProgress.GET_OUTPUTS),
+    )
     try:
         wps_inputs = []
         # parse both dict and list type inputs
@@ -618,6 +642,7 @@ def parse_wps_inputs(wps_process, job, container=None):
                             f"for input [{input_id}] of [{job.process}]."
                         ),
                         logger=LOGGER,
+                        progress=JobProgress.GET_INPUTS,
                     )
                     process = OGCAPIRemoteProcess(
                         input_value,
@@ -626,7 +651,9 @@ def parse_wps_inputs(wps_process, job, container=None):
                         update_status=job_log_update_status_func,
                     )
                     out_dir = os.path.join(job.tmpdir, "inputs")
-                    results = process.execute(input_value.get("inputs"), out_dir, input_value.get("outputs"))
+                    inputs = copy.deepcopy(input_value.get("inputs", {}))
+                    outputs = copy.deepcopy(input_value.get("outputs"))
+                    results = process.execute(inputs, out_dir, outputs)
                     if not results:
                         raise ValueError(
                             f"Abort execution. Cannot map empty outputs from {proc_uri} "
@@ -677,6 +704,7 @@ def parse_wps_inputs(wps_process, job, container=None):
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
                         logger=LOGGER,
                         level=logging.WARNING,
+                        progress=JobProgress.GET_INPUTS,
                     )
                 else:
                     wps_inputs.append((input_id, input_data))
