@@ -9,7 +9,7 @@ import yaml
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
 from cwltool.job import CommandLineJob, JobBase
-#from cwltool.singularity import SingularityCommandLineJob
+from cwltool.singularity import SingularityCommandLineJob
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.compat import cache
@@ -236,8 +236,8 @@ class BuiltinProcessJobDocker(BuiltinProcessJobBase, DockerCommandLineJob):
     pass
 
 
-# class BuiltinProcessJobSingularity(BuiltinProcessJobBase, SingularityCommandLineJob):
-#     pass
+class BuiltinProcessJobSingularity(BuiltinProcessJobBase, SingularityCommandLineJob):
+    pass
 
 
 # pylint: disable=W0221,W0237 # naming using python like arguments
@@ -247,6 +247,6 @@ class BuiltinProcess(CommandLineTool):
         job = super(BuiltinProcess, self).make_job_runner(runtime_context)
         if issubclass(job, DockerCommandLineJob):
             return BuiltinProcessJobDocker
-        # if issubclass(job, SingularityCommandLineJob):
-        #     return BuiltinProcessJobSingularity
+        if issubclass(job, SingularityCommandLineJob):
+            return BuiltinProcessJobSingularity
         return BuiltinProcessJobBase

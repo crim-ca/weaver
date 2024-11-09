@@ -537,8 +537,8 @@ def log_and_save_update_status_handler(
 
     :param job: Reference :term:`Job` for which the status will be updated and saved with uncommitted log entries.
     :param container: Container to retrieve the database connection.
-    :param update_status: Function to apply last-minute status update operations. Skipped if omitted.
-    :param update_progress: Function to apply last-minute progress update operations. Skipped if omitted.
+    :param update_status: Function to apply override status update operations. Skipped if omitted.
+    :param update_progress: Function to apply override progress update operations. Skipped if omitted.
     """
     db = get_db(container)
     store = db.get_store(StoreJobs)
@@ -674,7 +674,9 @@ def parse_wps_inputs(wps_process, job, container=None):
                 properties = input_value.get("properties") if isinstance(input_value, dict) else None
                 if properties:
                     input_prop_path = os.path.join(job.tmpdir, "inputs", input_id)
-                    input_prop_values = {input_id: resolved_input_values}  # FIXME: handle other cross-input refs?
+                    # FIXME: handle other cross-input refs?
+                    #   (ie: parametrized I/O in https://docs.ogc.org/DRAFTS/21-009.html#section_deployable_workflows)
+                    input_prop_values = {input_id: resolved_input_values}
                     resolved_input_values = process_properties(
                         properties,
                         input_prop_values,

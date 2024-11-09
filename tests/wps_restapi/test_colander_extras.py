@@ -988,18 +988,9 @@ def test_schema_default_missing_validator_combinations(test_case):
     evaluate_test_cases([test_case])
 
 
-def test_schema_default_missing_validator_openapi():
-    """
-    Validate that resulting OpenAPI schema are as expected while still providing advanced deserialization features.
-
-    Resulting schema are very similar can often cannot be distinguished for some variants, but the various combination
-    of values for ``default``, ``missing`` and ``validator`` will provide very distinct behavior during parsing.
-
-    .. seealso::
-        :func:`test_schema_default_missing_validator_combinations`
-    """
-    converter = ce.ObjectTypeConverter(ce.OAS3TypeConversionDispatcher())
-    test_schemas = [
+@pytest.mark.parametrize(
+    "schema",
+    [
         Mapping,
         Missing,
         Default,
@@ -1011,9 +1002,20 @@ def test_schema_default_missing_validator_openapi():
         DefaultDropValidator,
         DefaultDropRequired,
     ]
-    for schema in test_schemas:
-        converted = converter.convert_type(schema())
-        assert converted == schema.schema_expected, f"Schema for [{schema.__name__}] not as expected"
+)
+def test_schema_default_missing_validator_openapi(schema):
+    """
+    Validate that resulting OpenAPI schema are as expected while still providing advanced deserialization features.
+
+    Resulting schema are very similar can often cannot be distinguished for some variants, but the various combination
+    of values for ``default``, ``missing`` and ``validator`` will provide very distinct behavior during parsing.
+
+    .. seealso::
+        :func:`test_schema_default_missing_validator_combinations`
+    """
+    converter = ce.ObjectTypeConverter(ce.OAS3TypeConversionDispatcher())
+    converted = converter.convert_type(schema())
+    assert converted == schema.schema_expected, f"Schema for [{schema.__name__}] not as expected"
 
 
 def test_dropable_variable_mapping():

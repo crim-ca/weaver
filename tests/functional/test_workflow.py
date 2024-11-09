@@ -1675,7 +1675,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         #   approach that has all execution steps managed by CWL, each nested call is performed on its own.
         #   Therefore, the collected details will only contain the logs from the top-most process and its directly
         #   nested process. Further nested processes will not be embedded within those logs, as the entire nested
-        #   operation is dispatched as a "single process". Retrieve the logs iteratively digging in the nested jobs.
+        #   operation is dispatched as a "single process". Retrieve the logs iteratively crawling into the nested jobs.
         details_to_process = list(details.values())
         while details_to_process:
             active_detail = details_to_process.pop(0)
@@ -1723,7 +1723,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
                 float(progress) for progress in
                 re.findall(
                     # Extra '.*\n' is to make sure we match only the first percent of the current job log per line.
-                    # Because of nested processes and cwl operations, there can be sub-progress percentages as well.
+                    # Because of nested processes and CWL operations, there can be sub-progress percentages as well.
                     r"([0-9]+(?:\.[0-9]+)?)%.*\n",
                     job_detail["logs"],
                 )
