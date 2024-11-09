@@ -81,6 +81,7 @@ from cornice_swagger.converters.schema import (
     IntegerTypeConverter,
     NumberTypeConverter,
     ObjectTypeConverter,
+    StringTypeConverter,
     TimeTypeConverter,
     TypeConversionDispatcher,
     TypeConverter,
@@ -138,7 +139,7 @@ class MetadataTypeConverter(TypeConverter):
         return result
 
 
-class ExtendedStringTypeConverter(MetadataTypeConverter, BaseStringTypeConverter):
+class ExtendedStringTypeConverter(MetadataTypeConverter, StringTypeConverter):
     pass
 
 
@@ -197,12 +198,11 @@ FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI 
 URI_REGEX = rf"{URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
 URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
-    "uri": {"converter": ExtendedStringTypeConverter, "validator": URI},
-    "url": {"converter": ExtendedStringTypeConverter, "validator": URL},
-    "file": {"converter": ExtendedStringTypeConverter, "validator": FILE_URI},
-    "date": {"converter": ExtendedDateTimeTypeConverter},
-    "time": {"converter": ExtendedDateTimeTypeConverter},
-    "date-time": {"converter": ExtendedDateTimeTypeConverter},
+    # following MUST NOT use the 'StringTypeConverter' or 'ExtendedStringTypeConverter'
+    # otherwise, it causes a recursion error when 'StringTypeConverter' tries to dispatch their parameter handling
+    "uri": {"converter": BaseStringTypeConverter, "validator": URI},
+    "url": {"converter": BaseStringTypeConverter, "validator": URL},
+    "file": {"converter": BaseStringTypeConverter, "validator": FILE_URI},
 })
 
 

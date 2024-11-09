@@ -21,6 +21,8 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import List, Tuple
 
+    from weaver.typedefs import JSON  # noqa
+
 
 @pytest.mark.functional
 class GenericApiRoutesTestCase(WpsConfigBase):
@@ -34,7 +36,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
     def test_frontpage_format(self):
         resp = self.app.get(sd.api_frontpage_service.path, headers=self.json_headers)
         assert resp.status_code == 200
-        body = resp.json
+        body = cast("JSON", resp.json)
         try:
             sd.FrontpageSchema().deserialize(body)
         except colander.Invalid as ex:
