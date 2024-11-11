@@ -1978,6 +1978,7 @@ class KeywordMapper(ExtendedMappingSchema):
             ExtendedSchemaBase._validate(node)
 
     def _bind(self, kw):
+        # type: (Dict[str, Any]) -> None
         """
         Applies the bindings to the children nodes.
 
@@ -2005,7 +2006,7 @@ class KeywordMapper(ExtendedMappingSchema):
                 else:
                     setattr(self, k, v)
         if getattr(self, "after_bind", None):
-            self.after_bind(self, kw)
+            self.after_bind(self, kw)  # pylint: disable=E1102  # defined as colander SchemaNode attribute in meta-type
 
     @abstractmethod
     def _deserialize_keyword(self, cstruct):
