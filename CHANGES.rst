@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Add support of *OGC API - Processes - Part 3: Workflows and Chaining* with *Nested Process* ad-hoc workflow
+  definitions directly submitted for execution (fixes `#747 <https://github.com/crim-ca/weaver/issues/747>`_,
+  relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
 - Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
   (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
 - Add ``headers``, ``mode`` and ``response`` parameters along the ``inputs`` and ``outputs`` returned by
