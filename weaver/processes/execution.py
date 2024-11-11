@@ -38,6 +38,7 @@ from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.builtin.collection_processor import process_collection
+from weaver.processes.builtin.properties_processor import process_properties
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -669,6 +670,18 @@ def parse_wps_inputs(wps_process, job, container=None):
                 else:
                     resolved_input_values = [(input_value, input_info)]
 
+                # post-handling of properties
+                properties = input_value.get("properties") if isinstance(input_value, dict) else None
+                if properties:
+                    input_prop_path = os.path.join(job.tmpdir, "inputs", input_id)
+                    # FIXME: handle other cross-input refs?
+                    #   (ie: parametrized I/O in https://docs.ogc.org/DRAFTS/21-009.html#section_deployable_workflows)
+                    input_prop_values = {input_id: resolved_input_values}
+                    resolved_input_values = process_properties(
+                        properties,
+                        input_prop_values,
+                        input_prop_path,
+                    )
                 resolved_inputs.extend(resolved_input_values)
 
             for input_value, input_info in resolved_inputs:
