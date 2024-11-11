@@ -6754,7 +6754,7 @@ class JobTitleNullable(OneOfKeywordSchema):
     ]
 
 
-class PatchJobBodySchema(Execute):
+class PatchJobBodySchema(ExecuteParameters):
     description = "Execution request contents to be updated."
     # 'missing=null' ensures that, if a field is provided with an "empty" definition (JSON null, no-field dict, etc.),
     # contents are passed down as is rather than dropping them (what 'missing=drop' would do due to DropableSchemaNode)
