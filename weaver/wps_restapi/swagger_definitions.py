@@ -6754,12 +6754,13 @@ class JobTitleNullable(OneOfKeywordSchema):
     ]
 
 
-class PatchJobBodySchema(ExecuteParameters):
+class PatchJobBodySchema(ExecuteProcessParameters):
     description = "Execution request contents to be updated."
     # 'missing=null' ensures that, if a field is provided with an "empty" definition (JSON null, no-field dict, etc.),
     # contents are passed down as is rather than dropping them (what 'missing=drop' would do due to DropableSchemaNode)
     # this is to allow "unsetting" any values that could have been defined during job creation or previous updates
     title = JobTitleNullable(missing=null)
+    mode = JobExecuteModeEnum(missing=drop, deprecated=True)  # override without default 'auto'
     subscribers = JobExecuteSubscribers(missing=null)
     # all parameters that are not 'missing=drop' in original 'Execute' definition must be added to allow partial update
     inputs = ExecuteInputValues(missing=drop, description="Input values or references to be updated.")
