@@ -142,7 +142,7 @@ if TYPE_CHECKING:
         Status.ERROR,
         Status.UNKNOWN
     ]
-    AnyStatusType = Union[Status, StatusType, int]
+    AnyStatusType: TypeAlias = Union[Status, StatusType, int]
 
     AnyStatusCategory: Type[StatusCategory] = Union[
         StatusCategory,

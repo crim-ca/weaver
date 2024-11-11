@@ -1983,7 +1983,7 @@ class KeywordMapper(ExtendedMappingSchema):
 
         Based on :meth:`colander._SchemaNode._bind` except that `children` are obtained from the keyword.
         """
-        self.bindings = kw
+        self.bindings = kw  # pylint: disable=W0201  # false-positive - property exists in colander SchemaNode meta-type
         children = self.get_keyword_items()
         for child in children:
             child._bind(kw)

@@ -1,4 +1,3 @@
-import copy
 from typing import TYPE_CHECKING
 
 from weaver.processes.constants import PACKAGE_FILE_TYPE, JobInputsOutputsSchema

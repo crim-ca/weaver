@@ -502,8 +502,10 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         if response.status_code != 201:
             LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
             self.update_status(
-                f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
-                f"{repr_json(response.text, indent=2)}",
+                (
+                    f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
+                    f"{repr_json(response.text, indent=2)}"
+                ),
                 RemoteJobProgress.EXECUTION,
                 Status.FAILED,
                 level=logging.ERROR,

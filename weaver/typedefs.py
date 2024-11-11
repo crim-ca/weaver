@@ -402,7 +402,7 @@ if TYPE_CHECKING:
     # update_status(message, progress, status, *args, **kwargs)
     UpdateStatusPartialFunction = TypeVar(
         "UpdateStatusPartialFunction",
-        bound=Callable[[str, Number, AnyStatusType, ..., Any], None]
+        bound=Callable[[str, Number, AnyStatusType, Any, Any], None]
     )
 
     DatetimeIntervalType = TypedDict("DatetimeIntervalType", {

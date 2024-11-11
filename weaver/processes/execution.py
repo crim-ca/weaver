@@ -542,7 +542,7 @@ def log_and_save_update_status_handler(
     db = get_db(container)
     store = db.get_store(StoreJobs)
 
-    def log_and_update_status(message, progress=None, status=None, *_, **kwargs):
+    def log_and_update_status(message, progress=None, status=None, *_, **kwargs):  # pylint: disable=W1113
         # type: (str, Optional[Number], Optional[AnyStatusType], Any, Any) -> None
         if update_status and status:
             status = update_status(status)
