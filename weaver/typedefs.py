@@ -430,6 +430,30 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
+    FieldModifierFilter = Union[
+        str,
+        JSON,  # CQL or other
+    ]
+    FieldModifierFilterCRS = str
+    FieldModifierFilterLang = str
+    FieldModifierProperties = Dict[str, str]
+    FieldModifierSortByItem = TypedDict("FieldModifierSortByItem", {
+        "field": str,
+        "direction": Literal["asc", "desc"],
+    }, total=True)
+    FieldModifierSortBy = Union[
+        str,
+        List[str],
+        List[FieldModifierSortByItem],
+    ]
+    FiledModifiers = TypedDict("FiledModifiers", {
+        "filter": Optional[FieldModifierFilter],
+        "filter-crs": Optional[FieldModifierFilterCRS],
+        "filter-lang": Optional[FieldModifierFilterLang],
+        "properties": Optional[FieldModifierProperties],
+        "sortBy": Optional[FieldModifierSortBy],
+    }, total=False)
+
     JobValueBbox = TypedDict("JobValueBbox", {
         "bbox": Required[List[Number]],
         "crs": NotRequired[str],
@@ -452,12 +476,17 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueCollection = TypedDict("JobValueCollection", {
         "collection": Required[str],
-        "filter": Optional[JSON],
-        "filter-crs": Optional[str],
-        "filter-lang": Optional[str],
-        "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
+        "filter": Optional[FieldModifierFilter],
+        "filter-crs": Optional[FieldModifierFilterCRS],
+        "filter-lang": Optional[FieldModifierFilterLang],
+        "properties": Optional[FieldModifierProperties],
+        "sortBy": Optional[FieldModifierSortBy],
     }, total=False)
-    JobValueNestedProcess = "ProcessExecution"  # type: TypeAlias
+    JobValueNestedProcessOnly = "ProcessExecution"  # type: TypeAlias
+    JobValueNestedProcess = Union[
+        JobValueNestedProcessOnly,
+        FiledModifiers,
+    ]
     JobValueData = TypedDict("JobValueData", {
         "data": Required[AnyValueType],
     }, total=False)

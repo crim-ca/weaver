@@ -31,6 +31,7 @@ from weaver.formats import (  # isort:skip # noqa: E402
     get_cwl_file_format,
     get_extension
 )
+from weaver.processes.builtin.field_modifier_processor import process_field_modifiers  # isort:skip # noqa: E402
 from weaver.processes.builtin.utils import (  # isort:skip # noqa: E402
     get_package_details,
     is_geojson_url,
@@ -151,6 +152,16 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         if not (col_resp.status_code == 200 and "features" in col_json):
             raise ValueError(f"Could not parse [{col_href}] as a GeoJSON FeatureCollection.")
 
+        col_json = process_field_modifiers(
+            col_args.get("filter"),
+            col_args.get("filter-crs"),
+            col_args.get("filter-lang"),
+            col_args.get("properties"),
+            col_args.get("sortBy"),
+            col_json,
+            output_dir,
+        )
+
         for i, feat in enumerate(col_json["features"]):
             path = os.path.join(output_dir, f"feature-{i}.geojson")
             with open(path, mode="w", encoding="utf-8") as file:
@@ -165,16 +176,29 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             if "-" in arg:
                 col_args[arg.replace("-", "_")] = col_args.pop(arg)
         known_params = set(inspect.signature(ItemSearch).parameters)
-        known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "modifier"}
-        for param in set(col_args) - known_params:
+        known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "properties"}
+        unknown_params = set(col_args) - known_params
+        for param in unknown_params:
             col_args.pop(param)
+
+        # STAC client can be-process filters and sorting server-side
+        # only perform the remaining properties modifier operations locally
+        col_properties = col_args.pop("properties", None)
+        col_field_modifier = None
+        if col_properties:
+            col_field_modifier = lambda obj: process_field_modifiers(  # noqa: E731  # pylint: disable=C3001
+                obj.dict(),
+                output_dir,
+                properties=col_properties,
+            )
 
         timeout = col_args.pop("timeout", 10)
         search = ItemSearch(
-            url=api_url,
+            url=f"{api_url}/search",
             method="POST",
             stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add 'headers' with authorization/cookies?
             collections=col_id,
+            modifier=col_field_modifier,
             **col_args
         )
         for item in search.items():

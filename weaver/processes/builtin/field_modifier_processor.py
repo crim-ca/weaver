@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import (
         CWL_IO_ValueMap,
+        FieldModifierFilter,
+        FieldModifierFilterCRS,
+        FieldModifierFilterLang,
+        FieldModifierProperties,
+        FieldModifierSortBy,
         JSON,
         Path,
     )
@@ -41,7 +46,7 @@ LOGGER.setLevel(logging.INFO)
 
 # process details
 __version__ = "1.0"
-__title__ = "Properties Processor"
+__title__ = "Field Modifier Processor"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 OUTPUT_CWL_JSON = "cwl.output.json"
@@ -56,32 +61,54 @@ def compute_property(property_name, calculation, properties):
     properties.update({property_name: result})
 
 
-def process_properties(input_properties, input_values, output_dir, logger=LOGGER):
-    # type: (Dict[str, str], Dict[str, JSON], Path, LoggerHandler) -> JSON
+def process_field_modifiers(
+    values,             # type: Dict[str, JSON]
+    output_dir,         # type: Path
+    *,                  # force named keyword arguments after
+    filter=None,        # type: FieldModifierFilter,
+    filter_crs=None,    # type: FieldModifierFilterCRS,
+    filter_lang=None,   # type: FieldModifierFilterLang,
+    properties=None,    # type: FieldModifierProperties,
+    sortby=None,        # type: FieldModifierSortBy,
+    logger=LOGGER,      # type: LoggerHandler
+):                      # type: (...) -> JSON
     """
     Processor of a ``properties`` definition for an input or output.
 
-    :param input_properties:
-        Properties definition submitted to the process and to be generated from input values.
-    :param input_values:
-        Values available for properties generation.
+    :param values:
+        Values available for properties modification.
     :param output_dir: Directory to write the output (provided by the :term:`CWL` definition).
+    :param properties:
+        Properties definition submitted to the process and to be generated from input values.
     :param logger: Optional logger handler to employ.
     :return: File reference containing the resolved properties.
     """
     logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
-        "Process [{}] Got arguments: input_properties={}, input_values={} output_dir=[{}]",
+        (
+            "Process [{}] Got arguments:\n"
+            "  filter={}\n"
+            "  filter_crs={}\n"
+            "  filter_lang={}\n"
+            "  properties={}\n"
+            "  sortby={}\n"
+            "  values={}\n"
+            "  output_dir=[{}]"
+        ),
         PACKAGE_NAME,
-        Lazify(lambda: repr_json(input_properties, indent=2)),
-        Lazify(lambda: repr_json(input_values, indent=2)),
+        Lazify(lambda: repr_json(filter, indent=2)),
+        Lazify(lambda: repr_json(filter_crs, indent=2)),
+        Lazify(lambda: repr_json(filter_lang, indent=2)),
+        Lazify(lambda: repr_json(properties, indent=2)),
+        Lazify(lambda: repr_json(sortby, indent=2)),
+        Lazify(lambda: repr_json(values, indent=2)),
         output_dir,
     )
     os.makedirs(output_dir, exist_ok=True)
 
     # sort properties later if they depend on other ones, the least dependencies to be computed first
-    props_deps = {prop: 0 for prop in input_properties}
-    for prop, calc in input_properties.items():
+    props_deps = {prop: 0 for prop in properties}
+    for prop, calc in properties.items():
         for prop_dep in props_deps:
             if prop == prop_dep:
                 if prop in calc:
@@ -92,7 +119,7 @@ def process_properties(input_properties, input_values, output_dir, logger=LOGGER
     if not filter(lambda dep: dep[-1] == 0, props_deps.items()):
         raise ValueError("Invalid properties all depend on another one. Impossible resolution order.")
     props = sorted(
-        list(input_properties.items()),
+        list(properties.items()),
         key=lambda p: props_deps[p[0]]
     )
 
@@ -104,21 +131,36 @@ def process_properties(input_properties, input_values, output_dir, logger=LOGGER
     return properties
 
 
-def process_cwl(input_properties, input_values, output_dir):
-    # type: (Dict[str, str], Dict[str, JSON], Path) -> CWL_IO_ValueMap
-    out_props = process_properties(input_properties, input_values, output_dir)
-    prop_file_path = os.path.join(output_dir, f"{uuid.uuid4()}.json")
-    with open(prop_file_path, mode="w", encoding="utf-8") as prop_file:
-        json.dump(out_props, prop_file, indent=2)
+def process_cwl(
+    input_filter,       # type: FieldModifierFilter,
+    input_filter_crs,   # type: FieldModifierFilterCRS,
+    input_filter_lang,  # type: FieldModifierFilterLang,
+    input_properties,   # type: FieldModifierProperties,
+    input_sortby,       # type: FieldModifierSortBy,
+    input_values,       # type: Dict[str, JSON]
+    output_dir,         # type: Path
+):                      # type: (...) -> CWL_IO_ValueMap
+    result = process_field_modifiers(
+        values=input_values,
+        output_dir=output_dir,
+        filter=input_filter,
+        filter_crs=input_filter_crs,
+        filter_lang=input_filter_lang,
+        properties=input_properties,
+        sortby=input_sortby,
+    )
+    file_path = os.path.join(output_dir, f"{uuid.uuid4()}.json")
+    with open(file_path, mode="w", encoding="utf-8") as mod_file:
+        json.dump(result, mod_file, indent=2)
     out_cwl_file = {
         "class": "File",
-        "path": prop_file_path,
-        "format": get_cwl_file_format(ContentType.APP_JSON),
+        "path": file_path,
+        "format": get_cwl_file_format(ContentType.APP_JSON, make_reference=True),
     }
     cwl_outputs = {"referenceOutput": out_cwl_file}  # output ID must match the one used in CWL definition
     cwl_out_path = os.path.join(output_dir, OUTPUT_CWL_JSON)
-    with open(cwl_out_path, mode="w", encoding="utf-8") as file:
-        json.dump(cwl_outputs, file)
+    with open(cwl_out_path, mode="w", encoding="utf-8") as cwl_out_file:
+        json.dump(cwl_outputs, cwl_out_file)
     return cwl_outputs
 
 
@@ -127,29 +169,62 @@ def main(*args):
     LOGGER.info("Process [%s] Parsing inputs...", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "-F", "--filter",
+        dest="input_filter",
+        metavar="INPUT_FILTER",
+        required=False,
+        help="Filter definition submitted to the process and to be generated from input values.",
+    )
+    parser.add_argument(
+        "--filter-crs",
+        dest="input_filter_crs",
+        metavar="INPUT_FILTER_CRS",
+        required=False,
+        help="Filter Coordinate Reference System (CRS) to employ with the 'filter' parameter.",
+    )
+    parser.add_argument(
+        "--filter-lang",
+        dest="input_filter_lang",
+        metavar="INPUT_FILTER_LANG",
+        required=False,
+        help="Filter language to interpret the 'filter' parameter.",
+    )
+    parser.add_argument(
         "-P", "--properties",
+        dest="input_properties",
         metavar="INPUT_PROPERTIES",
-        required=True,
+        required=False,
         help="Properties definition submitted to the process and to be generated from input values.",
     )
     parser.add_argument(
+        "-S", "--sortby", "--sortBy", "--sort-by",
+        dest="input_sortby",
+        metavar="INPUT_SORTBY",
+        required=False,
+        help="Sorting definition with relevant properties and ordering direction.",
+    )
+    parser.add_argument(
         "-V", "--values",
+        dest="input_values",
         metavar="INPUT_VALUES",
         required=True,
         help="Values available for properties generation.",
     )
     parser.add_argument(
         "-o", "--outdir",
+        dest="output_dir",
         metavar="OUTDIR",
         required=True,
         help="Output directory of the retrieved data.",
     )
     ns = parser.parse_args(*args)
     LOGGER.info("Process [%s] Loading properties input from file '%s'.", PACKAGE_NAME, ns.properties)
-    prop_in = load_file(ns.properties)
+    prop_in = load_file(ns.input_properties)
     LOGGER.info("Process [%s] Loading values input from file '%s'.", PACKAGE_NAME, ns.values)
-    val_in = load_file(ns.values)
-    sys.exit(process_cwl(prop_in, val_in, ns.outdir) is not None)
+    val_in = load_file(ns.input_values)
+    params = dict(**vars(ns))
+    params.update({"input_properties": prop_in, "input_values": val_in})
+    sys.exit(process_cwl(**params) is not None)
 
 
 if __name__ == "__main__":

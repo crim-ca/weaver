@@ -1608,6 +1608,18 @@ class FilterSchema(ExtendedMappingSchema):
         return result
 
 
+class PropertiesFieldModifierExpression(ExtendedMappingSchema):
+    prop = AnyFilterExpression(
+        variable="{property}",
+        description="Expression that defines how to compute the property.",
+        validator=Length(min=1),
+    )
+
+
+class PropertiesFieldModifierSchema(ExtendedMappingSchema):
+    properties = PropertiesFieldModifierExpression(missing=drop)
+
+
 class SortByExpression(ExpandStringList, ExtendedSchemaNode):
     schema_type = String
     default = None
@@ -1619,9 +1631,38 @@ class SortByExpression(ExpandStringList, ExtendedSchemaNode):
     )
 
 
+class SortByDirection(ExtendedSchemaNode):
+    schema_type = String
+    validator = OneOf(["asc", "desc"])
+
+
+class SortByObject(StrictMappingSchema):
+    field = ExtendedSchemaNode(String())
+    direction = SortByDirection()
+
+
+class SortByItem(OneOfKeywordSchema):
+    _one_of = [
+        SortByExpression(),
+        SortByObject(),
+    ]
+
+
+class SortByList(ExtendedSequenceSchema):
+    item = SortByItem()
+    validator = Length(min=1)
+
+
+class SortByDefinition(OneOfKeywordSchema):
+    _one_of = [
+        SortByExpression(),
+        SortByList(),
+    ]
+
+
 class SortBySchema(ExtendedMappingSchema):
-    sort_by_lower = SortByExpression(name="sortby", missing=drop)
-    sort_by_upper = SortByExpression(name="sortBy", missing=drop)
+    sort_by_lower = SortByDefinition(name="sortby", missing=drop)
+    sort_by_upper = SortByDefinition(name="sortBy", missing=drop)
 
     def deserialize(self, cstruct):
         # type: (JSON) -> Union[JSON, colander.null]
@@ -1636,11 +1677,17 @@ class SortBySchema(ExtendedMappingSchema):
             return result
         if result.get("sortby"):
             # keep only 'official' "sortBy" from OGC API Processes
-            # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
+            # others APIs (Features, Records, STAC) use "sortby", but their query parameter is usually case-insensitive
             if not result.get("sortBy"):
                 result["sortBy"] = result["sortby"]
             del result["sortby"]
         return result
+
+
+class FieldModifierSchema(FilterSchema, SortBySchema, PropertiesFieldModifierSchema):
+    """
+    Field modifiers that can operation on properties identified within the referenced content definition.
+    """
 
 
 class SupportedCRS(ExtendedMappingSchema):
@@ -3901,7 +3948,7 @@ class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
     validator = OneOf(ExecuteCollectionFormat.values())
 
 
-class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
+class ExecuteCollectionInput(FieldModifierSchema, PermissiveMappingSchema):
     description = inspect.cleandoc("""
         Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
 
@@ -4301,7 +4348,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     )
 
 
-class ExecuteParameters(ExecuteInputOutputs):
+class ExecuteParameters(ExtendedMappingSchema):
     """
     Basic execution parameters that can be submitted to run a process.
 
@@ -4327,17 +4374,21 @@ class ExecuteParameters(ExecuteInputOutputs):
     subscribers = JobExecuteSubscribers(missing=drop)
 
 
-class ExecuteProcessParameters(ExecuteParameters):
+class ExecuteProcessParameters(ExecuteParameters, ExecuteInputOutputs, FieldModifierSchema):
     title = "ExecuteProcessParameters"
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
     _sort_first = [
         "title",
         "process",
-        "inputs",
-        "outputs",
-        "properties",
         "mode",
         "response",
+        "inputs",
+        "outputs",
+        "filter",
+        "filter-crs",
+        "filter-lang",
+        "properties",
+        "sortBy",
         "subscribers",
     ]
     _title = JobTitle(name="title", missing=drop)
@@ -4382,11 +4433,15 @@ class Execute(AllOfKeywordSchema):
         "title",
         "status",
         "process",
-        "inputs",
-        "outputs",
-        "properties",
         "mode",
         "response",
+        "inputs",
+        "outputs",
+        "filter",
+        "filter-crs",
+        "filter-lang",
+        "properties",
+        "sortBy",
         "subscribers",
     ]
     _all_of = [

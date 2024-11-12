@@ -92,11 +92,8 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: Literal["deploy"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessDeployment, Dict[str, JSON]]
+                         **kwargs,          # type: Any
+                         ):                 # type: (...) -> ProcessDeployment
         ...
 
     @classmethod
@@ -104,11 +101,8 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: Literal["describe"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessDescription, Dict[str, JSON]]
+                         **kwargs,          # type: Any
+                         ):                 # type: (...) -> ProcessDescription
         ...
 
     @classmethod
@@ -116,11 +110,8 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: Literal["execute", "quotation"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessExecution, Dict[str, JSON]]
+                         **kwargs,          # type: Any
+                         ):                 # type: (...) -> ProcessExecution
         ...
 
     @classmethod
@@ -128,10 +119,7 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: Literal["package"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
+                         **kwargs,          # type: Any
                          ):                 # type: (...) -> CWL
         ...
 
@@ -140,10 +128,7 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: Literal["estimator"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
+                         **kwargs,          # type: Any
                          ):                 # type: (...) -> Dict[str, JSON]
         ...
 
@@ -152,10 +137,7 @@ class ResourcesUtil(GenericUtils):
     def retrieve_payload(cls,
                          process,           # type: str
                          ref_type=None,     # type: ReferenceType
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[True]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
+                         **kwargs,          # type: Any
                          ):                 # type: (...) -> str
         ...
 
@@ -378,10 +360,8 @@ class WpsConfigBase(GenericUtils):
     @overload
     def deploy_process(cls,
                        payload,                             # type: JSON
-                       process_id=None,                     # type: Optional[str]
                        describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOGCType
-                       mock_requests_only_local=True,       # type: bool
-                       add_package_requirement=True,        # type: bool
+                       **kwargs,                            # type: Any
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionMapping, CWL]
         ...
 
@@ -389,10 +369,8 @@ class WpsConfigBase(GenericUtils):
     @overload
     def deploy_process(cls,
                        payload,                             # type: JSON
-                       process_id=None,                     # type: Optional[str]
                        describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOLDType
-                       mock_requests_only_local=True,       # type: bool
-                       add_package_requirement=True,        # type: bool
+                       **kwargs,                            # type: Any
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionListing, CWL]
         ...
 
