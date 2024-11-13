@@ -1579,7 +1579,7 @@ class FilterSchema(ExtendedMappingSchema):
     def deserialize(self, cstruct):
         # type: (JSON) -> Union[JSON, colander.null]
         result = super().deserialize(cstruct)
-        if not result:
+        if not cstruct:
             return result
         filter_expr = result.get("filter")
         filter_lang = result.get("filter-lang")
@@ -1608,7 +1608,7 @@ class FilterSchema(ExtendedMappingSchema):
         return result
 
 
-class PropertiesFieldModifierExpression(ExtendedMappingSchema):
+class PropertiesExpression(ExtendedMappingSchema):
     prop = AnyFilterExpression(
         variable="{property}",
         description="Expression that defines how to compute the property.",
@@ -1616,8 +1616,18 @@ class PropertiesFieldModifierExpression(ExtendedMappingSchema):
     )
 
 
-class PropertiesFieldModifierSchema(ExtendedMappingSchema):
-    properties = PropertiesFieldModifierExpression(missing=drop)
+class PropertiesSchema(ExtendedMappingSchema):
+    properties = PropertiesExpression(missing=drop, validator=Length(min=1))
+
+    def deserialize(self, cstruct):
+        result = super().deserialize(cstruct)
+        if "properties" in cstruct and "properties" not in result:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid properties expression could not be interpreted.",
+                value={"properties": repr_json(cstruct["properties"])},
+            )
+        return result
 
 
 class SortByExpression(ExpandStringList, ExtendedSchemaNode):
@@ -1673,7 +1683,7 @@ class SortBySchema(ExtendedMappingSchema):
         Therefore, additional fields must be left untouched.
         """
         result = super().deserialize(cstruct)
-        if not result:
+        if not cstruct:
             return result
         if result.get("sortby"):
             # keep only 'official' "sortBy" from OGC API Processes
@@ -1681,10 +1691,17 @@ class SortBySchema(ExtendedMappingSchema):
             if not result.get("sortBy"):
                 result["sortBy"] = result["sortby"]
             del result["sortby"]
+        sort_by = cstruct.get("sortby") or cstruct.get("sortBy")
+        if "sortBy" not in result and sort_by:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid sortBy expression could not be interpreted.",
+                value={"sortBy": repr_json(sort_by)},
+            )
         return result
 
 
-class FieldModifierSchema(FilterSchema, SortBySchema, PropertiesFieldModifierSchema):
+class FieldModifierSchema(FilterSchema, SortBySchema, PropertiesSchema):
     """
     Field modifiers that can operation on properties identified within the referenced content definition.
     """
