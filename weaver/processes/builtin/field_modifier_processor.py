@@ -12,17 +12,17 @@ import uuid
 from typing import TYPE_CHECKING
 
 from pyparsing import (
-    Word,
-    nums,
-    alphas,
-    alphanums,
     Combine,
     Literal,
-    ZeroOrMore,
-    one_of,
     OpAssoc,
-    infix_notation,
     ParserElement,
+    Word,
+    ZeroOrMore,
+    alphanums,
+    alphas,
+    infix_notation,
+    nums,
+    one_of
 )
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
         FieldModifierSortBy,
         JSON,
         Number,
-        Path,
+        Path
     )
     from weaver.utils import LoggerHandler
 

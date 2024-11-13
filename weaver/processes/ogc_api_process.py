@@ -9,12 +9,12 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from weaver.typedefs import (
-        JSON,
         CWL_ExpectedOutputs,
         ExecutionInputsMap,
         ExecutionOutputsMap,
         JobInputs,
         JobOutputs,
+        JSON,
         UpdateStatusPartialFunction
     )
     from weaver.wps.service import WorkerRequest
