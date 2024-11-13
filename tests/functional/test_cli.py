@@ -770,8 +770,9 @@ class TestWeaverClient(TestWeaverClientBase):
 class TestWeaverCLI(TestWeaverClientBase):
     def setUp(self):
         super(TestWeaverCLI, self).setUp()
-        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process",
-                                      access=Visibility.PUBLIC)
+        job = self.job_store.save_job(
+            task_id="12345678-1111-2222-3333-111122223333", process="fake-process", access=Visibility.PUBLIC
+        )
         job.status = Status.SUCCEEDED
         self.test_job = self.job_store.update_job(job)
 
@@ -985,7 +986,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             the expected authentication credentials. Re-running this test by itself validates if this case happened.
             Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1030,7 +1031,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         .. seealso::
             :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1072,7 +1073,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1150,7 +1151,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -2279,37 +2280,36 @@ class TestWeaverCLI(TestWeaverClientBase):
         body = json.loads(text)
         assert body == job.statistics
 
-    def test_job_info_wrong_status(self):
+    @parameterized.expand([
+        ("results", Status.FAILED, "JobResultsFailed", True),
+        ("statistics", Status.FAILED, "NoJobStatistics", True),
+        ("exceptions", Status.FAILED, repr_json(["failed"], force_string=True, indent=2), False),
+    ])
+    def test_job_info_status_dependant(self, operation, status, expect, expect_error):
         # results/statistics must be in success status
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
         job.save_log(message="Some info", status=Status.ACCEPTED, errors=ValueError("failed"))
         job = self.job_store.update_job(job)
-
-        for operation, status, expect in [
-            ("results", Status.FAILED, "JobResultsFailed"),
-            ("statistics", Status.FAILED, "404 Not Found"),
-            # ("exceptions", Status.SUCCEEDED, "404 Not Found"),  # no error, just irrelevant or empty
-        ]:
-            job.status = status
-            job = self.job_store.update_job(job)
-            lines = mocked_sub_requests(
-                self.app, run_command,
-                [
-                    # "weaver",
-                    operation,
-                    "-u", self.url,
-                    "-j", str(job.id),
-                    "-nL",
-                ],
-                trim=False,
-                entrypoint=weaver_cli,
-                only_local=True,
-                expect_error=True,
-            )
-            assert len(lines)
-            text = "".join(lines)
-            assert expect in text
+        job.status = status
+        job = self.job_store.update_job(job)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                operation,
+                "-u", self.url,
+                "-j", str(job.id),
+                "-nL",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=expect_error,
+        )
+        assert len(lines)
+        text = "\n".join(lines)
+        assert expect in text
 
     def test_execute_remote_input(self):
         """

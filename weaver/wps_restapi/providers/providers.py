@@ -17,8 +17,9 @@ from weaver.datatype import Process, Service
 from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
 from weaver.formats import ContentType, OutputFormat
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
+from weaver.processes.execution import submit_job
 from weaver.store.base import StoreServices
-from weaver.utils import get_any_id, get_settings
+from weaver.utils import get_any_id
 from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links
@@ -141,7 +142,8 @@ def remove_provider(request):
     """
     Remove an existing service provider.
     """
-    service, store = get_service(request)
+    store = get_db(request).get_store(StoreServices)
+    service = get_service(request)
 
     try:
         store.delete_service(service.name)
@@ -165,7 +167,7 @@ def get_provider(request):
     """
     Get a provider definition (GetCapabilities).
     """
-    service, _ = get_service(request)
+    service = get_service(request)
     data = get_schema_ref(sd.ProviderSummarySchema, request, ref_name=False)
     info = service.summary(request)
     data.update(info)
@@ -208,14 +210,12 @@ def describe_provider_process(request):
 
     Note: this processes won't be stored to the local process storage.
     """
-    provider_id = request.matchdict.get("provider_id")
-    process_id = request.matchdict.get("process_id")
-    store = get_db(request).get_store(StoreServices)
-    service = store.fetch_by_name(provider_id)
+    service = get_service(request)
     # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
     wps = get_wps_client(service.url, request)
-    process = wps.describeprocess(process_id)
-    return Process.convert(process, service, get_settings(request))
+    proc_id = request.matchdict.get("process_id")
+    process = wps.describeprocess(proc_id)
+    return Process.convert(process, service, container=request)
 
 
 @sd.provider_process_service.get(
@@ -278,11 +278,7 @@ def submit_provider_job(request):
     """
     Execute a remote provider process.
     """
-    from weaver.processes.execution import submit_job  # isort:skip # noqa: E402 # pylint: disable=C0413
-
-    store = get_db(request).get_store(StoreServices)
-    provider_id = request.matchdict.get("provider_id")
-    service = store.fetch_by_name(provider_id)
+    service = get_service(request)
     return submit_job(request, service, tags=["wps-rest"])
 
 

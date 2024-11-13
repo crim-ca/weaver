@@ -11,15 +11,26 @@ from celery.utils.debug import ps as get_celery_process
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
+from pyramid.httpexceptions import (
+    HTTPAccepted,
+    HTTPBadRequest,
+    HTTPCreated,
+    HTTPNotAcceptable,
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
+)
 from pyramid_celery import celery_app as app
+from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.execute import (
     ExecuteControlOption,
     ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
     parse_prefer_header_execute_mode,
+    parse_prefer_header_return,
     update_preference_applied_return_header
 )
 from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
@@ -35,15 +46,18 @@ from weaver.processes.convert import (
     ows2json_output_data
 )
 from weaver.processes.types import ProcessType
+from weaver.processes.utils import get_process
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
     apply_number_with_unit,
     as_int,
+    extend_instance,
     fully_qualified_name,
     get_any_id,
     get_any_value,
     get_header,
+    get_path_kvp,
     get_registry,
     get_settings,
     now,
@@ -53,6 +67,7 @@ from weaver.utils import (
     wait_secs
 )
 from weaver.visibility import Visibility
+from weaver.wps.service import get_pywps_service
 from weaver.wps.utils import (
     check_wps_status,
     get_wps_client,
@@ -61,6 +76,7 @@ from weaver.wps.utils import (
     get_wps_output_dir,
     get_wps_output_path,
     get_wps_output_url,
+    get_wps_path,
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
@@ -69,7 +85,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Dict, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Type, Union
     from uuid import UUID
 
     from celery.app.task import Task
@@ -86,7 +102,9 @@ if TYPE_CHECKING:
         AnyProcessRef,
         AnyResponseType,
         AnyServiceRef,
+        AnySettingsContainer,
         AnyValueType,
+        AnyViewResponse,
         CeleryResult,
         HeaderCookiesType,
         HeadersType,
@@ -123,8 +141,6 @@ def execute_process(task, job_id, wps_url, headers=None):
     """
     Celery task that executes the WPS process job monitoring as status updates (local and remote).
     """
-    from weaver.wps.service import get_pywps_service
-
     LOGGER.debug("Job execute process called.")
 
     task_process = get_celery_process()
@@ -667,8 +683,31 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
-def submit_job(request, reference, tags=None):
-    # type: (Request, Union[Service, Process], Optional[List[str]]) -> AnyResponseType
+def submit_job_dispatch_wps(request, process):
+    # type: (Request, Process) -> AnyViewResponse
+    """
+    Dispatch a :term:`XML` request to the relevant :term:`Process` handler using the :term:`WPS` endpoint.
+
+    Sends the :term:`XML` request to the :term:`WPS` endpoint which knows how to parse it properly.
+    Execution will end up in the same :func:`submit_job_handler` function as for :term:`OGC API - Processes`
+    :term:`JSON` execution.
+
+    .. warning::
+        The function assumes that :term:`XML` was pre-validated as present in the :paramref:`request`.
+    """
+    service = get_pywps_service()
+    wps_params = {"version": "1.0.0", "request": "Execute", "service": "WPS", "identifier": process.id}
+    request.path_info = get_wps_path(request)
+    request.query_string = get_path_kvp("", **wps_params)[1:]
+    location = request.application_url + request.path_info + request.query_string
+    LOGGER.warning("Route redirection [%s] -> [%s] for WPS-XML support.", request.url, location)
+    http_request = extend_instance(request, WerkzeugRequest)
+    http_request.shallow = False
+    return service.call(http_request)
+
+
+def submit_job(request, reference, tags=None, process_id=None):
+    # type: (Request, Union[Service, Process], Optional[List[str]], Optional[str]) -> AnyResponseType
     """
     Generates the job submission from details retrieved in the request.
 
@@ -676,27 +715,17 @@ def submit_job(request, reference, tags=None):
         :func:`submit_job_handler` to provide elements pre-extracted from requests or from other parsing.
     """
     # validate body with expected JSON content and schema
-    if ContentType.APP_JSON not in request.content_type:
-        raise HTTPBadRequest(json={
-            "code": "InvalidHeaderValue",
-            "name": "Content-Type",
-            "description": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' not supported.",
-            "value": str(request.content_type)
-        })
-    try:
-        json_body = request.json_body
-    except Exception as ex:
-        raise HTTPBadRequest(f"Invalid JSON body cannot be decoded for job submission. [{ex}]")
+    json_body = validate_job_json(request)
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
 
-    provider_id = None  # None OK if local
-    process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
+    prov_id = None  # None OK if local
+    proc_id = None  # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
     tags = tags or []
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        process_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
+        proc_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
@@ -718,8 +747,8 @@ def submit_job(request, reference, tags=None):
         lang = matched_lang
     elif isinstance(reference, Service):
         service_url = reference.url
-        provider_id = reference.id
-        process_id = resolve_process_tag(request)
+        prov_id = reference.id
+        proc_id = process_id or resolve_process_tag(request)
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
@@ -732,13 +761,13 @@ def submit_job(request, reference, tags=None):
     user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     headers = dict(request.headers)
     settings = get_settings(request)
-    return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
+    return submit_job_handler(json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local,
                               visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
 
 
 def submit_job_handler(payload,             # type: ProcessExecution
                        settings,            # type: SettingsType
-                       service_url,         # type: str
+                       wps_url,             # type: str
                        provider=None,       # type: Optional[AnyServiceRef]
                        process=None,        # type: AnyProcessRef
                        is_workflow=False,   # type: bool
@@ -751,25 +780,13 @@ def submit_job_handler(payload,             # type: ProcessExecution
                        context=None,        # type: Optional[str]
                        ):                   # type: (...) -> AnyResponseType
     """
-    Submits the job to the Celery worker with provided parameters.
+    Parses parameters that defines the submitted :term:`Job`, and responds accordingly with the selected execution mode.
 
-    Assumes that parameters have been pre-fetched and validated, except for the input payload.
+    Assumes that parameters have been pre-fetched and validated, except for the :paramref:`payload` containing the
+    desired inputs and outputs from the :term:`Job`. The selected execution mode looks up the various combinations
+    of headers and body parameters available across :term:`API` implementations and revisions.
     """
-    try:
-        json_body = sd.Execute().deserialize(payload)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest(
-            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
-                "type": "InvalidSchema",
-                "title": "Execute",
-                "detail": "Execution body failed schema validation.",
-                "status": HTTPBadRequest.code,
-                "error": ex.msg,
-                "cause": ex.asdict(),
-                "value": repr_json(ex.value),
-            })
-        )
-
+    json_body = validate_job_schema(payload)
     db = get_db(settings)
 
     # non-local is only a reference, no actual process object to validate
@@ -779,6 +796,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
         process = proc_store.fetch_by_id(process)
     if process and is_local:
         validate_process_io(process, json_body)
+        validate_process_id(process, json_body)
     else:
         LOGGER.warning(
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
@@ -792,78 +810,300 @@ def submit_job_handler(payload,             # type: ProcessExecution
         job_ctl_opts = ExecuteControlOption.values()
     exec_max_wait = settings.get("weaver.execute_sync_max_wait", settings.get("weaver.exec_sync_max_wait"))
     exec_max_wait = as_int(exec_max_wait, default=20)
-    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait)
+    mode, wait, applied = parse_prefer_header_execute_mode(headers, job_ctl_opts, exec_max_wait, return_auto=True)
     if not applied:  # whatever returned is a default, consider 'mode' in body as alternative
-        is_execute_async = ExecuteMode.get(json_body.get("mode")) != ExecuteMode.SYNC   # convert auto to async
+        execute_mode = ExecuteMode.get(json_body.get("mode"), default=ExecuteMode.AUTO)
     else:
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
-        is_execute_async = mode != ExecuteMode.SYNC
+        execute_mode = mode
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
 
+    job_pending_created = json_body.get("status") == "create"
+    if job_pending_created:
+        job_status = Status.CREATED
+        job_message = "Job created with pending trigger."
+    else:
+        job_status = Status.ACCEPTED
+        job_message = "Job task submitted for execution."
+
     subscribers = map_job_subscribers(json_body, settings)
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=Status.ACCEPTED, process=process, service=provider_id,
+    job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
-                         execute_async=is_execute_async, execute_response=exec_resp, execute_return=exec_return,
+                         execute_mode=execute_mode, execute_wait=wait,
+                         execute_response=exec_resp, execute_return=exec_return,
                          custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
                          accept_type=accept_type, accept_language=language)
-    job.save_log(logger=LOGGER, message="Job task submitted for execution.", status=Status.ACCEPTED, progress=0)
+    job.save_log(logger=LOGGER, message=job_message, status=job_status, progress=0)
+    job.wps_url = wps_url
     job = store.update_job(job)
-    location_url = job.status_url(settings)
-    resp_headers = {"Location": location_url}
-    resp_headers.update(applied)
 
-    wps_url = clean_ows_url(service_url)
-    result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)  # type: CeleryResult
-    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
-    if not is_execute_async:
-        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", wait)
+    return submit_job_dispatch_task(job, headers=req_headers, container=settings)
+
+
+def submit_job_dispatch_task(
+    job,                    # type: Job
+    *,                      # force named keyword arguments after
+    container,              # type: AnySettingsContainer
+    headers=None,           # type: AnyHeadersContainer
+    force_submit=False,     # type: bool
+):                          # type: (...) -> AnyResponseType
+    """
+    Submits the :term:`Job` to the :mod:`celery` worker with provided parameters.
+
+    Assumes that parameters have been pre-fetched, validated, and can be resolved from the :term:`Job`.
+    """
+    db = get_db(container)
+    store = db.get_store(StoreJobs)
+
+    location_url = job.status_url(container)
+    resp_headers = {"Location": location_url}
+    req_headers = copy.deepcopy(headers or {})
+
+    task_result = None  # type: Optional[CeleryResult]
+    job_pending_created = job.status == Status.CREATED
+    if job_pending_created and force_submit:
+        # preemptively update job status to avoid next
+        # dispatch steps ignoring submission to the worker
+        job.status = Status.ACCEPTED
+        job = store.update_job(job)
+        job_pending_created = False
+        response_class = HTTPAccepted
+    else:
+        response_class = HTTPCreated
+
+    if not job_pending_created:
+        wps_url = clean_ows_url(job.wps_url)
+        task_result = execute_process.delay(job_id=job.id, wps_url=wps_url, headers=headers)
+        LOGGER.debug("Celery pending task [%s] for job [%s].", task_result.id, job.id)
+
+    execute_sync = not job_pending_created and not job.execute_async
+    if execute_sync:
+        LOGGER.debug("Celery task requested as sync if it completes before (wait=%ss)", job.execution_wait)
         try:
-            result.wait(timeout=wait)
+            task_result.wait(timeout=job.execution_wait)
         except CeleryTaskTimeoutError:
             pass
-        if result.ready():
+        if task_result.ready():
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
             if job.status == Status.SUCCEEDED:
+                _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
+                if sync_applied:
+                    resp_headers.update(sync_applied)
                 return get_job_results_response(
                     job,
                     request_headers=req_headers,
                     response_headers=resp_headers,
-                    container=settings,
+                    container=container,
                 )
             # otherwise return the error status
-            body = job.json(container=settings)
+            body = job.json(container=container)
             body["location"] = location_url
             resp = get_job_submission_response(body, resp_headers, error=True)
             return resp
         else:
-            LOGGER.debug("Celery task requested as sync took too long to complete (wait=%ss). Continue in async.", wait)
-            # sync not respected, therefore must drop it
-            # since both could be provided as alternative preferences, drop only async with limited subset
-            prefer = get_header("Preference-Applied", headers, pop=True)
-            _, _, async_applied = parse_prefer_header_execute_mode({"Prefer": prefer}, [ExecuteControlOption.ASYNC])
-            if async_applied:
-                resp_headers.update(async_applied)
+            job.save_log(
+                logger=LOGGER,
+                level=logging.WARNING,
+                message=(
+                    f"Job requested as synchronous execution took too long to complete (wait={job.execution_wait}s). "
+                    "Will resume with asynchronous execution."
+                )
+            )
+            job = store.update_job(job)
+            execute_sync = False
+
+    if not execute_sync:
+        # either sync was not respected, therefore must drop it, or it was not requested at all
+        # since both could be provided as alternative preferences, drop only sync with limited subset
+        _, _, async_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.ASYNC])
+        if async_applied:
+            resp_headers.update(async_applied)
 
     LOGGER.debug("Celery task submitted to run async.")
     body = {
         "jobID": job.id,
         "processID": job.process,
-        "providerID": provider_id,  # dropped by validator if not applicable
-        "status": map_status(Status.ACCEPTED),
-        "location": location_url
+        "providerID": job.service,  # dropped by validator if not applicable
+        "status": map_status(job.status),
+        "location": location_url,   # for convenience/backward compatibility, but official is Location *header*
     }
     resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
-    resp = get_job_submission_response(body, resp_headers)
+    resp = get_job_submission_response(body, resp_headers, response_class=response_class)
     return resp
+
+
+def update_job_parameters(job, request):
+    # type: (Job, Request) -> None
+    """
+    Updates an existing :term:`Job` with new request parameters.
+    """
+    body = validate_job_json(request)
+    body = validate_job_schema(body, sd.PatchJobBodySchema)
+
+    value = field = loc = None
+    job_process = get_process(job.process)
+    validate_process_id(job_process, body)
+    try:
+        loc = "body"
+
+        # used to avoid possible attribute name conflict
+        # (e.g.: 'job.response' vs 'job.execution_response')
+        execution_fields = ["response", "mode"]
+
+        for node in sd.PatchJobBodySchema().children:
+            field = node.name
+            if not field or field not in body:
+                continue
+            if field in ["subscribers", "notification_email"]:
+                continue  # will be handled simultaneously after
+
+            value = body[field]  # type: ignore
+            if field not in execution_fields and field in job:
+                setattr(job, field, value)
+            elif field in execution_fields:
+                field = f"execution_{field}"
+                if field == "execution_mode":
+                    if value == ExecuteMode.AUTO:
+                        continue  # don't override previously set value that resolved with default value by omission
+                    if value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
+                        job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                        if job_ctrl_exec not in job_process.jobControlOptions:
+                            raise HTTPBadRequest(
+                                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                                    "type": "InvalidJobUpdate",
+                                    "title": "Invalid Job Execution Update",
+                                    "detail": (
+                                        "Update of the job execution mode is not permitted "
+                                        "by supported jobControlOptions of the process description."
+                                    ),
+                                    "status": HTTPBadRequest.code,
+                                    "cause": {"name": "mode", "in": loc},
+                                    "value": repr_json(
+                                        {
+                                            "process.jobControlOptions": job_process.jobControlOptions,
+                                            "job.mode": job_ctrl_exec,
+                                        }, force_string=False
+                                    ),
+                                })
+                            )
+
+                # 'response' will take precedence, but (somewhat) align 'Prefer: return' value to match intention
+                # they are not 100% compatible because output 'transmissionMode' must be considered when
+                # resolving 'response', but given both 'response' and 'transmissionMode' override 'Prefer',
+                # this is an "acceptable" compromise (see docs 'Execution Response' section for more details)
+                if field == "execution_response":
+                    if value == ExecuteResponse.RAW:
+                        job.execution_return = ExecuteReturnPreference.REPRESENTATION
+                    else:
+                        job.execution_return = ExecuteReturnPreference.MINIMAL
+
+                setattr(job, field, value)
+
+        settings = get_settings(request)
+        subscribers = map_job_subscribers(body, settings=settings)
+        if not subscribers and body.get("subscribers") == {}:
+            subscribers = {}  # asking to remove all subscribers explicitly
+        if subscribers is not None:
+            job.subscribers = subscribers
+
+        # for both 'mode' and 'response'
+        # if provided both in body and corresponding 'Prefer' header parameter,
+        # the body parameter takes precedence (set in code above)
+        # however, if provided only in header, allow override of the body parameter considered as "higher priority"
+        loc = "header"
+        if ExecuteMode.get(body.get("mode"), default=ExecuteMode.AUTO) == ExecuteMode.AUTO:
+            mode, wait, _ = parse_prefer_header_execute_mode(
+                request.headers,
+                job_process.jobControlOptions,
+                return_auto=True,
+            )
+            job.execution_mode = mode
+            job.execution_wait = wait if mode == ExecuteMode.SYNC else job.execution_wait
+        if "response" not in body:
+            job_return = parse_prefer_header_return(request.headers)
+            if job_return:
+                job.execution_return = job_return
+                if job_return == ExecuteReturnPreference.REPRESENTATION:
+                    job.execution_response = ExecuteResponse.RAW
+                else:
+                    job.execution_response = ExecuteResponse.DOCUMENT
+
+    except ValueError as exc:
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidJobUpdate",
+                "title": "Invalid Job Execution Update",
+                "detail": "Could not update the job execution definition using specified parameters.",
+                "status": HTTPUnprocessableEntity.code,
+                "error": type(exc),
+                "cause": {"name": field, "in": loc},
+                "value": repr_json(value, force_string=False),
+            })
+        )
+
+    LOGGER.info("Updating %s", job)
+    db = get_db(request)
+    store = db.get_store(StoreJobs)
+    store.update_job(job)
+
+
+def validate_job_json(request):
+    # type: (Request) -> JSON
+    """
+    Validates that the request contains valid :term:`JSON` contents, but not necessary valid against expected schema.
+
+    .. seealso::
+        :func:`validate_job_schema`
+    """
+    if ContentType.APP_JSON not in request.content_type:
+        raise HTTPUnsupportedMediaType(json={
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "title": "Unsupported Media-Type",
+            "detail": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' is not supported.",
+            "code": "InvalidHeaderValue",
+            "name": "Content-Type",
+            "value": str(request.content_type)
+        })
+    try:
+        json_body = request.json_body
+    except Exception as ex:
+        raise HTTPBadRequest(json={
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "title": "Bad Request",
+            "detail": f"Invalid JSON body cannot be decoded for job submission. [{ex}]",
+        })
+    return json_body
+
+
+def validate_job_schema(payload, body_schema=sd.Execute):
+    # type: (Any, Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]) -> ProcessExecution
+    """
+    Validates that the input :term:`Job` payload is valid :term:`JSON` for an execution request.
+    """
+    try:
+        json_body = body_schema().deserialize(payload)
+    except colander.Invalid as ex:
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                "type": "InvalidSchema",
+                "title": "Invalid Job Execution Schema",
+                "detail": "Execution body failed schema validation.",
+                "status": HTTPUnprocessableEntity.code,
+                "error": ex.msg,
+                "cause": ex.asdict(),
+                "value": repr_json(ex.value),
+            })
+        )
+    return json_body
 
 
 def validate_job_accept_header(headers, execution_mode):
@@ -878,7 +1118,7 @@ def validate_job_accept_header(headers, execution_mode):
     if ContentType.APP_JSON in accept:
         return ContentType.APP_JSON
     # anything always allowed in sync, since results returned directly
-    if execution_mode == ExecuteMode.SYNC:
+    if execution_mode in [ExecuteMode.SYNC, ExecuteMode.AUTO]:
         return accept
     if ContentType.ANY in accept:
         return
@@ -896,6 +1136,40 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_process_id(job_process, payload):
+    # type: (Process, ProcessExecution) -> None
+    """
+    Validates that the specified ``process`` in the payload corresponds to the referenced :term:`Job` :term:`Process`.
+
+    If not ``process```is specified, no check is performed. The :term:`Job` is assumed to have pre-validated that
+    the :term:`Process` is appropriate from another reference, such as using the ID from the path or a query parameter.
+
+    :raises HTTPException: Corresponding error for detected invalid combination of process references.
+    """
+    if "process" in payload:
+        # note: don't use 'get_process' for input process, as it might not even exist!
+        req_process_url = payload["process"]
+        req_process_id = payload["process"].rsplit("/processes/", 1)[-1]
+        if req_process_id != job_process.id or req_process_url != job_process.processDescriptionURL:
+            raise HTTPBadRequest(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                    {
+                        "type": "InvalidJobUpdate",
+                        "title": "Invalid Job Execution Update",
+                        "detail": "Update of the reference process for the job execution is not permitted.",
+                        "status": HTTPBadRequest.code,
+                        "cause": {"name": "process", "in": "body"},
+                        "value": repr_json(
+                            {
+                                "body.process": payload["process"],
+                                "job.process": job_process.processDescriptionURL,
+                            }, force_string=False
+                        ),
+                    }
+                )
+            )
 
 
 def validate_process_io(process, payload):

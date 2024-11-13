@@ -3,7 +3,14 @@ import itertools
 import pytest
 from pyramid.httpexceptions import HTTPBadRequest
 
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference, parse_prefer_header_execute_mode
+from weaver.datatype import Job
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteReturnPreference,
+    parse_prefer_header_execute_mode,
+    update_preference_applied_return_header
+)
 
 
 @pytest.mark.parametrize(
@@ -20,12 +27,16 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPrefe
         for (_headers, _support, _expected), _extra
         in itertools.product(
             [
-                # no mode
+                # no mode (API-wide default async)
                 ({"Prefer": "respond-async, wait=4"}, [],
                  (ExecuteMode.ASYNC, None, {})),
                 # both modes supported (sync attempted upto max/specified wait time, unless async requested explicitly)
+                ({"Prefer": ""}, None,  # explicit 'None' or omitting the parameter entirely means "any" mode
+                 (ExecuteMode.SYNC, 10, {})),
                 ({"Prefer": ""}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
                  (ExecuteMode.SYNC, 10, {})),
+                ({"Prefer": "respond-async"}, None,
+                 (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
                 ({"Prefer": "respond-async"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
                  (ExecuteMode.ASYNC, None, {"Preference-Applied": "respond-async"})),
                 ({"Prefer": "respond-async, wait=4"}, [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC],
@@ -98,3 +109,46 @@ def test_parse_prefer_header_execute_mode_invalid(prefer_header):
     headers = {"Prefer": prefer_header}
     with pytest.raises(HTTPBadRequest):
         parse_prefer_header_execute_mode(headers, [ExecuteControlOption.ASYNC])
+
+
+@pytest.mark.parametrize(
+    ["job_return", "request_headers", "response_headers", "expect_headers"],
+    [
+        (
+            None,
+            {},
+            {},
+            {},
+        ),
+        (
+            None,
+            {"Prefer": "respond-async, wait=4"},
+            {},
+            {},
+        ),
+        (
+            None,
+            {"Prefer": f"return={ExecuteReturnPreference.MINIMAL}"},
+            {},
+            {"Preference-Applied": f"return={ExecuteReturnPreference.MINIMAL}"},
+        ),
+        (
+            ExecuteReturnPreference.MINIMAL,
+            {"Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}"},
+            {},
+            {},
+        ),
+        (
+            ExecuteReturnPreference.MINIMAL,
+            {"Prefer": f"return={ExecuteReturnPreference.MINIMAL}"},
+            {"Preference-Applied": "respond-async"},
+            {"Preference-Applied": f"return={ExecuteReturnPreference.MINIMAL}; respond-async"},
+        ),
+    ]
+)
+def test_update_preference_applied_return_header(job_return, request_headers, response_headers, expect_headers):
+    job = Job(task_id="test")
+    if job_return:
+        job.execution_return = job_return
+    update_headers = update_preference_applied_return_header(job, request_headers, response_headers)
+    assert update_headers == expect_headers

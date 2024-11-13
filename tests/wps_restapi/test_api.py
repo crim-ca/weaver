@@ -160,6 +160,22 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert "$id" in body["components"]["schemas"]["CWL"]
         assert body["components"]["schemas"]["CWL"]["$id"] == sd.CWL_SCHEMA_URL
 
+    def test_openapi_jobs_create_description(self):
+        """
+        Ensure the correct docstring is picked up by multiple service decorators across view functions.
+
+        .. seealso::
+            - :func:`weaver.wps_restapi.jobs.jobs.create_job`
+            - :func:`weaver.wps_restapi.jobs.jobs.create_job_unsupported_media_type`
+        """
+        resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+
+        for field in ["summary", "description"]:
+            desc = body["paths"][sd.jobs_service.path]["post"].get(field, "")
+            assert not desc or "Create a new processing job" in desc
+
     def test_status_unauthorized_and_forbidden(self):
         """
         Validates that 401/403 status codes are correctly handled and that the appropriate one is returned.

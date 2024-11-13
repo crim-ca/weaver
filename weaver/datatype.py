@@ -111,6 +111,7 @@ if TYPE_CHECKING:
         ExecutionInputs,
         ExecutionOutputs,
         ExecutionSubscribers,
+        JobResults,
         JSON,
         Link,
         Metadata,
@@ -318,6 +319,9 @@ class LocalizedDateTimeProperty(property):
         if instance is None:
             # allow access to the descriptor as class attribute 'getattr(type(instance), property-name)'
             return self  # noqa
+        # ensure that any 'fget' specified at property creation is employed
+        if self.fget != self.__get__:  # pylint: disable=W0143
+            return self.fget(instance)
         dt = instance.get(self.name, None)
         if not dt:
             if self.default_now:
@@ -329,7 +333,10 @@ class LocalizedDateTimeProperty(property):
 
     def __set__(self, instance, value):
         # type: (Any, Union[datetime, str]) -> None
-        if isinstance(str, datetime):
+        # ensure that any 'fset' specified at property creation is employed
+        if self.fset != self.__set__:  # pylint: disable=W0143
+            return self.fset(instance, value)
+        if isinstance(value, str):
             value = dt_parse(value)
         if not isinstance(value, datetime):
             name = fully_qualified_name(instance)
@@ -860,6 +867,25 @@ class Job(Base, LoggerHandler):
         self["wps_id"] = wps_id
 
     @property
+    def wps_url(self):
+        # type: () -> Optional[str]
+        """
+        Service URL reference for :term:`WPS` interface.
+
+        .. seealso::
+            - :attr:`Process.processEndpointWPS1`
+            - :attr:`Service.url`
+        """
+        return self.get("wps_url", None)
+
+    @wps_url.setter
+    def wps_url(self, service):
+        # type: (Optional[str]) -> None
+        if not isinstance(service, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.wps_url'")
+        self["wps_url"] = service
+
+    @property
     def service(self):
         # type: () -> Optional[str]
         """
@@ -913,6 +939,18 @@ class Job(Base, LoggerHandler):
             return "process"
         return "provider"
 
+    @property
+    def title(self):
+        # type: () -> Optional[str]
+        return self.get("title", None)
+
+    @title.setter
+    def title(self, title):
+        # type: (Optional[str]) -> None
+        if not (isinstance(title, str) or not title):  # disallow empty title as well
+            raise TypeError(f"Type 'str' or 'None' is required for '{self.__name__}.title'")
+        self["title"] = title
+
     def _get_inputs(self):
         # type: () -> ExecutionInputs
         if self.get("inputs") is None:
@@ -946,14 +984,14 @@ class Job(Base, LoggerHandler):
 
     @property
     def user_id(self):
-        # type: () -> Optional[str]
+        # type: () -> Optional[Union[AnyUUID, int]]
         return self.get("user_id", None)
 
     @user_id.setter
     def user_id(self, user_id):
-        # type: (Optional[str]) -> None
-        if not isinstance(user_id, int) or user_id is None:
-            raise TypeError(f"Type 'int' is required for '{self.__name__}.user_id'")
+        # type: (Optional[Union[AnyUUID, int]]) -> None
+        if not isinstance(user_id, (int, str, uuid.UUID)) or user_id is None:
+            raise TypeError(f"Type 'int', 'str' or a UUID is required for '{self.__name__}.user_id'")
         self["user_id"] = user_id
 
     @property
@@ -1060,7 +1098,7 @@ class Job(Base, LoggerHandler):
     @property
     def execution_mode(self):
         # type: () -> AnyExecuteMode
-        return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.ASYNC)
+        return ExecuteMode.get(self.get("execution_mode"), ExecuteMode.AUTO)
 
     @execution_mode.setter
     def execution_mode(self, mode):
@@ -1070,6 +1108,23 @@ class Job(Base, LoggerHandler):
             modes = list(ExecuteMode.values())
             raise ValueError(f"Invalid value for '{self.__name__}.execution_mode'. Must be one of {modes}")
         self["execution_mode"] = mode
+
+    @property
+    def execution_wait(self):
+        # type: () -> Optional[int]
+        """
+        Execution time (in seconds) to wait for a synchronous response.
+        """
+        if self.execute_async:
+            return None
+        return self.get("execution_wait")
+
+    @execution_wait.setter
+    def execution_wait(self, wait):
+        # type: (Optional[int]) -> None
+        if not (wait is None or isinstance(wait, int)):
+            raise ValueError(f"Invalid value for '{self.__name__}.execution_wait'. Must be None or an integer.")
+        self["execution_wait"] = wait
 
     @property
     def execution_response(self):
@@ -1212,13 +1267,13 @@ class Job(Base, LoggerHandler):
         self["statistics"] = stats
 
     def _get_results(self):
-        # type: () -> List[Optional[Dict[str, JSON]]]
+        # type: () -> JobResults
         if self.get("results") is None:
             self["results"] = []
         return dict.__getitem__(self, "results")
 
     def _set_results(self, results):
-        # type: (List[Optional[Dict[str, JSON]]]) -> None
+        # type: (JobResults) -> None
         if not isinstance(results, list):
             raise TypeError(f"Type 'list' is required for '{self.__name__}.results'")
         self["results"] = results
@@ -1429,7 +1484,7 @@ class Job(Base, LoggerHandler):
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
         job_exec = f"{job_url.rsplit('/', 1)[0]}/execution"
         job_list = base_url + sd.jobs_service.path
-        job_links = [
+        job_links = [  # type: List[Link]
             {"href": job_url, "rel": "status", "title": "Job status."},  # OGC
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
             {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,
@@ -1506,6 +1561,7 @@ class Job(Base, LoggerHandler):
             "processID": self.process,
             "providerID": self.service,
             "type": self.type,
+            "title": self.title,
             "status": map_status(self.status),
             "message": self.status_message,
             "created": self.created,
@@ -1533,8 +1589,10 @@ class Job(Base, LoggerHandler):
             "id": self.id,
             "task_id": self.task_id,
             "wps_id": self.wps_id,
+            "wps_url": self.wps_url,
             "service": self.service,
             "process": self.process,
+            "title": self.title,
             "inputs": self.inputs,
             "outputs": self.outputs,
             "user_id": self.user_id,
@@ -1544,6 +1602,7 @@ class Job(Base, LoggerHandler):
             "execution_response": self.execution_response,
             "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
+            "execution_wait": self.execution_wait,
             "is_workflow": self.is_workflow,
             "created": self.created,
             "started": self.started,
