@@ -476,7 +476,7 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueCollection = TypedDict("JobValueCollection", {
         "collection": Required[str],
-        "filter": Optional[FieldModifierFilter],
+        "filter": Optional[FieldModifierFilterExpression],
         "filter-crs": Optional[FieldModifierFilterCRS],
         "filter-lang": Optional[FieldModifierFilterLang],
         "properties": Optional[FieldModifierProperties],
