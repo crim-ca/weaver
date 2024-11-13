@@ -3945,8 +3945,10 @@ class ExecuteNestedProcessReference(ExtendedMappingSchema):
 class ExecuteNestedProcessParameters(ExtendedMappingSchema):
     """
     Dynamically defines the nested process parameters with recursive schema handling.
+
     This class must create the nested properties dynamically because the required classes are not yet defined, and
     those required definitions also depend on this class to define the nested process as a possible input value.
+
     .. seealso::
         - https://docs.pylonsproject.org/projects/colander/en/latest/binding.html
     """
