@@ -71,7 +71,7 @@ OUTPUT_CWL_JSON = "cwl.output.json"
 
 
 @functools.lru_cache(1024)
-def create_expression_parser():
+def create_expression_parser():  # pylint: disable=R1260,too-complex
     # type: () -> ParserElement
     """
     Creates a parser that can safely evaluate the underlying arithmetic expression with variable substitutions.
@@ -264,7 +264,6 @@ def evaluate_property(
     property_getter = property_getter or dict.__getitem__
     property_setter = property_setter or dict.__setitem__
 
-    ...  # FIXME: ast to do eval safely - TBD: what about property pointing at file?
     expr = create_expression_parser()
     result = expr.parse_string(property_expression)[0].eval(properties, getter=property_getter)
     property_setter(properties, property_name, result)
@@ -438,7 +437,7 @@ def main(*args):
     prop_in = load_file(ns.input_properties)
     LOGGER.info("Process [%s] Loading values input from file '%s'.", PACKAGE_NAME, ns.values)
     val_in = load_file(ns.input_values)
-    params = dict(**vars(ns))
+    params = {**vars(ns)}
     params.update({"input_properties": prop_in, "input_values": val_in})
     sys.exit(process_cwl(**params) is not None)
 

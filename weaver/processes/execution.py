@@ -665,12 +665,20 @@ def parse_wps_inputs(wps_process, job, container=None):
                             f"to input [{input_id}] of [{job.process}]."
                         )
                     results = results[0]
-                    field_modifier_props = input_value.get("properties")
-                    if field_modifier_props:
+
+                    field_modifier_properties = input_value.get("properties")
+                    field_modifier_filter_expr = input_value.get("filter")
+                    field_modifier_filter_crs = input_value.get("filter-crs")
+                    field_modifier_filter_lang = input_value.get("filter-lang")
+                    field_modifier_sortby = input_value.get("sortBy")
+                    if field_modifier_properties or field_modifier_filter_expr or field_modifier_sortby:
                         results = process_field_modifiers(
                             results,
-                            out_dir,
-                            properties=field_modifier_props,
+                            properties=field_modifier_properties,
+                            filter_expr=field_modifier_filter_expr,
+                            filter_crs=field_modifier_filter_crs,
+                            filter_lang=field_modifier_filter_lang,
+                            sortby=field_modifier_sortby,
                         )
 
                     resolved_input_values = [(results, input_info)]

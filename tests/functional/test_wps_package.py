@@ -2494,7 +2494,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         out_prop.update(field_props)
         for feat_src, feat_out in zip(col_feats["features"], out_data["features"]):
             assert feat_src["properties"] == {"name": "test"}
-            assert out_data["properties"] == out_prop
+            assert feat_out["properties"] == out_prop
 
     @pytest.mark.oap_part3
     def test_execute_job_with_nested_process_properties_field_modifier(self):
