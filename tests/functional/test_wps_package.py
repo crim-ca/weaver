@@ -2418,9 +2418,9 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         """
         Validate parsing and handling of ``collection`` specified in an input with :term:`STAC` :term:`API` endpoint.
 
-        Also, evaluate the dynamic insertion of a ``properties`` definition.
-
-        .. versionadded:: 6.0
+        .. versionadded:: 5.8
+        .. versionchanged:: 6.0
+            Evaluate the dynamic insertion of a ``properties`` definition into the retrieved collection features.
         """
         name = "EchoFeatures"
         body = self.retrieve_payload(name, "deploy", local=True)
@@ -2435,10 +2435,19 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             )
             exec_body_val = self.retrieve_payload(name, "execute", local=True)
             col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+            col_feats["features"][0]["properties"]["data"] = 10
+            field_props = {
+                "properties.result": "A * (B + C) / properties.data",  # = 21
+                # intermediate variables, should not be set
+                "B": 123,
+                "C": -50,
+                "A": 3,
+            }
             filter_lang = "cql2-json"
             filter_value = {"op": "=", "args": [{"property": "name"}, "test"]}
-            field_props = {"variable": "1 + 1"}  # not in search request, separate post-operation
             search_body = {
+                # note: 'properties' are not in search request, separate post-operation
+                "collections": ["test"],
                 "filter": filter_value,
                 "filter-lang": filter_lang,
             }

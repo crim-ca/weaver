@@ -430,7 +430,7 @@ if TYPE_CHECKING:
     DataSource = Union[DataSourceFileRef, DataSourceOpenSearch]
     DataSourceConfig = Dict[str, DataSource]  # JSON/YAML file contents
 
-    FieldModifierFilter = Union[
+    FieldModifierFilterExpression = Union[
         str,
         JSON,  # CQL or other
     ]
@@ -447,7 +447,7 @@ if TYPE_CHECKING:
         List[FieldModifierSortByItem],
     ]
     FiledModifiers = TypedDict("FiledModifiers", {
-        "filter": Optional[FieldModifierFilter],
+        "filter": Optional[FieldModifierFilterExpression],
         "filter-crs": Optional[FieldModifierFilterCRS],
         "filter-lang": Optional[FieldModifierFilterLang],
         "properties": Optional[FieldModifierProperties],

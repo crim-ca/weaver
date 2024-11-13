@@ -16,7 +16,7 @@ inputs:
     inputBinding:
       prefix: --properties
   filter:
-    doc: Filter definition submitted to the process and to be generated from input values.
+    doc: Filter expression submitted to the process and to be generated from input values.
     type: File
     format: "iana:application/json"
     inputBinding:
@@ -33,7 +33,7 @@ inputs:
     inputBinding:
       prefix: --filter-lang
   sortBy:
-    doc: Sorting definition with relevant properties and ordering direction.
+    doc: Sorting definition with relevant field names and ordering direction.
     type: string?
     inputBinding:
       prefix: --sortby

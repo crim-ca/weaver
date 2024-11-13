@@ -20,7 +20,13 @@ from tests.utils import (
 )
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
-from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
+from weaver.processes.builtin import (
+    field_modifier_processor,
+    file_index_selector,
+    jsonarray2netcdf,
+    metalink2netcdf,
+    register_builtin_processes
+)
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.status import Status
 from weaver.utils import create_metalink, fully_qualified_name, get_path_kvp
@@ -1099,3 +1105,11 @@ def test_file_index_selector_invalid_out_dir():
         with pytest.raises(ValueError) as err:
             file_index_selector.main("-f", "", "-i", "1", "-o", tmp_out_dir)
         assert "does not exist" in str(err.value)
+
+
+def test_field_modifier_processor_expression_variables():
+    expr = field_modifier_processor.create_expression_parser()
+    calc = "properties.eo:cloud_cover + 1"
+    var = {"properties.eo:cloud_cover": 2}
+    val = expr.parse_string(calc)[0].eval(var, dict.__getitem__)
+    assert val == 3.0
