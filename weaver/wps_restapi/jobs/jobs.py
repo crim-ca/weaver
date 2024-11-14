@@ -627,7 +627,7 @@ def get_job_outputs(request):
 def get_job_output(request):
     # type: (PyramidRequest) -> AnyResponseType
     """
-    Retrieve the output values resulting from a job execution.
+    Retrieve a specific output from a job execution.
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
@@ -647,7 +647,7 @@ def get_job_output(request):
         raise HTTPNotFound(
             json={
                 "code": "",
-                "description": "The requested output format is not in the possible output formats",
+                "description": "The requested output format is not in the possible output formats.",
                 "cause": "Incompatible mime Types",
                 "error": "",
                 "value": ""
@@ -660,7 +660,7 @@ def get_job_output(request):
     if accept != result_media_type and accept not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
-            "description": "The requested output format is not in the possible output formats",
+            "description": "The requested output format is not in the possible output formats.",
             "cause": "Incompatible mime Types",
             "error": "InvalidMimeTypeRequested",
             "value": ""

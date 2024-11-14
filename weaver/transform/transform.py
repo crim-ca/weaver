@@ -5,6 +5,7 @@ import os.path
 import shutil
 import tarfile
 import tempfile
+from typing import List
 
 import pandas as pd
 import xmltodict
@@ -41,7 +42,6 @@ HTML_CONTENT = """<html>
     <body><p>%CONTENT%</p></body>
     </html>"""
 
-
 CONVERSION_DICT = {
     ContentType.TEXT_PLAIN: [ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ContentType.APP_PDF],
     ContentType.TEXT_HTML: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
@@ -64,6 +64,15 @@ EXCLUDED_TYPES = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, Conten
 
 
 def exception_handler(func):
+    """
+    Decorator to handle exceptions in functions and log them.
+
+    Args:
+        func (Callable): Function to wrap with exception handling.
+
+    Returns:
+        Callable: The wrapped function.
+    """
     def inner_function(*args, **kwargs):
         try:
             if "_to_" in func.__name__:
@@ -77,7 +86,14 @@ def exception_handler(func):
 
 
 @exception_handler
-def image_to_any(i, out):
+def image_to_any(i: str, out: str) -> None:
+    """
+    Converts image files to a specified output format. If no conversion is needed, it copies the file.
+
+    Args:
+        i (str): Input image file path.
+        out (str): Output file path.
+    """
     # exit if no transformation needed
     if os.path.splitext(i)[1] == os.path.splitext(out)[1]:
         if not os.path.exists(out):
@@ -102,7 +118,14 @@ def image_to_any(i, out):
     return images_to_any([Image.open(i)], out)
 
 
-def images_to_any(ims, out):
+def images_to_any(ims: List[Image.Image], out: str) -> None:
+    """
+    Processes a list of images and converts them to the desired format, saving them in the specified output path.
+
+    Args:
+        ims (List[Image.Image]): List of Image objects to process.
+        out (str): Output file path.
+    """
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
         _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_file_extension(out))
@@ -150,7 +173,14 @@ def images_to_any(ims, out):
 
 
 @exception_handler
-def any_to_html(i, out):
+def any_to_html(i: str, out: str) -> None:
+    """
+    Converts any content type (text or image) to HTML format.
+
+    Args:
+        i (str): Input file path.
+        out (str): Output file path.
+    """
     try:
         if not is_image(i):
             content = get_content(i)
@@ -170,7 +200,14 @@ def any_to_html(i, out):
 
 
 @exception_handler
-def any_to_pdf(i, out):
+def any_to_pdf(i: str, out: str) -> None:
+    """
+    Converts a file to PDF format. If the file is an image, it is embedded in the PDF, otherwise, it is treated as text.
+
+    Args:
+        i (str): Input file path.
+        out (str): Output PDF file path.
+    """
     image = Image.open(i) if is_image(i) else None
     new_pdf = FPDF(orientation="P", unit="pt", format="A4")
     if image is None:
@@ -222,7 +259,14 @@ def any_to_pdf(i, out):
 
 
 @exception_handler
-def csv_to_json(i, out):
+def csv_to_json(i: str, out: str) -> None:
+    """
+    Converts a CSV file to a JSON file with a 'datas' key containing the rows.
+
+    Args:
+        i (str): Path to the input CSV file.
+        out (str): Path to the output JSON file.
+    """
     with open(i, encoding="utf-8") as csvf:
         csv_reader = csv.DictReader(csvf)
 
@@ -236,7 +280,14 @@ def csv_to_json(i, out):
 
 
 @exception_handler
-def csv_to_xml(i, out):
+def csv_to_xml(i: str, out: str) -> None:
+    """
+    Converts a CSV file to an XML file by first converting it to JSON.
+
+    Args:
+        i (str): Path to the input CSV file.
+        out (str): Path to the output XML file.
+    """
     file = f"{i}.json"
     csv_to_json(i, file)
     data = readfromjson(file)
@@ -244,13 +295,27 @@ def csv_to_xml(i, out):
 
 
 @exception_handler
-def json_to_xml(i, out):
+def json_to_xml(i: str, out: str) -> None:
+    """
+    Converts a JSON file to an XML file.
+
+    Args:
+        i (str): Path to the input JSON file.
+        out (str): Path to the output XML file.
+    """
     data = readfromjson(i)
     write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
 
 
 @exception_handler
-def json_to_txt(i, out):
+def json_to_txt(i: str, out: str) -> None:
+    """
+    Converts a JSON file to a text file.
+
+    Args:
+        i (str): Path to the input JSON file.
+        out (str): Path to the output text file.
+    """
     with open(i, "r", encoding="utf-8") as file:
         data = json.load(file)
     with open(out, "w", encoding="utf-8") as txt_file:
@@ -258,7 +323,14 @@ def json_to_txt(i, out):
 
 
 @exception_handler
-def json_to_yaml(i, out):
+def json_to_yaml(i: str, out: str) -> None:
+    """
+    Converts a JSON file to a YAML file.
+
+    Args:
+        i (str): Path to the input JSON file.
+        out (str): Path to the output YAML file.
+    """
     with open(i, "r", encoding="utf-8") as file:
         configuration = json.load(file)
     with open(out, "w", encoding="utf-8") as yaml_file:
@@ -266,7 +338,14 @@ def json_to_yaml(i, out):
 
 
 @exception_handler
-def yaml_to_json(i, out):
+def yaml_to_json(i: str, out: str) -> None:
+    """
+    Converts a YAML file to a JSON file.
+
+    Args:
+        i (str): Path to the input YAML file.
+        out (str): Path to the output JSON file.
+    """
     with open(i, "r", encoding="utf-8") as file:
         configuration = yaml.safe_load(file)
     with open(out, "w", encoding="utf-8") as json_file:
@@ -274,48 +353,120 @@ def yaml_to_json(i, out):
 
 
 @exception_handler
-def json_to_csv(i, out):
+def json_to_csv(i: str, out: str) -> None:
+    """
+    Converts a JSON file to a CSV file.
+
+    Args:
+        i (str): Path to the input JSON file.
+        out (str): Path to the output CSV file.
+    """
     with open(i, encoding="utf-8") as file:
         data_file = pd.read_json(file, encoding="utf-8")
         data_file.to_csv(out, encoding="utf-8", index=False)
 
 
 @exception_handler
-def xml_to_json(i, out):
+def xml_to_json(i: str, out: str) -> None:
+    """
+    Converts an XML file to a JSON file.
+
+    Args:
+        i (str): Path to the input XML file.
+        out (str): Path to the output JSON file.
+    """
     write_content(out, xmltodict.parse(get_content(i)))
 
 
 @exception_handler
-def html_to_txt(i, out):
+def html_to_txt(i: str, out: str) -> None:
+    """
+    Converts an HTML file to a text file.
+
+    Args:
+        i (str): Path to the input HTML file.
+        out (str): Path to the output text file.
+    """
     write_content(out, " ".join(BeautifulSoup(get_content(i), "html.parser").stripped_strings))
 
 
 @exception_handler
-def yaml_to_csv(i, out):
+def yaml_to_csv(i: str, out: str) -> None:
+    """
+    Converts a YAML file to a CSV file by first converting it to JSON.
+
+    Args:
+        i (str): Path to the input YAML file.
+        out (str): Path to the output CSV file.
+    """
     yaml_to_json(i, f"{i}.json")
     json_to_csv(f"{i}.json", out)
 
 
 @exception_handler
-def yaml_to_xml(i, out):
+def yaml_to_xml(i: str, out: str) -> None:
+    """
+    Converts a YAML file to an XML file by first converting it to JSON.
+
+    Args:
+        i (str): Path to the input YAML file.
+        out (str): Path to the output XML file.
+    """
     yaml_to_json(i, f"{i}.json")
     json_to_xml(f"{i}.json", out)
 
 
 @exception_handler
-def xml_to_yaml(i, out):
+def xml_to_yaml(i: str, out: str) -> None:
+    """
+    Converts an XML file to a YAML file by first converting it to JSON.
+
+    Args:
+        i (str): Path to the input XML file.
+        out (str): Path to the output YAML file.
+    """
     xml_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
 
 
 @exception_handler
-def csv_to_yaml(i, out):
+def csv_to_yaml(i: str, out: str) -> None:
+    """
+    Converts a CSV file to a YAML file by first converting it to JSON.
+
+    Args:
+        i (str): Path to the input CSV file.
+        out (str): Path to the output YAML file.
+    """
     csv_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
 
 
 class Transform:
-    def __init__(self, file_path, current_media_type: str, wanted_media_type: str):
+    """
+    Class for handling the transformation of files between different media types (e.g., text, image, application).
+
+    Attributes:
+        file_path (str): The path to the input file to be transformed.
+        current_media_type (str): The media type of the input file.
+        wanted_media_type (str): The desired media type after transformation.
+        output_path (str): The path where the transformed file will be saved.
+        ext (str): The extension of the output file based on the wanted media type.
+
+    Methods:
+        process(): Initiates the file transformation process based on the input and output media types.
+        get(): Returns a FileResponse with the transformed file for download.
+    """
+
+    def __init__(self, file_path: str, current_media_type: str, wanted_media_type: str):
+        """
+        Initializes the Transform object with file paths and media types.
+
+        Args:
+            file_path (str): Path to the file to be transformed.
+            current_media_type (str): The media type of the input file.
+            wanted_media_type (str): The desired media type for the output file.
+        """
         self.file_path = file_path
         self.cmt = current_media_type.lower()
         self.wmt = wanted_media_type.lower()
@@ -332,7 +483,13 @@ class Transform:
                 except OSError as exc:
                     LOGGER.warning("Failed to delete [%s] err: %s", os.path.basename(self.output_path), exc)
 
-    def process(self):
+    def process(self) -> None:
+        """
+        Processes the file based on the current and wanted media types and performs the transformation.
+
+        Raises:
+            RuntimeError: If an error occurs during the file transformation process.
+        """
         try:
             if self.output_path != self.file_path:
                 if "text/" in self.cmt:
@@ -344,7 +501,13 @@ class Transform:
         except Exception as e:
             raise RuntimeError(f"Error processing file {self.file_path}: {str(e)}")
 
-    def process_text(self):
+    def process_text(self) -> None:
+        """
+        Handles the transformation of text-based files (e.g., plain text, HTML, CSV).
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "plain" in self.cmt:
             if "html" in self.wmt:
                 any_to_html(self.file_path, self.output_path)
@@ -356,7 +519,13 @@ class Transform:
         if "csv" in self.cmt:
             self.process_csv()
 
-    def process_csv(self):
+    def process_csv(self) -> None:
+        """
+        Handles the conversion of CSV files to other formats like JSON, XML, and YAML.
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "json" in self.wmt:
             csv_to_json(self.file_path, self.output_path)
         elif "xml" in self.wmt:
@@ -366,7 +535,13 @@ class Transform:
         else:
             raise RuntimeError(f"Conversion from CSV to {self.wmt} is not supported.")
 
-    def process_application(self):
+    def process_application(self) -> None:
+        """
+        Handles the conversion of application files (e.g., JSON, XML, YAML).
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "json" in self.cmt:
             self.process_json()
         if "yaml" in self.cmt:
@@ -374,7 +549,13 @@ class Transform:
         if "xml" in self.cmt:
             self.process_xml()
 
-    def process_json(self):
+    def process_json(self) -> None:
+        """
+        Handles the transformation of JSON files to other formats like CSV, XML, YAML, and plain text.
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "csv" in self.wmt:
             json_to_csv(self.file_path, self.output_path)
         elif "xml" in self.wmt:
@@ -386,7 +567,13 @@ class Transform:
         else:
             raise RuntimeError(f"Conversion from JSON to {self.wmt} is not supported.")
 
-    def process_yaml(self):
+    def process_yaml(self) -> None:
+        """
+        Handles the conversion of YAML files to other formats like CSV, JSON, and XML.
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "csv" in self.wmt:
             yaml_to_csv(self.file_path, self.output_path)
         elif "json" in self.wmt:
@@ -396,7 +583,13 @@ class Transform:
         else:
             raise RuntimeError(f"Conversion from YAML to {self.wmt} is not supported.")
 
-    def process_xml(self):
+    def process_xml(self) -> None:
+        """
+        Handles the conversion of XML files to JSON or YAML.
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "json" in self.wmt:
             xml_to_json(self.file_path, self.output_path)
         elif "yaml" in self.wmt:
@@ -404,7 +597,13 @@ class Transform:
         else:
             raise RuntimeError(f"Conversion from XML to {self.wmt} is not supported.")
 
-    def process_image(self):
+    def process_image(self) -> None:
+        """
+        Handles the conversion of image files to other formats (e.g., image to image or image to PDF).
+
+        Raises:
+            RuntimeError: If a conversion type is unsupported.
+        """
         if "image/" in self.wmt:
             image_to_any(self.file_path, self.output_path)
             if not os.path.exists(self.output_path) and os.path.exists(f"{self.output_path}.tar.gz"):
@@ -414,8 +613,16 @@ class Transform:
         else:
             raise RuntimeError(f"Conversion from img to {self.wmt} is not supported.")
 
-    def get(self):
-        # type:(...) -> FileResponse
+    def get(self) -> FileResponse:
+        """
+        Returns the transformed file as a response for download.
+
+        Returns:
+            FileResponse: The response containing the transformed file.
+
+        Raises:
+            HTTPUnprocessableEntity: If an error occurs during file transformation.
+        """
         try:
             if not os.path.exists(self.output_path):
                 self.process()
@@ -425,7 +632,7 @@ class Transform:
         except Exception as err:
             raise HTTPUnprocessableEntity(json={
                 "code": "JobOutputProcessingError",
-                "description": "An error occured while treating the output data",
+                "description": "An error occurred while treating the output data",
                 "cause": str(err),
                 "error": type(err).__name__,
                 "value": ""

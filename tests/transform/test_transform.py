@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 
+import pytest
 from pyramid.response import FileResponse
 
 from tests.resources import TRANSFORM_PATH
@@ -37,6 +38,8 @@ def transform(f, cmt="", wmt=""):
         assert False, f"{os.path.splitext(f)[1]} -> {f} {str(err)}"
 
 
-def test_transformations():
-    for file_name in os.listdir(TRANSFORM_PATH):
-        transform(os.path.join(TRANSFORM_PATH, file_name))
+@pytest.mark.parametrize("file_name", [f for f in os.listdir(TRANSFORM_PATH)
+                                       if os.path.isfile(os.path.join(TRANSFORM_PATH, f))])
+def test_transformations(file_name):
+    file_path = os.path.join(TRANSFORM_PATH, file_name)
+    transform(file_path)
