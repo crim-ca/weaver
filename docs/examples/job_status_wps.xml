@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wps:ExecuteResponse
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsExecute_response.xsd"
+        service="WPS"
+        version="1.0.0"
+        xml:lang="en-CA"
+        serviceInstance="https:/example.com/wps?request=GetCapabilities&amp;amp;service=WPS"
+        statusLocation="https:/example.com/wpsoutputs/fd6e2171-39a7-4f99-b639-c43b51f15b56.xml">
+    <wps:Process wps:processVersion="1.1.0">
+        <ows:Identifier>example-process</ows:Identifier>
+        </wps:Process>
+        <wps:Status creationTime="2024-09-19T14:29:49Z">
+            <wps:ProcessSucceeded>Package operations complete.</wps:ProcessSucceeded>
+        </wps:Status>
+        <wps:ProcessOutputs>
+            <wps:Output>
+                <ows:Identifier>output</ows:Identifier>
+                <ows:Title>output</ows:Title>
+                <wps:Reference
+                        href="https:/example.com/wpsoutputs/fd6e2171-39a7-4f99-b639-c43b51f15b56/output/data.json"
+                        mimeType="application/json" encoding="" schema=""
+                />
+            </wps:Output>
+        </wps:ProcessOutputs>
+</wps:ExecuteResponse>

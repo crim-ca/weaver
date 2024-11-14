@@ -21,8 +21,9 @@ from tests.utils import (
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
+from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.status import Status
-from weaver.utils import create_metalink, fully_qualified_name
+from weaver.utils import create_metalink, fully_qualified_name, get_path_kvp
 from weaver.wps.utils import map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -209,7 +210,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.status_code == 201
 
         job_url = resp.json["location"]
-        job_res = self.monitor_job(job_url, expect_failed=True)
+        job_res = self.monitor_job(job_url, expect_failed=True, return_status=True)
         assert job_res["status"] == Status.FAILED
         job_logs = self.app.get(f"{job_url}/logs").json
         assert any("ValueError: Not a valid file URL reference" in log for log in job_logs)
@@ -242,7 +243,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.headers["Location"] == job_url
         results = self.monitor_job(job_url)
 
-        output_url = f"{job_url}/outputs"
+        output_url = get_path_kvp(f"{job_url}/outputs", schema=JobInputsOutputsSchema.OLD)
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
@@ -265,6 +266,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,  # by value/reference doesn't matter because of this
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],
             })
@@ -288,7 +290,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint
-        output_url = f"{job_url}/outputs"
+        output_url = get_path_kvp(f"{job_url}/outputs", schema=JobInputsOutputsSchema.OLD)
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
@@ -305,6 +307,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 # NOTE: quantity of outputs important as well
                 #       since single output, content-type is directly that output (otherwise should be multipart)
@@ -332,7 +335,7 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by raw data,
         # Weaver still offers them with document on outputs endpoint
-        output_url = f"{job_url}/outputs"
+        output_url = get_path_kvp(f"{job_url}/outputs", schema=JobInputsOutputsSchema.OLD)
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{resp.text}"
         outputs = resp.json
@@ -351,6 +354,7 @@ class BuiltinAppTest(WpsConfigBase):
         with contextlib.ExitStack() as stack_exec:
             body, nc_data = self.setup_jsonarray2netcdf_inputs(stack_exec)
             body.update({
+                "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.RAW,  # by value/reference important here
                 "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.REFERENCE}],  # Link header
             })
@@ -374,7 +378,8 @@ class BuiltinAppTest(WpsConfigBase):
 
         # even though results are requested by Link reference,
         # Weaver still offers them with document on outputs endpoint
-        resp = self.app.get(f"{job_url}/outputs", headers=self.json_headers)
+        output_url = get_path_kvp(f"{job_url}/outputs", schema=JobInputsOutputsSchema.OLD)
+        resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json
 
@@ -442,7 +447,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         results = resp.json
 
-        output_url = f"{job_url}/outputs"
+        output_url = get_path_kvp(f"{job_url}/outputs", schema=JobInputsOutputsSchema.OLD)
         resp = self.app.get(output_url, headers=self.json_headers)
         assert resp.status_code == 200, f"Error job outputs:\n{repr_json(resp.text, indent=2)}"
         outputs = resp.json

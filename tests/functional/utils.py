@@ -31,7 +31,7 @@ from weaver.processes.builtin import get_builtin_reference_mapping
 from weaver.processes.constants import JobInputsOutputsSchema, ProcessSchema
 from weaver.processes.wps_package import get_application_requirement
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_weaver_url, load_file
+from weaver.utils import fully_qualified_name, get_path_kvp, get_weaver_url, load_file
 from weaver.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -41,6 +41,8 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from webtest import TestApp
 
+    from weaver.processes.constants import ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaType
+    from weaver.status import AnyStatusType
     from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
     from weaver.typedefs import (
         AnyRequestMethod,
@@ -61,7 +63,21 @@ if TYPE_CHECKING:
     ReferenceType = Literal["deploy", "describe", "execute", "package", "quotation", "estimator"]
 
 
-class ResourcesUtil(object):
+class GenericUtils(unittest.TestCase):
+    def fully_qualified_test_name(self, name=""):
+        """
+        Generates a unique name using the current test method full context name and the provided name, if any.
+
+        Normalizes the generated name such that it can be used as a valid :term:`Process` or :term:`Service` ID.
+        """
+        extra_name = f"-{name}" if name else ""
+        class_name = fully_qualified_name(self)
+        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
+        return test_name
+
+
+class ResourcesUtil(GenericUtils):
     @classmethod
     def request(cls, method, url, *args, **kwargs):
         # type: (AnyRequestMethod, str, *Any, **Any) -> AnyResponseType
@@ -271,7 +287,7 @@ class ResourcesUtil(object):
         return proc_names
 
 
-class JobUtils(object):
+class JobUtils(GenericUtils):
     job_store = None
     job_info = None  # type: Iterable[Job]
 
@@ -316,7 +332,7 @@ class JobUtils(object):
         )
 
 
-class WpsConfigBase(unittest.TestCase):
+class WpsConfigBase(GenericUtils):
     json_headers = MappingProxyType({"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON})
     html_headers = MappingProxyType({"Accept": ContentType.TEXT_HTML})
     xml_headers = MappingProxyType({"Content-Type": ContentType.TEXT_XML})
@@ -363,7 +379,7 @@ class WpsConfigBase(unittest.TestCase):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OGC]  # noqa
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOGCType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionMapping, CWL]
@@ -374,7 +390,7 @@ class WpsConfigBase(unittest.TestCase):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: Literal[ProcessSchema.OLD]  # noqa
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOLDType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescriptionListing, CWL]
@@ -384,7 +400,7 @@ class WpsConfigBase(unittest.TestCase):
     def deploy_process(cls,
                        payload,                             # type: JSON
                        process_id=None,                     # type: Optional[str]
-                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchema
+                       describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaType
                        mock_requests_only_local=True,       # type: bool
                        add_package_requirement=True,        # type: bool
                        ):                                   # type: (...) -> Tuple[ProcessDescription, CWL]
@@ -440,13 +456,6 @@ class WpsConfigBase(unittest.TestCase):
             return f"Error logs:\n{_text}"
         return ""
 
-    def fully_qualified_test_process_name(self, name=""):
-        extra_name = f"-{name}" if name else ""
-        class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
-        test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
-        return test_name
-
     @overload
     def monitor_job(self, status_url, **__):
         # type: (str, **Any) -> ExecutionResults
@@ -462,7 +471,7 @@ class WpsConfigBase(unittest.TestCase):
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
                     return_status=False,                # type: bool
-                    wait_for_status=None,               # type: Optional[str]
+                    wait_for_status=None,               # type: Optional[AnyStatusType]
                     expect_failed=False,                # type: bool
                     ):                                  # type: (...) -> Union[ExecutionResults, JobStatusResponse]
         """
@@ -485,17 +494,16 @@ class WpsConfigBase(unittest.TestCase):
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
-        wait_for_status = wait_for_status or Status.SUCCEEDED
+        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCEEDED)
 
         def check_job_status(_resp, running=False):
             # type: (AnyResponseType, bool) -> bool
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
-            final = Status.FAILED if expect_failed else Status.SUCCEEDED
-            statuses = [Status.ACCEPTED, Status.RUNNING, final] if running else [final]
+            statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
             assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
             assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
-            return body["status"] in {wait_for_status, Status.SUCCEEDED, Status.FAILED}  # break condition
+            return body["status"] in {final_status, Status.SUCCEEDED, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or self.monitor_timeout
@@ -518,7 +526,8 @@ class WpsConfigBase(unittest.TestCase):
         return resp.json
 
     def get_outputs(self, status_url):
-        resp = self.app.get(f"{status_url}/outputs", headers=dict(self.json_headers))
+        path = get_path_kvp(f"{status_url}/outputs", schema=JobInputsOutputsSchema.OLD)
+        resp = self.app.get(path, headers=dict(self.json_headers))
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)
         assert resp.status_code == 200, f"Get outputs failed:\n{pretty}\n{self._try_get_logs(status_url)}"

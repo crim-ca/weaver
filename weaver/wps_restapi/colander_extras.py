@@ -599,7 +599,7 @@ class NoneType(colander.SchemaType):
         raise colander.Invalid(
             node,
             colander._(
-                "${val} cannot be serialized: ${err}",
+                "${val} cannot be processed: ${err}",
                 mapping={"val": appstruct, "err": "Not 'null'."},
             ),
         )
@@ -790,7 +790,7 @@ class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
         # results: {'s2': {'field': 'ok'}}
 
-    .. seealso:
+    .. seealso::
         - https://github.com/Pylons/colander/issues/276
         - https://github.com/Pylons/colander/issues/299
 
@@ -1448,6 +1448,11 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         """
         Converts the data using validation against the :term:`JSON` schema definition.
         """
+        # don't inject the schema meta/id if the mapping is empty
+        # this is to avoid creating a non-empty mapping, which often as a "special" meaning
+        # furthermore, when the mapping is empty, there is no data to ensuring this schema is actually applied
+        if not cstruct:
+            return cstruct
         # meta-schema always disabled in this context since irrelevant
         # refer to the "id" of the parent schema representing this data using "$schema"
         # this is not "official" JSON requirement, but very common in practice

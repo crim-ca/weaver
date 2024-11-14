@@ -11,7 +11,7 @@ import shutil
 import smtplib
 import tempfile
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import mock
 import pytest
@@ -38,6 +38,7 @@ from tests.utils import (
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
 from weaver.datatype import DockerAuthentication, Service
+from weaver.execute import ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
 from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
@@ -48,9 +49,11 @@ from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
 if TYPE_CHECKING:
-    from typing import Dict, Optional
+    from typing import Any, Callable, Dict, Optional, Union
 
-    from weaver.typedefs import AnyRequestType, AnyResponseType, CWL
+    from weaver.cli import OperationResult
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import AnyRequestType, AnyResponseType, CWL, JSON
 
 
 class FakeAuthHandler(object):
@@ -134,6 +137,7 @@ class TestWeaverClient(TestWeaverClientBase):
         return test_file_path
 
     def process_listing_op(self, operation, **op_kwargs):
+        # type: (Callable[[Any, ...], OperationResult], **Any) -> OperationResult
         result = mocked_sub_requests(self.app, operation, only_local=True, **op_kwargs)
         assert result.success
         assert "processes" in result.body
@@ -453,9 +457,17 @@ class TestWeaverClient(TestWeaverClientBase):
             "Dummy process that simply echo's back the input message for testing purposes."
         ), "CLI should not have overridden the process description field."
 
-    def run_execute_inputs_schema_variant(self, inputs_param, process="Echo",
-                                          preload=False, location=False, expect_success=True,
-                                          mock_exec=True, **exec_kwargs):
+    def run_execute_inputs_schema_variant(
+        self,
+        inputs_param,           # type: Union[JSON, str]
+        process="Echo",         # type: str
+        preload=False,          # type: bool
+        location=False,         # type: Optional[str]
+        expect_success=True,    # type: bool
+        expect_status=None,     # type: Optional[AnyStatusType]
+        mock_exec=True,         # type: bool
+        **exec_kwargs,          # type: Any
+    ):                          # type: (...) -> OperationResult
         if isinstance(inputs_param, str):
             ref = {"location": inputs_param} if location else {"ref_name": inputs_param}
             if preload:
@@ -470,8 +482,11 @@ class TestWeaverClient(TestWeaverClientBase):
                 mock_exec_func = None
             for mock_exec_proc in mocked_execute_celery(func_execute_task=mock_exec_func):
                 stack_exec.enter_context(mock_exec_proc)
-            result = mocked_sub_requests(self.app, self.client.execute, self.test_process[process],
-                                         inputs=inputs_param, **exec_kwargs)
+            result = cast(
+                "OperationResult",
+                mocked_sub_requests(self.app, self.client.execute, self.test_process[process],
+                                    inputs=inputs_param, **exec_kwargs)
+            )
         if expect_success:
             assert result.success, result.message + (result.text if result.text else "")
             assert "jobID" in result.body
@@ -479,7 +494,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert "status" in result.body
             assert "location" in result.body
             assert result.body["processID"] == self.test_process[process]
-            assert result.body["status"] == Status.ACCEPTED
+            assert result.body["status"] == expect_status or Status.ACCEPTED
             assert result.body["location"] == result.headers["Location"]
             assert "undefined" not in result.message
         else:
@@ -723,6 +738,86 @@ class TestWeaverClient(TestWeaverClientBase):
         ]:
             self.run_execute_inputs_with_vault_file(input_data, "CatFile", preload=False, embed=True)
 
+    def test_execute_trigger(self):
+        result = self.run_execute_inputs_schema_variant(
+            "Execute_Echo_cwl_schema.yml",
+            preload=True,
+            pending=True,  # this is the parameter of interest for this test
+            expect_status=Status.CREATED,
+        )
+        assert result.success
+        assert result.message == (
+            "Job successfully submitted for creation. "
+            "Waiting on trigger request to being execution."
+        )
+        job_id = result.body["jobID"]
+
+        # technically, trigger only need to submit the job to the execution queue
+        # however, because we do not have an actual celery worker queue configured in tests, mock the execution inline
+        # the response will be as if we only "accepted" the submission, but the job will be completed for next steps
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec_proc in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec_proc)
+            result = mocked_sub_requests(self.app, self.client.trigger_job, job_id)
+
+        assert result.success
+        assert result.code == 202
+        result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=5, interval=1)
+        assert result.success
+
+        result = mocked_sub_requests(self.app, self.client.results, job_id)
+        assert result.success
+
+        output = result.body["output"]["href"]
+        output = map_wps_output_location(output, self.settings, exists=True)
+        assert os.path.isfile(output)
+        with open(output, mode="r", encoding="utf-8") as out_file:
+            out_data = out_file.read().strip()
+        assert out_data == "Test message"
+
+    def test_update_job(self):
+        result = self.run_execute_inputs_schema_variant(
+            "Execute_Echo_cwl_schema.yml",
+            preload=True,
+            pending=True,  # pre-requirement for updating job is that it must not already be queued/running
+            expect_status=Status.CREATED,
+        )
+        assert result.success
+        assert result.message == (
+            "Job successfully submitted for creation. "
+            "Waiting on trigger request to being execution."
+        )
+        job_id = result.body["jobID"]
+
+        result = mocked_sub_requests(self.app, self.client.status, job_id)
+        assert result.success
+        assert "title" not in result.body
+
+        result = mocked_sub_requests(
+            self.app,
+            self.client.update_job,
+            job_id,
+            title="Random Title",
+            headers={"Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}"},
+            inputs={"message": "new message"},
+            output_filter={"output": {}},
+            output_context="test",
+            subscribers={"successUri": "https://example.com"},
+        )
+        assert result.success
+        assert result.code == 204
+        assert result.body is None
+
+        result = mocked_sub_requests(self.app, self.client.status, job_id)
+        assert result.success
+        assert result.body["title"] == "Random Title"
+
+        result = mocked_sub_requests(self.app, self.client.inputs, job_id)
+        assert result.success
+        assert result.body["inputs"] == {"message": "new message"}
+        assert result.body["outputs"] == {"output": {}}
+        assert result.body["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}; respond-async"
+
     @mocked_dismiss_process()
     def test_dismiss(self):
         for status in [Status.ACCEPTED, Status.FAILED, Status.RUNNING, Status.SUCCEEDED]:
@@ -771,8 +866,9 @@ class TestWeaverClient(TestWeaverClientBase):
 class TestWeaverCLI(TestWeaverClientBase):
     def setUp(self):
         super(TestWeaverCLI, self).setUp()
-        job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process="fake-process",
-                                      access=Visibility.PUBLIC)
+        job = self.job_store.save_job(
+            task_id="12345678-1111-2222-3333-111122223333", process="fake-process", access=Visibility.PUBLIC
+        )
         job.status = Status.SUCCEEDED
         self.test_job = self.job_store.update_job(job)
 
@@ -986,7 +1082,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             the expected authentication credentials. Re-running this test by itself validates if this case happened.
             Find a way to make it work seamlessly. Retries sometime works, but it is not guaranteed.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1031,7 +1127,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         .. seealso::
             :meth:`tests.wps_restapi.test_processes.WpsRestApiProcessesTest.test_deploy_process_CWL_DockerRequirement_auth_header_format`
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1073,7 +1169,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -1151,7 +1247,7 @@ class TestWeaverCLI(TestWeaverClientBase):
 
         All parameter values are themselves valid, only their combination that are not.
         """
-        p_id = self.fully_qualified_test_process_name()
+        p_id = self.fully_qualified_test_name()
         docker_reg = "fake.repo"
         docker_img = "org/project/private-image:latest"
         docker_ref = f"{docker_reg}/{docker_img}"
@@ -2281,37 +2377,36 @@ class TestWeaverCLI(TestWeaverClientBase):
         body = json.loads(text)
         assert body == job.statistics
 
-    def test_job_info_wrong_status(self):
+    @parameterized.expand([
+        ("results", Status.FAILED, "JobResultsFailed", True),
+        ("statistics", Status.FAILED, "NoJobStatistics", True),
+        ("exceptions", Status.FAILED, repr_json(["failed"], force_string=True, indent=2), False),
+    ])
+    def test_job_info_status_dependant(self, operation, status, expect, expect_error):
         # results/statistics must be in success status
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
         job.save_log(message="Some info", status=Status.ACCEPTED, errors=ValueError("failed"))
         job = self.job_store.update_job(job)
-
-        for operation, status, expect in [
-            ("results", Status.FAILED, "JobResultsFailed"),
-            ("statistics", Status.FAILED, "404 Not Found"),
-            # ("exceptions", Status.SUCCEEDED, "404 Not Found"),  # no error, just irrelevant or empty
-        ]:
-            job.status = status
-            job = self.job_store.update_job(job)
-            lines = mocked_sub_requests(
-                self.app, run_command,
-                [
-                    # "weaver",
-                    operation,
-                    "-u", self.url,
-                    "-j", str(job.id),
-                    "-nL",
-                ],
-                trim=False,
-                entrypoint=weaver_cli,
-                only_local=True,
-                expect_error=True,
-            )
-            assert len(lines)
-            text = "".join(lines)
-            assert expect in text
+        job.status = status
+        job = self.job_store.update_job(job)
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # "weaver",
+                operation,
+                "-u", self.url,
+                "-j", str(job.id),
+                "-nL",
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+            expect_error=expect_error,
+        )
+        assert len(lines)
+        text = "\n".join(lines)
+        assert expect in text
 
     def test_execute_remote_input(self):
         """
@@ -2377,7 +2472,7 @@ class TestWeaverClientAuthBase(TestWeaverClientBase):
 
         def proxy_view(request):
             # type: (AnyRequestType) -> AnyResponseType
-            auth = request.headers.get("Authorization")  # should be added by a auth-handler called inline of operation
+            auth = request.headers.get("Authorization")  # should be added by an auth-handler called inline of operation
             if not auth:
                 return HTTPUnauthorized()
             token = auth.split(" ")[-1]

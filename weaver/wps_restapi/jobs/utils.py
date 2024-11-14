@@ -3,7 +3,7 @@ import math
 import os
 import shutil
 from copy import deepcopy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, overload
 
 import colander
 from celery.utils.log import get_task_logger
@@ -12,6 +12,7 @@ from pyramid.httpexceptions import (
     HTTPCreated,
     HTTPForbidden,
     HTTPInternalServerError,
+    HTTPLocked,
     HTTPNoContent,
     HTTPNotFound,
     HTTPOk
@@ -41,7 +42,7 @@ from weaver.execute import (
 )
 from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -55,12 +56,14 @@ from weaver.utils import (
     get_header,
     get_href_headers,
     get_path_kvp,
+    get_request_args,
     get_sane_name,
     get_secure_path,
     get_settings,
     get_weaver_url,
     is_uuid,
-    make_link_header
+    make_link_header,
+    parse_kvp
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
@@ -69,15 +72,16 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+    from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
         AnyRequestType,
+        AnyResponseClass,
         AnyResponseType,
         AnySettingsContainer,
         AnyValueType,
@@ -297,10 +301,22 @@ def get_job_list_links(job_total, filters, request):
     return links
 
 
-def get_schema_query(schema, strict=True):
-    # type: (Optional[JobInputsOutputsSchemaType], bool) -> Optional[JobInputsOutputsSchemaType]
+@overload
+def get_job_io_schema_query(
+    schema,         # type: Optional[str]
+    strict=True,    # type: bool
+    default=None,   # type: JobInputsOutputsSchemaType
+):                  # type: (...) -> JobInputsOutputsSchemaType
+    ...
+
+
+def get_job_io_schema_query(
+    schema,         # type: Optional[str]
+    strict=True,    # type: bool
+    default=None,   # type: Optional[JobInputsOutputsSchemaType]
+):                  # type: (...) -> Optional[JobInputsOutputsSchemaType]
     if not schema:
-        return None
+        return default
     # unescape query (eg: "OGC+strict" becomes "OGC string" from URL parsing)
     schema_checked = cast(
         "JobInputsOutputsSchemaType",
@@ -317,6 +333,49 @@ def get_schema_query(schema, strict=True):
     if not strict:
         return schema_checked.split("+", 1)[0]
     return schema_checked
+
+
+def get_job_status_schema(request):
+    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
+    """
+    Identifies if a :term:`Job` status response schema applies for the request.
+    """
+
+    def make_headers(resolved_schema):
+        # type: (JobStatusSchemaType) -> HeadersType
+        content_type = clean_media_type_format(content_accept, strip_parameters=True)
+        content_profile = f"{content_type}; profile={resolved_schema}"
+        content_headers = {"Content-Type": content_profile}
+        if resolved_schema == JobStatusSchema.OGC:
+            content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
+        elif resolved_schema == JobStatusSchema.OPENEO:
+            content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        return content_headers
+
+    content_accept = request.accept.header_value or ContentType.APP_JSON
+    if content_accept == ContentType.ANY:
+        content_accept = ContentType.APP_JSON
+
+    params = get_request_args(request)
+    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
+    if schema:
+        headers = make_headers(schema)
+        return schema, headers
+    ctype = get_header("Accept", request.headers)
+    if not ctype:
+        return JobStatusSchema.OGC, {}
+    params = parse_kvp(ctype)
+    profile = params.get("profile")
+    if not profile:
+        schema = JobStatusSchema.OGC
+        headers = make_headers(schema)
+        return schema, headers
+    schema = cast(
+        "JobStatusSchemaType",
+        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
+    )
+    headers = make_headers(schema)
+    return schema, headers
 
 
 def make_result_link(
@@ -587,7 +646,7 @@ def get_job_results_response(
     :param results_contents: Body contents that override originally submitted job parameters when requesting results.
     """
     raise_job_dismissed(job, container)
-    raise_job_bad_status(job, container)
+    raise_job_bad_status_success(job, container)
     settings = get_settings(container)
 
     results, _ = get_results(
@@ -1080,8 +1139,12 @@ def get_job_results_multipart(job, results, *, headers, settings):
     return resp
 
 
-def get_job_submission_response(body, headers, error=False):
-    # type: (JSON, AnyHeadersContainer, bool) -> Union[HTTPOk, HTTPCreated, HTTPBadRequest]
+def get_job_submission_response(
+    body,                   # type: JSON
+    headers,                # type: AnyHeadersContainer
+    error=False,            # type: bool
+    response_class=None,    # type: Optional[Type[AnyResponseClass]]
+):                          # type: (...) -> Union[AnyResponseClass, HTTPBadRequest]
     """
     Generates the response contents returned by :term:`Job` submission process.
 
@@ -1110,16 +1173,26 @@ def get_job_submission_response(body, headers, error=False):
             http_class = HTTPBadRequest
             http_desc = sd.FailedSyncJobResponse.description
         else:
-            http_class = HTTPOk
+            http_class = response_class or HTTPOk
             http_desc = sd.CompletedJobResponse.description
             body = sd.CompletedJobStatusSchema().deserialize(body)
 
         body["description"] = http_desc
         return http_class(json=body, headerlist=headers)
 
-    body["description"] = sd.CreatedLaunchJobResponse.description
+    if status == Status.CREATED:
+        body["description"] = (
+            "Job successfully submitted for creation. "
+            "Waiting on trigger request to being execution."
+        )
+    else:
+        body["description"] = (
+            "Job successfully submitted to processing queue. "
+            "Execution should begin when resources are available."
+        )
     body = sd.CreatedJobStatusSchema().deserialize(body)
-    return HTTPCreated(json=body, headerlist=headers)
+    http_class = response_class or HTTPCreated
+    return http_class(json=body, headerlist=headers)
 
 
 def validate_service_process(request):
@@ -1200,13 +1273,42 @@ def validate_service_process(request):
     return service_name, process_name
 
 
-def raise_job_bad_status(job, container=None):
+def raise_job_bad_status_locked(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> None
+    """
+    Raise the appropriate message for :term:`Job` unable to be modified.
+    """
+    if job.status != Status.CREATED:
+        links = job.links(container=container)
+        headers = [("Link", make_link_header(link)) for link in links]
+        job_reason = ""
+        if job.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
+            job_reason = " It has already finished execution."
+        elif job.status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
+            job_reason = " It is already queued for execution."
+        elif job.status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
+            job_reason = " It is already executing."
+        raise HTTPLocked(
+            headers=headers,
+            json={
+                "title": "Job Locked for Execution",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked",
+                "detail": f"Job cannot be modified.{job_reason}",
+                "status": HTTPLocked.code,
+                "cause": {"status": job.status},
+                "links": links
+            }
+        )
+
+
+def raise_job_bad_status_success(job, container=None):
     # type: (Job, Optional[AnySettingsContainer]) -> None
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
     if job.status != Status.SUCCEEDED:
         links = job.links(container=container)
+        headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
             err_code = None
             err_info = None
@@ -1234,26 +1336,32 @@ def raise_job_bad_status(job, container=None):
                 err_code = OWSNoApplicableCode.code
                 err_info = "unknown"
             # /req/core/job-results-failed
-            raise HTTPBadRequest(json={
-                "title": "JobResultsFailed",
-                "type": err_code,
-                "detail": "Job results not available because execution failed.",
-                "status": HTTPBadRequest.code,
-                "cause": err_info,
-                "links": links
-            })
+            raise HTTPBadRequest(
+                headers=headers,
+                json={
+                    "title": "JobResultsFailed",
+                    "type": err_code,
+                    "detail": "Job results not available because execution failed.",
+                    "status": HTTPBadRequest.code,
+                    "cause": err_info,
+                    "links": links
+                }
+            )
 
         # /req/core/job-results-exception/results-not-ready
         # must use OWS instead of HTTP class to preserve provided JSON body
         # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
-        raise OWSNotFound(json={
-            "title": "JobResultsNotReady",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
-            "detail": "Job is not ready to obtain results.",
-            "status": HTTPNotFound.code,
-            "cause": {"status": job.status},
-            "links": links
-        })
+        raise OWSNotFound(
+            headers=headers,
+            json={
+                "title": "JobResultsNotReady",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
+                "detail": "Job is not ready to obtain results.",
+                "status": HTTPNotFound.code,
+                "cause": {"status": job.status},
+                "links": links
+            }
+        )
 
 
 def raise_job_dismissed(job, container=None):
@@ -1266,7 +1374,9 @@ def raise_job_dismissed(job, container=None):
         settings = get_settings(container)
         job_links = job.links(settings)
         job_links = [link for link in job_links if link["rel"] in ["status", "alternate", "collection", "up"]]
+        headers = [("Link", make_link_header(link)) for link in job_links]
         raise JobGone(
+            headers=headers,
             json={
                 "title": "JobDismissed",
                 "type": "JobDismissed",

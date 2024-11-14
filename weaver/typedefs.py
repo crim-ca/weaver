@@ -377,7 +377,11 @@ if TYPE_CHECKING:
     AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
-    AnyViewResponse = Union[PyramidResponse, WebobResponse, HTTPException, JSON]
+    AnyResponseClass = Union[PyramidResponse, WebobResponse, HTTPException]
+    AnyViewResponse = Union[AnyResponseClass, JSON]
+    AnyViewCallableContextRequest = Callable[[Any, AnyRequestType], AnyViewResponse]
+    AnyViewCallableRequestOnly = Callable[[AnyRequestType], AnyViewResponse]
+    AnyViewCallable = Union[AnyViewCallableContextRequest, AnyViewCallableRequestOnly]
     RequestMethod = Literal[
         "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE",
         "head", "get", "post", "put", "patch", "delete",
@@ -893,6 +897,14 @@ if TYPE_CHECKING:
         "schema": NotRequired[Union[str, OpenAPISchema]],
         "default": NotRequired[bool],
     }, total=False)
+    LiteralDataDomainDataType = TypedDict("LiteralDataDomainDataType", {
+        "name": Required[str]
+    })
+    LiteralDataDomainType = TypedDict("LiteralDataDomainType", {
+        "dataType": Required[LiteralDataDomainDataType],
+        "valueDefinition": NotRequired[AnyValueType],
+        "defaultValue": NotRequired[AnyValueType],
+    }, total=False)
     ProcessInputOutputItem = TypedDict("ProcessInputOutputItem", {
         "id": str,
         "title": NotRequired[str],
@@ -901,6 +913,7 @@ if TYPE_CHECKING:
         "metadata": NotRequired[List[Metadata]],
         "schema": NotRequired[OpenAPISchema],
         "formats": NotRequired[List[FormatMediaType]],
+        "literalDataDomains": NotRequired[List[LiteralDataDomainType]],
         "minOccurs": int,
         "maxOccurs": Union[int, Literal["unbounded"]],
     }, total=False)
@@ -974,6 +987,8 @@ if TYPE_CHECKING:
     }, total=True)
 
     ProcessExecution = TypedDict("ProcessExecution", {
+        "process": NotRequired[str],
+        "status": NotRequired[Literal["create"]],
         "mode": NotRequired[AnyExecuteMode],
         "response": NotRequired[AnyExecuteResponse],
         "inputs": NotRequired[ExecutionInputs],

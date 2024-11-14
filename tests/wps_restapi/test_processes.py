@@ -151,7 +151,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         to avoid extra package content-specific validations.
         """
         if not process_id:
-            process_id = self.fully_qualified_test_process_name()
+            process_id = self.fully_qualified_test_name()
         body = {
             "processDescription": {},
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
@@ -541,7 +541,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_set_jobControlOptions_async_execute(self):
         path = "/processes"
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         process_data["processDescription"]["jobControlOptions"] = [ExecuteControlOption.ASYNC]
         package_mock = mocked_process_package()
@@ -557,7 +557,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_set_jobControlOptions_sync_execute(self):
         path = "/processes"
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         process_data["processDescription"]["jobControlOptions"] = [ExecuteControlOption.SYNC]
         package_mock = mocked_process_package()
@@ -574,7 +574,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
         # deploy valid test process
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
         with contextlib.ExitStack() as stack:
@@ -669,7 +669,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
 
     def test_deploy_process_success(self):
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
@@ -684,7 +684,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
     def test_deploy_process_ogc_schema(self):
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
         process_desc = process_data["processDescription"]
         package_mock = mocked_process_package()
@@ -727,7 +727,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert resp.json["process"]["id"] == process_name
 
     def test_deploy_process_bad_name(self):
-        process_name = f"{self.fully_qualified_test_process_name()}..."
+        process_name = f"{self.fully_qualified_test_name()}..."
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
@@ -753,7 +753,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert resp.content_type == ContentType.APP_JSON
 
     def test_deploy_process_missing_or_invalid_components(self):
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
@@ -787,7 +787,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         """
         Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment.
         """
-        process_name = self.fully_qualified_test_process_name()
+        process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
@@ -2334,14 +2334,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_not_found(self):
-        name = self.fully_qualified_test_process_name()
+        name = self.fully_qualified_test_name()
         path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404, f"Error: {resp.text}"
         assert resp.content_type == ContentType.APP_JSON
 
     def test_delete_process_bad_name(self):
-        name = f"{self.fully_qualified_test_process_name()}..."
+        name = f"{self.fully_qualified_test_name()}..."
         path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, f"Error: {resp.text}"
@@ -2549,7 +2549,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert "value" not in resp.json
 
     def test_get_process_visibility_not_found(self):
-        path = f"/processes/{self.fully_qualified_test_process_name()}/visibility"
+        path = f"/processes/{self.fully_qualified_test_name()}/visibility"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON

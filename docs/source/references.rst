@@ -149,6 +149,10 @@
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
+.. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
+.. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
+.. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
 .. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
 .. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
@@ -162,6 +166,10 @@
 .. _ONNX-long: `ONNX`_
 .. |ONNX| replace:: ONNX
 .. _ONNX: https://onnx.ai/
+.. |openeo| replace:: openEO
+.. _openeo: https://openeo.org/
+.. |openeo-api| replace:: openEO API
+.. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |pywps| replace:: PyWPS
@@ -246,6 +254,14 @@
 .. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes/paths/~1processes~1{process_id}~1execution/post
 .. |exec-req-job| replace:: ``POST {WEAVER_URL}/processes/{processID}/jobs`` (Execute)
 .. _exec-req-job: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
+.. |job-exec-req| replace:: ``POST {WEAVER_URL}/jobs`` (Create)
+.. _job-exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Jobs/paths/~1jobs/post
+.. |job-update-req| replace:: ``PATCH {WEAVER_URL}/jobs/{jobID}`` (Update)
+.. _job-update-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Jobs/paths/~1jobs~1{job_id}/patch
+.. |job-trigger-req| replace:: ``POST {WEAVER_URL}/jobs{jobID}/results`` (Trigger)
+.. _job-trigger-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Jobs/paths/~1jobs~1{job_id}~1results/post
+.. |job-stats-req| replace:: ``GET {WEAVER_URL}/jobs{jobID}/statistics``
+.. _job-stats-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Jobs/paths/~1jobs~1{job_id}~1statistics/get
 .. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{processID}/visibility`` (Visibility)
 .. _vis-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1visibility%2Fput
 .. |pkg-req| replace:: ``GET {WEAVER_URL}/processes/{processID}/package`` (Package)

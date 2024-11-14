@@ -90,6 +90,7 @@ if TYPE_CHECKING:
         MutableMapping,
         NoReturn,
         Optional,
+        Sequence,
         Tuple,
         Type,
         TypeVar,
@@ -1555,7 +1556,7 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, **AnyValueType) -> str
+    # type: (str, str, **Union[AnyValueType, Sequence[AnyValueType]]) -> str
     """
     Generates the URL with Key-Value-Pairs (:term:`KVP`) query parameters.
 

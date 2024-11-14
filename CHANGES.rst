@@ -12,6 +12,27 @@ Changes
 
 Changes:
 --------
+- Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
+  (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
+- Add `CLI` operations ``update_job``, ``trigger_job`` and ``inputs`` corresponding to the required `Job` operations
+  defined by *OGC API - Processes - Part 4: Job Management*.
+- Add ``headers``, ``mode`` and ``response`` parameters along the ``inputs`` and ``outputs`` returned by
+  the ``GET /jobs/{jobID}/inputs`` endpoint to better describe the expected resolution strategy of the
+  multiple `Job` execution options according to submitted request parameters.
+- Increase flexible auto-resolution of *synchronous* vs *asynchronous* `Job` execution when no explicit strategy
+  is specified by ``mode`` body parameter or ``Prefer`` header. Situations where such flexible resolution can occur
+  will be reflected by a ``mode: auto`` and the absence of ``wait``/``respond-async`` in the ``Prefer`` header
+  within the response of the ``GET /jobs/{jobID}/inputs`` endpoint.
+- Add support "on-trigger" `Job` submission using the ``status: create`` request body parameter.
+  Such a `Job` will be pending, and can be modified by ``PATCH /jobs/{jobID}`` requests, until execution is triggered
+  by a subsequent ``POST /jobs/{jobID}/results`` request.
+- Align ``GET /jobs/{jobID}/outputs`` with requirements of *OGC API - Processes - Part 4: Job Management* endpoints
+  such that omitting the ``schema`` query parameter will automatically apply the `OGC` mapping representation by
+  default. Previous behavior was to return whichever representation that was used by the internal `Process` interface.
+- Align `Job` status and update operations with some of the `openEO` behaviors, such as supporting a `Job` ``title``
+  and allowing ``status`` to return `openEO` values when using ``profile=openeo`` in the ``Content-Type`` or using
+  the query parameter ``profile``/``schema``. The ``Content-Schema`` will also reflect the resolved representation
+  in the `Job` status response.
 - Add support of ``response: raw`` execution request body parameter as alternative to ``response: document``,
   which allows directly returning the result contents or ``Link`` headers rather then embedding them in a `JSON`
   response (fixes `#376 <https://github.com/crim-ca/weaver/issues/376>`_).

@@ -1,14 +1,21 @@
 import contextlib
 import uuid
 from copy import deepcopy
+from datetime import datetime, timedelta
 
 import mock
 import pytest
+from visibility import Visibility
 
 from tests import resources
 from tests.utils import setup_mongodb_processstore
-from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Process
-from weaver.execute import ExecuteControlOption
+from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Job, Process, Service
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteReturnPreference
+from weaver.formats import ContentType
+from weaver.status import Status
+from weaver.utils import localize_datetime, now
+
+TEST_UUID = uuid.uuid4()
 
 
 def test_package_encode_decode():
@@ -252,3 +259,179 @@ def test_process_outputs_alt():
 
     # Assert that process outputs are unchanged
     assert process.outputs[0]["formats"] == [{"mediaType": "image/tiff"}]
+
+
+@pytest.mark.parametrize(
+    ["attribute", "value", "result"],
+    [
+        ("user_id", TEST_UUID, TEST_UUID),
+        ("user_id", str(TEST_UUID), str(TEST_UUID)),
+        ("user_id", "not-a-uuid", "not-a-uuid"),
+        ("user_id", 1234, 1234),
+        ("user_id", 3.14, TypeError),
+        ("task_id", TEST_UUID, TEST_UUID),
+        ("task_id", str(TEST_UUID), TEST_UUID),
+        ("task_id", "not-a-uuid", "not-a-uuid"),
+        ("task_id", 1234, TypeError),
+        ("wps_id", TEST_UUID, TEST_UUID),
+        ("wps_id", str(TEST_UUID), TEST_UUID),
+        ("wps_id", 1234, TypeError),
+        ("wps_url", "https://example.com/wps", "https://example.com/wps"),
+        ("wps_url", 1234, TypeError),
+        ("execution_mode", ExecuteMode.ASYNC, ExecuteMode.ASYNC),
+        ("execution_mode", None, ValueError),  # "auto" required if unspecified
+        ("execution_mode", "abc", ValueError),
+        ("execution_mode", 12345, ValueError),
+        ("execution_response", ExecuteResponse.RAW, ExecuteResponse.RAW),
+        ("execution_response", None, ExecuteResponse.DOCUMENT),  # weaver's default
+        ("execution_response", "abc", ValueError),
+        ("execution_response", 12345, ValueError),
+        ("execution_return", ExecuteReturnPreference.REPRESENTATION, ExecuteReturnPreference.REPRESENTATION),
+        ("execution_return", None, ExecuteReturnPreference.MINIMAL),  # weaver's default
+        ("execution_return", "abc", ValueError),
+        ("execution_return", 12345, ValueError),
+        ("execution_wait", 1234, 1234),
+        ("execution_wait", None, None),
+        ("execution_wait", "abc", ValueError),
+        ("is_local", True, True),
+        ("is_local", 1, TypeError),
+        ("is_local", None, TypeError),
+        ("is_workflow", True, True),
+        ("is_workflow", 1, TypeError),
+        ("is_workflow", None, TypeError),
+        ("created", "2024-01-02", localize_datetime(datetime(year=2024, month=1, day=2))),
+        ("created", datetime(year=2024, month=1, day=2), localize_datetime(datetime(year=2024, month=1, day=2))),
+        ("created", "abc", ValueError),
+        ("created", 12345, TypeError),
+        ("updated", "2024-01-02", localize_datetime(datetime(year=2024, month=1, day=2))),
+        ("updated", datetime(year=2024, month=1, day=2), localize_datetime(datetime(year=2024, month=1, day=2))),
+        ("updated", "abc", ValueError),
+        ("updated", 12345, TypeError),
+        ("service", Service(name="test", url="https://example.com/wps"), "test"),
+        ("service", "test", "test"),
+        ("service", 1234, TypeError),
+        ("service", None, TypeError),
+        ("process", Process(id="test", package={}), "test"),
+        ("process", "test", "test"),
+        ("process", 1234, TypeError),
+        ("process", None, TypeError),
+        ("progress", "test", TypeError),
+        ("process", None, TypeError),
+        ("progress", 123, ValueError),
+        ("progress", -20, ValueError),
+        ("progress", 50, 50),
+        ("progress", 2.5, 2.5),
+        ("statistics", {}, {}),
+        ("statistics", None, TypeError),
+        ("statistics", 1234, TypeError),
+        ("exceptions", [], []),
+        ("exceptions", {}, TypeError),
+        ("exceptions", "error", TypeError),
+        ("exceptions", None, TypeError),
+        ("exceptions", 1234, TypeError),
+        ("results", [], []),
+        ("results", None, TypeError),
+        ("results", 1234, TypeError),
+        ("logs", [], []),
+        ("logs", "info", TypeError),
+        ("logs", None, TypeError),
+        ("logs", 1234, TypeError),
+        ("tags", [], []),
+        ("tags", "test", TypeError),
+        ("tags", None, TypeError),
+        ("tags", 1234, TypeError),
+        ("title", "test", "test"),
+        ("title", None, None),
+        ("title", TypeError, TypeError),
+        ("title", 1234, TypeError),
+        ("status", Status.SUCCEEDED, Status.SUCCEEDED),
+        ("status", 12345678, ValueError),
+        ("status", "random", ValueError),
+        ("status_message", None, "no message"),
+        ("status_message", "test", "test"),
+        ("status_message", 123456, TypeError),
+        ("status_location", f"https://example.com/jobs/{TEST_UUID}", f"https://example.com/jobs/{TEST_UUID}"),
+        ("status_location", None, TypeError),
+        ("status_location", 123456, TypeError),
+        ("accept_type", None, TypeError),
+        ("accept_type", 123456, TypeError),
+        ("accept_type", ContentType.APP_JSON, ContentType.APP_JSON),
+        ("accept_language", None, TypeError),
+        ("accept_language", 123456, TypeError),
+        ("accept_language", "en", "en"),
+        ("access", Visibility.PRIVATE, Visibility.PRIVATE),
+        ("access", 12345678, ValueError),
+        ("access", "random", ValueError),
+        ("access", None, ValueError),
+        ("context", "test", "test"),
+        ("context", None, None),
+        ("context", 1234, TypeError),
+    ]
+)
+def test_job_attribute_setter(attribute, value, result):
+    job = Job(task_id="test")
+    if isinstance(result, type) and issubclass(result, Exception):
+        with pytest.raises(result):
+            setattr(job, attribute, value)
+    else:
+        setattr(job, attribute, value)
+        assert job[attribute] == result
+
+
+@pytest.mark.parametrize(
+    ["value", "result"],
+    [
+        (TEST_UUID, TEST_UUID),
+        (str(TEST_UUID), TEST_UUID),
+        ("not-a-uuid", ValueError),
+        (12345, TypeError),
+
+    ]
+)
+def test_job_id(value, result):
+    if isinstance(result, type) and issubclass(result, Exception):
+        with pytest.raises(result):
+            Job(task_id="test", id=value)
+    else:
+        job = Job(task_id="test", id=value)
+        assert job.id == result
+
+
+def test_job_updated_auto():
+    min_dt = now()
+    job = Job(task_id="test")
+    update_dt = job.updated
+    assert isinstance(update_dt, datetime)
+    assert update_dt > min_dt
+    assert update_dt == job.updated, "Updated time auto generated should have been set to avoid always regenerating it."
+
+
+def test_job_updated_status():
+    created = now()
+    started = now() + timedelta(seconds=1)
+    finished = now() + timedelta(seconds=2)
+    # date-times cannot be set in advance in job,
+    # otherwise 'updated' detects and returns them automatically
+    job = Job(task_id="test")
+    job.created = created
+    job.status = Status.ACCEPTED
+    assert job.updated == created
+    job["updated"] = None  # reset to test auto resolve
+    job.started = started
+    job.status = Status.STARTED
+    assert job.updated == started
+    job["updated"] = None  # reset to test auto resolve
+    job.finished = finished
+    job.status = Status.SUCCEEDED
+    assert job.updated == finished
+
+
+def test_job_execution_wait_ignored_async():
+    job = Job(task_id="test", execution_wait=1234, execution_mode=ExecuteMode.ASYNC)
+    assert job.execution_mode == ExecuteMode.ASYNC
+    assert job.execution_wait is None, "Because of async explicitly set, wait time does not apply"
+
+
+def test_job_display():
+    job = Job(task_id=TEST_UUID, id=TEST_UUID)
+    assert str(job) == f"Job <{TEST_UUID}>"

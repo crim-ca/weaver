@@ -3,33 +3,60 @@ from typing import TYPE_CHECKING
 from box import Box
 from celery.utils.log import get_task_logger
 from colander import Invalid
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnprocessableEntity
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPNoContent,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPPermanentRedirect,
+    HTTPUnprocessableEntity,
+    HTTPUnsupportedMediaType
+)
 
+from weaver import xml_util
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
-from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format, repr_json
+from weaver.execute import parse_prefer_header_execute_mode, rebuild_prefer_header
+from weaver.formats import (
+    ContentType,
+    OutputFormat,
+    add_content_type_charset,
+    clean_media_type_format,
+    guess_target_format,
+    repr_json
+)
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.execution import (
+    submit_job,
+    submit_job_dispatch_task,
+    submit_job_dispatch_wps,
+    update_job_parameters
+)
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
+from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_value, get_settings
+from weaver.utils import get_any_value, get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
     get_job,
+    get_job_io_schema_query,
     get_job_list_links,
     get_job_output_transmission,
     get_job_possible_output_formats,
     get_job_results_response,
     get_job_results_single,
+    get_job_status_schema,
     get_results,
-    get_schema_query,
-    raise_job_bad_status,
+    raise_job_bad_status_locked,
+    raise_job_bad_status_success,
     raise_job_dismissed,
     validate_service_process
 )
+from weaver.wps_restapi.providers.utils import get_service
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
 
 if TYPE_CHECKING:
@@ -182,24 +209,145 @@ def get_queried_jobs(request):
     return Box(body)
 
 
+@sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS],
+    content_type=list(ContentType.ANY_XML),
+    schema=sd.PostJobsEndpointXML(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+@sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
+    content_type=ContentType.APP_JSON,
+    schema=sd.PostJobsEndpointJSON(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+def create_job(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Create a new processing job with advanced management and execution capabilities.
+    """
+    proc_key = "process"
+    proc_url = None
+    proc_id = None
+    prov_id = None
+    try:
+        ctype = get_header("Content-Type", request.headers, default=ContentType.APP_JSON)
+        ctype = clean_media_type_format(ctype, strip_parameters=True)
+        if ctype == ContentType.APP_JSON and "process" in request.json_body:
+            proc_url = request.json_body["process"]
+            proc_url = sd.ProcessURL().deserialize(proc_url)
+            prov_url, proc_id = proc_url.rsplit("/processes/", 1)
+            prov_parts = prov_url.rsplit("/providers/", 1)
+            prov_id = prov_parts[-1] if len(prov_parts) > 1 else None
+        elif ctype in ContentType.ANY_XML:
+            proc_key = "ows:Identifier"
+            body_xml = xml_util.fromstring(request.text)
+            proc_id = body_xml.xpath(proc_key, namespaces=body_xml.getroottree().nsmap)[0].text
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "title": "NoSuchProcess",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "detail": "Process URL or identifier reference could not be parsed.",
+            "status": HTTPBadRequest.code,
+            "cause": {"in": "body", proc_key: repr_json(proc_url, force_string=False)}
+        }) from exc
+
+    if ctype in ContentType.ANY_XML:
+        process = get_process(process_id=proc_id)
+        return submit_job_dispatch_wps(request, process)
+
+    if prov_id:
+        ref = get_service(request, provider_id=prov_id)
+    else:
+        ref = get_process(process_id=proc_id)
+        proc_id = None  # ensure ref is used, process ID needed only for provider
+    return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+
+
+@sd.jobs_service.post()
+def create_job_unsupported_media_type(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Handle the case where no ``content_type`` was matched for decorated service handlers on :func:`create_job`.
+
+    This operation must be defined with a separate service decorator allowing "any" ``content_type`` because
+    match by ``content_type`` is performed prior to invoking the applicable decorated view function.
+    Therefore, using a custom ``error_handler`` on the decorators of :func:`create_job` would never be invoked
+    since their preconditions would never be encountered. Decorated views that provide a ``content_type`` explicitly
+    are prioritized. Therefore, this will match any fallback ``content_type`` not already defined by another decorator.
+
+    .. warning::
+        It is very important that this is defined after :func:`create_job` such that its docstring is employed for
+        rendering the :term:`OpenAPI` definition instead of this docstring.
+    """
+    ctype = get_header("Content-Type", request.headers)
+    return HTTPUnsupportedMediaType(
+        json={
+            "title": "Unsupported Media Type",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "detail": "Process URL or identifier reference missing or invalid.",
+            "status": HTTPUnsupportedMediaType.code,
+            "cause": {"in": "headers", "name": "Content-Type", "value": ctype},
+        }
+    )
+
+
+@sd.process_results_service.post(
+    tags=[sd.TAG_JOBS, sd.TAG_EXECUTE, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobResultsTriggerExecutionEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_job_results_responses,
+)
+@sd.job_results_service.post(
+    tags=[sd.TAG_JOBS, sd.TAG_EXECUTE, sd.TAG_RESULTS],
+    schema=sd.JobResultsTriggerExecutionEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_job_results_responses,
+)
+def trigger_job_execution(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Trigger the execution of a previously created job.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_locked(job, request)
+    return submit_job_dispatch_task(job, container=request, force_submit=True)
+
+
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
-    schema=sd.ProviderJobEndpoint(),
-    accept=ContentType.APP_JSON,
+    schema=sd.GetProviderJobEndpoint(),
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_prov_single_job_status_responses,
 )
 @sd.process_job_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetProcessJobEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
-    schema=sd.JobEndpoint(),
-    accept=ContentType.APP_JSON,
+    schema=sd.GetJobEndpoint(),
+    accept=[ContentType.APP_JSON] + [
+        f"{ContentType.APP_JSON}; profile={profile}"
+        for profile in JobStatusSchema.values()
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -210,13 +358,51 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    job_status = job.json(request)
-    return HTTPOk(json=job_status)
+    job_body = job.json(request)
+    schema, headers = get_job_status_schema(request)
+    if schema == JobStatusSchema.OPENEO:
+        job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
+    return HTTPOk(json=job_body, headers=headers)
+
+
+@sd.provider_job_service.patch(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS],
+    schema=sd.PatchProviderJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_provider_job_responses,
+)
+@sd.process_job_service.patch(
+    tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
+    schema=sd.PatchProcessJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_process_job_responses,
+)
+@sd.job_service.patch(
+    tags=[sd.TAG_JOBS],
+    schema=sd.PatchJobEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.patch_job_responses,
+)
+def update_pending_job(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Update a previously created job still pending execution.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_locked(job, request)
+    update_job_parameters(job, request)
+    links = job.links(request, self_link="status")
+    headers = [("Link", make_link_header(link)) for link in links]
+    return HTTPNoContent(headers=headers)
 
 
 @sd.provider_job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS],
-    schema=sd.ProviderJobEndpoint(),
+    schema=sd.DeleteProviderJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.delete_prov_job_responses,
@@ -230,7 +416,7 @@ def get_job_status(request):
 )
 @sd.job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS],
-    schema=sd.JobEndpoint(),
+    schema=sd.DeleteJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.delete_job_responses,
@@ -340,17 +526,30 @@ def get_job_inputs(request):
     Retrieve the inputs values and outputs definitions of a job.
     """
     job = get_job(request)
-    schema = get_schema_query(request.params.get("schema"), strict=False)
+    schema = get_job_io_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
     job_inputs = job.inputs
     job_outputs = job.outputs
     if job.is_local:
         process = get_process(job.process, request=request)
         job_inputs = mask_process_inputs(process.package, job_inputs)
-    if schema:
-        job_inputs = convert_input_values_schema(job_inputs, schema)
-        job_outputs = convert_output_params_schema(job_outputs, schema)
-    body = {"inputs": job_inputs, "outputs": job_outputs}
-    body.update({"links": job.links(request, self_link="inputs")})
+    job_inputs = convert_input_values_schema(job_inputs, schema)
+    job_outputs = convert_output_params_schema(job_outputs, schema)
+    job_prefer = rebuild_prefer_header(job)
+    job_mode, _, _ = parse_prefer_header_execute_mode({"Prefer": job_prefer}, return_auto=True)
+    job_headers = {
+        "Accept": job.accept_type,
+        "Accept-Language": job.accept_language,
+        "Prefer": job_prefer,
+        "X-WPS-Output-Context": job.context,
+    }
+    body = {
+        "mode": job_mode,
+        "response": job.execution_response,
+        "inputs": job_inputs,
+        "outputs": job_outputs,
+        "headers": job_headers,
+        "links": job.links(request, self_link="inputs"),
+    }
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)
 
@@ -384,8 +583,8 @@ def get_job_outputs(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    raise_job_bad_status(job, request)
-    schema = get_schema_query(request.params.get("schema"))
+    raise_job_bad_status_success(job, request)
+    schema = get_job_io_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
     links = job.links(request, self_link="outputs")
@@ -432,7 +631,7 @@ def get_job_output(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    raise_job_bad_status(job, request)
+    raise_job_bad_status_success(job, request)
     settings = get_settings(request)
     output_id = request.matchdict.get("output_id")
     # Get requested media-type. "*/*" if omit
