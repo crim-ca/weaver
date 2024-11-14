@@ -12,8 +12,14 @@ from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
-from weaver.processes.convert import get_cwl_io_type
+from weaver.processes.constants import (
+    PACKAGE_COMPLEX_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
+    PACKAGE_FILE_TYPE,
+    JobInputsOutputsSchema,
+    OpenSearchField
+)
+from weaver.processes.convert import convert_input_values_schema, get_cwl_io_type
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -43,7 +49,6 @@ if TYPE_CHECKING:
         CookiesTupleType,
         CWL_ExpectedOutputs,
         CWL_Output_Type,
-        CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
         JobCustomInputs,
         JobCustomOutputs,
@@ -103,7 +108,7 @@ class WpsProcessInterface(abc.ABC):
 
     def execute(
         self,
-        workflow_inputs,    # type: Union[CWL_RuntimeInputsMap, JobCustomInputs]
+        workflow_inputs,    # type: Union[CWL_WorkflowInputs, JobCustomInputs]
         out_dir,            # type: str
         expected_outputs,   # type: Union[CWL_ExpectedOutputs, JobCustomOutputs]
     ):                      # type: (...) -> JobOutputs
@@ -169,7 +174,7 @@ class WpsProcessInterface(abc.ABC):
 
     def prepare(  # noqa: B027  # intentionally not an abstract method to allow no-op
         self,
-        workflow_inputs,    # type: Union[CWL_RuntimeInputsMap, JobCustomInputs]
+        workflow_inputs,    # type: Union[CWL_WorkflowInputs, JobCustomInputs]
         expected_outputs,   # type: Union[CWL_ExpectedOutputs, JobCustomOutputs]
     ):                      # type: (...) -> None
         """
@@ -402,6 +407,7 @@ class WpsProcessInterface(abc.ABC):
         Retrieves inputs for local staging if required for the following :term:`Job` execution.
         """
         execute_body_inputs = []
+        workflow_inputs = convert_input_values_schema(workflow_inputs, JobInputsOutputsSchema.OGC)
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if not isinstance(workflow_input_value, list):
                 workflow_input_value = [workflow_input_value]
