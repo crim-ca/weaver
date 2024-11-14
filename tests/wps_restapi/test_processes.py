@@ -56,11 +56,15 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple
+    from typing import List, Optional, Tuple, TypeAlias
     from typing_extensions import Literal
+
+    import _pytest  # noqa: W0212
 
     from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+
+    Marker: TypeAlias = "_pytest.mark.structures.Mark"  # noqa
 
 
 # noinspection PyTypeHints
@@ -96,13 +100,15 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     """
     yield caplog  # run the test and collect logs from it
 
-    marker = list(filter(
-        lambda _marker:
-            _marker.name == "parametrize"
-            and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,
-        request.keywords.get("pytestmark", [])
-    ))[0]  # type: "_pytest.mark.structures.Mark"
-    cwl_hint = marker.args[1][0]
+    markers = list(
+        filter(
+            lambda _marker:
+                _marker.name == "parametrize"
+                and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,  # noqa
+            request.keywords.get("pytestmark", [])
+        )
+    )  # type: List[Marker]
+    cwl_hint = markers[0].args[1][0]
 
     log_records = caplog.get_records(when="call")
     warn_hint = re.compile(rf".*unknown hint .*{cwl_hint}.*", re.IGNORECASE)
