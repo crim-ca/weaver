@@ -184,11 +184,12 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
 
         # STAC client can be-process filters and sorting server-side
         # only perform the remaining properties modifier operations locally
-        col_field_modifier = None
         if col_properties:
             def col_field_modifier(stac_feat_col):
                 for _feat in stac_feat_col.get("features", []):
                     process_field_modifiers(_feat, properties=col_properties)
+        else:
+            col_field_modifier = None
 
         search = ItemSearch(
             url=f"{api_url}/search",
