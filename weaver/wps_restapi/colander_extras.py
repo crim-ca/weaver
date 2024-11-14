@@ -799,6 +799,8 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):  # 
 
     @staticmethod
     def _validate(node):
+        if isinstance(node, colander.deferred):
+            return
         if node.default and node.validator not in [colander.null, None]:
             try:
                 node.validator(node, node.default)
@@ -1986,25 +1988,19 @@ class KeywordMapper(ExtendedMappingSchema):
         """
         self.bindings = kw  # pylint: disable=W0201  # false-positive - property exists in colander SchemaNode meta-type
         children = self.get_keyword_items()
-        for child in children:
-            child._bind(kw)
+        for idx, child in enumerate(list(children)):
+            if hasattr(child, "_bind"):
+                child._bind(kw)
+            elif isinstance(child, colander.deferred):
+                v = child(self, kw)
+                if isinstance(v, colander.SchemaNode):
+                    children[idx] = v
         names = dir(self)
         for k in names:
             v = getattr(self, k)
             if isinstance(v, colander.deferred):
                 v = v(self, kw)
-                if isinstance(v, colander.SchemaNode):
-                    if not v.name:
-                        v.name = k
-                    if v.raw_title is colander._marker:
-                        v.title = k.replace("_", " ").title()
-                    for idx, node in enumerate(list(children)):
-                        if node.name == v.name:
-                            children[idx] = v
-                        else:
-                            children.append(v)
-                else:
-                    setattr(self, k, v)
+                setattr(self, k, v)
         if getattr(self, "after_bind", None):
             self.after_bind(self, kw)  # pylint: disable=E1102  # defined as colander SchemaNode attribute in meta-type
 
