@@ -62,19 +62,16 @@ def get_file_extension(filename, dot=True):
 
 def write_images(images, output_file, ext="png"):
     with tempfile.TemporaryDirectory() as tmp_path:
-        imgs = []
+        img_paths = []
         for i, img in enumerate(images):
-            img_path = f"{os.path.join(tmp_path, str(i).zfill(4))}.{ext}"
+            img_path = os.path.join(tmp_path, f"{str(i).zfill(4)}.{ext}")
             img.save(img_path)
-            imgs.append(img)
-
-        if len(imgs) > 1:
+            img_paths.append(img_path)
+        if len(img_paths) > 1:
             if not output_file.endswith(".tar.gz"):
                 output_file += ".tar.gz"
-
             with tarfile.open(output_file, "w:gz") as tar:
-                for file_name in os.listdir(tmp_path):
-                    path = os.path.join(tmp_path, file_name)
-                    tar.add(path, arcname=file_name)
+                for img_path in img_paths:
+                    tar.add(img_path, arcname=os.path.basename(img_path))
         else:
-            shutil.copy(imgs[0], output_file)
+            shutil.copy(img_paths[0], output_file)
