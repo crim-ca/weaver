@@ -1380,15 +1380,16 @@ def make_link_header(
         Parameter :paramref:`rel` is optional to allow unpacking with a single parameter,
         but its value is required to form a valid ``Link`` header.
     """
+    params = {}
     if isinstance(href, dict):
-        rel = rel or href.get("rel")
-        type = type or href.get("type")  # noqa
-        title = title or href.get("title")
-        charset = charset or href.get("charset")  # noqa
-        hreflang = hreflang or href.get("hreflang")
+        rel = rel or href.pop("rel", None)
+        type = type or href.pop("type", None)  # noqa
+        title = title or href.pop("title", None)
+        charset = charset or href.pop("charset", None)  # noqa
+        hreflang = hreflang or href.pop("hreflang", None)
         params = {key: val for key, val in href.items() if val and isinstance(val, str)}
-        kwargs.update(params)
-        href = href["href"]
+        href = params.pop("href", None)
+    params.update(kwargs)
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""
@@ -1398,8 +1399,8 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
-    if kwargs:
-        for key, val in kwargs.items():
+    if params:
+        for key, val in params.items():
             link += f"; {key}={val}"
     return link
 

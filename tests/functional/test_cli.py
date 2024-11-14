@@ -1650,7 +1650,8 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert os.path.isfile(path), "Original file results should exist in job output dir."
 
             # path should be in contents as well, pre-resolved within download dir (not same as job output dir)
-            assert len([line for line in content if "path:" in line]) == 1
+            # path is also found as an output link in contents
+            assert len([line for line in content if "path:" in line]) == 2
             path = None
             for line in content:
                 if "path:" in line:

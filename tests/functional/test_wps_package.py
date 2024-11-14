@@ -4119,9 +4119,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type is None
         assert results.headers["Content-Location"] == results_href
         assert ("Link", output_data_link) in results.headerlist
+        rel_pattern = re.compile(r"rel=\"([^\"]+)\"")
         assert not any(
-            any(out_id in link[-1] for out_id in ["output_json", "output_text"])
-            for link in results.headerlist if link[0] == "Link"
+            any(out_id in rel_pattern.search(link[1]).group(1) for out_id in ["output_json", "output_text"])
+            for link in results.headerlist if link[0] == "Link" and rel_pattern.search(link[1])
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)

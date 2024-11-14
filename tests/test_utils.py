@@ -78,6 +78,7 @@ from weaver.utils import (
     is_valid_url,
     localize_datetime,
     make_dirs,
+    make_link_header,
     null,
     parse_kvp,
     parse_number_with_unit,
@@ -2329,3 +2330,23 @@ def test_create_metalink():
         )
         assert req_mock.calls[0].request.url == tmp_href4
         assert req_mock.calls[1].request.url == tmp_href5
+
+
+@pytest.mark.parametrize(
+    "href, kwargs, expected",
+    [
+        # Test case where `output` is only in href dictionary
+        ({"href": "https://example.com", "rel": "self", "id": "output"}, {},
+         "<https://example.com>; rel=\"self\"; id=output"),
+
+        # Test case where `output` is only in kwargs
+        ("https://example.com", {"rel": "self", "id": "output"},
+         "<https://example.com>; rel=\"self\"; id=output"),
+
+        # Test case where `output2` in kwargs should override dict
+        ({"href": "https://example.com", "rel": "self", "id": "output"}, {"id": "output2"},
+         "<https://example.com>; rel=\"self\"; id=output2"),
+    ]
+)
+def test_make_link_header(href, kwargs, expected):
+    assert make_link_header(href, **kwargs) == expected
