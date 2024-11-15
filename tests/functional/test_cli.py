@@ -450,7 +450,8 @@ class TestWeaverClient(TestWeaverClientBase):
         for out_fmt in output_formats:
             out_fmt.pop("$schema", None)
             out_fmt.pop("$id", None)
-        assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN}]
+        assert output_formats == [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                                  {"mediaType": ContentType.TEXT_HTML}, {"mediaType": ContentType.APP_PDF}]
         assert "undefined" not in result.message, "CLI should not have confused process description as response detail."
         assert result.body["description"] == (
             "Dummy process that simply echo's back the input message for testing purposes."
@@ -1745,7 +1746,8 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert os.path.isfile(path), "Original file results should exist in job output dir."
 
             # path should be in contents as well, pre-resolved within download dir (not same as job output dir)
-            assert len([line for line in content if "path:" in line]) == 1
+            # path is also found as an output link in contents
+            assert len([line for line in content if "path:" in line]) == 2
             path = None
             for line in content:
                 if "path:" in line:

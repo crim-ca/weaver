@@ -151,7 +151,6 @@ if TYPE_CHECKING:
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
-
 WEAVER_CONFIG_REMOTE_LIST = f"[{', '.join(WeaverFeature.REMOTE)}]"
 
 API_TITLE = "Weaver REST API"
@@ -300,7 +299,6 @@ for _name in os.listdir(SCHEMA_EXAMPLE_DIR):
         else:
             EXAMPLES[_name] = f.read()
 
-
 #########################################################
 # API tags
 #########################################################
@@ -346,8 +344,11 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
+job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
 job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
+job_output_service = Service(name="job_output", path=f"{job_outputs_service.path}/{{output_id}}")
+
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
 job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
@@ -363,8 +364,11 @@ process_payload_service = Service(name="process_payload", path=f"{process_servic
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
+process_result_value_service = Service(name="process_result_value", path=process_service.path +
+                                       job_result_value_service.path)
 process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
+process_output_service = Service(name="process_output", path=process_service.path + job_output_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
@@ -378,8 +382,11 @@ provider_process_package_service = Service(name="provider_process_pkg", path=f"{
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
+provider_result_value_service = Service(name="provider_result_value", path=provider_service.path +
+                                        process_result_value_service.path)
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
+provider_output_service = Service(name="provider_output", path=provider_service.path + process_output_service.path)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
@@ -393,6 +400,7 @@ provider_result_service = Service(name="provider_result", path=provider_service.
 
 vault_service = Service(name="vault", path="/vault")
 vault_file_service = Service(name="vault_file", path=f"{vault_service.path}/{{file_id}}")
+
 
 #########################################################
 # Generic schemas
@@ -427,6 +435,13 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class URN(ExtendedSchemaNode):
+    schema_type = String
+    description = "Universal ressource name."
+    example = "urn:ogc:def:objectType:authority:version:code"
+    pattern = re.compile(r"^urn\:[A-Za-z0-9]+(:[A-Za-z0-9]+)+$")
 
 
 class URI(ExtendedSchemaNode):
@@ -646,6 +661,14 @@ class AcceptHeader(ExtendedSchemaNode):
     default = ContentType.APP_JSON  # defaults to JSON for easy use within browsers
 
 
+class AcceptAnyHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Accept"
+    schema_type = String
+    missing = drop
+
+
 class AcceptLanguageHeader(ExtendedSchemaNode):
     # ok to use 'name' in this case because target 'key' in the mapping must
     # be that specific value but cannot have a field named with this format
@@ -721,6 +744,13 @@ class RequestHeaders(ExtendedMappingSchema):
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
     content_type = RequestContentTypeHeader()
+
+
+class RequestAnyHeaders(RequestHeaders):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
+    accept = AcceptAnyHeader()
 
 
 class ResponseHeaders(ExtendedMappingSchema):
@@ -808,8 +838,9 @@ class FileResponseHeaders(NoContent):
     content_type = ContentTypeHeader(example=ContentType.APP_JSON)
     content_length = ContentLengthHeader()
     content_disposition = ContentDispositionHeader()
-    date = DateHeader()
-    last_modified = LastModifiedHeader()
+    content_location = ReferenceURL()
+    date = DateHeader(missing=drop)
+    last_modified = LastModifiedHeader(missing=drop)
 
 
 class AccessToken(ExtendedSchemaNode):
@@ -861,8 +892,14 @@ class LinkRelationshipType(OneOfKeywordSchema):
             "Relationship of the link to the current content. "
             "This should be one item amongst registered relations https://www.iana.org/assignments/link-relations/."
         )),
-        URL(description="Fully qualified extension link relation to the current content.")
+        URL(description="Fully qualified extension link relation to the current content."),
     ]
+
+
+class LinkId(ExtendedMappingSchema):
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4 (Target Attributes)
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4.2 (Extension Attributes)
+    id = SLUG(name="id", missing=drop)
 
 
 class LinkRelationship(ExtendedMappingSchema):
@@ -874,7 +911,8 @@ class LinkBase(LinkLanguage, MetadataBase):
     type = MediaType(description="IANA identifier of content-type located at the link.", missing=drop)
 
 
-class Link(LinkRelationship, LinkBase):
+class Link(LinkRelationship, LinkBase, LinkId):
+    # https://datatracker.ietf.org/doc/html/rfc2068#section-19.6.2.4 (Link Header)
     _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/link.json"
     _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 
@@ -1118,8 +1156,8 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 class Content(ExtendedMappingSchema):
     href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
-                        default=drop,       # if invalid, drop it completely,
-                        missing=required,   # but still mark as 'required' for parent objects
+                        default=drop,  # if invalid, drop it completely,
+                        missing=required,  # but still mark as 'required' for parent objects
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
@@ -1802,8 +1840,8 @@ class AllowedRangesList(ExtendedSequenceSchema):
 class AllowedValues(OneOfKeywordSchema):
     _one_of = [
         AllowedRangesList(description="List of value ranges and constraints."),  # array of {range}
-        AllowedValuesList(description="List of enumerated allowed values."),     # array of "value"
-        ExtendedSchemaNode(String(), description="Single allowed value."),       # single "value"
+        AllowedValuesList(description="List of enumerated allowed values."),  # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),  # single "value"
     ]
 
 
@@ -2398,8 +2436,8 @@ class QuotePath(ExtendedMappingSchema):
     quote_id = UUID(description="Quote ID")
 
 
-class ResultPath(ExtendedMappingSchema):
-    result_id = UUID(description="Result ID")
+class OutputPath(ExtendedMappingSchema):
+    output_id = UUID(description="Output ID")
 
 
 #########################################################
@@ -3130,7 +3168,7 @@ class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
     svc_loc = WPSServiceInstanceAttribute()
     process = WPSProcessSummary()
     status = WPSStatus()
-    inputs = WPSDataInputs(missing=drop)          # when lineage is requested only
+    inputs = WPSDataInputs(missing=drop)  # when lineage is requested only
     out_def = WPSOutputDefinitions(missing=drop)  # when lineage is requested only
     outputs = WPSProcessOutputs()
 
@@ -3298,6 +3336,38 @@ class GetJobEndpoint(JobPath):
     querystring = GetJobQuery()
 
 
+class OutputEndpoint(OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ResultValueEndpoint(OutputEndpoint):
+    pass
+
+
+class JobAnyOutputEndpoint(JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class JobResultValueEndpoint(JobAnyOutputEndpoint):
+    pass
+
+
+class ProcessAnyOutputEndpoint(LocalProcessPath, JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ProcessResultValueEndpoint(ProcessAnyOutputEndpoint):
+    pass
+
+
+class ProviderAnyOutputEndpoint(ProviderProcessPath, LocalProcessPath, JobPath, OutputPath):
+    header = RequestAnyHeaders()
+
+
+class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
+    pass
+
+
 class ProcessInputsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
 
@@ -3359,12 +3429,27 @@ class JobOutputsEndpoint(JobPath):
     querystring = LocalProcessJobResultsQuery()
 
 
+class JobOutputEndpoint(JobPath):
+    header = RequestHeaders()
+    querystring = LocalProcessJobResultsQuery()
+
+
 class ProcessOutputsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeaders()
     querystring = LocalProcessJobResultsQuery()
 
 
+class ProcessOutputEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = LocalProcessJobResultsQuery()
+
+
 class ProviderOutputsEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeaders()
+    querystring = JobResultsQuery()
+
+
+class ProviderOutputEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeaders()
     querystring = JobResultsQuery()
 
@@ -3496,7 +3581,7 @@ class ExecuteOutputMapAdditionalProperties(ExtendedMappingSchema):
 class ExecuteOutputSpecMap(AnyOfKeywordSchema):
     _any_of = [
         ExecuteOutputMapAdditionalProperties(),  # normal {"<output-id>": {...}}
-        EmptyMappingSchema(),                    # allows explicitly provided {}
+        EmptyMappingSchema(),  # allows explicitly provided {}
     ]
 
 
@@ -4186,7 +4271,7 @@ class ExecuteInputMapAdditionalProperties(StrictMappingSchema):
 class ExecuteInputMapValues(AnyOfKeywordSchema):
     _any_of = [
         ExecuteInputMapAdditionalProperties(),  # normal {"<input-id>": {...}}
-        EmptyMappingSchema(),                   # allows explicitly provided {}
+        EmptyMappingSchema(),  # allows explicitly provided {}
     ]
 
 
@@ -6179,6 +6264,12 @@ class JobStatisticsSchema(ExtendedMappingSchema):
     process = ProcessStatisticsSchema(missing=drop)
     outputs = OutputStatisticsMap(missing=drop)
 
+# todo check
+# class JobtransformerSchema(ExtendedMappingSchema):
+#     application = ApplicationStatisticsSchema(missing=drop)
+#     process = ProcessStatisticsSchema(missing=drop)
+#     outputs = OutputStatisticsMap(missing=drop)
+
 
 class FrontpageParameterSchema(ExtendedMappingSchema):
     name = ExtendedSchemaNode(String(), example="api")
@@ -7497,6 +7588,11 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
     body = NoContent(default="")
 
 
+class JobResultsContentResponse(ExtendedMappingSchema):
+    header = FileResponseHeaders()
+    body = ResultData(default="")
+
+
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
@@ -8069,6 +8165,25 @@ get_prov_outputs_responses = copy(get_job_outputs_responses)
 get_prov_outputs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+
+get_job_output_responses = {
+    "200": OkGetJobOutputsResponse(description="success", examples={
+        "JobOutput": {
+            "summary": "Obtained wanted job value following process execution.",
+            "value": "Depending on media-type",
+        }
+    }),
+    "400": InvalidJobResponseSchema(),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_output_responses = copy(get_job_output_responses)
+get_prov_output_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+
 get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
@@ -8091,6 +8206,24 @@ get_prov_results_responses = copy(get_job_results_responses)
 get_prov_results_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+
+get_job_result_responses = {
+    "200": JobResultsContentResponse(description="success by value"),
+    "204": NoContentJobResultsResponse(description="success by reference"),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_result_responses = copy(get_job_result_responses)
+get_prov_result_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+
+get_proc_result_responses = get_job_result_responses
+
+
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
         "JobExceptions": {
@@ -8145,6 +8278,25 @@ get_prov_stats_responses = copy(get_stats_responses)
 get_prov_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+
+# get_job_transformer_responses = {
+#     "200": OkGetJobtransformerResponse(description="success", examples={
+#         "JobTransformer": {
+#             "summary": "Obtained possible output format.",
+#             "value": EXAMPLES["job_transformer.json"],
+#         }
+#     }),
+#     "400": InvalidJobResponseSchema(),
+#     "404": NotFoundJobResponseSchema(),
+#     "405": MethodNotAllowedErrorResponseSchema(),
+#     "410": GoneJobResponseSchema(),
+#     "500": InternalServerErrorResponseSchema(),
+# }
+# get_prov_transformer_responses = copy(get_job_transformer_responses)
+# get_prov_transformer_responses.update({
+#     "403": ForbiddenProviderLocalResponseSchema(),
+# })
+
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),

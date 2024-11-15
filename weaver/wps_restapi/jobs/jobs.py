@@ -6,6 +6,7 @@ from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPNoContent,
+    HTTPNotFound,
     HTTPOk,
     HTTPPermanentRedirect,
     HTTPUnprocessableEntity,
@@ -37,14 +38,17 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_header, get_settings, make_link_header
+from weaver.utils import get_any_value, get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
     get_job,
     get_job_io_schema_query,
     get_job_list_links,
+    get_job_output_transmission,
+    get_job_possible_output_formats,
     get_job_results_response,
+    get_job_results_single,
     get_job_status_schema,
     get_results,
     raise_job_bad_status_locked,
@@ -583,9 +587,90 @@ def get_job_outputs(request):
     schema = get_job_io_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
     results, _ = get_results(job, request, schema=schema, link_references=False)
     outputs = {"outputs": results}
-    outputs.update({"links": job.links(request, self_link="outputs")})
+    links = job.links(request, self_link="outputs")
+    outputs.update({"links": links})
     outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)
+
+
+@sd.provider_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderResultValueEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessResultValueEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    schema=sd.JobResultValueEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@sd.provider_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProviderAnyOutputEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessAnyOutputEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.JobAnyOutputEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_output(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve a specific output from a job execution.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+    settings = get_settings(request)
+    output_id = request.matchdict.get("output_id")
+    # Get requested media-type. "*/*" if omit
+    accept = str(request.accept) if request.accept else "*/*"
+    headers = request.headers
+    possible_media_types = get_job_possible_output_formats(job)
+    possible_media_types = next((o["alternatives"] for o in possible_media_types
+                                if str(o["output_id"]) == output_id), None)
+    results = [o for o in job.results if str(o["identifier"]) == output_id]
+    if results:
+        result = results[0]
+    else:
+        raise HTTPNotFound(
+            json={
+                "code": "",
+                "description": "The requested output format is not in the possible output formats.",
+                "cause": "Incompatible mime Types",
+                "error": "",
+                "value": ""
+            }
+        )
+    result_media_type = result["mimeType"]
+    result_media_type = guess_target_format(request, default=result_media_type)
+
+    # if format requested not equal to result media type and not in possible mediatypes...
+    if accept != result_media_type and accept not in possible_media_types:
+        raise HTTPUnprocessableEntity(json={
+            "code": "InvalidMimeTypeRequested",
+            "description": "The requested output format is not in the possible output formats.",
+            "cause": "Incompatible mime Types",
+            "error": "InvalidMimeTypeRequested",
+            "value": ""
+        })
+
+    is_reference = bool(get_any_value(result, key=True, file=True))
+    _, output_format = get_job_output_transmission(job, output_id, is_reference)
+    output_format = accept or output_format or result_media_type
+
+    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 
 
 @sd.provider_results_service.get(
@@ -800,7 +885,9 @@ def includeme(config):
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_result_value_service)
     config.add_cornice_service(sd.job_outputs_service)
+    config.add_cornice_service(sd.job_output_service)
     config.add_cornice_service(sd.job_inputs_service)
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
@@ -808,7 +895,9 @@ def includeme(config):
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_result_value_service)
     config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_output_service)
     config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)
@@ -816,7 +905,9 @@ def includeme(config):
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_result_value_service)
     config.add_cornice_service(sd.process_outputs_service)
+    config.add_cornice_service(sd.process_output_service)
     config.add_cornice_service(sd.process_inputs_service)
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)

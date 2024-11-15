@@ -58,6 +58,7 @@ from weaver.processes.types import ProcessType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
+from weaver.transform import transform
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,
@@ -1466,6 +1467,31 @@ class Job(Base, LoggerHandler):
         result_job_path = os.path.join(result_job_path, file_name)
         return result_job_path
 
+    def get_all_possible_formats_links(self, url, results):
+        """
+        Get direct links to all outputs in any possible format.
+        """
+        try:
+            links = []
+            for result in results:
+                media_type = get_field(result, "mimeType", search_variations=True)
+                if media_type and media_type not in transform.EXCLUDED_TYPES:
+                    possible_formats = transform.CONVERSION_DICT.get(media_type, [])
+                    id = get_field(result, "identifier", search_variations=True)
+                    links.extend([
+                        {
+                            "href": f"{url}/{id}?f={media_type}",
+                            "rel": "output",
+                            "id": id,
+                            "type": media_type,
+                            "title": f"Link to job {id} result in alternate {media_type}"
+                        }
+                        for media_type in possible_formats])
+            return links
+        except Exception as ex:
+            print(ex)
+            return []
+
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
@@ -1520,6 +1546,9 @@ class Job(Base, LoggerHandler):
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
                 ])
+                f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
+                if len(f_links) > 0:
+                    job_links.extend(f_links)
             else:
                 job_links.append({
                     "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
@@ -2747,7 +2776,7 @@ class Process(Base):
         if schema == ProcessSchema.WPS:
             return self.xml(request)
 
-        process = self.dict()
+        process = copy.deepcopy(self.dict())
         links = self.links()
         process.update({
             "deploymentProfile": self.deployment_profile,
@@ -2768,6 +2797,20 @@ class Process(Base):
             # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
+                if io_type == "outputs":
+                    formats = io_def.get("formats", [])
+                    if formats and isinstance(formats[0], dict):
+                        default_format = get_field(formats[0], "mediaType", search_variations=True)
+                        # All current media_types
+                        existing_media_types = {get_field(format_entry, "mediaType", search_variations=True)
+                                                for format_entry in formats
+                                                if isinstance(format_entry, dict)}
+                        # Possible alternate format
+                        alternate_format = transform.CONVERSION_DICT.get(default_format, [])
+                        for alt_format in alternate_format:
+                            if alt_format not in existing_media_types:
+                                formats.append({"mediaType": alt_format})
+                        io_def["formats"] = formats
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)
