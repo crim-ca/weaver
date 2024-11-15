@@ -436,7 +436,9 @@ if TYPE_CHECKING:
     ]
     FieldModifierFilterCRS = str
     FieldModifierFilterLang = str
-    FieldModifierProperties = Dict[str, str]
+    FieldModifierPropertiesFilter = List[str]
+    FieldModifierPropertiesExpr = Dict[str, str]
+    FieldModifierProperties = Union[FieldModifierPropertiesExpr, FieldModifierPropertiesFilter]
     FieldModifierSortByItem = TypedDict("FieldModifierSortByItem", {
         "field": str,
         "direction": Literal["asc", "desc"],

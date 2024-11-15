@@ -2414,7 +2414,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert out_data["features"] == col_feats["features"]
 
     @pytest.mark.oap_part3
-    def test_execute_job_with_collection_input_stac(self):
+    def test_execute_job_with_collection_input_stac_as_features_with_properties(self):
         """
         Validate parsing and handling of ``collection`` specified in an input with :term:`STAC` :term:`API` endpoint.
 
@@ -2435,19 +2435,43 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             )
             exec_body_val = self.retrieve_payload(name, "execute", local=True)
             col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
-            col_feats["features"][0]["properties"]["data"] = 10
+
+            # patch the original content to make it respect STAC validation
+            col_id = "test"
+            for idx, feat in enumerate(col_feats["features"]):
+                feat.update({
+                    "stac_version": "1.0.0",
+                    "stac_extensions": [],
+                    "collection": col_id,
+                    "id": f"{col_id}-{idx}",
+                    "assets": {},
+                })
+                feat["properties"].update({
+                    "datetime": "2024-01-01T00:00:00Z",
+                })
+
+            # setup input collection properties
+            var_A = 3
+            var_B = 123
+            var_C = -63
+            var_data = 10
+            expect_result = (var_A * (var_B + var_C) / var_data) ** 2  # = 324
+            col_feats["features"][0]["properties"]["data"] = var_data
+            col_feats_src = copy.deepcopy(col_feats["features"][0])  # for later validation
             field_props = {
-                "properties.result": "A * (B + C) / properties.data",  # = 21
+                "properties.result": "(A * (B + C) / properties.data) ^ 2",
                 # intermediate variables, should not be set
-                "B": 123,
-                "C": -50,
-                "A": 3,
+                # use random order to validate resolution priority
+                "B": var_B,
+                "C": var_C,
+                "A": var_A,
             }
+            forbidden_vars = set(field_props) - {"properties.result"}
             filter_lang = "cql2-json"
             filter_value = {"op": "=", "args": [{"property": "name"}, "test"]}
             search_body = {
                 # note: 'properties' are not in search request, separate post-operation
-                "collections": ["test"],
+                "collections": [col_id],
                 "filter": filter_value,
                 "filter-lang": filter_lang,
             }
@@ -2459,7 +2483,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 "response": ExecuteResponse.DOCUMENT,
                 "inputs": {
                     "features": {
-                        "collection": f"{tmp_host}/collections/test",
+                        "collection": f"{tmp_host}/collections/{col_id}",
                         "format": ExecuteCollectionFormat.STAC,
                         "type": ContentType.APP_GEOJSON,
                         "filter-lang": filter_lang,
@@ -2489,12 +2513,22 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             out_data = json.load(out_fd)
 
         assert "features" in out_data and isinstance(out_data["features"], list)
+        assert len(out_data["features"]) == 1
         assert all("properties" in feat for feat in out_data["features"])
-        out_prop = {"name": "test"}
-        out_prop.update(field_props)
+
         for feat_src, feat_out in zip(col_feats["features"], out_data["features"]):
-            assert feat_src["properties"] == {"name": "test"}
-            assert feat_out["properties"] == out_prop
+            assert feat_src["properties"] == col_feats_src["properties"], "source data should not be modified"
+            assert feat_out["properties"] != col_feats_src["properties"], "result data should have been modified"
+
+            # validate multiple locations to ensure insertion happened
+            # where expected and omitted where disallowed (i.e.: variables)
+            assert "properties.result" not in feat_out
+            assert "properties.result" not in feat_out["properties"]
+            assert "result" in feat_out["properties"]
+            assert feat_out["properties"]["result"] == expect_result
+            for var in forbidden_vars:
+                assert var not in feat_out
+                assert var not in feat_out["properties"]
 
     @pytest.mark.oap_part3
     def test_execute_job_with_nested_process_properties_field_modifier(self):

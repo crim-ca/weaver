@@ -31,17 +31,27 @@ from weaver.formats import (  # isort:skip # noqa: E402
     get_cwl_file_format,
     get_extension
 )
-from weaver.processes.builtin.field_modifier_processor import process_field_modifiers  # isort:skip # noqa: E402
+from weaver.processes.builtin.field_modifier_processor import (  # isort:skip # noqa: E402
+    NestedDictHandler,
+    process_field_modifiers
+)
 from weaver.processes.builtin.utils import (  # isort:skip # noqa: E402
     get_package_details,
     is_geojson_url,
     validate_reference
 )
-from weaver.utils import Lazify, get_any_id, load_file, repr_json, request_extra  # isort:skip # noqa: E402
+from weaver.utils import (  # isort:skip # noqa: E402
+    Lazify,
+    get_any_id,
+    get_secure_filename,
+    load_file,
+    repr_json,
+    request_extra
+)
 from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
-    from typing import List
+    from typing import Dict, List
 
     from pystac import Asset
 
@@ -70,7 +80,7 @@ __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to
 OUTPUT_CWL_JSON = "cwl.output.json"
 
 
-def process_collection(collection_input, input_definition, output_dir, logger=LOGGER):  # pylint: disable=R1260
+def process_collection(collection_input, input_definition, output_dir, logger=LOGGER):
     # type: (JobValueCollection, ProcessInputOutputItem, Path, LoggerHandler) -> List[CWL_IO_FileValue]
     """
     Processor of a :term:`Collection`.
@@ -143,131 +153,24 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     )
     resolved_files = []
     if col_fmt == ExecuteCollectionFormat.GEOJSON:
-        # static GeoJSON FeatureCollection document
-        col_resp = request_extra(
-            "GET",
-            col_href,
-            queries=col_args,
-            headers={"Accept": f"{ContentType.APP_GEOJSON},{ContentType.APP_JSON}"},
-            timeout=col_args["timeout"],
-            retries=3,
-            only_server_errors=False,
-        )
-        col_json = col_resp.json()
-        if not (col_resp.status_code == 200 and "features" in col_json):
-            raise ValueError(f"Could not parse [{col_href}] as a GeoJSON FeatureCollection.")
-
-        col_json = process_field_modifiers(col_json, **col_args)
-
-        for i, feat in enumerate(col_json["features"]):
-            path = os.path.join(output_dir, f"feature-{i}.geojson")
-            with open(path, mode="w", encoding="utf-8") as file:
-                json.dump(feat, file)
-            _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
-            file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
-            resolved_files.append(file_obj)
+        geojson_files = resolve_static_geojson_features_files(col_href, col_args, output_dir)
+        resolved_files.extend(geojson_files)
 
     elif col_fmt == ExecuteCollectionFormat.STAC:
-        # convert all parameters to their corresponding name of the query utility, and ignore unknown ones
-        for arg in list(col_args):
-            if "-" in arg:
-                col_args[arg.replace("-", "_")] = col_args.pop(arg)
-
-        timeout = col_args.pop("timeout", 10)
-        col_properties = col_args.pop("properties", None)  # will become 'modifier' callable
-
-        known_params = set(inspect.signature(ItemSearch).parameters)
-        known_params -= {"url", "method", "stac_io", "client", "collections", "ids"}
-        unknown_params = set(col_args) - known_params
-        for param in unknown_params:
-            col_args.pop(param)
-
-        # STAC client can be-process filters and sorting server-side
-        # only perform the remaining properties modifier operations locally
-        if col_properties:
-            def col_field_modifier(stac_feat_col):
-                for _feat in stac_feat_col.get("features", []):
-                    process_field_modifiers(_feat, properties=col_properties)
-        else:
-            col_field_modifier = None
-
-        search = ItemSearch(
-            url=f"{api_url}/search",
-            method="POST",
-            stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add 'headers' with authorization/cookies?
-            collections=col_id,
-            modifier=col_field_modifier,
-            **col_args
-        )
-        for item in search.items():
-            for ctype in col_media_type:
-                for _, asset in item.get_assets(media_type=ctype):  # type: (..., Asset)
-                    _, file_fmt = get_cwl_file_format(ctype)
-                    file_obj = {"class": "File", "path": asset.href, "format": file_fmt}
-                    resolved_files.append(file_obj)
+        stac_files = resolve_stac_collection_files(api_url, col_id, col_args, col_media_type, output_dir)
+        resolved_files.extend(stac_files)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
-        if str(col_args.get("filter-lang")) == "cql2-json":
-            col_args["cql"] = col_args.pop("filter")
-        search = Features(
-            url=api_url,
-            # FIXME: add 'auth' or 'headers' authorization/cookies?
-            headers={"Accept": f"{ContentType.APP_GEOJSON}, {ContentType.APP_VDN_GEOJSON}, {ContentType.APP_JSON}"},
-        )
-        items = search.collection_items(col_id, **col_args)
-        if items.get("type") != "FeatureCollection" or "features" not in items:
-            raise ValueError(
-                f"Collection [{col_href}] using format [{col_fmt}] did not return a GeoJSON FeatureCollection."
-            )
-        for i, feat in enumerate(items["features"]):
-            # NOTE:
-            #   since STAC is technically OGC API - Features compliant, both can be used interchangeably
-            #   if media-types are non-GeoJSON and happen to contain STAC Assets, handle it as STAC transparently
-            if "assets" in feat and col_media_type != [ContentType.APP_GEOJSON]:
-                for _, asset in feat["assets"].items():  # type: (str, JSON)
-                    if asset["type"] in col_media_type:
-                        _, file_fmt = get_cwl_file_format(asset["type"])
-                        file_obj = {"class": "File", "path": asset["href"], "format": file_fmt}
-                        resolved_files.append(file_obj)
-            else:
-                path = os.path.join(output_dir, f"feature-{i}.geojson")
-                with open(path, mode="w", encoding="utf-8") as file:
-                    json.dump(feat, file)
-                _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
-                file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
-                resolved_files.append(file_obj)
+        feat_files = resolve_ogc_api_features_files(api_url, col_id, col_args, col_media_type, output_dir)
+        resolved_files.extend(feat_files)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
-        cov = Coverages(
-            url=api_url,
-            # FIXME: add 'auth' or 'headers' authorization/cookies?
-            headers={"Accept": ContentType.APP_JSON},
-        )
-        ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
-        ext = get_extension(ctype, dot=False)
-        path = os.path.join(output_dir, f"map.{ext}")
-        with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, cov.coverage(col_id)).getbuffer()
-            file.write(data)  # type: ignore
-        _, file_fmt = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
-        resolved_files.append(file_obj)
+        cov_files = resolve_ogc_api_coverages_files(api_url, col_id, col_args, col_media_type, output_dir)
+        resolved_files.extend(cov_files)
 
     elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
-        maps = Maps(
-            url=api_url,
-            # FIXME: add 'auth' or 'headers' authorization/cookies?
-            headers={"Accept": ContentType.APP_JSON},
-        )
-        ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
-        ext = get_extension(ctype[0], dot=False)
-        path = os.path.join(output_dir, f"map.{ext}")
-        with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, maps.map(col_id)).getbuffer()
-            file.write(data)  # type: ignore
-        _, file_fmt = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
-        resolved_files.append(file_obj)
+        maps_files = resolve_ogc_api_maps_files(api_url, col_id, col_args, col_media_type, output_dir)
+        resolved_files.extend(maps_files)
 
     else:
         raise ValueError(f"Collection [{col_href}] could not be resolved. Unknown format [{col_fmt}].")
@@ -283,6 +186,189 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         Lazify(lambda: repr_json(resolved_files, indent=2)),
     )
     return resolved_files
+
+
+def resolve_stac_collection_files(
+    api_url,                # type: str
+    collection_id,          # type: str
+    collection_args,        # type: Dict[str, JSON]
+    supported_media_types,  # type: List[str]
+    output_dir,             # type: str
+):                          # type: (...) -> List[CWL_IO_FileValue]
+
+    # convert all parameters to their corresponding name of the query utility, and ignore unknown ones
+    for arg in list(collection_args):
+        if "-" in arg:
+            collection_args[arg.replace("-", "_")] = collection_args.pop(arg)
+
+    timeout = collection_args.pop("timeout", 10)
+    col_properties = collection_args.pop("properties", None)  # will become 'modifier' callable
+
+    known_params = set(inspect.signature(ItemSearch).parameters)
+    known_params -= {"url", "method", "stac_io", "client", "collections", "ids"}
+    unknown_params = set(collection_args) - known_params
+    for param in unknown_params:
+        collection_args.pop(param)
+
+    # STAC can perform filters and sorting server-side
+    # only perform the remaining properties modifier operations locally as needed
+    if col_properties:
+        def col_field_modifier(stac_feat_col):
+            for _feat in stac_feat_col.get("features", []):
+                handler = NestedDictHandler(_feat)
+                process_field_modifiers(_feat, properties=col_properties, property_handler=handler)
+    else:
+        col_field_modifier = None
+
+    resolved_files = []
+    search = ItemSearch(
+        url=f"{api_url}/search",
+        method="POST",
+        stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add 'headers' with authorization/cookies?
+        collections=collection_id,
+        modifier=col_field_modifier,
+        **collection_args
+    )
+    for item in search.items():
+        for ctype in supported_media_types:
+            for _, asset in item.get_assets(media_type=ctype):  # type: (..., Asset)
+                _, file_fmt = get_cwl_file_format(ctype)
+                file_obj = {"class": "File", "path": asset.href, "format": file_fmt}
+                resolved_files.append(file_obj)
+        else:
+            # allow resolution of the STAC feature itself if no specific asset media-type was matched
+            # (i.e.: accessing the collection as if it was a plain "OGC API - Features")
+            if ContentType.APP_GEOJSON in supported_media_types:
+                # already retrieved the contents, so might as well use them to avoid the extra request
+                # also, content is necessary to use the updated data in case 'properties' were injected
+                item_id = get_secure_filename(item.id)
+                path = os.path.join(output_dir, f"{item_id}.geojson")
+                with open(path, mode="w", encoding="utf-8") as file:
+                    json.dump(item.to_dict(), file)
+                _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+                file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+                resolved_files.append(file_obj)
+
+    return resolved_files
+
+
+def resolve_static_geojson_features_files(
+    collection_href,        # type: str
+    collection_args,        # type: Dict[str, JSON]
+    output_dir,             # type: str
+):                          # type: (...) -> List[CWL_IO_FileValue]
+    col_resp = request_extra(
+        "GET",
+        collection_href,
+        queries=collection_args,
+        headers={"Accept": f"{ContentType.APP_GEOJSON},{ContentType.APP_JSON}"},
+        timeout=collection_args["timeout"],
+        retries=3,
+        only_server_errors=False,
+    )
+    col_json = col_resp.json()
+    if not (col_resp.status_code == 200 and "features" in col_json):
+        raise ValueError(f"Could not parse [{collection_href}] as a GeoJSON FeatureCollection.")
+
+    col_json = process_field_modifiers(col_json, **collection_args)
+
+    resolved_files = []
+    for i, feat in enumerate(col_json["features"]):
+        path = os.path.join(output_dir, f"feature-{i}.geojson")
+        with open(path, mode="w", encoding="utf-8") as file:
+            json.dump(feat, file)
+        _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+        resolved_files.append(file_obj)
+    return resolved_files
+
+
+def resolve_ogc_api_features_files(
+    api_url,                # type: str
+    collection_id,          # type: str
+    collection_args,        # type: Dict[str, JSON]
+    supported_media_types,  # type: List[str]
+    output_dir,             # type: str
+):                          # type: (...) -> List[CWL_IO_FileValue]
+    if str(collection_args.get("filter-lang")) == "cql2-json":
+        collection_args["cql"] = collection_args.pop("filter")
+    search = Features(
+        url=api_url,
+        # FIXME: add 'auth' or 'headers' authorization/cookies?
+        headers={"Accept": f"{ContentType.APP_GEOJSON}, {ContentType.APP_VDN_GEOJSON}, {ContentType.APP_JSON}"},
+    )
+    items = search.collection_items(collection_id, **collection_args)
+    if items.get("type") != "FeatureCollection" or "features" not in items:
+        raise ValueError(
+            f"Collection [{api_url}/collections/{collection_id}] using "
+            f"format [{ExecuteCollectionFormat.OGC_FEATURES}] did not return a GeoJSON FeatureCollection."
+        )
+
+    resolved_files = []
+    for i, feat in enumerate(items["features"]):
+        # NOTE:
+        #   since STAC is technically OGC API - Features compliant, both can be used interchangeably
+        #   if media-types are non-GeoJSON and happen to contain STAC Assets, handle it as STAC transparently
+        if "assets" in feat and supported_media_types != [ContentType.APP_GEOJSON]:
+            for _, asset in feat["assets"].items():  # type: (str, JSON)
+                if asset["type"] in supported_media_types:
+                    _, file_fmt = get_cwl_file_format(asset["type"])
+                    file_obj = {"class": "File", "path": asset["href"], "format": file_fmt}
+                    resolved_files.append(file_obj)
+        else:
+            path = os.path.join(output_dir, f"feature-{i}.geojson")
+            with open(path, mode="w", encoding="utf-8") as file:
+                json.dump(feat, file)
+            _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+            file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+            resolved_files.append(file_obj)
+    return resolved_files
+
+
+def resolve_ogc_api_coverages_files(
+    api_url,                # type: str
+    collection_id,          # type: str
+    collection_args,        # type: Dict[str, JSON]
+    supported_media_types,  # type: List[str]
+    output_dir,             # type: str
+):                          # type: (...) -> List[CWL_IO_FileValue]
+    cov = Coverages(
+        url=api_url,
+        # FIXME: add 'auth' or 'headers' authorization/cookies?
+        headers={"Accept": ContentType.APP_JSON},
+    )
+    ctype = (supported_media_types or [ContentType.IMAGE_COG])[0]
+    ext = get_extension(ctype, dot=False)
+    path = os.path.join(output_dir, f"map.{ext}")
+    with open(path, mode="wb") as file:
+        data = cast(io.BytesIO, cov.coverage(collection_id)).getbuffer()
+        file.write(data)  # type: ignore
+    _, file_fmt = get_cwl_file_format(ctype)
+    file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+    return [file_obj]
+
+
+def resolve_ogc_api_maps_files(
+    api_url,                # type: str
+    collection_id,          # type: str
+    collection_args,        # type: Dict[str, JSON]
+    supported_media_types,  # type: List[str]
+    output_dir,             # type: str
+):                          # type: (...) -> List[CWL_IO_FileValue]
+    maps = Maps(
+        url=api_url,
+        # FIXME: add 'auth' or 'headers' authorization/cookies?
+        headers={"Accept": ContentType.APP_JSON},
+    )
+    ctype = (supported_media_types or [ContentType.IMAGE_COG])[0]
+    ext = get_extension(ctype[0], dot=False)
+    path = os.path.join(output_dir, f"map.{ext}")
+    with open(path, mode="wb") as file:
+        data = cast(io.BytesIO, maps.map(collection_id)).getbuffer()
+        file.write(data)  # type: ignore
+    _, file_fmt = get_cwl_file_format(ctype)
+    file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+    return [file_obj]
 
 
 def process_cwl(collection_input, input_definition, output_dir):

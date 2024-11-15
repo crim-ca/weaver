@@ -1608,25 +1608,52 @@ class FilterSchema(ExtendedMappingSchema):
         return result
 
 
+class AnyPropertyExpression(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(validator=Length(min=1)),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String(), validator=Length(min=1)),
+    ]
+
+
+class PropertyFiltering(ExtendedSequenceSchema):
+    description = "Properties to filter from available data."
+    prop = ExtendedSchemaNode(String(), validator=Length(min=1))
+    validator = Length(min=1)
+
+
 class PropertiesExpression(ExtendedMappingSchema):
-    prop = AnyFilterExpression(
+    description = "Properties to compute from available data."
+    prop = AnyPropertyExpression(
         variable="{property}",
         description="Expression that defines how to compute the property.",
-        validator=Length(min=1),
     )
+    validator = Length(min=1)
+
+
+class PropertiesDefinition(OneOfKeywordSchema):
+    summary = "Properties to retrieve or compute."
+    description = "Properties produced from the data in the context of where they are specified."
+    _one_of = [
+        PropertyFiltering(),
+        PropertiesExpression(),
+    ]
 
 
 class PropertiesSchema(ExtendedMappingSchema):
-    properties = PropertiesExpression(missing=drop, validator=Length(min=1))
+    properties = PropertiesDefinition(missing=drop)
 
     def deserialize(self, cstruct):
         result = super().deserialize(cstruct)
-        if "properties" in cstruct and "properties" not in result:
-            raise colander.Invalid(
-                node=self,
-                msg="Invalid properties expression could not be interpreted.",
-                value={"properties": repr_json(cstruct["properties"])},
-            )
+        if "properties" in cstruct:
+            props = (result or {}).get("properties") or {}
+            if cstruct["properties"] != props:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Invalid properties definition could not be interpreted.",
+                    value={"properties": repr_json(cstruct["properties"])},
+                )
         return result
 
 

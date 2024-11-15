@@ -2,6 +2,7 @@
 """
 Generates properties contents using the specified input definitions.
 """
+import abc
 import argparse
 import functools
 import json
@@ -34,10 +35,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # pylint: disable=C0413,wrong-import-order
 from weaver.formats import ContentType, get_cwl_file_format  # isort:skip # noqa: E402
 from weaver.processes.builtin.utils import get_package_details  # isort:skip # noqa: E402)
-from weaver.utils import Lazify, load_file, repr_json  # isort:skip # noqa: E402
+from weaver.utils import Lazify, fully_qualified_name, load_file, repr_json  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, TypeAlias
+    from typing import Callable, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
 
     from weaver.typedefs import (
         CWL_IO_ValueMap,
@@ -52,8 +53,9 @@ if TYPE_CHECKING:
     )
     from weaver.utils import LoggerHandler
 
-    PropertyGetter: TypeAlias = Callable[[object, str], Any]
-    PropertySetter: TypeAlias = Callable[[object, str, Any], None]
+    PropertyValue = TypeVar("PropertyValue")
+    PropertyVariable = Union[PropertyValue, Number]
+    PropertyGetter: TypeAlias = Callable[[str], PropertyVariable]
 
 PACKAGE_NAME, PACKAGE_BASE, PACKAGE_MODULE = get_package_details(__file__)
 
@@ -68,6 +70,84 @@ __title__ = "Field Modifier Processor"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 OUTPUT_CWL_JSON = "cwl.output.json"
+
+
+class PropertyHandler(abc.ABC):
+    def __init__(self, instance):
+        self.instance = instance
+
+    @abc.abstractmethod
+    def __getattr__(self, property_name):
+        # type: (str) -> PropertyValue
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __setattr__(self, property_name, value):
+        # type: (str, PropertyValue) -> None
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __delattr__(self, property_name):
+        # type: (str) -> None
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __iter__(self):
+        # type: () -> List[PropertyValue]
+        raise NotImplementedError
+
+
+class DictHandler(dict, PropertyHandler):
+    """
+    Operates on dictionary properties directly by key names.
+    """
+    def __getattr__(self, property_name):
+        return dict.__getitem__(self, property_name)
+
+
+class NestedDictHandler(dict, PropertyHandler):
+    """
+    Operates on dictionary properties with nested key names separated by dots (``.``).
+
+    .. code-block:: python
+
+        handler = NestedDictHandler({"A": {"B": 123}})
+        handler.__getattr__("A.B")       # returns 123
+        handler.__setattr__("A.B", 456)  # updates {"A": {"B": 456}}
+    """
+    def _get_parent_nested(self, property_name):
+        # type: (str) -> Tuple[Optional[Union[Dict[str, JSON]]], Optional[Union[str, int]]]
+        props = property_name.split(".")
+        data = self
+        for idx, prop in enumerate(props):
+            if isinstance(data, dict):
+                data = data.get(prop)
+            elif isinstance(data, list) and str.isnumeric(prop):
+                data = data[int(prop)]
+            else:
+                raise ValueError(f"Invalid property accessor unresolved: {property_name}")
+            if idx >= len(props) - 2:
+                if data is None:
+                    break
+                last = props[-1]
+                last = int(last) if str.isnumeric(last) else last
+                return data, last
+        return None, None
+
+    def __getattr__(self, property_name):
+        data, last = self._get_parent_nested(property_name)
+        if last is not None:
+            return data[last]
+
+    def __setattr__(self, property_name, value):
+        data, last = self._get_parent_nested(property_name)
+        if last is not None:
+            data[last] = value
+
+    def __delattr__(self, property_name):
+        data, last = self._get_parent_nested(property_name)
+        if last is not None:
+            del data[last]
 
 
 @functools.lru_cache(1024)
@@ -94,11 +174,12 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, Union[PropertyValue, Number]], PropertyGetter) -> Union[PropertyValue, Number]
             if self.value in variables:
-                return getter(variables, self.value)
-            else:
+                return variables[self.value]
+            elif str(self.value).isnumeric():
                 return float(self.value)
+            return getter(self.value)
 
     class EvalSignOp:
         """
@@ -109,7 +190,7 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.sign, self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, PropertyVariable], PropertyGetter) -> PropertyVariable
             mult = {"+": 1, "-": -1}[self.sign]
             return mult * self.value.eval(variables, getter)
 
@@ -133,7 +214,7 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, PropertyVariable], PropertyGetter) -> PropertyVariable
             res = self.value[-1].eval(variables, getter)
             for val in self.value[-3::-2]:
                 res = val.eval(variables, getter) ** res
@@ -148,7 +229,7 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, PropertyVariable], PropertyGetter) -> PropertyVariable
             prod = self.value[0].eval(variables, getter)
             for op, val in operator_operands(self.value[1:]):
                 if op == "*":
@@ -166,7 +247,7 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, PropertyVariable], PropertyGetter) -> PropertyVariable
             _sum = self.value[0].eval(variables, getter)
             for op, val in operator_operands(self.value[1:]):
                 if op == "+":
@@ -199,7 +280,7 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
             self.value = tokens[0]
 
         def eval(self, variables, getter):
-            # type: (Dict[str, Number], PropertyGetter) -> Number
+            # type: (Dict[str, PropertyVariable], PropertyGetter) -> PropertyVariable
             val1 = self.value[0].eval(variables, getter)
             for op, val in operator_operands(self.value[1:]):
                 fn = EvalComparisonOp.opMap[op]
@@ -247,40 +328,33 @@ def create_expression_parser():  # pylint: disable=R1260,too-complex
 
 def evaluate_property(
     properties,             # type: Dict[str, JSON]
-    property_name,          # type: str
     property_expression,    # type: str
-    property_getter=None,   # type: PropertyGetter
-    property_setter=None,   # type: PropertySetter
-):                          # type: (...) -> None
+    property_handler,       # type: PropertyHandler
+):                          # type: (...) -> PropertyVariable
     """
-    Evaluates the applicable property expression with variable retrieval and insertion in the destination object.
+    Evaluates the applicable property expression with variable retrieval from reference data using the specifed handler.
 
     :param properties: Mapping of available property variables and expressions.
-    :param property_name: Target property to evaluate.
     :param property_expression: Calculation to be evaluated for the property, possibly referring to other properties.
-    :param property_getter: Function that knows how to retrieve a variable property from the properties' destination.
-    :param property_setter: Function that knows how to insert the evaluated property into the properties' destination.
+    :param property_handler: Implementation that knows how to manipulate property access from the data.
     """
-    property_getter = property_getter or dict.__getitem__
-    property_setter = property_setter or dict.__setitem__
-
-    expr = create_expression_parser()
-    result = expr.parse_string(property_expression)[0].eval(properties, getter=property_getter)
-    property_setter(properties, property_name, result)
+    parser = create_expression_parser()
+    expr = parser.parse_string(property_expression)[0]
+    result = expr.eval(properties, getter=property_handler.__getattr__)
+    return result
 
 
 def process_field_modifiers(
-    values,                 # type: Dict[str, JSON]
+    values,                 # type: PropertyValue
     *,                      # force named keyword arguments after
     filter_expr=None,       # type: FieldModifierFilterExpression,
     filter_crs=None,        # type: FieldModifierFilterCRS,
     filter_lang=None,       # type: FieldModifierFilterLang,
     properties=None,        # type: FieldModifierProperties,
-    property_getter=None,   # type: PropertyGetter
-    property_setter=None,   # type: PropertySetter
+    property_handler=None,  # type: PropertyHandler
     sortby=None,            # type: FieldModifierSortBy,
     logger=LOGGER,          # type: LoggerHandler
-):                          # type: (...) -> JSON
+):                          # type: (...) -> Dict[str, PropertyValue]
     """
     Processor of field modifiers for an input or output.
 
@@ -294,8 +368,7 @@ def process_field_modifiers(
     :param filter_lang: Filter language to interpret the filter expression.
     :param filter_crs: Filter Coordinate Reference System (CRS) to employ with the filter expression.
     :param properties: Properties definition submitted to the process and to be generated from input values.
-    :param property_getter: Function that knows how to retrieve a variable property from the properties' destination.
-    :param property_setter: Function that knows how to insert the evaluated property into the properties' destination.
+    :param property_handler: Implementation that knows how to manipulate property access for the data destination.
     :param sortby: Sorting definition with relevant field names and ordering direction.
     :param logger: Optional logger handler to employ.
     :return: File reference containing the resolved properties.
@@ -308,6 +381,7 @@ def process_field_modifiers(
             "  filter_crs=%s\n"
             "  filter_lang=%s\n"
             "  properties=%s\n"
+            "  property_handler=%s\n"
             "  sortby=%s\n"
             "  values=%s"
         ),
@@ -316,33 +390,63 @@ def process_field_modifiers(
         Lazify(lambda: repr_json(filter_crs, indent=2)),
         Lazify(lambda: repr_json(filter_lang, indent=2)),
         Lazify(lambda: repr_json(properties, indent=2)),
+        Lazify(lambda: fully_qualified_name(property_handler) if property_handler else None),
         Lazify(lambda: repr_json(sortby, indent=2)),
         Lazify(lambda: repr_json(values, indent=2)),
     )
     properties = properties or {}
 
-    # sort properties later if they depend on other ones, the least dependencies to be computed first
-    props_deps = {prop: 0 for prop in properties}
-    for prop, calc in properties.items():
-        for prop_dep in props_deps:
-            if prop == prop_dep:
-                if prop in calc:
-                    raise ValueError(f"Invalid recursive property [{prop}] references itself.")
-                continue
-            if prop_dep in calc:
-                props_deps[prop_dep] += 1
-    if not filter(lambda dep: dep[-1] == 0, props_deps.items()):
-        raise ValueError("Invalid properties all depend on another one. Impossible resolution order.")
-    props = sorted(
-        list(properties.items()),
-        key=lambda p: props_deps[p[0]]
-    )
+    # if unspecified, consider the values as dict with handler
+    # (values will be set/retrieved directly by literal keys)
+    # alternate value handler need to be specified explicitly
+    if not property_handler:
+        property_handler = values
 
-    # compute the properties
-    for prop, calc in props:
-        evaluate_property(properties, prop, calc, property_getter=property_getter, property_setter=property_setter)
+    # FIXME: handle filtering
+    #   define a meta-set operation wrapping the property handler ?
+    #   eg: for each 'feature', do 'properties', but 'filter'/'sortby' over entire set of 'features'
 
-    # FIXME: handle filtering and sorting
+    # properties are a filtering subset
+    if isinstance(properties, list):
+        available_properties = set(property_handler)
+        requested_properties = set(properties)
+        for prop in available_properties - requested_properties:
+            del property_handler[prop]
+
+    # otherwise, properties are expressions
+    else:
+        # sort properties later if they depend on other ones, the least dependencies to be computed first
+        props_deps = {prop: 0 for prop in properties}
+        for prop, calc in properties.items():
+            for prop_dep in props_deps:
+                if prop == prop_dep:
+                    if prop in str(calc):
+                        raise ValueError(f"Invalid recursive property [{prop}] references itself.")
+                    continue
+                if prop_dep in str(calc):
+                    props_deps[prop_dep] += 1
+        if not filter(lambda dep: dep[-1] == 0, props_deps.items()):
+            raise ValueError("Invalid properties all depend on another one. Impossible resolution order.")
+        props = sorted(
+            list(properties.items()),
+            key=lambda p: props_deps[p[0]],
+            reverse=True,
+        )
+
+        # compute the properties
+        for prop, calc in props:
+            result = evaluate_property(
+                properties,
+                str(calc),
+                property_handler=property_handler,
+            )
+            # make resolved values available for next iterations
+            # the 'properties' become a temporary variable buffer for cross-reference
+            # the 'property_handler' decides if that result should be inserted or not
+            properties[prop] = result
+            property_handler.__setattr__(prop, result)
+
+    # FIXME: handle sorting - over set of objects containing 'properties'
 
     return properties
 
