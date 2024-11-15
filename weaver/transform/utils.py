@@ -4,9 +4,9 @@ import shutil
 import tarfile
 import tempfile
 from typing import List, Union
-from PIL import Image
 
 from celery.utils.log import get_task_logger
+from PIL import Image
 
 LOGGER = get_task_logger(__name__)
 
