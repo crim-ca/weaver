@@ -1647,7 +1647,7 @@ class PropertiesSchema(ExtendedMappingSchema):
     def deserialize(self, cstruct):
         result = super().deserialize(cstruct)
         if "properties" in cstruct:
-            props = (result or {}).get("properties") or {}
+            props = (result or {}).get("properties")
             if cstruct["properties"] != props:
                 raise colander.Invalid(
                     node=self,
