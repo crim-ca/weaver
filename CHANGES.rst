@@ -17,6 +17,8 @@ Changes:
   relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
 - Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
   (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
+- Add `CLI` operations ``update_job``, ``trigger_job`` and ``inputs`` corresponding to the required `Job` operations
+  defined by *OGC API - Processes - Part 4: Job Management*.
 - Add ``headers``, ``mode`` and ``response`` parameters along the ``inputs`` and ``outputs`` returned by
   the ``GET /jobs/{jobID}/inputs`` endpoint to better describe the expected resolution strategy of the
   multiple `Job` execution options according to submitted request parameters.

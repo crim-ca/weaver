@@ -328,7 +328,7 @@ if TYPE_CHECKING:
     CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # CWL loading
-    CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
+    CWL_WorkflowInputs = Union[CWL_RuntimeInputsMap, CWL_RuntimeInputList]
     # mapping of ID:glob-pattern (File/Directory or string with loadContents)
     CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
         "type": Literal["File", "Directory", "string"],

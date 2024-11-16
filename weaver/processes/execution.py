@@ -24,6 +24,7 @@ from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
+from weaver.exceptions import JobExecutionError, WeaverExecutionError
 from weaver.execute import (
     ExecuteControlOption,
     ExecuteMode,
@@ -299,6 +300,8 @@ def execute_process(task, job_id, wps_url, headers=None):
         LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
         # note: don't update the progress here to preserve last one that was set
         job.status = map_status(Status.FAILED)
+        if isinstance(exc, WeaverExecutionError):
+            job.save_log(message=str(exc), logger=task_logger, level=logging.ERROR)
         job.status_message = f"Failed to run {job!s}."
         errors = f"{fully_qualified_name(exc)}: {exc!s}"
         job.save_log(errors=errors, logger=task_logger)
@@ -644,6 +647,14 @@ def parse_wps_inputs(wps_process, job, container=None):
                         logger=LOGGER,
                         progress=JobProgress.GET_INPUTS,
                     )
+                    inputs = copy.deepcopy(input_value.get("inputs", {}))
+                    outputs = copy.deepcopy(input_value.get("outputs"))
+                    out_ids = [get_any_id(out) for out in outputs] if isinstance(outputs, list) else (outputs or [])
+                    if len(input_value.get("outputs", {})) > 1:  # preemptive check to avoid wasting time/resources
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map multiple outputs {list(out_ids)} "
+                            f"from [{proc_uri}] to input [{input_id}] of [{job.process}]."
+                        )
                     process = OGCAPIRemoteProcess(
                         input_value,
                         proc_uri,
@@ -651,18 +662,16 @@ def parse_wps_inputs(wps_process, job, container=None):
                         update_status=job_log_update_status_func,
                     )
                     out_dir = os.path.join(job.tmpdir, "inputs")
-                    inputs = copy.deepcopy(input_value.get("inputs", {}))
-                    outputs = copy.deepcopy(input_value.get("outputs"))
                     results = process.execute(inputs, out_dir, outputs)
                     if not results:
-                        raise ValueError(
-                            f"Abort execution. Cannot map empty outputs from {proc_uri} "
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map empty outputs from [{proc_uri}] "
                             f"to input [{input_id}] of [{job.process}]."
                         )
-                    if len(results) != 1:
-                        raise ValueError(
-                            f"Abort execution. Cannot map multiple outputs from {proc_uri} "
-                            f"to input [{input_id}] of [{job.process}]."
+                    if len(results) != 1:  # post-execution check since no explicit output specified could lead to many
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map multiple outputs {list(out_ids)} "
+                            f"from [{proc_uri}] to input [{input_id}] of [{job.process}]."
                         )
                     results = results[0]
 
