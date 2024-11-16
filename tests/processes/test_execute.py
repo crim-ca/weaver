@@ -7,6 +7,7 @@ import dataclasses
 import uuid
 from typing import TYPE_CHECKING, List, cast
 
+import mock
 import pytest
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
 
@@ -36,6 +37,11 @@ class MockProcess:
         self.dataInputs = inputs
 
 
+@mock.patch(
+    # avoid error on database connection not established
+    "weaver.processes.execution.log_and_save_update_status_handler",
+    lambda *_, **__: lambda *_a, **__kw: None,
+)
 @pytest.mark.parametrize(
     ["input_data", "input_definition", "expect_input"],
     [

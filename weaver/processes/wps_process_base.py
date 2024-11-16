@@ -12,8 +12,14 @@ from weaver.base import Constants
 from weaver.exceptions import PackageExecutionError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType, repr_json
-from weaver.processes.constants import PACKAGE_COMPLEX_TYPES, PACKAGE_DIRECTORY_TYPE, PACKAGE_FILE_TYPE, OpenSearchField
-from weaver.processes.convert import get_cwl_io_type
+from weaver.processes.constants import (
+    PACKAGE_COMPLEX_TYPES,
+    PACKAGE_DIRECTORY_TYPE,
+    PACKAGE_FILE_TYPE,
+    JobInputsOutputsSchema,
+    OpenSearchField
+)
+from weaver.processes.convert import convert_input_values_schema, get_cwl_io_type
 from weaver.processes.utils import map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -43,7 +49,6 @@ if TYPE_CHECKING:
         CookiesTupleType,
         CWL_ExpectedOutputs,
         CWL_Output_Type,
-        CWL_RuntimeInputsMap,
         CWL_WorkflowInputs,
         JobCustomInputs,
         JobCustomOutputs,
@@ -94,15 +99,19 @@ class WpsProcessInterface(abc.ABC):
     """
 
     def __init__(self, request, update_status):
-        # type: (WorkerRequest, UpdateStatusPartialFunction) -> None
+        # type: (Optional[WorkerRequest], UpdateStatusPartialFunction) -> None
         self.request = request
         self.headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self.settings = get_settings()
         self.update_status = update_status  # type: UpdateStatusPartialFunction
         self.temp_staging = set()
 
-    def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (CWL_RuntimeInputsMap, str, CWL_ExpectedOutputs) -> JobOutputs
+    def execute(
+        self,
+        workflow_inputs,    # type: Union[CWL_WorkflowInputs, JobCustomInputs]
+        out_dir,            # type: str
+        expected_outputs,   # type: Union[CWL_ExpectedOutputs, JobCustomOutputs]
+    ):                      # type: (...) -> JobOutputs
         """
         Execute the core operation of the remote :term:`Process` using the given inputs.
 
@@ -125,7 +134,7 @@ class WpsProcessInterface(abc.ABC):
 
         self.update_status("Preparing inputs/outputs for remote execution.",
                            RemoteJobProgress.FORMAT_IO, Status.RUNNING)
-        expect_outputs = [{"id": output} for output in expected_outputs]
+        expect_outputs = [{"id": out_id, **out_info} for out_id, out_info in expected_outputs.items()]
         process_inputs = self.format_inputs(staged_inputs)
         process_outputs = self.format_outputs(expect_outputs)
 
@@ -165,8 +174,8 @@ class WpsProcessInterface(abc.ABC):
 
     def prepare(  # noqa: B027  # intentionally not an abstract method to allow no-op
         self,
-        workflow_inputs,    # type: CWL_RuntimeInputsMap
-        expected_outputs,   # type: CWL_ExpectedOutputs
+        workflow_inputs,    # type: Union[CWL_WorkflowInputs, JobCustomInputs]
+        expected_outputs,   # type: Union[CWL_ExpectedOutputs, JobCustomOutputs]
     ):                      # type: (...) -> None
         """
         Implementation dependent operations to prepare the :term:`Process` for :term:`Job` execution.
@@ -346,6 +355,8 @@ class WpsProcessInterface(abc.ABC):
             doesn't necessarily produce file names with the output ID as expected to find them (could be anything),
             staging must patch locations to let :term:`CWL` runtime resolve the files according to glob definitions.
         """
+        if not expected_outputs:
+            return
         for result in results:
             res_id = get_any_id(result)
             if res_id not in expected_outputs:
@@ -396,6 +407,7 @@ class WpsProcessInterface(abc.ABC):
         Retrieves inputs for local staging if required for the following :term:`Job` execution.
         """
         execute_body_inputs = []
+        workflow_inputs = convert_input_values_schema(workflow_inputs, JobInputsOutputsSchema.OGC)
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if not isinstance(workflow_input_value, list):
                 workflow_input_value = [workflow_input_value]
@@ -433,7 +445,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
     def __init__(self,
                  step_payload,      # type: JSON
                  process,           # type: str
-                 request,           # type: WorkerRequest
+                 request,           # type: Optional[WorkerRequest]
                  update_status,     # type: UpdateStatusPartialFunction
                  ):                 # type: (...) -> None
         super(OGCAPIRemoteProcessBase, self).__init__(
@@ -465,19 +477,41 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
             "response": ExecuteResponse.DOCUMENT,
             "inputs": process_inputs,
         }
+        execute_headers = {
+            "Prefer": "respond-async",
+            "Accept": ContentType.APP_JSON,
+            "Content-Type": ContentType.APP_JSON,
+        }
         if process_outputs is not None:  # don't insert to avoid filter-output by explicit empty dict/list
             execute_body["outputs"] = process_outputs
         LOGGER.debug("Execute process %s body for [%s]:\n%s", self.process_type, self.process, repr_json(execute_body))
-        request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
-        response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
+        request_url = self.url + sd.process_execution_service.path.format(process_id=self.process)
+        response = self.make_request(
+            method="POST",
+            url=request_url,
+            json=execute_body,
+            headers=execute_headers,
+            timeout=10,
+            retry=True,
+        )
         if response.status_code in [404, 405]:
-            request_url = self.url + sd.process_execution_service.path.format(process_id=self.process)
-            response = self.make_request(method="POST", url=request_url, json=execute_body, retry=True)
+            # backward compatibility endpoint
+            request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
+            response = self.make_request(
+                method="POST",
+                url=request_url,
+                json=execute_body,
+                headers=execute_headers,
+                timeout=10,
+                retry=True,
+            )
         if response.status_code != 201:
             LOGGER.error("Request [POST %s] failed with: [%s]", request_url, response.status_code)
             self.update_status(
-                f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
-                f"{repr_json(response.text, indent=2)}",
+                (
+                    f"Request [POST {request_url}] failed with: [{response.status_code}]\n"
+                    f"{repr_json(response.text, indent=2)}"
+                ),
                 RemoteJobProgress.EXECUTION,
                 Status.FAILED,
                 level=logging.ERROR,
@@ -494,7 +528,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
         job_status_value = map_status(job_status_data["status"])
         job_id = job_status_data["jobID"]
 
-        self.update_status(f"Monitoring job on remote ADES : {job_status_uri}",
+        self.update_status(f"Monitoring job on remote ADES: [{job_status_uri}]",
                            RemoteJobProgress.MONITORING, Status.RUNNING)
 
         retry = 0

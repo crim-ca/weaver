@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Add support of *OGC API - Processes - Part 3: Workflows and Chaining* with *Nested Process* ad-hoc workflow
+  definitions directly submitted for execution (fixes `#747 <https://github.com/crim-ca/weaver/issues/747>`_,
+  relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
 - Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
   (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
 - Add `CLI` operations ``update_job``, ``trigger_job`` and ``inputs`` corresponding to the required `Job` operations
@@ -77,6 +80,7 @@ Fixes:
 - Add the appropriate HTTP error type to respect ``/conf/dru/deploy/unsupported-content-type``
   (fixes `#624 <https://github.com/crim-ca/weaver/issues/624>`_).
 - Fix S3 bucket storage for result file missing the output ID in the path to match local WPS output storage structure.
+- Fix rendering of the ``deprecated`` property in `OpenAPI` representation.
 
 .. _changes_5.9.0:
 

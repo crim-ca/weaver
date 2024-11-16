@@ -61,6 +61,7 @@ reports
 
 ## PyCharm
 *.idea
+*.run
 
 ## Intellij
 *.iml

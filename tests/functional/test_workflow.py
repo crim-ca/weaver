@@ -70,6 +70,7 @@ if TYPE_CHECKING:
         ExecutionInputsMap,
         ExecutionResults,
         HeadersType,
+        JSON,
         ProcessDeployment,
         ProcessExecution,
         SettingsType
@@ -119,6 +120,7 @@ class WorkflowProcesses(enum.Enum):
     APP_ECHO = "Echo"
     APP_ECHO_OPTIONAL = "EchoOptional"
     APP_ECHO_SECRETS = "EchoSecrets"
+    APP_ECHO_RESULTS_TESTER = "EchoResultsTester"
     APP_ICE_DAYS = "Finch_IceDays"
     APP_READ_FILE = "ReadFile"
     APP_SUBSET_BBOX = "ColibriFlyingpigeon_SubsetBbox"
@@ -166,7 +168,8 @@ class ProcessInfo(object):
                  application_package=None,  # type: Optional[CWL]
                  ):                         # type: (...) -> None
         self.pid = WorkflowProcesses(process_id)        # type: WorkflowProcesses
-        self.id = self.pid.value                        # type: Optional[str]  # noqa
+        self.id = self.pid.value                        # type: str
+        self.path = f"/processes/{self.id}"             # type: str
         self.test_id = test_id                          # type: Optional[str]
         self.deploy_payload = deploy_payload            # type: Optional[ProcessDeployment]
         self.execute_payload = execute_payload          # type: Optional[ProcessExecution]
@@ -208,7 +211,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
     """
     Used between various TestCase runs.
     """
-    logger_level = logging.INFO     # type: int
+    logger_level = logging.INFO     # type: AnyLogLevel
     logger_enabled = True           # type: bool
     logger = None                   # type: Optional[logging.Logger]
     # setting indent to `None` disables pretty-printing of JSON payload
@@ -820,6 +823,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         log_full_trace,                 # type: bool
         requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
         override_execute_body=None,     # type: Optional[ProcessExecution]
+        override_execute_path=None,     # type: Optional[str]
     ):                                  # type: (...) -> ExecutionResults
         ...
 
@@ -831,6 +835,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         log_full_trace=False,           # type: bool
         requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
         override_execute_body=None,     # type: Optional[ProcessExecution]
+        override_execute_path=None,     # type: Optional[str]
         detailed_results=True,          # type: Literal[True]
     ):                                  # type: (...) -> DetailedExecutionResults
         ...
@@ -842,6 +847,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         log_full_trace=False,           # type: bool
         requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
         override_execute_body=None,     # type: Optional[ProcessExecution]
+        override_execute_path=None,     # type: Optional[str]
         detailed_results=False,         # type: bool
     ):                                  # type: (...) -> Union[ExecutionResults, DetailedExecutionResults]
         """
@@ -867,6 +873,9 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             Function to add further requests mock specifications as needed by the calling test case.
         :param override_execute_body:
             Alternate execution request content from the default one loaded from the referenced Workflow location.
+        :param override_execute_path:
+            Alternate execution request path from the default one employed by the workflow runner.
+            Must be a supported endpoints (``/jobs``, ``/processes/{pID}/jobs``, ``/processes/{pID}/execution``).
         :param detailed_results:
             If enabled, each step involved in the :term:`Workflow` chain will provide their respective details
             including the :term:`Process` ID, the :term:`Job` UUID, intermediate outputs and logs.
@@ -879,29 +888,45 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
 
         # deploy processes and make them visible for workflow
         has_duplicate_apps = len(set(test_application_ids)) != len(list(test_application_ids))
-        path_deploy = "/processes"
         for process_id in test_application_ids:
-            path_visible = f"{path_deploy}/{self.test_processes_info[process_id].id}/visibility"
-            data_visible = {"value": Visibility.PUBLIC}
-            allowed_status = [HTTPCreated.code, HTTPConflict.code] if has_duplicate_apps else HTTPCreated.code
-            self.request("POST", path_deploy, status=allowed_status, headers=self.headers,
-                         json=self.test_processes_info[process_id].deploy_payload,
-                         message="Expect deployed application process.")
-            self.request("PUT", path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
-                         message="Expect visible application process.")
+            self.prepare_process(process_id, exists_ok=has_duplicate_apps)
 
         # deploy workflow process itself and make visible
-        workflow_info = self.test_processes_info[test_workflow_id]
-        self.request("POST", path_deploy, status=HTTPCreated.code, headers=self.headers,
-                     json=workflow_info.deploy_payload,
-                     message="Expect deployed workflow process.")
-        process_path = f"{path_deploy}/{workflow_info.id}"
-        visible_path = f"{process_path}/visibility"
-        visible = {"value": Visibility.PUBLIC}
-        resp = self.request("PUT", visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
-        self.assert_test(lambda: resp.json.get("value") == Visibility.PUBLIC,
-                         message="Process should be public.")
+        workflow_info = self.prepare_process(test_workflow_id)
+        status_or_results = self.execute_monitor_process(
+            workflow_info,
+            detailed_results=detailed_results,
+            override_execute_body=override_execute_body,
+            override_execute_path=override_execute_path,
+            requests_mock_callback=requests_mock_callback,
+        )
+        return status_or_results
 
+    def prepare_process(self, process_id, exists_ok=False):
+        # type: (WorkflowProcesses, bool) -> ProcessInfo
+        """
+        Deploys the process referenced by ID using the available :term:`Application Package` and makes it visible.
+        """
+        proc_info = self.test_processes_info[process_id]
+        body_deploy = proc_info.deploy_payload
+        path_deploy = "/processes"
+        path_visible = f"{proc_info.path}/visibility"
+        data_visible = {"value": Visibility.PUBLIC}
+        allowed_status = [HTTPCreated.code, HTTPConflict.code] if exists_ok else HTTPCreated.code
+        self.request("POST", path_deploy, status=allowed_status, headers=self.headers, json=body_deploy,
+                     message="Expect deployed process.")
+        self.request("PUT", path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
+                     message="Expect visible process.")
+        return proc_info
+
+    def execute_monitor_process(
+        self,
+        process_info,                   # type: ProcessInfo
+        requests_mock_callback=None,    # type: Optional[Callable[[RequestsMock], None]]
+        override_execute_body=None,     # type: Optional[ProcessExecution]
+        override_execute_path=None,     # type: Optional[str]
+        detailed_results=True,          # type: Literal[True]
+    ):                                  # type: (...) -> Union[JSON, DetailedExecutionResults]
         with contextlib.ExitStack() as stack_exec:
             for data_source_use in [
                 "weaver.processes.sources.get_data_source_from_url",
@@ -918,9 +943,9 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                     requests_mock_callback(mock_req)
 
             # execute workflow
-            execute_body = override_execute_body or workflow_info.execute_payload
+            execute_body = override_execute_body or process_info.execute_payload
             execute_body.setdefault("mode", ExecuteMode.ASYNC)
-            execute_path = f"{process_path}/jobs"
+            execute_path = override_execute_path or f"{process_info.path}/jobs"
             self.assert_test(lambda: execute_body is not None,
                              message="Cannot execute workflow without a request body!")
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
@@ -1016,6 +1041,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 if detailed_results:
                     details[job_id] = self.extract_job_details(workflow_job_url, workflow_logs)
                 log_matches = set(re.findall(r".*(https?://.+/jobs/.+(?:/logs)?).*", workflow_logs))
+                log_matches = {url.strip("[]") for url in log_matches}
                 log_matches -= {workflow_job_url}
                 log_matches = {url if url.rstrip("/").endswith("/logs") else f"{url}/logs" for url in log_matches}
                 for log_url in log_matches:
@@ -1067,6 +1093,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_OPTIONAL,
+        WorkflowProcesses.APP_ECHO_RESULTS_TESTER,
         WorkflowProcesses.APP_ECHO_SECRETS,
         WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS,
         WorkflowProcesses.APP_READ_FILE,
@@ -1603,3 +1630,105 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         with open(path, mode="r", encoding="utf-8") as out_file:
             data = out_file.read().strip()
         assert data == "test-message", "output from workflow should match the default resolved from input omission"
+
+    @pytest.mark.oap_part3
+    def test_workflow_ad_hoc_nested_process_chaining(self):
+        """
+        Validate the execution of an ad-hoc workflow directly submitted for execution with nested process references.
+
+        The test purposely uses two different processes that have different input requirements, but that happen to have
+        similarly named inputs/outputs, such that we can validate nesting chains the correct parameters at each level.
+        Similarly, the same process is reused more than once in a nested fashion to make sure they don't get mixed.
+        Finally, output selection is defined using multi-output processes to make sure filtering is applied inline.
+        """
+        passthrough_process_info = self.prepare_process(WorkflowProcesses.APP_PASSTHROUGH_EXPRESSIONS)
+        echo_result_process_info = self.prepare_process(WorkflowProcesses.APP_ECHO_RESULTS_TESTER)
+
+        workflow_exec = {
+            "process": f"{self.WEAVER_RESTAPI_URL}{passthrough_process_info.path}",
+            "inputs": {
+                "message": {
+                    "process": f"{self.WEAVER_RESTAPI_URL}{passthrough_process_info.path}",
+                    "inputs": {
+                        "message": {
+                            "process": f"{self.WEAVER_RESTAPI_URL}{echo_result_process_info.path}",
+                            "inputs": {
+                                "message": "test"
+                            },
+                            "outputs": {"output_data": {}}
+                        },
+                        "code": 123,
+                    },
+                    "outputs": {"message": {}}
+                },
+                "code": 456,
+            }
+        }
+        details = self.execute_monitor_process(
+            passthrough_process_info,
+            override_execute_body=workflow_exec,
+            override_execute_path="/jobs",
+        )
+
+        # note:
+        #   Because we are running an ad-hoc nested chaining of processes rather than the typical 'workflow'
+        #   approach that has all execution steps managed by CWL, each nested call is performed on its own.
+        #   Therefore, the collected details will only contain the logs from the top-most process and its directly
+        #   nested process. Further nested processes will not be embedded within those logs, as the entire nested
+        #   operation is dispatched as a "single process". Retrieve the logs iteratively crawling into the nested jobs.
+        details_to_process = list(details.values())
+        while details_to_process:
+            active_detail = details_to_process.pop(0)
+            if active_detail["inputs"] == workflow_exec["inputs"]:
+                continue  # top-most process, already got all logs
+            nested_job_id = active_detail["job"]
+            nested_job_proc = active_detail["process"]
+            nested_job_url = f"/processes/{nested_job_proc}/jobs/{nested_job_id}"
+            _, nested_details = self.try_retrieve_logs(nested_job_url, True)
+            for job_id, job_detail in nested_details.items():
+                if job_id not in details:
+                    details[job_id] = job_detail
+                    details_to_process.append(job_detail)
+
+        self.assert_test(
+            lambda: len(details) == 3,
+            "Jobs amount should match the number of involved nested processes.",
+        )
+
+        # heuristic:
+        # since all nested processes contain all other definitions as input, we can sort by size deepest->highest
+        job_details = sorted(details.values(), key=lambda info: len(str(info["inputs"])))
+
+        self.assert_test(
+            lambda: job_details[0]["outputs"] == {
+                "output_data": {"value": "test"}
+            }
+        )
+        self.assert_test(
+            lambda: job_details[1]["outputs"] == {
+                "message": {"value": "test"},
+            }
+        )
+        self.assert_test(
+            lambda: job_details[2]["outputs"] == {
+                "message": {"value": "test"},
+                "code": {"value": 456},
+                "number": {"value": 3.1416},
+                "integer": {"value": 3},
+            }
+        )
+
+        for job_detail in job_details:
+            job_progresses = [
+                float(progress) for progress in
+                re.findall(
+                    # Extra '.*\n' is to make sure we match only the first percent of the current job log per line.
+                    # Because of nested processes and CWL operations, there can be sub-progress percentages as well.
+                    r"([0-9]+(?:\.[0-9]+)?)%.*\n",
+                    job_detail["logs"],
+                )
+            ]
+            self.assert_test(
+                lambda: sorted(job_progresses) == job_progresses,
+                "Job log progress values should be in sequential order even when involving a nested process execution."
+            )

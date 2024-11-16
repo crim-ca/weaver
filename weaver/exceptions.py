@@ -49,6 +49,12 @@ class WeaverException(Exception):
     detail = message = comment = explanation = "Unknown error"
 
 
+class WeaverExecutionError(WeaverException):
+    """
+    Generic exception occurring during an execution of any given process, job, provider or package.
+    """
+
+
 class ListingInvalidParameter(WeaverException, OWSInvalidParameterValue, ValueError):
     """
     Error related to an invalid parameter for listing queries.
@@ -210,6 +216,12 @@ class JobRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, JobExce
     """
 
 
+class JobExecutionError(HTTPInternalServerError, OWSNoApplicableCode, WeaverExecutionError, JobException):
+    """
+    Error related to an execution issue for a job.
+    """
+
+
 class JobUpdateError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to an update issue for a job.
@@ -262,7 +274,7 @@ class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageExcep
     """
 
 
-class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
+class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, WeaverExecutionError, PackageException):
     """
     Error related to a runtime issue during package execution.
 

@@ -1929,11 +1929,13 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Test modification of the execution ``return`` and ``response`` options, going back-and-forth between approaches.
         """
+        test_inputs = {"message": "test"}
+        test_outputs = {"result": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
-            execute_mode=ExecuteMode.AUTO,
-            execute_response=ExecuteResponse.DOCUMENT,
+            execute_mode=ExecuteMode.AUTO, execute_response=ExecuteResponse.DOCUMENT,
+            inputs=test_inputs, outputs=test_outputs,
         )
 
         body = {}
@@ -1950,6 +1952,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {"response": ExecuteResponse.DOCUMENT}
         path = f"/jobs/{new_job.id}"
@@ -1962,6 +1966,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.MINIMAL}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {}
         headers = {
@@ -1977,6 +1983,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {"response": ExecuteResponse.RAW}
         path = f"/jobs/{new_job.id}"
@@ -1989,6 +1997,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
     @pytest.mark.oap_part4
     def test_job_update_subscribers(self):

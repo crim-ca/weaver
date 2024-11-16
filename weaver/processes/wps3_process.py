@@ -17,7 +17,7 @@ from weaver.warning import MissingParameterWarning
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Tuple, Union
+    from typing import Optional, Tuple, Union
 
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -69,7 +69,7 @@ class Wps3Process(OGCAPIRemoteProcessBase):
         step_payload,   # type: JSON
         job_order,      # type: CWL_RuntimeInputsMap
         process,        # type: str
-        request,        # type: WorkerRequest
+        request,        # type: Optional[WorkerRequest]
         update_status,  # type: UpdateStatusPartialFunction
     ):                  # type: (...) -> None
         super(Wps3Process, self).__init__(
@@ -107,7 +107,7 @@ class Wps3Process(OGCAPIRemoteProcessBase):
             raise PackageExecutionError(f"Failed resolution of {self.process_type} process data source: [{exc!r}]")
 
         self.provider = data_source  # fix immediately for below `update_status` call
-        self.update_status(f"Provider {data_source} is selected {reason}.",
+        self.update_status(f"Provider [{data_source}] is selected {reason}.",
                            Wps3RemoteJobProgress.SETUP, Status.RUNNING)
 
         return data_source, url, deploy_body
