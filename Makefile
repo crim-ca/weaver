@@ -292,7 +292,7 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 	)
 
 .PHONY: install-dev-npm
-install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## install all npm development dependencies
+install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint	## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -300,7 +300,7 @@ install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## i
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+clean-all: clean-build clean-cache clean-dist clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -743,6 +743,13 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+
+.PHONY: dist-pypi
+dist-pypi: clean-dist
+	@echo "Build distributions for PyPI ..."
+	@-python setup.py sdist
+	@-python setup.py bdist_wheel
+	@ls -l dist
 
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 

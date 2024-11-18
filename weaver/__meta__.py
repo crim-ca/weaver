@@ -1,6 +1,7 @@
 __name__ = "weaver"
 __title__ = "Weaver"
 __version__ = "5.9.0"
+__package__ = "crim-weaver"
 __description__ = "Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)."
 __source_repository__ = "https://github.com/crim-ca/weaver"
 __docker_repository__ = "https://hub.docker.com/r/pavics/weaver"

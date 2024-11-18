@@ -76,7 +76,7 @@ LOGGER.info("test requirements: %s", TEST_REQUIREMENTS)
 LOGGER.info("link requirements: %s", LINKS)
 
 setup(
-    name=__meta__.__name__,
+    name=__meta__.__package__,
     version=__meta__.__version__,
     description=__meta__.__description__,
     long_description=LONG_DESCRIPTION,
