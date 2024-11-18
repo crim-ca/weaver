@@ -16,7 +16,7 @@ __authors__ = [
 ]
 __author__ = ", ".join(__authors__)
 __emails__ = [
-    ""
+    "info@crim.ca"
 ]
 __keywords__ = [
     "buildout",
