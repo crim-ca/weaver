@@ -232,33 +232,33 @@ def test_process_outputs_alt():
         stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
 
     process = Process(id=f"test-{uuid.uuid4()!s}", package={},
-                      outputs=[{"identifier": "output1", "formats": [{"mediaType": "image/tiff"}]}],
-                      inputs=[{"identifier": "input_1", "formats": [{"mediaType": "application/zip"}]}])
+                      outputs=[{"identifier": "output1", "formats": [{"mediaType": ContentType.IMAGE_TIFF}]}],
+                      inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
     offer = process.offering()
 
     # Assert that process outputs in offering contains alternate representation
     assert offer["outputs"]["output1"]["formats"] == [
         {
-            "mediaType": "image/tiff"
+        "mediaType": ContentType.IMAGE_TIFF
         },
         {
-            "mediaType": "image/png"
+        "mediaType": ContentType.IMAGE_PNG
         },
         {
-            "mediaType": "image/gif"
+        "mediaType": ContentType.IMAGE_GIF
         },
         {
-            "mediaType": "image/jpeg"
+        "mediaType": ContentType.IMAGE_JPEG
         },
         {
-            "mediaType": "image/svg+xml"
+        "mediaType": ContentType.IMAGE_SVG_XML
         },
         {
-            "mediaType": "application/pdf"
+        "mediaType": ContentType.APP_PDF
         }]
 
     # Assert that process outputs are unchanged
-    assert process.outputs[0]["formats"] == [{"mediaType": "image/tiff"}]
+    assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
 
 
 @pytest.mark.parametrize(
