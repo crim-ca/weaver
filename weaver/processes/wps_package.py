@@ -74,6 +74,13 @@ from weaver.formats import (
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
+    CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+    CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED,
+    CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+    CWL_NAMESPACE_SCHEMA_URL,
     CWL_NAMESPACE_WEAVER_DEFINITION,
     CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -226,16 +233,6 @@ PACKAGE_PROGRESS_PREP_OUT = 98
 PACKAGE_PROGRESS_DONE = 100
 
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
-
-SUPPORTED_METADATA_MAPPING = [
-    "s:author",
-    "s:citation",
-    "s:codeRepository",
-    "s:contributor",
-    "s:dateCreated",
-    "s:license",
-    "s:releaseNotes",
-]
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -794,18 +791,25 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                     metadata.append({"title": namespaces_inv[namespace_url], "href": schema})
         wps_package_metadata["metadata"] = metadata
 
-    if "s:keywords" in cwl_package_package and isinstance(cwl_package_package["s:keywords"], list):
+    if (
+        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS in cwl_package_package and
+        isinstance(cwl_package_package[CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS], list)
+    ):
         wps_package_metadata["keywords"] = list(
-            set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
+            set(wps_package_metadata.get("keywords", [])) |
+            set(cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS, []))
         )
 
     # specific use case with a different mapping
     # https://docs.ogc.org/bp/20-089r1.html#toc31
-    if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
+    if (
+        CWL_NAMESPACE_SCHEMA_METADATA_VERSION in cwl_package_package or
+        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION in cwl_package_package
+    ):
         version_value = (
             wps_package_metadata.get("version")
-            or cwl_package_package.get("s:version")
-            or cwl_package_package.get("s:softwareVersion")
+            or cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
+            or cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION)
         )
         # Only set the key if version_value is not empty or null
         if version_value:
@@ -815,34 +819,48 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         if version_value:
             wps_package_metadata["version"] = str(version_value)
 
-    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
+    schema_ns = f"{CWL_NAMESPACE_SCHEMA_ID}:"
+    for metadata_mapping in CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED:
+        if metadata_mapping in [  # skip handled above
+            CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+            CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+            CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+        ]:
+            continue
+
         if metadata_mapping in cwl_package_package:
             metadata = wps_package_metadata.get("metadata", [])
             if (
-                isinstance((cwl_package_package[metadata_mapping]), str)
+                isinstance(cwl_package_package[metadata_mapping], str)
                 and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
             ):
                 url = cwl_package_package[metadata_mapping]
-                if metadata_mapping == "s:codeRepository":
-                    type = "text/html"
+                if metadata_mapping == CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY:
+                    ctype = ContentType.TEXT_HTML
                 else:
-                    type = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
+                    ctype = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
                 metadata.append({
-                    "type": type,
-                    "rel": metadata_mapping.strip("s:"),
+                    "type": ctype,
+                    "rel": metadata_mapping.strip(schema_ns),
                     "href": cwl_package_package[metadata_mapping]
+                })
+            elif isinstance(cwl_package_package[metadata_mapping], str):
+                class_name = metadata_mapping.strip(schema_ns)
+                metadata.append({
+                    "role": class_name,
+                    "value": cwl_package_package[metadata_mapping]
                 })
             else:
                 for objects in cwl_package_package[metadata_mapping]:
-                    class_name = objects["class"].strip("s:")
+                    class_name = objects["class"].strip(schema_ns)
                     value = {
-                        "$schema": f"https://schema.org/{class_name}"
+                        "$schema": f"{CWL_NAMESPACE_SCHEMA_URL}{class_name}"
                     }
                     for key, val in objects.items():
-                        if key.startswith("s:"):
-                            value[key.strip("s:")] = val
+                        if key.startswith(schema_ns):
+                            value[key.strip(schema_ns)] = val
                     metadata.append({
-                        "role": metadata_mapping.strip("s:"),
+                        "role": metadata_mapping.strip(schema_ns),
                         "value": value
                     })
 

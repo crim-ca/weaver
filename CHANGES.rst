@@ -65,6 +65,9 @@ Changes:
 
 Fixes:
 ------
+- Fix definition of `CWL` ``schema.org`` namespaced fields (i.e.: ``s:author`` and ``s:dateCreated``) causing
+  schema deserialization error when validation the submitted request body against typical examples provided in
+  `CWL Metadata and Authorship <https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html>`_.
 - Fix ``GET /jobs/{jobId}/inputs`` contents to correctly return the submitted ``outputs`` definition
   for `Process` execution (fixes `#715 <https://github.com/crim-ca/weaver/issues/715>`_).
 - Fix missing ``Link`` header with ``rel: monitor`` relationship in the created `Job` responses

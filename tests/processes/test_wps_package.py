@@ -54,6 +54,7 @@ from weaver.processes.wps_package import (
     mask_process_inputs
 )
 from weaver.wps.service import WorkerRequest
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Dict, TypeVar
@@ -845,59 +846,45 @@ def test_format_extension_validator_basic(data_input, mode, expect):
     assert format_extension_validator(data_input, mode) == expect
 
 
-@pytest.mark.parametrize("original, expected", [
-    (
-        # Test author metadata with empty wps_package
-        {
-            "cwl_package_package": {
-                "s:author": [
-                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
-                ],
+@pytest.mark.parametrize(
+    ["cwl_package_original", "cwl_package_expected"],
+    [
+        (
+            # Test author metadata with empty wps_package
+            {
+                "cwl_package_package": {
+                    "s:author": [
+                        {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                    ],
+                },
+                "wps_package_metadata": {}
             },
-            "wps_package_metadata": {}
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "metadata": [
-                {
-                    "role": "author",
-                    "value": {
-                        "$schema": "https://schema.org/Person",
-                        "name": "John Doe",
-                        "affiliation": "Example Inc."
+            {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "role": "author",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "John Doe",
+                            "affiliation": "Example Inc."
+                        }
                     }
-                }
-            ]
-        }
-    ),
-    (
-        # Test codeRepository
-        {
-            "cwl_package_package": {
-                "s:codeRepository": "https://gitlab.com/",
+                ]
+            }
+        ),
+        (
+            # Test codeRepository
+            {
+                "cwl_package_package": {
+                    "s:codeRepository": "https://gitlab.com/",
+                },
+                "wps_package_metadata": {}
             },
-            "wps_package_metadata": {}
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "metadata": [
-                {
-                    "type": "text/html",
-                    "rel": "codeRepository",
-                    "href": "https://gitlab.com/"
-                }
-            ]
-        }
-    ),
-    (
-        # Test Version with existing metadata
-        {
-            "cwl_package_package": {
-                "s:version": "1.0"
-            },
-            "wps_package_metadata": {
+            {
+                "abstract": "",
+                "title": "",
                 "metadata": [
                     {
                         "type": "text/html",
@@ -906,88 +893,93 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                     }
                 ]
             }
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "version": "1.0",
-            "metadata": [
-                {
-                    "type": "text/html",
-                    "rel": "codeRepository",
-                    "href": "https://gitlab.com/"
+        ),
+        (
+            # Test Version with existing metadata
+            {
+                "cwl_package_package": {
+                    "s:version": "1.0"
                 },
-            ],
-        }
-    ),
-    (
-        # Test softwareVersion
-        {
-            "cwl_package_package": {
-                "s:softwareVersion": "1.0.0"
-            },
-            "wps_package_metadata": {}
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "version": "1.0.0"
-        }
-    ),
-    (
-        # Test contributor
-        {
-            "cwl_package_package": {
-                "s:contributor": [
-                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
-                ],
-            },
-            "wps_package_metadata": {}
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "metadata": [
-                {
-                    "role": "contributor",
-                    "value": {
-                        "$schema": "https://schema.org/Person",
-                        "name": "John Doe",
-                        "affiliation": "Example Inc."
-                    }
+                "wps_package_metadata": {
+                    "metadata": [
+                        {
+                            "type": "text/html",
+                            "rel": "codeRepository",
+                            "href": "https://gitlab.com/"
+                        }
+                    ]
                 }
-            ]
-        }
-    ),
-    (
-        # Test citation
-        {
-            "cwl_package_package": {
-                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
             },
-            "wps_package_metadata": {}
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "metadata": [
-                {
-                    "type": "text/plain",
-                    "rel": "citation",
-                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
-                },
-            ],
-        }
-    ),
-    (
-        # Test dateCreated with existing metadata
-        {
-            "cwl_package_package": {
-                "s:dateCreated": [
-                    {"class": "s:DateTime", "s:dateCreated": "2016-12-13"}
+            {
+                "abstract": "",
+                "title": "",
+                "version": "1.0",
+                "metadata": [
+                    {
+                        "type": "text/html",
+                        "rel": "codeRepository",
+                        "href": "https://gitlab.com/"
+                    },
                 ],
+            }
+        ),
+        (
+            # Test softwareVersion
+            {
+                "cwl_package_package": {
+                    "s:softwareVersion": "1.0.0"
+                },
+                "wps_package_metadata": {}
             },
-            "wps_package_metadata": {
+            {
+                "abstract": "",
+                "title": "",
+                "version": "1.0.0"
+            }
+        ),
+        (
+            # Test contributor
+            {
+                "cwl_package_package": {
+                    "s:contributor": [
+                        {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."},
+                        {"class": "s:Person", "s:name": "Other Guy", "s:affiliation": "Elsewhere"},
+                    ],
+                },
+                "wps_package_metadata": {}
+            },
+            {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "role": "contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "John Doe",
+                            "affiliation": "Example Inc."
+                        }
+                    },
+                    {
+                        "role": "contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Other Guy",
+                            "affiliation": "Elsewhere"
+                        }
+                    }
+                ]
+            }
+        ),
+        (
+            # Test citation
+            {
+                "cwl_package_package": {
+                    "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                },
+                "wps_package_metadata": {}
+            },
+            {
                 "abstract": "",
                 "title": "",
                 "metadata": [
@@ -998,31 +990,48 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                     },
                 ],
             }
-        },
-        {
-            "abstract": "",
-            "title": "",
-            "metadata": [
-                {
-                    "type": "text/plain",
-                    "rel": "citation",
-                    "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+        ),
+        (
+            # Test dateCreated with existing metadata
+            {
+                "cwl_package_package": {
+                    "s:dateCreated": "2016-12-13",
                 },
-                {
-                    "role": "dateCreated",
-                    "value": {
-                        "$schema": "https://schema.org/DateTime",
-                        "dateCreated": "2016-12-13",
-                    }
+                "wps_package_metadata": {
+                    "abstract": "",
+                    "title": "",
+                    "metadata": [
+                        {
+                            "type": "text/plain",
+                            "rel": "citation",
+                            "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                        },
+                    ],
                 }
-            ]
-        }
-    ),
-])
-def test_process_metadata(original, expected):
+            },
+            {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                    {
+                        "role": "dateCreated",
+                        "value": "2016-12-13",
+                    }
+                ]
+            }
+        ),
+    ]
+)
+def test_process_metadata(cwl_package_original, cwl_package_expected):
     # type: (CWL, CWL) -> None
-    cwl_package_package = original["cwl_package_package"]
-    wps_package_metadata = original["wps_package_metadata"]
+    cwl_package_package = cwl_package_original["cwl_package_package"]
+    wps_package_metadata = cwl_package_original["wps_package_metadata"]
+    cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package_package)  # must not raise
+    assert cwl_package_validated == cwl_package_package  # should be unchanged
     _update_package_metadata(wps_package_metadata, cwl_package_package)
-    # Assertions
-    assert wps_package_metadata == expected
+    assert wps_package_metadata == cwl_package_expected
