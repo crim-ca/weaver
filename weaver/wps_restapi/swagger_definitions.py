@@ -5801,7 +5801,6 @@ class CWLAuthors(ExtendedSequenceSchema):
     validator = Length(min=1)
 
 
-
 class CWLDateCreated(OneOfKeywordSchema):
     _one_of = [
         ExtendedSchemaNode(
