@@ -784,7 +784,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         and isinstance(cwl_package_package["$namespaces"], dict)
     ):
         metadata = wps_package_metadata.get("metadata", [])
-        namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"]}
+        namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"].items()}
         for schema in cwl_package_package["$schemas"]:
             for namespace_url in namespaces_inv:
                 if schema.startswith(namespace_url):

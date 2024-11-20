@@ -6,6 +6,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 """
 import contextlib
 import copy
+import inspect
 import io
 import itertools
 import json
@@ -16,7 +17,7 @@ import shutil
 import sys
 import tempfile
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import cwltool.process
 import mock
@@ -33,6 +34,9 @@ from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.formats import ContentType
 from weaver.processes.constants import (
+    CWL_NAMESPACE_SCHEMA_DEFINITION,
+    CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_URL,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_CUDA,
@@ -57,10 +61,10 @@ from weaver.wps.service import WorkerRequest
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, TypeVar
+    from typing import Any, Callable, Dict, TypeVar, Union
     from typing_extensions import Literal
 
-    from weaver.typedefs import CWL
+    from weaver.typedefs import CWL, CWL_AnyRequirements, ProcessOfferingMapping
 
     KT = TypeVar("KT")
     VT_co = TypeVar("VT_co", covariant=True)
@@ -302,8 +306,8 @@ def _add_requirement(reqs1, reqs2):
         if field not in reqs2:
             continue
         reqs1.setdefault(field, {})
-        defs1 = reqs1[field]
-        defs2 = reqs2[field]
+        defs1 = cast("CWL_AnyRequirements", reqs1[field])  # type: CWL_AnyRequirements
+        defs2 = cast("CWL_AnyRequirements", reqs2[field])  # type: CWL_AnyRequirements
         if isinstance(defs1, list):
             if isinstance(defs2, dict):
                 defs2 = [_combine({"class": req}, val) for req, val in defs2.items()]
@@ -847,18 +851,16 @@ def test_format_extension_validator_basic(data_input, mode, expect):
 
 
 @pytest.mark.parametrize(
-    ["cwl_package_original", "cwl_package_expected"],
+    ["cwl_package_package", "wps_package_metadata", "cwl_package_expected"],
     [
         (
             # Test author metadata with empty wps_package
             {
-                "cwl_package_package": {
-                    "s:author": [
-                        {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
-                    ],
-                },
-                "wps_package_metadata": {}
+                "s:author": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
             },
+            {},
             {
                 "abstract": "",
                 "title": "",
@@ -877,11 +879,9 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test codeRepository
             {
-                "cwl_package_package": {
-                    "s:codeRepository": "https://gitlab.com/",
-                },
-                "wps_package_metadata": {}
+                "s:codeRepository": "https://gitlab.com/",
             },
+            {},
             {
                 "abstract": "",
                 "title": "",
@@ -897,18 +897,16 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test Version with existing metadata
             {
-                "cwl_package_package": {
-                    "s:version": "1.0"
-                },
-                "wps_package_metadata": {
-                    "metadata": [
-                        {
-                            "type": "text/html",
-                            "rel": "codeRepository",
-                            "href": "https://gitlab.com/"
-                        }
-                    ]
-                }
+                "s:version": "1.0"
+            },
+            {
+                "metadata": [
+                    {
+                        "type": "text/html",
+                        "rel": "codeRepository",
+                        "href": "https://gitlab.com/"
+                    }
+                ]
             },
             {
                 "abstract": "",
@@ -926,11 +924,9 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test softwareVersion
             {
-                "cwl_package_package": {
-                    "s:softwareVersion": "1.0.0"
-                },
-                "wps_package_metadata": {}
+                "s:softwareVersion": "1.0.0"
             },
+            {},
             {
                 "abstract": "",
                 "title": "",
@@ -940,14 +936,12 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test contributor
             {
-                "cwl_package_package": {
-                    "s:contributor": [
-                        {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."},
-                        {"class": "s:Person", "s:name": "Other Guy", "s:affiliation": "Elsewhere"},
-                    ],
-                },
-                "wps_package_metadata": {}
+                "s:contributor": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."},
+                    {"class": "s:Person", "s:name": "Other Guy", "s:affiliation": "Elsewhere"},
+                ],
             },
+            {},
             {
                 "abstract": "",
                 "title": "",
@@ -974,11 +968,9 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test citation
             {
-                "cwl_package_package": {
-                    "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
-                },
-                "wps_package_metadata": {}
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
             },
+            {},
             {
                 "abstract": "",
                 "title": "",
@@ -994,20 +986,18 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (
             # Test dateCreated with existing metadata
             {
-                "cwl_package_package": {
-                    "s:dateCreated": "2016-12-13",
-                },
-                "wps_package_metadata": {
-                    "abstract": "",
-                    "title": "",
-                    "metadata": [
-                        {
-                            "type": "text/plain",
-                            "rel": "citation",
-                            "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
-                        },
-                    ],
-                }
+                "s:dateCreated": "2016-12-13",
+            },
+            {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                ],
             },
             {
                 "abstract": "",
@@ -1025,13 +1015,53 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 ]
             }
         ),
+        (
+            # test CWL '$schemas' and '$namespace' mapping to alternate metadata references
+            {
+                "$schemas": [CWL_NAMESPACE_SCHEMA_URL],
+                "$namespaces": dict(CWL_NAMESPACE_SCHEMA_DEFINITION),
+            },
+            {
+                "metadata": [
+                    {
+                        "role": "test",
+                        "value": "test",
+                    }
+                ]
+            },
+            {
+                "abstract": "",
+                "title": "",
+                "metadata": [
+                    {
+                        "role": "test",
+                        "value": "test",
+                    },
+                    {
+                        "title": CWL_NAMESPACE_SCHEMA_ID,
+                        "href": CWL_NAMESPACE_SCHEMA_URL,
+                    }
+                ]
+            }
+        ),
+        (
+            # test CWL 's:keywords' vs WPS 'keywords'
+            {
+                "s:keywords": ["a", "b", "c"],
+            },
+            {
+                "keywords": ["a", "x", "y", "d", "e", "f"],
+            },
+            lambda src: set(src["keywords"]) == {"a", "b", "c", "x", "y", "d", "e", "f"},
+        ),
     ]
 )
-def test_process_metadata(cwl_package_original, cwl_package_expected):
-    # type: (CWL, CWL) -> None
-    cwl_package_package = cwl_package_original["cwl_package_package"]
-    wps_package_metadata = cwl_package_original["wps_package_metadata"]
+def test_process_metadata(cwl_package_package, wps_package_metadata, cwl_package_expected):
+    # type: (CWL, ProcessOfferingMapping, Union[CWL, Callable[[CWL], bool]]) -> None
     cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package_package)  # must not raise
     assert cwl_package_validated == cwl_package_package  # should be unchanged
     _update_package_metadata(wps_package_metadata, cwl_package_package)
-    assert wps_package_metadata == cwl_package_expected
+    if inspect.isfunction(cwl_package_expected):
+        assert cwl_package_expected(wps_package_metadata)
+    else:
+        assert wps_package_metadata == cwl_package_expected
