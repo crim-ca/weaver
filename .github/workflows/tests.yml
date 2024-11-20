@@ -135,7 +135,7 @@ jobs:
         if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
         uses: codecov/test-results-action@v1
         with:
-          files: ./junit.xml,!./cache
+          files: reports/coverage-junit.xml,!./cache
           flags: ${{ matrix.python-version }}
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload coverage report
