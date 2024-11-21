@@ -339,8 +339,6 @@ class WpsRestApiJobsTest(JobUtils):
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
 
-    @pytest.mark.html
-    @pytest.mark.oap_part1
     @parameterized.expand([
         ({}, ),  # detail omitted should apply it for HTML, unlike JSON that returns the simplified listing by default
         ({"detail": None}, ),
@@ -353,6 +351,8 @@ class WpsRestApiJobsTest(JobUtils):
         ({"detail": "False"}, ),
         ({"detail": "no"}, ),
     ])
+    @pytest.mark.html
+    @pytest.mark.oap_part1
     def test_get_jobs_detail_html_enforced(self, params):
         """
         Using :term:`HTML`, ``detail`` response is always enforced to allow rendering, regardless of the parameter.
@@ -779,7 +779,6 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    @pytest.mark.oap_part1
     @parameterized.expand([
         get_path_kvp(
             sd.jobs_service.path,
@@ -818,6 +817,7 @@ class WpsRestApiJobsTest(JobUtils):
             service="provider-2",
         ),
     ])
+    @pytest.mark.oap_part1
     def test_get_jobs_process_or_service_mismatch_in_path_or_query(self, path):
         # type: (str) -> None
         """
@@ -1820,13 +1820,13 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
 
-    @pytest.mark.oap_part4
     @pytest.mark.xfail(reason="CWL PROV not implemented (https://github.com/crim-ca/weaver/issues/673)")
+    @pytest.mark.oap_part4
     def test_job_run_response(self):
         raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/673)
 
-    @pytest.mark.oap_part4
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCEEDED])
+    @pytest.mark.oap_part4
     def test_job_update_locked(self, status):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,

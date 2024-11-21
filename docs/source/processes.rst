@@ -414,13 +414,15 @@ Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/proc
 The request body requires mainly two components:
 
 - | ``processDescription``:
-  | Defines the process identifier, metadata, inputs, outputs, and some execution specifications. This mostly
-    corresponds to information that is provided by traditional :term:`WPS` definition.
+  | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
+    This mostly corresponds to information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions.
 - | ``executionUnit``:
-  | Defines the core details of the `Application Package`_. This corresponds to the explicit :term:`CWL` definition
-    that indicates how to execute the given application.
+  | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
+    or other :ref:`proc_types` references that indicates how to execute the underlying application.
 
-.. _Application Package: docs/source/package.rst
+.. |app_pkg| replace:: Application Package
+.. _app_pkg: docs/source/package.rst
 
 Upon deploy request, `Weaver` will either respond with a successful result, or with the appropriate error message,
 whether caused by conflicting ID, invalid definitions or other parsing issues. A successful process deployment will
