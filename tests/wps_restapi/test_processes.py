@@ -1055,7 +1055,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         })
         return cwl
 
-    def test_deploy_process_CWL_DockerRequirement_href(self):
+    @parameterized.expand([
+        ("mapping", ),
+        ("listing", ),
+    ])
+    @pytest.mark.oap_part2
+    def test_deploy_process_CWL_DockerRequirement_href(self, exec_unit_style):
+        # type: (Literal["mapping", "listing"]) -> None
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
@@ -1069,9 +1075,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 json.dump(cwl, cwl_file)
 
             p_id = "test-docker-python-version"
+            unit = [{"href": tmp_href}] if exec_unit_style == "listing" else {"href": tmp_href}
             body = {
                 "processDescription": {"process": {"id": p_id}},
-                "executionUnit": [{"href": tmp_href}],
+                "executionUnit": unit,
                 "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
@@ -2570,12 +2577,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             else:
                 self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")
 
-    @pytest.mark.oap_part3
     @parameterized.expand([
         ({}, {}, True),  # no outputs returned
         ({}, {"result1": "data", "result2": 123}, True),  # too many outputs returned (not explicitly requested)
         ({"result1": {}, "result2": {}}, {"result1": "data", "result2": 123}, False),  # too many outputs requested
     ])
+    @pytest.mark.oap_part3
     def test_execute_process_nested_invalid_results_amount(self, test_outputs, mock_result, expect_execute):
         proc_path = f"/processes/{self.process_public.identifier}"
         exec_path = f"{proc_path}/jobs"
