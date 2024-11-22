@@ -532,6 +532,84 @@ def test_any2cwl_io_from_oas():
                 "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
             },
         ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["a", "b", "c"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                # note: "type" as array of single mapping with "type: array" would also be valid ([] around the {})
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["a", "b", "c"],
+                    },
+                }
+            }
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["a", "b", "c"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["a", "b", "c"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["a", "b", "c"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["a", "b", "c"],
+                        },
+                    }
+                ]
+            }
+        )
     ]
 )
 def test_any2cwl_io_enum_convert(io_select, test_io, expect):
