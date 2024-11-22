@@ -52,10 +52,28 @@ def test_cli_url_required_in_client_or_param():
         WeaverClient().execute("")
     try:
         with mock.patch("weaver.cli.WeaverClient._parse_inputs", return_value=OperationResult()):
-            WeaverClient(url="http://fake.domain.com").execute("")
-            WeaverClient().execute("", url="http://fake.domain.com")
+            WeaverClient(url="https://fake.domain.com").execute("")
+            WeaverClient().execute("", url="https://fake.domain.com")
     except ValueError:
         pytest.fail()
+
+
+@pytest.mark.cli
+def test_cli_url_override_by_operation():
+    with mock.patch("weaver.cli.WeaverClient._parse_inputs", return_value=OperationResult()):
+        client = WeaverClient(url="https://fake.domain.com")
+        real_get_url = WeaverClient._get_url
+        returned_url = []
+
+        def mock_get_url(_url):
+            _url = real_get_url(client, _url)
+            returned_url.append(_url)
+            return _url
+
+        with mock.patch("weaver.cli.WeaverClient._get_url", side_effect=mock_get_url) as mocked:
+            client.execute(url="https://other.domain.com", process_id="random")
+        assert mocked.call_args.args[0] == "https://other.domain.com"
+        assert returned_url[0] == "https://other.domain.com"
 
 
 @pytest.mark.cli
@@ -73,7 +91,7 @@ def test_parse_inputs_from_file():
             json.dump({"inputs": {"input1": "data"}}, input_json)
             input_json.flush()
             input_json.seek(0)
-            result = WeaverClient().execute("fake_process", inputs=input_json.name, url="http://fake.domain.com")
+            result = WeaverClient().execute("fake_process", inputs=input_json.name, url="https://fake.domain.com")
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == {"input1": "data"}
@@ -133,7 +151,7 @@ def test_parse_inputs(data_inputs, expect_inputs):
 
     # use '_upload_files' to early-stop the operation, since it is the step right after parsing inputs
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
-        result = WeaverClient().execute("fake_process", inputs=data_inputs, url="http://fake.domain.com")
+        result = WeaverClient().execute("fake_process", inputs=data_inputs, url="https://fake.domain.com")
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == expect_inputs
@@ -167,7 +185,7 @@ def test_parse_inputs_with_media_type():
                 # different media-type than YAML on purpose to ensure parsing uses provided value, and not extension
                 "-I", f"input:File={input_yaml.name}@mediaType={ContentType.APP_CWL}",
                 "-p", "fake_process",
-                "-u", "http://fake.domain.com",
+                "-u", "https://fake.domain.com",
                 "-q",  # since CLI fails purposely, avoid logging errors which would be confusing if debugging logs
             ], entrypoint=no_error_cli)
 
@@ -180,8 +198,8 @@ def test_parse_inputs_with_media_type():
     }
 
     inputs.clear()
-    schema_json = "http://schema.org/random.json"
-    schema_xml = "http://schema.org/other.xml"
+    schema_json = "https://schema.org/random.json"
+    schema_xml = "https://schema.org/other.xml"
     with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
         with ExitStack() as stack:
             input_yaml = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".yml"))
@@ -213,7 +231,7 @@ def test_parse_inputs_with_media_type():
                 "-I", f"input:File={input_json.name}@type={ContentType.APP_JSON}@rel=schema",
                 "-I", f"other:File={input_tif.name}@mediaType={ctype_tif_escaped}@encoding=base64@rel=image",
                 "-p", "fake_process",
-                "-u", "http://fake.domain.com",
+                "-u", "https://fake.domain.com",
                 "-q",  # since CLI fails purposely, avoid logging errors which would be confusing if debugging logs
             ], entrypoint=no_error_cli)
 

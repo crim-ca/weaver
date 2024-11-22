@@ -470,7 +470,9 @@ class WeaverClient(object):
         # type: (Optional[str]) -> str
         if not self._url and not url:
             raise ValueError("No URL available. Client was not created with an URL and operation did not receive one.")
-        return self._url or self._parse_url(url)
+        if url:
+            return self._parse_url(url)
+        return self._url
 
     @staticmethod
     def _parse_url(url):

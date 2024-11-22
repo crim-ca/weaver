@@ -65,6 +65,8 @@ Changes:
 
 Fixes:
 ------
+- Fix ``url`` parameter to override the `CLI` internal ``url`` when passed explicitly to the invoked operation.
+- Fix ``href`` detection when provided directly as mapping within the ``executionUnit`` of the deployment body.
 - Fix definition of `CWL` ``schema.org`` namespaced fields (i.e.: ``s:author`` and ``s:dateCreated``) causing
   schema deserialization error when validation the submitted request body against typical examples provided in
   `CWL Metadata and Authorship <https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html>`_.
