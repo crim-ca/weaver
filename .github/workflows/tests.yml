@@ -131,13 +131,6 @@ jobs:
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/test-results-action@v1
-        with:
-          files: reports/coverage-junit.xml,!./cache
-          flags: ${{ matrix.python-version }}
-          token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload coverage report
         uses: codecov/codecov-action@v2
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
@@ -146,6 +139,13 @@ jobs:
           files: ./reports/coverage.xml
           fail_ci_if_error: true
           verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
+        uses: codecov/test-results-action@v1
+        with:
+          files: reports/coverage-junit.xml,!./cache
+          flags: ${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   deploy-docker:
     needs: tests
