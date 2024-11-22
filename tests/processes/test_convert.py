@@ -532,6 +532,197 @@ def test_any2cwl_io_from_oas():
                 "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
             },
         ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 2,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 1,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": [
+                    {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 0,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    # explicitly array, MUST force CWL to be an array as well
+                    # doesn't matter that default min/max occurs = 1
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                # note: "type" as array of single mapping with "type: array" would also be valid ([] around the {})
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 1,  # same as previous, but explicitly specified rather than default
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,  # because optional, array must be combined with "null"
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,  # same as previous
+                "maxOccurs": 4,  # explicitly specified should not change anything
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        )
     ]
 )
 def test_any2cwl_io_enum_convert(io_select, test_io, expect):

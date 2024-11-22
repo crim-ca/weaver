@@ -65,6 +65,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `CWL` conversion from a `OGC API - Processes` definition specifying an `I/O` with ``schema`` explicitly
+  indicating a ``type: array`` and nested ``enum``, even if ``minOccurs: 1`` is omitted or explicitly set.
 - Fix ``url`` parameter to override the `CLI` internal ``url`` when passed explicitly to the invoked operation.
 - Fix ``href`` detection when provided directly as mapping within the ``executionUnit`` of the deployment body.
 - Fix definition of `CWL` ``schema.org`` namespaced fields (i.e.: ``s:author`` and ``s:dateCreated``) causing

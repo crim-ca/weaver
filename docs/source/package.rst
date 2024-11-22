@@ -554,18 +554,18 @@ Inputs/Outputs ID
 -----------------------
 
 Inputs and outputs (:term:`I/O`) ``id`` from the :term:`CWL` context will be respectively matched against corresponding
-``id`` or ``identifier`` field from I/O of :term:`WPS` context. In the :term:`CWL` definition, all of the allowed I/O
-structures are supported, whether they are specified using an array list with explicit definitions, using "shortcut"
-variant (i.e.: ``<type>[]``), or using key-value pairs (see |cwl-io-map|_ for more details). Regardless of array or
-mapping format, :term:`CWL` requires that all I/O have unique ``id``.
-On the :term:`WPS` side, either a mapping or list of I/O are also expected with unique ``id``.
+``id`` or ``identifier`` field from :term:`I/O` of :term:`WPS` context. In the :term:`CWL` definition, all of the
+allowed :term:`I/O` structures are supported, whether they are specified using an array list with explicit definitions,
+using "shortcut" variant (i.e.: ``<type>[]``), or using key-value pairs (see |cwl-io-map|_ for more details).
+Regardless of array or mapping format, :term:`CWL` requires that all :term:`I/O` have unique ``id``.
+On the :term:`WPS` side, either a mapping or list of :term:`I/O` are also expected with unique ``id``.
 
 .. versionchanged:: 4.0
-    Previous versions only supported :term:`WPS` I/O using the listing format. Both can be used interchangeably in
-    both :term:`CWL` and :term:`WPS` contexts as of this version.
+    Previous versions only supported :term:`WPS` :term:`I/O` using the listing format.
+    Both can be used interchangeably in both :term:`CWL` and :term:`WPS` contexts as of this version.
 
-To summarize, the following :term:`CWL` and :term:`WPS` I/O definitions are all equivalent and will result into the
-same process definition after deployment. For simplification purpose, below examples omit all but mandatory fields
+To summarize, the following :term:`CWL` and :term:`WPS` :term:`I/O` definitions are all equivalent and will result into
+the same process definition after deployment. For simplification purpose, below examples omit all but mandatory fields
 (only of the ``inputs`` and ``outputs`` portion of the full deployment body) to produce the same result.
 Other fields are discussed afterward in specific sections.
 
@@ -616,11 +616,13 @@ the :ref:`Deploy <proc_op_deploy>` request body with any of the following variat
 .. warning::
     `Weaver` assumes that its main purpose is to eventually execute an :term:`Application Package` and will therefore
     prioritize specification in :term:`CWL` over :term:`WPS` to infer types. Because of this, any unmatched ``id`` from
-    the :term:`WPS` context against provided :term:`CWL` ``id``\s of the same I/O section **will be dropped**, as they
-    ultimately would have no purpose during :term:`CWL` execution.
+    the :term:`WPS` context against provided :term:`CWL` ``id``\s of the same :term:`I/O` section **will be dropped**,
+    as they ultimately would have no purpose during :term:`CWL` execution.
 
     This does not apply in the case of referenced :ref:`proc_wps_12` processes since no :term:`CWL` is available in the
-    first place.
+    first place. Similarly, when deploying a :ref:`Remote OGC API - Processes <proc_ogc_api>` by :term:`URL` reference,
+    it is expected that only the :term:`OAS` context (see :ref:`oas_io_schema`) with ``schema`` are provided. Therefore,
+    these definitions could overrule the :term:`CWL` resolution that would normally occur.
 
 .. _cwl-io-types:
 
@@ -650,7 +652,10 @@ The simplification of types can happen when converting in any direction
 It all depends on which definitions that were provided are the more specific. For example, a :term:`WPS` ``dateTime``
 will be simplified to a generic :term:`CWL` ``string``, and into an :term:`OAS` ``string`` with ``format: "date-time"``.
 In this example, it would be important to provide the :term:`WPS` or :term:`OAS` definitions if the *date-time* portion
-was critical, since it could not be inferred only from :term:`CWL` ``string``.
+was critical, since it could not be inferred only from :term:`CWL` ``string`` (since it doesn't define this concept).
+
+.. seealso::
+    Further details for the :term:`OAS` context are provided in :ref:`oas_io_schema`.
 
 Further details regarding handling methods or important considerations for
 specific types will be presented in :ref:`cwl-type` and :ref:`cwl-dir` sections.
@@ -740,10 +745,10 @@ In the :term:`WPS` context, three data types exist, namely ``Literal``, ``Boundi
 
 As presented in previous examples, :term:`I/O` in the :term:`WPS` context does not require an explicit indication of
 which data type from one of ``Literal``, ``BoundingBox`` and ``Complex`` to apply. Instead, :term:`WPS` type can be
-inferred using the matched API schema of the I/O. For instance, ``Complex`` I/O (e.g.: file reference) requires the
-``formats`` field to distinguish it from a plain ``string``. Therefore, specifying either ``format`` in :term:`CWL`
-or ``formats`` in :term:`WPS` immediately provides all needed information for `Weaver` to understand that this I/O is
-expected to be a file reference.
+inferred using the matched API schema of the :term:`I/O`. For instance, ``Complex`` :term:`I/O`
+(e.g.: :ref:`File Reference <file_ref_types>`) requires the ``formats`` field to distinguish it from a plain ``string``.
+Therefore, specifying either ``format`` in :term:`CWL` or ``formats`` in :term:`WPS` immediately provides all needed
+information for `Weaver` to understand that this :term:`I/O` is expected to be a file reference.
 
 .. code-block:: json
     :caption: WPS Complex Data Type
@@ -884,7 +889,7 @@ Following is an example where input definitions are equivalent in both :term:`CW
 
     +-----------------------------------------------+-----------------------------------------------------------------+
     | .. code-block:: json                          | .. code-block:: json                                            |
-    |    :caption: WPS Format with MIME-type        |    :caption: CWL Format with Namespace                          |
+    |    :caption: :term:`WPS` Format with MIME-type|    :caption: :term:`CWL` Format with Namespace                  |
     |    :linenos:                                  |    :linenos:                                                    |
     |                                               |                                                                 |
     |    {                                          |    {                                                            |
@@ -981,19 +986,19 @@ the following two variants are equivalent and completely interchangeable.
     :align: center
     :widths: 50,50
 
-    +---------------------------------------------------+-----------------------------------------------+
-    | .. code-block:: json                              | .. code-block:: json                          |
-    |    :caption: WPS AllowedValues Input              |    :caption: CWL Enum Values                  |
-    |    :linenos:                                      |    :linenos:                                  |
-    |                                                   |                                               |
-    |    {                                              |    {                                          |
-    |      "id": "input",                               |      "id": "input",                           |
-    |      "literalDataDomains": [                      |      "type": {                                |
-    |        {"allowedValues": ["value-1", "value-2"]}  |        "type": "enum",                        |
-    |      ]                                            |        "symbols": ["value-1", "value-2"]      |
-    |    }                                              |      }                                        |
-    |                                                   |    }                                          |
-    +---------------------------------------------------+-----------------------------------------------+
+   +---------------------------------------------------+-----------------------------------------------+
+   | .. code-block:: json                              | .. code-block:: json                          |
+   |    :caption: :term:`WPS` AllowedValues Input      |    :caption: :term:`CWL` Enum Values          |
+   |    :linenos:                                      |    :linenos:                                  |
+   |                                                   |                                               |
+   |    {                                              |    {                                          |
+   |      "id": "input",                               |      "id": "input",                           |
+   |      "literalDataDomains": [                      |      "type": {                                |
+   |        {"allowedValues": ["value-1", "value-2"]}  |        "type": "enum",                        |
+   |      ]                                            |        "symbols": ["value-1", "value-2"]      |
+   |    }                                              |      }                                        |
+   |                                                   |    }                                          |
+   +---------------------------------------------------+-----------------------------------------------+
 
 `Weaver` will ensure to propagate such definitions bidirectionally in order to update the :term:`CWL` or :term:`WPS`
 correspondingly with the provided information in the other context if missing. The primitive type to apply to a missing
@@ -1026,8 +1031,8 @@ than :term:`CWL` because all details are contained within the same two parameter
 preferable to provide the ``minOccurs`` and ``maxOccurs`` in the :term:`WPS` context, and let `Weaver` infer the
 ``array`` and/or ``"null"`` type requirements automatically. Also, because of all implied parameters in this situation
 to specify the similar details, it is important to avoid providing contradicting specifications as `Weaver` will have
-trouble guessing the intended result when merging specifications. If unambiguous guess can be made, :term:`CWL` will be
-employed as the overruling definition to resolve erroneous mismatches (as for any other corresponding fields).
+trouble guessing the intended result when merging specifications. If an ambiguous guess is made, :term:`CWL` will
+be employed as the overruling definition to resolve erroneous mismatches (as for any other corresponding fields).
 
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the :term:`WPS` context. Native
@@ -1048,20 +1053,20 @@ of *multiple* and *optional* information.
     :align: center
     :widths: 50,50
 
-    +---------------------------------------------------+-----------------------------------------------------------+
-    | .. code-block:: json                              | .. code-block:: json                                      |
-    |    :caption: WPS Multi-Value Input (required)     |    :caption: CWL Multi-Value Input (required)             |
-    |    :linenos:                                      |    :linenos:                                              |
-    |                                                   |                                                           |
-    |    {                                              |    {                                                      |
-    |      "id": "input-multi-required",                |      "id": "input-multi-required",                        |
-    |      "format": "application/json",                |      "format": "iana:application/json",                   |
-    |      "minOccurs": 1,                              |      "type": {                                            |
-    |      "maxOccurs": "unbounded"                     |        "type": "array", "items": "File"                   |
-    |    }                                              |      }                                                    |
-    |                                                   |    }                                                      |
-    |                                                   |                                                           |
-    +---------------------------------------------------+-----------------------------------------------------------+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: json                                  | .. code-block:: json                                  |
+    |    :caption: :term:`WPS` Multi-Value Input (required) |    :caption: :term:`CWL` Multi-Value Input (required) |
+    |    :linenos:                                          |    :linenos:                                          |
+    |                                                       |                                                       |
+    |    {                                                  |    {                                                  |
+    |      "id": "input-multi-required",                    |      "id": "input-multi-required",                    |
+    |      "format": "application/json",                    |      "format": "iana:application/json",               |
+    |      "minOccurs": 2,                                  |      "type": {                                        |
+    |      "maxOccurs": "unbounded"                         |        "type": "array", "items": "File"               |
+    |    }                                                  |      }                                                |
+    |                                                       |    }                                                  |
+    |                                                       |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
 
 
 It can be noted from the examples that ``minOccurs`` and ``maxOccurs`` can be either an ``integer`` or a ``string``
@@ -1093,7 +1098,12 @@ compliant with :term:`OGC API - Processes` specification that requires this deta
 the :ref:`Process Description <proc_op_describe>`. The same kind of ``schema`` definitions can be used
 for the :ref:`Deploy <proc_op_deploy>` operation.
 
-For example, the below representations are equivalent between :term:`WPS`, :term:`OAS` and :term:`CWL` definitions.
+.. note::
+    This section will present multiple example to illustrate the conversion logic of various :term:`I/O`
+    representations using the different :term:`WPS`/:term:`OAS`/:term:`CWL` contexts.
+    See table :ref:`table-io-summary-context-mapping` for a quick overview.
+
+Below representations are equivalent between :term:`WPS`, :term:`OAS` and :term:`CWL` definitions.
 Obviously, corresponding definitions can become more or less complicated with multiple combinations of corresponding
 parameters presented later in this section. Some definitions are also not completely portable between contexts.
 
@@ -1102,27 +1112,27 @@ parameters presented later in this section. Some definitions are also not comple
     :align: center
     :widths: 33,34,33
 
-    +-------------------------------+------------------------------+-----------------------------+
-    | .. code-block:: json          | .. code-block:: json         | .. code-block:: json        |
-    |    :caption: WPS Input        |    :caption: OAS Input       |    :caption: CWL Input      |
-    |    :linenos:                  |    :linenos:                 |    :linenos:                |
-    |                               |                              |                             |
-    |    {                          |    {                         |    {                        |
-    |      "id": "input",           |      "id": "input",          |      "id": "input",         |
-    |      "literalDataDomains": [  |      "schema": {             |      "type": {              |
-    |        {                      |        "type": "array",      |        "type": "array",     |
-    |           "allowedValues": [  |        "items": {            |        "items": {           |
-    |             "value-1",        |          "type": "string",   |          "type": "enum",    |
-    |             "value-2"         |          "enum": [           |          "symbols": [       |
-    |           ]                   |            "value-1",        |            "value-1",       |
-    |        }                      |            "value-2"         |            "value-2"        |
-    |      ],                       |          ]                   |          ]                  |
-    |      "minOccurs": 2,          |        },                    |        }                    |
-    |      "maxOccurs": 4           |        "minItems": 2,        |      }                      |
-    |    }                          |        "maxItems": 4         |    }                        |
-    |                               |      }                       |                             |
-    |                               |    }                         |                             |
-    +-------------------------------+------------------------------+-----------------------------+
+    +--------------------------------+--------------------------------+--------------------------------+
+    | .. code-block:: json           | .. code-block:: json           | .. code-block:: json           |
+    |    :caption: :term:`WPS` Input |    :caption: :term:`OAS` Input |    :caption: :term:`CWL` Input |
+    |    :linenos:                   |    :linenos:                   |    :linenos:                   |
+    |                                |                                |                                |
+    |    {                           |    {                           |    {                           |
+    |      "id": "input",            |      "id": "input",            |      "id": "input",            |
+    |      "literalDataDomains": [   |      "schema": {               |      "type": {                 |
+    |        {                       |        "type": "array",        |        "type": "array",        |
+    |           "allowedValues": [   |        "items": {              |        "items": {              |
+    |             "value-1",         |          "type": "string",     |          "type": "enum",       |
+    |             "value-2"          |          "enum": [             |          "symbols": [          |
+    |           ]                    |            "value-1",          |            "value-1",          |
+    |        }                       |            "value-2"           |            "value-2"           |
+    |      ],                        |          ]                     |          ]                     |
+    |      "minOccurs": 2,           |        },                      |        }                       |
+    |      "maxOccurs": 4            |        "minItems": 2,          |      }                         |
+    |    }                           |        "maxItems": 4           |    }                           |
+    |                                |      }                         |                                |
+    |                                |    }                           |                                |
+    +--------------------------------+--------------------------------+--------------------------------+
 
 .. seealso::
     An example with extensive variations of supported :term:`I/O` definitions with :term:`OAS` is
@@ -1136,13 +1146,216 @@ As per all previous parameters in :term:`CWL` and :term:`WPS` contexts, details 
 complementary and `Weaver` will attempt to infer, combine and convert between the various representations as best
 as possible according to the level of details provided.
 
-Furthermore, `Weaver` will *extend* (as needed) any provided ``schema`` during
+Furthermore, `Weaver` will *extend* (as needed) any provided ``schema`` and the resulting :term:`CWL` ``type`` during
 :ref:`Process Deployment <proc_op_deploy>` if it can identify that the specific :term:`OAS` definition is inconsistent
-with other parameters. For example, if ``minOccurs``/``maxOccurs`` were provided by indicating that the :term:`I/O` must
-have exactly between [2-4] elements, but only a single :term:`OAS` object was defined under ``schema``, that :term:`OAS`
-definition would be converted to the corresponding array, as single values are not permitted in this case. Similarly, if
-the range of items was instead [1-4], the :term:`OAS` definition would be adjusted with ``oneOf`` keyword, allowing both
-single value and array representation of those values, when submitted for :ref:`Process Execution <proc_op_execute>`.
+with other parameters. It will also consider any supplementary details provided across all contexts (:term:`CWL`,
+:term:`WPS` and :term:`OAS`) to resolve the definitions in the other unspecified contexts.
+
+For example, as shown below, if ``minOccurs``/``maxOccurs`` are provided to indicate that the :term:`I/O` must
+have exactly between [2-4] elements, but only a single :term:`OAS` object instance is defined under ``schema``,
+that :term:`OAS` definition will be converted internally (since single values would not make sense in this case),
+to generate the corresponding array representation for the final :term:`CWL` ``type``.
+
+.. table:: Mutil-Value Array inferred from Occurrences
+    :class: table-code
+    :name: table-io-oas2cwl-multi
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: Submitted :term:`OAS` :term:`I/O`    |    :caption: Resolved :term:`CWL` :term:`I/O` |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "schema": {                                  |      "type": {                                |
+    |        "type": "string",                          |        "type": "array",                       |
+    |        "enum": [                                  |        "items": {                             |
+    |          "value-1",                               |          "type": "enum",                      |
+    |          "value-2"                                |          "symbols": [                         |
+    |        ]                                          |            "value-1",                         |
+    |      },                                           |            "value-2"                          |
+    |      "minOccurs": 2,                              |          ]                                    |
+    |      "maxOccurs": 4                               |        }                                      |
+    |    }                                              |      }                                        |
+    |                                                   |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
+
+If the amount of allowed items was instead in the [1-4] range (notice the modified ``minOccurs=1`` below),
+while still providing only a single instance of those items under ``schema``, the :term:`OAS` definition
+would be adjusted in the resulting :ref:`Process Description <proc_op_describe>` with a ``oneOf`` keyword
+to conveniently allow submitting a :ref:`Process Execution <proc_op_execute>` with either single value or
+an array of this value representation.
+The :term:`CWL` ``type`` would also be adjusted automatically to represent the same single/multi-value flexibility.
+
+.. table:: Single/Mutil-Value Array inferred from Occurrences
+    :class: table-code
+    :name: table-io-oas2cwl-single-or-multi
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: Submitted :term:`OAS` :term:`I/O`    |    :caption: Resolved :term:`CWL` :term:`I/O` |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "schema": {                                  |      "type": [                                |
+    |        "type": "string",                          |        {                                      |
+    |        "enum": [                                  |          "type": "enum",                      |
+    |          "value-1",                               |          "symbols": [                         |
+    |          "value-2"                                |            "value-1",                         |
+    |        ]                                          |            "value-2"                          |
+    |      },                                           |          ]                                    |
+    |      "minOccurs": 1,                              |        },                                     |
+    |      "maxOccurs": 4                               |        {                                      |
+    |    }                                              |          "type": "array",                     |
+    |                                                   |          "items": {                           |
+    |                                                   |            "type": "enum",                    |
+    |                                                   |            "symbols": [                       |
+    |                                                   |              "value-1",                       |
+    |                                                   |              "value-2"                        |
+    |                                                   |            ]                                  |
+    |                                                   |          }                                    |
+    |                                                   |        }                                      |
+    |                                                   |      ]                                        |
+    |                                                   |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
+
+Alternatively, if ``minOccurs=0`` is detected along the :term:`OAS` definition, `Weaver` will consider
+that this :term:`I/O` is optional , and will update the :term:`CWL`
+representation accordingly with the ``"null"`` type, as shown below.
+
+.. seealso::
+    :ref:`cwl-array-null-values`
+
+.. table:: Nullable Single/Multi-Value Array inferred from Occurrences
+    :class: table-code
+    :name: table-io-oas2cwl-single-or-multi-nullable
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: Submitted :term:`OAS` :term:`I/O`    |    :caption: Resolved :term:`CWL` :term:`I/O` |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "schema": {                                  |      "type": [                                |
+    |        "type": "string",                          |        "null",                                |
+    |        "enum": [                                  |        {                                      |
+    |          "value-1",                               |          "type": "enum",                      |
+    |          "value-2"                                |          "symbols": [                         |
+    |        ]                                          |            "value-1",                         |
+    |      },                                           |            "value-2"                          |
+    |      "minOccurs": 0,                              |          ]                                    |
+    |      "maxOccurs": 4                               |        },                                     |
+    |    }                                              |        {                                      |
+    |                                                   |          "type": "array",                     |
+    |                                                   |          "items": {                           |
+    |                                                   |            "type": "enum",                    |
+    |                                                   |            "symbols": [                       |
+    |                                                   |              "value-1",                       |
+    |                                                   |              "value-2"                        |
+    |                                                   |            ]                                  |
+    |                                                   |          }                                    |
+    |                                                   |        }                                      |
+    |                                                   |      ]                                        |
+    |                                                   |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
+
+Contrary to previous examples where a "single-value" definition was always provided under the ``schema``,
+it is also possible to provide a ``type: array`` directly. In such case, because of the requirement from
+the ``schema``, single values cannot be submitted as they would not respect the array condition.
+This change would be reflected in the resolved :term:`CWL` by omitting the single-value option in the ``type``
+definition, as shown below.
+
+.. note::
+    In the below example, ``minOccurs`` and ``maxOccurs`` are not required, since the ``type: array``
+    indication is sufficient in itself to identify that the :term:`CWL` should be only an array.
+    However, they can be provided to apply further restriction on the allowed :term:`I/O` dimensionality,
+    since :term:`CWL` will not directly enforce such restrictions.
+
+.. _warn-single-occurs-multi:
+.. warning::
+
+    A seemingly ambiguous resolution can happen when an :term:`I/O` ``schema`` explicitly defines
+    a ``type: array`` specification by itself (without any ``minOccurs``/``maxOccurs`` indication).
+    By default, :term:`OGC API - Processes` and :term:`WPS` contexts consider that
+    omitting ``minOccurs``/``maxOccurs`` is equivalent to setting them both to ``1``.
+    However, given that an ``array`` implies multiple values, such resolution is in itself ambiguous and conflicting.
+    In such case, `Weaver` will assume that users intend their :term:`I/O` to be an ``array``
+    (since it was specified explicitly in the submitted ``schema``), and will silently ignore the ambiguity
+    to generate a :term:`CWL` and :term:`WPS` representation as if ``minOccurs>1`` was specified.
+
+.. table:: Multi-Value Array inferred from Occurrences
+    :class: table-code
+    :name: table-io-oas2cwl-array
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: Submitted :term:`OAS` :term:`I/O`    |    :caption: Resolved :term:`CWL` :term:`I/O` |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "schema": {                                  |      "type": {                                |
+    |        "type": "array",                           |        "type": "array",                       |
+    |        "items": {                                 |        "items": {                             |
+    |          "type": "string",                        |          "type": "enum",                      |
+    |          "enum": [                                |          "symbols": [                         |
+    |            "value-1",                             |            "value-1",                         |
+    |            "value-2"                              |            "value-2"                          |
+    |          ]                                        |          ]                                    |
+    |        }                                          |        }                                      |
+    |      },                                           |      }                                        |
+    |    }                                              |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
+
+As one might expect, mixing ``minOccurs=0`` in combination with the ``type: array`` within the ``schema``
+will also generate the relevant representation by combining it with ``"null"`` for the :term:`CWL` type definition.
+
+.. table:: Nullable Multi-Value Array inferred from Occurrences
+    :class: table-code
+    :name: table-io-oas2cwl-array-nullable
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: Submitted :term:`OAS` :term:`I/O`    |    :caption: Resolved :term:`CWL` :term:`I/O` |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "schema": {                                  |      "type": [                                |
+    |        "type": "array",                           |        "null",                                |
+    |        "items": {                                 |        {                                      |
+    |          "type": "string",                        |          "type": "array",                     |
+    |          "enum": [                                |          "items": {                           |
+    |            "value-1",                             |            "type": "enum",                    |
+    |            "value-2"                              |            "symbols": [                       |
+    |          ]                                        |              "value-1",                       |
+    |        }                                          |              "value-2"                        |
+    |      },                                           |            ]                                  |
+    |      "minOccurs": 0                               |          }                                    |
+    |    }                                              |        }                                      |
+    |                                                   |      ]                                        |
+    |                                                   |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
+
+For any more complicated nested representations of multi-dimensional arrays,
+a specific :term:`Media-Type` is required, as presented in further details by
+the :ref:`oas_json_types` and :ref:`oas_file_references` sections. This is done
+on purpose, since the auto-resolution of :term:`CWL` types would lead to too much
+ambiguity when considering all combinations of array dimensionality, value cardinality and nested properties.
+Defining an explicit :term:`Media-Type` registered within a naming authority registry will ensure that all
+parties interacting with the :term:`Processes` will have a common understanding of their :term:`I/O` definition.
 
 Below is a summary of fields that are equivalent or considered to identify similar specifications
 (corresponding fields are aligned in the table).
@@ -1150,8 +1363,9 @@ Note that all :term:`OAS` elements are always nested under the ``schema`` field 
 located where appropriate as per :term:`OpenAPI` specification. Other :term:`OAS` fields are still permitted, but
 are not explicitly handled to search for corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 
-.. table::
+.. table:: Summary of :term:`I/O` Context Mappings
     :align: center
+    :name: table-io-summary-context-mapping
 
     +-------------------------------------+---------------------------------------+------------------------------------+
     | Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context  |
@@ -1201,38 +1415,63 @@ When any of those three :term:`JSON` definition is detected, other equivalent re
 a ``oneOf`` keyword if they were not already explicitly provided in ``schema``. When analyzing and combining those
 definitions, any :term:`OAS` ``$ref`` or ``contentSchema`` specifications will be used to resolve the corresponding
 ``type: object`` with the most explicit ``schema`` definition available. If this cannot be achieved, a generic
-``object`` allowing any ``additionalProperties`` (i.e.: no :term:`JSON` schema variation) will be used instead.
+``object`` allowing any ``additionalProperties`` (i.e.: no :term:`JSON` schema validation) will be used instead.
 External URIs pointing to an :term:`OAS` schema formatted either as :term:`JSON` or :term:`YAML` are resolved and
 fetched inline as needed during :term:`I/O` merging strategy to interpret specified references.
 
-Following is a sample representation of equivalent variants :term:`JSON` definitions, which would be
-automatically expended using the ``oneOf`` structure with other missing components if applicable.
+Following are sample representations of equivalent variants of :term:`JSON` definitions, which would be
+automatically expended using the ``oneOf`` structure if the other representations where missing when
+submitting the :term:`I/O` definition.
 
 .. table::
     :class: table-code
     :align: center
-    :widths: 50,50
 
-    +-----------------------------------------------------------+---------------------------------------------------+
-    | .. code-block:: json                                      | .. code-block:: json                              |
-    |   :caption: JSON Complex Input with schema reference      |   :caption: Generic JSON Complex Input            |
-    |                                                           |                                                   |
-    |    {                                                      |    {                                              |
-    |      "id:" "input",                                       |      "id:" "input",                               |
-    |      "schema": {                                          |      "schema": {                                  |
-    |        "oneOf": [                                         |        "oneOf": [                                 |
-    |          {                                                |          {                                        |
-    |            "type": "string",                              |            "type": "string",                      |
-    |            "contentMediaType": "application/json"         |            "contentMediaType": "application/json" |
-    |            "contentSchema": "http://host.com/schema.json" |          },                                       |
-    |          },                                               |          {                                        |
-    |          {                                                |            "type": "object",                      |
-    |            "$ref": "http://host.com/schema.json"          |            "additionalProperties": true           |
-    |          }                                                |          }                                        |
-    |        ]                                                  |        ]                                          |
-    |      }                                                    |      }                                            |
-    |    }                                                      |    }                                              |
-    +-----------------------------------------------------------+---------------------------------------------------+
+    +-----------------------------------------------------------+
+    | .. code-block:: json                                      |
+    |   :caption: :term:`JSON` Complex Input with Reference     |
+    |                                                           |
+    |    {                                                      |
+    |      "id": "input",                                       |
+    |      "schema": {                                          |
+    |        "oneOf": [                                         |
+    |          {                                                |
+    |            "type": "string",                              |
+    |            "contentMediaType": "application/json",        |
+    |            "contentSchema": "http://host.com/schema.json" |
+    |          },                                               |
+    |          {                                                |
+    |            "$ref": "http://host.com/schema.json"          |
+    |          }                                                |
+    |        ]                                                  |
+    |      }                                                    |
+    |    }                                                      |
+    +-----------------------------------------------------------+
+
+.. table::
+    :class: table-code
+    :align: center
+
+    +---------------------------------------------------+
+    | .. code-block:: json                              |
+    |   :caption: Generic :term:`JSON` Complex Input    |
+    |                                                   |
+    |    {                                              |
+    |      "id": "input",                               |
+    |      "schema": {                                  |
+    |        "oneOf": [                                 |
+    |          {                                        |
+    |            "type": "string",                      |
+    |            "contentMediaType": "application/json" |
+    |          },                                       |
+    |          {                                        |
+    |            "type": "object",                      |
+    |            "additionalProperties": true           |
+    |          }                                        |
+    |        ]                                          |
+    |      }                                            |
+    |    }                                              |
+    +---------------------------------------------------+
 
 
 Special handling of well-known :term:`OAS` ``type: object`` structures is also performed to convert them to more
@@ -1269,8 +1508,8 @@ purposes.
    by reference.
 
 2. Using a generic ``{"type": "string", "format": "uri"}`` :term:`OAS` schema does not convey the :term:`Media-Types`
-   requirements as well as inferring them "link-to" ``{"type": "string", "contentMediaType: <format>}``. It is therefore
-   better to omit them entirely as they do not add any :term:`I/O` descriptive value.
+   requirements as well as inferring them from a ``{"type": "string", "contentMediaType: <media-type>}`` representation.
+   It is therefore better to omit them entirely as they do not add any :term:`I/O` descriptive value.
 
 3. Because the above string-formatted ``uri`` are left out from definitions, it can instead be used explicitly in an
    :term:`I/O` specification to indicate to `Weaver` that the :term:`Process` uses a ``Literal`` URI string, that must
@@ -1294,7 +1533,7 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
     |    :caption: Single Format Complex Input  |    :caption: Multiple Supported Format Complex Input  |
     |                                           |                                                       |
     |    {                                      |    {                                                  |
-    |      "id:" "input",                       |      "id:" "input",                                   |
+    |      "id": "input",                       |      "id": "input",                                   |
     |      "schema": {                          |      "schema": {                                      |
     |        "type": "string",                  |        "oneOf": [                                     |
     |        "contentMediaType": "image/png",   |          {                                            |

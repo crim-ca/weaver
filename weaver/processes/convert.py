@@ -928,17 +928,41 @@ def any2cwl_io(wps_io, io_select):
     # convert OAS format to JSON first to simplify following comparisons
     wps_io_type = get_field(wps_io, "type", search_variations=True)
     wps_io_schema = get_field(wps_io, "schema", search_variations=False)
+
+    # check for min/max occurs before 'schema' conversion because they
+    # can be employed with either the WPS or the OGC API representations
+    wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True)
+    wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
+
+    schema_array = False
     if wps_io_type is null and isinstance(wps_io_schema, dict):
         wps_io = oas2json_io(wps_io_schema)
         wps_io_cat = get_field(wps_io, "type", search_variations=False)
         wps_io_type = get_field(wps_io, "data_type", search_variations=False)
+        schema_array = get_field(wps_io_schema, "type", search_variations=False) == "array"
+
+        # re-check for min/max occurs in case some details where inferred from the 'schema'
+        if wps_min_occ is null:
+            wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
+        if wps_max_occ is null:
+            wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
+
+    if wps_min_occ is null:
+        wps_min_occ = 1
 
     wps_default = get_field(wps_io, "default", search_variations=True)
-    wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
-    wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
     is_min_null = wps_min_occ in [0, "0"]
     allow_unique = wps_min_occ in [0, "0", 1, "1"]
     allow_array = wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1)
+
+    # If the OGC API 'schema' of the I/O explicitly requested for an array,
+    # min occurrence of 1 should be interpreted as needing at least 1 value *in the array*.
+    # This reflects the typical expectation since omitting the occurrence means 1 by default,
+    # but an implementation that desires a direct value wouldn't usually indicate 'type: array'.
+    # (relates to https://github.com/opengeospatial/ogcapi-processes/issues/414)
+    if schema_array:
+        allow_unique = False
+        allow_array = True
 
     if wps_io_cat not in list(WPS_COMPLEX_TYPES):
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
@@ -946,6 +970,7 @@ def any2cwl_io(wps_io, io_select):
             LOGGER.warning("Could not identify a CWL literal data type with [%s].", wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
+
             cwl_io_enum = _convert_cwl_io_enum(cwl_io_type, wps_allow, io_select, allow_unique, allow_array)
             cwl_io.update(cwl_io_enum)
         else:
@@ -971,7 +996,7 @@ def any2cwl_io(wps_io, io_select):
                 "items": cwl_io["type"]
             }
             # if single value still allowed, or explicitly multi-value array if min greater than one
-            if wps_min_occ > 1:
+            if wps_min_occ > 1 or not allow_unique:
                 cwl_io["type"] = cwl_array
             else:
                 cwl_io["type"] = [cwl_io["type"], cwl_array]
