@@ -947,6 +947,9 @@ def any2cwl_io(wps_io, io_select):
         if wps_max_occ is null:
             wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
 
+    if wps_min_occ is null:
+        wps_min_occ = 1
+
     wps_default = get_field(wps_io, "default", search_variations=True)
     is_min_null = wps_min_occ in [0, "0"]
     allow_unique = wps_min_occ in [0, "0", 1, "1"]
