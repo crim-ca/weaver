@@ -986,7 +986,7 @@ the following two variants are equivalent and completely interchangeable.
     :align: center
     :widths: 50,50
 
-    +---------------------------------------------------+-----------------------------------------------+
+   +---------------------------------------------------+-----------------------------------------------+
    | .. code-block:: json                              | .. code-block:: json                          |
    |    :caption: :term:`WPS` AllowedValues Input      |    :caption: :term:`CWL` Enum Values          |
    |    :linenos:                                      |    :linenos:                                  |
@@ -1156,10 +1156,9 @@ have exactly between [2-4] elements, but only a single :term:`OAS` object instan
 that :term:`OAS` definition will be converted internally (since single values would not make sense in this case),
 to generate the corresponding array representation for the final :term:`CWL` ``type``.
 
-.. table::
+.. table:: Mutil-Value Array inferred from Occurrences
     :class: table-code
     :name: table-io-oas2cwl-multi
-    :caption: Mutil-Value Array inferred from Occurrences
     :align: center
     :widths: 50,50
 
@@ -1190,10 +1189,9 @@ to conveniently allow submitting a :ref:`Process Execution <proc_op_execute>` wi
 an array of this value representation.
 The :term:`CWL` ``type`` would also be adjusted automatically to represent the same single/multi-value flexibility.
 
-.. table::
+.. table:: Single/Mutil-Value Array inferred from Occurrences
     :class: table-code
     :name: table-io-oas2cwl-single-or-multi
-    :caption: Single/Mutil-Value Array inferred from Occurrences
     :align: center
     :widths: 50,50
 
@@ -1233,10 +1231,9 @@ representation accordingly with the ``"null"`` type, as shown below.
 .. seealso::
     :ref:`cwl-array-null-values`
 
-.. table::
+.. table:: Nullable Single/Multi-Value Array inferred from Occurrences
     :class: table-code
     :name: table-io-oas2cwl-single-or-multi-nullable
-    :caption: Nullable Single/Multi-Value Array inferred from Occurrences
     :align: center
     :widths: 50,50
 
@@ -1294,10 +1291,9 @@ definition, as shown below.
     (since it was specified explicitly in the submitted ``schema``), and will silently ignore the ambiguity
     to generate a :term:`CWL` and :term:`WPS` representation as if ``minOccurs>1`` was specified.
 
-.. table::
+.. table:: Multi-Value Array inferred from Occurrences
     :class: table-code
     :name: table-io-oas2cwl-array
-    :caption: Multi-Value Array inferred from Occurrences
     :align: center
     :widths: 50,50
 
@@ -1324,10 +1320,9 @@ definition, as shown below.
 As one might expect, mixing ``minOccurs=0`` in combination with the ``type: array`` within the ``schema``
 will also generate the relevant representation by combining it with ``"null"`` for the :term:`CWL` type definition.
 
-.. table::
+.. table:: Nullable Multi-Value Array inferred from Occurrences
     :class: table-code
     :name: table-io-oas2cwl-array-nullable
-    :caption: Nullable Multi-Value Array inferred from Occurrences
     :align: center
     :widths: 50,50
 
@@ -1368,10 +1363,9 @@ Note that all :term:`OAS` elements are always nested under the ``schema`` field 
 located where appropriate as per :term:`OpenAPI` specification. Other :term:`OAS` fields are still permitted, but
 are not explicitly handled to search for corresponding definitions in :term:`WPS` and :term:`CWL` contexts.
 
-.. table::
+.. table:: Summary of :term:`I/O` Context Mappings
     :align: center
     :name: table-io-summary-context-mapping
-    :caption: Summary of :term:`I/O` Context Mappings
 
     +-------------------------------------+---------------------------------------+------------------------------------+
     | Parameters in :term:`WPS` Context   | Parameters in :term:`OAS` Context     | Parameters in :term:`CWL` Context  |
@@ -1438,7 +1432,7 @@ submitting the :term:`I/O` definition.
     |   :caption: :term:`JSON` Complex Input with Reference     |
     |                                                           |
     |    {                                                      |
-    |      "id:" "input",                                       |
+    |      "id": "input",                                       |
     |      "schema": {                                          |
     |        "oneOf": [                                         |
     |          {                                                |
@@ -1463,7 +1457,7 @@ submitting the :term:`I/O` definition.
     |   :caption: Generic :term:`JSON` Complex Input    |
     |                                                   |
     |    {                                              |
-    |      "id:" "input",                               |
+    |      "id": "input",                               |
     |      "schema": {                                  |
     |        "oneOf": [                                 |
     |          {                                        |
@@ -1514,8 +1508,8 @@ purposes.
    by reference.
 
 2. Using a generic ``{"type": "string", "format": "uri"}`` :term:`OAS` schema does not convey the :term:`Media-Types`
-   requirements as well as inferring them "link-to" ``{"type": "string", "contentMediaType: <format>}``. It is therefore
-   better to omit them entirely as they do not add any :term:`I/O` descriptive value.
+   requirements as well as inferring them from a ``{"type": "string", "contentMediaType: <media-type>}`` representation.
+   It is therefore better to omit them entirely as they do not add any :term:`I/O` descriptive value.
 
 3. Because the above string-formatted ``uri`` are left out from definitions, it can instead be used explicitly in an
    :term:`I/O` specification to indicate to `Weaver` that the :term:`Process` uses a ``Literal`` URI string, that must
@@ -1539,7 +1533,7 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
     |    :caption: Single Format Complex Input  |    :caption: Multiple Supported Format Complex Input  |
     |                                           |                                                       |
     |    {                                      |    {                                                  |
-    |      "id:" "input",                       |      "id:" "input",                                   |
+    |      "id": "input",                       |      "id": "input",                                   |
     |      "schema": {                          |      "schema": {                                      |
     |        "type": "string",                  |        "oneOf": [                                     |
     |        "contentMediaType": "image/png",   |          {                                            |
