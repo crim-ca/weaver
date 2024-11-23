@@ -65,6 +65,11 @@ Changes:
 
 Fixes:
 ------
+- Fix `CWL` ``enum`` type mishandling ``symbols`` containing a colon (``:``) character (e.g.: a list of allowed times)
+  leading to their invalid interpretation as namespaced strings (i.e.: ``<ns>:<value>``), in turn failing validation
+  and breaking the resulting `CWL`. Such ``enum`` will be patched with an updated ``valueFrom`` JavaScript definition
+  performing the equivalent ``enum`` value validation to transparently replicate the original intent (relates to
+  `common-workflow-language/cwltool#2071 <https://github.com/common-workflow-language/cwltool/issues/2071>`_).
 - Fix `CWL` conversion from a `OGC API - Processes` definition specifying an `I/O` with ``schema`` explicitly
   indicating a ``type: array`` and nested ``enum``, even if ``minOccurs: 1`` is omitted or explicitly set.
 - Fix ``url`` parameter to override the `CLI` internal ``url`` when passed explicitly to the invoked operation.
