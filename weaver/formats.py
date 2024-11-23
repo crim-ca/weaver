@@ -828,7 +828,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         ``must_exist=False`` before providing it to the `CWL` I/O definition. Setting ``must_exist=False`` should be
         used only for literal string comparison or pre-processing steps to evaluate formats.
 
-    :param media_type: Some reference, namespace'd or literal (possibly extended) media-type string.
+    :param media_type: Some reference, namespaced or literal (possibly extended) media-type string.
     :param make_reference: Construct the full URL reference to the resolved media-type. Otherwise, return tuple details.
     :param must_exist:
         Return result only if it can be resolved to an official media-type (or synonym if enabled), otherwise ``None``.

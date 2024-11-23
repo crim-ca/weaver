@@ -2236,29 +2236,34 @@ def test_ogcapi2cwl_process_without_extra():
 
 
 @pytest.mark.parametrize(
-    ["input_str", "input_int", "input_float"],
+    ["input_str", "input_int", "input_float", "input_time"],
     [
         # OpenAPI schema references
         (
             {"schema": {"type": "string", "enum": ["a", "b", "c"]}},
             {"schema": {"type": "integer", "enum": [1, 2, 3]}},
             {"schema": {"type": "number", "format": "float", "enum": [1.2, 3.4]}},
+            {"schema": {"type": "string", "format": "time", "enum": ["12:00", "24:00"]}},
         ),
         # OGC-API input definitions
         (
             {"data_type": "string", "allowed_values": ["a", "b", "c"]},
             {"data_type": "integer", "allowed_values": [1, 2, 3]},
             {"data_type": "float", "allowed_values": [1.2, 3.4]},
+            {"data_type": "string", "allowed_values": ["12:00", "24:00"]},
         ),
     ]
 )
-def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
+def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float, input_time):
     """
-    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+    Test that a :term:`CWL` with pseudo-``enum`` type has the necessary :term:`CWL` requirements to perform validation.
 
     .. seealso::
         - :func:`test_any2cwl_io_enum_convert`
         - :func:`test_any2cwl_io_enum_validate`
+        - :func:`weaver.processes.convert._convert_cwl_io_enum`
+        - :func:`weaver.processes.convert._get_cwl_js_value_from`
+        - :func:`weaver.processes.convert._patch_cwl_enum_js_requirement`
     """
     href = "https://remote-server.com/processes/test-process"
     body = {
@@ -2266,6 +2271,7 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
             "enum-str": input_str,
             "enum-int": input_int,
             "enum-float": input_float,
+            "enum-time": input_time,
         },
         "outputs": {
             "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
@@ -2294,6 +2300,84 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
     assert "[1.2, 3.4]" in cwl_value_from
     assert "values.includes(self)" in cwl_value_from
     assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl["inputs"]["enum-time"]["type"] == {"type": "enum", "symbols": ["#12:00", "#24:00"]}
+    assert "inputBinding" not in cwl["inputs"]["enum-time"]
+
+
+@pytest.mark.parametrize(
+    ["cwl_io", "wps_io_expected"],
+    [
+        (
+            {
+                "name": "test",
+                "type": "enum",
+                "symbols": ["#12:00", "#24:00"],
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": {
+                    "type": "enum",
+                    "symbols": ["#12:00", "#24:00"],
+                }
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["#12:00", "#24:00"],
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+                "min_occurs": 1,
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["#12:00", "#24:00"],
+                        }
+                    }
+                ]
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+                "min_occurs": 1,
+            }
+        )
+    ]
+)
+def test_patched_cwl_enum_colon_back_conversion(cwl_io, wps_io_expected):
+    """
+    Given a :term:`CWL` ``enum`` that contains ``:`` characters patched with prefixed ``#`` test the inverse conversion.
+    """
+    wps_io = cwl2wps_io(cwl_io, IO_INPUT)
+    wps_allow = [allow.value for allow in wps_io.allowed_values]
+    assert wps_allow == ["12:00", "24:00"]
 
 
 @mocked_remote_server_requests_wps1([
