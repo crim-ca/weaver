@@ -35,7 +35,6 @@ from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.formats import ContentType
 from weaver.processes.constants import (
     CWL_NAMESPACE_SCHEMA_DEFINITION,
-    CWL_NAMESPACE_SCHEMA_ID,
     CWL_NAMESPACE_SCHEMA_URL,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
