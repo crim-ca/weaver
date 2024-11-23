@@ -131,13 +131,15 @@ jobs:
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/test-results-action@v1
-        with:
-          files: reports/coverage-junit.xml,!./cache
-          flags: ${{ matrix.python-version }}
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # disable due to confusing and unhelpful messages created by codecov
+      # (see )https://github.com/codecov/feedback/issues/304#issuecomment-2492675117)
+      # - name: Upload test results to Codecov
+      #   if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
+      #   uses: codecov/test-results-action@v1
+      #   with:
+      #     files: reports/coverage-junit.xml,!./cache
+      #     flags: ${{ matrix.python-version }}
+      #     token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload coverage report
         uses: codecov/codecov-action@v2
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
