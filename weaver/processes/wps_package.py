@@ -75,8 +75,11 @@ from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
     CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
     CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
     CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_PERSON,
     CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
     CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED,
     CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
@@ -769,89 +772,77 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
             _get_package_io(package_factory, io_select=IO_OUTPUT, as_json=as_json))
 
 
-def _update_package_metadata(wps_package_metadata, cwl_package_package):
+def _update_package_metadata(wps_metadata, cwl_package):
     # type: (JSON, CWL) -> None
     """
     Updates the package :term:`WPS` metadata dictionary from extractable `CWL` package definition.
     """
-    wps_package_metadata["title"] = wps_package_metadata.get("title", cwl_package_package.get("label", ""))
-    wps_package_metadata["abstract"] = wps_package_metadata.get("abstract", cwl_package_package.get("doc", ""))
+    wps_metadata["title"] = wps_metadata.get("title", cwl_package.get("label", ""))
+    wps_metadata["abstract"] = wps_metadata.get("abstract", cwl_package.get("doc", ""))
 
     if (
-        "$schemas" in cwl_package_package
-        and isinstance(cwl_package_package["$schemas"], list)
-        and "$namespaces" in cwl_package_package
-        and isinstance(cwl_package_package["$namespaces"], dict)
+        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS in cwl_package and
+        isinstance(cwl_package[CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS], list)
     ):
-        metadata = wps_package_metadata.get("metadata", [])
-        namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"].items()}
-        for schema in cwl_package_package["$schemas"]:
-            for namespace_url in namespaces_inv:
-                if schema.startswith(namespace_url):
-                    metadata.append({"title": namespaces_inv[namespace_url], "href": schema})
-        wps_package_metadata["metadata"] = metadata
-
-    if (
-        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS in cwl_package_package and
-        isinstance(cwl_package_package[CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS], list)
-    ):
-        wps_package_metadata["keywords"] = list(
-            set(wps_package_metadata.get("keywords", [])) |
-            set(cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS, []))
+        wps_metadata["keywords"] = list(
+            set(wps_metadata.get("keywords", [])) |
+            set(cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS, []))
         )
 
     # specific use case with a different mapping
     # https://docs.ogc.org/bp/20-089r1.html#toc31
     if (
-        CWL_NAMESPACE_SCHEMA_METADATA_VERSION in cwl_package_package or
-        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION in cwl_package_package
+        CWL_NAMESPACE_SCHEMA_METADATA_VERSION in cwl_package or
+        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION in cwl_package
     ):
         version_value = (
-            wps_package_metadata.get("version")
-            or cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
-            or cwl_package_package.get(CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION)
+            wps_metadata.get("version")
+            or cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
+            or cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION)
         )
         # Only set the key if version_value is not empty or null
         if version_value:
-            wps_package_metadata["version"] = str(version_value)
+            wps_metadata["version"] = str(version_value)
     else:
-        version_value = wps_package_metadata.get("version")
+        version_value = wps_metadata.get("version")
         if version_value:
-            wps_package_metadata["version"] = str(version_value)
+            wps_metadata["version"] = str(version_value)
 
     schema_ns = f"{CWL_NAMESPACE_SCHEMA_ID}:"
-    for metadata_mapping in CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED:
-        if metadata_mapping in [  # skip handled above
+    metadata = wps_metadata.get("metadata", [])
+    for meta_name in CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED:
+        if meta_name in [  # skip handled above
             CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
             CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
             CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
         ]:
             continue
 
-        if metadata_mapping in cwl_package_package:
-            metadata = wps_package_metadata.get("metadata", [])
+        meta_uri = meta_name.replace(schema_ns, CWL_NAMESPACE_SCHEMA_URL)
+
+        # CWL package => WPS context
+        if meta_name in cwl_package:
             if (
-                isinstance(cwl_package_package[metadata_mapping], str)
-                and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
+                isinstance(cwl_package[meta_name], str)
+                and urlparse(cwl_package[meta_name]).scheme != ""
             ):
-                url = cwl_package_package[metadata_mapping]
-                if metadata_mapping == CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY:
+                url = cwl_package[meta_name]
+                if meta_name == CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY:
                     ctype = ContentType.TEXT_HTML
                 else:
                     ctype = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
                 metadata.append({
                     "type": ctype,
-                    "rel": metadata_mapping.strip(schema_ns),
-                    "href": cwl_package_package[metadata_mapping]
+                    "rel": meta_uri,
+                    "href": cwl_package[meta_name]
                 })
-            elif isinstance(cwl_package_package[metadata_mapping], str):
-                class_name = metadata_mapping.strip(schema_ns)
+            elif isinstance(cwl_package[meta_name], str):
                 metadata.append({
-                    "role": class_name,
-                    "value": cwl_package_package[metadata_mapping]
+                    "role": meta_uri,
+                    "value": cwl_package[meta_name]
                 })
             else:
-                for objects in cwl_package_package[metadata_mapping]:
+                for objects in cwl_package[meta_name]:
                     class_name = objects["class"].strip(schema_ns)
                     value = {
                         "$schema": f"{CWL_NAMESPACE_SCHEMA_URL}{class_name}"
@@ -860,11 +851,45 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                         if key.startswith(schema_ns):
                             value[key.strip(schema_ns)] = val
                     metadata.append({
-                        "role": metadata_mapping.strip(schema_ns),
+                        "role": meta_uri,
                         "value": value
                     })
+            wps_metadata["metadata"] = metadata
 
-            wps_package_metadata["metadata"] = metadata
+        # CWL package <= WPS context
+        # note:
+        #   this mapping is accomplished only if the CWL did not already result in creating the other mapping
+        #   purposely avoid overriding a field already provided in CWL (the "truth"), even if they mismatch
+        #   this could be done on purpose, such as attributing different authors for the process vs package
+        else:
+            metadata_found = [meta for meta in metadata if (meta.get("role") or meta.get("rel")) == meta_uri]
+            if not metadata_found:
+                continue
+            metadata_found = copy.deepcopy(metadata_found)
+            if meta_name in [CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR, CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR]:
+                for meta in metadata_found:
+                    if "value" not in meta or not isinstance(meta["value"], dict):
+                        continue  # pragma: no cover  # sanity check, should not happen (fails validation)
+                    meta_schema = meta.get("$schema", "").replace(CWL_NAMESPACE_SCHEMA_URL, schema_ns)
+                    meta_schema = meta_schema or CWL_NAMESPACE_SCHEMA_METADATA_PERSON
+                    meta["class"] = meta_schema
+                    meta.pop("role", None)
+                    meta.pop("$schema", None)
+                    meta["value"].pop("$schema", None)
+                    meta_value = meta.pop("value")
+                    for field in list(meta_value):
+                        field_ns = f"{CWL_NAMESPACE_SCHEMA_ID}:{field}"
+                        meta[field_ns] = meta_value.pop(field)
+                cwl_package[meta_name] = metadata_found
+
+            # all other fields must be a single string
+            # ignore others to avoid injecting unknown structures that could break the CWL
+            elif len(metadata_found) == 1:
+                meta_key = get_any_value(metadata_found[0], key=True)
+                meta_value = metadata_found[0][meta_key]
+                if not isinstance(meta_value, str):
+                    continue  # pragma: no cover  # sanity check, should not happen (fails validation)
+                cwl_package[meta_name] = meta_value
 
 
 def _patch_wps_process_description_url(reference, process_hint):

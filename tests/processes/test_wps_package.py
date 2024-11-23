@@ -35,7 +35,6 @@ from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.formats import ContentType
 from weaver.processes.constants import (
     CWL_NAMESPACE_SCHEMA_DEFINITION,
-    CWL_NAMESPACE_SCHEMA_ID,
     CWL_NAMESPACE_SCHEMA_URL,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_DOCKER_GPU,
@@ -851,7 +850,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
 
 
 @pytest.mark.parametrize(
-    ["cwl_package_package", "wps_package_metadata", "cwl_package_expected"],
+    ["cwl_package", "wps_metadata", "process_metadata_expected", "cwl_metadata_expected"],
     [
         (
             # Test author metadata with empty wps_package
@@ -866,7 +865,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "title": "",
                 "metadata": [
                     {
-                        "role": "author",
+                        "role": "https://schema.org/author",
                         "value": {
                             "$schema": "https://schema.org/Person",
                             "name": "John Doe",
@@ -874,12 +873,17 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                         }
                     }
                 ]
+            },
+            {
+                "s:author": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."}
+                ],
             }
         ),
         (
             # Test codeRepository
             {
-                "s:codeRepository": "https://gitlab.com/",
+                "s:codeRepository": "https://gitlab.com/some-org/some-repo",
             },
             {},
             {
@@ -888,10 +892,13 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/html",
-                        "rel": "codeRepository",
-                        "href": "https://gitlab.com/"
+                        "rel": "https://schema.org/codeRepository",
+                        "href": "https://gitlab.com/some-org/some-repo"
                     }
                 ]
+            },
+            {
+                "s:codeRepository": "https://gitlab.com/some-org/some-repo"
             }
         ),
         (
@@ -903,8 +910,8 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/html",
-                        "rel": "codeRepository",
-                        "href": "https://gitlab.com/"
+                        "rel": "https://schema.org/codeRepository",
+                        "href": "https://gitlab.com/some-org/some-repo"
                     }
                 ]
             },
@@ -915,10 +922,14 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/html",
-                        "rel": "codeRepository",
-                        "href": "https://gitlab.com/"
+                        "rel": "https://schema.org/codeRepository",
+                        "href": "https://gitlab.com/some-org/some-repo"
                     },
                 ],
+            },
+            {
+                "s:version": "1.0",
+                "s:codeRepository": "https://gitlab.com/some-org/some-repo"
             }
         ),
         (
@@ -931,6 +942,9 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "abstract": "",
                 "title": "",
                 "version": "1.0.0"
+            },
+            {
+                "s:softwareVersion": "1.0.0"
             }
         ),
         (
@@ -947,7 +961,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "title": "",
                 "metadata": [
                     {
-                        "role": "contributor",
+                        "role": "https://schema.org/contributor",
                         "value": {
                             "$schema": "https://schema.org/Person",
                             "name": "John Doe",
@@ -955,7 +969,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                         }
                     },
                     {
-                        "role": "contributor",
+                        "role": "https://schema.org/contributor",
                         "value": {
                             "$schema": "https://schema.org/Person",
                             "name": "Other Guy",
@@ -963,6 +977,12 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                         }
                     }
                 ]
+            },
+            {
+                "s:contributor": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."},
+                    {"class": "s:Person", "s:name": "Other Guy", "s:affiliation": "Elsewhere"},
+                ],
             }
         ),
         (
@@ -977,10 +997,13 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/plain",
-                        "rel": "citation",
+                        "rel": "https://schema.org/citation",
                         "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
                     },
                 ],
+            },
+            {
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2",
             }
         ),
         (
@@ -994,7 +1017,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/plain",
-                        "rel": "citation",
+                        "rel": "https://schema.org/citation",
                         "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
                     },
                 ],
@@ -1005,14 +1028,18 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "metadata": [
                     {
                         "type": "text/plain",
-                        "rel": "citation",
+                        "rel": "https://schema.org/citation",
                         "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
                     },
                     {
-                        "role": "dateCreated",
+                        "role": "https://schema.org/dateCreated",
                         "value": "2016-12-13",
                     }
                 ]
+            },
+            {
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2",
+                "s:dateCreated": "2016-12-13",
             }
         ),
         (
@@ -1024,7 +1051,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
             {
                 "metadata": [
                     {
-                        "role": "test",
+                        "role": "https://example.com/test",
                         "value": "test",
                     }
                 ]
@@ -1034,15 +1061,15 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "title": "",
                 "metadata": [
                     {
-                        "role": "test",
+                        "role": "https://example.com/test",
                         "value": "test",
-                    },
-                    {
-                        "title": CWL_NAMESPACE_SCHEMA_ID,
-                        "href": CWL_NAMESPACE_SCHEMA_URL,
                     }
                 ]
-            }
+            },
+            {
+                "$schemas": [CWL_NAMESPACE_SCHEMA_URL],
+                "$namespaces": dict(CWL_NAMESPACE_SCHEMA_DEFINITION),
+            },
         ),
         (
             # test CWL 's:keywords' vs WPS 'keywords'
@@ -1053,15 +1080,183 @@ def test_format_extension_validator_basic(data_input, mode, expect):
                 "keywords": ["a", "x", "y", "d", "e", "f"],
             },
             lambda src: set(src["keywords"]) == {"a", "b", "c", "x", "y", "d", "e", "f"},
+            {
+                "s:keywords": ["a", "b", "c"],
+            },
         ),
+        (
+            # test that uses multiple combinations, some info on one side or the other, and some mixed
+            {
+                "s:version": "1.2.3",
+                "s:author": [
+                    {"class": "s:Person", "s:name": "Another Guy", "s:affiliation": "Super Industry"}
+                ],
+            },
+            {
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "https://schema.org/citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                    {
+                        "role": "https://schema.org/dateCreated",
+                        "value": "2016-12-13",
+                    },
+                    {
+                        "role": "https://schema.org/author",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Main Guy",
+                            "affiliation": "Some Company"
+                        }
+                    },
+                    {
+                        "role": "https://schema.org/contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "John Doe",
+                            "affiliation": "Example Inc."
+                        }
+                    },
+                    {
+                        "role": "https://schema.org/contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Other Guy",
+                            "affiliation": "Elsewhere"
+                        }
+                    },
+                ]
+            },
+            {
+                "title": "",
+                "abstract": "",
+                "version": "1.2.3",
+                "metadata": [
+                    {
+                        "type": "text/plain",
+                        "rel": "https://schema.org/citation",
+                        "href": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2"
+                    },
+                    {
+                        "role": "https://schema.org/dateCreated",
+                        "value": "2016-12-13",
+                    },
+                    {
+                        "role": "https://schema.org/author",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Main Guy",
+                            "affiliation": "Some Company"
+                        }
+                    },
+                    {
+                        "role": "https://schema.org/contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "John Doe",
+                            "affiliation": "Example Inc."
+                        }
+                    },
+                    {
+                        "role": "https://schema.org/contributor",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Other Guy",
+                            "affiliation": "Elsewhere"
+                        }
+                    },
+                    {
+                        "role": "https://schema.org/author",
+                        "value": {
+                            "$schema": "https://schema.org/Person",
+                            "name": "Another Guy",
+                            "affiliation": "Super Industry"
+                        }
+                    },
+                ]
+            },
+            {
+                "s:version": "1.2.3",
+                "s:citation": "https://dx.doi.org/10.6084/m9.figshare.3115156.v2",
+                "s:dateCreated": "2016-12-13",
+                "s:author": [
+                    # must not be replaced by the other author defined in the process metadata!
+                    {"class": "s:Person", "s:name": "Another Guy", "s:affiliation": "Super Industry"}
+                ],
+                "s:contributor": [
+                    {"class": "s:Person", "s:name": "John Doe", "s:affiliation": "Example Inc."},
+                    {"class": "s:Person", "s:name": "Other Guy", "s:affiliation": "Elsewhere"},
+                ],
+            }
+        ),
+        (
+            # Duplicate WPS "role/rel" that must map to a single field on CWL side is ignored (cannot disambiguate).
+            # At the same, test that both "role/rel" are considered, with "role" prioritized since another "rel" can
+            # be used to represent the link by another commonly known relation-type.
+            {},
+            {
+                "metadata": [
+                    {
+                        "type": "text/html",
+                        "rel": "https://schema.org/codeRepository",
+                        "href": "https://gitlab.com/some-org/some-repo"
+                    },
+                    {
+                        "type": "text/html",
+                        "rel": "alt-source",
+                        "role": "https://schema.org/codeRepository",
+                        "href": "https://github.com/alt-org/other-repo"
+                    }
+                ]
+            },
+            {
+                "title": "",
+                "abstract": "",
+                "metadata": [
+                    {
+                        "type": "text/html",
+                        "rel": "https://schema.org/codeRepository",
+                        "href": "https://gitlab.com/some-org/some-repo"
+                    },
+                    {
+                        "type": "text/html",
+                        "rel": "alt-source",
+                        "role": "https://schema.org/codeRepository",
+                        "href": "https://github.com/alt-org/other-repo"
+                    }
+                ]
+            },
+            {},  # should not be updated with any of the links
+        )
     ]
 )
-def test_process_metadata(cwl_package_package, wps_package_metadata, cwl_package_expected):
-    # type: (CWL, ProcessOfferingMapping, Union[CWL, Callable[[CWL], bool]]) -> None
-    cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package_package)  # must not raise
-    assert cwl_package_validated == cwl_package_package  # should be unchanged
-    _update_package_metadata(wps_package_metadata, cwl_package_package)
-    if inspect.isfunction(cwl_package_expected):
-        assert cwl_package_expected(wps_package_metadata)
+def test_process_metadata(cwl_package, wps_metadata, process_metadata_expected, cwl_metadata_expected):
+    # type: (CWL, ProcessOfferingMapping, Union[CWL, Callable[[CWL], bool]], CWL) -> None
+
+    # submitted CWL metadata must not raise and must be unmodified after validation
+    cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package)
+    assert cwl_package_validated == cwl_package
+
+    # submitted WPS metadata must not raise and must be unmodified after validation
+    if "metadata" in wps_metadata:
+        wps_metadata_validated = sd.DescriptionMeta().deserialize(wps_metadata)
+        assert wps_metadata_validated["metadata"] == wps_metadata["metadata"]
+
+    _update_package_metadata(wps_metadata, cwl_package)
+
+    # resolved result should be as expected
+    if inspect.isfunction(process_metadata_expected):
+        assert process_metadata_expected(wps_metadata)
     else:
-        assert wps_package_metadata == cwl_package_expected
+        assert wps_metadata == process_metadata_expected
+
+    # resolved metadata must not raise and must be unmodified after validation
+    if isinstance(process_metadata_expected, dict) and "metadata" in process_metadata_expected:
+        process_metadata_validated = sd.DescriptionMeta().deserialize(process_metadata_expected)
+        assert process_metadata_validated["metadata"] == process_metadata_expected["metadata"]
+
+    # resolved CWL metadata must not raise and must be unmodified after validation
+    cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package)
+    assert cwl_package_validated == cwl_metadata_expected
