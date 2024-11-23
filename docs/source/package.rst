@@ -1552,15 +1552,15 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
 Metadata
 -----------------------
 
-Metadata fields are transferred between :term:`WPS` (from :term:`Process` description) and :term:`CWL`
+Metadata fields are transferred between :term:`WPS`/:term:`OAP` (from :term:`Process` description) and :term:`CWL`
 (from :term:`Application Package`) when match is possible. Per :term:`I/O` definition that support certain
 metadata fields (notably descriptions), are also transferred.
 
 .. note::
-    Because the ``schema`` (:term:`OAS`) definitions are embedded within :term:`WPS` I/O definitions, corresponding
-    metadata fields **ARE NOT** transferred. This choice is made in order to keep ``schema`` succinct such that they
-    only describe the structure of the expected data type and format, and to avoid too much metadata duplication for
-    each :term:`I/O` in the resulting :term:`Process` description.
+    Metadata fields nested within the ``schema`` (:term:`OAS`) property employed to represent
+    an :term:`OAP` :term:`I/O` definition **ARE NOT** transferred. This choice is made in order to keep ``schema``
+    succinct such that they only describe the structure of the expected data type and format,
+    and to avoid too much metadata duplication for each :term:`I/O` in the resulting :term:`Process` description.
 
 Below is a list of compatible elements.
 
@@ -1572,9 +1572,9 @@ Below is a list of compatible elements.
     +-----------------------------------------+----------------------------------------------------------+
     | Parameters in :term:`WPS` Context       | Parameters in :term:`CWL` Context                        |
     +=========================================+==========================================================+
-    | ``keywords``                            | ``s:keywords`` [#cwl_schemaorg]_                         |
+    | ``keywords``                            | ``s:keywords`` [#CWLschemaorg]_                          |
     +-----------------------------------------+----------------------------------------------------------+
-    | ``metadata`` |br|                       | Supported fields [#cwl_schemaorg]_ : |br|                |
+    | ``metadata`` |br|                       | Supported fields [#CWLschemaorg]_ : |br|                 |
     | (using ``title``, ``role``, ``value``,  | - ``s:author`` |br|                                      |
     | ``rel`` and ``href`` fields)            | - ``s:citation`` |br|                                    |
     |                                         | - ``s:codeRepository`` |br|                              |
@@ -1587,15 +1587,15 @@ Below is a list of compatible elements.
     +-----------------------------------------+----------------------------------------------------------+
     | ``abstract``/``description``            | ``doc``                                                  |
     +-----------------------------------------+----------------------------------------------------------+
-    | ``version``                             | ``s:version``/``s:softwareVersion`` [#cwl_schemaorg]_    |
+    | ``version``                             | ``s:version``/``s:softwareVersion`` [#CWLschemaorg]_     |
     +-----------------------------------------+----------------------------------------------------------+
 
 .. rubric:: Details
 
-.. [#cwl_schemaorg]
+.. [#CWLschemaorg]
     When using these properties, it is expected that the :term:`CWL` :term:`Application Package` resolves
     the ``$schemas`` with a reference to the |cwl-metadata-schema-org|_. Furthermore, the ``$namespaces``
-    is expected to resolve the prefix ``s`` to the `http://schema.org <http://schema.org>`_ definitions
+    is expected to resolve the prefix ``s`` to the `https://schema.org <https://schema.org>`_ definitions
     corresponding to the RDF schema, as shown below.
 
     See |cwl-metadata|_ for a complete example using those fields and their expected contents.
@@ -1605,7 +1605,7 @@ Below is a list of compatible elements.
     $schemas:
       - https://schema.org/version/latest/schemaorg-current-https.rdf
     $namespaces:
-      s: http://schema.org
+      s: https://schema.org
 
 .. _app_pkg_secret_parameters:
 

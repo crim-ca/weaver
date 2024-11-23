@@ -62,6 +62,10 @@ Changes:
   submitted ``response`` body parameter (*OGC API - Processes v1.0*),
   the ``Prefer: return`` header (*OGC API - Processes v2.0*), the requested ``Accept`` header,
   and any relevant ``transmissionMode`` request body overrides per filtered ``outputs``.
+- Modify the mapping and generation of `WPS`/`OGC API` metadata against `CWL` corresponding fields using
+  the namespaced ``schema.org`` to *always* employ the full `URI` as ``rel`` or ``role`` according to the
+  provided metadata link or value to allow explicit identification of the ``schema.org`` concept origin.
+- Add mapping of metadata from `CWL` to `WPS`/`OGC API` ``metadata`` field for additional ``schema.org`` concepts.
 
 Fixes:
 ------
@@ -70,8 +74,10 @@ Fixes:
 - Fix ``url`` parameter to override the `CLI` internal ``url`` when passed explicitly to the invoked operation.
 - Fix ``href`` detection when provided directly as mapping within the ``executionUnit`` of the deployment body.
 - Fix definition of `CWL` ``schema.org`` namespaced fields (i.e.: ``s:author`` and ``s:dateCreated``) causing
-  schema deserialization error when validation the submitted request body against typical examples provided in
+  schema deserialization error when validating the submitted request body against typical examples provided in
   `CWL Metadata and Authorship <https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html>`_.
+- Fix mapping of `CWL` ``schema.org`` metadata to `WPS`/`OGC API` equivalent metadata defining invalid ``role``
+  not respecting the `URI` schema validation constraint.
 - Fix ``GET /jobs/{jobId}/inputs`` contents to correctly return the submitted ``outputs`` definition
   for `Process` execution (fixes `#715 <https://github.com/crim-ca/weaver/issues/715>`_).
 - Fix missing ``Link`` header with ``rel: monitor`` relationship in the created `Job` responses
@@ -114,7 +120,7 @@ Changes:
   and a sample `crim-ca/ncml2stac <https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac>`_ repository
   making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
   (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
-- Add parsing of additional metadata from schema.org in CWL document to convert into process fields
+- Add parsing of additional metadata from ``schema.org`` in CWL document to convert into process fields
   (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
 - Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_).
 
