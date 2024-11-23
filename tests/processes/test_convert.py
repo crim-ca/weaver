@@ -2301,7 +2301,7 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float, 
     assert "values.includes(self)" in cwl_value_from
     assert "self.every(item => values.includes(item))" not in cwl_value_from
 
-    assert cwl["inputs"]["enum-time"]["type"] == {"type": "enum", "symbols": ["#12:00", "#24:00"]}
+    assert cwl["inputs"]["enum-time"] == {"type": "enum", "symbols": ["#12:00", "#24:00"]}
     assert "inputBinding" not in cwl["inputs"]["enum-time"]
 
 
