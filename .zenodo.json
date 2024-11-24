@@ -22,9 +22,44 @@
       "type": "ProjectLeader"
     },
     {
+      "name": "Byrns, David",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Caron, David",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Pelletier, Francis",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Gagnon-Grenier, Félix",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
       "name": "Azeli, Nazim",
-      "affiliation": "Computer Research Institute of Montréal",
-      "type": "ProjectMember"
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Perron, Louis-David",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Cummings, Charles-William",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Trapsida, Nadir",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Lacoursière, Éric",
+      "affiliation": "Computer Research Institute of Montréal"
+    },
+    {
+      "name": "Schwartz, Misha",
+      "affiliation": "University of Toronto"
     }
   ],
   "communities": [
@@ -77,17 +112,17 @@
   },
   "language": "eng",
   "keywords": [
-    "bird-house",
-    "WPS",
-    "Web Processing Service",
     "OGC",
     "OGC API - Processes",
     "CWL",
     "Common Workflow Language",
+    "WPS",
+    "Web Processing Service",
     "Workflow",
     "Remote Execution",
-    "Web API"
+    "Web API",
+    "bird-house"
   ],
   "access_right": "open",
-  "license": "Apache 2.0"
+  "license": "Apache-2.0"
 }
