@@ -745,6 +745,31 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
+.PHONY: extract-changes
+extract-changes:	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Extracting changes for ${VERSION} ..."
+	@bash -c '\
+		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
+		STOP=$$(tail -n +$$(($${START} + 2)) "$(APP_ROOT)/CHANGES.rst" \
+			| grep -n ".. _changes" \
+			| cut -d ":" -f 1 | head -n 1); \
+		tail -n +$${START} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP} \
+			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
+	'
+
+.PHONY: generate-changes-html
+generate-changes-html: extract-changes
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Checking necessary Sphinx dependency ..."
+	@pip show sphinx >/dev/null || bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)" install-doc'
+	@-echo "Converting changes for ${VERSION} ..."
+	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
+	@rst2html \
+		--template "$(REPORTS_DIR)/html-body-template.txt" \
+		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@-echo "Generates changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 
 .PHONY: docker-info

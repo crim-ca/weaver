@@ -25,17 +25,24 @@ jobs:
       run: |
         name=$(basename ${zipball}).zip
         curl -L $zipball > $name
-        echo "archive=${name}" >> $GITHUB_ENV
+        echo "ZENODO_ARCHIVE=${name}" >> $GITHUB_ENV
+
+    - name: Generate Changelog
+      id: zenodo_metadata
+      run: |
+        make generate-changes-html VERSION=${{ github.ref_name }}
+        echo "ZENODO_DESCRIPTION=$(cat reports/CHANGES_${{ github.ref_name }}.html | tr -d '\n')" >> $GITHUB_ENV
 
     - name: Run Zenodo Publish
       id: deploy_zenodo
-      uses: rseng/zenodo-release@main
+      uses: fmigneault/zenodo-release@main
       with:
         token: ${{ secrets.ZENODO_TOKEN }}
         version: ${{ github.ref_name }}
         zenodo_json: .zenodo.json
         html_url: ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}  # GitHub tag link
-        archive: ${{ env.archive }}
+        archive: ${{ env.ZENODO_ARCHIVE }}
+        description: ${{ env.ZENODO_DESCRIPTION }}
 
         # DOI for all versions. Leaving this blank (the default) will create
         # a new DOI on every release. Use a DOI that represents all versions will
