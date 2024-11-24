@@ -857,10 +857,12 @@ def _get_cwl_js_value_from(cwl_io_symbols, allow_unique, allow_array):
 def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, allow_array):
     # type: (Union[str, Type[null]], List[AnyValueType], IO_Select_Type, bool, bool) -> CWL_IO_Type
     """
-    Converts the :term:`I/O` definition to a :term:`CWL` :term:`I/O` that allows ``Enum``-like functionality.
+    Converts the :term:`I/O` definition to a :term:`CWL` :term:`I/O` that allows ``enum``-like functionality.
 
     In the event of an explicit ``string`` as base type, :term:`CWL` directly supports ``type: enum``. Other basic
-    types are not directly supported, and must instead perform manual validation against the set of allowed values.
+    types are not directly supported, and must instead perform manual validation against the set of allowed values,
+    using JavaScript evaluation applied by ``valueFrom`` against the the submitted values to replicate the automatic
+    behavior performed by ``enum`` type.
 
     .. seealso::
         - https://github.com/common-workflow-language/cwl-v1.2/issues/267
@@ -871,15 +873,35 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, a
         Because ``valueFrom`` can only be used with ``inputBinding``, any output providing a set of allowed values
         that are not ``string``-based will be ignored when converted to :term:`CWL` :term:`I/O`.
 
+    .. seealso::
+        - :func:`_get_cwl_js_value_from` defines the ``enum``-like ``valueFrom`` checks
+        - :func:`_patch_cwl_enum_js_requirement` must be called on the entire :term:`CWL` to inject the
+          relevant :data:`CWL_REQUIREMENT_INLINE_JAVASCRIPT`, since it might not be defined in the original :term:`CWL`.
+
+    Another edge-case that happens even if the base type is a ``string`` is when the enum ``symbols``
+    contain an entry with a ``:`` character (e.g.: as in the case of a time ``HH:MM`` string).
+    In such case, :mod:`schema_salad` incorrectly parses it as if a namespaced :term:`URL` (i.e.: ``<ns>:<value>``)
+    was specified. Because of this, the symbol strings get extended to an unresolvable namespace, which leads to a
+    partial and incorrect enum value (e.g.: ``abc:def`` becomes ``input-id#def``). This causes the resulting ``enum``
+    to never accept the submitted values, or worst, causes the entire :term:`CWL` to fail validation if duplicate
+    values are obtained (e.g.: ``12:00`` and ``24:00`` both extend to ``input-id#00``, causing a duplicate ``00``).
+    To handle this case, the ``symbols`` can be updated with a prefixed ``#`` character, making :mod:`schema_salad`
+    interpret it as if it was already a :term:`URI` relative to the input, which is what it aims to generate, and
+    therefore interprets the rest of the string (including the ``:``) literally.
+
+    .. seealso::
+        - https://github.com/common-workflow-language/cwltool/issues/2071
+
     :param cwl_io_type: Basic type for which allowed values should apply.
     :param cwl_io_symbols: Allowed values to restrict the :term:`I/O` definition.
     :return: Converted definition as CWL Enum or with relevant value validation as applicable for the type.
     """
     if cwl_io_type not in PACKAGE_BASIC_TYPES:
         return {}
-    if cwl_io_type == "string":
+    any_colon_symbol = any(":" in str(symbol) for symbol in cwl_io_symbols)
+    if cwl_io_type == "string" and not any_colon_symbol:
         return {"type": {"type": PACKAGE_ENUM_BASE, "symbols": cwl_io_symbols}}
-    if cwl_io_type not in PACKAGE_NUMERIC_TYPES:
+    if cwl_io_type not in PACKAGE_NUMERIC_TYPES and not (cwl_io_type == "string" and any_colon_symbol):
         LOGGER.warning(
             "Could not resolve conversion of CWL I/O as Enum for type '%s'. "
             "Ignoring value validation against specified allowed values: %s.",
@@ -889,9 +911,10 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, a
         return {"type": cwl_io_type}
 
     if not (
-        (all(isinstance(value, bool) for value in cwl_io_symbols) and cwl_io_type == "boolean") or
-        (all(isinstance(value, int) for value in cwl_io_symbols) and cwl_io_type in PACKAGE_INTEGER_TYPES) or
-        (all(isinstance(value, float) for value in cwl_io_symbols) and cwl_io_type in PACKAGE_FLOATING_TYPES)
+        (cwl_io_type == "string" and all(isinstance(value, str) for value in cwl_io_symbols)) or
+        (cwl_io_type == "boolean" and all(isinstance(value, bool) for value in cwl_io_symbols)) or
+        (cwl_io_type in PACKAGE_INTEGER_TYPES and all(isinstance(value, int) for value in cwl_io_symbols)) or
+        (cwl_io_type in PACKAGE_FLOATING_TYPES and all(isinstance(value, float) for value in cwl_io_symbols))
     ):
         LOGGER.warning(
             "Incompatible CWL I/O type '%s' detected for specified allowed values: %s. "
@@ -900,6 +923,10 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, a
             cwl_io_symbols,
         )
         cwl_io_type = "Any"
+
+    if any_colon_symbol:
+        cwl_io_symbols = [f"#{symbol}" for symbol in cwl_io_symbols]
+        return {"type": PACKAGE_ENUM_BASE, "symbols": cwl_io_symbols}
 
     if io_select != IO_INPUT:
         return {"type": cwl_io_type}
@@ -1390,6 +1417,13 @@ def parse_cwl_enum_type(io_info):
         raise PackageTypeError(
             f"Unsupported I/O 'enum' base type: `{type(first_allow)!s}`, from definition: `{io_info!r}`."
         )
+
+    if io_type == "string":
+        # un-patch enum causing CWL parsing errors caused by ':' (see _convert_cwl_io_enum)
+        io_allow = [
+            allow[1:] if allow.startswith("#") and ":" in allow else allow
+            for allow in io_allow
+        ]
 
     io_def = CWLIODefinition(
         type=io_type,  # type: ignore
