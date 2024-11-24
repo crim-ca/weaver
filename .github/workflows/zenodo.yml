@@ -1,0 +1,67 @@
+name: Zenodo Release
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    if: ${{ success() && contains(github.ref, 'refs/tags') }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: "0"
+    - name: Download Archive
+      env:
+        tarball: ${{ github.event.release.tarball_url }}
+        zipball: ${{ github.event.release.zipball_url }}
+      # Add the suffix to the name of the file so type is recognized when
+      # downloading from Zenodo .tar.gz for tarball and .zip for zipball.
+      # Archiving the zipball will cause Zenodo to show a preview of the contents while using tarball will not.
+      run: |
+        name=$(basename ${zipball}).zip
+        curl -L $zipball > $name
+        echo "archive=${name}" >> $GITHUB_ENV
+
+    - name: Run Zenodo Publish
+      id: deploy_zenodo
+      uses: rseng/zenodo-release@main
+      with:
+        token: ${{ secrets.ZENODO_TOKEN }}
+        version: ${{ github.ref_name }}
+        zenodo_json: .zenodo.json
+        html_url: ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}  # GitHub tag link
+        archive: ${{ env.archive }}
+
+        # DOI for all versions. Leaving this blank (the default) will create
+        # a new DOI on every release. Use a DOI that represents all versions will
+        # create a new version for this existing DOI.
+        # Newer versions have their own DOIs, but they're also linked to this DOI
+        # as a different version. When using this, use the DOI for all versions.
+        doi: '10.5281/zenodo.14210717'
+
+    - name: View Outputs
+      env:
+        doi: ${{ steps.deploy_zenodo.outputs.doi }}
+        conceptdoi: ${{ steps.deploy_zenodo.outputs.conceptdoi }}
+        conceptbadge: ${{ steps.deploy_zenodo.outputs.conceptbadge }}
+        badge: ${{ steps.deploy_zenodo.outputs.badge }}
+        bucket: ${{ steps.deploy_zenodo.outputs.bucket }}
+        latest: ${{ steps.deploy_zenodo.outputs.latest }}
+        latest_html: ${{ steps.deploy_zenodo.outputs.latest_html }}
+        record: ${{ steps.deploy_zenodo.outputs.record }}
+        record_html: ${{ steps.deploy_zenodo.outputs.record_html }}
+      run: |
+        echo "doi ${doi}"
+        echo "conceptdoi ${conceptdoi}"
+        echo "conceptbadge ${conceptbadge}"
+        echo "badge ${badge}"
+        echo "bucket ${bucket}"
+        echo "latest ${latest}"
+        echo "latest html ${latest_html}"
+        echo "record ${record}"
+        echo "record html ${record_html}"

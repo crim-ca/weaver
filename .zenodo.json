@@ -1,0 +1,93 @@
+{
+  "upload_type": "software",
+  "title": "crim-ca/weaver:5.9.0",
+  "description": "Weaver: Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES); OGC API - Processes; WPS; CWL Application Package",
+  "version": "5.9.0",
+  "creators": [
+    {
+      "name": "Charette-Migneault, Francis",
+      "orcid": "0000-0003-4862-3349",
+      "affiliation": "Computer Research Institute of Montréal"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Computer Research Institute of Montréal",
+      "type": "HostingInstitution"
+    },
+    {
+      "name": "Charette-Migneault, Francis",
+      "orcid": "0000-0003-4862-3349",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectLeader"
+    },
+    {
+      "name": "Azeli, Nazim",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "crim"
+    },
+    {
+      "identifier": "birdhouse"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.14210717",
+      "relation": "isPartOf",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "https://github.com/crim-ca/weaver",
+      "scheme": "url",
+      "relation": "isMetadataFor",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://osf.io/d3esv/",
+      "scheme": "url",
+      "relation": "isVariantFormOf",
+      "resource_type": "OSF Record"
+    },
+    {
+      "identifier": "https://pavics-weaver.readthedocs.io/",
+      "scheme": "url",
+      "relation": "isDocumentedBy",
+      "resource_type": "ReadTheDocs"
+    }
+  ],
+  "custom": {
+    "code:codeRepository": "https://github.com/crim-ca/weaver",
+    "code:programmingLanguage": [
+      {
+        "id": "python",
+        "title": {"en": "Python"}
+      }
+    ],
+    "code:developmentStatus": [
+      {
+        "id": "active",
+        "title": {"en": "Active"}
+      }
+    ]
+  },
+  "language": "eng",
+  "keywords": [
+    "bird-house",
+    "WPS",
+    "Web Processing Service",
+    "OGC",
+    "OGC API - Processes",
+    "CWL",
+    "Common Workflow Language",
+    "Workflow",
+    "Remote Execution",
+    "Web API"
+  ],
+  "access_right": "open",
+  "license": "Apache 2.0"
+}
