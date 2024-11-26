@@ -569,10 +569,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["formats"][2]["default"] = False
         # Alternate type added automatically in offering.
         alternative_formats = [
-            {"mediaType": "image/gif"},
-            {"mediaType": "image/tiff"},
-            {"mediaType": "image/svg+xml"},
-            {"mediaType": "application/pdf"}
+            {"mediaType": ContentType.IMAGE_GIF},
+            {"mediaType": ContentType.IMAGE_TIFF},
+            {"mediaType": ContentType.IMAGE_SVG_XML},
+            {"mediaType": ContentType.APP_PDF}
         ]
         expect_outputs["file"]["formats"].extend(alternative_formats)
         expect_outputs["file"]["schema"] = {
@@ -1519,11 +1519,17 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert len(proc["outputs"][0]["formats"]) == 4  # Alternative format added in process
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][0]["formats"][3]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][1]["id"] == "single_value_multi_format"
         assert len(proc["outputs"][1]["formats"]) == 6  # Alternative format added in process
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][1]["formats"][3]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][1]["formats"][4]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][1]["formats"][5]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
@@ -3155,17 +3161,19 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(proc["outputs"], list)
         assert len(proc["outputs"]) == 2
         assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
-        assert len(proc["outputs"][0]["formats"]) == 3, \
-            "Default format and alternate formats should be added " \
+        assert len(proc["outputs"][0]["formats"]) == 3, (
+            "Default format and alternate formats should be added "
             "to process definition when omitted from both CWL and WPS"
+        )
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
         assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
         assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
-        assert len(proc["outputs"][1]["formats"]) == 3, \
-            "Default format and alternate formats should be added " \
+        assert len(proc["outputs"][1]["formats"]) == 3, (
+            "Default format and alternate formats should be added "
             "to process definition when omitted from both CWL and WPS"
+        )
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
@@ -4136,10 +4144,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type is None
         assert results.headers["Content-Location"] == results_href
         assert ("Link", output_data_link) in results.headerlist
-        rel_pattern = re.compile(r"rel=\"([^\"]+)\"")
+        rel_pattern = re.compile(r"rel=\"?([^\"]+)\"?")
         assert not any(
             any(out_id in rel_pattern.search(link[1]).group(1) for out_id in ["output_json", "output_text"])
-            for link in results.headerlist if link[0] == "Link" and rel_pattern.search(link[1])
+            for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)

@@ -239,22 +239,22 @@ def test_process_outputs_alt():
     # Assert that process outputs in offering contains alternate representation
     assert offer["outputs"]["output1"]["formats"] == [
         {
-        "mediaType": ContentType.IMAGE_TIFF
+            "mediaType": ContentType.IMAGE_TIFF
         },
         {
-        "mediaType": ContentType.IMAGE_PNG
+            "mediaType": ContentType.IMAGE_PNG
         },
         {
-        "mediaType": ContentType.IMAGE_GIF
+            "mediaType": ContentType.IMAGE_GIF
         },
         {
-        "mediaType": ContentType.IMAGE_JPEG
+            "mediaType": ContentType.IMAGE_JPEG
         },
         {
-        "mediaType": ContentType.IMAGE_SVG_XML
+            "mediaType": ContentType.IMAGE_SVG_XML
         },
         {
-        "mediaType": ContentType.APP_PDF
+            "mediaType": ContentType.APP_PDF
         }]
 
     # Assert that process outputs are unchanged

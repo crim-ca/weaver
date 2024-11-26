@@ -2332,7 +2332,8 @@ def test_create_metalink():
     "href, kwargs, expected",
     [
         # Test case where `output` is only in href dictionary
-        ({"href": "https://example.com", "rel": "self", "id": "output"}, {},
+        ({"href": "https://example.com", "rel": "self", "id": "output"},
+         {},
          "<https://example.com>; rel=\"self\"; id=output"),
 
         # Test case where `output` is only in kwargs
@@ -2340,7 +2341,8 @@ def test_create_metalink():
          "<https://example.com>; rel=\"self\"; id=output"),
 
         # Test case where `output2` in kwargs should override dict
-        ({"href": "https://example.com", "rel": "self", "id": "output"}, {"id": "output2"},
+        ({"href": "https://example.com", "rel": "self", "id": "output"},
+         {"id": "output2"},
          "<https://example.com>; rel=\"self\"; id=output2"),
     ]
 )

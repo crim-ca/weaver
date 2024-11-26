@@ -1840,8 +1840,8 @@ class AllowedRangesList(ExtendedSequenceSchema):
 class AllowedValues(OneOfKeywordSchema):
     _one_of = [
         AllowedRangesList(description="List of value ranges and constraints."),  # array of {range}
-        AllowedValuesList(description="List of enumerated allowed values."),  # array of "value"
-        ExtendedSchemaNode(String(), description="Single allowed value."),  # single "value"
+        AllowedValuesList(description="List of enumerated allowed values."),     # array of "value"
+        ExtendedSchemaNode(String(), description="Single allowed value."),       # single "value"
     ]
 
 
@@ -3168,7 +3168,7 @@ class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
     svc_loc = WPSServiceInstanceAttribute()
     process = WPSProcessSummary()
     status = WPSStatus()
-    inputs = WPSDataInputs(missing=drop)  # when lineage is requested only
+    inputs = WPSDataInputs(missing=drop)          # when lineage is requested only
     out_def = WPSOutputDefinitions(missing=drop)  # when lineage is requested only
     outputs = WPSProcessOutputs()
 
@@ -3581,7 +3581,7 @@ class ExecuteOutputMapAdditionalProperties(ExtendedMappingSchema):
 class ExecuteOutputSpecMap(AnyOfKeywordSchema):
     _any_of = [
         ExecuteOutputMapAdditionalProperties(),  # normal {"<output-id>": {...}}
-        EmptyMappingSchema(),  # allows explicitly provided {}
+        EmptyMappingSchema(),                    # allows explicitly provided {}
     ]
 
 
@@ -4271,7 +4271,7 @@ class ExecuteInputMapAdditionalProperties(StrictMappingSchema):
 class ExecuteInputMapValues(AnyOfKeywordSchema):
     _any_of = [
         ExecuteInputMapAdditionalProperties(),  # normal {"<input-id>": {...}}
-        EmptyMappingSchema(),  # allows explicitly provided {}
+        EmptyMappingSchema(),                   # allows explicitly provided {}
     ]
 
 
@@ -6263,12 +6263,6 @@ class JobStatisticsSchema(ExtendedMappingSchema):
     application = ApplicationStatisticsSchema(missing=drop)
     process = ProcessStatisticsSchema(missing=drop)
     outputs = OutputStatisticsMap(missing=drop)
-
-# todo check
-# class JobtransformerSchema(ExtendedMappingSchema):
-#     application = ApplicationStatisticsSchema(missing=drop)
-#     process = ProcessStatisticsSchema(missing=drop)
-#     outputs = OutputStatisticsMap(missing=drop)
 
 
 class FrontpageParameterSchema(ExtendedMappingSchema):
@@ -8278,25 +8272,6 @@ get_prov_stats_responses = copy(get_stats_responses)
 get_prov_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
-
-# get_job_transformer_responses = {
-#     "200": OkGetJobtransformerResponse(description="success", examples={
-#         "JobTransformer": {
-#             "summary": "Obtained possible output format.",
-#             "value": EXAMPLES["job_transformer.json"],
-#         }
-#     }),
-#     "400": InvalidJobResponseSchema(),
-#     "404": NotFoundJobResponseSchema(),
-#     "405": MethodNotAllowedErrorResponseSchema(),
-#     "410": GoneJobResponseSchema(),
-#     "500": InternalServerErrorResponseSchema(),
-# }
-# get_prov_transformer_responses = copy(get_job_transformer_responses)
-# get_prov_transformer_responses.update({
-#     "403": ForbiddenProviderLocalResponseSchema(),
-# })
-
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),
