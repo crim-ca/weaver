@@ -74,6 +74,7 @@ Fixes:
   a step within a workflow, the parent workflow was marked as succeeded (`XML` status document), and any step executed
   after the successful one that were depending on the workflow inputs could result in not-found file references if it
   was staged by the previous step.
+- Fix optional ``title`` in metadata causing failing HTML rendering of the `Process` description if omitted.
 - Fix `CWL` ``enum`` type mishandling ``symbols`` containing a colon (``:``) character (e.g.: a list of allowed times)
   leading to their invalid interpretation as namespaced strings (i.e.: ``<ns>:<value>``), in turn failing validation
   and breaking the resulting `CWL`. Such ``enum`` will be patched with updated ``symbols`` prefixed by ``#`` to respect
