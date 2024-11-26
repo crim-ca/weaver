@@ -1939,8 +1939,8 @@ class WpsPackage(Process):
                 level=logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
             )
 
-    def update_status(self, message, progress, status, error=None):
-        # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
+    def update_status(self, message, progress, status, error=None, step=False):
+        # type: (str, Number, AnyStatusType, Optional[Exception], bool) -> None
         """
         Updates the :mod:`pywps` real job status from a specified parameters.
         """
@@ -1961,7 +1961,7 @@ class WpsPackage(Process):
             # therefore, use the '_update_status' to enforce the status
             # using protected method also avoids weird overrides of progress
             # percent on failure and final 'success' status
-            self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
+            self.response._update_status(pywps_status_id, message, self.percent, clean=not step)  # noqa: W0212
 
         if isinstance(error, Exception):
             self.exception_message(exception_type=type(error), exception=error,
@@ -1979,11 +1979,17 @@ class WpsPackage(Process):
                            status,                  # type: AnyStatusType
                            error=None,              # type: Optional[Exception]
                            ):                       # type: (...) -> None
+        # ensure the status of the current workflow is not changed to 'success' if up a step-update
+        # setting to 'success' will report the wrong value in the status XML document
+        # this would also trigger cleanup, which would remove an staged file needed by a future step
+        if status == Status.SUCCEEDED:
+            status = Status.RUNNING
         self.update_status(
             message=f"[provider: {target_host}, step: {step_name}] - {str(message).strip()}",
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
             error=error,
+            step=True,
         )
 
     def log(self, level, message, *args, **kwargs):
