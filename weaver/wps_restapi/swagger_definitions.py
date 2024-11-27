@@ -69,6 +69,18 @@ from weaver.processes.constants import (
     CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
     CWL_NAMESPACE_OGC_API_PROC_PART1_URL,
     CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+    CWL_NAMESPACE_SCHEMA_METADATA_EMAIL,
+    CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+    CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+    CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+    CWL_NAMESPACE_SCHEMA_METADATA_PERSON,
+    CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+    CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
     CWL_NAMESPACE_SCHEMA_URL,
     CWL_NAMESPACE_WEAVER_ID,
     CWL_NAMESPACE_WEAVER_URL,
@@ -5851,17 +5863,71 @@ class CWLSchemas(ExtendedSequenceSchema):
     url = URL(title="CWLSchemaURL", description="Schema reference for the CWL definition.")
 
 
-class CWLMetadata(ExtendedMappingSchema):
+class CWLPerson(PermissiveMappingSchema):
+    _sort_first = [
+        "class",
+        CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+        CWL_NAMESPACE_SCHEMA_METADATA_EMAIL,
+        CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+    ]
+    _class = ExtendedSchemaNode(
+        String(),
+        name="class",
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_METADATA_PERSON]),
+        description="Author of the Application Package.",
+    )
+    _id = URI(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+        description="Reference identifier of the person. Typically, an ORCID URI.",
+        missing=drop,
+    )
+    name = ExtendedSchemaNode(
+        String(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+        description="Name of the person.",
+        missing=drop,
+    )
+    email = ExtendedSchemaNode(
+        String(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+        description="Email of the person.",
+        missing=drop,
+    )
+
+
+class CWLAuthors(ExtendedSequenceSchema):
+    item = CWLPerson()
+    validator = Length(min=1)
+
+
+class CWLDateCreated(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(
+            DateTime(),
+            name=CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+            format="date-time",
+            description="Date-time of creation in ISO-8601 format.",
+        )
+    ]
+
+
+class CWLMetadata(PermissiveMappingSchema):
     _sort_first = [
         "cwlVersion",
         "class",
         "id",
-        "version",
         "label",
         "doc",
         "intent",
-        f"{CWL_NAMESPACE_SCHEMA_ID}:author",
-        f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
+        "version",
+        CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+        CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+        CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+        CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+        CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+        CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
     ]
     _sort_after = ["$namespaces", "$schemas"]
 
@@ -5869,16 +5935,43 @@ class CWLMetadata(ExtendedMappingSchema):
     label = ExtendedSchemaNode(String(), missing=drop)
     doc = ExtendedSchemaNode(String(), missing=drop)
     intent = ExtendedSchemaNode(String(), missing=drop)
-    author = ExtendedSchemaNode(
-        String(),
-        name=f"{CWL_NAMESPACE_SCHEMA_ID}:author",
+    version = Version(missing=drop)
+    s_version = Version(missing=drop, name=CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
+
+    author = CWLAuthors(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
         missing=drop,
-        description="Author of the Application Package.",
+        description="Author(s) of the Application Package.",
+    )
+    contributor = CWLAuthors(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+        missing=drop,
+        description="Contributor(s) of the Application Package.",
     )
     keywords = KeywordList(
-        name=f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
+        name=CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
         missing=drop,
         description="Keywords applied to the Application Package.",
+    )
+    license = URL(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+        missing=drop,
+        description=(
+            "License related to the Application Package. "
+            "Preferably an URL to the specific license, but generic license URL is allowed."
+        ),
+    )
+    code_repo = URL(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+        missing=drop,
+        description="URL to the original code repository providing the Application Package.",
+    )
+    date_created = ExtendedSchemaNode(
+        DateTime(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+        format="date-time",
+        missing=drop,
+        description="Date-time of creation in ISO-8601 format.",
     )
     namespaces = CWLNamespaces(missing=drop)
     schemas = CWLSchemas(missing=drop)

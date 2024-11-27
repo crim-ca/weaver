@@ -324,7 +324,11 @@ def get_job_status_schema(request):
 
     def make_headers(resolved_schema):
         # type: (JobStatusSchemaType) -> HeadersType
-        content_type = clean_media_type_format(content_accept, strip_parameters=True)
+        content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
+        # FIXME: support HTML or XML
+        #  (allow transparently for browsers types since Accept did not raise earlier, and no other supported yet)
+        if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
+            content_type = ContentType.APP_JSON
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
         if resolved_schema == JobStatusSchema.OGC:

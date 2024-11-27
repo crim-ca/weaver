@@ -467,7 +467,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
                 raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = payload.get("executionUnit")
         if isinstance(execution_units, dict):
-            if "unit" not in execution_units:
+            if "unit" not in execution_units and "href" not in execution_units:
                 execution_units = {"unit": execution_units}
             execution_units = [execution_units]
         if not isinstance(execution_units, list) or not len(execution_units) == 1:

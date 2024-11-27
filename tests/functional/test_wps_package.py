@@ -4870,11 +4870,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    @pytest.mark.oap_part1
     @parameterized.expand([
         ContentType.MULTIPART_ANY,
         ContentType.MULTIPART_MIXED,
     ])
+    @pytest.mark.oap_part1
     def test_execute_multi_output_multipart_accept(self, multipart_header):
         """
         Requesting ``multipart`` explicitly should return it instead of default :term:`JSON` ``document`` response.

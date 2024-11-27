@@ -62,9 +62,34 @@ Changes:
   submitted ``response`` body parameter (*OGC API - Processes v1.0*),
   the ``Prefer: return`` header (*OGC API - Processes v2.0*), the requested ``Accept`` header,
   and any relevant ``transmissionMode`` request body overrides per filtered ``outputs``.
+- Modify the mapping and generation of `WPS`/`OGC API` metadata against `CWL` corresponding fields using
+  the namespaced ``schema.org`` to *always* employ the full `URI` as ``rel`` or ``role`` according to the
+  provided metadata link or value to allow explicit identification of the ``schema.org`` concept origin.
+- Add mapping of metadata from `CWL` to `WPS`/`OGC API` ``metadata`` field for additional ``schema.org`` concepts.
 
 Fixes:
 ------
+- Fix race condition between workflow step early input staging cleanup on successful step status update.
+  Due to the ``_update_status`` method of ``pywps`` performing cleanup when propagating a successful completion of
+  a step within a workflow, the parent workflow was marked as succeeded (`XML` status document), and any step executed
+  after the successful one that were depending on the workflow inputs could result in not-found file references if it
+  was staged by the previous step.
+- Fix optional ``title`` in metadata causing failing HTML rendering of the `Process` description if omitted.
+- Fix HTML ``Content-Type`` header erroneously set for JSON-only (for now) ``GET /jobs/{jobId}`` as similar endpoints.
+- Fix `CWL` ``enum`` type mishandling ``symbols`` containing a colon (``:``) character (e.g.: a list of allowed times)
+  leading to their invalid interpretation as namespaced strings (i.e.: ``<ns>:<value>``), in turn failing validation
+  and breaking the resulting `CWL`. Such ``enum`` will be patched with updated ``symbols`` prefixed by ``#`` to respect
+  the expected URI representation of ``enum`` values by the `CWL` parser (relates to
+  `common-workflow-language/cwltool#2071 <https://github.com/common-workflow-language/cwltool/issues/2071>`_).
+- Fix `CWL` conversion from a `OGC API - Processes` definition specifying an `I/O` with ``schema`` explicitly
+  indicating a ``type: array`` and nested ``enum``, even if ``minOccurs: 1`` is omitted or explicitly set.
+- Fix ``url`` parameter to override the `CLI` internal ``url`` when passed explicitly to the invoked operation.
+- Fix ``href`` detection when provided directly as mapping within the ``executionUnit`` of the deployment body.
+- Fix definition of `CWL` ``schema.org`` namespaced fields (i.e.: ``s:author`` and ``s:dateCreated``) causing
+  schema deserialization error when validating the submitted request body against typical examples provided in
+  `CWL Metadata and Authorship <https://www.commonwl.org/user_guide/topics/metadata-and-authorship.html>`_.
+- Fix mapping of `CWL` ``schema.org`` metadata to `WPS`/`OGC API` equivalent metadata defining invalid ``role``
+  not respecting the `URI` schema validation constraint.
 - Fix ``GET /jobs/{jobId}/inputs`` contents to correctly return the submitted ``outputs`` definition
   for `Process` execution (fixes `#715 <https://github.com/crim-ca/weaver/issues/715>`_).
 - Fix missing ``Link`` header with ``rel: monitor`` relationship in the created `Job` responses
@@ -107,7 +132,7 @@ Changes:
   and a sample `crim-ca/ncml2stac <https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac>`_ repository
   making use of it with the `Weaver` `CLI` to generate a deployed `OGC API - Processes` definition
   (fixes `#63 <https://github.com/crim-ca/weaver/issues/63>`_).
-- Add parsing of additional metadata from schema.org in CWL document to convert into process fields
+- Add parsing of additional metadata from ``schema.org`` in CWL document to convert into process fields
   (fixes `#463 <https://github.com/crim-ca/weaver/issues/463>`_).
 - Add more metadata mapping details in documentation (fixes `#613 <https://github.com/crim-ca/weaver/issues/613>`_).
 
