@@ -39,6 +39,7 @@ from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.builtin.collection_processor import process_collection
+from weaver.processes.builtin.field_modifier_processor import process_field_modifiers
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, JobInputsOutputsSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -672,7 +673,24 @@ def parse_wps_inputs(wps_process, job, container=None):
                             f"Abort execution. Cannot map multiple outputs {list(out_ids)} "
                             f"from [{proc_uri}] to input [{input_id}] of [{job.process}]."
                         )
-                    resolved_input_values = [(results[0], input_info)]
+                    results = results[0]
+
+                    field_modifier_properties = input_value.get("properties")
+                    field_modifier_filter_expr = input_value.get("filter")
+                    field_modifier_filter_crs = input_value.get("filter-crs")
+                    field_modifier_filter_lang = input_value.get("filter-lang")
+                    field_modifier_sortby = input_value.get("sortBy")
+                    if field_modifier_properties or field_modifier_filter_expr or field_modifier_sortby:
+                        results = process_field_modifiers(
+                            results,
+                            properties=field_modifier_properties,
+                            filter_expr=field_modifier_filter_expr,
+                            filter_crs=field_modifier_filter_crs,
+                            filter_lang=field_modifier_filter_lang,
+                            sortby=field_modifier_sortby,
+                        )
+
+                    resolved_input_values = [(results, input_info)]
 
                 # typical file/data
                 else:

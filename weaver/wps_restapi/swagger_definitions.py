@@ -1591,7 +1591,7 @@ class FilterSchema(ExtendedMappingSchema):
     def deserialize(self, cstruct):
         # type: (JSON) -> Union[JSON, colander.null]
         result = super().deserialize(cstruct)
-        if not result:
+        if not cstruct:
             return result
         filter_expr = result.get("filter")
         filter_lang = result.get("filter-lang")
@@ -1620,6 +1620,55 @@ class FilterSchema(ExtendedMappingSchema):
         return result
 
 
+class AnyPropertyExpression(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(validator=Length(min=1)),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String(), validator=Length(min=1)),
+    ]
+
+
+class PropertyFiltering(ExtendedSequenceSchema):
+    description = "Properties to filter from available data."
+    prop = ExtendedSchemaNode(String(), validator=Length(min=1))
+    validator = Length(min=1)
+
+
+class PropertiesExpression(ExtendedMappingSchema):
+    description = "Properties to compute from available data."
+    prop = AnyPropertyExpression(
+        variable="{property}",
+        description="Expression that defines how to compute the property.",
+    )
+    validator = Length(min=1)
+
+
+class PropertiesDefinition(OneOfKeywordSchema):
+    summary = "Properties to retrieve or compute."
+    description = "Properties produced from the data in the context of where they are specified."
+    _one_of = [
+        PropertyFiltering(),
+        PropertiesExpression(),
+    ]
+
+
+class PropertiesSchema(ExtendedMappingSchema):
+    properties = PropertiesDefinition(missing=drop)
+
+    def deserialize(self, cstruct):
+        result = super().deserialize(cstruct)
+        if "properties" in cstruct:
+            props = (result or {}).get("properties")
+            if cstruct["properties"] != props:
+                raise colander.Invalid(
+                    node=self,
+                    msg="Invalid properties definition could not be interpreted.",
+                    value={"properties": repr_json(cstruct["properties"])},
+                )
+        return result
+
+
 class SortByExpression(ExpandStringList, ExtendedSchemaNode):
     schema_type = String
     default = None
@@ -1631,9 +1680,38 @@ class SortByExpression(ExpandStringList, ExtendedSchemaNode):
     )
 
 
+class SortByDirection(ExtendedSchemaNode):
+    schema_type = String
+    validator = OneOf(["asc", "desc"])
+
+
+class SortByObject(StrictMappingSchema):
+    field = ExtendedSchemaNode(String())
+    direction = SortByDirection()
+
+
+class SortByItem(OneOfKeywordSchema):
+    _one_of = [
+        SortByExpression(),
+        SortByObject(),
+    ]
+
+
+class SortByList(ExtendedSequenceSchema):
+    item = SortByItem()
+    validator = Length(min=1)
+
+
+class SortByDefinition(OneOfKeywordSchema):
+    _one_of = [
+        SortByExpression(),
+        SortByList(),
+    ]
+
+
 class SortBySchema(ExtendedMappingSchema):
-    sort_by_lower = SortByExpression(name="sortby", missing=drop)
-    sort_by_upper = SortByExpression(name="sortBy", missing=drop)
+    sort_by_lower = SortByDefinition(name="sortby", missing=drop)
+    sort_by_upper = SortByDefinition(name="sortBy", missing=drop)
 
     def deserialize(self, cstruct):
         # type: (JSON) -> Union[JSON, colander.null]
@@ -1644,15 +1722,28 @@ class SortBySchema(ExtendedMappingSchema):
         Therefore, additional fields must be left untouched.
         """
         result = super().deserialize(cstruct)
-        if not result:
+        if not cstruct:
             return result
         if result.get("sortby"):
             # keep only 'official' "sortBy" from OGC API Processes
-            # others OGC APIs use "sortby", but their query parameters are usually case-insensitive
+            # others APIs (Features, Records, STAC) use "sortby", but their query parameter is usually case-insensitive
             if not result.get("sortBy"):
                 result["sortBy"] = result["sortby"]
             del result["sortby"]
+        sort_by = cstruct.get("sortby") or cstruct.get("sortBy")
+        if "sortBy" not in result and sort_by:
+            raise colander.Invalid(
+                node=self,
+                msg="Invalid sortBy expression could not be interpreted.",
+                value={"sortBy": repr_json(sort_by)},
+            )
         return result
+
+
+class FieldModifierSchema(FilterSchema, SortBySchema, PropertiesSchema):
+    """
+    Field modifiers that can operation on properties identified within the referenced content definition.
+    """
 
 
 class SupportedCRS(ExtendedMappingSchema):
@@ -3913,7 +4004,7 @@ class ExecuteCollectionFormatEnum(ExtendedSchemaNode):
     validator = OneOf(ExecuteCollectionFormat.values())
 
 
-class ExecuteCollectionInput(FilterSchema, SortBySchema, PermissiveMappingSchema):
+class ExecuteCollectionInput(FieldModifierSchema, PermissiveMappingSchema):
     description = inspect.cleandoc("""
         Reference to a 'collection' that can optionally be filtered, sorted, or parametrized.
 
@@ -4315,7 +4406,7 @@ class ExecuteInputOutputs(ExtendedMappingSchema):
     )
 
 
-class ExecuteParameters(ExecuteInputOutputs):
+class ExecuteParameters(ExtendedMappingSchema):
     """
     Basic execution parameters that can be submitted to run a process.
 
@@ -4341,17 +4432,21 @@ class ExecuteParameters(ExecuteInputOutputs):
     subscribers = JobExecuteSubscribers(missing=drop)
 
 
-class ExecuteProcessParameters(ExecuteParameters):
+class ExecuteProcessParameters(ExecuteParameters, ExecuteInputOutputs, FieldModifierSchema):
     title = "ExecuteProcessParameters"
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/execute.yaml"
     _sort_first = [
         "title",
         "process",
-        "inputs",
-        "outputs",
-        "properties",
         "mode",
         "response",
+        "inputs",
+        "outputs",
+        "filter",
+        "filter-crs",
+        "filter-lang",
+        "properties",
+        "sortBy",
         "subscribers",
     ]
     _title = JobTitle(name="title", missing=drop)
@@ -4396,11 +4491,15 @@ class Execute(AllOfKeywordSchema):
         "title",
         "status",
         "process",
-        "inputs",
-        "outputs",
-        "properties",
         "mode",
         "response",
+        "inputs",
+        "outputs",
+        "filter",
+        "filter-crs",
+        "filter-lang",
+        "properties",
+        "sortBy",
         "subscribers",
     ]
     _all_of = [

@@ -430,7 +430,7 @@ class SchemeURL(colander.Regex):
         if path_pattern:
             if isinstance(path_pattern, RegexPattern):
                 path_pattern = path_pattern.pattern
-            # depending colander version: $ end-of-line, \Z end-of-string (before \n if any), or \z end-of-string (\0)
+            # depends on colander version: $ end-of-line, \Z end-of-string (before \n if any), or \z end-of-string (\0)
             index = -2 if regex.lower().endswith(r"\z") else -1 if regex.endswith("$") else 0
             regex = rf"{regex[:index] + path_pattern}\Z"
         super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
@@ -1400,7 +1400,7 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         return result
 
 
-class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
+class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase, TypeConverter):
     """
     Mapping schema that supports auto-insertion of JSON-schema references provided in the definition.
 
@@ -1532,23 +1532,24 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
             return self._schema_deserialize(cstruct, schema_id, None)
         return cstruct
 
-    def convert_type(self, cstruct, dispatcher=None):  # noqa  # parameter to allow forwarding ref for override schemas
-        # type: (OpenAPISchema, Optional[TypeConversionDispatcher]) -> OpenAPISchema
+    @staticmethod
+    def convert_type(node, cstruct, dispatcher=None):  # noqa  # parameter to allow forwarding ref for override schemas
+        # type: (colander.SchemaNode, OpenAPISchema, Optional[TypeConversionDispatcher]) -> OpenAPISchema
         """
         Converts the node to obtain the :term:`JSON` schema definition.
         """
         schema_id = schema_meta = None
-        schema_id_include = getattr(self, "_schema_include", False)
-        schema_id_include_convert_type = getattr(self, "_schema_include_convert_type", False)
-        schema_meta_include = getattr(self, "_schema_meta_include", False)
-        schema_meta_include_convert_type = getattr(self, "_schema_meta_include_convert_type", False)
-        schema_extra = getattr(self, "_schema_extra", None)
+        schema_id_include = getattr(node, "_schema_include", False)
+        schema_id_include_convert_type = getattr(node, "_schema_include_convert_type", False)
+        schema_meta_include = getattr(node, "_schema_meta_include", False)
+        schema_meta_include_convert_type = getattr(node, "_schema_meta_include_convert_type", False)
+        schema_extra = getattr(node, "_schema_extra", None)
         if schema_id_include and schema_id_include_convert_type:
-            schema_id = getattr(self, "_schema", None)
+            schema_id = getattr(node, "_schema", None)
         if schema_meta_include and schema_meta_include_convert_type:
-            schema_meta = getattr(self, "_schema_meta", None)
+            schema_meta = getattr(node, "_schema_meta", None)
         if schema_id or schema_meta or schema_extra:
-            return self._schema_deserialize(cstruct, schema_meta, schema_id, schema_extra)
+            return node._schema_deserialize(cstruct, schema_meta, schema_id, schema_extra)
         return cstruct
 
     @staticmethod

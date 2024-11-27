@@ -387,7 +387,19 @@ def test_collection_input_filter_lang_case_insensitive():
         },
         {
             "collection": "https://example.com/collections/test",
-            "sortBy": ["name"],
+            "sortBy": [123],
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "properties": "ABC",
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "properties": [],
+        },
+        {
+            "collection": "https://example.com/collections/test",
+            "properties": {},
         },
     ]
 )
