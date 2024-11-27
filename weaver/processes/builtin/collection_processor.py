@@ -36,7 +36,7 @@ from weaver.processes.builtin.utils import (  # isort:skip # noqa: E402
     is_geojson_url,
     validate_reference
 )
-from weaver.processes.constants import PACKAGE_FILE_TYPE
+from weaver.processes.constants import PACKAGE_FILE_TYPE  # isort:skip # noqa: E402
 from weaver.utils import Lazify, get_any_id, load_file, repr_json, request_extra  # isort:skip # noqa: E402
 from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E402
 
