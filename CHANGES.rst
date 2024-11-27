@@ -17,6 +17,9 @@ Changes:
   relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
 - Add support of *OGC API - Processes - Part 4: Job Management* endpoints for `Job` creation and execution
   (fixes `#716 <https://github.com/crim-ca/weaver/issues/716>`_).
+- Add ``format: stac-items`` support to the ``ExecuteCollectionInput`` definition allowing a ``collection`` input
+  explicitly requesting for the STAC Items themselves rather than contained Assets. This avoids the ambiguity between
+  Items and Assets that could both represent the same ``application/geo+json`` media-type.
 - Add `CLI` operations ``update_job``, ``trigger_job`` and ``inputs`` corresponding to the required `Job` operations
   defined by *OGC API - Processes - Part 4: Job Management*.
 - Add ``headers``, ``mode`` and ``response`` parameters along the ``inputs`` and ``outputs`` returned by
@@ -69,6 +72,9 @@ Changes:
 
 Fixes:
 ------
+- Fix `CLI` failing to parse additional ``Link`` headers when they are all combined into a single comma-separated value.
+- Fix `STAC` ``collection`` incorrectly resolving the API endpoint to perform the Item Search operation.
+- Fix resolution of input/output media-types against the unspecified defaults to allow more descriptive results.
 - Fix race condition between workflow step early input staging cleanup on successful step status update.
   Due to the ``_update_status`` method of ``pywps`` performing cleanup when propagating a successful completion of
   a step within a workflow, the parent workflow was marked as succeeded (`XML` status document), and any step executed
