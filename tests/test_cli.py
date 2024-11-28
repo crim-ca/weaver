@@ -121,6 +121,14 @@ def test_cli_url_override_by_operation():
             "https://oper-url.example.com",
             "https://oper-url.example.com/providers/test-provider/processes/test-process",
         ),
+        (
+            "https://init-url.example.com/jobs",
+            "https://oper-url.example.com/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
         # Without operation URL (only init URL)
         (
             "https://init-url.example.com",
@@ -156,6 +164,30 @@ def test_cli_url_override_by_operation():
         ),
         (
             "https://init-url.example.com/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/jobs/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/jobs",  # no final slash variant
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            f"https://init-url.example.com/jobs/{uuid.uuid4()}",
             None,
             "test-process",
             "test-provider",
