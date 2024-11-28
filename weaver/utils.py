@@ -521,8 +521,8 @@ def get_any_id(info, default=None, pop=False, key=False):
     return default
 
 
-def get_any_value(info, default=None, file=True, data=True, pop=False, key=False):
-    # type: (MutableMapping[str, Any], Any, bool, bool, bool, bool) -> AnyValueType
+def get_any_value(info, default=None, file=True, data=True, pop=False, key=False, extras=None):
+    # type: (MutableMapping[str, Any], Any, bool, bool, bool, bool, Optional[List[str]]) -> AnyValueType
     """
     Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference, data]``.
 
@@ -532,9 +532,12 @@ def get_any_value(info, default=None, file=True, data=True, pop=False, key=False
     :param data: If enabled, data-related key names will be considered.
     :param pop: If enabled, remove the matched key from the input mapping.
     :param key: If enabled, return the matched key instead of the value.
+    :param extras: If provided, additional key names to be considered.
     :returns: Value (or key if requested) of the matched `value-like` key or ``None`` if not found.
     """
-    for check, field in [(file, "href"), (data, "value"), (file, "reference"), (data, "data")]:
+    extras = [(True, name) for name in (extras or [])]
+    fields = [(file, "href"), (data, "value"), (file, "reference"), (data, "data")] + extras
+    for check, field in fields:
         if check:
             value = info.pop(field, null) if pop else info.get(field, null)
             if value is not null:
@@ -1404,6 +1407,24 @@ def parse_link_header(link_header):
         link["type"] = ctype
     link.update({param: value[0] for param, value in params.items() if value})
     return link
+
+
+def explode_headers(headers):
+    # type: (Optional[AnyHeadersContainer]) -> ResponseHeaders
+    """
+    Explodes comma-separated headers in containers to a flattened list with repeated header names for each value.
+    """
+    headers = ResponseHeaders(headers or {})
+    if not headers:
+        return headers
+    hdr_list = [
+        (hdr, list(parse_kvp(val, key_value_sep=",", pair_sep=",", unescape_quotes=False, case_insensitive=False)))
+        for hdr, val in headers.items()
+    ]
+    headers = ResponseHeaders()
+    for hrd, val in hdr_list:
+        headers.extend([(hrd, sub) for sub in val])
+    return headers
 
 
 def get_base_url(url):

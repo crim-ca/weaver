@@ -61,6 +61,7 @@ from weaver.utils import (
     assert_sane_name,
     bytes2str,
     create_metalink,
+    explode_headers,
     fetch_directory,
     fetch_file,
     get_any_value,
@@ -2325,3 +2326,48 @@ def test_create_metalink():
         )
         assert req_mock.calls[0].request.url == tmp_href4
         assert req_mock.calls[1].request.url == tmp_href5
+
+
+@pytest.mark.parametrize(
+    ["test_headers", "expect_headers", "expect_get_all"],
+    [
+        # NOTE: casing of letters, quotes and parameter ordering are all important! this is being evaluated explicitly
+        (
+            {
+                "Link": "<https://example.com/test>; rel=\"test\", <https://example.com/test>; rel=\"other\"; title=OK"
+            },
+            [
+                ("Link", "<https://example.com/test>; rel=\"test\""),
+                ("Link", "<https://example.com/test>; rel=\"other\"; title=OK"),
+            ],
+            [
+                "<https://example.com/test>; rel=\"test\"",
+                "<https://example.com/test>; rel=\"other\"; title=OK",
+            ],
+        ),
+        (
+            {
+                "Link": "<#test>; rel=\"test\"; type=\"text/plain\", <./test>; rel=\"other\"; title=Alt",
+                "Content-Type": "application/json"
+            },
+            [
+                ("Link", "<#test>; rel=\"test\"; type=\"text/plain\""),
+                ("Link", "<./test>; rel=\"other\"; title=Alt"),
+                ("Content-Type", "application/json"),
+            ],
+            [
+                "<#test>; rel=\"test\"; type=\"text/plain\"",
+                "<./test>; rel=\"other\"; title=Alt",
+            ],
+        ),
+        (
+            {},
+            [],
+            [],
+        )
+    ]
+)
+def test_explode_headers(test_headers, expect_headers, expect_get_all):
+    results = explode_headers(test_headers)
+    assert list(results.items()) == expect_headers
+    assert results.getall("Link") == expect_get_all

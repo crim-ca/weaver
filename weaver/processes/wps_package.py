@@ -2748,6 +2748,11 @@ class WpsPackage(Process):
                                 output.data_format.validate = format_extension_validator
                         return
 
+        # if the format is the "any" media-type default, allow override by explicit format defined by the result
+        if output.data_format.mime_type in [ContentType.TEXT_PLAIN, ContentType.ANY] and output.data_format.default:
+            output.supported_formats = (result_format_base, )
+            output.data_format = result_format_base
+
         # no match found, minimally check for extension
         if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:
             output.data_format.validate = format_extension_validator

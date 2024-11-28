@@ -1351,21 +1351,25 @@ def validate_process_io(process, payload):
                                 "executionFormats": None,
                             }
                         })
+                # if a media-type was specified, allow it even if not
+                # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                io_accept += any_types
-                if not all(io_fmt in io_accept for io_fmt in io_ctypes):
-                    raise OWSInvalidParameterValue(json={
-                        "code": "InvalidParameterValue",
-                        "name": io_name,
-                        "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect "
-                            "supported formats specified by the process description."
-                        ),
-                        "value": {
-                            "supportedFormats": list(io_accept),
-                            "executionFormats": list(io_ctypes),
-                        }
-                    })
+                if not all(io_fmt in any_types for io_fmt in io_accept):
+                    # otherwise, all formats must be within allowed ones
+                    io_accept += any_types
+                    if not all(io_fmt in io_accept for io_fmt in io_ctypes):
+                        raise OWSInvalidParameterValue(json={
+                            "code": "InvalidParameterValue",
+                            "name": io_name,
+                            "description": (
+                                f"Submitted '{io_name}' requested Content-Types that do not respect "
+                                "supported formats specified by the process description."
+                            ),
+                            "value": {
+                                "supportedFormats": list(io_accept),
+                                "executionFormats": list(io_ctypes),
+                            }
+                        })
 
             if io_type == "inputs":
                 io_min = io_proc["minOccurs"]

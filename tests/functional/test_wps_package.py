@@ -2394,6 +2394,101 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             out_data = json.load(out_fd)
         assert out_data["features"] == col_feats["features"]
 
+    @pytest.mark.oap_part3
+    def test_execute_job_with_collection_input_stac_items(self):
+        """
+        Validate parsing and handling of ``collection`` specified in an input with :term:`STAC` :term:`API` endpoint.
+
+        Ensures that ``format: stac-items`` can be used to return the Items directly rather than matched Assets
+        by corresponding :term:`Media-Type`.
+
+        .. versionadded:: 6.0
+            Fix resolution of STAC ItemSearch endpoint.
+        """
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_svr = stack.enter_context(
+                responses.RequestsMock(assert_all_requests_are_fired=False)
+            )
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+
+            # patch the original content to make it respect STAC validation
+            col_id = "test"
+            stac_feats_url = f"{tmp_host}/collections/{col_id}/items"
+            for idx, feat in enumerate(col_feats["features"]):
+                feat.update({
+                    "stac_version": "1.0.0",
+                    "stac_extensions": [],
+                    "collection": col_id,
+                    "id": f"{col_id}-{idx}",
+                    "properties": {
+                        "datetime": "2024-01-01T00:00:00Z",
+                    },
+                    "assets": {},
+                    "links": [{"rel": "self", "href": f"{stac_feats_url}/{col_id}-{idx}"}]
+                })
+
+            filter_lang = "cql2-json"
+            filter_value = {"op": "=", "args": [{"property": "name"}, "test"]}
+            search_datetime = "2024-01-01T00:00:00Z/2024-01-02T00:00:00Z"
+            search_body = {
+                "collections": [col_id],
+                "datetime": search_datetime,
+                "filter": filter_value,
+                "filter-lang": filter_lang,
+            }
+            search_match = responses.matchers.json_params_matcher(search_body)
+            tmp_svr.add("POST", f"{tmp_host}/search", json=col_feats, match=[search_match])
+
+            stac_item_body = col_feats["features"][0]
+            stac_item_id = stac_item_body["id"]
+            stac_item_url = f"{stac_feats_url}/{stac_item_id}"
+            tmp_svr.add("HEAD", stac_item_url, json=stac_item_body)
+            tmp_svr.add("GET", stac_item_url, json=stac_item_body)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "features": {
+                        "collection": f"{tmp_host}/collections/{col_id}",
+                        "format": ExecuteCollectionFormat.STAC_ITEMS,  # NOTE: this is the test!
+                        "type": ContentType.APP_GEOJSON,
+                        "datetime": search_datetime,
+                        "filter-lang": filter_lang,
+                        "filter": filter_value,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "features" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+
+        assert "features" in out_data and isinstance(out_data["features"], list)
+        assert len(out_data["features"]) == 1
+
     def test_execute_job_with_context_output_dir(self):
         cwl = {
             "cwlVersion": "v1.0",

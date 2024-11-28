@@ -41,6 +41,7 @@ from weaver.utils import (
     Lazify,
     OutputMethod,
     copy_doc,
+    explode_headers,
     fetch_reference,
     fully_qualified_name,
     get_any_id,
@@ -500,7 +501,7 @@ class WeaverClient(object):
         content_type=None,      # type: Optional[ContentType]
     ):                          # type: (...) -> OperationResult
         # multi-header of same name, for example to support many Link
-        headers = ResponseHeaders(response.headers)
+        headers = explode_headers(response.headers)
         code = getattr(response, "status_code", None) or getattr(response, "code", None)
         _success = False
         try:
@@ -1080,23 +1081,25 @@ class WeaverClient(object):
             if (
                 # consider possible ambiguity if literal CWL input is named 'inputs'
                 # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
-                #   unless 'value/href' are present or their sub-dict don't have CWL 'class'
+                #   unless 'value/href/collection/process' (known OGC structures)
+                #   are present AND their sub-dict don't have CWL 'class'
                 # - if value of 'inputs' is a mapping with nested objects,
                 #   they must be interpreted as the CWL form if a 'class' is found
                 #   (literals would be interpreted the same regardless of OGC or CWL form)
                 # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-                #   unless 'value/href' (and also 'id' technically) are present
+                #   unless 'value/href/collection/process' (and also 'id' technically) are present
                 values is not null and
                 (
                     (
                         isinstance(values, dict) and
-                        get_any_value(values, default=null) is null and
+                        get_any_value(values, default=null, extras=["collection", "processes"]) is null and
                         "class" in values
                     ) or
                     (
                         isinstance(values, (dict, list)) and
                         any(
-                            isinstance(v, dict) and get_any_value(v, default=null) is null
+                            isinstance(v, dict) and
+                            get_any_value(v, default=null, extras=["collection", "processes"]) is null
                             for v in (values if isinstance(values, list) else values.values())
                         )
                     )
