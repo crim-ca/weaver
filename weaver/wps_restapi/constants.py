@@ -5,7 +5,7 @@ from weaver.base import Constants
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import TypedDict
+    from weaver.typedefs import Union, TypedDict
 
     Conformance = TypedDict("Conformance", {
         "conformsTo": List[str]
@@ -23,10 +23,13 @@ class ConformanceCategory(Constants):
 if TYPE_CHECKING:
     from weaver.typedefs import Literal
 
-    AnyConformanceCategory = Literal[
-        ConformanceCategory.ALL,
-        ConformanceCategory.CONFORMANCE,
-        ConformanceCategory.PERMISSION,
-        ConformanceCategory.RECOMMENDATION,
-        ConformanceCategory.REQUIREMENT,
+    AnyConformanceCategory = Union[
+        ConformanceCategory,
+        Literal[
+            ConformanceCategory.ALL,
+            ConformanceCategory.CONFORMANCE,
+            ConformanceCategory.PERMISSION,
+            ConformanceCategory.RECOMMENDATION,
+            ConformanceCategory.REQUIREMENT,
+        ]
     ]
