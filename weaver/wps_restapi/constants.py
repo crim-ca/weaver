@@ -5,7 +5,7 @@ from weaver.base import Constants
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import Union, TypedDict
+    from weaver.typedefs import TypedDict, Union
 
     Conformance = TypedDict("Conformance", {
         "conformsTo": List[str]
