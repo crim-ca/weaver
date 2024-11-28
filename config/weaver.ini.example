@@ -6,7 +6,11 @@
 ###
 
 [app:main]
-use = egg:weaver
+# WARNING:
+#   For backward compatibility, a system link can be created to map this distribution as "weaver -> crim_weaver".
+#   See 'docker/Dockerfile-base' for system link mapping example.
+#   Otherwise, replace the following with 'egg:weaver' according to the installed package distribution.
+use = egg:crim-weaver
 
 pyramid.reload_templates = false
 pyramid.debug_authorization = false

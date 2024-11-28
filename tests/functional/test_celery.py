@@ -63,7 +63,7 @@ def test_celery_registry_resolution():
         cfg_ini.write(
             inspect.cleandoc(f"""
             [app:main]
-            use = egg:weaver
+            use = egg:crim-weaver
             [celery]
             broker_url = {celery_mongo_broker}
             result_backend = {celery_mongo_broker}

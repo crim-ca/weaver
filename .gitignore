@@ -50,6 +50,9 @@ unit_tests/testdata.json
 result[s].xml
 testdata.json
 
+# PyPI distributions
+dist/
+
 ## R
 *.Rhistory
 

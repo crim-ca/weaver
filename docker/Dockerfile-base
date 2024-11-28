@@ -37,4 +37,12 @@ COPY ./ ${APP_DIR}
 # equivalent of `make install` without conda env and pre-installed packages
 RUN pip install --no-dependencies -e ${APP_DIR}
 
+# backward-compatibility mapping for 'importlib.metadata' dist/package name resolution
+# this allows existing 'weaver.ini' to point at 'weaver' rather than 'crim-weaver' for pserve and celery INI
+RUN ln -s $( \
+      python -c 'import importlib.metadata; DIST=importlib.metadata.Distribution.from_name("crim-weaver")._path; \
+        print(DIST); \
+        print(str(DIST).replace("crim_", ""))' \
+    )
+
 CMD ["bash"]
