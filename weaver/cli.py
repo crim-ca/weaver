@@ -718,7 +718,7 @@ class WeaverClient(object):
             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
             request_timeout=request_timeout, request_retries=request_retries
         )
-        if resp.status_code != 200:
+        if resp.code != 200:
             no_ver = "This server might not implement the '/versions' endpoint."
             return OperationResult(
                 False, f"Failed to obtain server version. {no_ver}",

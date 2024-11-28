@@ -600,3 +600,14 @@ def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, su
     else:
         assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
         assert dict(**vars(ns)) == subscriber_result  # pylint: disable=R1735
+
+
+@pytest.mark.cli
+def test_cli_version_non_weaver():
+    """
+    Tests that the ``version`` operation is handled gracefully for a server not supporting it (Weaver-specific).
+    """
+    with mock.patch("weaver.cli.WeaverClient._request", return_value=OperationResult(success=False, code=404)):
+        result = WeaverClient(url="https://fake.domain.com").version()
+    assert result.code == 404
+    assert "Failed to obtain server version." in result.message
