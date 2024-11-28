@@ -414,8 +414,9 @@ class WeaverClient(object):
             For specific authentication method on per-request basis, parameter should be provided to respective methods.
             Should perform required adjustments to request to allow access control of protected contents.
         """
+        self._url = None
         if url:
-            self._url = self._parse_url(url)
+            self._url = self._get_url(url)
             LOGGER.debug("Using URL: [%s]", self._url)
         else:
             self._url = None
@@ -470,9 +471,14 @@ class WeaverClient(object):
         # type: (Optional[str]) -> str
         if not self._url and not url:
             raise ValueError("No URL available. Client was not created with an URL and operation did not receive one.")
-        if url:
-            return self._parse_url(url)
-        return self._url
+        url = self._parse_url(url) if url else self._url
+        if url.endswith("/processes") or url.endswith("/jobs"):
+            url = url.rsplit("/", 1)[0]
+        if "/processes/" in url:
+            url = url.split("/processes/", 1)[0]
+        if "/jobs/" in url:
+            url = url.split("/jobs/", 1)[0]
+        return url
 
     @staticmethod
     def _parse_url(url):
@@ -1350,7 +1356,8 @@ class WeaverClient(object):
 
         # omit x-headers on purpose for 'describe', assume they are intended for 'execute' operation only
         LOGGER.debug("Looking up process [%s] (provider: %s) to execute on [%s]", process_id, provider_id, base)
-        result = self.describe(process_id, provider_id=provider_id, url=base, auth=auth)
+        desc_url = self._get_process_url(url or base, process_id=process_id, provider_id=provider_id)
+        result = self.describe(url=desc_url, process_id=process_id, provider_id=provider_id, auth=auth)
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=result.body, headers=result.headers, code=result.code, text=result.text)
@@ -1364,7 +1371,6 @@ class WeaverClient(object):
         )
 
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
-        desc_url = self._get_process_url(base, process_id, provider_id)
         exec_url = f"{desc_url}/execution"  # use OGC-API compliant endpoint (not '/jobs')
         exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
         exec_headers.update(self._headers)

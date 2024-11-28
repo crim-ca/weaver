@@ -77,6 +77,102 @@ def test_cli_url_override_by_operation():
 
 
 @pytest.mark.cli
+@pytest.mark.parametrize(
+    ["init_url", "oper_url", "proc_id", "prov_id", "expect_base_url", "expect_proc_url"],
+    [
+        # With operation URL override
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        # Without operation URL (only init URL)
+        (
+            "https://init-url.example.com",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/processes",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/processes/test-process",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+    ]
+)
+def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_base_url, expect_proc_url):
+    client = WeaverClient(url=init_url)
+    result = client._get_url(url=oper_url)
+    assert result == expect_base_url
+    result = client._get_process_url(url=oper_url, process_id=proc_id, provider_id=prov_id)
+    assert result == expect_proc_url
+
+
+@pytest.mark.cli
 def test_parse_inputs_from_file():
     inputs = []
     mock_result = OperationResult(False, code=500)
