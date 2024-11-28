@@ -18,9 +18,9 @@ from werkzeug.wrappers.request import Request as WerkzeugRequest
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
-from weaver.formats import ContentType, guess_target_format
+from weaver.formats import ContentType, get_format, guess_target_format
 from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.processes.convert import wps2json_job_payload
+from weaver.processes.convert import get_field, wps2json_job_payload
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
@@ -40,7 +40,9 @@ from weaver.wps_restapi.jobs.utils import get_job_submission_response
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Deque, Dict, List, Optional, Union
+
+    from pywps.inout.basic import ComplexInput
 
     from weaver.datatype import Job
     from weaver.typedefs import (
@@ -235,6 +237,43 @@ class WorkerService(ServiceWPS):
             return resp
 
         return body
+
+    @handle_known_exceptions
+    def create_complex_inputs(self, source, inputs):
+        # type: (ComplexInput, List[Dict[str, str]]) -> Deque[ComplexInput]
+        """
+        Dynamically adjust process input definitions to align with unrestricted format as applicable.
+
+        Due to how :meth:`create_complex_inputs` of :mod:`pywps` is implemented
+        (check of format by ``[0]`` index), a ``supported_formats`` property must always contain at least 1 format.
+        However, that restriction erroneously rejects an "any" :term:`Media-Type` input that does not enforce
+        a specific format (i.e.: ``text/plain`` and ``*/*`` by default). Therefore, update the input dynamically
+        to inject the missing formats matching submitted inputs to make them succeed the validation transparently.
+
+        Without this patch, a submitted input trying to be more informative about its content by advertising its
+        actual :term:`Media-Type`, schema, encoding, etc. gets penalized over an input "just" submitting the
+        complex data/file reference.
+        """
+        input_def = source.clone()
+        input_use_default_format = (
+            len(input_def.supported_formats) == 1 and
+            input_def.supported_formats[0].default and
+            input_def.supported_formats[0].mime_type in [ContentType.TEXT_PLAIN, ContentType.ANY]
+        )
+        if input_use_default_format:
+            patched_formats = [input_def.supported_formats[0]]
+            patched_media_types = [patched_formats[0].mime_type]
+            for input_data in inputs:
+                data_ctype = get_field(input_data, "mimeType", search_variations=True)
+                if data_ctype and data_ctype not in patched_media_types:
+                    patched_media_types.append(data_ctype)
+                    data_format = get_format(data_ctype)
+                    data_format.encoding = get_field(input_data, "encoding", default=data_format.encoding)
+                    data_format.schema = get_field(input_data, "schema", default=data_format.schema)
+                    patched_formats.append(data_format)
+            input_def.supported_formats = tuple(patched_formats)
+
+        return super(WorkerService, self).create_complex_inputs(input_def, inputs)
 
     @handle_known_exceptions
     def prepare_process_for_execution(self, identifier):
