@@ -20,6 +20,7 @@ Changes:
 - Add ``format: stac-items`` support to the ``ExecuteCollectionInput`` definition allowing a ``collection`` input
   explicitly requesting for the STAC Items themselves rather than contained Assets. This avoids the ambiguity between
   Items and Assets that could both represent the same ``application/geo+json`` media-type.
+- Add `CLI` operations ``info``, ``version`` and ``conformance`` to retrieve the metadata details of the server.
 - Add `CLI` operations ``update_job``, ``trigger_job`` and ``inputs`` corresponding to the required `Job` operations
   defined by *OGC API - Processes - Part 4: Job Management*.
 - Add `CLI` support of the ``collection`` and ``process`` inputs respectively for *Collection Input*

@@ -35,8 +35,10 @@ from tests.utils import (
     run_command,
     setup_config_from_settings
 )
+from weaver.__meta__ import __version__
 from weaver.base import classproperty
 from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as weaver_cli
+from weaver.config import WeaverConfiguration
 from weaver.datatype import DockerAuthentication, Service
 from weaver.execute import ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
@@ -135,6 +137,25 @@ class TestWeaverClient(TestWeaverClientBase):
         with open(test_file_path, mode="w", encoding="utf-8") as test_file:
             test_file.write(data)
         return test_file_path
+
+    def test_info(self):
+        result = mocked_sub_requests(self.app, self.client.info)
+        assert result.success
+        assert result.body["title"] == "Weaver"
+        assert result.body["configuration"] == WeaverConfiguration.HYBRID
+        assert "parameters" in result.body
+
+    def test_version(self):
+        result = mocked_sub_requests(self.app, self.client.version)
+        assert result.success
+        assert "versions" in result.body
+        assert result.body["versions"] == [{"name": "weaver", "version": __version__, "type": "api"}]
+
+    def test_conformance(self):
+        result = mocked_sub_requests(self.app, self.client.conformance)
+        assert result.success
+        assert "conformsTo" in result.body
+        assert isinstance(result.body["conformsTo"], list)
 
     def process_listing_op(self, operation, **op_kwargs):
         # type: (Callable[[Any, ...], OperationResult], **Any) -> OperationResult

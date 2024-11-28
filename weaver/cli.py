@@ -57,6 +57,7 @@ from weaver.utils import (
     setup_loggers
 )
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.constants import ConformanceCategory
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Type, Union
@@ -100,10 +101,12 @@ if TYPE_CHECKING:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
         from weaver.status import AnyStatusSearch
+        from weaver.wps_restapi.constants import AnyConformanceCategory
     except ImportError:
         AnyOutputFormat = str
         AnyStatusSearch = str
         ProcessSchemaType = str
+        AnyConformanceCategory = str
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
@@ -650,6 +653,127 @@ class WeaverClient(object):
             return {sd.XAuthDockerHeader.name: f"Basic {token}"}
         return {}
 
+    def info(
+        self,
+        url=None,               # type: Optional[str]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        with_links=True,        # type: bool
+        with_headers=False,     # type: bool
+        request_timeout=None,   # type: Optional[int]
+        request_retries=None,   # type: Optional[int]
+        output_format=None,     # type: Optional[AnyOutputFormat]
+    ):                          # type: (...) -> OperationResult
+        """
+        Retrieve server information from the landing page.
+
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        base = self._get_url(url)
+        resp = self._request(
+            "GET", base,
+            headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+            request_timeout=request_timeout, request_retries=request_retries
+        )
+        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    def version(
+        self,
+        url=None,               # type: Optional[str]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        with_links=True,        # type: bool
+        with_headers=False,     # type: bool
+        request_timeout=None,   # type: Optional[int]
+        request_retries=None,   # type: Optional[int]
+        output_format=None,     # type: Optional[AnyOutputFormat]
+    ):                          # type: (...) -> OperationResult
+        """
+        Retrieve server version.
+
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        base = self._get_url(url)
+        version_url = f"{base}/versions"
+        resp = self._request(
+            "GET", version_url,
+            headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+            request_timeout=request_timeout, request_retries=request_retries
+        )
+        if resp.code != 200:
+            no_ver = "This server might not implement the '/versions' endpoint."
+            return OperationResult(
+                False, f"Failed to obtain server version. {no_ver}",
+                body=resp.body, text=resp.text, code=resp.code, headers=resp.headers
+            )
+        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    def conformance(
+        self,
+        category=None,          # type: Optional[AnyConformanceCategory]
+        url=None,               # type: Optional[str]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        with_links=True,        # type: bool
+        with_headers=False,     # type: bool
+        request_timeout=None,   # type: Optional[int]
+        request_retries=None,   # type: Optional[int]
+        output_format=None,     # type: Optional[AnyOutputFormat]
+    ):                          # type: (...) -> OperationResult
+        """
+        Retrieve server conformance classes.
+
+        :param category: Select the category of desired conformance item references to be returned.
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        base = self._get_url(url)
+        conf_url = f"{base}/conformance"
+        conf = ConformanceCategory.get(category)
+        query = {"category": conf} if conf else None
+        resp = self._request(
+            "GET", conf_url,
+            headers=self._headers, x_headers=headers, params=query,
+            settings=self._settings, auth=auth,
+            request_timeout=request_timeout, request_retries=request_retries
+        )
+        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
     def register(
         self,
         provider_id,            # type: str
@@ -1004,16 +1128,16 @@ class WeaverClient(object):
 
     def package(
         self,
-        process_id,                 # type: str
-        provider_id=None,           # type: Optional[str]
-        url=None,                   # type: Optional[str]
-        auth=None,                  # type: Optional[AuthBase]
-        headers=None,               # type: Optional[AnyHeadersContainer]
-        with_links=True,            # type: bool
-        with_headers=False,         # type: bool
-        request_timeout=None,       # type: Optional[int]
-        request_retries=None,       # type: Optional[int]
-        output_format=None,         # type: Optional[AnyOutputFormat]
+        process_id,             # type: str
+        provider_id=None,       # type: Optional[str]
+        url=None,               # type: Optional[str]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        with_links=True,        # type: bool
+        with_headers=False,     # type: bool
+        request_timeout=None,   # type: Optional[int]
+        request_retries=None,   # type: Optional[int]
+        output_format=None,     # type: Optional[AnyOutputFormat]
     ):                          # type: (...) -> OperationResult
         """
         Retrieve the :term:`Application Package` definition of the specified :term:`Process`.
@@ -2137,34 +2261,27 @@ def add_url_param(parser, required=True):
 
 def add_shared_options(parser):
     # type: (argparse.ArgumentParser) -> None
-    links_grp = parser.add_mutually_exclusive_group()
+
+    out_grp = parser.add_argument_group(
+        title="Output Arguments",
+        description="Parameters to control specific options related to output format and contents."
+    )
+    links_grp = out_grp.add_mutually_exclusive_group()
     links_grp.add_argument("-nL", "--no-links", dest="with_links", action="store_false",
                            help="Remove \"links\" section from returned result body.")
     links_grp.add_argument("-wL", "--with-links", dest="with_links", action="store_true", default=True,
                            help="Preserve \"links\" section from returned result body (default).")
-    headers_grp = parser.add_mutually_exclusive_group()
+    headers_grp = out_grp.add_mutually_exclusive_group()
     headers_grp.add_argument("-nH", "--no-headers", dest="with_headers", action="store_false", default=False,
                              help="Omit response headers, only returning the result body (default).")
     headers_grp.add_argument("-wH", "--with-headers", dest="with_headers", action="store_true",
                              help="Return response headers additionally to the result body.")
-    parser.add_argument(
-        "-H", "--header", action=ValidateHeaderAction, nargs=1, dest="headers", metavar="HEADER",
-        help=(
-            "Additional headers to apply for sending requests toward the service. "
-            "This option can be provided multiple times, each with a value formatted as:"
-            "\n\n``Header-Name: value``\n\n"
-            "Header names are case-insensitive. "
-            "Quotes can be used in the ``value`` portion to delimit it. "
-            "Surrounding spaces are trimmed. "
-            "Note that overridden headers expected by requests and the service could break some functionalities."
-        )
-    )
     fmt_docs = "\n\n".join([
         re.sub(r"\:[a-z]+\:\`([A-Za-z0-9_\-]+)\`", r"\1", f"{getattr(OutputFormat, fmt).upper()}: {doc}")  # remove RST
         for fmt, doc in sorted(OutputFormat.docs().items()) if doc
     ])
     fmt_choices = [fmt.upper() for fmt in sorted(OutputFormat.values())]
-    parser.add_argument(
+    out_grp.add_argument(
         "-F", "--format", choices=fmt_choices, type=str.upper, dest="output_format",
         help=(
             f"Select an alternative output representation (default: {OutputFormat.JSON_STR.upper()}, case-insensitive)."
@@ -2186,6 +2303,18 @@ def add_shared_options(parser):
     req_grp.add_argument(
         "-rR", "--request-retries", dest="request_retries", action=ValidateNonZeroPositiveNumberAction, type=int,
         help="Amount of attempt to retry HTTP requests in case of failure (default: no retry)."
+    )
+    req_grp.add_argument(
+        "-H", "--header", action=ValidateHeaderAction, nargs=1, dest="headers", metavar="HEADER",
+        help=(
+            "Additional headers to apply for sending requests toward the service. "
+            "This option can be provided multiple times, each with a value formatted as:"
+            "\n\n``Header-Name: value``\n\n"
+            "Header names are case-insensitive. "
+            "Quotes can be used in the ``value`` portion to delimit it. "
+            "Surrounding spaces are trimmed. "
+            "Note that overridden headers expected by requests and the service could break some functionalities."
+        )
     )
 
     auth_grp = parser.add_argument_group(
@@ -2917,6 +3046,39 @@ def make_parser():
         description="Name of the operation to run."
     )
 
+    op_info = WeaverArgumentParser(
+        "info",
+        description="Retrieve server information from the landing page.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_info)
+    add_url_param(op_info)
+    add_shared_options(op_info)
+
+    op_version = WeaverArgumentParser(
+        "version",
+        description="Retrieve server version.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_version)
+    add_url_param(op_version)
+    add_shared_options(op_version)
+
+    op_conformance = WeaverArgumentParser(
+        "conformance",
+        description="Retrieve server conformance classes.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_conformance)
+    add_url_param(op_conformance)
+    add_shared_options(op_conformance)
+    op_conformance.add_argument(
+        "-c", "--category", dest="category",
+        default=ConformanceCategory.CONFORMANCE,  # same as API default, expected OGC API compliant result
+        help="Select the category of desired conformance item references to be returned (default: %(default)s).",
+        choices=ConformanceCategory.values()
+    )
+
     op_deploy = WeaverArgumentParser(
         "deploy",
         description="Deploy a process.",
@@ -3288,6 +3450,9 @@ def make_parser():
     )
 
     operations = [
+        op_info,
+        op_version,
+        op_conformance,
         op_deploy,
         op_undeploy,
         op_register,
@@ -3318,7 +3483,7 @@ def make_parser():
         op_aliases = [alias for alias, op_alias in aliases.items() if op_alias is op_parser]
         # add help disabled otherwise conflicts with main parser help
         sub_op_parser = ops_parsers.add_parser(
-            op_parser.prog, aliases=op_aliases, parents=[log_parser, op_parser],
+            op_parser.prog, aliases=op_aliases, parents=[op_parser, log_parser],
             add_help=False, help=op_parser.description,
             formatter_class=op_parser.formatter_class,
             description=op_parser.description, usage=op_parser.usage
