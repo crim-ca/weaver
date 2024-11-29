@@ -1,9 +1,19 @@
+"""
+This module provides utilities for converting PNG images to a SVG format.
+
+Cross-reference:
+This work draws inspiration from png2svg.py, available at:
+https://github.com/ianmackinnon/png2svg/blob/master/png2svg.py
+"""
 import operator
 from collections import deque
 from io import StringIO
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from PIL import Image
+
+if TYPE_CHECKING:
+    from typing import List, Optional, Tuple
 
 
 def add_tuple(first_tuple, second_tuple):
@@ -184,24 +194,5 @@ def rgba_image_to_svg_contiguous(img, opaque=None, keep_every_point=False):
             str.write(
                 f""" " style="fill:rgb{color[0:3]}; fill-opacity:{float(color[3]) / 255:.3f}; stroke:none;" />\n""")
 
-    str.write("""</svg>\n""")
-    return str.getvalue()
-
-
-def rgba_image_to_svg_pixels(img, opaque=None):
-    # type: (Image.Image, Optional[bool]) -> str
-    str = StringIO()
-    str.write(svg_header(*img.size))
-
-    width, height = img.size
-    for x in range(width):
-        for y in range(height):
-            here = (x, y)
-            rgba = img.getpixel(here)
-            if opaque and not rgba[3]:
-                continue
-            str.write(
-                    f"""  <rect x="{x}" y="{y}" width="1" height="1" style="fill:rgb{rgba[0:3]};
-                    fill-opacity:{float(rgba[2]) / 255:.3f}; stroke:none;" />\n""")
     str.write("""</svg>\n""")
     return str.getvalue()

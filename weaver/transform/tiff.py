@@ -5,64 +5,54 @@ import numpy as np
 import rasterio
 from PIL import Image, UnidentifiedImageError
 
-from weaver.transform.utils import write_images
-
 
 def normalize_band(image_band: np.ndarray) -> np.ndarray:
     """
     Normalize a single band of an image to the range [0, 1].
 
-    Args:
-        image_band (np.ndarray): The image band to normalize.
-
-    Returns:
-        np.ndarray: The normalized image band.
+    :param image_band: The image band to normalize.
+    :type image_band: np.ndarray
+    :return: The normalized image band.
+    :rtype: np.ndarray
     """
     band_min, band_max = image_band.min(), image_band.max()  # type: ignore  # IDE type stub error
     return (image_band - band_min) / (band_max - band_min)
-
-
-def brighten_band(image_band: np.ndarray, alpha: float = 0.13, beta: float = 0.0,
-                  gamma: float = 2.0) -> np.ndarray:
-    """
-    Apply a brightness adjustment to a single band of an image using a gamma correction.
-
-    Args:
-        image_band (np.ndarray): The image band to adjust.
-        alpha (float): The scaling factor for the image band.
-        beta (float): The offset added to the image band before applying the power.
-        gamma (float): The gamma factor for correction.
-
-    Returns:
-        np.ndarray: The brightened image band.
-    """
-    return np.clip(np.power(alpha * image_band + beta, 1. / gamma), 0, 255)
 
 
 class Tiff:
     """
     A class for working with TIFF files, including GeoTIFFs and multi-page TIFFs.
 
-    Attributes:
-        file_path (str): The file path to the TIFF image.
-        dataset (rasterio.Dataset): The rasterio dataset for GeoTIFFs.
-        is_geotiff (bool): A flag indicating whether the image is a GeoTIFF.
-        images (List[np.ndarray]): The list of image arrays for multi-page TIFFs.
-        _images (List[np.ndarray]): A copy of the list of image arrays.
-        nb_bands (int): The number of bands in the GeoTIFF.
-        width (int): The width of the image.
-        height (int): The height of the image.
-        bands (dict): A dictionary of band indexes and their data types.
-        coordinates (Tuple[Tuple[float, float], Tuple[float, float]]): The coordinates for the GeoTIFF.
-        crs (rasterio.crs.CRS): The coordinate reference system for the GeoTIFF.
+    :ivar file_path: The file path to the TIFF image.
+    :vartype file_path: str
+    :ivar dataset: The rasterio dataset for GeoTIFFs.
+    :vartype dataset: rasterio.Dataset
+    :ivar is_geotiff: A flag indicating whether the image is a GeoTIFF.
+    :vartype is_geotiff: bool
+    :ivar images: The list of image arrays for multi-page TIFFs.
+    :vartype images: List[np.ndarray]
+    :ivar _images: A copy of the list of image arrays.
+    :vartype _images: List[np.ndarray]
+    :ivar nb_bands: The number of bands in the GeoTIFF.
+    :vartype nb_bands: int
+    :ivar width: The width of the image.
+    :vartype width: int
+    :ivar height: The height of the image.
+    :vartype height: int
+    :ivar bands: A dictionary of band indexes and their data types.
+    :vartype bands: dict
+    :ivar coordinates: The coordinates for the GeoTIFF.
+    :vartype coordinates: Tuple[Tuple[float, float], Tuple[float, float]]
+    :ivar crs: The coordinate reference system for the GeoTIFF.
+    :vartype crs: rasterio.crs.CRS
     """
 
     def __init__(self, file_path: str):
         """
         Initialize the Tiff object with the given file path.
 
-        Args:
-            file_path (str): The file path to the TIFF image.
+        :param file_path: The file path to the TIFF image.
+        :type file_path: str
         """
         self.file_path = file_path
         self.dataset = rasterio.open(self.file_path)
@@ -94,8 +84,8 @@ class Tiff:
         """
         Get the range of valid band indexes for the TIFF file.
 
-        Returns:
-            range: A range object representing valid band indexes.
+        :return: A range object representing valid band indexes.
+        :rtype: range
         """
         return range(1, self.nb_bands + 1)
 
@@ -103,39 +93,34 @@ class Tiff:
         """
         Retrieve a specific band of the image by index.
 
-        Args:
-            index (int): The band index to retrieve.
-
-        Returns:
-            Optional[np.ndarray]: The band as a NumPy array, or None if not found.
-
-        Raises:
-            RuntimeError: If the band index is invalid or data cannot be read.
+        :param index: The band index to retrieve.
+        :type index: int
+        :return: The band as a NumPy array, or None if not found.
+        :rtype: Optional[np.ndarray]
+        :raises RuntimeError: If the band index is invalid or data cannot be read.
         """
-        try:
-            if index in self.range:
-                return self.dataset.read(index)
-            return None
-        except KeyError as err:
-            raise RuntimeError(f"Failed to read data at index {index}") from err
+        if index in self.range:
+            return self.dataset.read(index)
+        return None
 
     def get_images(self, red_band: int = 1, green_band: int = 2, blue_band: int = 3) -> List[Image.Image]:
         """
         Retrieve RGB images by combining bands from a GeoTIFF or multi-page TIFF.
 
-        Args:
-            red_band (int): The band index for the red channel.
-            green_band (int): The band index for the green channel.
-            blue_band (int): The band index for the blue channel.
-
-        Returns:
-            List[Image.Image]: A list of PIL Image objects representing the RGB image(s).
+        :param red_band: The band index for the red channel.
+        :type red_band: int
+        :param green_band: The band index for the green channel.
+        :type green_band: int
+        :param blue_band: The band index for the blue channel.
+        :type blue_band: int
+        :return: A list of PIL Image objects representing the RGB image(s).
+        :rtype: List[Image.Image]
         """
         if self.is_geotiff:
             indexes = [i for i in [red_band, green_band, blue_band] if i in self.range]
             array = (
-                    np.dstack([normalize_band(self.get_band(idx)) for idx in indexes])
-                    * 255
+                np.dstack([normalize_band(self.get_band(idx)) for idx in indexes])
+                * 255
             ).astype(np.uint8)
             if len(indexes) < 3:
                 array = np.squeeze(array, axis=2)
@@ -146,15 +131,3 @@ class Tiff:
             for page in self.images.pages:
                 imlist.append(Image.fromarray(page))
             return imlist
-
-    def convert_to_png(self, output_file: str, red: int = 1, green: int = 2, blue: int = 3):
-        """
-        Convert the TIFF file to a PNG image.
-
-        Args:
-            output_file (str): The path to save the PNG file.
-            red (int): The band index for the red channel.
-            green (int): The band index for the green channel.
-            blue (int): The band index for the blue channel.
-        """
-        write_images(self.get_images(red, green, blue), output_file, ext="png")
