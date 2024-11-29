@@ -188,6 +188,8 @@
 .. STAC
 .. |stac-spec| replace:: STAC Specification
 .. _stac-spec: https://stacspec.org/en/about/stac-spec/
+.. |stac-api| replace:: STAC API
+.. _stac-api: https://github.com/radiantearth/stac-api-spec
 .. |stac-api-spec| replace:: STAC API Specification
 .. _stac-api-spec: https://github.com/radiantearth/stac-api-spec
 .. |stac-collections| replace:: STAC Collections
