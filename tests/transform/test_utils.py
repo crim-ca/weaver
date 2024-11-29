@@ -43,17 +43,20 @@ def test_write_images_custom_extension():
     images = create_sample_images()
     with tempfile.NamedTemporaryFile(suffix=".jpg") as temp_file_custom:
         output_tar_path = f"{temp_file_custom.name}.tar.gz"
-        write_images(images, temp_file_custom.name, ext="jpg")
-        # Check that the output is a tar.gz with .jpg images inside
-        assert tarfile.is_tarfile(output_tar_path)
-        # Verify the contents of the tar archive
-        with tarfile.open(output_tar_path, "r:gz") as tar:
-            members = tar.getmembers()
-            assert len(members) == len(images)
-            for i, member in enumerate(members):
-                assert member.name == f"{str(i).zfill(4)}.jpg"
-        # Clean up the output tar.gz file
-        os.remove(output_tar_path)
+        try:
+            write_images(images, temp_file_custom.name, ext="jpg")
+            # Check that the output is a tar.gz file with .jpg images inside
+            assert tarfile.is_tarfile(output_tar_path)
+            # Verify the contents of the tar archive
+            with tarfile.open(output_tar_path, "r:gz") as tar:
+                members = tar.getmembers()
+                assert len(members) == len(images)
+                for i, member in enumerate(members):
+                    assert member.name == f"{str(i).zfill(4)}.jpg"
+        finally:
+            # Ensure cleanup of the output tar.gz file
+            if os.path.exists(output_tar_path):
+                os.remove(output_tar_path)
 
 
 def test_write_images_output_file_naming():
