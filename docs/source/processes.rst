@@ -1690,23 +1690,35 @@ depends on the negotiated :term:`Media-Types` required by the corresponding inpu
 in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
 and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
 
-For example, if a :term:`Process` input indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
-or contained a ``format: geojson-feature-collection`` indicate in its ``schema``, the referenced ``collection``
-would most probably be accessed
+For example, if a :term:`Process` input definition indicates that
+it accepts :term:`GeoJSON` (``application/geo+json``) as its contents :term:`Media-Type`,
+or contains a ``format: geojson-feature-collection`` indication within its ``schema`` definition,
+the referenced ``collection`` would most probably need to resolve access to the data
 using |ogc-api-features|_ (i.e.: with request ``GET /collections/dataset-features/items``),
-to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be passed to the corresponding
-input of the :term:`Process`.
-However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
-the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
+to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be
+passed to the corresponding input of the :term:`Process`.
+However, depending on the capabilities of the server (e.g.: a |stac-api|_ instance or various extension support),
+the ``POST /search`` or the ``POST /collections/dataset-features/search`` operations could be considered as well.
 
-Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process` while targeting
-the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
-potentially be retrieved as input for the :ref:`Process Execution <proc_op_execute>`.
+Alternatively, if an array of ``image/tiff; application=geotiff`` is expected by the :term:`Process` input definition
+and the submitted input provides a ``collection`` referring to a |stac-api|_ endpoint,
+the |stac-assets|_ matching the requested :term:`Media-Type` could potentially be retrieved as input for
+the :ref:`Process Execution <proc_op_execute>`.
+
+Contrary to an ``href`` input where the referenced :term:`URL` (potentially pointing at a :term:`Collection`
+with predefined filtering query parameters) is directly accessed with a single request, the ``collection`` input offers
+the option to the server to further negotiate and resolve the targeted :term:`Collection` reference and the data it
+contains. In some situations, such as when a very large amount of data needs to be accessed and retrieved with an
+iterative paging or tiling approach, the ``collection`` input allows to automatically resolve this operation
+(as supported by the server), whereas the direct ``href`` reference would only return the limited content as directly
+responded by the server hosting the :term`Collection`, and potentially not reflecting the actual intent of the user
+submitting the :ref:`Process Execution <proc_op_execute>`. Therefore, the ``collection`` allows the resolution of more
+complex data access mechanisms that cannot be resolved by a single request or operation.
 
 In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
 the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
 specified. However, its capability to auto-resolve multiple :term:`Media-Types` negotiations, formats, data structures,
-data cardinality and :term:`API` protocols simultaneously can make its behavior hard to predict.
+data cardinality and :term:`API` access mechanisms simultaneously can make its behavior hard to predict.
 
 .. hint::
     In order to evaluate the expected resolution of a :term:`Collection`
@@ -1717,7 +1729,7 @@ data cardinality and :term:`API` protocols simultaneously can make its behavior 
     Since the :term:`Builtin Process` only performs the resolution of the ``collection`` into the corresponding
     data sources for the target :term:`Process`, without actually downloading the resolved :term:`URL` references,
     using it can potentially help identify and avoid unintended large processing, or allow users to validate that
-    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval for the
+    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval strategy for the
     desired execution purpose.
 
 .. seealso::
@@ -1751,7 +1763,7 @@ to hint the resolution toward certain outcomes.
       - Indicates the desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
         This can be used similarly to ``type``, but can provide further resolution indications in cases where
         the ``type`` alone remains ambiguous, such as distinguishing between many different :term:`GeoJSON`
-        *feature types* which are all represented by the same ``application/geo+json`` media-type.
+        *feature types* which are all represented by the same ``application/geo+json`` :term:`Media-Type`.
     * - ``format``
       - Indicates the preferred data access mechanism to employ amongst
         :py:class:`weaver.execute.ExecuteCollectionFormat` supported values.
