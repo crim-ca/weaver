@@ -718,13 +718,14 @@ class WeaverClient(object):
             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
             request_timeout=request_timeout, request_retries=request_retries
         )
-        if resp.code != 200:
+        result = self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+        if result.code != 200:
             no_ver = "This server might not implement the '/versions' endpoint."
             return OperationResult(
                 False, f"Failed to obtain server version. {no_ver}",
-                body=resp.body, text=resp.text, code=resp.code, headers=resp.headers
+                body=result.body, text=result.text, code=result.code, headers=result.headers
             )
-        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+        return result
 
     def conformance(
         self,
