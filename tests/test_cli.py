@@ -607,7 +607,8 @@ def test_cli_version_non_weaver():
     """
     Tests that the ``version`` operation is handled gracefully for a server not supporting it (Weaver-specific).
     """
-    with mock.patch("weaver.cli.WeaverClient._request", return_value=OperationResult(success=False, code=404)):
-        result = WeaverClient(url="https://fake.domain.com").version()
+    with mock.patch("requests.Session.request", return_value=MockedResponse(body="", status="404 Not Found")):
+        with mock.patch("weaver.cli.WeaverClient._request", return_value=OperationResult(success=False, code=404)):
+            result = WeaverClient(url="https://fake.domain.com").version()
     assert result.code == 404
     assert "Failed to obtain server version." in result.message
