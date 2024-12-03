@@ -7,8 +7,7 @@ message: |
 version: "6.0.0"
 
 authors:
-  - name: &crim -|
-      Computer Research Institute of Montréal
+  - name: &crim Computer Research Institute of Montréal
     city: "Montréal"
     region: "Québec"
     alias: CRIM
