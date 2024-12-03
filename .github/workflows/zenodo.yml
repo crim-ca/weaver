@@ -25,11 +25,16 @@ jobs:
         name=$(basename *.zip)
         echo "ZENODO_ARCHIVE=${name}" >> $GITHUB_ENV
 
+    # if changelogs fail to generate, silently ignore
+    # prefer a partially generated release than none at all
     - name: Generate Changelog
       id: zenodo_metadata
+      env:
+        REPORTS_DIR: ${{ github.workspace }}/reports
+        CHANGES_HTML: ${{ github.workspace }}/reports/CHANGES_${{ github.ref_name }}.html
       run: |
         make generate-changes-html VERSION=${{ github.ref_name }}
-        echo "ZENODO_DESCRIPTION=$(cat reports/CHANGES_${{ github.ref_name }}.html | tr -d '\n')" >> $GITHUB_ENV
+        echo "ZENODO_DESCRIPTION=$(cat ${{ env.CHANGES_HTML }} | tr -d '\n' || echo '')" >> $GITHUB_ENV
 
     - name: Run Zenodo Publish
       id: deploy_zenodo
