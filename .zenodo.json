@@ -86,13 +86,13 @@
       "identifier": "https://osf.io/d3esv/",
       "scheme": "url",
       "relation": "isVariantFormOf",
-      "resource_type": "OSF Record"
+      "resource_type": "other"
     },
     {
       "identifier": "https://pavics-weaver.readthedocs.io/",
       "scheme": "url",
       "relation": "isDocumentedBy",
-      "resource_type": "ReadTheDocs"
+      "resource_type": "other"
     }
   ],
   "custom": {

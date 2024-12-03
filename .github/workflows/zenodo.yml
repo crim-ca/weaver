@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: "0"
-    - name: Download Archive
+    - name: Generate Archive
       # We don't use releases, but tags. Therefore, we have to make the zip ourselves.
       # env:
       #   tarball: ${{ github.event.release.tarball_url }}
