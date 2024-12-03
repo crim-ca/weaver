@@ -90,6 +90,7 @@ endif
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
+ARCHIVE_DIR := $(APP_ROOT)/archive
 
 # end of configuration
 
@@ -300,7 +301,14 @@ install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## i
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+clean-all: clean-archive clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+
+.PHONY: clean-archive
+clean-archive:	## remove archive files and directories
+	@-echo "Removing archives..."
+	@-rm "$(APP_ROOT)"/*.tar.gz
+	@-rm "$(APP_ROOT)"/*.zip
+	@-rm -fr "$(ARCHIVE_DIR)"
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -759,7 +767,7 @@ extract-changes:	## uses the specified VERSION to extract its sub-section in CHA
 	'
 
 .PHONY: generate-changes-html
-generate-changes-html: extract-changes
+generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Checking necessary Sphinx dependency ..."
 	@pip show sphinx >/dev/null || bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)" install-doc'
@@ -769,6 +777,31 @@ generate-changes-html: extract-changes
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@-echo "Generates changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+
+.PHONY: generate-archive
+generate-archive:	## generate ZIP and TAR.GZ archives using current contents
+	@-echo "Generating archives"
+	@tar \
+		-C "$(APP_ROOT)" \
+		--exclude=.git \
+		--exclude=.github \
+		--exclude-vcs \
+		--exclude-vcs-ignores \
+		--exclude=*.zip \
+		--exclude=*.tar.gz \
+		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
+		.
+	@cd "$(APP_ROOT)" && \
+		mkdir -p "$(ARCHIVE_DIR)" && \
+		cp "$(APP_NAME)-$(APP_VERSION).tar.gz" "$(ARCHIVE_DIR)/$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		cd "$(ARCHIVE_DIR)" && \
+		tar -xzf "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		rm "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		zip -r "$(APP_NAME)-$(APP_VERSION).zip" * && \
+		mv "$(APP_NAME)-$(APP_VERSION).zip" "$(APP_ROOT)" && \
+		cd "$(APP_ROOT)" && \
+		rm -fr "$(ARCHIVE_DIR)"
 
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 
