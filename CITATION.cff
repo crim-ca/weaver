@@ -1,0 +1,110 @@
+cff-version: 1.2.0
+title: "crim-ca/weaver:5.9.0"
+message: |
+  Weaver: Workflow Execution Management Service (EMS);
+  Application, Deployment and Execution Service (ADES);
+  OGC API - Processes; WPS; CWL Application Package
+version: "5.9.0"
+
+authors:
+  - name: &crim -|
+      Computer Research Institute of Montréal
+    city: "Montréal"
+    region: "Québec"
+    alias: CRIM
+    website: "https://www.crim.ca/"
+    email: "info@crim.ca"
+    tel: "1 (514) 840-1234"
+    country: CA
+    post-code: "H3N 1M3"
+    address: "101 – 405, avenue Ogilvy"
+  - &fmigneault
+    given-names: "Francis"
+    family-names: "Charette-Migneault"
+    alias: fmigneault
+    email: "francis.charette-migneault@crim.ca"
+    orcid: "https://orcid.org/0000-0003-4862-3349"
+    affiliation: *crim
+  - given-names: David
+    family-names: Byrns
+    alias: dbyrns
+    affiliation: *crim
+  - given-names: David
+    family-names: Caron
+    alias: davidcaron
+    affiliation: *crim
+  - given-names: Francis
+    family-names: Pelletier
+    alias: f-PLT
+    affiliation: *crim
+  - given-names: Félix
+    family-names: Gagnon-Grenier
+    alias: Zvax
+    affiliation: *crim
+  - given-names: Nazim
+    family-names: Azeli
+    alias: Nazim-crim
+    affiliation: *crim
+  - given-names: Louis-David
+    family-names: Perron
+    alias: perronld
+    affiliation: *crim
+  - given-names: Charles-William
+    family-names: Cummings
+    alias: cwcummings
+    affiliation: *crim
+  - given-names: Nadir
+    family-names: Trapsida
+    alias: trapsidanadir
+    affiliation: *crim
+  - given-names: Éric
+    family-names: Lacoursière
+    alias: elacoursiere-crim
+    affiliation: *crim
+  - given-names: Misha
+    family-names: Schwartz
+    alias: mishaschwartz
+    affiliation: "University of Toronto"
+
+contact:
+  - *fmigneault
+
+doi: "10.5281/zenodo.14210717"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.14210717"
+    description: "Zenodo DOI"
+  - type: url
+    value: "https://github.com/crim-ca/weaver"
+    description: "Source code repository."
+  - type: url
+    value: "https://osf.io/d3esv/"
+    description: "OSF Record"
+
+references:
+  - title: Weaver Documentation
+    authors:
+      - *fmigneault
+    contact:
+      - *fmigneault
+    url: "https://pavics-weaver.readthedocs.io/"
+    type: manual
+
+type: "software"
+url: "https://github.com/crim-ca/weaver"
+repository-code: "https://github.com/crim-ca/weaver"
+
+keywords:
+  - "OGC"
+  - "OGC API - Processes"
+  - "CWL"
+  - "Common Workflow Language"
+  - "WPS"
+  - "Web Processing Service"
+  - "Workflow"
+  - "Remote Execution"
+  - "Web API"
+  - "bird-house"
+
+license: "Apache-2.0"
+license-url: "https://github.com/crim-ca/weaver/blob/master/LICENSE.txt"

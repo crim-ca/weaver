@@ -45,6 +45,8 @@ for each process.
       - | |py_ver| |deps| |pyup|
     * - license
       - | |license| |license_scan|
+    * - citation
+      - | |citation-zenodo| |citation-cff|
     * - build status
       - | |readthedocs| |docker_build_mode| |docker_build_status|
     * - tests status
@@ -113,6 +115,14 @@ for each process.
 .. |license_scan| image:: https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver.svg?type=shield&issueType=license
     :target: https://app.fossa.com/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver?ref=badge_shield&issueType=license
     :alt: FOSSA Status
+
+.. |citation-zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.14210718.svg
+    :alt: Zenodo DOI
+    :target: https://zenodo.org/doi/10.5281/zenodo.14210718
+
+.. |citation-cff| image:: https://img.shields.io/badge/citation-cff-blue
+    :alt: CFF
+    :target: https://github.com/crim-ca/weaver/blob/master/CITATION.cff
 
 .. end-badges
 
