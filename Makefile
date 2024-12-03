@@ -759,10 +759,10 @@ extract-changes:	## uses the specified VERSION to extract its sub-section in CHA
 	@-echo "Extracting changes for ${VERSION} ..."
 	@bash -c '\
 		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
-		STOP=$$(tail -n +$$(($${START} + 2)) "$(APP_ROOT)/CHANGES.rst" \
+		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
 			| grep -n ".. _changes" \
 			| cut -d ":" -f 1 | head -n 1); \
-		tail -n +$${START} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP} \
+		tail -n +$${START:-0} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP:--1} \
 			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
 	'
 
