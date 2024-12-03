@@ -58,13 +58,13 @@ for each process.
     :alt: Requires Python 3.8+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/5.9.0.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.0.0.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/5.9.0...master
+    :target: https://github.com/crim-ca/weaver/compare/6.0.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-5.9.0-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.0.0-blue
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/5.9.0
+    :target: https://github.com/crim-ca/weaver/tree/6.0.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
     :alt: Libraries.io Dependencies Status
@@ -78,9 +78,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=5.9.0&branch=5.9.0
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.0.0&branch=6.0.0
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A5.9.0
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.0.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: ReadTheDocs Build Status (master branch)
@@ -92,7 +92,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/5.9.0?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.0.0?label=tag%20status
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -276,12 +276,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:5.9.0
+    docker pull pavics/weaver:6.0.0
 
 For convenience, following tags are also available:
 
-- ``weaver:5.9.0-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:5.9.0-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:6.0.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:6.0.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 

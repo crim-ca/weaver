@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-title: "crim-ca/weaver:5.9.0"
+title: "crim-ca/weaver:6.0.0"
 message: |
   Weaver: Workflow Execution Management Service (EMS);
   Application, Deployment and Execution Service (ADES);
   OGC API - Processes; WPS; CWL Application Package
-version: "5.9.0"
+version: "6.0.0"
 
 authors:
   - name: &crim -|

@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.0.0:
+
+`6.0.0 <https://github.com/crim-ca/weaver/tree/6.0.0>`_ (2024-12-03)
+========================================================================
+
+Changes:
+--------
 - Add support of *OGC API - Processes - Part 3: Workflows and Chaining* with *Nested Process* ad-hoc workflow
   definitions directly submitted for execution (fixes `#747 <https://github.com/crim-ca/weaver/issues/747>`_,
   relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
