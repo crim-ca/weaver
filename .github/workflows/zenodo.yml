@@ -33,7 +33,7 @@ jobs:
         REPORTS_DIR: ${{ github.workspace }}/reports
         CHANGES_HTML: ${{ github.workspace }}/reports/CHANGES_${{ github.ref_name }}.html
       run: |
-        make generate-changes-html VERSION=${{ github.ref_name }}
+        make generate-changes-html VERSION=${{ github.ref_name }} || true
         echo "ZENODO_DESCRIPTION=$(cat ${{ env.CHANGES_HTML }} | tr -d '\n' || echo '')" >> $GITHUB_ENV
 
     - name: Run Zenodo Publish
