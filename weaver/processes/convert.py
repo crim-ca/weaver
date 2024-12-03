@@ -1652,7 +1652,8 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
                     io_base_type = io_base_type if io_base_type is not None else typ  # less priority
                     io_type_many.add(typ)  # literal base type by itself (not array/enum)
             if len(io_type_many) != 1:
-                raise PackageTypeError(f"Unsupported I/O with many distinct base types for info: '{io_info!s}'")
+                io_err = repr_json(io_info, force_string=True, indent=None)
+                raise PackageTypeError(f"Unsupported I/O with many distinct base types for definition: '{io_err!s}'")
             io_type = io_base_type
 
         LOGGER.debug("I/O parsed for multiple base types")
