@@ -19,8 +19,8 @@ jobs:
       # downloading from Zenodo .tar.gz for tarball and .zip for zipball.
       # Archiving the zipball will cause Zenodo to show a preview of the contents while using tarball will not.
       run: |
-        name=$(basename ${zipball}).zip
-        curl -L $zipball > $name
+        name=$(basename ${{ env.zipball }}).zip
+        curl -L ${{ env.zipball }} > $name
         echo "ZENODO_ARCHIVE=${name}" >> $GITHUB_ENV
 
     - name: Generate Changelog
