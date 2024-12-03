@@ -23,43 +23,53 @@
     },
     {
       "name": "Byrns, David",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Caron, David",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Pelletier, Francis",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Gagnon-Grenier, Félix",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Azeli, Nazim",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Perron, Louis-David",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Cummings, Charles-William",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Trapsida, Nadir",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Lacoursière, Éric",
-      "affiliation": "Computer Research Institute of Montréal"
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
     },
     {
       "name": "Schwartz, Misha",
-      "affiliation": "University of Toronto"
+      "affiliation": "University of Toronto",
+      "type": "ProjectMember"
     }
   ],
   "communities": [
