@@ -28,7 +28,6 @@ jobs:
     - name: Generate Changelog
       id: zenodo_metadata
       run: |
-        cd 
         make generate-changes-html VERSION=${{ github.ref_name }}
         echo "ZENODO_DESCRIPTION=$(cat reports/CHANGES_${{ github.ref_name }}.html | tr -d '\n')" >> $GITHUB_ENV
 
