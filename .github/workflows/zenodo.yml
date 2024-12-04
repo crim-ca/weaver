@@ -35,6 +35,7 @@ jobs:
       run: |
         make generate-changes-html VERSION=${{ github.ref_name }} || true
         echo "ZENODO_DESCRIPTION=$(cat ${{ env.CHANGES_HTML }} | tr -d '\n' || echo '')" >> $GITHUB_ENV
+        cat ${{ env.CHANGES_HTML }}
 
     - name: Run Zenodo Publish
       id: deploy_zenodo

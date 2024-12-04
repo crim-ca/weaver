@@ -116,9 +116,9 @@ for each process.
     :target: https://app.fossa.com/projects/git%2Bgithub.com%2Fcrim-ca%2Fweaver?ref=badge_shield&issueType=license
     :alt: FOSSA Status
 
-.. |citation-zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.14210718.svg
+.. |citation-zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.14210717.svg
     :alt: Zenodo DOI
-    :target: https://zenodo.org/doi/10.5281/zenodo.14210718
+    :target: https://zenodo.org/doi/10.5281/zenodo.14210717
 
 .. |citation-cff| image:: https://img.shields.io/badge/citation-cff-blue
     :alt: CFF
