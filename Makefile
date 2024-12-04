@@ -757,7 +757,9 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 extract-changes:	## uses the specified VERSION to extract its sub-section in CHANGES.rst
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Extracting changes for ${VERSION} ..."
-	@bash -c '\
+	ls -la $(APP_ROOT)
+	ls -la $(REPORTS_DIR)
+	bash -c '\
 		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
 		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
 			| grep -n ".. _changes" \
@@ -765,18 +767,26 @@ extract-changes:	## uses the specified VERSION to extract its sub-section in CHA
 		tail -n +$${START:-0} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP:--1} \
 			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
 	'
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.rst"
 
+# note:
+#	some text must be inserted before and between the first 'version heading' and the 'changes' sub-heading
+#	otherwise headers levels are not parsed correctly (they are considered sections all using H1)
+#	therefore, inject the contents needed to parse as desired, and remove the temp HTML content afterwards
 .PHONY: generate-changes-html
 generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
-	@-echo "Checking necessary Sphinx dependency ..."
-	@pip show sphinx >/dev/null || bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)" install-doc'
+	@-echo "Checking necessary documentation dependency ..."
+	@which rst2html >/dev/null || bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)" install-doc'
 	@-echo "Converting changes for ${VERSION} ..."
 	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
+	@sed -i -e 's|Changes:|\\ \n\nChanges:|' "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@sed -i -e "s|^\`${VERSION}|   \n###\n\n\\ \n\n\`${VERSION}|" "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
 	@rst2html \
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
-	@-echo "Generates changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
 
 .PHONY: generate-archive
 generate-archive:	## generate ZIP and TAR.GZ archives using current contents
