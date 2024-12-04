@@ -754,11 +754,9 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
 .PHONY: extract-changes
-extract-changes:	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Extracting changes for ${VERSION} ..."
-	ls -la $(APP_ROOT)
-	ls -la $(REPORTS_DIR)
 	bash -c '\
 		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
 		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
