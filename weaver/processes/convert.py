@@ -93,6 +93,7 @@ from weaver.processes.constants import (
 )
 from weaver.utils import (
     HashDict,
+    Lazify,
     SchemaRefResolver,
     bytes2str,
     fetch_file,
@@ -1651,7 +1652,23 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
                 else:
                     io_base_type = io_base_type if io_base_type is not None else typ  # less priority
                     io_type_many.add(typ)  # literal base type by itself (not array/enum)
-            if len(io_type_many) != 1:
+
+            # Exception for common mangling operation needed for passing down a URL
+            # as string/File/Directory between various CWL definitions in a Workflow.
+            # Promote the 'string' to the other type as applicable.
+            # Using the most complex representation allows the *expected* reference to define format/media-types.
+            # Chaining of CWL definitions should "agree" on compatible types, but the process will consider it *only*
+            # as the more complex representation, which is the usual intent when string and File/Directory are mixed.
+            if io_type_many == {"string", PACKAGE_FILE_TYPE} or io_type_many == {"string", PACKAGE_DIRECTORY_TYPE}:
+                io_base_type = list(io_type_many - {"string"})[0]
+                LOGGER.warning(
+                    "I/O with many distinct base types %s promoted to '%s' for definition: '%s'",
+                    list(io_type_many),
+                    io_base_type,
+                    Lazify(lambda: repr_json(io_info)),
+                )
+            # otherwise, there must be only one exact literal base-type
+            elif len(io_type_many) != 1:
                 io_err = repr_json(io_info, force_string=True, indent=None)
                 raise PackageTypeError(f"Unsupported I/O with many distinct base types for definition: '{io_err!s}'")
             io_type = io_base_type

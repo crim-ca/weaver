@@ -12,7 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of `CWL` I/O defined with a ``type`` as an array of ``string`` combined with ``File`` or ``Directory``
+  to represent an "any URI" concept provided by remote reference or local file path. This allows `CWL` definitions
+  that support either representation to explicitly indicate it as such, without need for workarounds using
+  an ``InlineJavascriptRequirement`` to structure the reference in a compatible `CWL` type when chaining ``Workflow``
+  steps. The corresponding `OGC API - Processes` and `WPS` representation will consider this I/O as a *complex* type,
+  as if the ``string`` was omitted entirely, to allow representing any relevant ``format`` and `Media-Type` metadata.
 
 Fixes:
 ------
