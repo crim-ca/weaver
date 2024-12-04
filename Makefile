@@ -775,7 +775,7 @@ extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-
 generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Checking necessary documentation dependency ..."
-	@which rst2html >/dev/null || bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)" install-doc'
+	@which rst2html >/dev/null || pip install docutils
 	@-echo "Converting changes for ${VERSION} ..."
 	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
 	@sed -i -e 's|Changes:|\\ \n\nChanges:|' "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
