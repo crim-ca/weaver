@@ -799,6 +799,7 @@ generate-archive:	## generate ZIP and TAR.GZ archives using current contents
 		--exclude-vcs-ignores \
 		--exclude=*.zip \
 		--exclude=*.tar.gz \
+		--exclude="$(APP_NAME)-$(APP_VERSION).tar.gz" \
 		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
 		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
 		.
