@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.0.0:
+
+`6.0.0 <https://github.com/crim-ca/weaver/tree/6.0.0>`_ (2024-12-03)
+========================================================================
+
+Changes:
+--------
 - Add support of *OGC API - Processes - Part 3: Workflows and Chaining* with *Nested Process* ad-hoc workflow
   definitions directly submitted for execution (fixes `#747 <https://github.com/crim-ca/weaver/issues/747>`_,
   relates to `#412 <https://github.com/crim-ca/weaver/issues/412>`_).
@@ -828,7 +841,7 @@ Fixes:
 - Fix ``http`` directory download to match implemented `AWS S3` directory download in ``weaver.utils.fetch_directory``,
   so both types replicate the input directory's top level folder, which is necessary when downloading
   multiple directories for the same input source.
-- Fix deprecation warnings from :mod:`webob` and :mod:`owslib`.
+- Fix deprecation warnings from ``webob`` and ``owslib``.
 - Fix filtered warnings for expected cases during tests.
 - Fix a problem with ``convert_input_values_schema`` under the `OGC` schema, that caused the conversion to malfunction
   when the function built lists for repeated input IDs of more than two elements.
@@ -1684,7 +1697,8 @@ Changes:
   Range duration parameters are limited to single values each
   (relates to `opengeospatial/ogcapi-processes#261 <https://github.com/opengeospatial/ogcapi-processes/issues/261>`_).
 - Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
-  of ``minDuration`` and ``maxDuration``. Please refer to :ref:`database_migration`
+  of ``minDuration`` and ``maxDuration``. Please refer
+  to `Database Migration <https://pavics-weaver.readthedocs.io/en/latest/installation.html#database-migration>`_
   and `MongoDB official documentation <https://docs.mongodb.com/manual>`_ for migration methods.
 - Refactor ``Job`` search method to facilitate its extension in the event of future filter parameters.
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.

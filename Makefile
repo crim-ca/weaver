@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 5.9.0
+APP_VERSION ?= 6.0.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -90,6 +90,7 @@ endif
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
+ARCHIVE_DIR := $(APP_ROOT)/archive
 
 # end of configuration
 
@@ -300,7 +301,14 @@ install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## i
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+clean-all: clean-archive clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+
+.PHONY: clean-archive
+clean-archive:	## remove archive files and directories
+	@-echo "Removing archives..."
+	@-rm "$(APP_ROOT)"/*.tar.gz
+	@-rm "$(APP_ROOT)"/*.zip
+	@-rm -fr "$(ARCHIVE_DIR)"
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -744,6 +752,65 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+
+.PHONY: extract-changes
+extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Extracting changes for ${VERSION} ..."
+	bash -c '\
+		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
+		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
+			| grep -n ".. _changes" \
+			| cut -d ":" -f 1 | head -n 1); \
+		tail -n +$${START:-0} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP:--1} \
+			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
+	'
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+
+# note:
+#	some text must be inserted before and between the first 'version heading' and the 'changes' sub-heading
+#	otherwise headers levels are not parsed correctly (they are considered sections all using H1)
+#	therefore, inject the contents needed to parse as desired, and remove the temp HTML content afterwards
+.PHONY: generate-changes-html
+generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Checking necessary documentation dependency ..."
+	@which rst2html >/dev/null || pip install docutils
+	@-echo "Converting changes for ${VERSION} ..."
+	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
+	@sed -i -e 's|Changes:|\\ \n\nChanges:|' "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@sed -i -e "s|^\`${VERSION}|   \n###\n\n\\ \n\n\`${VERSION}|" "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@rst2html \
+		--template "$(REPORTS_DIR)/html-body-template.txt" \
+		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+
+.PHONY: generate-archive
+generate-archive:	## generate ZIP and TAR.GZ archives using current contents
+	@-echo "Generating archives"
+	@tar \
+		-C "$(APP_ROOT)" \
+		--exclude=.git \
+		--exclude=.github \
+		--exclude-vcs \
+		--exclude-vcs-ignores \
+		--exclude=*.zip \
+		--exclude=*.tar.gz \
+		--exclude="$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
+		.
+	@cd "$(APP_ROOT)" && \
+		mkdir -p "$(ARCHIVE_DIR)" && \
+		cp "$(APP_NAME)-$(APP_VERSION).tar.gz" "$(ARCHIVE_DIR)/$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		cd "$(ARCHIVE_DIR)" && \
+		tar -xzf "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		rm "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		zip -r "$(APP_NAME)-$(APP_VERSION).zip" * && \
+		mv "$(APP_NAME)-$(APP_VERSION).zip" "$(APP_ROOT)" && \
+		cd "$(APP_ROOT)" && \
+		rm -fr "$(ARCHIVE_DIR)"
 
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 
