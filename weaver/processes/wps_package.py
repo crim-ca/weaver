@@ -11,6 +11,7 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """
+import hashlib
 
 import copy
 import json
@@ -22,18 +23,24 @@ import tempfile
 import time
 import uuid
 from typing import TYPE_CHECKING, cast, overload
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl
 
 import colander
 import cwltool
 import cwltool.docker
 import cwltool.process
 import yaml
+import prov.constants
 from cwltool.context import LoadingContext, RuntimeContext
+from cwltool.cwlprov import provenance_constants as cwl_prov_const
+from cwltool.cwlprov.ro import ResearchObject
+from cwltool.cwlprov.writablebagfile import close_ro
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
+from cwltool.stdfsaccess import StdFsAccess
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
+from pyramid.settings import asbool
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, DataHandler, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
@@ -46,7 +53,9 @@ from pywps.validator import get_validator
 from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
+from urllib.parse import urlparse
 
+from weaver.__meta__ import __version__ as weaver_version
 from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
@@ -150,6 +159,7 @@ from weaver.utils import (
     get_sane_name,
     get_secure_directory_name,
     get_settings,
+    get_weaver_url,
     list_directory_recursive,
     null,
     open_module_resource_file,
@@ -1811,6 +1821,130 @@ class WpsPackage(Process):
         }
         return runtime_params
 
+    def setup_provenance(self, loading_context, runtime_context):
+        # type: (LoadingContext, RuntimeContext) -> None
+        """
+        Configure ``PROV`` runtime options.
+
+        .. seealso::
+            - https://www.w3.org/TR/prov-overview/
+            - https://cwltool.readthedocs.io/en/latest/CWLProv.html
+            - https://docs.ogc.org/DRAFTS/24-051.html#_requirements_class_provenance
+        """
+        weaver_cwl_prov = asbool(self.settings.get("weaver.cwl_prov", True))
+        if not weaver_cwl_prov:
+            return
+
+        loading_context.user_provenance = True
+        loading_context.host_provenance = True
+
+        fs = runtime_context.make_fs_access or StdFsAccess
+        if not runtime_context.research_obj:
+            ro = ResearchObject(
+                fs(""),
+                temp_prefix_ro=runtime_context.tmpdir_prefix,
+                orcid=runtime_context.orcid,
+                full_name=runtime_context.cwl_full_name,
+            )
+
+            # rewrite auto-initialized random UUIDs with Weaver-specific references
+            ro.ro_uuid = self.job.uuid
+            ro.base_uri = f"arcp://uuid,{ro.ro_uuid}/"
+
+            loading_context.research_obj = ro
+            runtime_context.research_obj = ro
+
+    def finalize_provenance(self, runtime_context):
+        # type: (RuntimeContext) -> None
+        if runtime_context.research_obj:
+            ro = runtime_context.research_obj
+            prov_obj = runtime_context.prov_obj
+
+            # FIXME:  all in try/except fails because 'prov_obj' is unset
+            #   (operation already performed before we reach here! - find a way to hook ourselves during the operation)
+            #   the actual creation of 'cwltool.cwlprov.provenance_profile.ProvenanceProfile'
+            #   happens within one of the 'cwltool.executors.JobExecutor', which ends up
+            #   calling 'process.parent_wf.finalize_prov_profile' directly before the end
+            #   of 'cwltool.executors.JobExecutor.execute', which in turns generates all the PROV files
+            try:
+                prov_obj.document.add_namespace("doi", "https://doi.org/")
+                sha1_ns = prov_obj.document._namespaces.get_namespace("sha1")
+
+                crim_name = "Computer Research Institute of Montréal"
+                crim_entity = prov_obj.document.entity(
+                    "_:crim",
+                    {
+                        prov.constants.PROV_TYPE: prov.constants.PROV["Organization"],
+                        "foaf:name": crim_name,
+                        "schema:name": crim_name,
+                    }
+                )
+
+                weaver_url = get_weaver_url(self.settings)
+                weaver_sha1 = hashlib.sha1(weaver_url)
+                weaver_agent = prov_obj.document.agent(
+                    sha1_ns.qname(weaver_sha1),
+                    {
+                        prov.constants.PROV_TYPE: prov.constants.PROV["SoftwareAgent"],
+                        prov.constants.PROV_LOCATION: weaver_url,
+                        prov.constants.PROV_LABEL: f"crim-ca/weaver {weaver_version}",
+                        # "prov:qualifiedPrimarySource":
+                        # "prov:Organization": "Computer Research Institute of Montréal (CRIM).",
+                        # "foaf:Project": "https://github.com/crim-ca/weaver",
+                        # "doi": "10.5281/zenodo.14210717"  # see CITATION.cff
+                    }
+                )
+
+                # cross-ref:  https://wf4ever.github.io/ro/wfprov.owl
+                job_entity = prov_obj.document.entity(
+                    self.job.uuid,
+                    {
+                        prov.constants.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
+                        prov.constants.PROV_LOCATION: self.job.job_url(self.settings),
+                        prov.constants.PROV_LABEL: "Job Information",
+                    }
+                )
+                proc_entity = prov_obj.document.entity(
+                    self.job.uuid,
+                    {
+                        prov.constants.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
+                        prov.constants.PROV_LOCATION: self.job.process_url(self.settings),
+                        prov.constants.PROV_LABEL: "Process Description",
+                    }
+                )
+
+                cwl_agent = prov_obj.document.get_record(cwl_prov_const.ACCOUNT_UUID)  # cwltool
+                usr_agent = prov_obj.document.get_record(cwl_prov_const.USER_UUID)  # pseudo-user (machine user)
+                wf_agent = prov_obj.document.get_record(ro.engine_uuid)  # current job run aligned with cwl workflow
+
+                # FIXME: patch override of 'host_provenance' since access through RO it is not possible
+                #  (private function in cwltool.cwlprov.provenance_profile.ProvenanceProfile.generate_prov_doc
+                # cwl_agent.extend()
+                # document.agent(
+                #     ACCOUNT_UUID,
+                #     {
+                #         PROV_TYPE: FOAF["OnlineAccount"],
+                #         "prov:location": hostname,
+                #         CWLPROV["hostname"]: hostname,
+                #     },
+                # )
+
+                # define relationships
+                prov_obj.document.actedOnBehalfOf(weaver_agent, usr_agent)
+                prov_obj.document.specializationOf(weaver_agent, cwl_agent)
+                prov_obj.document.attribution(crim_entity, weaver_agent)
+                prov_obj.document.wasDerivedFrom(cwl_agent, weaver_agent)
+                # prov_obj.document.wasStartedBy(job_agent, weaver_agent)
+                prov_obj.document.wasStartedBy(wf_agent, job_entity, time=self.job.created)
+                # prov_obj.document.specializationOf(wf_agent, job_entity)
+                # prov_obj.document.alternateOf(wf_agent, job_entity)
+            except:
+                pass
+
+            # sign-off and persist completed PROV
+            prov_dir = self.job.prov_path(self.settings)
+            close_ro(ro, prov_dir)
+
     def update_requirements(self):
         # type: () -> None
         """
@@ -2113,13 +2247,10 @@ class WpsPackage(Process):
             elif config == WeaverConfiguration.HYBRID:
                 self.remote_execution = problem_needs_remote is not None
 
+            loading_context = LoadingContext()
             if self.remote_execution:
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS
-                loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
-            else:
-                # ADES/Hybrid execute the CWL/AppPackage locally
-                loading_context = None
 
             self.update_effective_user()
             self.update_requirements()
@@ -2132,6 +2263,7 @@ class WpsPackage(Process):
             )
             runtime_context = RuntimeContext(kwargs=runtime_params)
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
+            self.setup_provenance(loading_context, runtime_context)
             try:
                 self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -2203,6 +2335,15 @@ class WpsPackage(Process):
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+            try:
+                self.finalize_provenance(runtime_context)
+            except Exception as exc:
+                self.exception_message(
+                    PackageExecutionError,
+                    exc,
+                    "Failed to save package PROV metadata. Ignoring error to avoid failing execution.",
+                    level=logging.WARN,
+                )
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"

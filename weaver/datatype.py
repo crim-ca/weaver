@@ -76,7 +76,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_client, get_wps_url
+from weaver.wps.utils import get_wps_client, get_wps_url, get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -94,6 +94,7 @@ if TYPE_CHECKING:
         AnyExecuteReturnPreference,
         AnyExecuteTransmissionMode
     )
+    from weaver.formats import AnyContentType
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.quotation.status import AnyQuoteStatus
@@ -1403,18 +1404,20 @@ class Job(Base, LoggerHandler):
             response = xml_util.tostring(response)
         self["response"] = response
 
-    def _job_url(self, base_url):
-        # type: (str) -> str
-        if self.service is not None:
-            base_url += sd.provider_service.path.format(provider_id=self.service)
-        job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
-        return base_url + job_path
-
-    def job_url(self, container=None, extra_path=None):
+    def process_url(self, container=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> str
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
-        return self._job_url(base_url) + (extra_path or "")
+        if self.service is not None:
+            base_url += sd.provider_service.path.format(provider_id=self.service)
+        proc_url = sd.process_service.path.format(process_id=self.process)
+        return base_url + proc_url
+
+    def job_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        proc_url = self.process_url(container)
+        job_url = sd.jobs_service.path.format(job_id=self.id)
+        return proc_url + job_url + (extra_path or "")
 
     def status_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
@@ -1466,6 +1469,36 @@ class Job(Base, LoggerHandler):
         result_job_path = os.path.join(result_job_path, file_name)
         return result_job_path
 
+    def prov_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        extra_path = "/prov" + (extra_path or "")
+        return self.job_url(container=container, extra_path=extra_path)
+
+    def prov_path(self, container=None, extra_path=None, prov_format=None):
+        # type: (Optional[AnySettingsContainer], Optional[str], AnyContentType) -> str
+        """
+        Obtain the relative path of the ``PROV`` contents.
+        """
+        job_path = self.result_path()
+        prov_path = f"{job_path}-prov"
+        _prov_path_mapping = {
+            (None, None): prov_path,  # the directory itself with all metadata
+            ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
+            ("/prov", ContentType.APP_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
+            ("/prov", ContentType.APP_JSON_LD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
+            ("/prov", ContentType.APP_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
+            ("/prov", ContentType.TEXT_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
+            ("/prov", ContentType.TEXT_PROVN): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
+            ("/prov", ContentType.TEXT_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
+            ("/prov", ContentType.APP_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
+        }
+        key = (extra_path, prov_format)
+        resolved_path = _prov_path_mapping.get(key)
+        if resolved_path:
+            out_dir = get_wps_output_dir(container)
+            return os.path.join(out_dir, resolved_path)
+        return resolved_path
+
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
@@ -1480,7 +1513,7 @@ class Job(Base, LoggerHandler):
         settings = get_settings(container)
         html_on = settings.get("weaver.wps_restapi_html", True)
         base_url = get_wps_restapi_base_url(settings)
-        job_url = self._job_url(base_url)  # full URL
+        job_url = self.job_url(settings)  # full URL
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
         job_exec = f"{job_url.rsplit('/', 1)[0]}/execution"
         job_list = base_url + sd.jobs_service.path
@@ -1519,6 +1552,8 @@ class Job(Base, LoggerHandler):
                      "title": "Job results of successful process execution (direct output values mapping)."},
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
+                    {"href": f"{job_url}/prov", "rel": "provenance",  # unofficial
+                     "title": "Job provenance collected following process execution."},
                 ])
             else:
                 job_links.append({

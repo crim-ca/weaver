@@ -100,6 +100,11 @@ weaver.cwl_egid =
 weaver.cwl_processes_dir =
 weaver.cwl_processes_register_error = false
 
+# provenance functionality
+# if disabled, provenance details will not be collected when running Application Packages and Workflows
+# if disabled, the '/jobs/{jobId}/prov' endpoint will always report missing information since unavailable
+weaver.cwl_prov = true
+
 # --- Weaver WPS settings ---
 weaver.wps = true
 weaver.wps_url =

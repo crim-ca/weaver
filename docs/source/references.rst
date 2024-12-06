@@ -172,6 +172,8 @@
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
+.. |prov-ontology| replace:: PROV-O: The PROV Ontology
+.. _prov-ontology: https://www.w3.org/TR/2013/REC-prov-o-20130430/
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report
