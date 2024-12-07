@@ -2424,6 +2424,22 @@ Job Provenance
     implement ``GET /jobs/{jobID}/run`` and/or ``GET /jobs/{jobID}/prov``
     (see https://github.com/crim-ca/weaver/issues/673)
 
+
+Configure ``PROV`` runtime options.
+
+Provenance is information about entities, activities, and people involved in producing a
+piece of data or thing, which can be used to form assessments about its quality, reliability or trustworthiness.
+
+.. seealso::
+    - https://www.w3.org/TR/prov-overview/
+    - https://cwltool.readthedocs.io/en/latest/CWLProv.html
+    - https://docs.ogc.org/DRAFTS/24-051.html#_requirements_class_provenance
+
+.. |prov-o-resources| image:: https://www.w3.org/TR/2013/REC-prov-o-20130430/diagrams/starting-points.svg
+    :alt: |prov-ontology| Resources
+    :target: `prov-ontology`_
+
+
 .. _proc_op_job_stats:
 
 Job Statistics

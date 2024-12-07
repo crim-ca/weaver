@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING
 
 from box import Box
@@ -7,6 +8,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPNoContent,
     HTTPOk,
+    HTTPNotAcceptable,
     HTTPPermanentRedirect,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
@@ -15,7 +17,7 @@ from pyramid.httpexceptions import (
 from weaver import xml_util
 from weaver.database import get_db
 from weaver.datatype import Job
-from weaver.exceptions import JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
+from weaver.exceptions import JobGone, JobNotFound, JobStatisticsNotFound, log_unhandled_exceptions
 from weaver.execute import parse_prefer_header_execute_mode, rebuild_prefer_header
 from weaver.formats import (
     ContentType,
@@ -762,6 +764,54 @@ def get_job_stats(request):
     return HTTPOk(json=body)
 
 
+@sd.provider_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    ##schema=sd.ProviderJobStatisticsEndpoint(),  # FIXME
+    ###accept=ContentType.APP_JSON,  # FIXME
+    ###renderer=OutputFormat.JSON,  # FIXME
+    ###response_schemas=sd.get_job_prov_responses,  # FIXME
+)
+@sd.process_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    ###schema=sd.ProcessJobStatisticsEndpoint(),  # FIXME
+    ###accept=ContentType.APP_JSON,  # FIXME
+    ###renderer=OutputFormat.JSON,  # FIXME
+    ###response_schemas=sd.get_job_prov_responses,  # FIXME
+)
+@sd.job_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    ####schema=sd.JobStatisticsEndpoint(),  # FIXME
+    ###accept=ContentType.APP_JSON,  # FIXME
+    ###renderer=OutputFormat.JSON,  # FIXME
+    ###response_schemas=sd.get_job_prov_responses,  # FIXME
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_prov(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve the provenance details of a job.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+
+    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
+    prov_path = job.prov_path(request, "/prov", prov_type)
+    if not prov_path or not os.path.isfile(prov_path):
+        prov_dir = job.prov_path(request)
+        prov_err = HTTPNotAcceptable if os.path.isdir(prov_dir) else JobGone
+        raise prov_err(json={
+            "title": "NoJobProvenance",
+            "type": "no-job-provenance",  # unofficial
+            "detail": "Job provenance could not be retrieved for the specified job.",
+            "status": prov_err.code,
+            "cause": "Missing or invalid provenance details."
+        })
+    with open(prov_path, mode="r", encoding="utf-8") as prov_f:
+        data = prov_f.read()
+    return HTTPOk(body=data, headers={"Content-Type": prov_type})
+
+
 @sd.provider_result_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS, sd.TAG_DEPRECATED],
     schema=sd.ProviderResultEndpoint(),
@@ -805,6 +855,7 @@ def includeme(config):
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
     config.add_cornice_service(sd.job_stats_service)
+    config.add_cornice_service(sd.job_prov_service)
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
@@ -813,6 +864,7 @@ def includeme(config):
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)
     config.add_cornice_service(sd.provider_stats_service)
+    config.add_cornice_service(sd.provider_prov_service)
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
@@ -821,6 +873,7 @@ def includeme(config):
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
     config.add_cornice_service(sd.process_stats_service)
+    config.add_cornice_service(sd.process_prov_service)
 
     # backward compatibility routes (deprecated)
     config.add_cornice_service(sd.job_result_service)

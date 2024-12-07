@@ -334,6 +334,7 @@ TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
 TAG_STATISTICS = "Statistics"
+TAG_PROVENANCE = "Provenance"
 TAG_VAULT = "Vault"
 TAG_WPS = "WPS"
 TAG_DEPRECATED = "Deprecated Endpoints"
@@ -364,6 +365,7 @@ job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outp
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
 job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
+job_prov_service = Service(name="job_prov", path=f"{job_service.path}/prov")
 
 processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
@@ -381,6 +383,7 @@ process_outputs_service = Service(name="process_outputs", path=process_service.p
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
+process_prov_service = Service(name="process_prov", path=process_service.path + job_prov_service.path)
 process_execution_service = Service(name="process_execution", path=f"{process_service.path}/execution")
 
 providers_service = Service(name="providers", path="/providers")
@@ -395,6 +398,7 @@ provider_inputs_service = Service(name="provider_inputs", path=provider_service.
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
+provider_prov_service = Service(name="provider_prov", path=provider_service.path + process_prov_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
 provider_execution_service = Service(name="provider_execution", path=f"{provider_process_service.path}/execution")
