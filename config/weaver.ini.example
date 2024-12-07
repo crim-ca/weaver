@@ -133,7 +133,7 @@ weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
 # access constraints can be comma-separated
 weaver.wps_metadata_identification_accessconstraints=NONE
 weaver.wps_metadata_identification_fees=NONE
-weaver.wps_metadata_provider_name=CRIM
+weaver.wps_metadata_provider_name=Computer Research Institute of Montréal (CRIM)
 weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
 weaver.wps_metadata_contact_name=Francis Charette-Migneault
 weaver.wps_metadata_contact_position=Research Software Developer

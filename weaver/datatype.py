@@ -1554,6 +1554,8 @@ class Job(Base, LoggerHandler):
                      "title": "Job statistics collected following process execution."},
                     {"href": f"{job_url}/prov", "rel": "provenance",  # unofficial
                      "title": "Job provenance collected following process execution."},
+                    {"href": f"{job_url}/prov", "rel": "https://www.w3.org/ns/prov",  # unofficial
+                     "title": "Job provenance collected following process execution."},
                 ])
             else:
                 job_links.append({
@@ -1577,8 +1579,8 @@ class Job(Base, LoggerHandler):
         job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": ContentType.APP_JSON, "hreflang": AcceptLanguage.EN_CA}
         for link in job_links:
-            for meta, parma in link_meta.items():
-                link.setdefault(meta, parma)
+            for meta, param in link_meta.items():
+                link.setdefault(meta, param)
         return job_links
 
     def json(self, container=None):  # pylint: disable=W0221,arguments-differ
