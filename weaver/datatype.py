@@ -1416,7 +1416,7 @@ class Job(Base, LoggerHandler):
     def job_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> str
         proc_url = self.process_url(container)
-        job_url = sd.jobs_service.path.format(job_id=self.id)
+        job_url = sd.job_service.path.format(job_id=self.id)
         return proc_url + job_url + (extra_path or "")
 
     def status_url(self, container=None):
