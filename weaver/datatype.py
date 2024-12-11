@@ -37,7 +37,6 @@ from pywps.app import WPSRequest
 from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
-from cwltool.tests.test_fetch import path_fragments
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
