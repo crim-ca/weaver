@@ -172,6 +172,8 @@
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
+.. |prov| replace:: PROV
+.. _prov: https://www.w3.org/TR/prov-overview/
 .. |prov-ontology| replace:: PROV-O: The PROV Ontology
 .. _prov-ontology: https://www.w3.org/TR/2013/REC-prov-o-20130430/
 .. |pywps| replace:: PyWPS
@@ -186,6 +188,8 @@
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
+.. |w3c| replace:: W3C
+.. _w3c: https://www.w3.org/
 
 .. STAC
 .. |stac-spec| replace:: STAC Specification

@@ -14,6 +14,7 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPLocked,
     HTTPNoContent,
+    HTTPNotAcceptable,
     HTTPNotFound,
     HTTPOk
 )
@@ -40,7 +41,14 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
+from weaver.formats import (
+    ContentEncoding,
+    ContentType,
+    clean_media_type_format,
+    get_format,
+    guess_target_format,
+    repr_json
+)
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -1410,3 +1418,37 @@ def dismiss_job_task(job, container):
     job.status = map_status(Status.DISMISSED)
     job = store.update_job(job)
     return job
+
+
+def get_job_prov_response(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve specific :term:`Provenance` contents of a :term:`Job` based on the request.
+
+    The specific request path is redirected to the relevant command from :mod:`cwlprov`.
+    If applicable, request :term:`Media-Type` specifiers are considered to return alternate representations.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+
+    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
+    prov_path = "/prov" + request.path.rsplit("/prov", 1)[-1]
+    prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
+    if not prov_data:
+        prov_dir = job.prov_path(request)
+        prov_exists = os.path.isdir(prov_dir)
+        prov_err = HTTPNotAcceptable if prov_exists else JobGone
+        prov_body = {
+            "title": "NoJobProvenance",
+            "type": "no-job-provenance",  # unofficial
+            "detail": "Job provenance could not be retrieved for the specified job.",
+            "cause": "Missing or invalid provenance details."
+        }
+        if prov_exists and "run_id" in request.matchdict:
+            prov_err = JobNotFound
+            prov_body["error"] = "No such run ID for specified job provenance."
+            prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
+        prov_body["status"] = prov_err.code
+        return prov_err(json=prov_body, headers={"Content-Type": ContentType.APP_JSON})
+    return HTTPOk(body=prov_data, headers={"Content-Type": prov_type})

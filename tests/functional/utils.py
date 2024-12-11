@@ -24,6 +24,7 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver import WEAVER_ROOT_DIR
+from weaver.base import classinstancemethod
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
 
 
 class GenericUtils(unittest.TestCase):
+    @classinstancemethod
     def fully_qualified_test_name(self, name=""):
         """
         Generates a unique name using the current test method full context name and the provided name, if any.
@@ -72,7 +74,10 @@ class GenericUtils(unittest.TestCase):
         """
         extra_name = f"-{name}" if name else ""
         class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        if hasattr(self, "_testMethodName"):
+            test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        else:
+            test_name = f"{class_name}{extra_name}"  # called from class method
         test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
         return test_name
 
@@ -449,24 +454,28 @@ class WpsConfigBase(GenericUtils):
             info.append(deepcopy(resp.json))
         return info  # type: ignore
 
-    def _try_get_logs(self, status_url):
-        _resp = self.app.get(f"{status_url}/logs", headers=dict(self.json_headers))
+    @classmethod
+    def _try_get_logs(cls, status_url):
+        _resp = cls.app.get(f"{status_url}/logs", headers=dict(cls.json_headers))
         if _resp.status_code == 200:
             _text = "\n".join(_resp.json)
             return f"Error logs:\n{_text}"
         return ""
 
     @overload
-    def monitor_job(self, status_url, **__):
+    @classmethod
+    def monitor_job(cls, status_url, **__):
         # type: (str, **Any) -> ExecutionResults
         ...
 
     @overload
-    def monitor_job(self, status_url, return_status=False, **__):
+    @classmethod
+    def monitor_job(cls, status_url, return_status=False, **__):
         # type: (str, Literal[True], **Any) -> JobStatusResponse
         ...
 
-    def monitor_job(self,
+    @classmethod
+    def monitor_job(cls,
                     status_url,                         # type: str
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
@@ -501,17 +510,17 @@ class WpsConfigBase(GenericUtils):
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
             statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
-            assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
-            assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
+            assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{cls._try_get_logs(status_url)}"
+            assert body["status"] in statuses, f"Error job info:\n{pretty}\n{cls._try_get_logs(status_url)}"
             return body["status"] in {final_status, Status.SUCCEEDED, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
-        left = timeout or self.monitor_timeout
-        delta = interval or self.monitor_interval
+        left = timeout or cls.monitor_timeout
+        delta = interval or cls.monitor_interval
         once = True
         resp = None
         while left >= 0 or once:
-            resp = self.app.get(status_url, headers=self.json_headers)
+            resp = cls.app.get(status_url, headers=cls.json_headers)
             if check_job_status(resp, running=True):
                 break
             time.sleep(delta)
@@ -521,7 +530,7 @@ class WpsConfigBase(GenericUtils):
         if return_status or expect_failed:
             return resp.json
         params = {"schema": JobInputsOutputsSchema.OGC}  # not strict to preserve old 'format' field
-        resp = self.app.get(f"{status_url}/results", params=params, headers=self.json_headers)
+        resp = cls.app.get(f"{status_url}/results", params=params, headers=cls.json_headers)
         assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 

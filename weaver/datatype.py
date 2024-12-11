@@ -6,6 +6,7 @@ import base64
 import copy
 import enum
 import inspect
+import io
 import json
 import os
 import re
@@ -26,6 +27,7 @@ import colander
 import pyramid.httpexceptions
 import requests.exceptions
 from cryptography.fernet import Fernet
+from cwlprov.tool import Tool as CWLProvTool
 from dateutil.parser import parse as dt_parse
 from docker.auth import decode_auth  # pylint: disable=E0611
 from owslib.util import ServiceException as OWSServiceException
@@ -35,6 +37,7 @@ from pywps.app import WPSRequest
 from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
+from cwltool.tests.test_fetch import path_fragments
 from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
@@ -1498,6 +1501,43 @@ class Job(Base, LoggerHandler):
             out_dir = get_wps_output_dir(container)
             return os.path.join(out_dir, resolved_path)
         return resolved_path
+
+    def prov_data(
+        self,
+        container=None,     # type: Optional[AnySettingsContainer]
+        extra_path=None,    # type: Optional[str]
+        prov_format=None,   # type: AnyContentType
+    ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
+        """
+        Read or retrieve data from the packaged provenance directory contents associated to the :term:`Job`.
+        """
+        prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
+        if prov_path and os.path.isfile(prov_path):
+            with open(prov_path, mode="r", encoding="utf-8") as prov_f:
+                data = prov_f.read()
+            fmt = prov_format
+        else:
+            prov_path = self.prov_path(container=container)
+            if not prov_path or not os.path.isdir(prov_path):
+                return None, None
+            path = extra_path.split("/prov/", 1)[-1]
+            frag = path.strip("/").split("/")
+            oper, params = frag[0], frag[1:]
+            args = ["-d", prov_path, oper]
+            if oper == "run":
+                args.extend(["--steps", "--start", "--end", "--duration", "--labels", "--inputs", "--outputs"])
+            elif oper in ["inputs", "outputs"]:
+                args.extend(["--parameters", "--format", "uris"])
+            args.extend(params)
+            tool = CWLProvTool(args)
+            tool.output = io.StringIO()  # override the buffer argument to "print"
+            result = tool.main()  # noqa  # function annotated to return nothing, but sometimes returns an error code
+            if result not in [0, None]:
+                return None, None
+            tool.output.seek(0)
+            data = tool.output.read()
+            fmt = ContentType.TEXT_PLAIN
+        return data, fmt
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]

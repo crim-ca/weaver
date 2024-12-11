@@ -250,6 +250,14 @@ Glossary
         Entity that describes the required inputs, produced outputs, and any applicable metadata for the execution of
         the defined script, calculation, or operation.
 
+    Provenance
+        Metadata using the :term:`W3C` |prov|_ standard that is applied to a submitted :term:`Job` execution to allow
+        retrieving its origin, the related :term:`Application Package`, its :term:`I/O` sources and results, as well as
+        additional details about the server host and runtime user as applicable to replicate the experiment.
+
+        .. seealso::
+            :ref:`proc_op_job_prov`
+
     Provider
         Entity that offers an ensemble of :term:`Process` under it. It is typically a reference to a remote service,
         where any :term:`Process` it provides is fetched dynamically on demand.
@@ -330,6 +338,9 @@ Glossary
         Main international standards organization for the World Wide Web.
         Since |ogc-api-standards|_ are based on HTTP and web communications, this consortium establishes the
         common foundation definitions used by the :term:`API` specifications.
+
+        .. seealso::
+            |w3c|_
 
     WKT
         Well-Known Text geometry representation.
