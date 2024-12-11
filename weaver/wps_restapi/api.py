@@ -523,6 +523,7 @@ def get_conformance(category, settings):
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part3}/conf/openeo-workflows",
         # f"{ogcapi_proc_part3}/req/openeo-workflows",
+        f"{ogcapi_proc_part4}/conf/job-management",
         f"{ogcapi_proc_part4}/conf/jm/create/post-op",
         f"{ogcapi_proc_part4}/per/job-management/additional-status-codes",  # see 'weaver.status.map_status'
         f"{ogcapi_proc_part4}/per/job-management/create-body",              # Weaver has XML for WPS
@@ -552,6 +553,12 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/update-patch-op",
         f"{ogcapi_proc_part4}/req/job-management/update-response",
         f"{ogcapi_proc_part4}/req/job-management/update-response-locked",
+        f"{ogcapi_proc_part4}/req/provenance",
+        f"{ogcapi_proc_part4}/req/provenance/prov-get-op",
+        f"{ogcapi_proc_part4}/req/provenance/prov-response",
+        f"{ogcapi_proc_part4}/req/provenance/prov-content-negotiation",
+        f"{ogcapi_proc_part4}/req/provenance/inputs-get-op",
+        f"{ogcapi_proc_part4}/req/provenance/inputs-response",
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
