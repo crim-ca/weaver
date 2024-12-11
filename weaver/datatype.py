@@ -1579,7 +1579,6 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
-
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -1606,7 +1605,7 @@ class Job(Base, LoggerHandler):
             "href": f"{job_url}/logs", "rel": "logs",  # unofficial
             "title": "List of collected job logs during process execution."
         })
-        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
+        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions", "provenance"]:
             self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
             # back to specific job if we are in one of its sub-endpoints

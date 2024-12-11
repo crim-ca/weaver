@@ -1451,4 +1451,7 @@ def get_job_prov_response(request):
             prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
         prov_body["status"] = prov_err.code
         return prov_err(json=prov_body, headers={"Content-Type": ContentType.APP_JSON})
-    return HTTPOk(body=prov_data, headers={"Content-Type": prov_type})
+    links = job.links(container=request, self_link="provenance")
+    headers = [("Link", make_link_header(link)) for link in links]
+    headers.append(("Content-Type", prov_type))
+    return HTTPOk(body=prov_data, headers=headers)
