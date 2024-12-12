@@ -54,53 +54,53 @@ for each process.
     * - releases
       - | |version| |commits-since| |docker_image|
 
-.. |py_ver| image:: https://img.shields.io/badge/python-3.8%2B-blue.svg
+.. |py_ver| image:: https://img.shields.io/badge/python-3.8%2B-blue.svg?logo=python
     :alt: Requires Python 3.8+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.0.0.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.0.0.svg?logo=github
     :alt: Commits since latest release
     :target: https://github.com/crim-ca/weaver/compare/6.0.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-6.0.0-blue
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.0.0-blue?logo=github
     :alt: Latest Tagged Version
     :target: https://github.com/crim-ca/weaver/tree/6.0.0
 
-.. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver
+.. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver?logo=librariesdotio&logoColor=white
     :alt: Libraries.io Dependencies Status
     :target: https://libraries.io/github/crim-ca/weaver
 
-.. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg
+.. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg?logo=pyup
     :alt: PyUp Dependencies Status
     :target: https://pyup.io/account/repos/github/crim-ca/weaver/
 
-.. |github_latest| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=master&branch=master
+.. |github_latest| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=master&branch=master&logo=github
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.0.0&branch=6.0.0
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.0.0&branch=6.0.0&logo=github
     :alt: Github Actions CI Build Status (latest tag)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.0.0
 
-.. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
+.. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
     :target: `ReadTheDocs`_
 
-.. |docker_build_mode| image:: https://img.shields.io/docker/automated/pavics/weaver.svg?label=build
+.. |docker_build_mode| image:: https://img.shields.io/docker/automated/pavics/weaver.svg?label=build&logo=docker
     :alt: Docker Build Mode (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.0.0?label=tag%20status
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.0.0?label=tag&logo=docker
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
-.. |docker_image| image:: https://img.shields.io/badge/docker-pavics%2Fweaver-blue
+.. |docker_image| image:: https://img.shields.io/badge/docker-pavics%2Fweaver-blue?logo=docker
     :alt: Docker Image
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
-.. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
+.. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage&logo=codecov
     :alt: Code Coverage
     :target: https://codecov.io/gh/crim-ca/weaver
 
