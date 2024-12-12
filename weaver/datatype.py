@@ -1471,26 +1471,23 @@ class Job(Base, LoggerHandler):
         """
         Get direct links to all outputs in any possible format.
         """
-        try:
-            links = []
-            for result in results:
-                media_type = get_field(result, "mimeType", search_variations=True)
-                if media_type and media_type not in transform.EXCLUDED_TYPES:
-                    possible_formats = transform.CONVERSION_DICT.get(media_type, [])
-                    id = get_field(result, "identifier", search_variations=True)
-                    links.extend([
-                        {
-                            "href": f"{url}/{id}?f={media_type}",
-                            "rel": "output",
-                            "id": id,
-                            "type": media_type,
-                            "title": f"Link to job {id} result in alternate {media_type}"
-                        }
-                        for media_type in possible_formats])
-            return links
-        except Exception as ex:
-            print(ex)
-            return []
+        links = []
+        for result in results:
+            media_type = get_field(result, "mimeType", search_variations=True)
+            if media_type and media_type not in transform.EXCLUDED_TYPES:
+                possible_formats = transform.CONVERSION_DICT.get(media_type, [])
+                id = get_field(result, "identifier", search_variations=True)
+                links.extend([
+                    {
+                        "href": f"{url}/{id}?f={media_type}",
+                        "rel": "output",
+                        "id": id,
+                        "type": media_type,
+                        "title": f"Link to job {id} result in alternate {media_type}"
+                    }
+                    for media_type in possible_formats
+                            ])
+        return links
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]

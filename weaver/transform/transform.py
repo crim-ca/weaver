@@ -67,11 +67,10 @@ def exception_handler(func):
     """
     Decorator to handle exceptions in functions and log them.
 
-    Args:
-        func (Callable): Function to wrap with exception handling.
-
-    Returns:
-        Callable: The wrapped function.
+    :param func: Function to wrap with exception handling.
+    :type func: Callable
+    :return: The wrapped function.
+    :rtype: Callable
     """
     def inner_function(*args, **kwargs):
         try:
@@ -90,9 +89,10 @@ def image_to_any(i: str, out: str) -> None:
     """
     Converts image files to a specified output format. If no conversion is needed, it copies the file.
 
-    Args:
-        i (str): Input image file path.
-        out (str): Output file path.
+    :param i: Input image file path.
+    :type i: str
+    :param out: Output file path.
+    :type out: str
     """
     # exit if no transformation needed
     if os.path.splitext(i)[1] == os.path.splitext(out)[1]:
@@ -122,9 +122,10 @@ def images_to_any(ims: List[Image.Image], out: str) -> None:
     """
     Processes a list of images and converts them to the desired format, saving them in the specified output path.
 
-    Args:
-        ims (List[Image.Image]): List of Image objects to process.
-        out (str): Output file path.
+    :param ims: List of Image objects to process.
+    :type ims: List[Image.Image]
+    :param out: Output file path.
+    :type out: str
     """
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
@@ -177,9 +178,10 @@ def any_to_html(i: str, out: str) -> None:
     """
     Converts any content type (text or image) to HTML format.
 
-    Args:
-        i (str): Input file path.
-        out (str): Output file path.
+    :param i: Input file path.
+    :type i: str
+    :param out: Output file path.
+    :type out: str
     """
     try:
         if not is_image(i):
@@ -204,9 +206,10 @@ def any_to_pdf(i: str, out: str) -> None:
     """
     Converts a file to PDF format. If the file is an image, it is embedded in the PDF, otherwise, it is treated as text.
 
-    Args:
-        i (str): Input file path.
-        out (str): Output PDF file path.
+    :param i: Input file path.
+    :type i: str
+    :param out: Output PDF file path.
+    :type out: str
     """
     image = Image.open(i) if is_image(i) else None
     new_pdf = FPDF(orientation="P", unit="pt", format="A4")
@@ -263,9 +266,10 @@ def csv_to_json(i: str, out: str) -> None:
     """
     Converts a CSV file to a JSON file with a 'datas' key containing the rows.
 
-    Args:
-        i (str): Path to the input CSV file.
-        out (str): Path to the output JSON file.
+    :param i: Path to the input CSV file.
+    :type i: str
+    :param out: Path to the output JSON file.
+    :type out: str
     """
     with open(i, encoding="utf-8") as csvf:
         csv_reader = csv.DictReader(csvf)
@@ -284,9 +288,10 @@ def csv_to_xml(i: str, out: str) -> None:
     """
     Converts a CSV file to an XML file by first converting it to JSON.
 
-    Args:
-        i (str): Path to the input CSV file.
-        out (str): Path to the output XML file.
+    :param i: Path to the input CSV file.
+    :type i: str
+    :param out: Path to the output XML file.
+    :type out: str
     """
     file = f"{i}.json"
     csv_to_json(i, file)
@@ -299,9 +304,10 @@ def json_to_xml(i: str, out: str) -> None:
     """
     Converts a JSON file to an XML file.
 
-    Args:
-        i (str): Path to the input JSON file.
-        out (str): Path to the output XML file.
+    :param i: Path to the input JSON file.
+    :type i: str
+    :param out: Path to the output XML file.
+    :type out: str
     """
     data = readfromjson(i)
     write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
@@ -312,9 +318,10 @@ def json_to_txt(i: str, out: str) -> None:
     """
     Converts a JSON file to a text file.
 
-    Args:
-        i (str): Path to the input JSON file.
-        out (str): Path to the output text file.
+    :param i: Path to the input JSON file.
+    :type i: str
+    :param out: Path to the output text file.
+    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         data = json.load(file)
@@ -327,9 +334,10 @@ def json_to_yaml(i: str, out: str) -> None:
     """
     Converts a JSON file to a YAML file.
 
-    Args:
-        i (str): Path to the input JSON file.
-        out (str): Path to the output YAML file.
+    :param i: Path to the input JSON file.
+    :type i: str
+    :param out: Path to the output YAML file.
+    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         configuration = json.load(file)
@@ -342,9 +350,10 @@ def yaml_to_json(i: str, out: str) -> None:
     """
     Converts a YAML file to a JSON file.
 
-    Args:
-        i (str): Path to the input YAML file.
-        out (str): Path to the output JSON file.
+    :param i: Path to the input YAML file.
+    :type i: str
+    :param out: Path to the output JSON file.
+    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         configuration = yaml.safe_load(file)
@@ -357,9 +366,10 @@ def json_to_csv(i: str, out: str) -> None:
     """
     Converts a JSON file to a CSV file.
 
-    Args:
-        i (str): Path to the input JSON file.
-        out (str): Path to the output CSV file.
+    :param i: Path to the input JSON file.
+    :type i: str
+    :param out: Path to the output CSV file.
+    :type out: str
     """
     with open(i, encoding="utf-8") as file:
         data_file = pd.read_json(file, encoding="utf-8")
@@ -371,9 +381,10 @@ def xml_to_json(i: str, out: str) -> None:
     """
     Converts an XML file to a JSON file.
 
-    Args:
-        i (str): Path to the input XML file.
-        out (str): Path to the output JSON file.
+    :param i: Path to the input XML file.
+    :type i: str
+    :param out: Path to the output JSON file.
+    :type out: str
     """
     write_content(out, xmltodict.parse(get_content(i)))
 
@@ -383,9 +394,10 @@ def html_to_txt(i: str, out: str) -> None:
     """
     Converts an HTML file to a text file.
 
-    Args:
-        i (str): Path to the input HTML file.
-        out (str): Path to the output text file.
+    :param i: Path to the input HTML file.
+    :type i: str
+    :param out: Path to the output text file.
+    :type out: str
     """
     write_content(out, " ".join(BeautifulSoup(get_content(i), "html.parser").stripped_strings))
 
@@ -395,9 +407,10 @@ def yaml_to_csv(i: str, out: str) -> None:
     """
     Converts a YAML file to a CSV file by first converting it to JSON.
 
-    Args:
-        i (str): Path to the input YAML file.
-        out (str): Path to the output CSV file.
+    :param i: Path to the input YAML file.
+    :type i: str
+    :param out: Path to the output CSV file.
+    :type out: str
     """
     yaml_to_json(i, f"{i}.json")
     json_to_csv(f"{i}.json", out)
@@ -408,9 +421,10 @@ def yaml_to_xml(i: str, out: str) -> None:
     """
     Converts a YAML file to an XML file by first converting it to JSON.
 
-    Args:
-        i (str): Path to the input YAML file.
-        out (str): Path to the output XML file.
+    :param i: Path to the input YAML file.
+    :type i: str
+    :param out: Path to the output XML file.
+    :type out: str
     """
     yaml_to_json(i, f"{i}.json")
     json_to_xml(f"{i}.json", out)
@@ -421,9 +435,10 @@ def xml_to_yaml(i: str, out: str) -> None:
     """
     Converts an XML file to a YAML file by first converting it to JSON.
 
-    Args:
-        i (str): Path to the input XML file.
-        out (str): Path to the output YAML file.
+    :param i: Path to the input XML file.
+    :type i: str
+    :param out: Path to the output YAML file.
+    :type out: str
     """
     xml_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
@@ -434,9 +449,10 @@ def csv_to_yaml(i: str, out: str) -> None:
     """
     Converts a CSV file to a YAML file by first converting it to JSON.
 
-    Args:
-        i (str): Path to the input CSV file.
-        out (str): Path to the output YAML file.
+    :param i: Path to the input CSV file.
+    :type i: str
+    :param out: Path to the output YAML file.
+    :type out: str
     """
     csv_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
@@ -446,6 +462,10 @@ class Transform:
     """
     Class for handling the transformation of files between different media types (e.g., text, image, application).
 
+    :param file_path: The path to the input file to be transformed.
+    :param current_media_type: The media type of the input file.
+    :param wanted_media_type: The desired media type after transformation.
+
     Attributes:
         file_path (str): The path to the input file to be transformed.
         current_media_type (str): The media type of the input file.
@@ -454,18 +474,19 @@ class Transform:
         ext (str): The extension of the output file based on the wanted media type.
 
     Methods:
-        process(): Initiates the file transformation process based on the input and output media types.
-        get(): Returns a FileResponse with the transformed file for download.
+        process():
+            Initiates the file transformation process based on the input and output media types.
+        get():
+            Returns a `FileResponse` with the transformed file for download.
     """
 
     def __init__(self, file_path: str, current_media_type: str, wanted_media_type: str):
         """
         Initializes the Transform object with file paths and media types.
 
-        Args:
-            file_path (str): Path to the file to be transformed.
-            current_media_type (str): The media type of the input file.
-            wanted_media_type (str): The desired media type for the output file.
+        :param file_path: Path to the file to be transformed.
+        :param current_media_type: The media type of the input file.
+        :param wanted_media_type: The desired media type for the output file.
         """
         self.file_path = file_path
         self.cmt = current_media_type.lower()
@@ -487,8 +508,7 @@ class Transform:
         """
         Processes the file based on the current and wanted media types and performs the transformation.
 
-        Raises:
-            RuntimeError: If an error occurs during the file transformation process.
+        :raises RuntimeError: If an error occurs during the file transformation process.
         """
         try:
             if self.output_path != self.file_path:
@@ -505,8 +525,7 @@ class Transform:
         """
         Handles the transformation of text-based files (e.g., plain text, HTML, CSV).
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "plain" in self.cmt:
             if "html" in self.wmt:
@@ -523,8 +542,7 @@ class Transform:
         """
         Handles the conversion of CSV files to other formats like JSON, XML, and YAML.
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "json" in self.wmt:
             csv_to_json(self.file_path, self.output_path)
@@ -539,8 +557,7 @@ class Transform:
         """
         Handles the conversion of application files (e.g., JSON, XML, YAML).
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "json" in self.cmt:
             self.process_json()
@@ -553,8 +570,7 @@ class Transform:
         """
         Handles the transformation of JSON files to other formats like CSV, XML, YAML, and plain text.
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "csv" in self.wmt:
             json_to_csv(self.file_path, self.output_path)
@@ -571,8 +587,7 @@ class Transform:
         """
         Handles the conversion of YAML files to other formats like CSV, JSON, and XML.
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "csv" in self.wmt:
             yaml_to_csv(self.file_path, self.output_path)
@@ -587,8 +602,7 @@ class Transform:
         """
         Handles the conversion of XML files to JSON or YAML.
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "json" in self.wmt:
             xml_to_json(self.file_path, self.output_path)
@@ -601,8 +615,7 @@ class Transform:
         """
         Handles the conversion of image files to other formats (e.g., image to image or image to PDF).
 
-        Raises:
-            RuntimeError: If a conversion type is unsupported.
+        :raises RuntimeError: If a conversion type is unsupported.
         """
         if "image/" in self.wmt:
             image_to_any(self.file_path, self.output_path)
@@ -617,11 +630,8 @@ class Transform:
         """
         Returns the transformed file as a response for download.
 
-        Returns:
-            FileResponse: The response containing the transformed file.
-
-        Raises:
-            HTTPUnprocessableEntity: If an error occurs during file transformation.
+        :returns: The response containing the transformed file.
+        :raises HTTPUnprocessableEntity: If an error occurs during file transformation.
         """
         try:
             if not os.path.exists(self.output_path):
