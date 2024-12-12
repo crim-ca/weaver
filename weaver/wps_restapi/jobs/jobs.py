@@ -44,6 +44,7 @@ from weaver.wps_restapi.jobs.utils import (
     get_job,
     get_job_io_schema_query,
     get_job_list_links,
+    get_job_prov_response,
     get_job_results_response,
     get_job_status_schema,
     get_results,
@@ -71,7 +72,7 @@ LOGGER = get_task_logger(__name__)
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/job_listing.mako",
     response_schemas=sd.derive_responses(
-        sd.get_prov_all_jobs_responses,
+        sd.get_provider_all_jobs_responses,
         sd.GenericHTMLResponse(name="HTMLProviderJobListing", description="Listing of jobs.")
     ),
 )
@@ -80,7 +81,7 @@ LOGGER = get_task_logger(__name__)
     schema=sd.GetProviderJobsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_all_jobs_responses,
+    response_schemas=sd.get_provider_all_jobs_responses,
 )
 @sd.process_jobs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
@@ -325,7 +326,7 @@ def trigger_job_execution(request):
         for profile in JobStatusSchema.values()
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_single_job_status_responses,
+    response_schemas=sd.get_provider_single_job_status_responses,
 )
 @sd.process_job_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
@@ -401,7 +402,7 @@ def update_pending_job(request):
     schema=sd.DeleteProviderJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.delete_prov_job_responses,
+    response_schemas=sd.delete_provider_job_responses,
 )
 @sd.process_job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES],
@@ -499,7 +500,7 @@ def cancel_job_batch(request):
     schema=sd.ProviderInputsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_inputs_responses,
+    response_schemas=sd.get_provider_inputs_responses,
 )
 @sd.process_inputs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -555,7 +556,7 @@ def get_job_inputs(request):
     schema=sd.ProviderOutputsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_outputs_responses,
+    response_schemas=sd.get_provider_outputs_responses,
 )
 @sd.process_outputs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -593,7 +594,7 @@ def get_job_outputs(request):
     schema=sd.ProviderResultsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_results_responses,
+    response_schemas=sd.get_provider_results_responses,
 )
 @sd.process_results_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -625,21 +626,21 @@ def get_job_results(request):
     schema=sd.ProviderExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_exceptions_responses,
+    response_schemas=sd.get_provider_exceptions_responses,
 )
 @sd.process_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES],
     schema=sd.ProcessExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_exceptions_responses,
+    response_schemas=sd.get_job_exceptions_responses,
 )
 @sd.job_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS],
     schema=sd.JobExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_exceptions_responses,
+    response_schemas=sd.get_job_exceptions_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_exceptions(request):
@@ -664,7 +665,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_logs_responses,
+    response_schemas=sd.get_provider_logs_responses,
 )
 @sd.process_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES],
@@ -677,7 +678,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_logs_responses,
+    response_schemas=sd.get_job_logs_responses,
 )
 @sd.job_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS],
@@ -690,7 +691,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_logs_responses,
+    response_schemas=sd.get_job_logs_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_logs(request):
@@ -717,21 +718,21 @@ def get_job_logs(request):
     schema=sd.ProviderJobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_stats_responses,
+    response_schemas=sd.get_provider_stats_responses,
 )
 @sd.process_stats_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATISTICS, sd.TAG_PROCESSES],
     schema=sd.ProcessJobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_stats_responses,
+    response_schemas=sd.get_job_stats_responses,
 )
 @sd.job_stats_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATISTICS],
     schema=sd.JobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_stats_responses,
+    response_schemas=sd.get_job_stats_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_stats(request):
@@ -760,6 +761,177 @@ def get_job_stats(request):
         })
     body = sd.JobStatisticsSchema().deserialize(stats)
     return HTTPOk(json=body)
+
+
+@sd.provider_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvEndpoint(),
+    accept=sd.JobProvAcceptHeader.validator.choices,
+    response_schemas=sd.get_job_prov_responses,
+)
+@sd.process_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvEndpoint(),
+    accept=sd.JobProvAcceptHeader.validator.choices,
+    response_schemas=sd.get_job_prov_responses,
+)
+@sd.job_prov_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvEndpoint(),
+    accept=sd.JobProvAcceptHeader.validator.choices,
+    response_schemas=sd.get_job_prov_responses,
+)
+@sd.provider_prov_info_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_info_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_info_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_who_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_who_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_who_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_inputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_inputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_inputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_outputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_outputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_outputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_outputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_outputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_outputs_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_responses,  # FIXME
+)
+@sd.provider_prov_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_run_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.provider_prov_run_id_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],
+    schema=sd.ProviderJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.process_prov_run_id_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROCESSES],
+    schema=sd.ProcessJobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@sd.job_prov_run_id_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
+    schema=sd.JobProvMetadataEndpoint(),
+    accept=ContentType.TEXT_PLAIN,
+    response_schemas=sd.get_job_prov_metadata_responses,
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_prov(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve the provenance details of a job based on the contextual request path.
+    """
+    return get_job_prov_response(request)
 
 
 @sd.provider_result_service.get(
@@ -805,14 +977,15 @@ def includeme(config):
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
     config.add_cornice_service(sd.job_stats_service)
-    config.add_cornice_service(sd.provider_job_service)
-    config.add_cornice_service(sd.provider_jobs_service)
-    config.add_cornice_service(sd.provider_results_service)
-    config.add_cornice_service(sd.provider_outputs_service)
-    config.add_cornice_service(sd.provider_inputs_service)
-    config.add_cornice_service(sd.provider_exceptions_service)
-    config.add_cornice_service(sd.provider_logs_service)
-    config.add_cornice_service(sd.provider_stats_service)
+    config.add_cornice_service(sd.job_prov_service)
+    config.add_cornice_service(sd.job_prov_info_service)
+    config.add_cornice_service(sd.job_prov_who_service)
+    config.add_cornice_service(sd.job_prov_inputs_service)
+    config.add_cornice_service(sd.job_prov_inputs_run_service)
+    config.add_cornice_service(sd.job_prov_outputs_service)
+    config.add_cornice_service(sd.job_prov_outputs_run_service)
+    config.add_cornice_service(sd.job_prov_run_service)
+    config.add_cornice_service(sd.job_prov_run_id_service)
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
@@ -821,6 +994,32 @@ def includeme(config):
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
     config.add_cornice_service(sd.process_stats_service)
+    config.add_cornice_service(sd.process_prov_service)
+    config.add_cornice_service(sd.process_prov_info_service)
+    config.add_cornice_service(sd.process_prov_who_service)
+    config.add_cornice_service(sd.process_prov_inputs_service)
+    config.add_cornice_service(sd.process_prov_inputs_run_service)
+    config.add_cornice_service(sd.process_prov_outputs_service)
+    config.add_cornice_service(sd.process_prov_outputs_run_service)
+    config.add_cornice_service(sd.process_prov_run_service)
+    config.add_cornice_service(sd.process_prov_run_id_service)
+    config.add_cornice_service(sd.provider_job_service)
+    config.add_cornice_service(sd.provider_jobs_service)
+    config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_inputs_service)
+    config.add_cornice_service(sd.provider_exceptions_service)
+    config.add_cornice_service(sd.provider_logs_service)
+    config.add_cornice_service(sd.provider_stats_service)
+    config.add_cornice_service(sd.provider_prov_service)
+    config.add_cornice_service(sd.provider_prov_info_service)
+    config.add_cornice_service(sd.provider_prov_who_service)
+    config.add_cornice_service(sd.provider_prov_inputs_service)
+    config.add_cornice_service(sd.provider_prov_inputs_run_service)
+    config.add_cornice_service(sd.provider_prov_outputs_service)
+    config.add_cornice_service(sd.provider_prov_outputs_run_service)
+    config.add_cornice_service(sd.provider_prov_run_service)
+    config.add_cornice_service(sd.provider_prov_run_id_service)
 
     # backward compatibility routes (deprecated)
     config.add_cornice_service(sd.job_result_service)
