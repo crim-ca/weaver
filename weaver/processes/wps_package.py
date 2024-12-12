@@ -11,9 +11,8 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """
-import hashlib
-
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -23,7 +22,7 @@ import tempfile
 import time
 import uuid
 from typing import TYPE_CHECKING, cast, overload
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlparse
 
 import colander
 import cwltool
@@ -53,7 +52,6 @@ from pywps.validator import get_validator
 from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
-from urllib.parse import urlparse
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.compat import cache
@@ -180,6 +178,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Any, AnyStr, Callable, Deque, Dict, List, Optional, Tuple, Type, Union
 
+    from cwltool.cwlprov.provenance_profile import ProvenanceProfile
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
@@ -1497,153 +1496,165 @@ class WeaverResearchObject(ResearchObject):
     Defines extended provenance details related to `Weaver` operations and referencing the active server instance.
     """
 
-    def __init__(self, fs_access, temp_prefix_ro="tmp", orcid="", full_name="", ro_uuid=None, settings=None):
-        # type: (StdFsAccess, str, str, str, uuid.UUID, AnySettingsContainer) -> None
+    def __init__(self, job, settings, fs_access, temp_prefix_ro="tmp", orcid="", full_name=""):
+        # type: (Job, AnySettingsContainer, StdFsAccess, str, str, str) -> None
         super(WeaverResearchObject, self).__init__(fs_access, temp_prefix_ro, orcid, full_name)
 
         # rewrite auto-initialized random UUIDs with Weaver-specific references
-        self.ro_uuid = ro_uuid or uuid.uuid4()
+        self.job = job
+        self.ro_uuid = job.uuid
         self.base_uri = f"arcp://uuid,{self.ro_uuid}/"
         self.settings = settings
 
-    # FIXME: improve "hook" strategy with CWLProv
-    #   all the following is not called when the runner resolves to a 'cwltool.executors.SingleJobExecutor'
-    #   (ie: when the CWL is a CommandLineTool). This is because its code sets the 'ProvenanceProfile' option
-    #   with 'user_provenance=False' explicitly Sadly, this is our only availble "hook" mechanism for the time being.
-    #   However, it works for a CWL Workflow since that variant passes down
-    #   the 'user_provenance option that we set (ie: 'ProvenanceProfile' created in 'cwltool.workflow.Workflow').
-    #   see https://github.com/common-workflow-language/cwltool/pull/2082 for alternative to resolve "properly"
-    def user_provenance(self, document):
-        # type: (ProvDocument) -> None
+    @staticmethod
+    def sha1_uuid(document, identifier):
+        # type: (ProvDocument, str) -> str
         """
-        Hook `Weaver` updates onto user provenance step.
-
-        Because of how the :class`ResearchObject` and :class:`cwltool.cwlprov.provenance_profile.ProvenanceProfile`
-        definitions are passed around, invoked, and finalized in the :mod:`cwltool` operations, attempting to update
-        the ``PROV`` definitions after execution of the tool would be too late, since all manifest and provenance files
-        would already have been written to disk. Instead, hook ourselves to this function that is invoked before the
-        procedure is completed to adjust or apply additional metadata.
+        Generate a prefixed SHA1 hash from the identifier value.
         """
-        self.self_check()
+        sha1_ns = document._namespaces[cwl_prov_const.DATA]
+        sha1_id = f"{sha1_ns.prefix}:{hashlib.sha1(identifier.encode()).hexdigest()}"
+        return sha1_id
 
-        # NOTE:
-        #   the original operation does the following,
-        #   but using the machine user means nothing in a docker running on a server
-        # (username, fullname) = _whoami()
+    def initialize_provenance(self, full_name, host_provenance, user_provenance, orcid, fsaccess, run_uuid=None):
+        # type: (str, bool, bool, str, StdFsAccess, Optional[uuid.UUID]) -> ProvenanceProfile
+        """
+        Hook `Weaver` metadata onto user provenance step.
+        """
+        prov_profile = super(WeaverResearchObject, self).initialize_provenance(
+            full_name=full_name,
+            host_provenance=host_provenance,
+            user_provenance=user_provenance,
+            orcid=orcid,
+            fsaccess=fsaccess,
+            run_uuid=run_uuid,
+        )
+        document = prov_profile.document
+
+        doi_ns = document.add_namespace("doi", "https://doi.org/")
+
+        weaver_full_name = f"crim-ca/weaver:{weaver_version}"
+        weaver_code_url = "https://github.com/crim-ca/weaver"
+        weaver_code_sha1 = self.sha1_uuid(document, weaver_code_url)
+        weaver_code_entity = document.entity(
+            weaver_code_sha1,
+            {
+                prov.constants.PROV_TYPE: prov.constants.PROV["PrimarySource"],
+                prov.constants.PROV_LABEL: "Source code repository",
+                prov.constants.PROV_LOCATION: weaver_code_url,
+            },
+        )
 
         weaver_url = get_weaver_url(self.settings)
         weaver_desc = self.settings.get(
             "weaver.wps_metadata_identification_abstract",
             "Weaver OGC API Processes Server"
         )
-        weaver_full_name = f"crim-ca/weaver:{weaver_version}"
-
-        # for whatever reason, this is done by a local 'host_provenance' function
-        # within the 'ProvenanceProfile.generate_prov_doc' method, and it applies
-        # by default the machine host FQDN, which is irrelevant inside a docker container
-        # instead, use actual information from the weaver server to populate the field
-        # note: because it is done here, option 'host_provenance' MUST be disabled to avoid duplicates
-        document.add_namespace(cwl_prov_const.UUID)
-        document.add_namespace(cwl_prov_const.ORCID)
-        document.add_namespace(cwl_prov_const.FOAF)
-        cwltool_agent = document.agent(
-            cwl_prov_const.ACCOUNT_UUID,
-            {
-                prov.constants.PROV_TYPE: cwl_prov_const.FOAF["OnlineAccount"],
-                prov.constants.PROV_LABEL: weaver_desc,
-                prov.constants.PROV_LOCATION: weaver_url,
-                cwl_prov_const.FOAF["accountName"]: weaver_full_name,
-            },
-        )
-
-        full_name = self.full_name or "undefined"
-        user_agent = document.agent(
-            self.orcid or cwl_prov_const.USER_UUID,  # actual user if provided or alias for machine
-            {
-                prov.constants.PROV_TYPE: prov.constants.PROV["Person"],
-                prov.constants.PROV_LABEL: "User running the workflow job.",
-                cwl_prov_const.FOAF["name"]: full_name,
-                cwl_prov_const.FOAF["account"]: cwltool_agent,
-            },
-        )
-        # cwltool may be started on the shell (directly by user),
-        # by shell script (indirectly by user)
-        # or from a different program
-        #   (which again is launched by any of the above)
-        #
-        # We can't tell in which way, but ultimately we're still
-        # acting in behalf of that user (even if we might
-        # get their name wrong!)
-        document.actedOnBehalfOf(cwltool_agent, user_agent)
-
-        document.add_namespace("doi", "https://doi.org/")
-        sha1_ns = document._namespaces.get_namespace("sha1")
+        weaver_instance_sha1 = self.sha1_uuid(document, weaver_url)
+        weaver_instance_meta = [
+            (prov.constants.PROV_TYPE, prov.constants.PROV["SoftwareAgent"]),
+            (prov.constants.PROV_LOCATION, weaver_url),
+            (prov.constants.PROV_LABEL, weaver_desc),
+            (prov.constants.PROV_LABEL, weaver_full_name),
+            (prov.constants.PROV_ATTR_GENERAL_ENTITY, weaver_code_sha1),
+            (prov.constants.PROV_ATTR_SPECIFIC_ENTITY, f"{doi_ns.prefix}:10.5281/zenodo.14210717"),  # see CITATION.cff
+        ]
+        weaver_instance_agent = document.agent(weaver_instance_sha1, weaver_instance_meta)
 
         crim_name = "Computer Research Institute of Montréal"
+        crim_sha1 = self.sha1_uuid(document, crim_name)
         crim_entity = document.entity(
-            "_:crim",
+            crim_sha1,
             {
                 prov.constants.PROV_TYPE: prov.constants.PROV["Organization"],
-                "foaf:name": crim_name,
-                "schema:name": crim_name,
+                cwl_prov_const.FOAF["name"]: crim_name,
+                cwl_prov_const.SCHEMA["name"]: crim_name,
             }
         )
 
-        server_provider_name = self.settings.get("weaver.wps_metadata_provider_name", weaver_url)
-        server_provider_entity = document.entity(
-            "_:server",
-            {
-                prov.constants.PROV_TYPE: prov.constants.PROV["Organization"],
-                "foaf:name": server_provider_name,
-                "schema:name": server_provider_name,
-            }
-        )
+        server_provider_name = self.settings.get("weaver.wps_metadata_provider_name")
+        server_provider_url = self.settings.get("weaver.wps_metadata_provider_url")
+        server_provider_meta = []
+        server_provider_entity = None
+        if server_provider_name:
+            server_provider_meta.extend([
+                (cwl_prov_const.FOAF["name"], server_provider_name),
+                (cwl_prov_const.SCHEMA["name"], server_provider_name),
+            ])
+        if server_provider_url:
+            server_provider_meta.extend([
+                (prov.constants.PROV_LOCATION, server_provider_url),
+            ])
+        if server_provider_meta:
+            server_provider_id = server_provider_url or server_provider_name
+            server_provider_sha1 = self.sha1_uuid(document, server_provider_id)
+            server_provider_meta.extend([
+                (prov.constants.PROV_TYPE, prov.constants.PROV["Organization"]),
+                (prov.constants.PROV_LABEL, "Server Provider"),
+            ])
+            server_provider_entity = document.entity(
+                server_provider_sha1,
+                server_provider_meta,
+            )
 
-        weaver_sha1 = hashlib.sha1(weaver_url)
-        weaver_agent = document.agent(
-            sha1_ns.qname(weaver_sha1),
-            {
-                prov.constants.PROV_TYPE: prov.constants.PROV["SoftwareAgent"],
-                prov.constants.PROV_LOCATION: weaver_url,
-                prov.constants.PROV_LABEL: weaver_full_name,
-                # "prov:qualifiedPrimarySource":
-                # "prov:Organization": "Computer Research Institute of Montréal (CRIM).",
-                # "foaf:Project": "https://github.com/crim-ca/weaver",
-                # "doi": "10.5281/zenodo.14210717"  # see CITATION.cff
-            }
-        )
-
-        # cross-ref:  https://wf4ever.github.io/ro/wfprov.owl
         job_entity = document.entity(
-            self.job.uuid,
+            self.job.uuid.urn,
             {
                 prov.constants.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
                 prov.constants.PROV_LOCATION: self.job.job_url(self.settings),
                 prov.constants.PROV_LABEL: "Job Information",
             }
         )
+        proc_url = self.job.process_url(self.settings)
+        proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
+        proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
         proc_entity = document.entity(
-            self.job.uuid,
+            proc_uuid,
             {
                 prov.constants.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
-                prov.constants.PROV_LOCATION: self.job.process_url(self.settings),
+                prov.constants.PROV_LOCATION: proc_url,
                 prov.constants.PROV_LABEL: "Process Description",
             }
         )
 
-        wf_agent = document.get_record(self.engine_uuid)  # current job run aligned with cwl workflow
+        # following agents are expected to exist (created by inherited class)
+        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
+        user_agent = document.get_record(cwl_prov_const.USER_UUID)[0]
+        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
 
-        # define relationships
-        document.actedOnBehalfOf(weaver_agent, user_agent)
-        document.specializationOf(weaver_agent, cwltool_agent)
-        document.attribution(crim_entity, weaver_agent)
-        document.wasDerivedFrom(cwltool_agent, weaver_agent)
-        document.derivation(server_provider_entity, weaver_agent)
-        document.wasStartedBy(job_entity, weaver_agent)
+        # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
+        document.primary_source(weaver_instance_agent, weaver_code_entity)
+        document.actedOnBehalfOf(weaver_instance_agent, user_agent)
+        document.specializationOf(weaver_instance_agent, cwltool_agent)
+        document.attribution(crim_entity, weaver_code_entity)
+        document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
+        document.wasStartedBy(job_entity, weaver_instance_agent)
         document.wasStartedBy(wf_agent, job_entity, time=self.job.created)
         document.specializationOf(wf_agent, job_entity)
         document.alternateOf(wf_agent, job_entity)
         document.wasGeneratedBy(job_entity, proc_entity)
+        if server_provider_entity:
+            document.derivation(server_provider_entity, weaver_instance_agent)
+            document.attribution(server_provider_entity, weaver_instance_agent)
+
+        return prov_profile
+
+    def resolve_user(self):
+        # type: () -> Tuple[str, str]
+        """
+        Override :mod:`cwltool` default machine user.
+        """
+        weaver_full_name = f"crim-ca/weaver:{weaver_version}"
+        return weaver_full_name, weaver_full_name
+
+    def resolve_host(self):
+        # type: () -> Tuple[str, str]
+        """
+        Override :mod:`cwltool` default machine host.
+        """
+        weaver_url = get_weaver_url(self.settings)
+        weaver_fqdn = urlparse(weaver_url).hostname
+        return weaver_fqdn, weaver_url
 
 
 class WpsPackage(Process):
@@ -1988,20 +1999,23 @@ class WpsPackage(Process):
         """
         weaver_cwl_prov = asbool(self.settings.get("weaver.cwl_prov", True))
         if not weaver_cwl_prov:
+            loading_context.research_obj = None
+            runtime_context.research_obj = None
+            runtime_context.prov_obj = None
             return
 
-        loading_context.user_provenance = True
-        loading_context.host_provenance = False  # see 'WeaverResearchObject.user_provenance'
+        runtime_context.prov_user = loading_context.user_provenance = True
+        runtime_context.prov_host = loading_context.host_provenance = True
 
         fs = runtime_context.make_fs_access or StdFsAccess
         if not runtime_context.research_obj:
             ro = WeaverResearchObject(
+                self.job,  # align the RO definition with the job (make the UUIDs equal)
+                self.settings,
                 fs(""),
                 temp_prefix_ro=runtime_context.tmpdir_prefix,
                 orcid=runtime_context.orcid,
                 full_name=runtime_context.cwl_full_name,
-                ro_uuid=self.job.uuid,  # align the RO definition with the job (make the UUIDs logical)
-                settings=self.settings,
             )
 
             loading_context.research_obj = ro
