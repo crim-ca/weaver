@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, cast
 
 import mock
 import pytest
+import yaml
 from owslib.ows import DEFAULT_OWS_NAMESPACE
 from owslib.wps import WPSException
 from parameterized import parameterized
@@ -23,6 +24,7 @@ from webtest import TestApp as WebTestApp
 
 from tests import resources
 from tests.functional.utils import JobUtils, ResourcesUtil, WpsConfigBase
+from tests.functional.test_job_provenance import TestJobProvenanceBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
@@ -45,6 +47,7 @@ from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_
 from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import fully_qualified_name, get_registry
 from weaver.visibility import Visibility
@@ -2557,3 +2560,84 @@ class TestWeaverCLIAuthHandler(TestWeaverClientAuthBase):
         assert any(f"\"id\": \"{proc}\"" in line for line in lines)
         assert any("\"inputs\": {" in line for line in lines)
         assert any("\"outputs\": {" in line for line in lines)
+
+
+@pytest.mark.prov
+class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
+    def setUp(self):
+        # purposely omit 'TestWeaverClientBase' setup to
+        # avoid clearing the generated job with PROV metadata
+        TestJobProvenanceBase.setUp(self)
+
+    def test_prov(self):
+        result = mocked_sub_requests(self.app, self.client.prov, self.job_url)
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.APP_JSON
+        assert isinstance(result.body, dict), "body should be the PROV-JSON"
+        assert "actedOnBehalfOf" in result.body
+        assert "agent" in result.body
+        assert "crim-ca/weaver" in str(result.body["agent"])
+        assert "cwltool" in str(result.body["agent"])
+
+    def test_prov_yaml_by_output_format(self):
+        result = mocked_sub_requests(self.app, self.client.prov, self.job_url, output_format=OutputFormat.YAML)
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.APP_JSON, "original type should still be JSON (from API)"
+        assert isinstance(result.body, dict), "response body should still be the original PROV-JSON"
+        assert isinstance(result.text, str), "text property should be the PROV-JSON represented as YAML string"
+        assert yaml.safe_load(result.text) == result.body, "PROV-JSON contents should be identical in YAML format"
+        assert "actedOnBehalfOf" in result.text
+        assert "agent" in result.text
+        assert "crim-ca/weaver" in str(result.text)
+        assert "cwltool" in str(result.text)
+
+    def test_prov_xml_by_prov_format(self):
+        result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov_format=ProvenanceFormat.PROV_XML)
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.APP_XML, "original type should still be XML (from API)"
+        assert isinstance(result.body, str), "body should be the PROV-XML representation"
+        assert "actedOnBehalfOf" in result.body
+        assert "agent" in result.body
+        assert "crim-ca/weaver" in str(result.body)
+        assert "cwltool" in str(result.body)
+
+    def test_prov_info(self):
+        result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov=ProvenancePathType.PROV_INFO)
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        assert "Research Object of CWL workflow run" in result.text
+        assert self.job_id in result.text
+
+    def test_prov_run(self):
+        result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov=ProvenancePathType.PROV_RUN)
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        assert "Job Information" in result.text
+        assert self.proc_id in result.text
+        assert self.job_id in result.text
+        assert "< wf:main/message" in result.text, (
+            "Indication of inward input 'message' ID should be present"
+        )
+        assert f"> wf:main/{self.proc_id}/output" in result.text, (
+            "Indication of outward result 'output' ID should be present"
+        )
+
+    def test_prov_run_with_id(self):
+        result = mocked_sub_requests(
+            self.app,
+            self.client.prov,
+            self.job_url,
+            prov=ProvenancePathType.PROV_RUN,
+            prov_run_id=self.job_id,  # redundant in this case, but test that parameter is parsed and resolves
+        )
+        assert result.success
+        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        assert "Job Information" in result.text
+        assert self.proc_id in result.text
+        assert self.job_id in result.text
+        assert "< wf:main/message" in result.text, (
+            "Indication of inward input 'message' ID should be present"
+        )
+        assert f"> wf:main/{self.proc_id}/output" in result.text, (
+            "Indication of outward result 'output' ID should be present"
+        )

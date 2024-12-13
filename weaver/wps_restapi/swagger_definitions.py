@@ -117,6 +117,7 @@ from weaver.processes.constants import (
     JobStatusSchema,
     ProcessSchema
 )
+from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
@@ -7763,14 +7764,7 @@ class GoneJobResponseSchema(ExtendedMappingSchema):
 
 
 class JobProvAcceptHeader(AcceptHeader):
-    validator = OneOf([
-        ContentType.APP_JSON,
-        ContentType.APP_XML,
-        ContentType.TEXT_XML,
-        ContentType.TEXT_PROVN,
-        ContentType.TEXT_TURTLE,
-        ContentType.APP_NT,
-    ])
+    validator = OneOf(ProvenanceFormat.media_types)
 
 
 class JobProvRequestHeaders(RequestHeaders):
@@ -7779,6 +7773,7 @@ class JobProvRequestHeaders(RequestHeaders):
 
 class JobProvEndpoint(JobPath):
     header = JobProvRequestHeaders()
+    querystring = FormatQuery()
 
 
 class ProcessJobProvEndpoint(JobProvEndpoint, LocalProcessPath):

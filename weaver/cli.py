@@ -35,6 +35,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.utils import get_process_information
 from weaver.processes.wps_package import get_process_definition
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
@@ -72,6 +73,7 @@ if TYPE_CHECKING:
             AnyRequestMethod,
             AnyRequestType,
             AnyResponseType,
+            AnyUUID,
             CookiesType,
             CWL,
             CWL_IO_ValueMap,
@@ -83,7 +85,8 @@ if TYPE_CHECKING:
             HeadersType,
             JobSubscribers,
             JSON,
-            SettingsType
+            SettingsType,
+            URL
         )
     except ImportError:
         # pylint: disable=C0103,invalid-name
@@ -97,6 +100,8 @@ if TYPE_CHECKING:
         ExecutionResultValue = Union[ExecutionResultObjectRef, List[ExecutionResultObjectRef]]
         JobSubscribers = Dict[str, Any]
         HeadersType = Dict[str, str]
+        URL = str
+        AnyUUID = str
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
@@ -110,7 +115,8 @@ if TYPE_CHECKING:
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
-    ArgumentParserRule = Tuple[argparse._ActionsContainer, Callable[[argparse.Namespace], Optional[bool]], str]  # noqa
+    ArgumentParserRuleCheck = Callable[[argparse.Namespace], Optional[Union[bool, str]]]
+    ArgumentParserRule = Tuple[argparse._ActionsContainer, ArgumentParserRuleCheck, str]  # noqa
 
 LOGGER = logging.getLogger("weaver.cli")  # do not use '__name__' since it becomes '__main__' from CLI call
 
@@ -149,7 +155,7 @@ class OperationResult(AutoBase):
         self.success = success
         self.message = message
         self.headers = ResponseHeaders(headers) if headers is not None else None
-        self.body = body
+        self.body = body or text
         self.text = text
         self.code = code
 
@@ -633,8 +639,8 @@ class WeaverClient(object):
         return OperationResult(True, p_id, body)
 
     def _parse_job_ref(self, job_reference, url=None):
-        # type: (str, Optional[str]) -> Tuple[Optional[str], Optional[str]]
-        if job_reference.startswith("http"):
+        # type: (Union[URL, AnyUUID], Optional[str]) -> Tuple[Optional[str], Optional[str]]
+        if str(job_reference).startswith("http"):
             job_url = job_reference
             job_parts = [part for part in job_url.split("/") if part.strip()]
             job_id = job_parts[-1]
@@ -1526,7 +1532,7 @@ class WeaverClient(object):
 
     def trigger_job(
         self,
-        job_reference,          # type: str
+        job_reference,          # type: Union[URL, AnyUUID]
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1570,7 +1576,7 @@ class WeaverClient(object):
 
     def update_job(
         self,
-        job_reference,          # type: str
+        job_reference,          # type: Union[URL, AnyUUID]
         title=null,             # type: Union[Type[null], Optional[str]]
         inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
         subscribers=None,       # type: Optional[JobSubscribers]
@@ -1857,7 +1863,7 @@ class WeaverClient(object):
 
     def status(
         self,
-        job_reference,          # type: str
+        job_reference,          # type: Union[URL, AnyUUID]
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1898,7 +1904,7 @@ class WeaverClient(object):
     def _job_info(
         self,
         x_path,                 # type: str
-        job_reference,          # type: str
+        job_reference,          # type: Union[URL, AnyUUID]
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1914,7 +1920,7 @@ class WeaverClient(object):
         The :term:`Job` must be in the expected status to retrieve relevant information.
 
         .. seealso::
-            :ref:`proc_op_result`
+            :ref:`proc_op_status`
 
         :param job_reference: Either the full :term:`Job` status URL or only its UUID.
         :param url: Instance URL if not already provided during client creation.
@@ -1958,6 +1964,87 @@ class WeaverClient(object):
         return self._job_info("/statistics", *args, **kwargs)
 
     stats = statistics  # alias
+
+    def provenance(
+        self,
+        job_reference,          # type: Union[URL, AnyUUID]
+        prov=None,              # type: Optional[ProvenancePathType]
+        prov_run_id=None,       # type: Optional[AnyUUID]
+        prov_format=None,       # type: Optional[ProvenanceFormat]
+        output_format=None,     # type: Optional[AnyOutputFormat]
+        url=None,               # type: Optional[str]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        *args,                  # type: Any
+        **kwargs,               # type: Any
+    ):                          # type: (...) -> OperationResult
+        """
+        Obtain the :term:`Provenance` metadata from a successful :term:`Job` execution.
+
+        The :term:`Job` must be in the expected status to retrieve relevant information.
+
+        .. seealso::
+            - :ref:`proc_op_status`
+            - :ref:`proc_op_job_prov`
+
+        :param job_reference: Either the full :term:`Job` status URL or only its UUID.
+        :param prov:
+            Type of :term:`Provenance` metadata to retrieve, as expressed by relative path.
+            For example, retrieving an execution run metadata can be requested with ``run``, ``/run`` or ``/prov/run``.
+            Available relative paths are as per defined by the :term:`API` endpoints (see :class:`ProvenancePathType`).
+            Can be combined in certain cases with a :paramref:`run_id` to obtain only the metadata of a nested step
+            within a :term:`Workflow` execution. If omitted, returns the main :term:`Provenance` metadata
+            representation as per the requested :paramref:`prov_format` (see :class:`ProvenanceFormat`).
+        :param prov_run_id:
+            Specific run (i.e.: a nested :term:`Workflow` step) for which to retrieve :term:`Provenance` metadata.
+            Applicable IDs will typically correspond to the underlying :term:`Job` ID that would have been created
+            for the corresponding steps, but could differ in particular situations.
+            To make sure, the top-most ``PROV`` metadata should be inspected to extract relevant run IDs.
+        :param prov_format:
+            Desired :term:`Provenance` metadata representation (see :class:`ProvenanceFormat`).
+            Applicable only when retrieving the ``PROV`` details (i.e.: :paramref:`prov` must be ``None`` or ``/prov``).
+            Ignored otherwise.
+            Can be combined with :paramref:`output_format` to convert the representation into semantically equivalent
+            representations. For example, :attr:`ProvenanceFormat.PROV_JSON` could be converted into the corresponding
+            :term:`YAML` representation using :attr:`OutputFormat.YAML`. However, this is limited only to directly
+            mappable representations (i.e.: :term:`JSON`, :term:`YAML`, :term:`XML`).
+        :param output_format:
+            Select an alternate output representation of the result body contents.
+            See also :paramref:`prov_format` for even more format combinations specific to :term:`Provenance` metadata.
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :returns: Retrieved information from the :term:`Job`.
+        """
+        prov_path = ProvenancePathType.get(prov, run_id=prov_run_id, default=ProvenancePathType.PROV)
+        prov_format, err_msg = ProvenanceFormat.resolve_compatible_formats(prov, prov_format, output_format)
+        if err_msg:
+            return OperationResult(False, message=err_msg)
+        if prov_format:
+            prov_ctype = ProvenanceFormat.as_media_type(prov_format)
+            if prov_ctype:
+                headers = CaseInsensitiveDict(headers or {})
+                headers["Accept"] = prov_ctype
+        if prov_path != ProvenancePathType.PROV:
+            headers = CaseInsensitiveDict(headers or {})
+            headers["Accept"] = ContentType.TEXT_PLAIN
+        result = self._job_info(
+            prov_path,
+            job_reference,
+            url=url,
+            auth=auth,
+            headers=headers,
+            output_format=output_format,
+            *args,
+            **kwargs,
+        )
+        return result
+
+    prov = provenance  # alias
 
     def monitor(
         self,
@@ -2598,6 +2685,55 @@ def add_timeout_param(parser):
     )
 
 
+def add_provenance_params(parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        "-pT", "--prov", "--prov-type", dest="prov", nargs=1,
+        choices=ProvenancePathType.types,
+        help=(
+            "Desired PROV metadata contents. "
+            "The main PROV metadata supports multiple representations. "
+            "All others are only available as plain text."
+        )
+    )
+    parser.add_argument(
+        "-pF", "--prov-format", dest="prov_format", nargs=1,
+        choices=ProvenanceFormat.formats,
+        help=(
+            "Desired PROV metadata schema representation. "
+            "Applicable formats depend on the PROV metadata type being requested. "
+            "Can be combined with -F/--format to transform the result to an alternate representation if compatible. "
+            "Note that certain request headers will be overridden to obtain the requested format even if they are "
+            "explicitly specified by the corresponding -H/--header option."
+        )
+    )
+    parser.add_argument(
+        "-pR", "--run", "--prov-run", dest="prov_run_id", nargs=1,
+        choices=ProvenancePathType.types,
+        help=(
+            "Specific run (i.e.: a nested Workflow step) for which to retrieve Provenance metadata. "
+            "Applicable IDs will typically correspond to the underlying Job ID that would have been "
+            "created for the corresponding steps, but could differ in particular situations. "
+            "To make sure, the top-most PROV metadata should be inspected to extract relevant run IDs."
+        )
+    )
+
+
+def check_compatible_prov_formats(ns):
+    # type: (argparse.Namespace) -> Optional[str]
+    """
+    Check multiple output format and PROV format for valid combinations.
+
+    If valid, update the arguments to make them work during invocation.
+    Otherwise, return the relevant error to fail argument validation and print the error message.
+    """
+    prov_format, err_msg = ProvenanceFormat.resolve_compatible_formats(ns.prov, ns.prov_format, ns.output_format)
+    if err_msg:
+        return err_msg
+    if prov_format:
+        ns.prov_format = prov_format
+
+
 class SubscriberAction(argparse.Action):
     """
     Action that will validate that the input argument references a valid subscriber argument.
@@ -2996,8 +3132,8 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         self.help_mode = False
         return text
 
-    def add_rule(self, rule, failure):
-        # type: (Callable[[argparse.Namespace], Optional[bool]], str) -> None
+    def add_rule(self, rule, failure=None):
+        # type: (ArgumentParserRuleCheck, Optional[str]) -> None
         self._rules.add((self, rule, failure))
 
     def parse_known_args(self, args=None, namespace=None):
@@ -3011,7 +3147,10 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         """
         ns, args = super(WeaverArgumentParser, self).parse_known_args(args=args, namespace=namespace)
         for container, rule, failure in self._rules:
-            if rule(ns) not in [None, True]:
+            result = rule(ns)
+            if result not in [None, True]:
+                if isinstance(result, str):
+                    failure = f"{failure} because {result}"
                 container.error(failure)
         return ns, args
 
@@ -3398,6 +3537,25 @@ def make_parser():
     add_job_ref_param(op_statistics)
     add_shared_options(op_statistics)
 
+    op_provenance = WeaverArgumentParser(
+        "provenance",
+        description=(
+            "Obtain the provenance metadata of a job using a reference UUID or URL. "
+            "Different W3C PROV representations can be retrieved according to specified format options. "
+            "Furthermore, different parts of the provenance metadata can be extracted."
+        ),
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_provenance)
+    add_url_param(op_provenance, required=False)
+    add_job_ref_param(op_provenance)
+    add_shared_options(op_provenance)
+    add_provenance_params(op_provenance)
+    op_provenance.add_rule(
+        check_compatible_prov_formats,
+        "specified options for -pF/--prov-format and -F/--format are not compatible",
+    )
+
     op_results = WeaverArgumentParser(
         "results",
         description=(
@@ -3472,6 +3630,7 @@ def make_parser():
         op_logs,
         op_exceptions,
         op_statistics,
+        op_provenance,
         op_results,
         op_upload,
     ]
@@ -3479,6 +3638,7 @@ def make_parser():
         "processes": op_capabilities,
         "errors": op_exceptions,
         "stats": op_statistics,
+        "prov": op_provenance,
     }
     for op_parser in operations:
         op_aliases = [alias for alias, op_alias in aliases.items() if op_alias is op_parser]

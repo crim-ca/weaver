@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import itertools
 import uuid
 from typing import TYPE_CHECKING
@@ -14,19 +15,18 @@ from weaver.formats import ContentType, OutputFormat
 if TYPE_CHECKING:
     from typing import Optional
 
+    from weaver.typedefs import AnyUUID
 
-@pytest.mark.oap_part4
-@pytest.mark.functional
-class TestJobProvenance(WpsConfigBase, ResourcesUtil):
-    """
-    Tests to evaluate the various endpoints for :term:`Job` :term:`Provenance`.
-    """
+
+class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
+    job_id = None   # type: Optional[AnyUUID]
     job_url = None  # type: Optional[str]
     proc_id = None  # type: Optional[str]
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = {
+        cls.settings = copy.deepcopy(cls.settings or {})
+        settings = {
             "weaver.cwl_prov": True,
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
@@ -35,14 +35,15 @@ class TestJobProvenance(WpsConfigBase, ResourcesUtil):
             "weaver.wps_output_url": "http://localhost/wpsoutputs",
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
         }
-        super(TestJobProvenance, cls).setUpClass()
-        cls.job_url = cls.setup_test_job()
+        cls.settings.update(settings)
+        super(TestJobProvenanceBase, cls).setUpClass()
+        cls.setup_test_job()
 
     @classmethod
     def tearDownClass(cls):
         cls.process_store.clear_processes()
         cls.job_store.clear_jobs()
-        super(TestJobProvenance, cls).tearDownClass()
+        super(TestJobProvenanceBase, cls).tearDownClass()
 
     @classmethod
     def setup_test_job(cls):
@@ -73,8 +74,17 @@ class TestJobProvenance(WpsConfigBase, ResourcesUtil):
             assert resp.status_code == 201, resp.text
             status_url = resp.headers.get("location")
             cls.monitor_job(status_url, return_status=True)
-        return status_url
+        cls.job_url = status_url
+        cls.job_id = status_url.rsplit("/", 1)[-1]
 
+
+@pytest.mark.prov
+@pytest.mark.oap_part4
+@pytest.mark.functional
+class TestJobProvenance(TestJobProvenanceBase):
+    """
+    Tests to evaluate the various endpoints for :term:`Job` :term:`Provenance`.
+    """
     @parameterized.expand([
         ({}, {}),  # default is JSON
         ({"f": OutputFormat.JSON}, {}),

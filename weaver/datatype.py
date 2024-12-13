@@ -57,6 +57,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -99,6 +100,7 @@ if TYPE_CHECKING:
     from weaver.formats import AnyContentType
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
+    from weaver.provenance import AnyProvenanceFormat
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -1472,28 +1474,28 @@ class Job(Base, LoggerHandler):
         return result_job_path
 
     def prov_url(self, container=None, extra_path=None):
-        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
-        extra_path = "/prov" + (extra_path or "")
+        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
+        extra_path = "/prov" + str(extra_path or "")
         return self.job_url(container=container, extra_path=extra_path)
 
     def prov_path(self, container=None, extra_path=None, prov_format=None):
-        # type: (Optional[AnySettingsContainer], Optional[str], AnyContentType) -> str
+        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType], Optional[AnyProvenanceFormat]) -> str
         """
         Obtain the relative path of the ``PROV`` contents.
         """
         job_path = self.result_path()
         prov_path = f"{job_path}-prov"
+        prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
             ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
-            ("/prov", ContentType.APP_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
-            ("/prov", ContentType.APP_JSON_LD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
-            ("/prov", ContentType.APP_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
-            ("/prov", ContentType.TEXT_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
-            ("/prov", ContentType.TEXT_PROVN): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
-            ("/prov", ContentType.TEXT_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
-            ("/prov", ContentType.APP_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
-        }
+            ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
+            ("/prov", ProvenanceFormat.PROV_JSON_LD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
+            ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
+            ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
+            ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
+            ("/prov", ProvenanceFormat.PROV_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
+        }  # type: Dict[Tuple[Optional[ProvenancePathType], ProvenanceFormat], str]
         key = (extra_path, prov_format)
         resolved_path = _prov_path_mapping.get(key)
         if resolved_path:
@@ -1504,7 +1506,7 @@ class Job(Base, LoggerHandler):
     def prov_data(
         self,
         container=None,     # type: Optional[AnySettingsContainer]
-        extra_path=None,    # type: Optional[str]
+        extra_path=None,    # type: Optional[ProvenancePathType]
         prov_format=None,   # type: AnyContentType
     ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
         """
@@ -2031,7 +2033,7 @@ class VaultFile(Authentication):
         return compare_digest(str(access), str(token))
 
     def encrypt(self, file):
-        # type: (IO[bytes|str]) -> BytesIO
+        # type: (IO[Union[bytes, str]]) -> BytesIO
         """
         Encrypt file data using a secret to avoid plain text contents during temporary :term:`Vault` storage.
 
@@ -2047,7 +2049,7 @@ class VaultFile(Authentication):
         return BytesIO(digest)
 
     def decrypt(self, file):
-        # type: (IO[bytes|str]) -> BytesIO
+        # type: (IO[Union[bytes, str]]) -> BytesIO
         """
         Decrypt file contents using secret.
         """

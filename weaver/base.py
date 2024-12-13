@@ -39,7 +39,11 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def __members__(cls):
         members = set(cls.__dict__) - set(object.__dict__)
-        members = [member for member in members if not inspect.ismethod(getattr(cls, member))]
+        members = [
+            member for member in members
+            if not isinstance(object.__getattribute__(cls, member), classmethod)
+            and not inspect.ismethod(getattr(cls, member))
+        ]
         return [member for member in members if not isinstance(member, str) or not member.startswith("_")]
 
     @classmethod
