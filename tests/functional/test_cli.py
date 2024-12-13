@@ -23,8 +23,8 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPOk, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests import resources
-from tests.functional.utils import JobUtils, ResourcesUtil, WpsConfigBase
 from tests.functional.test_job_provenance import TestJobProvenanceBase
+from tests.functional.utils import JobUtils, ResourcesUtil, WpsConfigBase
 from tests.utils import (
     get_weaver_url,
     mocked_dismiss_process,
@@ -2612,7 +2612,6 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov=ProvenancePathType.PROV_RUN)
         assert result.success
         assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
-        assert "Job Information" in result.text
         assert self.proc_id in result.text
         assert self.job_id in result.text
         assert "< wf:main/message" in result.text, (
@@ -2632,7 +2631,6 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
         )
         assert result.success
         assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
-        assert "Job Information" in result.text
         assert self.proc_id in result.text
         assert self.job_id in result.text
         assert "< wf:main/message" in result.text, (

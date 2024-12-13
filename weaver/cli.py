@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
         from weaver.typedefs import (
+            URL,
             AnyHeadersContainer,
             AnyRequestMethod,
             AnyRequestType,
@@ -85,8 +86,7 @@ if TYPE_CHECKING:
             HeadersType,
             JobSubscribers,
             JSON,
-            SettingsType,
-            URL
+            SettingsType
         )
     except ImportError:
         # pylint: disable=C0103,invalid-name
@@ -1975,7 +1975,6 @@ class WeaverClient(object):
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
-        *args,                  # type: Any
         **kwargs,               # type: Any
     ):                          # type: (...) -> OperationResult
         """
@@ -2039,7 +2038,6 @@ class WeaverClient(object):
             auth=auth,
             headers=headers,
             output_format=output_format,
-            *args,
             **kwargs,
         )
         return result

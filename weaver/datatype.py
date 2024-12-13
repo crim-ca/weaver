@@ -57,7 +57,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
-from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -79,7 +79,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_client, get_wps_url, get_wps_output_dir
+from weaver.wps.utils import get_wps_client, get_wps_output_dir, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -100,7 +100,7 @@ if TYPE_CHECKING:
     from weaver.formats import AnyContentType
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
-    from weaver.provenance import AnyProvenanceFormat
+    from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (

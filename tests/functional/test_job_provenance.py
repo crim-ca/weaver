@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 from parameterized import parameterized
-
 from status import Status
+
+from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
-from tests.functional.utils import WpsConfigBase, ResourcesUtil
 from weaver.formats import ContentType, OutputFormat
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
 
     @classmethod
     def setup_test_job(cls):
-        cls.proc_id = cls.fully_qualified_test_name("Echo")
+        cls.proc_id = cls.fully_qualified_test_name(cls, "Echo")
         cwl = cls.retrieve_payload("Echo", "package", local=True)
         body = {
             "processDescription": {

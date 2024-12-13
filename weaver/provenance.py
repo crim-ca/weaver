@@ -53,17 +53,17 @@ class ProvenancePathType(Constants):
         return None
 
     @classmethod
-    def get(
+    def get(            # pylint: disable=W0221,W0237  # arguments differ/renamed for clarity
         cls,
         prov,           # type: Union[AnyKey, EnumType, "ProvenancePathType"]
-        run_id=None,    # type: Optional[str]
         default=None,   # type: Optional[Any]
+        run_id=None,    # type: Optional[str]
     ):                  # type: (...) -> Optional["ProvenancePathType"]
         prov_found = super().get(prov)
         if prov_found is not None and run_id is None:
             return prov_found
         if isinstance(prov, str):
-            if not prov_found and prov.strip("/") not in ProvenancePathType.types:
+            if not prov_found and prov.strip("/") not in ProvenancePathType.types:  # pylint: disable=E1135
                 return default
             prov = f"/{prov}" if not prov.startswith("/") else prov
             prov = f"/prov{prov}" if not prov.startswith("/prov") else prov
@@ -96,8 +96,12 @@ class ProvenanceFormat(Constants):
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
 
     @classmethod
-    def get(cls, prov_format, default=None, allow_media_type=False):
-        # type: (Optional[AnyProvenanceFormat], Optional[Any], bool) -> Optional["ProvenanceFormat"]
+    def get(                        # pylint: disable=W0221,W0237  # arguments differ/renamed for clarity
+        cls,
+        prov_format,                # type: Optional[AnyProvenanceFormat]
+        default=None,               # type: Optional[Any]
+        allow_media_type=False,     # type: bool
+    ):                              # type: (...) -> Optional["ProvenanceFormat"]
         prov = super().get(prov_format, default=default)
         if prov is None and allow_media_type:
             prov = cls._media_types.get(prov_format)

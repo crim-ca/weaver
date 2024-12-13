@@ -128,33 +128,6 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
         return classmethod(self.fget).__get__(None, owner)()
 
 
-class classinstancemethod(property):  # pylint: disable=C0103,invalid-name
-    """
-    Combines :class:`classmethod` decorator and instance method behavior to work with either reference simultaneously.
-
-    .. seealso::
-        https://stackoverflow.com/a/48809254/5936364
-    """
-    def __init__(self, method, instance=None, owner=None):  # noqa
-        # type: (Callable[[Type[Any], Any, ...], Any], Any, Any) -> None
-        self.method = method
-        self.instance = instance
-        self.owner = owner
-
-    def __get__(self, instance, owner=None):
-        return type(self)(self.method, instance, owner)
-
-    def __call__(self, *args, **kwargs):
-        instance = self.instance
-        if instance is None:
-            if not args:
-                raise TypeError('missing required parameter "self"')
-            instance, args = args[0], args[1:]
-
-        cls = self.owner
-        return self.method(cls, instance, *args, **kwargs)
-
-
 class _EnumMeta(enum.EnumMeta):
     def __contains__(cls, member):
         """

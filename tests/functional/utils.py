@@ -24,7 +24,6 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver import WEAVER_ROOT_DIR
-from weaver.base import classinstancemethod
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.formats import ContentType
@@ -65,8 +64,8 @@ if TYPE_CHECKING:
 
 
 class GenericUtils(unittest.TestCase):
-    @classinstancemethod
     def fully_qualified_test_name(self, name=""):
+        # type: (str) -> str
         """
         Generates a unique name using the current test method full context name and the provided name, if any.
 
