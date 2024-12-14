@@ -217,7 +217,7 @@ class WeaverResearchObject(ResearchObject):
         Generate a prefixed SHA1 hash from the identifier value.
         """
         sha1_ns = document._namespaces[cwl_prov_const.DATA]
-        sha1_id = f"{sha1_ns.prefix}:{hashlib.sha1(identifier.encode()).hexdigest()}"  # nosec: B324
+        sha1_id = f"{sha1_ns.prefix}:{hashlib.sha1(identifier.encode(), usedforsecurity=False).hexdigest()}"
         return sha1_id
 
     def initialize_provenance(self, full_name, host_provenance, user_provenance, orcid, fsaccess, run_uuid=None):
