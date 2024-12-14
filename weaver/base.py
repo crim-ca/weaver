@@ -125,7 +125,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
 
     def __get__(self, cls, owner):  # noqa
         # type: (Type[object], Any) -> PropertyDataTypeT
-        return classmethod(self.fget).__get__(None, owner)()
+        return classmethod(self.fget).__get__(None, owner or cls)()
 
 
 class _EnumMeta(enum.EnumMeta):
