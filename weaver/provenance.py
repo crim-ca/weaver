@@ -37,6 +37,7 @@ class ProvenancePathType(Constants):
     PROV_INPUTS = "/prov/inputs"
     PROV_OUTPUTS = "/prov/outputs"
     PROV_RUN = "/prov/run"
+    PROV_RUNS = "/prov/runs"
 
     @classmethod
     @classproperty
@@ -78,7 +79,7 @@ class ProvenancePathType(Constants):
 
 class ProvenanceFormat(Constants):
     PROV_JSON = "PROV-JSON"
-    PROV_JSON_LD = "PROV-JSON-LD"
+    PROV_JSONLD = "PROV-JSONLD"
     PROV_XML = "PROV-XML"
     PROV_TURTLE = "PROV-TURTLE"
     PROV_N = "PROV-N"
@@ -86,7 +87,7 @@ class ProvenanceFormat(Constants):
 
     _media_types = {
         ContentType.APP_JSON: PROV_JSON,
-        ContentType.APP_JSON_LD: PROV_JSON_LD,
+        ContentType.APP_JSONLD: PROV_JSONLD,
         ContentType.TEXT_TURTLE: PROV_TURTLE,
         ContentType.TEXT_PROVN: PROV_N,
         ContentType.TEXT_XML: PROV_XML,
@@ -171,7 +172,7 @@ class ProvenanceFormat(Constants):
             return err_mismatch
 
         if out_fmt in [OutputFormat.JSON, OutputFormat.YAML, OutputFormat.YML]:
-            if prov_format not in [None, ProvenanceFormat.PROV_JSON, ProvenanceFormat.PROV_JSON_LD]:
+            if prov_format not in [None, ProvenanceFormat.PROV_JSON, ProvenanceFormat.PROV_JSONLD]:
                 return err_mismatch
             if prov_format is None:
                 prov_format = ProvenanceFormat.PROV_JSON

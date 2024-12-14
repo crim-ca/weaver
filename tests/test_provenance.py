@@ -35,7 +35,7 @@ def test_provenance_formats():
     result = ProvenanceFormat.formats
     expect = [
         ProvenanceFormat.PROV_JSON,
-        ProvenanceFormat.PROV_JSON_LD,
+        ProvenanceFormat.PROV_JSONLD,
         ProvenanceFormat.PROV_TURTLE,
         ProvenanceFormat.PROV_N,
         ProvenanceFormat.PROV_XML,
@@ -50,7 +50,7 @@ def test_provenance_media_types():
     result = ProvenanceFormat.media_types
     expect = [
         ContentType.APP_JSON,
-        ContentType.APP_JSON_LD,
+        ContentType.APP_JSONLD,
         ContentType.TEXT_TURTLE,
         ContentType.TEXT_PROVN,
         ContentType.TEXT_XML,
@@ -67,7 +67,7 @@ def test_provenance_media_types():
         (None, None),
         ("prov-json", ProvenanceFormat.PROV_JSON),
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
-        ("PROV-JSON-LD", ProvenanceFormat.PROV_JSON_LD),
+        ("PROV-JSON-LD", ProvenanceFormat.PROV_JSONLD),
     ]
 )
 def test_provenance_format(provenance, expect):
@@ -81,7 +81,7 @@ def test_provenance_format(provenance, expect):
     [
         (None, None),
         (ProvenanceFormat.PROV_JSON, ContentType.APP_JSON),
-        (ProvenanceFormat.PROV_JSON_LD, ContentType.APP_JSON_LD),
+        (ProvenanceFormat.PROV_JSONLD, ContentType.APP_JSONLD),
         (ProvenanceFormat.PROV_XML, ContentType.APP_XML),
         (ProvenanceFormat.PROV_NT, ContentType.APP_NT),
         (ProvenanceFormat.PROV_N, ContentType.TEXT_PROVN),
@@ -101,7 +101,7 @@ def test_provenance_as_media_type(provenance, expect):
         # only main PROV path allow format variants
         (ProvenancePathType.PROV, None, None, ProvenanceFormat.PROV_JSON, False),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON, None, ProvenanceFormat.PROV_JSON, False),
-        (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON_LD, None, ProvenanceFormat.PROV_JSON_LD, False),
+        (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSONLD, None, ProvenanceFormat.PROV_JSONLD, False),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML, None, ProvenanceFormat.PROV_XML, False),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_NT, None, ProvenanceFormat.PROV_NT, False),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_N, None, ProvenanceFormat.PROV_N, False),

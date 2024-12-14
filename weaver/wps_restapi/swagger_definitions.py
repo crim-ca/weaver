@@ -375,6 +375,7 @@ job_prov_outputs_service = Service(name="job_prov_outputs", path=f"{job_prov_ser
 job_prov_outputs_run_service = Service(name="job_prov_outputs_run", path=f"{job_prov_service.path}/outputs/{{run_id}}")
 job_prov_run_service = Service(name="job_prov_run", path=f"{job_prov_service.path}/run")
 job_prov_run_id_service = Service(name="job_prov_run_id", path=f"{job_prov_service.path}/run/{{run_id}}")
+job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.path}/runs")
 
 processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
@@ -419,6 +420,10 @@ process_prov_run_service = Service(
 process_prov_run_id_service = Service(
     name="process_prov_run_id",
     path=process_service.path + job_prov_run_id_service.path,
+)
+process_prov_runs_service = Service(
+    name="process_prov_runs",
+    path=process_service.path + job_prov_runs_service.path,
 )
 
 providers_service = Service(name="providers", path="/providers")
@@ -470,6 +475,10 @@ provider_prov_run_service = Service(
 provider_prov_run_id_service = Service(
     name="provider_prov_run_id",
     path=provider_service.path + process_prov_run_id_service.path,
+)
+provider_prov_runs_service = Service(
+    name="provider_prov_runs",
+    path=provider_service.path + process_prov_runs_service.path,
 )
 
 # backward compatibility deprecated routes
@@ -6484,8 +6493,23 @@ class JobStatisticsSchema(ExtendedMappingSchema):
 class FrontpageParameterSchema(ExtendedMappingSchema):
     name = ExtendedSchemaNode(String(), example="api")
     enabled = ExtendedSchemaNode(Boolean(), example=True)
-    url = URL(description="Referenced parameter endpoint.", example="https://weaver-host", missing=drop)
-    doc = ExtendedSchemaNode(String(), example="https://weaver-host/api", missing=drop)
+    url = URL(
+        description="Referenced parameter endpoint. Root URL when the functionality implies multiple endpoints.",
+        example="https://weaver-host",
+        missing=drop,
+    )
+    doc = ExtendedSchemaNode(
+        String(),
+        description="Endpoint where additional documentation can be found about the functionality.",
+        example="https://weaver-host/api",
+        missing=drop
+    )
+    api = URL(
+        String(),
+        description="OpenAPI documentation endpoint about the functionality.",
+        example="https://weaver-host/api",
+        missing=drop,
+    )
 
 
 class FrontpageParameters(ExtendedSequenceSchema):
@@ -8524,7 +8548,23 @@ get_provider_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_job_prov_responses = {
-    "200": OkGetJobProvResponse(description="Successful job PROV details."),
+    "200": OkGetJobProvResponse(
+        description="Successful job PROV details.",
+        examples={
+            "PROV-JSON": {
+                "summary": "Provenance details returned in PROV-JSON format.",
+                "value": EXAMPLES["job_prov.json"],
+            },
+            "PROV-N": {
+                "summary": "Provenance details returned in PROV-N format.",
+                "value": EXAMPLES["job_prov.txt"],
+            },
+            "PROV-XML": {
+                "summary": "Provenance details returned in PROV-XML format.",
+                "value": EXAMPLES["job_prov.xml"],
+            }
+        }
+    ),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobProvResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
@@ -8532,7 +8572,23 @@ get_job_prov_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 get_job_prov_metadata_responses = {
-    "200": OkGetJobProvMetadataResponse(description="Successful job PROV metadata retrieval."),
+    "200": OkGetJobProvMetadataResponse(
+        description="Successful job PROV metadata retrieval.",
+        examples={
+            "PROV run": {
+                "summary": "Provenance metadata of the run execution.",
+                "value": EXAMPLES["job_prov_run.txt"],
+            },
+            "PROV who": {
+                "summary": "Provenance metadata of who ran the job.",
+                "value": EXAMPLES["job_prov_who.txt"],
+            },
+            "PROV info": {
+                "summary": "Provenance metadata about the Research Object packaging information.",
+                "value": EXAMPLES["job_prov_info.txt"],
+            }
+        }
+    ),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobProvResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),

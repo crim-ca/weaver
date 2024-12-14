@@ -2686,7 +2686,7 @@ def add_timeout_param(parser):
 def add_provenance_params(parser):
     # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
-        "-pT", "--prov", "--prov-type", dest="prov", nargs=1,
+        "-pT", "--prov", "--prov-type", dest="prov",
         choices=ProvenancePathType.types,
         help=(
             "Desired PROV metadata contents. "
@@ -2695,7 +2695,7 @@ def add_provenance_params(parser):
         )
     )
     parser.add_argument(
-        "-pF", "--prov-format", dest="prov_format", nargs=1,
+        "-pF", "--prov-format", dest="prov_format",
         choices=ProvenanceFormat.formats,
         help=(
             "Desired PROV metadata schema representation. "
@@ -2706,7 +2706,7 @@ def add_provenance_params(parser):
         )
     )
     parser.add_argument(
-        "-pR", "--run", "--prov-run", dest="prov_run_id", nargs=1,
+        "-pR", "--run", "--prov-run", dest="prov_run_id",
         choices=ProvenancePathType.types,
         help=(
             "Specific run (i.e.: a nested Workflow step) for which to retrieve Provenance metadata. "

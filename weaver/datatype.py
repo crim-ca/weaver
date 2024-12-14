@@ -1491,7 +1491,7 @@ class Job(Base, LoggerHandler):
             (None, None): prov_path,  # the directory itself with all metadata
             ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
             ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
-            ("/prov", ProvenanceFormat.PROV_JSON_LD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
+            ("/prov", ProvenanceFormat.PROV_JSONLD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
             ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
             ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
             ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
@@ -1522,7 +1522,7 @@ class Job(Base, LoggerHandler):
             prov_path = self.prov_path(container=container)
             if not prov_path or not os.path.isdir(prov_path):
                 return None, None
-            path = extra_path.split("/prov/", 1)[-1]
+            path = str(extra_path).split("/prov/", 1)[-1]
             frag = path.strip("/").split("/")
             oper, params = frag[0], frag[1:]
             args = ["-d", prov_path, oper]

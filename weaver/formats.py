@@ -96,7 +96,7 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
-    APP_JSON_LD = "application/ld+json"
+    APP_JSONLD = "application/ld+json"
     APP_RAW_JSON = "application/raw+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
