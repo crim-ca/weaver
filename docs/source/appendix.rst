@@ -251,7 +251,7 @@ Glossary
         the defined script, calculation, or operation.
 
     Provenance
-        Metadata using the :term:`W3C` |prov|_ standard that is applied to a submitted :term:`Job` execution to allow
+        Metadata using the :term:`W3C` |PROV|_ standard that is applied to a submitted :term:`Job` execution to allow
         retrieving its origin, the related :term:`Application Package`, its :term:`I/O` sources and results, as well as
         additional details about the server host and runtime user as applicable to replicate the experiment.
 

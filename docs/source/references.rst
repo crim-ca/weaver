@@ -62,6 +62,8 @@
 .. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
 .. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
+.. |cwltool-cwlprov| replace:: CWLProv - Provenance Capture with :mod:`cwltool`
+.. _cwltool-cwlprov: https://cwltool.readthedocs.io/en/latest/CWLProv.html
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
@@ -172,10 +174,26 @@
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
-.. |prov| replace:: PROV
-.. _prov: https://www.w3.org/TR/prov-overview/
-.. |prov-ontology| replace:: PROV-O: The PROV Ontology
-.. _prov-ontology: https://www.w3.org/TR/2013/REC-prov-o-20130430/
+.. |JSON-LD| replace:: JSON Linked Data
+.. _JSON-LD: https://json-ld.org/
+.. |PROV| replace:: PROV
+.. _PROV: https://www.w3.org/TR/prov-overview/
+.. |PROV-JSON| replace:: PROV-JSON
+.. _PROV-JSON: https://www.w3.org/submissions/prov-json/
+.. |PROV-JSONLD| replace:: PROV-JSONLD
+.. _PROV-JSONLD: https://www.w3.org/submissions/prov-jsonld/
+.. |PROV-N| replace:: PROV-N
+.. _PROV-N: https://www.w3.org/TR/prov-n/
+.. |PROV-overview| replace:: PROV Overview
+.. _PROV-overview: https://www.w3.org/TR/prov-overview/
+.. |PROV-O| replace:: PROV-O: The PROV Ontology
+.. _PROV-O: https://www.w3.org/TR/2013/REC-prov-o-20130430/
+.. |PROV-XML| replace:: PROV-XML
+.. _PROV-XML: https://www.w3.org/TR/2013/NOTE-prov-xml-20130430/
+.. |rdf-n-triples| replace:: RDF N-Triples
+.. _rdf-n-triples: https://www.w3.org/TR/n-triples/
+.. |rdf-turtle| replace:: RDF Turtle
+.. _rdf-turtle: https://www.w3.org/TR/rdf12-turtle/
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report
@@ -208,7 +226,7 @@
 .. Example references
 .. |examples| replace:: Examples
 .. _examples: examples.rst
-.. |weaver-func-test-apps| replace:: Weaver functional tests
+.. |weaver-func-test-apps| replace:: Weaver functional tests Application Packages
 .. _weaver-func-test-apps: https://github.com/crim-ca/weaver/tree/master/tests/functional/application-packages
 .. |ogc-testbeds-apps| replace:: OGC-Testbeds Applications
 .. _ogc-testbeds-apps: https://github.com/crim-ca/application-packages

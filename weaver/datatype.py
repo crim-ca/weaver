@@ -1475,8 +1475,9 @@ class Job(Base, LoggerHandler):
 
     def prov_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
-        extra_path = "/prov" + str(extra_path or "")
-        return self.job_url(container=container, extra_path=extra_path)
+        extra_path = str(extra_path or "")
+        prov_path = f"/prov{extra_path}"
+        return self.job_url(container=container, extra_path=prov_path)
 
     def prov_path(self, container=None, extra_path=None, prov_format=None):
         # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType], Optional[AnyProvenanceFormat]) -> str

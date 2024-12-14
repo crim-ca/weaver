@@ -1433,7 +1433,8 @@ def get_job_prov_response(request):
     raise_job_bad_status_success(job, request)
 
     prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
-    prov_path = "/prov" + request.path.rsplit("/prov", 1)[-1]
+    prov_path = request.path.rsplit("/prov", 1)[-1]
+    prov_path = f"/prov{prov_path}"
     prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
     if not prov_data:
         prov_dir = job.prov_path(request)

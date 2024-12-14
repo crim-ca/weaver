@@ -18,9 +18,9 @@ from weaver.provenance import ProvenanceFormat, ProvenancePathType
         ("run", None, ProvenancePathType.PROV_RUN, "run"),
         ("/run", None, ProvenancePathType.PROV_RUN, "run"),
         ("/prov/run", None, ProvenancePathType.PROV_RUN, "run"),
-        ("run", "run-id", ProvenancePathType.PROV_RUN + "/run-id", "run"),
-        ("/run", "run-id", ProvenancePathType.PROV_RUN + "/run-id", "run"),
-        ("/prov/run", "run-id", ProvenancePathType.PROV_RUN + "/run-id", "run"),
+        ("run", "run-id", f"{ProvenancePathType.PROV_RUN}/run-id", "run"),
+        ("/run", "run-id", f"{ProvenancePathType.PROV_RUN}/run-id", "run"),
+        ("/prov/run", "run-id", f"{ProvenancePathType.PROV_RUN}/run-id", "run"),
     ]
 )
 def test_provenance_path_type_resolution(provenance, prov_run_id, expect_path, expect_type):

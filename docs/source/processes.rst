@@ -173,7 +173,7 @@ through some parsing (e.g.: :ref:`proc_wps_12`) or with some requirement indicat
 special handling. The represented :term:`Process` is aligned with |ogc-api-proc|_ specifications.
 
 When deploying one such :term:`Process` directly, it is expected to have a definition specified
-with a :term:`CWL` `Application Package`_, which provides resources about one of the described :ref:`app_pkg_types`.
+with a :term:`CWL` :ref:`application-package`, which provides resources about one of the described :ref:`app_pkg_types`.
 
 This is most of the time employed to wrap operations packaged in a reference :term:`Docker` image, but it can also
 wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`). When the :term:`Process` should be
@@ -490,6 +490,8 @@ the |getcap-req|_ request.
 Modify an Existing Process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
+.. versionadded:: 4.20
+
 Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
 the :ref:`Deployment <proc_op_deploy>` request. The undeploy operation consist of a ``DELETE`` request targeting the
 specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
@@ -497,8 +499,6 @@ specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
 .. note::
     The :term:`Process` must be accessible by the user considering any visibility configuration to perform this step.
     See :ref:`proc_op_deploy` section for details.
-
-.. versionadded:: 4.20
 
 Starting from version `4.20 <https://github.com/crim-ca/weaver/tree/4.20.0>`_, a :term:`Process` can be replaced or
 updated using respectively the ``PUT`` and ``PATCH`` requests onto the specific ``{WEAVER_URL}/processes/{processID}``
@@ -1989,7 +1989,7 @@ the configured :term:`WPS` output directory.
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
     individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
 
-.. versionadded:: 4.3
+.. versionchanged:: 4.3
     Addition of the ``X-WPS-Output-Context`` header.
 
 .. _proc_op_execute_subscribers:
@@ -2419,26 +2419,101 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 Job Provenance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. fixme: CWL and Job Prov (https://github.com/crim-ca/weaver/issues/673)
-.. todo::
-    implement ``GET /jobs/{jobID}/run`` and/or ``GET /jobs/{jobID}/prov``
-    (see https://github.com/crim-ca/weaver/issues/673)
+.. versionadded:: 6.1
 
+The provenance endpoints allow to obtain :term:`W3C` |PROV|_ metadata from a successfully completed :term:`Job`
+using various representations. This provenance information can help identify traceability information such as the input
+data sources, validate output checksums, and understand all internal :term:`Process` data transformations that were
+involved within an executed :term:`Workflow`.
 
-Configure ``PROV`` runtime options.
-
-Provenance is information about entities, activities, and people involved in producing a
+The |PROV|_ metadata consists of information about entities, activities, and people involved in producing a
 piece of data or thing, which can be used to form assessments about its quality, reliability or trustworthiness.
 
 .. seealso::
-    - https://www.w3.org/TR/prov-overview/
-    - https://cwltool.readthedocs.io/en/latest/CWLProv.html
-    - https://docs.ogc.org/DRAFTS/24-051.html#_requirements_class_provenance
+    - |PROV-overview|_
+    - |cwltool-cwlprov|_
 
-.. |prov-o-resources| image:: https://www.w3.org/TR/2013/REC-prov-o-20130430/diagrams/starting-points.svg
-    :alt: |prov-ontology| Resources
-    :target: `prov-ontology`_
+.. figure:: https://www.w3.org/TR/2013/REC-prov-o-20130430/diagrams/starting-points.svg
+    :alt: PROV-O Resources
+    :target: `PROV-O`_
+    :align: center
+    :width: 500px
 
+    PROV-O Resource Relationships
+
+
+The provenance endpoints are provided in alignment with the |ogc-api-proc-part4|_ provenance class requirement.
+However, `Weaver` also provides additional functionalities in comparison to the minimal requirements from the
+:term:`OGC` specification.
+
+Following is a table of available formats and corresponding endpoints offered by `Weaver`.
+
+.. list-table:: Job Provenance Endpoints
+    :name: table-job-prov
+    :align: center
+    :header-rows: 1
+    :widths: 25,10,20,45
+
+    * - Endpoint
+      - |PROV|_ Format
+      - :term:`Media-Type`
+      - Description
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSON|_
+      - ``application/json``
+      - :term:`Provenance` metadata using :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSONLD|_
+      - ``application/ld+json``
+      - :term:`Provenance` metadata using |JSON-LD|_ representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-XML|_
+      - ``text/xml`` or ``application/xml``
+      - :term:`Provenance` metadata using :term:`XML` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-N|_
+      - ``text/provenance-notation``
+      - :term:`Provenance` metadata using the main |PROV|_ notation representation.
+    * - ``/jobs/{jobID}/prov``
+      - PROV-NT
+      - ``application/n-triples``
+      - :term:`Provenance` metadata using |rdf-n-triples|_ (NT) representation.
+    * - ``/jobs/{jobID}/prov``
+      - PROV-TURTLE
+      - ``text/turtle``
+      - :term:`Provenance` metadata using |rdf-turtle|_ (TTL) representation.
+    * - ``/jobs/{jobID}/prov/info``
+      - |na|
+      - ``text/plain``
+      - Metadata about the *Research Object* packaging information.
+    * - ``/jobs/{jobID}/prov/who``
+      - |na|
+      - ``text/plain``
+      - Metadata of who ran the :term:`Job`.
+    * - ``/jobs/{jobID}/prov/runs``
+      - |na|
+      - ``text/plain``
+      - Obtain the list of ``runID`` steps of the :term:`Workflow` within the :term:`Job`.
+    * - ``/jobs/{jobID}/prov/run``
+      - |na|
+      - ``text/plain``
+      - Metadata of the main :term:`Job` and any nested step runs in the case of a :term:`Workflow`.
+    * - ``/jobs/{jobID}/prov/inputs``
+      - |na|
+      - ``text/plain``
+      - Metadata about the :term:`Job` input IDs.
+    * - ``/jobs/{jobID}/prov/outputs``
+      - |na|
+      - ``text/plain``
+      - Metadata about the :term:`Job` output IDs.
+    * - ``/jobs/{jobID}/prov/[run|inputs|outputs]/{runID}``
+      - |na|
+      - ``text/plain``
+      - Same as their respective definitions above, but for a specific step of a :term:`Workflow`.
+
+.. seealso::
+    This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
+    can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
 
 .. _proc_op_job_stats:
 
