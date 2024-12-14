@@ -2439,7 +2439,7 @@ piece of data or thing, which can be used to form assessments about its quality,
     :align: center
     :width: 500px
 
-    PROV-O Resource Relationships
+    Provenance Resource Relationships [|PROV-O|_]
 
 
 The provenance endpoints are provided in alignment with the |ogc-api-proc-part4|_ provenance class requirement.
