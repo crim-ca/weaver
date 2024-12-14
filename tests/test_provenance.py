@@ -67,7 +67,7 @@ def test_provenance_media_types():
         (None, None),
         ("prov-json", ProvenanceFormat.PROV_JSON),
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
-        ("PROV-JSON-LD", ProvenanceFormat.PROV_JSONLD),
+        ("PROV-JSONLD", ProvenanceFormat.PROV_JSONLD),
     ]
 )
 def test_provenance_format(provenance, expect):
