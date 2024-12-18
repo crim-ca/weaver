@@ -7788,7 +7788,7 @@ class GoneJobResponseSchema(ExtendedMappingSchema):
 
 
 class JobProvAcceptHeader(AcceptHeader):
-    validator = OneOf(ProvenanceFormat.media_types)
+    validator = OneOf(ProvenanceFormat.media_types())
 
 
 class JobProvRequestHeaders(RequestHeaders):

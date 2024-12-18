@@ -32,7 +32,7 @@ def test_provenance_path_type_resolution(provenance, prov_run_id, expect_path, e
 
 @pytest.mark.prov
 def test_provenance_formats():
-    result = ProvenanceFormat.formats
+    result = ProvenanceFormat.formats()
     expect = [
         ProvenanceFormat.PROV_JSON,
         ProvenanceFormat.PROV_JSONLD,
@@ -47,7 +47,7 @@ def test_provenance_formats():
 
 @pytest.mark.prov
 def test_provenance_media_types():
-    result = ProvenanceFormat.media_types
+    result = ProvenanceFormat.media_types()
     expect = [
         ContentType.APP_JSON,
         ContentType.APP_JSONLD,
@@ -131,7 +131,7 @@ def test_provenance_as_media_type(provenance, expect):
         (_prov, _prov_fmt, None, None, False)
         for _prov, _prov_fmt
         in itertools.product(
-            set(ProvenancePathType.types) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
+            set(ProvenancePathType.types()) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
             ProvenanceFormat.values(),
         )
     ]
@@ -142,7 +142,7 @@ def test_provenance_as_media_type(provenance, expect):
         (_prov, _prov_fmt, _out_fmt, None, True)
         for _prov, _prov_fmt, _out_fmt
         in itertools.product(
-            set(ProvenancePathType.types) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
+            set(ProvenancePathType.types()) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
             ProvenanceFormat.values(),
             set(OutputFormat.values()) - {OutputFormat.TEXT, OutputFormat.TXT},
         )
@@ -154,7 +154,7 @@ def test_provenance_as_media_type(provenance, expect):
         (_prov, _prov_fmt, _out_fmt, None, False)
         for _prov, _prov_fmt, _out_fmt
         in itertools.product(
-            set(ProvenancePathType.types) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
+            set(ProvenancePathType.types()) - {ProvenancePathType.as_type(ProvenancePathType.PROV)},
             ProvenanceFormat.values(),
             [OutputFormat.TEXT, OutputFormat.TXT],
         )

@@ -113,7 +113,6 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
-
     def __init__(self,
                  fget=None,     # type: Optional[Callable[[object], PropertyDataTypeT]]
                  fset=None,     # type: Optional[Callable[[object, PropertyDataTypeT], None]]
@@ -123,9 +122,9 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
         super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
         self.__doc__ = inspect.cleandoc(doc)
 
-    def __get__(self, cls, owner):  # noqa
-        # type: (Type[object], Any) -> PropertyDataTypeT
-        return classmethod(self.fget).__get__(None, owner or cls)()
+    def __get__(self, instance, owner=None):
+        # type: (Any, Optional[Type[object]]) -> PropertyDataTypeT
+        return self.fget.__get__(None, owner)(instance or owner)
 
 
 class _EnumMeta(enum.EnumMeta):

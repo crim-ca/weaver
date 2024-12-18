@@ -37,8 +37,6 @@ Changes:
 Fixes:
 ------
 - Fix missing documentation about certain ``WeaverClient`` operations.
-- Fix metaclass of ``weaver.base.Constants`` not properly handling derived classes using methods decorated
-  by mixed use of ``classmethod`` and ``classproperty`` to provide "*dynamically computed*" class attributes.
 - Fix ``weaver.cli.OperationResult`` not setting its ``text`` property when a valid non-`JSON` response is obtained.
 - Fix the `API` frontpage `HTML` rendering to returning enabled features and corresponding ``doc``/``url``/``api``
   endpoints for quick referencing the capabilities activated for a `Weaver` instance.

@@ -2687,7 +2687,7 @@ def add_provenance_params(parser):
     # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         "-pT", "--prov", "--prov-type", dest="prov",
-        choices=ProvenancePathType.types,
+        choices=ProvenancePathType.types(),
         help=(
             "Desired PROV metadata contents. "
             "The main PROV metadata supports multiple representations. "
@@ -2696,7 +2696,7 @@ def add_provenance_params(parser):
     )
     parser.add_argument(
         "-pF", "--prov-format", dest="prov_format",
-        choices=ProvenanceFormat.formats,
+        choices=ProvenanceFormat.formats(),
         help=(
             "Desired PROV metadata schema representation. "
             "Applicable formats depend on the PROV metadata type being requested. "
@@ -2707,7 +2707,7 @@ def add_provenance_params(parser):
     )
     parser.add_argument(
         "-pR", "--run", "--prov-run", dest="prov_run_id",
-        choices=ProvenancePathType.types,
+        choices=ProvenancePathType.types(),
         help=(
             "Specific run (i.e.: a nested Workflow step) for which to retrieve Provenance metadata. "
             "Applicable IDs will typically correspond to the underlying Job ID that would have been "

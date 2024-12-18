@@ -10,7 +10,7 @@ from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
 
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.base import Constants, classproperty
+from weaver.base import Constants
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
 
@@ -40,7 +40,6 @@ class ProvenancePathType(Constants):
     PROV_RUNS = "/prov/runs"
 
     @classmethod
-    @classproperty
     def types(cls):
         # type: () -> List[str]
         return [cls.as_type(prov) for prov in cls.values()]
@@ -64,7 +63,7 @@ class ProvenancePathType(Constants):
         if prov_found is not None and run_id is None:
             return prov_found
         if isinstance(prov, str):
-            if not prov_found and prov.strip("/") not in ProvenancePathType.types:  # pylint: disable=E1135
+            if not prov_found and prov.strip("/") not in ProvenancePathType.types():
                 return default
             prov = f"/{prov}" if not prov.startswith("/") else prov
             prov = f"/prov{prov}" if not prov.startswith("/prov") else prov
@@ -110,13 +109,11 @@ class ProvenanceFormat(Constants):
         return prov
 
     @classmethod
-    @classproperty
     def media_types(cls):
         # type: () -> List[ContentType]
         return list(cls._media_types)
 
     @classmethod
-    @classproperty
     def formats(cls):
         # type: () -> List["ProvenanceFormat"]
         return cls.values()
