@@ -4444,8 +4444,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/result.json",
-                "type": ContentType.APP_JSON,
+                "href": f"{out_url}/{job_id}/output_json/result.yml",
+                "type": ContentType.APP_YAML,
             },
         }
 
@@ -4453,7 +4453,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
         assert result_json.content_type == ContentType.APP_JSON
-        assert result_json.text == "{\"data\":\"test\"}"
+        assert result_json.text == "{\"data\": \"test\"}"
 
     @pytest.mark.oap_part1
     def test_execute_single_output_response_document_alt_format_yaml(self):
@@ -4522,8 +4522,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/result.json",
-                "type": ContentType.APP_JSON,
+                "href": f"{out_url}/{job_id}/output_json/result.yml",
+                "type": ContentType.APP_YAML,
             },
         }
 
@@ -4531,7 +4531,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
         assert result_json.content_type == ContentType.APP_JSON
-        assert result_json.text == "{\"data\":\"test\"}"
+        assert result_json.text == "{\"data\": \"test\"}"
 
     @pytest.mark.oap_part1
     def test_execute_single_output_response_document_alt_format_json_raw_literal(self):

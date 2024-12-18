@@ -442,6 +442,7 @@ class URN(ExtendedSchemaNode):
     description = "Universal ressource name."
     example = "urn:ogc:def:objectType:authority:version:code"
     pattern = re.compile(r"^urn\:[A-Za-z0-9]+(:[A-Za-z0-9]+)+$")
+    title = "NamespacedRelationshipType"
 
 
 class URI(ExtendedSchemaNode):
@@ -746,7 +747,7 @@ class RequestHeaders(ExtendedMappingSchema):
     content_type = RequestContentTypeHeader()
 
 
-class RequestAnyHeaders(RequestHeaders):
+class RequestHeadersAcceptAny(RequestHeaders):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
     """
@@ -3337,7 +3338,7 @@ class GetJobEndpoint(JobPath):
 
 
 class OutputEndpoint(OutputPath):
-    header = RequestAnyHeaders()
+    header = RequestHeadersAcceptAny()
 
 
 class ResultValueEndpoint(OutputEndpoint):
@@ -3345,7 +3346,7 @@ class ResultValueEndpoint(OutputEndpoint):
 
 
 class JobAnyOutputEndpoint(JobPath, OutputPath):
-    header = RequestAnyHeaders()
+    header = RequestHeadersAcceptAny()
 
 
 class JobResultValueEndpoint(JobAnyOutputEndpoint):
@@ -3353,7 +3354,7 @@ class JobResultValueEndpoint(JobAnyOutputEndpoint):
 
 
 class ProcessAnyOutputEndpoint(LocalProcessPath, JobPath, OutputPath):
-    header = RequestAnyHeaders()
+    header = RequestHeadersAcceptAny()
 
 
 class ProcessResultValueEndpoint(ProcessAnyOutputEndpoint):
@@ -3361,7 +3362,7 @@ class ProcessResultValueEndpoint(ProcessAnyOutputEndpoint):
 
 
 class ProviderAnyOutputEndpoint(ProviderProcessPath, LocalProcessPath, JobPath, OutputPath):
-    header = RequestAnyHeaders()
+    header = RequestHeadersAcceptAny()
 
 
 class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
@@ -7582,7 +7583,7 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
     body = NoContent(default="")
 
 
-class JobResultsContentResponse(ExtendedMappingSchema):
+class JobResultContentResponse(ExtendedMappingSchema):
     header = FileResponseHeaders()
     body = ResultData(default="")
 
@@ -8161,12 +8162,7 @@ get_prov_outputs_responses.update({
 })
 
 get_job_output_responses = {
-    "200": OkGetJobOutputsResponse(description="success", examples={
-        "JobOutput": {
-            "summary": "Obtained wanted job value following process execution.",
-            "value": "Depending on media-type",
-        }
-    }),
+    "200": OkGetJobOutputsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
@@ -8202,7 +8198,7 @@ get_prov_results_responses.update({
 })
 
 get_job_result_responses = {
-    "200": JobResultsContentResponse(description="success by value"),
+    "200": JobResultContentResponse(description="success by value"),
     "204": NoContentJobResultsResponse(description="success by reference"),
     "404": NotFoundJobResponseSchema(),
     "405": MethodNotAllowedErrorResponseSchema(),
