@@ -250,6 +250,7 @@ Glossary
         Entity that describes the required inputs, produced outputs, and any applicable metadata for the execution of
         the defined script, calculation, or operation.
 
+    PROV
     Provenance
         Metadata using the :term:`W3C` |PROV|_ standard that is applied to a submitted :term:`Job` execution to allow
         retrieving its origin, the related :term:`Application Package`, its :term:`I/O` sources and results, as well as

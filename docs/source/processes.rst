@@ -2426,8 +2426,12 @@ using various representations. This provenance information can help identify tra
 data sources, validate output checksums, and understand all internal :term:`Process` data transformations that were
 involved within an executed :term:`Workflow`.
 
-The |PROV|_ metadata consists of information about entities, activities, and people involved in producing a
-piece of data or thing, which can be used to form assessments about its quality, reliability or trustworthiness.
+The |PROV|_ metadata consists of information records about entities, activities, and people involved in producing a
+piece of data or thing |PROV-dfn|_, which can be used to form assessments about its quality, reliability or
+trustworthiness.
+
+.. |PROV-dfn| replace:: :sup:`[^]`
+.. _PROV-dfn: https://www.w3.org/TR/2013/REC-prov-dm-20130430/#dfn-provenance
 
 .. seealso::
     - |PROV-overview|_
@@ -2514,6 +2518,19 @@ Following is a table of available formats and corresponding endpoints offered by
 .. seealso::
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
     can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
+
+Resulting metadata that is collected from :term:`Job` :term:`Provenance` will be stored under a similar endpoint
+as the :ref:`exec_output_location`, except with an additional ``-prov`` suffix applied after the :term:`Job` UUID,
+as shown below.
+This location is selected to conveniently offer the ``PROV`` metadata with a different parent directory than
+the :term:`Job` outputs, therefore allowing different endpoint access control schemes between the ``PROV`` metadata
+and actual output data, while also reusing the configured :ref:`exec_output_location` that can be used to quickly
+serve :term:`Provenance` contents without any additional configuration.
+
+.. code-block::
+
+    {WPS_OUTPUT_URL}[/{WPS_OUTPUT_CONTEXT}]/{JOB_UUID}-prov
+
 
 .. _proc_op_job_stats:
 
