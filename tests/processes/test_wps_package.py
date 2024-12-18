@@ -30,7 +30,7 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from tests.utils import assert_equal_any_order
-from weaver.datatype import Process
+from weaver.datatype import Job, Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.formats import ContentType
 from weaver.processes.constants import (
@@ -79,6 +79,10 @@ class MockWpsPackage(WpsPackage):
     def __init__(self, *_, **__):
         super(MockWpsPackage, self).__init__(*_, **__)
         self.mock_status_location = None
+
+    @property
+    def job(self):
+        return Job(task_id="MockWpsPackage")
 
     @property
     def status_location(self):
