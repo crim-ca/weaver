@@ -1076,9 +1076,18 @@ class TestWeaverCLI(TestWeaverClientBase):
                 docker_lines = lines[i:]
                 break
         assert docker_lines
-        docker_opts = ["-T TOKEN", "-U USERNAME", "-P PASSWORD"]
+        # depending on python version, different (equivalent) variants are used
+        # allow any of them
+        docker_opts = [
+            ("-T TOKEN, --token TOKEN", "-T, --token TOKEN"),
+            ("-U USERNAME, --username USERNAME", "-U, --username USERNAME"),
+            ("-P PASSWORD, --password PASSWORD", "-P, --password PASSWORD"),
+        ]
         docker_help = f"Arguments {docker_opts} not found in:\n{repr_json(docker_lines, indent=2)}"
-        assert all(any(opt in line for line in docker_lines) for opt in docker_opts), docker_help
+        assert all(
+            any(opt1 in line or opt2 in line for line in docker_lines)
+            for opt1, opt2 in docker_opts
+        ), docker_help
 
     @staticmethod
     def add_docker_pull_ref(cwl, ref):
@@ -1919,9 +1928,9 @@ class TestWeaverCLI(TestWeaverClientBase):
         start = -1
         end = -1
         for index, line in enumerate(lines):
-            if "-I INPUTS, --inputs INPUTS" in line:
+            if "-I INPUTS, --inputs INPUTS" in line or "-I, --inputs INPUTS" in line:
                 start = index + 1
-            if "Example:" in line:
+            if "-I file:File=data.xml" in line:  # contents toward the end of '--inputs' help message
                 end = index
                 break
         assert 0 < start < end
