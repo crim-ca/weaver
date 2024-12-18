@@ -42,8 +42,7 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-##cwltool==3.1.20230906142556
-cwltool @ git+https://github.com/fmigneault/cwltool.git@cwl-prov-class
+cwltool==3.1.20241217163858
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.1.1

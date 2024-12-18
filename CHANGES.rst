@@ -27,6 +27,12 @@ Changes:
   case-by-case details about the specific cause of failure handled by the *rule* callable.
 - Update certain ``cornice`` service definitions that were using "``prov``" as referencing to `Providers` to avoid
   confusion with the multiple ``PROV``/`Provenance` related terminology and services added for the new feature.
+- Pin ``cwltool==3.1.20241217163858`` to employ the official release including
+  ``PROV`` configuration provided to easily configured `Weaver`
+  (relates to `common-workflow-language/cwltool#2082 <https://github.com/common-workflow-language/cwltool/pull/2082>_)
+  and integrate previously provided fixes
+  (relates to `common-workflow-language/cwltool#2082 <https://github.com/common-workflow-language/cwltool/pull/2036>_)
+  that were applied by a forked backport ``https://github.com/fmigneault/cwltool`` repository.
 
 Fixes:
 ------
