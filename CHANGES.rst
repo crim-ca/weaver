@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of Python 3.13.
+- Drop support of Python 3.8.
 
 Fixes:
 ------
