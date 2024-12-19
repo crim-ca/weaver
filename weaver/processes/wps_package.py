@@ -2249,7 +2249,7 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
             try:
                 self.finalize_provenance(runtime_context)
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover  # only safeguard, it's good if this branch never occurs!
                 self.exception_message(
                     PackageExecutionError,
                     exc,

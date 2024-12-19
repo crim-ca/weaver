@@ -1,11 +1,14 @@
 import contextlib
 import copy
 import itertools
+import os
 import uuid
 from typing import TYPE_CHECKING
 
 import pytest
 from parameterized import parameterized
+
+from provenance import ProvenanceFormat, ProvenancePathType
 from status import Status
 
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
@@ -18,6 +21,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyUUID
 
 
+@pytest.mark.prov
 class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
     job_id = None   # type: Optional[AnyUUID]
     job_url = None  # type: Optional[str]
@@ -28,6 +32,8 @@ class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
         cls.settings = copy.deepcopy(cls.settings or {})
         settings = {
             "weaver.cwl_prov": True,
+            "weaver.wps_metadata_provider_name": "TestJobProvenanceBase",  # metadata employed by PROV
+            "weaver.wps_metadata_provider_url": "http://localhost/",  # metadata employed by PROV
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
@@ -236,3 +242,58 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.status_code == 410
         assert resp.content_type == ContentType.APP_JSON
         assert resp.json["detail"] == "Job provenance could not be retrieved for the specified job."
+
+
+class TestJobProvenanceDisabled(TestJobProvenanceBase):
+    """
+    Test handling of the application when :term:`Provenance` feature is disabled.
+    """
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.settings = copy.deepcopy(cls.settings or {})
+        settings = {
+            "weaver.cwl_prov": False,  # NOTE: this is the test
+            "weaver.wps": True,
+            "weaver.wps_path": "/ows/wps",
+            "weaver.wps_restapi_path": "/",
+            "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_url": "http://localhost/wpsoutputs",
+            "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
+        }
+        cls.settings.update(settings)
+
+        # don't call 'TestJobProvenanceBase.setUpClass', but it's parents 'setUpClass' instead
+        # to configure the web test application the same way with above settings,
+        # while making sure to avoid re-enabling 'weaver.cwl_prov = true'
+        super(TestJobProvenanceBase, cls).setUpClass()
+
+        # NOTE:
+        #   by doing the execution embedded in job setup
+        #   most of the code paths without provenance will already be validated
+        #   only need to validate the remaining results to match expectations
+        cls.setup_test_job()
+
+    @parameterized.expand(
+        itertools.product(
+            [None, ProvenancePathType.PROV],
+            ProvenanceFormat.formats(),
+        )
+    )
+    def test_prov_not_created(self, prov_endpoint, prov_fmt):
+        """
+        Validate that disabled :term:`Provenance` feature works and that none is generated from an execution.
+        """
+        job = self.job_store.fetch_by_id(self.job_id)
+        prov_path = job.prov_path(extra_path=prov_endpoint, prov_format=prov_fmt, container=self.settings)
+        if prov_path is None:
+            pytest.skip("Ignore invalid combination of PROV path/format.")
+        assert not os.path.exists(prov_path)
+
+    @parameterized.expand(ProvenancePathType.values())
+    def test_prov_not_found(self, prov_endpoint):
+        """
+        Validate that disabled :term:`Provenance` feature works and that endpoints are not available.
+        """
+        prov_url = f"/jobs/{self.job_id}{prov_endpoint}"
+        resp = self.app.get(prov_url, expect_errors=True)
+        assert resp.status_code == 404

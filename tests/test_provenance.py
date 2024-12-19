@@ -8,6 +8,23 @@ from weaver.provenance import ProvenanceFormat, ProvenancePathType
 
 @pytest.mark.prov
 @pytest.mark.parametrize(
+    ["prov_method", "kwargs", "expected"],
+    [
+        (ProvenancePathType.as_type, {}, None),
+        (ProvenancePathType.get, {}, None),
+        (ProvenancePathType.get, {"default": None}, None),
+        (ProvenancePathType.get, {"default": "default"}, "default"),
+        (ProvenancePathType.get, {"run_id": "1234"}, None),
+        (ProvenancePathType.get, {"run_id": "1234", "default": "default"}, "default"),
+    ]
+)
+def test_provenance_path_type_unresolved(prov_method, kwargs, expected):
+    result = prov_method("random", **kwargs)
+    assert result == expected
+
+
+@pytest.mark.prov
+@pytest.mark.parametrize(
     ["provenance", "prov_run_id", "expect_path", "expect_type"],
     [
         ("prov", None, ProvenancePathType.PROV, "prov"),
@@ -123,6 +140,10 @@ def test_provenance_as_media_type(provenance, expect):
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML, OutputFormat.JSON_RAW, None, True),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON, OutputFormat.XML, None, True),
         (ProvenancePathType.PROV, ProvenanceFormat.PROV_TURTLE, OutputFormat.JSON, None, True),
+        (ProvenancePathType.PROV, None, OutputFormat.HTML, None, True),
+        (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON, OutputFormat.TEXT, None, True),
+        (ProvenancePathType.PROV_INFO, None, OutputFormat.JSON, None, True),
+        (ProvenancePathType.PROV_INFO, ProvenanceFormat.PROV_JSON, OutputFormat.JSON, None, True),
     ]
     +
     [
