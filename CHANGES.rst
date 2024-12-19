@@ -14,10 +14,32 @@ Changes:
 --------
 - Add support of Python 3.13.
 - Drop support of Python 3.8.
+- Add support of *OGC API - Processes - Part 4: Job Management* related to ``PROV`` requirement and conformance classes.
+- Add support of `W3C PROV <https://www.w3.org/TR/prov-overview/>`_ to provide ``GET /jobs/{jobId}/prov`` endpoints
+  and all underlying paths (``/info``, ``/who``, ``/run``, ``/inputs``, ``/outputs``, and ``../{runId}`` variants)
+  to retrieve provenance metadata from a `Job` execution and its corresponding `Process` and `Workflow` definitions,
+  as processed by ``cwltool``/``cwlprov`` and extended by `Weaver`-specific server metadata.
+  Supported ``PROV`` representations are ``PROV-N``, ``PROV-NT``, ``PROV-JSON``, ``PROV-JSONLD``, ``PROV-XML``
+  and ``PROV-TURTLE``, each of which can be obtained by providing the corresponding ``Accept`` headers.
+- Add ``weaver.cwl_prov`` configuration option to control the new ``PROV`` metadata collection feature.
+- Add ``prov`` and ``provenance`` CLI and ``WeaverClient`` operations.
+- Extend ``weaver.cli.WeaverArgumentParser`` "*rules*" to allow returning an error message providing better
+  case-by-case details about the specific cause of failure handled by the *rule* callable.
+- Update certain ``cornice`` service definitions that were using "``prov``" as referencing to `Providers` to avoid
+  confusion with the multiple ``PROV``/`Provenance` related terminology and services added for the new feature.
+- Pin ``cwltool==3.1.20241217163858`` to employ the official release including
+  ``PROV`` configuration provided to easily configured `Weaver`
+  (relates to `common-workflow-language/cwltool#2082 <https://github.com/common-workflow-language/cwltool/pull/2082>_)
+  and integrate previously provided fixes
+  (relates to `common-workflow-language/cwltool#2082 <https://github.com/common-workflow-language/cwltool/pull/2036>_)
+  that were applied by a forked backport ``https://github.com/fmigneault/cwltool`` repository.
 
 Fixes:
 ------
-- No change.
+- Fix missing documentation about certain ``WeaverClient`` operations.
+- Fix ``weaver.cli.OperationResult`` not setting its ``text`` property when a valid non-`JSON` response is obtained.
+- Fix the `API` frontpage `HTML` rendering to returning enabled features and corresponding ``doc``/``url``/``api``
+  endpoints for quick referencing the capabilities activated for a `Weaver` instance.
 
 .. _changes_6.0.0:
 

@@ -1,0 +1,71 @@
+document
+  prefix wfprov <http://purl.org/wf4ever/wfprov#>
+  prefix wfdesc <http://purl.org/wf4ever/wfdesc#>
+  prefix cwlprov <https://w3id.org/cwl/prov#>
+  prefix foaf <http://xmlns.com/foaf/0.1/>
+  prefix schema <http://schema.org/>
+  prefix orcid <https://orcid.org/>
+  prefix id <urn:uuid:>
+  prefix data <urn:hash::sha1:>
+  prefix sha256 <nih:sha-256;>
+  prefix researchobject <arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/>
+  prefix metadata <arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/metadata/>
+  prefix provenance <arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/metadata/provenance/>
+  prefix wf <arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/workflow/packed.cwl#>
+  prefix input <arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/workflow/primary-job.json#>
+  prefix doi <https://doi.org/>
+  prefix wf4ever <http://purl.org/wf4ever/wf4ever#>
+  
+  agent(id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b)
+  agent(id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b, [prov:type='foaf:OnlineAccount', prov:location="http://localhost:4002", cwlprov:hostname="localhost"])
+  agent(id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b, [prov:type='foaf:OnlineAccount', prov:label="crim-ca/weaver:6.0.0", foaf:accountName="crim-ca/weaver:6.0.0"])
+  agent(id:b3a49ee7-f620-4154-9e4d-d2e948748deb, [prov:type='schema:Person', prov:type='prov:Person', prov:label="crim-ca/weaver:6.0.0", foaf:name="crim-ca/weaver:6.0.0", foaf:account='id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b', schema:name="crim-ca/weaver:6.0.0"])
+  actedOnBehalfOf(id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b, id:b3a49ee7-f620-4154-9e4d-d2e948748deb, -)
+  agent(id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, [prov:type='prov:SoftwareAgent', prov:type='wfprov:WorkflowEngine', prov:label="cwltool 3.1.20240708091338.dev15+g9c05bb7d"])
+  wasStartedBy(id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, -, id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b, 2024-12-12T09:16:17.843783)
+  activity(id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:17.843806, -, [prov:type='wfprov:WorkflowRun', prov:label="Run of workflow/packed.cwl#main"])
+  wasAssociatedWith(id:1c49f085-bbd7-410d-a801-81fd42469e8a, id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, wf:main)
+  wasStartedBy(id:1c49f085-bbd7-410d-a801-81fd42469e8a, -, id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, 2024-12-12T09:16:17.843852)
+  entity(data:644e201526525f62152815a76a2dc773450f3dd9, [prov:type='prov:PrimarySource', prov:label="Source code repository", prov:location="https://github.com/crim-ca/weaver"])
+  agent(data:15401f8d937f5d526951c1bf20dcba16a1271d97, [prov:type='prov:SoftwareAgent', prov:location="http://localhost:4002", prov:label="Weaver internal WPS used for demo and testing.", prov:label="crim-ca/weaver:6.0.0", prov:generalEntity='data:644e201526525f62152815a76a2dc773450f3dd9', prov:specificEntity='doi:10.5281/zenodo.14210717'])
+  entity(data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2, [prov:type='prov:Organization', foaf:name="Computer Research Institute of Montréal", schema:name="Computer Research Institute of Montréal"])
+  entity(data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0, [foaf:name="CRIM", schema:name="CRIM", prov:location="http://pavics-weaver.readthedocs.org/en/latest/", prov:type='prov:Organization', prov:label="Server Provider"])
+  entity(id:1c49f085-bbd7-410d-a801-81fd42469e8a, [prov:type='wfdesc:ProcessRun', prov:location="http://localhost:4002/processes/echo/jobs/1c49f085-bbd7-410d-a801-81fd42469e8a", prov:label="Job Information"])
+  entity(data:15401f8d937f5d526951c1bf20dcba16a1271d97:echo, [prov:type='wfdesc:Process', prov:location="http://localhost:4002/processes/echo", prov:label="Process Description"])
+  wasDerivedFrom(data:15401f8d937f5d526951c1bf20dcba16a1271d97, data:644e201526525f62152815a76a2dc773450f3dd9, -, -, -, [prov:type='prov:PrimarySource'])
+  actedOnBehalfOf(data:15401f8d937f5d526951c1bf20dcba16a1271d97, id:b3a49ee7-f620-4154-9e4d-d2e948748deb, -)
+  specializationOf(data:15401f8d937f5d526951c1bf20dcba16a1271d97, id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b)
+  wasAttributedTo(data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2, data:644e201526525f62152815a76a2dc773450f3dd9)
+  wasDerivedFrom(id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b, data:15401f8d937f5d526951c1bf20dcba16a1271d97, -, -, -)
+  wasStartedBy(id:1c49f085-bbd7-410d-a801-81fd42469e8a, data:15401f8d937f5d526951c1bf20dcba16a1271d97, -, -)
+  wasStartedBy(id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, id:1c49f085-bbd7-410d-a801-81fd42469e8a, -, 2024-12-12T14:15:50.834000+00:00)
+  specializationOf(id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, id:1c49f085-bbd7-410d-a801-81fd42469e8a)
+  alternateOf(id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, id:1c49f085-bbd7-410d-a801-81fd42469e8a)
+  wasGeneratedBy(id:1c49f085-bbd7-410d-a801-81fd42469e8a, data:15401f8d937f5d526951c1bf20dcba16a1271d97:echo, -)
+  wasDerivedFrom(data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0, data:15401f8d937f5d526951c1bf20dcba16a1271d97, -, -, -)
+  wasAttributedTo(data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0, data:15401f8d937f5d526951c1bf20dcba16a1271d97)
+  entity(wf:main, [prov:type='wfdesc:Process', prov:type='prov:Plan', prov:label="Prospective provenance"])
+  entity(data:2ef7bde608ce5404e97d5f042f95f89f1c232871, [prov:type='wfprov:Artifact', prov:value="Hello World!"])
+  used(id:1c49f085-bbd7-410d-a801-81fd42469e8a, data:2ef7bde608ce5404e97d5f042f95f89f1c232871, 2024-12-12T09:16:17.846280, [prov:role='wf:main/message'])
+  agent(id:2148aee6-81e4-4bcd-9e48-78ff46a51ff1, [prov:type='prov:SoftwareAgent', cwlprov:image="debian:stretch-slim", prov:label="Container execution of image debian:stretch-slim"])
+  wasAssociatedWith(id:1c49f085-bbd7-410d-a801-81fd42469e8a, id:2148aee6-81e4-4bcd-9e48-78ff46a51ff1, -)
+  entity(data:2ef7bde608ce5404e97d5f042f95f89f1c232871, [prov:type='wfprov:Artifact', prov:value="Hello World!"])
+  used(id:1c49f085-bbd7-410d-a801-81fd42469e8a, data:2ef7bde608ce5404e97d5f042f95f89f1c232871, 2024-12-12T09:16:17.863017, [prov:role='wf:main/echo/message'])
+  entity(data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b, [prov:type='wfprov:Artifact'])
+  entity(id:59967079-217e-4bdb-92d7-2ef2f784825c, [prov:type='wf4ever:File', prov:type='wfprov:Artifact', cwlprov:basename="stdout.log", cwlprov:nameroot="stdout", cwlprov:nameext=".log"])
+  specializationOf(id:59967079-217e-4bdb-92d7-2ef2f784825c, data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b)
+  wasGeneratedBy(id:59967079-217e-4bdb-92d7-2ef2f784825c, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.867039, [prov:role='wf:main/echo/output'])
+  entity(data:da39a3ee5e6b4b0d3255bfef95601890afd80709, [prov:type='wfprov:Artifact'])
+  entity(id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b, [prov:type='wf4ever:File', prov:type='wfprov:Artifact', cwlprov:basename="stderr.log", cwlprov:nameroot="stderr", cwlprov:nameext=".log"])
+  specializationOf(id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b, data:da39a3ee5e6b4b0d3255bfef95601890afd80709)
+  wasGeneratedBy(id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.867039, [prov:role='wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4'])
+  entity(data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b)
+  entity(id:6b04550d-c2bd-400b-858b-14e287bbf8c3, [prov:type='wf4ever:File', prov:type='wfprov:Artifact', cwlprov:basename="stdout.log", cwlprov:nameroot="stdout", cwlprov:nameext=".log"])
+  specializationOf(id:6b04550d-c2bd-400b-858b-14e287bbf8c3, data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b)
+  wasGeneratedBy(id:6b04550d-c2bd-400b-858b-14e287bbf8c3, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.867039, [prov:role='wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1'])
+  wasEndedBy(id:1c49f085-bbd7-410d-a801-81fd42469e8a, -, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.867034)
+  wasGeneratedBy(id:59967079-217e-4bdb-92d7-2ef2f784825c, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.869180, [prov:role='wf:main/primary/output'])
+  wasGeneratedBy(id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.869180, [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4'])
+  wasGeneratedBy(id:6b04550d-c2bd-400b-858b-14e287bbf8c3, id:1c49f085-bbd7-410d-a801-81fd42469e8a, 2024-12-12T09:16:18.869180, [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1'])
+  wasEndedBy(id:1c49f085-bbd7-410d-a801-81fd42469e8a, -, id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c, 2024-12-12T09:16:18.869299)
+endDocument

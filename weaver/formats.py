@@ -96,11 +96,13 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_JSONLD = "application/ld+json"
     APP_RAW_JSON = "application/raw+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"
+    APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
@@ -125,6 +127,8 @@ class ContentType(Constants):
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
+    TEXT_PROVN = "text/provenance-notation"
+    TEXT_TURTLE = "text/turtle"
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
