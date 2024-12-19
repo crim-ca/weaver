@@ -202,17 +202,22 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
             r".*",
             log_data,
             re.MULTILINE | re.DOTALL
-        )
+        ), f"Captured Log Information expected in:\n{log_data}"
         # cwltool call with reference to the command and stdout/stderr redirects
         assert re.match(
             r".*"
-            rf"cwltool:job.* \[job {process.id}\].*echo \\\n"
+            rf"cwltool:job.* \[job {process.id}(_[0-9]+)?\].*echo \\\n"
             r"\s+'Dummy message' \> [\w\-/\.]+/stdout\.log 2\> [\w\-/\.]+/stderr\.log\n"
             r".*",
             log_data,
             re.MULTILINE | re.DOTALL
-        ), f"Information expected in:\n{log_data}"
-        assert f"[cwltool] [job {process.id}] completed success" in log_data
+        ), f"Command Information with Log redirects expected in:\n{log_data}"
+        assert re.match(
+            r".*"
+            rf"\[cwltool\] \[job {process.id}(_[0-9]+)?\] completed success",
+            log_data,
+            re.MULTILINE | re.DOTALL
+        ), f"Information about successful job expected in:\n{log_data}"
 
 
 def test_stdout_stderr_logging_for_commandline_tool_failure(caplog):
