@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING
 import pytest
 from parameterized import parameterized
 
-from provenance import ProvenanceFormat, ProvenancePathType
-from status import Status
-
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver.formats import ContentType, OutputFormat
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.status import Status
 
 if TYPE_CHECKING:
     from typing import Optional
