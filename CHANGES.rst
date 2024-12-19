@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.1.0:
+
+`6.1.0 <https://github.com/crim-ca/weaver/tree/6.1.0>`_ (2024-12-18)
+========================================================================
+
+Changes:
+--------
 - Add support of Python 3.13.
 - Drop support of Python 3.8.
 - Add support of *OGC API - Processes - Part 4: Job Management* related to ``PROV`` requirement and conformance classes.
