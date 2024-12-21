@@ -791,15 +791,17 @@ generate-archive:	## generate ZIP and TAR.GZ archives using current contents
 	@-echo "Generating archives"
 	@tar \
 		-C "$(APP_ROOT)" \
-		--exclude=.git \
-		--exclude=.github \
 		--exclude-vcs \
 		--exclude-vcs-ignores \
+		--exclude=.git \
+		--exclude=.github \
 		--exclude=*.zip \
 		--exclude=*.tar.gz \
+		--exclude=node_modules \
 		--exclude="$(APP_NAME)-$(APP_VERSION).tar.gz" \
 		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
 		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
+		--ignore-failed-read \
 		.
 	@cd "$(APP_ROOT)" && \
 		mkdir -p "$(ARCHIVE_DIR)" && \
