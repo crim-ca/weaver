@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Update Docker image Python from 3.10 to 3.11 for performance improvements.
 
 Fixes:
 ------
