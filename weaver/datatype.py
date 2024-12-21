@@ -1507,7 +1507,7 @@ class Job(Base, LoggerHandler):
     def prov_data(
         self,
         container=None,     # type: Optional[AnySettingsContainer]
-        extra_path=None,    # type: Optional[ProvenancePathType]
+        extra_path=None,    # type: Optional[Union[ProvenancePathType, str]]
         prov_format=None,   # type: AnyContentType
     ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
         """

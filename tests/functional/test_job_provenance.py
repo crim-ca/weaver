@@ -99,6 +99,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSON
         prov = resp.json
         assert "prefix" in prov
@@ -113,6 +114,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type in ContentType.ANY_XML
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
@@ -121,6 +123,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_TURTLE})
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_TURTLE
         prov = resp.text
         assert "@prefix cwlprov: " in prov
@@ -129,6 +132,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, headers={"Accept": ContentType.APP_NT})
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_NT
         prov = resp.text
         assert "_:N" in prov
@@ -138,6 +142,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_PROVN})
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_PROVN
         prov = resp.text
         assert "prov:type='wfprov:WorkflowEngine'" in prov
@@ -147,6 +152,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         job_id = self.job_url.rsplit("/", 1)[-1]
         resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_PLAIN})
         assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_PLAIN
         prov = resp.text
         assert f"Workflow run ID: urn:uuid:{job_id}" in prov
@@ -161,6 +167,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         headers = self.json_headers  # note: this is the test, while only plain text is supported
         resp = self.app.get(f"{prov_url}/info", headers=headers, expect_errors=True)
         assert resp.status_code == 406
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSON, (
             "error should be in JSON regardless of Accept header or the normal contents media-type"
         )
@@ -176,6 +183,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         proc_url = f"/{path}/{self.proc_id}" if path == "processes" else ""
         prov_url = f"{proc_url}/jobs/{job_id}/prov/{cmd}"
         resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_PLAIN})
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_PLAIN
         assert resp.text != ""
 
@@ -194,6 +203,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         job_id = self.job_url.rsplit("/", 1)[-1]
         prov_url = f"{self.job_url}/prov/{path}/{job_id}"
         resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_PLAIN})
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_PLAIN
         assert resp.text != ""
 
