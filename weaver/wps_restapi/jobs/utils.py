@@ -1451,8 +1451,7 @@ def get_job_prov_response(request):
             prov_body["error"] = "No such run ID for specified job provenance."
             prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
         prov_body["status"] = prov_err.code
-        return prov_err(json=prov_body, headers={"Content-Type": ContentType.APP_JSON})
+        return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
     links = job.links(container=request, self_link="provenance")
     headers = [("Link", make_link_header(link)) for link in links]
-    headers.append(("Content-Type", prov_type))
-    return HTTPOk(body=prov_data, headers=headers)
+    return HTTPOk(body=prov_data, headers=headers, content_type=prov_type, charset="utf-8")
