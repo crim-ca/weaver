@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.1.1:
+
+`6.1.1 <https://github.com/crim-ca/weaver/tree/6.1.1>`_ (2024-12-20)
+========================================================================
+
+Changes:
+--------
 - Update Docker image Python from 3.10 to 3.11 for performance improvements.
 
 Fixes:
