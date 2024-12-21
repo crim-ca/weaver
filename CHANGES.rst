@@ -16,7 +16,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix ``PROV`` endpoints returning multiple ``Content-Type`` headers
+  (default ``text/html`` inserted by ``webob.response.Response`` class onto top of the explicit one specified)
+  leading to inconsistent responses parsing and rendering across clients.
 
 .. _changes_6.1.0:
 

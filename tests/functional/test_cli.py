@@ -43,7 +43,7 @@ from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as wea
 from weaver.config import WeaverConfiguration
 from weaver.datatype import DockerAuthentication, Service
 from weaver.execute import ExecuteReturnPreference
-from weaver.formats import ContentType, OutputFormat, get_cwl_file_format, repr_json
+from weaver.formats import ContentType, OutputFormat, clean_media_type_format, get_cwl_file_format, repr_json
 from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
@@ -2581,7 +2581,8 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
     def test_prov(self):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url)
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.APP_JSON
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.APP_JSON
         assert isinstance(result.body, dict), "body should be the PROV-JSON"
         assert "actedOnBehalfOf" in result.body
         assert "agent" in result.body
@@ -2591,7 +2592,8 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
     def test_prov_yaml_by_output_format(self):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, output_format=OutputFormat.YAML)
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.APP_JSON, "original type should still be JSON (from API)"
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.APP_JSON, "original type should still be JSON (from API)"
         assert isinstance(result.body, dict), "response body should still be the original PROV-JSON"
         assert isinstance(result.text, str), "text property should be the PROV-JSON represented as YAML string"
         assert yaml.safe_load(result.text) == result.body, "PROV-JSON contents should be identical in YAML format"
@@ -2603,7 +2605,8 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
     def test_prov_xml_by_prov_format(self):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov_format=ProvenanceFormat.PROV_XML)
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.APP_XML, "original type should still be XML (from API)"
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.APP_XML, "original type should still be XML (from API)"
         assert isinstance(result.body, str), "body should be the PROV-XML representation"
         assert "actedOnBehalfOf" in result.body
         assert "agent" in result.body
@@ -2613,14 +2616,16 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
     def test_prov_info(self):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov=ProvenancePathType.PROV_INFO)
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.TEXT_PLAIN
         assert "Research Object of CWL workflow run" in result.text
         assert self.job_id in result.text
 
     def test_prov_run(self):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov=ProvenancePathType.PROV_RUN)
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.TEXT_PLAIN
         assert self.proc_id in result.text
         assert self.job_id in result.text
         assert "< wf:main/message" in result.text, (
@@ -2639,7 +2644,8 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
             prov_run_id=self.job_id,  # redundant in this case, but test that parameter is parsed and resolves
         )
         assert result.success
-        assert result.headers["Content-Type"] == ContentType.TEXT_PLAIN
+        ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
+        assert ctype == ContentType.TEXT_PLAIN
         assert self.proc_id in result.text
         assert self.job_id in result.text
         assert "< wf:main/message" in result.text, (
