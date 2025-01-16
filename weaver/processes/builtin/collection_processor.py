@@ -127,8 +127,12 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     api_url, col_id = col_parts if len(col_parts) == 2 else (None, col_parts[0])
     col_id_alt = get_any_id(col_input, pop=True)
     col_id = col_id or col_id_alt
+    timeout = col_args.pop("timeout", 10)
 
-    col_args.setdefault("timeout", 10)
+    # convert all query parameters to their corresponding function parameter name
+    for arg in list(col_args):
+        if "-" in arg:
+            col_args[arg.replace("-", "_")] = col_args.pop(arg)
 
     logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
@@ -144,7 +148,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             col_href,
             queries=col_args,
             headers={"Accept": f"{ContentType.APP_GEOJSON},{ContentType.APP_JSON}"},
-            timeout=col_args["timeout"],
+            timeout=timeout,
             retries=3,
             only_server_errors=False,
         )
@@ -161,16 +165,12 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             resolved_files.append(file_obj)
 
     elif col_fmt in [ExecuteCollectionFormat.STAC, ExecuteCollectionFormat.STAC_ITEMS]:
-        # convert all parameters to their corresponding name of the query utility, and ignore unknown ones
-        for arg in list(col_args):
-            if "-" in arg:
-                col_args[arg.replace("-", "_")] = col_args.pop(arg)
+        # ignore unknown or enforced parameters
         known_params = set(inspect.signature(ItemSearch).parameters)
         known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "modifier"}
         for param in set(col_args) - known_params:
             col_args.pop(param)
 
-        timeout = col_args.pop("timeout", 10)
         search_url = f"{api_url}/search"
         search = ItemSearch(
             url=search_url,
@@ -193,7 +193,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
                     resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
-        if str(col_args.get("filter-lang")) == "cql2-json":
+        if str(col_args.get("filter_lang")) == "cql2-json":
             col_args["cql"] = col_args.pop("filter")
         search = Features(
             url=api_url,
@@ -229,12 +229,19 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": ContentType.APP_JSON},
         )
+        # adjust subset representation to match expected tuples from utility
+        subset = col_args.get("subset")
+        if isinstance(subset, dict):
+            col_args["subset"] = [
+                (subset_dim, *subset_values)
+                for subset_dim, subset_values in subset.items()
+            ]
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype, dot=False)
-        path = os.path.join(output_dir, f"map.{ext}")
+        path = os.path.join(output_dir, f"coverage.{ext}")
         with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, cov.coverage(col_id)).getbuffer()
-            file.write(data)  # type: ignore
+            data = cast(io.BytesIO, cov.coverage(col_id, **col_args)).getbuffer()
+            file.write(data)
         _, file_fmt = get_cwl_file_format(ctype)
         file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
@@ -249,8 +256,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         ext = get_extension(ctype[0], dot=False)
         path = os.path.join(output_dir, f"map.{ext}")
         with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, maps.map(col_id)).getbuffer()
-            file.write(data)  # type: ignore
+            data = cast(io.BytesIO, maps.map(col_id, **col_args)).getbuffer()
+            file.write(data)
         _, file_fmt = get_cwl_file_format(ctype)
         file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
