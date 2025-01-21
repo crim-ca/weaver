@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Update ``pygeofilter>=0.3.1`` to resolve ``filter-lang=FES`` parser as per other filters
+  (relates to `geopython/pygeofilter#102 <https://github.com/geopython/pygeofilter/pull/102>`_).
 
 .. _changes_6.1.1:
 

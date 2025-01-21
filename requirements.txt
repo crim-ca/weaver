@@ -86,7 +86,7 @@ psutil
 #   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 # - extra 'backend-native' uses shapely for Python objects
 # - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
-pygeofilter[fes,backend-native]
+pygeofilter[fes,backend-native]>=0.3.1
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
