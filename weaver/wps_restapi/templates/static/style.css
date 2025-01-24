@@ -168,6 +168,7 @@ body {
     margin-left: 1em;
 }
 
+.job-title > .code,
 .process-title .code {
     font-size: 130%;
 }
@@ -191,7 +192,17 @@ body {
     padding: 1em;
 }
 
-.table-jobs-field {
+.table-job-status,
+.table-job-status th,
+.table-job-status td {
+    border-style: solid;
+    border-width: 1px;
+    border-collapse: collapse;
+    padding: 1em;
+}
+
+.table-jobs-field,
+.table-job-status-field {
     font-size: 90%;
     text-align: justify;
 }

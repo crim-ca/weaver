@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
 
 Fixes:
 ------

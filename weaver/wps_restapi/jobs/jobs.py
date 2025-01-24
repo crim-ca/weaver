@@ -317,6 +317,16 @@ def trigger_job_execution(request):
     return submit_job_dispatch_task(job, container=request, force_submit=True)
 
 
+@sd.provider_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_provider_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderJobStatus", description="Job status.")
+    ),
+)
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
@@ -328,7 +338,17 @@ def trigger_job_execution(request):
     response_schemas=sd.get_provider_single_job_status_responses,
 )
 @sd.process_job_service.get(
-    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessJobStatus", description="Job status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
@@ -336,6 +356,16 @@ def trigger_job_execution(request):
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLJobStatus", description="Job status.")
+    ),
 )
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
@@ -349,7 +379,7 @@ def trigger_job_execution(request):
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
-    # type: (PyramidRequest) -> HTTPOk
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve the status of a job.
     """
@@ -358,7 +388,9 @@ def get_job_status(request):
     schema, headers = get_job_status_schema(request)
     if schema == JobStatusSchema.OPENEO:
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
-    return HTTPOk(json=job_body, headers=headers)
+    if ContentType.APP_JSON in str(headers.get("Content-Type")):
+        return HTTPOk(json=job_body, headers=headers)
+    return Box(**job_body, job=job, box_intact_types=[Job])
 
 
 @sd.provider_job_service.patch(
