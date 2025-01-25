@@ -37,7 +37,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_header, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
@@ -383,11 +383,27 @@ def get_job_status(request):
     """
     Retrieve the status of a job.
     """
-    job = get_job(request)
-    job_body = job.json(request)
+    # resolve the job and the requested profile/schema representation
     schema, headers = get_job_status_schema(request)
+    job = get_job(request)
+
+    # apply additional properties that are profile-dependant
+    # properties applied in 'job_prop' must succeed schema validation as well
+    job_prop = {}
     if schema == JobStatusSchema.OPENEO:
+        cwl_url = get_path_kvp(job.process_url(request) + "/package", f=OutputFormat.JSON)
+        job_prop = {"process": {"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON}}
+    job_body = job.json(request, **job_prop)
+    if schema == JobStatusSchema.OPENEO:
+        # additional properties that are not validated explicitly
+        # align the content with metadata schema
+        # status is defined here to limit the combinations reported in OpenAPI as OGC-only statuses
+        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        job_body["type"] = JobStatusSchema.OPENEO
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
+
+    # adjust response contents according to rendering
+    # provide 'job' object directly for HTML templating to allow extra operations dynamically
     if ContentType.APP_JSON in str(headers.get("Content-Type")):
         return HTTPOk(json=job_body, headers=headers)
     return Box(**job_body, job=job, box_intact_types=[Job])

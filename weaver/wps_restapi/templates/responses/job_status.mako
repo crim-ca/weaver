@@ -12,7 +12,8 @@
 </h2>
 
 <div class="format-link">
-(<a href="${util.get_job_link(job.id, query='f=json')}">JSON</a>)
+    (<a href="${util.get_job_link(job.id, query='f=json&profile=OGC')}">JSON OGC</a>,
+     <a href="${util.get_job_link(job.id, query='f=json&profile=openEO')}">JSON openEO</a>)
 </div>
 
 <div class="job-status">
@@ -31,27 +32,32 @@
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#job-metadata">Job Metadata</a>
+                    Go to <a href="#metadata">Job Metadata</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#job-results">Job Results</a>
+                    Go to <a href="#results">Job Results</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#job-statistics">Job Statistics</a>
+                    Go to <a href="#statistics">Job Statistics</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#job-logs">Job Logs</a>
+                    Go to <a href="#logs">Job Logs</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#job-provenance">Job Provenance</a>
+                    Go to <a href="#errors">Job Errors</a>
+                </div>
+            </li>
+            <li>
+                <div class="nav-link">
+                    Go to <a href="#provenance">Job Provenance</a>
                 </div>
             </li>
             ${util.get_paging_links()}
@@ -59,8 +65,8 @@
     </div>
 
     <div class="content-section">
-        <h3 id="job-metadata">
-            <a href="#job-metadata">Job Metadata</a>
+        <h3 id="metadata">
+            <a href="#metadata">Metadata</a>
         </h3>
         <table class="table-job-status">
             <tr class="table-job-status-item ">
@@ -126,38 +132,46 @@
     </div>
 
     <div class="content-section">
-        <h3 id="job-results">
-            <a href="#job-results">Job Results</a>
+        <h3 id="results">
+            <a href="#results">Results</a>
         </h3>
         <!-- fill data here -->
     </div>
 
     <div class="content-section">
         <h3 id="job-logs">
-            <a href="#job-logs">Job Logs</a>
+            <a href="#job-logs">Logs</a>
+        </h3>
+        <!-- fill data here -->
+    </div>
+
+    <!-- fixme: if not success : error/exception -->
+    <div class="content-section">
+        <h3 id="errors">
+            <a href="#errors">Errors</a>
         </h3>
         <!-- fill data here -->
     </div>
 
     <div class="content-section">
-        <h3 id="job-statistics">
-            <a href="#job-statistics">Job Statistics</a>
+        <h3 id="statistics">
+            <a href="#statistics">Statistics</a>
         </h3>
         <!-- fill data here -->
     </div>
 
     <div class="content-section">
-        <h3 id="job-logs">
-            <a href="#job-logs">Job Logs</a>
+        <h3 id="provenance">
+            <a href="#provenance">Provenance</a>
         </h3>
         <!-- fill data here -->
     </div>
 
     <div class="content-section">
-        <h3 id="job-provenance">
-            <a href="#job-provenance">Job Provenance</a>
+        <h3 id="links">
+            <a href="#links">Links</a>
         </h3>
-        <!-- fill data here -->
+        ${util.render_links(links)}
     </div>
 
 </div>

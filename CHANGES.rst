@@ -13,10 +13,12 @@ Changes
 Changes:
 --------
 - Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
+- Add the ``process`` property to `Job` status response when requesting ``profile=openEO``,
+  with a direct reference to the underlying `CWL` `Application Package` of the main `Process` ran by the `Job`.
 
 Fixes:
 ------
-- No change.
+- Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
 
 .. _changes_6.1.1:
 

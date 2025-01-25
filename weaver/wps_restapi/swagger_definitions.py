@@ -292,6 +292,30 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
+JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
+JOB_STATUS_FIELD_AFTER = [
+    "jobID",
+    "processID",
+    "providerID",
+    "type",
+    "status",
+    "message",
+    "created",
+    "started",
+    "finished",
+    "updated",
+    "duration",
+    "runningDuration",
+    "runningSeconds",
+    "expirationDate",
+    "estimatedCompletion",
+    "nextPoll",
+    "percentCompleted",
+    "progress",
+    "process",
+    "links",
+]
+
 JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
 JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
@@ -3853,8 +3877,18 @@ class DurationISO(ExtendedSchemaNode):
         return cstruct
 
 
+class JobProcess(AnyOfKeywordSchema):
+    _any_of = [
+        ReferenceURL(),
+        PermissiveMappingSchema(),
+    ]
+
+
 class JobStatusInfo(ExtendedMappingSchema):
     _schema = OGC_API_SCHEMA_JOB_STATUS_URL
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
@@ -3889,6 +3923,7 @@ class JobStatusInfo(ExtendedMappingSchema):
                               description="Completion percentage of the job as indicated by the process.")
     progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
                                   description="Completion progress of the job (alias to 'percentCompleted').")
+    process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
 
 
@@ -3911,7 +3946,7 @@ class CreatedJobStatusSchema(DescriptionSchema):
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
-    location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
+    location = ExtendedSchemaNode(String(), example="https://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
 
 
 class PagingBodySchema(ExtendedMappingSchema):
