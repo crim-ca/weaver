@@ -25,7 +25,8 @@ pluggy>=0.7
 pytest<7
 pytest-httpserver>=1.0.7  # support werkzeug>=3
 pytest-server-fixtures
-pytest-rerunfailures
+#pytest-rerunfailures
+pytest-retry
 pydocstyle
 # FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
 # FIXME: use temporary unofficial version working with pylint>3 (https://github.com/edaniszewski/pylint-quotes/pull/30)
