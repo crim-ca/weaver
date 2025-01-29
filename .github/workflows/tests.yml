@@ -130,10 +130,16 @@ jobs:
           env | sort
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
+        continue-on-error: ${{ matrix.test-case == 'test-coverage-only' || matrix.allow-failure }}
 
-      # flaky test analysis
+      # manually invoke reporting in case of test failure to still generate them
+      # otherwise, they would have been generated automatically following the successful coverage run
+      - name: Handle Failed Coverage Report
+        if: ${{ failure() && matrix.test-case == 'test-coverage-only' }}
+        run: make coverage-reports
+      # flaky test analysis, which includes failed tests if applicable
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() && success() && matrix.test-case == 'test-coverage-only' }}
+        if: ${{ !cancelled() && matrix.test-case == 'test-coverage-only' }}
         uses: codecov/test-results-action@v1
         with:
           files: reports/coverage-junit.xml,!./cache

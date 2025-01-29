@@ -456,11 +456,22 @@ test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of bu
 .PHONY: test-docker
 test-docker: docker-test    ## alias to 'docker-test' execution smoke test of built docker images
 
+# NOTE:
+#	if any test fails during coverage run, pytest exit code will be propagated to allow reporting of the failure
+#	this will cause coverage analysis reporting to be skipped from early exit from the failure
+#	if coverage reporting is still needed although failed tests occurred, call 'coverage-reports' target separately
 .PHONY: test-coverage-only
-test-coverage-only: mkdir-reports  ## run all tests using coverage analysis
+test-coverage-only: mkdir-reports coverage-run coverage-reports  ## run all tests with coverage analysis and reports
+
+.PHONY: coverage-run
+coverage-run: mkdir-reports  ## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
 	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" \
-		"$$(which pytest)" "$(APP_ROOT)/tests"  $(TEST_XARGS) --junitxml="$(REPORTS_DIR)/coverage-junit.xml" || true'
+		"$$(which pytest)" "$(APP_ROOT)/tests"  $(TEST_XARGS) --junitxml="$(REPORTS_DIR)/coverage-junit.xml"'
+
+.PHONY: coverage-reports
+coverage-reports: mkdir-reports  ## generate coverage reports
+	@echo "Generate coverage reports..."
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
