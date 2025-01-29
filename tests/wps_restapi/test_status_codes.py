@@ -2,6 +2,7 @@ import unittest
 import uuid
 
 import pytest
+from parameterized import parameterized
 
 from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver.formats import ContentType
@@ -45,23 +46,24 @@ class StatusCodeTestCase(unittest.TestCase):
 
     headers = {"Accept": ContentType.APP_JSON}
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         config = setup_config_with_mongodb()
-        self.testapp = get_test_weaver_app(config)
+        cls.testapp = get_test_weaver_app(config)
 
-    def test_200(self):
-        for uri in TEST_PUBLIC_ROUTES:
-            resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(200, resp.status_code, f"route {uri} did not return 200")
+    @parameterized.expand(TEST_PUBLIC_ROUTES)
+    def test_200(self, uri):
+        resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
+        self.assertEqual(200, resp.status_code, f"route {uri} did not return 200")
 
     @pytest.mark.xfail(reason="Not working if not behind proxy. Protected implementation to be done.")
+    @parameterized.expand(TEST_FORBIDDEN_ROUTES)
     @unittest.expectedFailure
-    def test_401(self):
-        for uri in TEST_FORBIDDEN_ROUTES:
-            resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(401, resp.status_code, f"route {uri} did not return 401")
+    def test_401(self, uri):
+        resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
+        self.assertEqual(401, resp.status_code, f"route {uri} did not return 401")
 
-    def test_404(self):
-        for uri in TEST_NOTFOUND_ROUTES:
-            resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(404, resp.status_code, f"route {uri} did not return 404")
+    @parameterized.expand(TEST_NOTFOUND_ROUTES)
+    def test_404(self, uri):
+        resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
+        self.assertEqual(404, resp.status_code, f"route {uri} did not return 404")

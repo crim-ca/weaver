@@ -55,6 +55,12 @@ class WeaverExecutionError(WeaverException):
     """
 
 
+class AuthenticationError(WeaverException):
+    """
+    Generic exception related to an issue about authentication configuration or resolution.
+    """
+
+
 class ListingInvalidParameter(WeaverException, OWSInvalidParameterValue, ValueError):
     """
     Error related to an invalid parameter for listing queries.
@@ -265,7 +271,7 @@ class PackageRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, Pac
     """
 
 
-class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageException):
+class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageException, AuthenticationError):
     """
     Error related to a runtime failure caused by failing authentication prerequisite.
 
