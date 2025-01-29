@@ -130,7 +130,6 @@ jobs:
           env | sort
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
-        continue-on-error: ${{ matrix.test-case == 'test-coverage-only' || matrix.allow-failure }}
 
       # manually invoke reporting in case of test failure to still generate them
       # otherwise, they would have been generated automatically following the successful coverage run
