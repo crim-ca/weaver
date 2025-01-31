@@ -26,6 +26,7 @@ path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pyte
 pluggy>=0.7
 pytest
 pytest-httpserver>=1.0.7  # support werkzeug>=3
+pytest-profiling
 pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
