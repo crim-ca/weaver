@@ -28,6 +28,7 @@ import yaml
 from parameterized import parameterized
 
 from tests import resources
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
@@ -2488,6 +2489,74 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         assert "features" in out_data and isinstance(out_data["features"], list)
         assert len(out_data["features"]) == 1
+
+    @parameterized.expand([
+        (
+            {"subset": "Lat(10:20),Lon(30:40)", "datetime": "2025-01-01/2025-01-02"},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+        (
+            {"subset": {"Lat": [10, 20], "Lon": [30, 40]}, "datetime": ["2025-01-01", "2025-01-02"]},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+    ])
+    def test_execute_job_with_collection_input_coverages_netcdf(self, coverage_parameters, coverage_request):
+        # type: (JSON, str) -> None
+    ###def test_execute_job_with_collection_input_coverages_netcdf(self, coverage_parameters={"subset": "Lat(10:20),Lon(30:40)", "datetime": "2025-01-01/2025-01-02"}, coverage_request="?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02"):
+        name = "DockerNetCDF2Text"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        cwl = self.retrieve_payload(name, "package", local=True)
+        body["executionUnit"] = [{"unit": cwl}]
+        proc = self.fully_qualified_test_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_svr = stack.enter_context(responses.RequestsMock(assert_all_requests_are_fired=False))
+            test_file = "testrh.nc"
+            test_data = stack.enter_context(open(os.path.join(TEST_DATA_ROOT, test_file), mode="rb")).read()
+
+            # coverage request expected with resolved query parameters matching submitted collection input parameters
+            col_url = f"{tmp_host}/collections/climate-data"
+            col_cov_url = f"{col_url}/coverage"
+            col_cov_req = f"{col_cov_url}{coverage_request}"
+            tmp_svr.add("GET", col_cov_req, body=test_data)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "input_nc": {
+                        "collection": col_url,
+                        "format": ExecuteCollectionFormat.OGC_COVERAGE,  # NOTE: this is the test!
+                        "type": ContentType.APP_NETCDF,  # must align with process input media-type
+                        **coverage_parameters,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "output_txt" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        cov_fn = "coverage.nc"  # file name applied by 'collection_processor' (resolved by 'format' + 'type' extension)
+        cov_out = "coverage.txt"  # extension modified by invoked process from input file name
+        job_out = os.path.join(job_dir, "output_txt", cov_out)
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = out_fd.read()
+        assert cov_fn in out_data
+        assert cov_out in out_data
 
     def test_execute_job_with_context_output_dir(self):
         cwl = {

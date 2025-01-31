@@ -199,6 +199,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": f"{ContentType.APP_GEOJSON}, {ContentType.APP_VDN_GEOJSON}, {ContentType.APP_JSON}"},
+            json_="{}",  # avoid unnecessary request on init
         )
         items = search.collection_items(col_id, **col_args)
         if items.get("type") != "FeatureCollection" or "features" not in items:
@@ -228,14 +229,8 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": ContentType.APP_JSON},
+            json_="{}",  # avoid unnecessary request on init
         )
-        # adjust subset representation to match expected tuples from utility
-        subset = col_args.get("subset")
-        if isinstance(subset, dict):
-            col_args["subset"] = [
-                (subset_dim, *subset_values)
-                for subset_dim, subset_values in subset.items()
-            ]
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype, dot=False)
         path = os.path.join(output_dir, f"coverage.{ext}")
@@ -251,6 +246,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": ContentType.APP_JSON},
+            json_="{}",  # avoid unnecessary request on init
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype[0], dot=False)
