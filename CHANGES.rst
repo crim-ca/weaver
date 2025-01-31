@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Update ``owslib==0.32.1`` for parameters fixes employed by *Collection Input* with ``format=ogc-coverage-collection``.
 
 Fixes:
 ------
