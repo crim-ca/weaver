@@ -27,6 +27,7 @@ from weaver.cli import (
     WeaverClient,
     main as weaver_cli
 )
+from weaver.exceptions import AuthenticationError
 from weaver.formats import ContentEncoding, ContentType
 
 
@@ -408,7 +409,7 @@ def test_auth_handler_basic():
 
 def test_auth_handler_bearer():
     req = WebTestRequest({})
-    auth = BearerAuthHandler(identity=str(uuid.uuid4()))
+    auth = BearerAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     token = str(uuid.uuid4())
     with mock.patch(
         "requests.Session.request",
@@ -435,7 +436,7 @@ def test_auth_handler_bearer_explicit_token_matches_request_token():
     req_request_token = WebTestRequest({})
     token = str(uuid.uuid4())
     auth_explicit_token = BearerAuthHandler(token=token)
-    auth_request_token = BearerAuthHandler(identity=str(uuid.uuid4()))
+    auth_request_token = BearerAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     with mock.patch(
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
@@ -450,7 +451,7 @@ def test_auth_handler_bearer_explicit_token_matches_request_token():
 
 def test_auth_handler_cookie():
     req = WebTestRequest({})
-    auth = CookieAuthHandler(identity=str(uuid.uuid4()))
+    auth = CookieAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     token = str(uuid.uuid4())
     with mock.patch(
         "requests.Session.request",
@@ -506,7 +507,7 @@ def test_auth_handler_cookie_explicit_token_matches_request_token():
     req_request_token = WebTestRequest({})
     token = str(uuid.uuid4())
     auth_explicit_token = CookieAuthHandler(token=token)
-    auth_request_token = CookieAuthHandler(identity=str(uuid.uuid4()))
+    auth_request_token = CookieAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     with mock.patch(
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
@@ -517,6 +518,30 @@ def test_auth_handler_cookie_explicit_token_matches_request_token():
     assert "Cookie" in resp_explicit_token.headers and len(resp_explicit_token.headers["Cookie"])
     assert "Cookie" in resp_request_token.headers and len(resp_request_token.headers["Cookie"])
     assert resp_explicit_token.headers["Cookie"] == resp_request_token.headers["Cookie"]
+
+
+def test_auth_request_handler_no_url_or_token_init():
+    with pytest.raises(AuthenticationError):
+        BearerAuthHandler(identity=str(uuid.uuid4()))
+
+    try:
+        BearerAuthHandler(token=str(uuid.uuid4()))  # OK
+        BearerAuthHandler(url="https://example.com")  # OK
+    except Exception as exc:
+        pytest.fail(msg=f"Expected no init error from valid combinations. Got [{exc}]")
+
+
+def test_auth_request_handler_no_url_ignored_request():
+    req = WebTestRequest({})
+    auth = BearerAuthHandler(
+        identity=str(uuid.uuid4()),
+        url="https://example.com",  # URL must be passed to avoid error
+    )
+    auth.url = None  # reset after init check
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert not resp.headers, "No headers should have been added since URL could not be resolved."
 
 
 def test_upload_file_not_found():

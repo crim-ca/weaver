@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, cast
 
 import mock
 import pytest
+import responses
 import yaml
 from owslib.ows import DEFAULT_OWS_NAMESPACE
 from owslib.wps import WPSException
@@ -562,7 +563,7 @@ class TestWeaverClient(TestWeaverClientBase):
         ]:
             self.run_execute_inputs_schema_variant(invalid_inputs_schema, expect_success=False)
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=1)
+    @pytest.mark.flaky(retries=2, delay=1)
     def test_execute_manual_monitor_status_and_download_results(self):
         """
         Test a typical case of :term:`Job` execution, result retrieval and download, but with manual monitoring.
@@ -1097,7 +1098,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER] = {"dockerPull": ref}
         return cwl
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=1)
+    @pytest.mark.flaky(retries=2, delay=1)
     def test_deploy_docker_auth_username_password_valid(self):
         """
         Test that username and password arguments can be provided simultaneously for docker login.
@@ -1869,6 +1870,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         """
         proc = self.test_process["Echo"]
         with contextlib.ExitStack() as stack_exec:
+            req_mock = stack_exec.enter_context(responses.RequestsMock())
             for mock_exec_proc in mocked_execute_celery():
                 stack_exec.enter_context(mock_exec_proc)
 
@@ -1876,6 +1878,10 @@ class TestWeaverCLI(TestWeaverClientBase):
             test_email_failed = "failed-job@email.com"
             test_callback_started = "https://server.com/started"
             test_callback_success = "https://server.com/success"
+
+            req_mock.add_callback(responses.POST, test_callback_started, callback=lambda _: (200, {}, ""))
+            req_mock.add_callback(responses.POST, test_callback_success, callback=lambda _: (200, {}, ""))
+
             lines = mocked_sub_requests(
                 self.app, run_command,
                 [

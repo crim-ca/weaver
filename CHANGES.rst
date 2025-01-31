@@ -20,6 +20,8 @@ Fixes:
   to provide additional parameters to the remote collection request.
 - Update ``pygeofilter>=0.3.1`` to resolve ``filter-lang=FES`` parser as per other filters
   (relates to `geopython/pygeofilter#102 <https://github.com/geopython/pygeofilter/pull/102>`_).
+- Fix ``weaver.cli.RequestAuthHandler`` and its derived classes erroneously invoking ``request_auth`` method when
+  both the ``url`` and ``token`` are omitted, leading to invalid ``requests`` call under ``weaver.utils.request_extra``.
 
 .. _changes_6.1.1:
 
