@@ -2512,7 +2512,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
             tmp_svr = stack.enter_context(responses.RequestsMock(assert_all_requests_are_fired=False))
-            test_file = "testrh.nc"
+            test_file = "test.nc"
             test_data = stack.enter_context(open(os.path.join(TEST_DATA_ROOT, test_file), mode="rb")).read()
 
             # coverage request expected with resolved query parameters matching submitted collection input parameters
@@ -2565,6 +2565,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             os.path.join(job_dir, cov_col),
             os.path.join(job_dir, "inputs", cov_col),
             os.path.join(job_dir, "output_txt", cov_col),
+            os.path.join(job_out, cov_col),
             os.path.join(job_out, "inputs", cov_col),
             os.path.join(job_out, "output_txt", cov_col),
         ]:
