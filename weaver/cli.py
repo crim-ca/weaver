@@ -23,7 +23,7 @@ from yaml.scanner import ScannerError
 
 from weaver import __meta__
 from weaver.datatype import AutoBase
-from weaver.exceptions import PackageRegistrationError
+from weaver.exceptions import AuthenticationError, PackageRegistrationError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
@@ -278,6 +278,9 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         HTTPBasicAuth.__init__(self, username=identity, password=password)
         self.token = token
 
+        if not self.token and not self.url:
+            raise AuthenticationError("Either the token or the URL to retrieve it must be provided to the handler.")
+
     @property
     def auth_token_name(self):
         # type: () -> str
@@ -334,12 +337,12 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
 
     def __call__(self, request):
         # type: (AnyRequestType) -> AnyRequestType
-        if self.token is None:
+        if self.token is None and self.url:
             auth_token = self.request_auth()
         else:
             auth_token = self.token
         if not auth_token:
-            LOGGER.warning("Expected authorization token could not be retrieved from: [%s] in [%s]",
+            LOGGER.warning("Expected authorization token could not be retrieved from URL: [%s] in [%s]",
                            self.url, fully_qualified_name(self))
         else:
             auth_token = self.parse_token(auth_token)
