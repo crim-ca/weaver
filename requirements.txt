@@ -116,7 +116,7 @@ ruamel.yaml>=0.16
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
 schema-salad>=8.3.20221209165047,<9
-shapely
+shapely<=2.0.6  # patch fix against unresolved GEOS library (https://github.com/shapely/shapely/issues/2212)
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
 # Python<3.10 error via pip, avoid endless package install lookup error with botocore
