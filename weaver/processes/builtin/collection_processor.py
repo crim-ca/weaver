@@ -41,7 +41,7 @@ from weaver.utils import Lazify, get_any_id, load_file, repr_json, request_extra
 from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
-    from typing import List
+    from typing import Dict, List
 
     from pystac import Asset
 
@@ -133,6 +133,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     for arg in list(col_args):
         if "-" in arg:
             col_args[arg.replace("-", "_")] = col_args.pop(arg)
+    col_args = parse_collection_parameters(col_args)
 
     logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
@@ -272,6 +273,27 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         Lazify(lambda: repr_json(resolved_files, indent=2)),
     )
     return resolved_files
+
+
+def parse_collection_parameters(parameters):
+    # type: (Dict[str, JSON]) -> Dict[str, JSON]
+    """
+    Applies any relevant conversions of known parameters between allowed request format and expected utilities.
+    """
+    if not parameters:
+        return {}
+
+    subset = parameters.get("subset")
+    if subset and isinstance(subset, str):
+        subset_dims = {}
+        for item in subset.split(","):
+            dim, span = item.split("(", 1)
+            span = span.split(")", 1)[0]
+            ranges = span.split(":")
+            subset_dims[dim] = list(ranges)
+        parameters["subset"] = subset_dims
+
+    return parameters
 
 
 def process_cwl(collection_input, input_definition, output_dir):
