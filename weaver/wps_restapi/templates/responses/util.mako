@@ -3,32 +3,32 @@ Utilities for rendering elements in other pages.
 -->
 
 
-<%def name="get_provider_link(provider_id, query='')">
-    ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}
+<%def name="get_provider_link(provider_id, query='')">\
+${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_processes_link(provider_id='', query='')">
-    <%
-        _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
-    %>
-    ${_prefix}/processes${f"?{query}" if query else ""}
+<%def name="get_processes_link(provider_id='', query='')">\
+<%
+    _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
+%>
+${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_process_link(process_id, provider_id='', query='')">
-    ${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}
+<%def name="get_process_link(process_id, provider_id='', query='')">\
+${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">
-    ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}
+<%def name="get_jobs_link(query='')">\
+${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 
 
-<%def name="get_job_link(job_id, query='')">
-    ${weaver.wps_restapi_url}/jobs/${job_id}${f"?{query}" if query else ""}
+<%def name="get_job_link(job_id, query='')">\
+${weaver.wps_restapi_url}/jobs/${job_id}${f"?{query}" if query else ""}\
 </%def>
 
 
@@ -88,6 +88,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 -->
 <%def name="render_json(json_data, indent=2, **kwargs)">
     <pre><code class="language-json">${json.dumps(json_data, indent=indent, **kwargs)}</code></pre>
+</%def>
+<%def name="render_yaml(yaml_data, indent=2, **kwargs)">
+    <pre><code class="language-yaml">${yaml.safe_dumps(yaml_data, indent=indent, **kwargs)}</code></pre>
 </%def>
 
 

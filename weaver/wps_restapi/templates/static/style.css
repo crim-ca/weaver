@@ -350,13 +350,13 @@ body {
 .status-success,
 .status-succeeded,
 .status-successful {
-    background-color: darkgreen;
+    background-color: forestgreen;
 }
 
 .progress-success,
 .progress-succeeded,
 .progress-successful {
-    accent-color: darkgreen;
+    accent-color: forestgreen;
 }
 
 /* --- Version Footer --- */

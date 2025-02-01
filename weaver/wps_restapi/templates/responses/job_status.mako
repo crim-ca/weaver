@@ -143,6 +143,37 @@
             <a href="#job-logs">Logs</a>
         </h3>
         <!-- fill data here -->
+        <div>
+            <script>
+                async function fetchJobLogs(format) {
+                    const url = "${util.get_job_link(job.id)}";
+                    const resp = await fetch(url + "/logs?f=" + format);
+                    const data = await resp.text();
+                    let log = document.getElementById("job-logs-content");
+                    toggleLogs(true);
+                    log.innerHTML = data;
+                    let btn_show = document.getElementById("job-logs-button-show");
+                    btn_show.onclick = toggleLogs;
+                }
+                function toggleLogs(show) {
+                    let log = document.getElementById("job-logs-content");
+                    let btn_show = document.getElementById("job-logs-button-show");
+                    let btn_hide = document.getElementById("job-logs-button-hide");
+                    log.parentElement.style.display = show ? "unset" : "none";
+                    btn_hide.style.display = show ? "unset" : "none";
+                    btn_show.style.display = show ? "none" : "unset";
+                }
+            </script>
+            <button type="button" id="job-logs-button-show" onclick="fetchJobLogs('text')">Display Logs</button>
+            <button
+                type="button"
+                id="job-logs-button-hide"
+                onclick="toggleLogs(false)"
+                style="display: none"
+            >Hide Logs
+            </button>
+            <pre style="display: none"><code id="job-logs-content"></code></pre>
+        </div>
     </div>
 
     <!-- fixme: if not success : error/exception -->
