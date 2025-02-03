@@ -1624,8 +1624,8 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
-    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
+    def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
         Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
@@ -1659,6 +1659,7 @@ class Job(Base, LoggerHandler):
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
+        job_json.update(**kwargs)
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):

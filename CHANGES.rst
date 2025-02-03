@@ -12,10 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
+- Add the ``process`` property to `Job` status response when requesting ``profile=openEO``,
+  with a direct reference to the underlying `CWL` `Application Package` of the main `Process` ran by the `Job`.
 
 Fixes:
 ------
+- Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
 - Fix ``weaver.cli.RequestAuthHandler`` and its derived classes erroneously invoking ``request_auth`` method when
   both the ``url`` and ``token`` are omitted, leading to invalid ``requests`` call under ``weaver.utils.request_extra``.
 
