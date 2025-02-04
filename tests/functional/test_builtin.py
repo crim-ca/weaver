@@ -438,7 +438,7 @@ class BuiltinAppTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         for field in ["status", "created", "finished", "duration", "progress"]:
             assert field in resp.json
-        assert resp.json["status"] == Status.SUCCEEDED
+        assert resp.json["status"] == Status.SUCCESSFUL
         assert resp.json["progress"] == 100
 
         out_url = f"{job_url}/results"

@@ -15,7 +15,7 @@ from pyramid.settings import asbool
 from weaver import WEAVER_MODULE_DIR
 from weaver.datatype import Job
 from weaver.processes.constants import JobInputsOutputsSchema
-from weaver.status import Status
+from weaver.status import Status, StatusCategory, map_status
 from weaver.utils import bytes2str, fully_qualified_name, get_settings, request_extra, str2bytes
 from weaver.wps_restapi.jobs.utils import get_results
 
@@ -186,21 +186,22 @@ def map_job_subscribers(job_body, settings):
     notification_email = job_body.get("notification_email")
     submit_subscribers = job_body.get("subscribers") or {}
     mapped_subscribers = {}
-    for status, name, sub_type, alt in [
-        (Status.STARTED, "inProgressEmail", "emails", None),
-        (Status.FAILED, "failedEmail", "emails", notification_email),
-        (Status.SUCCEEDED, "successEmail", "emails", notification_email),
-        (Status.STARTED, "inProgressUri", "callbacks", None),
-        (Status.FAILED, "failedUri", "callbacks", None),
-        (Status.SUCCEEDED, "successUri", "callbacks", None),
+    for status_category, name, sub_type, alt in [
+        (StatusCategory.RUNNING, "inProgressEmail", "emails", None),
+        (StatusCategory.FAILED, "failedEmail", "emails", notification_email),
+        (StatusCategory.SUCCESS, "successEmail", "emails", notification_email),
+        (StatusCategory.RUNNING, "inProgressUri", "callbacks", None),
+        (StatusCategory.FAILED, "failedUri", "callbacks", None),
+        (StatusCategory.SUCCESS, "successUri", "callbacks", None),
     ]:
         value = submit_subscribers.get(name) or alt
         if not value:
             continue
         if sub_type == "emails":
             value = encrypt_email(value, settings)
+        status_category = status_category.value.lower()
         mapped_subscribers.setdefault(sub_type, {})
-        mapped_subscribers[sub_type][status] = value
+        mapped_subscribers[sub_type][status_category] = value
     return mapped_subscribers or None
 
 
@@ -210,7 +211,12 @@ def send_job_notification_email(job, task_logger, settings):
     Sends a notification email about the execution status for the subscriber if requested during :term:`Job` submission.
     """
     job_subs = job.subscribers or {}
-    notification_email = job_subs.get("emails", {}).get(job.status)
+    job_status_category = map_status(job.status, category=True)
+    if job_status_category == Status.UNKNOWN:  # pragma: no cover
+        LOGGER.warning("Unknown status unmapped in subscribers notification email: [%s]", job.status)
+        return
+    category = job_status_category.value.lower()
+    notification_email = job_subs.get("emails", {}).get(category)
     if notification_email:
         try:
             email = decrypt_email(notification_email, settings)
@@ -229,10 +235,15 @@ def send_job_callback_request(job, task_logger, settings):
     Send a callback request about the execution status for the subscriber if requested at :term:`Job` execution.
     """
     job_subs = job.subscribers or {}
-    request_uri = job_subs.get("callbacks", {}).get(job.status)
+    job_status_category = map_status(job.status, category=True)
+    if job_status_category == Status.UNKNOWN:  # pragma: no cover
+        LOGGER.warning("Unknown status unmapped in subscribers callback request: [%s]", job.status)
+        return
+    category = job_status_category.value.lower()
+    request_uri = job_subs.get("callbacks", {}).get(category)
     if request_uri:
         try:
-            if job.status != Status.SUCCEEDED:
+            if job_status_category != StatusCategory.SUCCESS:
                 body = job.json(settings)
             else:
                 # OGC-compliant request body needed to respect 'subscribers' callback definition

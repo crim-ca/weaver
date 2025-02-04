@@ -238,6 +238,10 @@ Glossary
         .. seealso::
             :ref:`quotation_estimator_model`
 
+    openEO
+        | Open Earth Observation
+        | Cloud backend :term:`API` initiative for unified Earth Observation, as described by :ref:`openEO`.
+
     OpenSearch
         Protocol of lookup and retrieval of remotely stored files.
         Please refer to :ref:`OpenSearch Data Source` for details.

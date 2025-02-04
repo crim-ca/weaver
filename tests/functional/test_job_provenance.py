@@ -161,7 +161,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         job = self.job_store.save_job(
             "test",
             process=self.proc_id,
-            status=Status.SUCCEEDED
+            status=Status.SUCCESSFUL
         )
         prov_url = job.prov_url(self.settings)
         headers = self.json_headers  # note: this is the test, while only plain text is supported
@@ -229,7 +229,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         job = self.job_store.save_job(
             "test",
             process=self.proc_id,
-            status=Status.SUCCEEDED
+            status=Status.SUCCESSFUL
         )
         prov_url = job.prov_url(self.settings)
         resp = self.app.get(prov_url, headers=self.json_headers, expect_errors=True)
@@ -244,7 +244,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         job = self.job_store.save_job(
             "test",
             process=self.proc_id,
-            status=Status.SUCCEEDED
+            status=Status.SUCCESSFUL
         )
         prov_url = job.prov_url(self.settings)
         headers = {"Accept": ContentType.TEXT_PLAIN}

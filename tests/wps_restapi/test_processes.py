@@ -2343,7 +2343,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         execute_data_tests[6][1]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
 
         def no_op(*_, **__):
-            return Status.SUCCEEDED
+            return Status.SUCCESSFUL
 
         path = f"/processes/{self.process_public.identifier}/jobs"
         with contextlib.ExitStack() as stack_exec:

@@ -593,7 +593,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.monitor, job_id, timeout=5, interval=1)
         assert result.success, result.text
         assert "undefined" not in result.message
-        assert result.body.get("status") == Status.SUCCEEDED
+        assert result.body.get("status") == Status.SUCCESSFUL
         links = result.body.get("links")
         assert isinstance(links, list)
         assert len([_link for _link in links if _link["rel"].endswith("results")]) == 1
@@ -684,8 +684,8 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             }
 
-            # order important, expect status 'started' (in-progress) to occur before 'succeeded'
-            # call for 'failed' should never happen since 'succeeded' expected, as validated by above method
+            # order important, expect status 'started' (in-progress) to occur before 'successful'
+            # call for 'failed' should never happen since 'successful' expected, as validated by above method
             assert mocked_requests.call_count == 2, "Should not have called both failed/success callback requests"
             assert mocked_requests.call_args_list[0].args == ("POST", subscribers["inProgressUri"])
             assert mocked_requests.call_args_list[0].kwargs["json"]["status"] in running_statuses  # status JSON
@@ -698,7 +698,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert mocked_emails.call_args_list[0].args[:2] == (None, subscribers["inProgressEmail"])
             assert f"Job {test_proc_byte} Started".encode() in mocked_emails.call_args_list[0].args[-1]
             assert mocked_emails.call_args_list[1].args[:2] == (None, subscribers["successEmail"])
-            assert f"Job {test_proc_byte} Succeeded".encode() in mocked_emails.call_args_list[1].args[-1]
+            assert f"Job {test_proc_byte} Successful".encode() in mocked_emails.call_args_list[1].args[-1]
 
     # NOTE:
     #   For all below '<>_auto_resolve_vault' test cases, the local file referenced in the Execute request body
@@ -834,17 +834,19 @@ class TestWeaverClient(TestWeaverClientBase):
 
         result = mocked_sub_requests(self.app, self.client.status, job_id)
         assert result.success
+        assert isinstance(result.body, dict)
         assert result.body["title"] == "Random Title"
 
         result = mocked_sub_requests(self.app, self.client.inputs, job_id)
         assert result.success
+        assert isinstance(result.body, dict)
         assert result.body["inputs"] == {"message": "new message"}
         assert result.body["outputs"] == {"output": {}}
         assert result.body["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}; respond-async"
 
     @mocked_dismiss_process()
     def test_dismiss(self):
-        for status in [Status.ACCEPTED, Status.FAILED, Status.RUNNING, Status.SUCCEEDED]:
+        for status in [Status.ACCEPTED, Status.FAILED, Status.RUNNING, Status.SUCCESSFUL]:
             proc = self.test_process["Echo"]
             job = self.job_store.save_job(task_id="12345678-1111-2222-3333-111122223333", process=proc)
             job.status = status
@@ -859,7 +861,7 @@ class TestWeaverClient(TestWeaverClientBase):
         job1 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
         job2 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
         job3 = self.job_store.save_job(task_id=uuid.uuid4(), process=proc, access=Visibility.PUBLIC)
-        job1.status = Status.SUCCEEDED
+        job1.status = Status.SUCCESSFUL
         job2.status = Status.FAILED
         job3.status = Status.RUNNING
         job1 = self.job_store.update_job(job1)
@@ -868,10 +870,10 @@ class TestWeaverClient(TestWeaverClientBase):
         jobs = [job1, job2, job3]
 
         for test_status, job_expect in [
-            (Status.SUCCEEDED, [job1]),
-            ([Status.SUCCEEDED], [job1]),
-            ([Status.SUCCEEDED, Status.RUNNING], [job1, job3]),
-            (f"{Status.SUCCEEDED},{Status.RUNNING}", [job1, job3]),
+            (Status.SUCCESSFUL, [job1]),
+            ([Status.SUCCESSFUL], [job1]),
+            ([Status.SUCCESSFUL, Status.RUNNING], [job1, job3]),
+            (f"{Status.SUCCESSFUL},{Status.RUNNING}", [job1, job3]),
             (StatusCategory.FINISHED, [job1, job2]),
             (StatusCategory.FINISHED.value, [job1, job2]),
             ([StatusCategory.FINISHED], [job1, job2]),
@@ -893,7 +895,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         job = self.job_store.save_job(
             task_id="12345678-1111-2222-3333-111122223333", process="fake-process", access=Visibility.PUBLIC
         )
-        job.status = Status.SUCCEEDED
+        job.status = Status.SUCCESSFUL
         self.test_job = self.job_store.update_job(job)
 
     def test_help_operations(self):
@@ -1612,7 +1614,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
 
     def test_execute_manual_monitor(self):
         proc = self.test_process["Echo"]
@@ -1656,7 +1658,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
 
             assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
-            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
             assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
@@ -1683,7 +1685,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
-            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
             assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
 
     def test_execute_result_by_reference(self):
@@ -1719,7 +1721,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
-            assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+            assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):
                     job_id = line.split(":")[-1].strip()
@@ -1823,7 +1825,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(f"status: {Status.SUCCEEDED}" in line for line in lines)
+            assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             job_id = None
             for line in lines:
                 if line.startswith("jobID: "):
@@ -1906,7 +1908,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 only_local=True,
             )
             data = json.loads(lines[0])
-            assert data["status"] == Status.SUCCEEDED
+            assert data["status"] == Status.SUCCESSFUL
 
             job = self.job_store.fetch_by_id(data["jobID"])
             # to properly compare, we must decrypt emails (encrypt is not deterministic on multiple calls)
@@ -1914,8 +1916,14 @@ class TestWeaverCLI(TestWeaverClientBase):
             for sub, email in subs["emails"].items():
                 subs["emails"][sub] = decrypt_email(email, self.settings)
             assert subs == {
-                "callbacks": {Status.STARTED: test_callback_started, Status.SUCCEEDED: test_callback_success},
-                "emails": {Status.STARTED: test_email_started, Status.FAILED: test_email_failed},
+                "callbacks": {
+                    StatusCategory.RUNNING.value.lower(): test_callback_started,
+                    StatusCategory.SUCCESS.value.lower(): test_callback_success,
+                },
+                "emails": {
+                    StatusCategory.RUNNING.value.lower(): test_email_started,
+                    StatusCategory.FAILED.value.lower(): test_email_failed,
+                },
             }, "Job subscribers should be as submitted, after combining CLI options, without extra or missing ones."
 
     def test_execute_help_details(self):
@@ -1991,7 +1999,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # "weaver",
                 "jobs",
                 "-u", self.url,
-                "-S", Status.SUCCEEDED,
+                "-S", Status.SUCCESSFUL,
                 "-N", 1,
                 "-nL",
             ],
@@ -2017,7 +2025,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # "weaver",
                 "jobs",
                 "-u", self.url,
-                "-S", Status.SUCCEEDED,
+                "-S", Status.SUCCESSFUL,
                 "-D",   # when details active, each job lists its own links
                 "-nL",  # unless links are requested to be removed (top-most and nested ones)
             ],
@@ -2037,7 +2045,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_jobs_filter_status_multi(self):
         self.job_store.clear_jobs()
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
-        job.status = Status.SUCCEEDED
+        job.status = Status.SUCCESSFUL
         job_s = self.job_store.update_job(job)
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.status = Status.FAILED
@@ -2052,7 +2060,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # "weaver",
                 "jobs",
                 "-u", self.url,
-                "-S", Status.SUCCEEDED, Status.ACCEPTED,
+                "-S", Status.SUCCESSFUL, Status.ACCEPTED,
                 "-D",
                 "-nL",  # unless links are requested to be removed (top-most and nested ones)
             ],
@@ -2067,9 +2075,9 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert isinstance(body["jobs"], list)
         assert len(body["jobs"])
         assert not any(_job["jobID"] == str(job_f.uuid) for _job in body["jobs"])
-        assert all(job["status"] in [Status.SUCCEEDED, Status.ACCEPTED] for job in body["jobs"])
+        assert all(job["status"] in [Status.SUCCESSFUL, Status.ACCEPTED] for job in body["jobs"])
         jobs_accept = list(filter(lambda _job: _job["status"] == Status.ACCEPTED, body["jobs"]))
-        jobs_success = list(filter(lambda _job: _job["status"] == Status.SUCCEEDED, body["jobs"]))
+        jobs_success = list(filter(lambda _job: _job["status"] == Status.SUCCESSFUL, body["jobs"]))
         assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
         assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
 
@@ -2339,7 +2347,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
         job.save_log(message="test run", progress=50, status=Status.RUNNING)
-        job.save_log(message="test done", progress=100, status=Status.SUCCEEDED)
+        job.save_log(message="test done", progress=100, status=Status.SUCCESSFUL)
         job = self.job_store.update_job(job)
 
         lines = mocked_sub_requests(
@@ -2358,7 +2366,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[0] == "["
         assert f"0% {Status.ACCEPTED}" in lines[1]
         assert f"50% {Status.RUNNING}" in lines[2]
-        assert f"100% {Status.SUCCEEDED}" in lines[3]
+        assert f"100% {Status.SUCCESSFUL}" in lines[3]
         assert lines[4] == "]"
 
     def test_job_exceptions(self):
@@ -2394,7 +2402,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_job_statistics(self):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
-        job.status = Status.SUCCEEDED  # error if not completed
+        job.status = Status.SUCCESSFUL  # error if not completed
         job = self.job_store.update_job(job)
 
         lines = mocked_sub_requests(
@@ -2488,7 +2496,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                     entrypoint=weaver_cli,
                     only_local=True,
                 )
-            assert any(f"\"status\": \"{Status.SUCCEEDED}\"" in line for line in lines)
+            assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
 
 
 class TestWeaverClientAuthBase(TestWeaverClientBase):
