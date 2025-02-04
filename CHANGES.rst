@@ -13,6 +13,7 @@ Changes
 Changes:
 --------
 - Update ``owslib==0.32.1`` for parameters fixes employed by *Collection Input* with ``format=ogc-coverage-collection``.
+- Drop support of Python 3.9 (required for ``owslib==0.32.1`` dependency).
 
 Fixes:
 ------

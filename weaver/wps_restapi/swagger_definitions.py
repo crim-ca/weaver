@@ -22,6 +22,7 @@ import os
 import re
 from copy import copy
 from decimal import Decimal
+from functools import cache
 from typing import TYPE_CHECKING
 
 import colander
@@ -35,7 +36,6 @@ from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
-from weaver.compat import cache
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
