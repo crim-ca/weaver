@@ -1919,8 +1919,8 @@ class WpsRestApiJobsTest(JobUtils):
         test_job = self.job_store.fetch_by_id(new_job.id)
         assert test_job.subscribers == {
             "callbacks": {
-                StatusCategory.SUCCESS: "https://example.com/success",
-                StatusCategory.FAILED: "https://example.com/failed",
+                StatusCategory.SUCCESS.value.lower(): "https://example.com/success",
+                StatusCategory.FAILED.value.lower(): "https://example.com/failed",
             }
         }
 
