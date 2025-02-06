@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.2.0:
+
+`6.2.0 <https://github.com/crim-ca/weaver/tree/6.2.0>`_ (2025-02-06)
+========================================================================
+
+Changes:
+--------
 - Replace ``succeeded`` status by ``successful`` everywhere where applicable (as originally defined by OGC API v1),
   to align with reversal of the proposed draft name, aligning between both v1 and v2 of `OGC API - Processes`
   (relates to `opengeospatial/ogcapi-processes#483 <https://github.com/opengeospatial/ogcapi-processes/pull/483>`_).
