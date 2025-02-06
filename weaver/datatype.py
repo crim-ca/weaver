@@ -1585,7 +1585,7 @@ class Job(Base, LoggerHandler):
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
-            if job_status == Status.SUCCEEDED:
+            if job_status == Status.SUCCESSFUL:
                 job_links.extend([
                     {"href": f"{job_url}/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},

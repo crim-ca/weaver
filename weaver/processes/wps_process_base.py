@@ -551,7 +551,7 @@ class OGCAPIRemoteProcessBase(WpsProcessInterface, abc.ABC):
                                             RemoteJobProgress.MONITORING, RemoteJobProgress.STAGE_OUT),
                                Status.RUNNING)
 
-        if job_status_value != Status.SUCCEEDED:
+        if job_status_value not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
             LOGGER.debug(get_log_monitor_msg(job_id, job_status_value,
                                              job_status_data.get("percentCompleted", 0),
                                              get_any_message(job_status_data), job_status_data.get("statusLocation")))

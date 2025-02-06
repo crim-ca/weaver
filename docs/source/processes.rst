@@ -1087,7 +1087,7 @@ Once the :term:`Job` is submitted, its status should initially switch to ``accep
 status will change to ``started`` for preparation steps (i.e.: allocation resources, retrieving required
 parametrization details, etc.), followed by ``running`` when effectively reaching the execution step of the underlying
 :term:`Application Package` operation. This status will remain as such until the operation completes, either with
-``succeeded`` or ``failed`` status.
+``successful`` or ``failed`` status.
 
 At any moment during |asynchronous|_ execution, the :term:`Job` status can be requested using |status-req|_. Note that
 depending on the timing at which the user executes this request and the availability of task workers, it could be
