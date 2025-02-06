@@ -81,7 +81,7 @@ def test_notify_email_job_complete():
     with mock.patch("smtplib.SMTP_SSL", autospec=smtplib.SMTP_SSL) as mock_smtp:
         mock_smtp.return_value.sendmail.return_value = None  # sending worked
 
-        test_job.status = Status.SUCCEEDED
+        test_job.status = Status.SUCCESSFUL
         notify_job_email(test_job, notify_email, settings)
         mock_smtp.assert_called_with("xyz.test.com", 12345, timeout=1)
         assert mock_smtp.return_value.sendmail.call_args[0][0] == "test-weaver@email.com"
@@ -91,7 +91,7 @@ def test_notify_email_job_complete():
         message = message_encoded.decode("utf8")
         assert "From: Weaver" in message
         assert f"To: {notify_email}" in message
-        assert f"Subject: Job {test_job.process} Succeeded"
+        assert f"Subject: Job {test_job.process} Successful"
         assert test_job_out_url in message
         assert test_job_log_url in message
         assert test_job_err_url not in message
@@ -139,7 +139,7 @@ def test_notify_job_email_custom_template():
         test_job = Job(
             task_id=uuid.uuid4(),
             process="test-process",
-            status=Status.SUCCEEDED,
+            status=Status.SUCCESSFUL,
             settings=settings,
         )
 
@@ -152,7 +152,7 @@ def test_notify_job_email_custom_template():
         assert message == "\n".join([
             "From: Weaver",
             f"To: {notify_email}",
-            f"Subject: Job {test_job.process} {Status.SUCCEEDED}",
+            f"Subject: Job {test_job.process} {Status.SUCCESSFUL}",
             "",
             f"Job: {test_url}/processes/{test_job.process}/jobs/{test_job.id}",
         ])
@@ -192,7 +192,7 @@ def test_notify_job_email_custom_template():
             {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
              "weaver.wps_email_notify_template_default": "test-default.mako"},
             "random-process",
-            Status.SUCCEEDED,
+            Status.SUCCESSFUL,
             False,
             "test-default.mako",
             2
@@ -219,7 +219,7 @@ def test_notify_job_email_custom_template():
             {"weaver.wps_email_notify_template_dir": "<TMP_DIR>",
              "weaver.wps_email_notify_template_default": "test-default.mako"},
             "tmp-process",
-            Status.SUCCEEDED,
+            Status.SUCCESSFUL,
             False,
             "test-default.mako",
             1

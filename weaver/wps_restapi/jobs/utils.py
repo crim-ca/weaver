@@ -1287,7 +1287,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status != Status.SUCCEEDED:
+    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:

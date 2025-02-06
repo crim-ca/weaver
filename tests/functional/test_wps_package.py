@@ -3732,7 +3732,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -3779,7 +3779,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4095,7 +4095,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         results = self.app.get(f"/jobs/{job_id}/results")
@@ -4149,7 +4149,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         out_url = get_wps_output_url(self.settings)
         job_id = status["jobID"]
@@ -4199,7 +4199,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -4259,7 +4259,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -4965,7 +4965,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5039,7 +5039,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5121,7 +5121,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5277,7 +5277,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5366,7 +5366,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5436,7 +5436,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5512,7 +5512,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5579,7 +5579,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5737,7 +5737,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5815,7 +5815,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             # retrieve the execution status
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")

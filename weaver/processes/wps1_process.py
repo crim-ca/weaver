@@ -217,7 +217,7 @@ class Wps1Process(WpsProcessInterface):
                 num_retries = 0
                 run_step += 1
 
-        if not execution.isSucceded():
+        if not execution.isSucceeded():
             exec_msg = execution.statusMessage or "Job failed."
             exec_status = map_status(execution.getStatus())
             exec_status_url = execution.statusLocation

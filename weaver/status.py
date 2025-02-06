@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from pywps.response.status import _WPS_STATUS, WPS_STATUS  # noqa: W0212
 
@@ -17,6 +17,7 @@ class StatusCategory(ExtendedEnum):
     RUNNING = "RUNNING"
     PENDING = "PENDING"
     FAILED = "FAILED"
+    SUCCESS = "SUCCESS"
 
 
 class Status(Constants):
@@ -39,7 +40,7 @@ class Status(Constants):
 
 JOB_STATUS_CATEGORIES = {
     # note:
-    #   OGC compliant (old): [Accepted, Running, Succeeded, Failed]
+    #   OGC compliant (old): [Accepted, Running, successful, Failed]
     #   OGC compliant (new): [accepted, running, successful, failed, dismissed, created]  ('created' in Part 4 only)
     #   PyWPS uses:          [Accepted, Started, Succeeded, Failed, Paused, Exception]
     #   OWSLib uses:         [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
@@ -52,9 +53,8 @@ JOB_STATUS_CATEGORIES = {
         Status.CREATED,     # Part 4: Job Management
         Status.ACCEPTED,
         Status.RUNNING,
-        Status.SUCCEEDED,   # new
         Status.FAILED,
-        Status.SUCCESSFUL,  # old (keep it because it matches existing ADES/EMS and other providers)
+        Status.SUCCESSFUL,  # v1/v2 official (alternative "SUCCEEDED" was in v2-draft for a while)
         Status.DISMISSED    # new
     ]),
     StatusCompliant.PYWPS: frozenset([
@@ -103,6 +103,11 @@ JOB_STATUS_CATEGORIES = {
         Status.SUCCESSFUL,
         Status.FINISHED
     ]),
+    StatusCategory.SUCCESS: frozenset([
+        Status.SUCCEEDED,
+        Status.SUCCESSFUL,
+        Status.FINISHED
+    ]),
     StatusCategory.FAILED: frozenset([
         Status.FAILED,
         Status.DISMISSED,
@@ -111,10 +116,8 @@ JOB_STATUS_CATEGORIES = {
     ]),
 }
 
-# FIXME: see below detail in map_status about 'successful', partially compliant to OGC statuses
-# https://github.com/opengeospatial/ogcapi-processes/blob/ca8e90/core/openapi/schemas/statusCode.yaml
-JOB_STATUS_CODE_API = JOB_STATUS_CATEGORIES[StatusCompliant.OGC] - {Status.SUCCESSFUL}
-JOB_STATUS_SEARCH_API = set(list(JOB_STATUS_CODE_API) + [Status.FINISHED])
+JOB_STATUS_CODE_API = JOB_STATUS_CATEGORIES[StatusCompliant.OGC]
+JOB_STATUS_SEARCH_API = set(Status.values()) - {Status.UNKNOWN}  # allow any variant for various profile support
 
 # id -> str
 STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}
@@ -122,7 +125,7 @@ STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STA
 STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 if TYPE_CHECKING:
-    from typing import Type, Union
+    from typing import Any, Type, Union
 
     from weaver.typedefs import Literal, TypeAlias
 
@@ -133,6 +136,7 @@ if TYPE_CHECKING:
         Status.QUEUED,
         Status.PAUSED,
         Status.SUCCEEDED,
+        Status.SUCCESSFUL,
         Status.FINISHED,
         Status.FAILED,
         Status.RUNNING,
@@ -164,23 +168,43 @@ if TYPE_CHECKING:
     ]
 
 
-def map_status(wps_status, compliant=StatusCompliant.OGC):  # pylint: disable=R1260
+@overload
+def map_status(wps_status):
+    # type: (AnyStatusType) -> StatusType
+    ...
+
+
+@overload
+def map_status(wps_status, compliant):
     # type: (AnyStatusType, StatusCompliant) -> StatusType
+    ...
+
+
+@overload
+def map_status(wps_status, *, category):
+    # type: (AnyStatusType, Any, Literal[True]) -> StatusCategory
+    ...
+
+
+def map_status(wps_status, compliant=StatusCompliant.OGC, category=False):  # pylint: disable=R1260
+    # type: (AnyStatusType, StatusCompliant, bool) -> Union[StatusType, StatusCategory]
     """
-    Maps WPS execution statuses to between compatible values of different implementations.
+    Maps execution statuses between compatible values of different implementations.
 
-    Mapping is supported for values from :mod:`weaver.status`, :mod:`OWSLib`, :mod:`pywps` as well as some
-    specific one-of values of custom implementations.
+    Mapping is supported for values from :mod:`weaver.status`, :mod:`OWSLib`, :mod:`pywps`, :term:`openEO`,
+    as well as some specific one-of values of custom :term:`OAP` implementations.
 
-    For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).
-    Statuses are returned following :class:`Status` format.
+    For each compliant combination, unsupported statuses are changed to corresponding ones with the
+    closest logical match. Statuses are returned following :class:`Status` format.
     Specifically, this ensures statues are lowercase and not prefixed by ``Process``
-    (as in XML response of OWS WPS like ``ProcessSucceeded`` for example).
+    (as in :term:`XML` response of :term:`OWS` :term:`WPS` like ``ProcessSucceeded`` for example).
 
     :param wps_status: One of :class:`Status` or its literal value to map to `compliant` standard.
     :param compliant: One of :class:`StatusCompliant` values.
-    :returns: mapped status complying to the requested compliant category, or :data:`Status.UNKNOWN` if no match found.
+    :param category: Request that the :class:`StatusCategory` corresponding to the supplied status is returned.
+    :returns: Mapped status complying to the requested compliant category, or :data:`Status.UNKNOWN` if no match found.
     """
+    compliant = StatusCompliant.get(compliant)
 
     # case of raw PyWPS status
     if isinstance(wps_status, int):
@@ -189,57 +213,68 @@ def map_status(wps_status, compliant=StatusCompliant.OGC):  # pylint: disable=R1
     # remove 'Process' from OWSLib statuses and lower for every compliant
     job_status = str(wps_status).lower().replace("process", "")
 
-    if compliant == StatusCompliant.OGC:
+    if category:
+        # order important to prioritize most restrictive
+        # categories with overlapping statuses first
+        for status_category in [
+            StatusCategory.SUCCESS,
+            StatusCategory.FAILED,
+            StatusCategory.RUNNING,
+            StatusCategory.PENDING,
+            StatusCategory.FINISHED,
+        ]:
+            if job_status in JOB_STATUS_CATEGORIES[status_category]:
+                return status_category
+        return Status.UNKNOWN
+
+    elif compliant == StatusCompliant.OGC:
         if job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
             if job_status in [Status.STARTED, Status.PAUSED]:
-                job_status = Status.RUNNING
-            elif job_status == Status.QUEUED:
-                job_status = Status.ACCEPTED
+                return Status.RUNNING
+            elif job_status in [Status.QUEUED]:
+                return Status.ACCEPTED
         elif job_status in [Status.CANCELED, Status.DISMISSED]:
-            job_status = Status.DISMISSED
+            return Status.DISMISSED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]:
-            job_status = Status.FAILED
-        elif job_status == Status.FINISHED:
-            job_status = Status.SUCCEEDED
+            return Status.FAILED
+        elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+            return Status.SUCCESSFUL
 
     elif compliant == StatusCompliant.PYWPS:
         if job_status in [Status.RUNNING]:
-            job_status = Status.STARTED
+            return Status.STARTED
+        elif job_status in [Status.ACCEPTED]:
+            return Status.ACCEPTED
         elif job_status in [Status.DISMISSED, Status.CANCELED]:
-            job_status = Status.FAILED
+            return Status.FAILED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]:
-            job_status = Status.FAILED
+            return Status.FAILED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
-            job_status = Status.PAUSED
+            return Status.PAUSED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-            job_status = Status.SUCCEEDED
+            return Status.SUCCEEDED
 
     elif compliant == StatusCompliant.OWSLIB:
         if job_status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
-            job_status = Status.PAUSED
+            return Status.PAUSED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
-            job_status = Status.RUNNING
+            return Status.RUNNING
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]:
-            job_status = Status.FAILED
+            return Status.FAILED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-            job_status = Status.SUCCEEDED
+            return Status.SUCCEEDED
 
     elif compliant == StatusCompliant.OPENEO:
         if job_status in JOB_STATUS_CATEGORIES[StatusCategory.PENDING]:
-            job_status = Status.QUEUED
-        elif job_status == Status.DISMISSED:
-            job_status = Status.CANCELED
+            return Status.QUEUED
+        elif job_status in [Status.DISMISSED]:
+            return Status.CANCELED
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]:
-            job_status = Status.RUNNING
+            return Status.RUNNING
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FAILED]:
-            job_status = Status.ERROR
+            return Status.ERROR
         elif job_status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-            job_status = Status.FINISHED
-
-    # FIXME: new official status is 'successful', but this breaks everywhere (tests, local/remote execute, etc.)
-    #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
-    if job_status == Status.SUCCESSFUL:
-        job_status = Status.SUCCEEDED
+            return Status.FINISHED
 
     if job_status in Status:
         return job_status

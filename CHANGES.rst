@@ -12,7 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Replace ``succeeded`` status by ``successful`` everywhere where applicable (as originally defined by OGC API v1),
+  to align with reversal of the proposed draft name, aligning between both v1 and v2 of `OGC API - Processes`
+  (relates to `opengeospatial/ogcapi-processes#483 <https://github.com/opengeospatial/ogcapi-processes/pull/483>`_).
+- Modify `Job` ``subscribers`` definition to employ the normalized ``weaver.status.StatusCategory`` instead
+  of ``weaver.status.Status`` as mapping keys, such that email and callback notifications are unified under
+  a common naming convention regardless of the resolved ``weaver.status.StatusCompliant`` representation.
 
 Fixes:
 ------

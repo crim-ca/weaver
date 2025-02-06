@@ -35,7 +35,7 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
+from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
@@ -741,7 +741,7 @@ def get_job_stats(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED] or job.status != Status.SUCCEEDED:
+    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
         raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial

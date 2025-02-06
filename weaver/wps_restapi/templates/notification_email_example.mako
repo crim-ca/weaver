@@ -12,12 +12,12 @@
     Below is a non-exhaustive list of example parameters from this method.
     Refer to the method for complete listing.
 
-        status:           succeeded, failed, started
+        status:           successful, failed, started
         logs:             url to the logs
         jobID:            example "617f23d3-f474-47f9-a8ec-55da9dd6ac71"
         result:           url to the outputs
         duration:         example "0:01:02"
-        message:          example "Job succeeded."
+        message:          example "Job successful."
         percentCompleted: example 100
 </%doc>
 From: Weaver
@@ -27,9 +27,14 @@ Content-Type: text/plain; charset=UTF-8
 
 Dear user,
 
-Your job submitted on ${job.created.strftime("%Y/%m/%d %H:%M %Z")} to ${settings.get("weaver.url")} ${job.status}.
+Your job submitted on ${job.created.strftime("%Y/%m/%d %H:%M %Z")} to ${settings.get("weaver.url")} \
+%if job.status == "successful":
+was successful.
+% elif job.status == "failed":
+has failed.
+%endif
 
-% if job.status == "succeeded":
+% if job.status == "successful":
 You can retrieve the output(s) at the following link: ${job.results_url(settings)}
 % elif job.status == "failed":
 You can retrieve potential error details from the following link: ${job.exceptions_url(settings)}

@@ -2052,7 +2052,7 @@ class WeaverClient(object):
         job_reference,                      # type: str
         timeout=None,                       # type: Optional[int]
         interval=None,                      # type: Optional[int]
-        wait_for_status=Status.SUCCEEDED,   # type: str
+        wait_for_status=Status.SUCCESSFUL,  # type: str
         url=None,                           # type: Optional[str]
         auth=None,                          # type: Optional[AuthBase]
         headers=None,                       # type: Optional[AnyHeadersContainer]
@@ -2101,7 +2101,7 @@ class WeaverClient(object):
                 return OperationResult(False, "Could not find job with specified reference.", {"job": job_reference})
             body = resp.json()
             status = body.get("status")
-            if status == wait_for_status:
+            if status == wait_for_status or map_status(status) == map_status(wait_for_status):
                 msg = f"Requested job status reached [{wait_for_status}]."
                 return self._parse_result(resp, success=True, message=msg, with_links=with_links,
                                           with_headers=with_headers, output_format=output_format)

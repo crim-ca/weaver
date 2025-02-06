@@ -412,16 +412,41 @@ def test_map_status_compliant(compliance, status):
     assert map_status(status, compliance) in JOB_STATUS_CATEGORIES[compliance]
 
 
-def test_map_status_back_compatibility_and_special_cases():
-    for c in (set(StatusCompliant.values()) - {StatusCompliant.OPENEO}):  # type: ignore
-        assert map_status("successful", c) == Status.SUCCEEDED
-    assert map_status("successful", StatusCompliant.OPENEO) == Status.FINISHED
+@pytest.mark.parametrize(
+    ["compliance", "status", "expected"],
+    list(
+        itertools.product(
+            [StatusCompliant.OGC],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.SUCCESSFUL],
+        )
+    ) + list(
+        itertools.product(
+            [StatusCompliant.OWSLIB, StatusCompliant.PYWPS],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.SUCCEEDED],
+        )
+    ) + list(
+        itertools.product(
+            [StatusCompliant.OPENEO],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.FINISHED],
+        )
+    )
+)
+def test_map_status_back_compatibility_and_special_cases(compliance, status, expected):
+    result = map_status(status, compliance)
+    assert result == expected
 
 
-def test_map_status_pywps_compliant_as_int_statuses():
-    for s in range(len(WPS_STATUS)):
-        if STATUS_PYWPS_MAP[s] != Status.UNKNOWN:
-            assert map_status(s, StatusCompliant.PYWPS) in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
+@pytest.mark.parametrize(
+    ["status_index"],
+    [[idx] for idx in range(len(WPS_STATUS)) if STATUS_PYWPS_MAP[idx] != Status.UNKNOWN],
+)
+def test_map_status_pywps_compliant_as_int_statuses(status_index):
+    status = map_status(status_index, StatusCompliant.PYWPS)
+    assert status in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
+    assert status == STATUS_PYWPS_MAP[status_index]
 
 
 def test_map_status_pywps_back_and_forth():
