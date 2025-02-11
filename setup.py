@@ -120,7 +120,7 @@ setup(
     package_data={"": ["*.mako"]},
     zip_safe=False,
     test_suite="tests",
-    python_requires=">=3.9, <4",
+    python_requires=">=3.10, <4",
     install_requires=REQUIREMENTS,
     dependency_links=LINKS,
     extras_require={

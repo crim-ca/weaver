@@ -12,11 +12,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Update ``owslib==0.32.1`` for parameters fixes employed by *Collection Input* with ``format=ogc-coverage-collection``.
+- Drop support of Python 3.9 (required for ``owslib==0.32.1`` dependency).
 
 Fixes:
 ------
-- No change.
+- Fix parsing of *Collection Input* ``format=ogc-coverage-collection`` and ``format=ogc-map-collection``
+  to provide additional parameters to the remote collection request.
+- Update ``pygeofilter>=0.3.1`` to resolve ``filter-lang=FES`` parser as per other filters
+  (relates to `geopython/pygeofilter#102 <https://github.com/geopython/pygeofilter/pull/102>`_).
 
 .. _changes_6.2.0:
 

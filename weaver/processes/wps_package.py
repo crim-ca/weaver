@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 import uuid
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import parse_qsl, urlparse
 
@@ -48,7 +49,6 @@ from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
-from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
