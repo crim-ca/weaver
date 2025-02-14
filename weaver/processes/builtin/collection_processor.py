@@ -196,6 +196,11 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
         if str(col_args.get("filter_lang")) == "cql2-json":
             col_args["cql"] = col_args.pop("filter")
+            col_args.pop("filter_lang")
+        else:
+            for arg in list(col_args):
+                if arg.startswith("filter_"):
+                    col_args[arg.replace("_", "-")] = col_args.pop(arg)
         search = Features(
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?

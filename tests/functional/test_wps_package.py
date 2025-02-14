@@ -2355,7 +2355,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 filter_match = responses.matchers.query_param_matcher({
                     "filter": filter_value,
                     "filter-lang": filter_lang,
-                    "timeout": "10",  # added internally by collection processor
                 })
             else:
                 filter_match = responses.matchers.json_params_matcher(filter_value)
