@@ -132,9 +132,26 @@
     </div>
 
     <div class="content-section">
+        <h3 id="inputs">
+            <a href="#inputs">Inputs</a>
+        </h3>
+        <p>Submitted request input values for the job execution.</p>
+        <!-- fill data here -->
+    </div>
+
+    <div class="content-section">
+        <h3 id="outputs">
+            <a href="#outputs">Outputs</a>
+        </h3>
+        <p>Submitted request output parametrization for the job execution.</p>
+        <!-- fill data here -->
+    </div>
+
+    <div class="content-section">
         <h3 id="results">
             <a href="#results">Results</a>
         </h3>
+        <p>Results produced by the job execution.</p>
         <!-- fill data here -->
     </div>
 
@@ -142,38 +159,8 @@
         <h3 id="job-logs">
             <a href="#job-logs">Logs</a>
         </h3>
-        <!-- fill data here -->
-        <div>
-            <script>
-                async function fetchJobLogs(format) {
-                    const url = "${util.get_job_link(job.id)}";
-                    const resp = await fetch(url + "/logs?f=" + format);
-                    const data = await resp.text();
-                    let log = document.getElementById("job-logs-content");
-                    toggleLogs(true);
-                    log.innerHTML = data;
-                    let btn_show = document.getElementById("job-logs-button-show");
-                    btn_show.onclick = toggleLogs;
-                }
-                function toggleLogs(show) {
-                    let log = document.getElementById("job-logs-content");
-                    let btn_show = document.getElementById("job-logs-button-show");
-                    let btn_hide = document.getElementById("job-logs-button-hide");
-                    log.parentElement.style.display = show ? "unset" : "none";
-                    btn_hide.style.display = show ? "unset" : "none";
-                    btn_show.style.display = show ? "none" : "unset";
-                }
-            </script>
-            <button type="button" id="job-logs-button-show" onclick="fetchJobLogs('text')">Display Logs</button>
-            <button
-                type="button"
-                id="job-logs-button-hide"
-                onclick="toggleLogs(false)"
-                style="display: none"
-            >Hide Logs
-            </button>
-            <pre style="display: none"><code id="job-logs-content"></code></pre>
-        </div>
+        <p>Logs captured during the job execution.</p>
+        ${util.build_job_toggle_button_code(job, type="logs", format="text", language="accesslog")}
     </div>
 
     <!-- fixme: if not success : error/exception -->
@@ -181,6 +168,7 @@
         <h3 id="errors">
             <a href="#errors">Errors</a>
         </h3>
+        <p>Errors that occurred during the job execution.</p>
         <!-- fill data here -->
     </div>
 
@@ -188,13 +176,15 @@
         <h3 id="statistics">
             <a href="#statistics">Statistics</a>
         </h3>
-        <!-- fill data here -->
+        <p>Statistics collected during the job execution.</p>
+        ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
     </div>
 
     <div class="content-section">
         <h3 id="provenance">
             <a href="#provenance">Provenance</a>
         </h3>
+        <p>Provenance metadata collected during the job execution request.</p>
         <!-- fill data here -->
     </div>
 

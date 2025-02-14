@@ -267,3 +267,54 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 %endfor
 </dl>
 </%def>
+
+
+<!--
+    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a job sub-path.
+    The code block and button display visibility and text are dynamically controlled and populated by state functions.
+    Once fetched, the job 'type' response contents are cached into to the code block element to avoid fetching again.
+    Classes are dynamically attributed with the corresponding 'type' parameter to allow different styling as needed.
+-->
+<%def name="build_job_toggle_button_code(job, type, format, language)">
+<div>
+    <script>
+        async function fetch_job_${type}(format) {
+            const url = "${get_job_link(job.id)}";
+            const resp = await fetch(url + "/${type}?f=" + format);
+            let data = "";
+            if ("${language}" == "json") {
+                data = await resp.json();
+                data = JSON.stringify(data, null, 4);
+            }
+            else {
+                data = await resp.text();
+            }
+            let code = hljs.highlight(data, {language: "${language}"}).value;
+            let code_block = document.getElementById("job-${type}-content");
+            toggle_job_${type}(true);
+            code_block.innerHTML = code;
+            let btn_show = document.getElementById("job-${type}-button-show");
+            btn_show.onclick = toggle_job_${type};
+        }
+        function toggle_job_${type}(show) {
+            let code_block = document.getElementById("job-${type}-content");
+            let btn_show = document.getElementById("job-${type}-button-show");
+            let btn_hide = document.getElementById("job-${type}-button-hide");
+            code_block.parentElement.style.display = show ? "unset" : "none";
+            btn_hide.style.display = show ? "unset" : "none";
+            btn_show.style.display = show ? "none" : "unset";
+        }
+    </script>
+    <button type="button" id="job-${type}-button-show"
+            onclick="fetch_job_${type}('${format}')">Display ${type.capitalize()}
+    </button>
+    <button
+        type="button"
+        id="job-${type}-button-hide"
+        onclick="toggle_job_${type}(false)"
+        style="display: none"
+    >Hide ${type.capitalize()}
+    </button>
+    <pre style="display: none"><code id="job-${type}-content" class="language-${language}">></code></pre>
+</div>
+</%def>
