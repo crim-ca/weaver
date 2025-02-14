@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import socket
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -17,7 +18,6 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
-from weaver.compat import cache
 
 if TYPE_CHECKING:
     from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
