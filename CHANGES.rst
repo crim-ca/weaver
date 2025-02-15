@@ -19,6 +19,7 @@ Changes:
 Fixes:
 ------
 - Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
+- Fix `Job` statistics not reported by the API in case of execution failure, although they might be partially available.
 
 .. _changes_6.2.0:
 

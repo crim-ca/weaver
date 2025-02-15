@@ -1003,7 +1003,7 @@ def submit_job_dispatch_task(
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-            if job.status in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+            if job.success:
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)

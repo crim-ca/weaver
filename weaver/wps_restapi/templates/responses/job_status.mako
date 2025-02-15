@@ -146,6 +146,8 @@
         %if job.success:
             <p>Results produced by the job execution.</p>
             ${util.build_job_toggle_button_code(job, type="results", format="json", language="json")}
+        %elif job.is_finished:
+            <p>No results available. Job is not finished.</p>
         %else:
             <p>No results available. Job did not succeed.</p>
         %endif
@@ -172,8 +174,12 @@
         <h3 id="statistics">
             <a href="#statistics">Statistics</a>
         </h3>
-        <p>Statistics collected during the job execution.</p>
-        ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
+        %if job.is_finished:
+            <p>Statistics collected during the job execution.</p>
+            ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
+        %else:
+            <p>No statistics available. Job is not finished.</p>
+        %endif
     </div>
 
     <div class="content-section">

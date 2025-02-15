@@ -1002,7 +1002,7 @@ class Job(Base, LoggerHandler):
     @property
     def success(self):
         # type: () -> bool
-        return Status.get()
+        return map_status(self.status, category=True) == StatusCategory.SUCCESS
 
     @property
     def status(self):

@@ -789,7 +789,7 @@ def get_job_stats(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+    if not job.is_finished:
         raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial
