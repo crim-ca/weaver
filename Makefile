@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 6.1.1
+APP_VERSION ?= 6.2.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -187,7 +187,7 @@ conda-base:		## obtain and install a missing conda distribution
 		 echo "Make sure to add '$(CONDA_BIN_DIR)' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-clean
-clean-clean: 	## remove the conda environment
+conda-clean: 	## remove the conda environment
 	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n "$(CONDA_ENV)" --yes --all
 
@@ -344,8 +344,8 @@ clean-docs-dirs:	## remove documentation artifacts (minimal)
 clean-src:		## remove all *.pyc files
 	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
-	@-rm -rf ./build
-	@-rm -rf ./src
+	@-rm -rf "$(APP_ROOT)/build"
+	@-rm -rf "$(APP_ROOT)/src"
 
 .PHONY: clean-test
 clean-test:		## remove files created by tests and coverage analysis

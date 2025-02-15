@@ -988,7 +988,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 lambda: timeout_running > 0,
                 message=(
                     "Maximum timeout reached for job execution test. "
-                    f"Expected job status change from '{Status.RUNNING}' to '{Status.SUCCEEDED}' "
+                    f"Expected job status change from '{Status.RUNNING}' to '{Status.SUCCESSFUL}' "
                     f"within {self.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT}s since first '{Status.RUNNING}'."
                 )
             )
@@ -1005,7 +1005,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
             if status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
-                failed = status != Status.SUCCEEDED
+                failed = status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]
                 logs, details = self.try_retrieve_logs(job_location_url, detailed_results=not failed)
                 self.assert_test(
                     lambda: not failed,

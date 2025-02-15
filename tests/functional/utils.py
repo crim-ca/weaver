@@ -493,7 +493,7 @@ class WpsConfigBase(GenericUtils):
             Monitor until the requested status is reached (default: when job is completed).
             If no value is specified and :paramref:`expect_failed` is enabled, completion status will be a failure.
             Otherwise, the successful status is used instead. Explicit intermediate status can be requested instead.
-            Whichever status is specified or defaulted, failed/succeeded statuses will break out of the monitoring loop,
+            Whichever status is specified or defaulted, failed/success statuses will break out of the monitoring loop,
             since no more status change is possible.
         :param expect_failed:
             If enabled, allow failing status to during status validation.
@@ -502,7 +502,7 @@ class WpsConfigBase(GenericUtils):
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
-        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCEEDED)
+        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCESSFUL)
 
         def check_job_status(_resp, running=False):
             # type: (AnyResponseType, bool) -> bool
@@ -511,7 +511,7 @@ class WpsConfigBase(GenericUtils):
             statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
             assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{cls._try_get_logs(status_url)}"
             assert body["status"] in statuses, f"Error job info:\n{pretty}\n{cls._try_get_logs(status_url)}"
-            return body["status"] in {final_status, Status.SUCCEEDED, Status.FAILED}  # break condition
+            return body["status"] in {final_status, Status.SUCCESSFUL, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
         left = timeout or cls.monitor_timeout
