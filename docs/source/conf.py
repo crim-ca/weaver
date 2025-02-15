@@ -460,6 +460,7 @@ linkcheck_anchors_ignore = [
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
     "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+    "issuecomment-[0-9]+",  # links to specific GitHub comments
 ]
 linkcheck_request_headers = {
     "https://github.com/": {

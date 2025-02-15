@@ -926,7 +926,7 @@ def _convert_cwl_io_enum(cwl_io_type, cwl_io_symbols, io_select, allow_unique, a
 
     if any_colon_symbol:
         cwl_io_symbols = [f"#{symbol}" for symbol in cwl_io_symbols]
-        return {"type": PACKAGE_ENUM_BASE, "symbols": cwl_io_symbols}
+        return {"type": {"type": PACKAGE_ENUM_BASE, "symbols": cwl_io_symbols}}
 
     if io_select != IO_INPUT:
         return {"type": cwl_io_type}

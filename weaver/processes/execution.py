@@ -256,10 +256,10 @@ def execute_process(task, job_id, wps_url, headers=None):
 
                 if execution.isComplete():
                     msg_progress = f" (status: {job_msg})" if job_msg else ""
-                    if execution.isSucceded():
+                    if execution.isSucceeded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
-                        job.status = map_status(Status.SUCCEEDED)
-                        job.status_message = f"Job succeeded{msg_progress}."
+                        job.status = map_status(Status.SUCCESSFUL)
+                        job.status_message = f"Job {job.status}{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [
@@ -551,6 +551,8 @@ def log_and_save_update_status_handler(
             status = update_status(status)
         if update_progress and progress is not None:
             progress = update_progress(progress)
+        if "error" in kwargs:
+            kwargs["errors"] = kwargs.pop("error")  # align with 'save_log' parameters
         job.save_log(message=message, progress=progress, status=status, **kwargs)
         store.update_job(job)
     return log_and_update_status
@@ -580,7 +582,9 @@ def parse_wps_inputs(wps_process, job, container=None):
         # successful execution of that nested process will log a 'succeeded' entry within this ongoing execution.
         # Because it is a nested process, it is expected that further operations from the 'parent' process using it will
         # log many more steps afterwards. Therefore, avoid the ambiguous entry within the context of the parent process.
-        update_status=lambda _status: Status.RUNNING if _status == Status.SUCCEEDED else _status,
+        update_status=lambda _status: (
+            Status.RUNNING if map_status(_status, category=True) == StatusCategory.SUCCESS else _status
+        ),
         # Similarly, progress of the current job will be constraint within inputs retrieval and the following outputs
         # retrieval for the nested progress execution. Mapping the progress will ensure overall gradual percent values.
         update_progress=lambda _progress: map_progress(_progress, JobProgress.GET_INPUTS, JobProgress.GET_OUTPUTS),
@@ -999,7 +1003,7 @@ def submit_job_dispatch_task(
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-            if job.status == Status.SUCCEEDED:
+            if job.status in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)
@@ -1351,21 +1355,25 @@ def validate_process_io(process, payload):
                                 "executionFormats": None,
                             }
                         })
+                # if a media-type was specified, allow it even if not
+                # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                io_accept += any_types
-                if not all(io_fmt in io_accept for io_fmt in io_ctypes):
-                    raise OWSInvalidParameterValue(json={
-                        "code": "InvalidParameterValue",
-                        "name": io_name,
-                        "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect "
-                            "supported formats specified by the process description."
-                        ),
-                        "value": {
-                            "supportedFormats": list(io_accept),
-                            "executionFormats": list(io_ctypes),
-                        }
-                    })
+                if not all(io_fmt in any_types for io_fmt in io_accept):
+                    # otherwise, all formats must be within allowed ones
+                    io_accept += any_types
+                    if not all(io_fmt in io_accept for io_fmt in io_ctypes):
+                        raise OWSInvalidParameterValue(json={
+                            "code": "InvalidParameterValue",
+                            "name": io_name,
+                            "description": (
+                                f"Submitted '{io_name}' requested Content-Types that do not respect "
+                                "supported formats specified by the process description."
+                            ),
+                            "value": {
+                                "supportedFormats": list(io_accept),
+                                "executionFormats": list(io_ctypes),
+                            }
+                        })
 
             if io_type == "inputs":
                 io_min = io_proc["minOccurs"]

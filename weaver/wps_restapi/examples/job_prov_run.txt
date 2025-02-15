@@ -1,0 +1,10 @@
+2024-12-12 09:16:17.843852                            Flow 1c49f085-bbd7-410d-a801-81fd42469e8a [ Run of workflow/packed.cwl#main
+2024-12-12 09:16:17.846280                            In   2ef7bde608ce5404e97d5f042f95f89f1c232871 < wf:main/message
+2024-12-12 09:16:17.863017                            In   2ef7bde608ce5404e97d5f042f95f89f1c232871 < wf:main/echo/message
+                           2024-12-12 09:16:18.867039 Out  59967079-217e-4bdb-92d7-2ef2f784825c > wf:main/echo/output
+                           2024-12-12 09:16:18.867039 Out  2ab450c1-7309-4c5b-b65b-b4dfa44f384b > wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4
+                           2024-12-12 09:16:18.867039 Out  6b04550d-c2bd-400b-858b-14e287bbf8c3 > wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1
+                           2024-12-12 09:16:18.869180 Out  59967079-217e-4bdb-92d7-2ef2f784825c > wf:main/primary/output
+                           2024-12-12 09:16:18.869180 Out  2ab450c1-7309-4c5b-b65b-b4dfa44f384b > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4
+                           2024-12-12 09:16:18.869180 Out  6b04550d-c2bd-400b-858b-14e287bbf8c3 > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1
+                           2024-12-12 09:16:18.867034 Flow 1c49f085-bbd7-410d-a801-81fd42469e8a ] Run of workflow/packed.cwl#main  (0:00:01.023182)

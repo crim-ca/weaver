@@ -11,7 +11,6 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """
-
 import copy
 import json
 import logging
@@ -21,6 +20,7 @@ import sys
 import tempfile
 import time
 import uuid
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import parse_qsl, urlparse
 
@@ -30,10 +30,12 @@ import cwltool.docker
 import cwltool.process
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
+from cwltool.cwlprov.writablebagfile import close_ro, packed_workflow
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
+from pyramid.settings import asbool
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, DataHandler, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
@@ -47,7 +49,6 @@ from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
-from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
@@ -128,6 +129,7 @@ from weaver.processes.convert import (
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import load_package_file, map_progress, pull_docker
+from weaver.provenance import WeaverResearchObject
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -1811,6 +1813,50 @@ class WpsPackage(Process):
         }
         return runtime_params
 
+    def setup_provenance(self, loading_context, runtime_context):
+        # type: (LoadingContext, RuntimeContext) -> None
+        """
+        Configure ``PROV`` runtime options.
+
+        .. seealso::
+            - https://www.w3.org/TR/prov-overview/
+            - https://cwltool.readthedocs.io/en/latest/CWLProv.html
+            - https://docs.ogc.org/DRAFTS/24-051.html#_requirements_class_provenance
+        """
+        weaver_cwl_prov = asbool(self.settings.get("weaver.cwl_prov", True))
+        if not weaver_cwl_prov:
+            loading_context.research_obj = None
+            runtime_context.research_obj = None
+            runtime_context.prov_obj = None
+            return
+
+        runtime_context.prov_user = loading_context.user_provenance = True
+        runtime_context.prov_host = loading_context.host_provenance = True
+
+        if not runtime_context.research_obj:
+            ro = WeaverResearchObject(
+                self.job,  # align the RO definition with the job (make the UUIDs equal)
+                self.settings,
+                runtime_context.make_fs_access(""),
+                temp_prefix_ro=runtime_context.tmpdir_prefix,
+                orcid=runtime_context.orcid,
+                full_name=runtime_context.cwl_full_name,
+            )
+
+            loading_context.research_obj = ro
+            runtime_context.research_obj = ro
+
+    def finalize_provenance(self, runtime_context):
+        # type: (RuntimeContext) -> None
+        if runtime_context.research_obj:
+            # perform packaging of the workflow
+            packed_wf_str = repr_json(self.package, force_string=True, indent=2)
+            packed_workflow(runtime_context.research_obj, packed_wf_str)
+
+            # sign-off and persist completed PROV
+            prov_dir = self.job.prov_path(self.settings)
+            close_ro(runtime_context.research_obj, prov_dir)
+
     def update_requirements(self):
         # type: () -> None
         """
@@ -1939,8 +1985,8 @@ class WpsPackage(Process):
                 level=logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
             )
 
-    def update_status(self, message, progress, status, error=None):
-        # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
+    def update_status(self, message, progress, status, error=None, step=False):
+        # type: (str, Number, AnyStatusType, Optional[Exception], bool) -> None
         """
         Updates the :mod:`pywps` real job status from a specified parameters.
         """
@@ -1961,7 +2007,7 @@ class WpsPackage(Process):
             # therefore, use the '_update_status' to enforce the status
             # using protected method also avoids weird overrides of progress
             # percent on failure and final 'success' status
-            self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
+            self.response._update_status(pywps_status_id, message, self.percent, clean=not step)  # noqa: W0212
 
         if isinstance(error, Exception):
             self.exception_message(exception_type=type(error), exception=error,
@@ -1979,11 +2025,17 @@ class WpsPackage(Process):
                            status,                  # type: AnyStatusType
                            error=None,              # type: Optional[Exception]
                            ):                       # type: (...) -> None
+        # ensure the status of the current workflow is not changed to 'success' if up a step-update
+        # setting to 'success' will report the wrong value in the status XML document
+        # this would also trigger cleanup, which would remove an staged file needed by a future step
+        if status == Status.SUCCEEDED:
+            status = Status.RUNNING
         self.update_status(
             message=f"[provider: {target_host}, step: {step_name}] - {str(message).strip()}",
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
             error=error,
+            step=True,
         )
 
     def log(self, level, message, *args, **kwargs):
@@ -2107,13 +2159,10 @@ class WpsPackage(Process):
             elif config == WeaverConfiguration.HYBRID:
                 self.remote_execution = problem_needs_remote is not None
 
+            loading_context = LoadingContext()
             if self.remote_execution:
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS
-                loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
-            else:
-                # ADES/Hybrid execute the CWL/AppPackage locally
-                loading_context = None
 
             self.update_effective_user()
             self.update_requirements()
@@ -2126,6 +2175,7 @@ class WpsPackage(Process):
             )
             runtime_context = RuntimeContext(kwargs=runtime_params)
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
+            self.setup_provenance(loading_context, runtime_context)
             try:
                 self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -2197,6 +2247,15 @@ class WpsPackage(Process):
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+            try:
+                self.finalize_provenance(runtime_context)
+            except Exception as exc:  # pragma: no cover  # only safeguard, it's good if this branch never occurs!
+                self.exception_message(
+                    PackageExecutionError,
+                    exc,
+                    "Failed to save package PROV metadata. Ignoring error to avoid failing execution.",
+                    level=logging.WARN,
+                )
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"
@@ -2741,6 +2800,11 @@ class WpsPackage(Process):
                             else:
                                 output.data_format.validate = format_extension_validator
                         return
+
+        # if the format is the "any" media-type default, allow override by explicit format defined by the result
+        if output.data_format.mime_type in [ContentType.TEXT_PLAIN, ContentType.ANY] and output.data_format.default:
+            output.supported_formats = (result_format_base, )
+            output.data_format = result_format_base
 
         # no match found, minimally check for extension
         if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:

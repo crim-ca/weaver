@@ -91,7 +91,13 @@ src
 ## Project process results
 workflows
 **/*.tif
+
+## build/release
+archive
+*.zip
+*.tar.gz
 **/*.zip
+**/*.tag.gz
 
 ## Project local configurations
 !config/*.example

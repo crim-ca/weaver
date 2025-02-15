@@ -27,6 +27,7 @@ from weaver.cli import (
     WeaverClient,
     main as weaver_cli
 )
+from weaver.exceptions import AuthenticationError
 from weaver.formats import ContentEncoding, ContentType
 
 
@@ -74,6 +75,134 @@ def test_cli_url_override_by_operation():
             client.execute(url="https://other.domain.com", process_id="random")
         assert mocked.call_args.args[0] == "https://other.domain.com"
         assert returned_url[0] == "https://other.domain.com"
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["init_url", "oper_url", "proc_id", "prov_id", "expect_base_url", "expect_proc_url"],
+    [
+        # With operation URL override
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes",
+            "test-process",
+            None,
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com",
+            "https://oper-url.example.com/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/jobs",
+            "https://oper-url.example.com/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        # Without operation URL (only init URL)
+        (
+            "https://init-url.example.com",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/processes",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/processes/test-process",
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            None,
+            "https://init-url.example.com",
+            "https://init-url.example.com/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/jobs/",  # final slash imported, should be removed
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/jobs",  # no final slash variant
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            f"https://init-url.example.com/jobs/{uuid.uuid4()}",
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+    ]
+)
+def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_base_url, expect_proc_url):
+    client = WeaverClient(url=init_url)
+    result = client._get_url(url=oper_url)
+    assert result == expect_base_url
+    result = client._get_process_url(url=oper_url, process_id=proc_id, provider_id=prov_id)
+    assert result == expect_proc_url
 
 
 @pytest.mark.cli
@@ -280,7 +409,7 @@ def test_auth_handler_basic():
 
 def test_auth_handler_bearer():
     req = WebTestRequest({})
-    auth = BearerAuthHandler(identity=str(uuid.uuid4()))
+    auth = BearerAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     token = str(uuid.uuid4())
     with mock.patch(
         "requests.Session.request",
@@ -307,7 +436,7 @@ def test_auth_handler_bearer_explicit_token_matches_request_token():
     req_request_token = WebTestRequest({})
     token = str(uuid.uuid4())
     auth_explicit_token = BearerAuthHandler(token=token)
-    auth_request_token = BearerAuthHandler(identity=str(uuid.uuid4()))
+    auth_request_token = BearerAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     with mock.patch(
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
@@ -322,7 +451,7 @@ def test_auth_handler_bearer_explicit_token_matches_request_token():
 
 def test_auth_handler_cookie():
     req = WebTestRequest({})
-    auth = CookieAuthHandler(identity=str(uuid.uuid4()))
+    auth = CookieAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     token = str(uuid.uuid4())
     with mock.patch(
         "requests.Session.request",
@@ -378,7 +507,7 @@ def test_auth_handler_cookie_explicit_token_matches_request_token():
     req_request_token = WebTestRequest({})
     token = str(uuid.uuid4())
     auth_explicit_token = CookieAuthHandler(token=token)
-    auth_request_token = CookieAuthHandler(identity=str(uuid.uuid4()))
+    auth_request_token = CookieAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
     with mock.patch(
         "requests.Session.request",
         side_effect=lambda *_, **__: mocked_auth_response("access_token", token)
@@ -389,6 +518,30 @@ def test_auth_handler_cookie_explicit_token_matches_request_token():
     assert "Cookie" in resp_explicit_token.headers and len(resp_explicit_token.headers["Cookie"])
     assert "Cookie" in resp_request_token.headers and len(resp_request_token.headers["Cookie"])
     assert resp_explicit_token.headers["Cookie"] == resp_request_token.headers["Cookie"]
+
+
+def test_auth_request_handler_no_url_or_token_init():
+    with pytest.raises(AuthenticationError):
+        BearerAuthHandler(identity=str(uuid.uuid4()))
+
+    try:
+        BearerAuthHandler(token=str(uuid.uuid4()))  # OK
+        BearerAuthHandler(url="https://example.com")  # OK
+    except Exception as exc:
+        pytest.fail(msg=f"Expected no init error from valid combinations. Got [{exc}]")
+
+
+def test_auth_request_handler_no_url_ignored_request():
+    req = WebTestRequest({})
+    auth = BearerAuthHandler(
+        identity=str(uuid.uuid4()),
+        url="https://example.com",  # URL must be passed to avoid error
+    )
+    auth.url = None  # reset after init check
+    with mock.patch("requests.Session.request") as mock_request:
+        resp = auth(req)  # type: ignore
+        mock_request.assert_not_called()
+    assert not resp.headers, "No headers should have been added since URL could not be resolved."
 
 
 def test_upload_file_not_found():
@@ -600,3 +753,14 @@ def test_subscriber_parsing(expect_error, subscriber_option, subscriber_dest, su
     else:
         assert expect_error is None, f"Test was expected to fail with {expect_error}, but did not raise"
         assert dict(**vars(ns)) == subscriber_result  # pylint: disable=R1735
+
+
+@pytest.mark.cli
+def test_cli_version_non_weaver():
+    """
+    Tests that the ``version`` operation is handled gracefully for a server not supporting it (Weaver-specific).
+    """
+    with mock.patch("weaver.cli.WeaverClient._request", return_value=OperationResult(success=False, code=404)):
+        result = WeaverClient(url="https://fake.domain.com").version()
+    assert result.code == 404
+    assert "Failed to obtain server version." in result.message

@@ -30,7 +30,7 @@ from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
 from tests.utils import assert_equal_any_order
-from weaver.datatype import Process
+from weaver.datatype import Job, Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
 from weaver.formats import ContentType
 from weaver.processes.constants import (
@@ -79,6 +79,10 @@ class MockWpsPackage(WpsPackage):
     def __init__(self, *_, **__):
         super(MockWpsPackage, self).__init__(*_, **__)
         self.mock_status_location = None
+
+    @property
+    def job(self):
+        return Job(task_id="MockWpsPackage")
 
     @property
     def status_location(self):
@@ -158,7 +162,7 @@ class MockProcess(Process):
         super(MockProcess, self).__init__(body)
 
 
-@pytest.mark.flaky(reruns=2, reruns_delay=1)
+@pytest.mark.flaky(retries=2, delay=1)
 def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
     """
     Execute a process and assert that stdout is correctly logged to log file upon successful process execution.
@@ -198,17 +202,22 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
             r".*",
             log_data,
             re.MULTILINE | re.DOTALL
-        )
+        ), f"Captured Log Information expected in:\n{log_data}"
         # cwltool call with reference to the command and stdout/stderr redirects
         assert re.match(
             r".*"
-            rf"cwltool:job.* \[job {process.id}\].*echo \\\n"
+            rf"(\[cwltool\]|cwltool:job.*) \[job {process.id}(_[0-9]+)?\].*echo \\\n"
             r"\s+'Dummy message' \> [\w\-/\.]+/stdout\.log 2\> [\w\-/\.]+/stderr\.log\n"
             r".*",
             log_data,
             re.MULTILINE | re.DOTALL
-        ), f"Information expected in:\n{log_data}"
-        assert f"[cwltool] [job {process.id}] completed success" in log_data
+        ), f"Command Information with Log redirects expected in:\n{log_data}"
+        assert re.match(
+            r".*"
+            rf"(\[cwltool\]|cwltool:job.*) \[job {process.id}(_[0-9]+)?\] completed success",
+            log_data,
+            re.MULTILINE | re.DOTALL
+        ), f"Information about successful job expected in:\n{log_data}"
 
 
 def test_stdout_stderr_logging_for_commandline_tool_failure(caplog):
