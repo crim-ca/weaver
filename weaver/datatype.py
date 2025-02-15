@@ -1000,6 +1000,11 @@ class Job(Base, LoggerHandler):
         self["user_id"] = user_id
 
     @property
+    def success(self):
+        # type: () -> bool
+        return Status.get()
+
+    @property
     def status(self):
         # type: () -> Status
         return Status.get(self.get("status"), Status.UNKNOWN)

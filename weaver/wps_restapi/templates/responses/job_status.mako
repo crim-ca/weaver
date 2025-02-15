@@ -135,24 +135,20 @@
         <h3 id="inputs">
             <a href="#inputs">Inputs</a>
         </h3>
-        <p>Submitted request input values for the job execution.</p>
-        <!-- fill data here -->
-    </div>
-
-    <div class="content-section">
-        <h3 id="outputs">
-            <a href="#outputs">Outputs</a>
-        </h3>
-        <p>Submitted request output parametrization for the job execution.</p>
-        <!-- fill data here -->
+        <p>Submitted request input values and output parametrization for the job execution.</p>
+        ${util.build_job_toggle_button_code(job, type="inputs", format="json", language="json")}
     </div>
 
     <div class="content-section">
         <h3 id="results">
             <a href="#results">Results</a>
         </h3>
-        <p>Results produced by the job execution.</p>
-        <!-- fill data here -->
+        %if job.success:
+            <p>Results produced by the job execution.</p>
+            ${util.build_job_toggle_button_code(job, type="results", format="json", language="json")}
+        %else:
+            <p>No results available. Job did not succeed.</p>
+        %endif
     </div>
 
     <div class="content-section">
