@@ -318,3 +318,65 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <pre style="display: none"><code id="job-${type}-content" class="language-${language}">></code></pre>
 </div>
 </%def>
+
+
+<!--
+    Applies an auto-refresh interval of the page into which it is invoked, if enabled by the checkbox.
+
+    At the same time, configures an event lister that will store the last scroll position and the checkbox state
+    before the refresh happens (if any), in order to reload it on the following refresh of the page, and restore
+    the previous position and auto-refresh state, therefore leaving the impression of preserving the same page
+    instead of jumping back to the top of the page and resetting the auto-refresh.
+-->
+<%def name="auto_refresh_page(interval, enabled=True)">
+<div class="auto-refresh">
+    <!--<meta http-equiv="refresh" content="${interval}" >-->
+    <p>
+        <label for="auto-refresh-page-checkbox">Auto-Refresh?</label>
+        <input type="checkbox" id="auto-refresh-page-checkbox" onclick="toggleAutoRefreshPageCheckbox()">
+    </p>
+
+    <script>
+        var auto_refresh_page_timer = setTimeout(toggleAutoRefreshPageCheckbox, ${interval} * 1000);
+        //var checkbox = document.getElementById("auto-refresh-page-checkbox");
+        //checkbox.checked = false;
+
+        function toggleAutoRefreshPageCheckbox() {
+            var checkbox = document.getElementById("auto-refresh-page-checkbox");
+            if (checkbox.checked) {
+                refresh();
+            }
+        }
+
+        function refresh() {
+            var checkbox = document.getElementById("auto-refresh-page-checkbox");
+            sessionStorage.setItem("auto_refresh_page", checkbox.checked);
+            document.location.reload(true);
+        }
+
+        function clear_refresh() {
+            var checkbox = document.getElementById("auto-refresh-page-checkbox");
+            checkbox.checked = false;
+            sessionStorage.setItem("auto_refresh_page", false);
+            clearTimeout(auto_refresh_page_timer);
+            auto_refresh_page_timer = null;
+        }
+
+        document.addEventListener("DOMContentLoaded", function(event) {
+            event.preventDefault();
+            var scroll_pos = sessionStorage.getItem("scroll_pos");
+            if (scroll_pos) window.scrollTo(0, scroll_pos);
+            var auto_refresh_page = sessionStorage.getItem("auto_refresh_page");
+            var checkbox = document.getElementById("auto-refresh-page-checkbox");
+            if (auto_refresh_page) checkbox.checked = true;
+            else clear_refresh();
+        });
+
+        window.onbeforeunload = function(event) {
+            //var checkbox = document.getElementById("auto-refresh-page-checkbox");
+            //sessionStorage.setItem("auto_refresh_page", checkbox.checked);
+            sessionStorage.setItem("scroll_pos", window.scrollY);
+        };
+    </script>
+</div>
+</%def>

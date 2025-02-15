@@ -68,6 +68,9 @@
         <h3 id="metadata">
             <a href="#metadata">Metadata</a>
         </h3>
+
+        ${util.auto_refresh_page(interval=5, enabled=(not job.is_finished))}
+
         <table class="table-job-status">
             <tr class="table-job-status-item ">
                 <td class="table-job-status-field field-key">Job ID</td>
