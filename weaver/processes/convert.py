@@ -1774,7 +1774,25 @@ def cwl2wps_io(io_info, io_select):
             # anything later on when CWL/WPS merging is attempted
             if io_def.symbols is not AnyValue:
                 kw["allowed_values"] = io_def.symbols
-            kw["default"] = io_info.get("default", None)
+            io_default = io_info.get("default", None)
+            # resilience against badly formed process descriptions
+            # (in case the reference is a remote process we have no control over)
+            if isinstance(io_default, list):
+                LOGGER.warning(
+                    "Detected badly formed 'default' as array for literal input [%s]. "
+                    "Attempting patch of the definition to make it valid.",
+                    io_def.name,
+                )
+                if len(io_default) == 0:
+                    io_default = None
+                elif len(io_default) == 1:
+                    io_default = io_default[0]
+            if not isinstance(io_default, (str, float, int, bool, type(None))):
+                raise PackageTypeError(
+                    f"Unsupported I/O info definition: '{io_info!r}' with '{io_select}' "
+                    f"specifies a 'default' that does not correspond to a valid literal value."
+                )
+            kw["default"] = io_default
             kw["min_occurs"] = io_def.min_occurs
             kw["max_occurs"] = io_def.max_occurs
         return io_literal(**kw)
