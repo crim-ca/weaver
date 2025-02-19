@@ -40,7 +40,12 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
+from weaver.formats import (
+    ContentEncoding,
+    ContentType,
+    clean_media_type_format,
+    get_format,
+    repr_json)
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -758,13 +763,15 @@ def get_job_results_response(
         return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
+    print(out_transmissions)
+    # TODO CHECK THIS
     res_id = out_vals[0][0]
-    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
-    #   req_fmt = guess_target_format(container)   where container=request
-    #   out_fmt (see above)
-    #   out_type = result.get("type")
-    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
-    out_fmt = None
+    # check accept header
+    req_fmt = (request_headers or {}).get("accept")
+    out_fmt = out_transmissions[res_id][1]
+    out_type = get_field(results[res_id], "mime_type", search_variations=True, default=None) #a voir en debuggant 
+    out_select = req_fmt or out_fmt or out_type  # (resolution order/precedence)
+    out_fmt = out_select
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
 
 
@@ -825,7 +832,6 @@ def generate_or_resolve_result(
 
     # Apply transform if type is different from desired output and desired output is different from plain
     if out and out not in transform.EXCLUDED_TYPES and out != typ:
-
         file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
         typ = out
         file_transform.get()

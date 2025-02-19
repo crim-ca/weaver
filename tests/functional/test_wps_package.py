@@ -3759,7 +3759,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 

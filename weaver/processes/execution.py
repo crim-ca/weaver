@@ -29,6 +29,7 @@ from weaver.execute import (
     ExecuteMode,
     ExecuteResponse,
     ExecuteReturnPreference,
+    ExecuteTransmissionMode,
     parse_prefer_header_execute_mode,
     parse_prefer_header_return,
     update_preference_applied_return_header
@@ -80,7 +81,12 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_return, get_job_submission_response
+from weaver.wps_restapi.jobs.utils import (
+    generate_or_resolve_result,
+    get_job_results_response,
+    get_job_return,
+    get_job_submission_response
+)
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
@@ -261,6 +267,27 @@ def execute_process(task, job_id, wps_url, headers=None):
                             ows2json_output_data(output, process, settings)
                             for output in execution.processOutputs
                         ]
+                        identifier_mapping = {}
+                        for index, result in enumerate(job_results):
+                            identifier_mapping[result["identifier"]] = index
+                        # mapper index avec identifier
+                        for job_output_id, values in job.outputs.items():
+                            if "format" in values:
+                                # job_output_id = get_any_id(job_output)
+                                result = job_results[identifier_mapping[job_output_id]]
+                                res_headers, _ = generate_or_resolve_result(
+                                    job,
+                                    result,
+                                    job_output_id,
+                                    job_output_id,
+                                    output_mode=ExecuteTransmissionMode.REFERENCE,
+                                    output_format=values["format"],
+                                    settings=settings
+                                )
+                                ref_key = get_any_value(result, key=True)
+                                result[ref_key] = res_headers["Content-Location"]
+                                result["mimeType"] = res_headers["Content-Type"]
+                                result["encoding"] = res_headers.get("Content-Encoding")
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
@@ -898,6 +925,8 @@ def submit_job_dispatch_task(
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)
+                    # TODO resolution de get job output, passer
+                    # modifier le request headers avec le bon type
                 return get_job_results_response(
                     job,
                     request_headers=req_headers,

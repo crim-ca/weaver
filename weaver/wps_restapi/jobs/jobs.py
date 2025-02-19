@@ -27,7 +27,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
-from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, get_field
 from weaver.processes.execution import (
     submit_job,
     submit_job_dispatch_task,
@@ -653,10 +653,11 @@ def get_job_output(request):
                 "value": ""
             }
         )
-    result_media_type = result["mimeType"]
+    result_media_type = get_field(result, "mimeType", search_variations=True)
     result_media_type = guess_target_format(request, default=result_media_type)
 
     # if format requested not equal to result media type and not in possible mediatypes...
+    #if result_media_type not in possible_media_types:
     if accept != result_media_type and accept not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
@@ -669,6 +670,12 @@ def get_job_output(request):
     is_reference = bool(get_any_value(result, key=True, file=True))
     _, output_format = get_job_output_transmission(job, output_id, is_reference)
     output_format = accept or output_format or result_media_type
+
+    # To ensure consistency and avoid type mismatches, all output formats are converted to a dictionary.
+    # This standardization prevents errors when handling cases in `get_job_results_single`
+    # where some formats are dictionaries and others are different types (e.g., strings or ContentType).
+    if not isinstance(output_format, dict):
+        output_format = {"mime_type": output_format}
 
     return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 
