@@ -80,6 +80,7 @@ numpy>=1.22.2
 oauthlib
 owslib==0.32.1
 PasteDeploy>=3.1.0; python_version >= "3.12"
+pandas
 Pillow
 pint
 psutil
