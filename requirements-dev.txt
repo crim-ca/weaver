@@ -4,10 +4,10 @@
 # pylint>=2.5 requires astroid>=2.4
 # install/update sometime fails randomly, so enforce it
 astroid
-# pin bandit, many issues in latest versions
+# pin bandit to avoid issues in early 1.8.x versions
 # - https://github.com/PyCQA/bandit/issues/1226
 # - https://github.com/PyCQA/bandit/issues/1227
-bandit<1.8
+bandit>=1.8.3
 bump2version
 codacy-coverage
 coverage
