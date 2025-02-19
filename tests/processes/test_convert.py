@@ -1,6 +1,10 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
+import inspect
+
+import logging
+
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
 import json
@@ -1004,6 +1008,89 @@ def test_cwl2wps_io_raise_mixed_types(test_type):
     io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
         cwl2wps_io(io_info, IO_INPUT)
+
+
+@pytest.mark.parametrize(
+    ["io_default", "io_expect", "is_erroneous"],
+    [
+        (
+            {"name": "data", "type": "string", "default": ["test"]},
+            "test",
+            True,
+        ),
+        (
+            {"name": "data", "type": "integer", "default": [1]},
+            1,
+            True,
+        ),
+        (
+            {"name": "data", "type": "float", "default": [3.1416]},
+            3.1416,
+            True,
+        ),
+        (
+            {"name": "data", "type": "boolean", "default": [True]},
+            True,
+            True,
+        ),
+        (
+            # empty considered as "null default"
+            {"name": "data", "type": "integer", "default": []},
+            None,
+            True,
+        ),
+        (
+            # explicitly "null default"
+            {"name": "data", "type": "integer", "default": [None]},
+            None,
+            True,
+        ),
+        (
+            # only 1 array element allowed for silent handling
+            {"name": "data", "type": "integer", "default": [1, 2, 3]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # don't allow nested lists, even if literal inside
+            # assume it is too much "lists" involved, and the intention is most probably wrong at this point
+            {"name": "data", "type": "integer", "default": [[1]]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # don't allow non-literals within list, even if single element
+            {"name": "data", "type": "integer", "default": [{}]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # sanity check valid case
+            {"name": "data", "type": "string", "default": "test"},
+            "test",
+            False,
+        ),
+        (
+            # sanity check valid case
+            {"name": "data", "type": "float", "default": 3.1416},
+            3.1416,
+            False,
+        )
+    ]
+)
+def test_cwl2wps_io_literal_handle_erroneous_defaults(io_default, io_expect, is_erroneous, caplog):
+    """
+    Given a remote :term:`OAP` process description with an erroneous ``default``, ensure parsing can mitigate silently.
+    """
+
+    if inspect.isclass(io_expect) and issubclass(io_expect, Exception):
+        with pytest.raises(io_expect):
+            cwl2wps_io(io_default, IO_INPUT)
+    else:
+        with caplog.at_level(logging.WARNING):
+            result = cwl2wps_io(io_default, IO_INPUT)
+            assert result.data == io_expect
+        assert not is_erroneous or (is_erroneous and "detected badly formed 'default'" in caplog.text.lower())
 
 
 def test_cwl2wps_io_record_format():
