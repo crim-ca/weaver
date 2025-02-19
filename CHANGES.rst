@@ -12,7 +12,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add resilient handling of `I/O` literal ``default`` values when parsing remote `OGC API - Processes` descriptions.
+  Due to varying definitions from the standard revisions, some implementations could indicate a single literal default
+  value as an array representation (e.g.: ``default: [1.23]``), leading to parsing "errors" in `Weaver` that expects a
+  strict match between the ``default`` value and its ``type``.
 
 Fixes:
 ------
