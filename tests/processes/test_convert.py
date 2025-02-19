@@ -2,7 +2,6 @@
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
 import inspect
-
 import logging
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
