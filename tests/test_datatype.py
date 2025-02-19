@@ -344,7 +344,7 @@ def test_process_outputs_alt():
         ("title", None, None),
         ("title", TypeError, TypeError),
         ("title", 1234, TypeError),
-        ("status", Status.SUCCEEDED, Status.SUCCEEDED),
+        ("status", Status.SUCCESSFUL, Status.SUCCESSFUL),
         ("status", 12345678, ValueError),
         ("status", "random", ValueError),
         ("status_message", None, "no message"),
@@ -422,7 +422,7 @@ def test_job_updated_status():
     assert job.updated == started
     job["updated"] = None  # reset to test auto resolve
     job.finished = finished
-    job.status = Status.SUCCEEDED
+    job.status = Status.SUCCESSFUL
     assert job.updated == finished
 
 

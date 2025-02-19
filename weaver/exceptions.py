@@ -49,6 +49,18 @@ class WeaverException(Exception):
     detail = message = comment = explanation = "Unknown error"
 
 
+class WeaverExecutionError(WeaverException):
+    """
+    Generic exception occurring during an execution of any given process, job, provider or package.
+    """
+
+
+class AuthenticationError(WeaverException):
+    """
+    Generic exception related to an issue about authentication configuration or resolution.
+    """
+
+
 class ListingInvalidParameter(WeaverException, OWSInvalidParameterValue, ValueError):
     """
     Error related to an invalid parameter for listing queries.
@@ -210,6 +222,12 @@ class JobRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, JobExce
     """
 
 
+class JobExecutionError(HTTPInternalServerError, OWSNoApplicableCode, WeaverExecutionError, JobException):
+    """
+    Error related to an execution issue for a job.
+    """
+
+
 class JobUpdateError(HTTPInternalServerError, OWSNoApplicableCode, JobException):
     """
     Error related to an update issue for a job.
@@ -253,7 +271,7 @@ class PackageRegistrationError(HTTPInternalServerError, OWSNoApplicableCode, Pac
     """
 
 
-class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageException):
+class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageException, AuthenticationError):
     """
     Error related to a runtime failure caused by failing authentication prerequisite.
 
@@ -262,7 +280,7 @@ class PackageAuthenticationError(HTTPForbidden, OWSAccessForbidden, PackageExcep
     """
 
 
-class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, PackageException):
+class PackageExecutionError(HTTPInternalServerError, OWSNoApplicableCode, WeaverExecutionError, PackageException):
     """
     Error related to a runtime issue during package execution.
 

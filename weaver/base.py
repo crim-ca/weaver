@@ -39,7 +39,11 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def __members__(cls):
         members = set(cls.__dict__) - set(object.__dict__)
-        members = [member for member in members if not inspect.ismethod(getattr(cls, member))]
+        members = [
+            member for member in members
+            if not isinstance(object.__getattribute__(cls, member), classmethod)
+            and not inspect.ismethod(getattr(cls, member))
+        ]
         return [member for member in members if not isinstance(member, str) or not member.startswith("_")]
 
     @classmethod
@@ -109,19 +113,19 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
-
-    def __init__(self,
-                 fget=None,     # type: Optional[Callable[[object], PropertyDataTypeT]]
-                 fset=None,     # type: Optional[Callable[[object, PropertyDataTypeT], None]]
-                 fdel=None,     # type: Optional[Callable[[object], None]]
-                 doc="",        # type: str
-                 ):             # type: (...) -> None
+    def __init__(
+        self,
+        fget=None,  # type: Optional[Callable[[object], PropertyDataTypeT]]
+        fset=None,  # type: Optional[Callable[[object, PropertyDataTypeT], None]]
+        fdel=None,  # type: Optional[Callable[[object], None]]
+        doc="",     # type: str
+    ):              # type: (...) -> None
         super(classproperty, self).__init__(fget=fget, fset=fset, fdel=fdel, doc=doc)
         self.__doc__ = inspect.cleandoc(doc)
 
-    def __get__(self, cls, owner):  # noqa
-        # type: (Type[object], Any) -> PropertyDataTypeT
-        return classmethod(self.fget).__get__(None, owner)()
+    def __get__(self, instance, owner=None):
+        # type: (Any, Optional[Type[object]]) -> PropertyDataTypeT
+        return self.fget.__get__(None, owner)(instance or owner)  # pylint: disable=E1101,no-member  # false-positive
 
 
 class _EnumMeta(enum.EnumMeta):

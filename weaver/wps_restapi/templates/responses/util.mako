@@ -116,7 +116,15 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 <dl class="indent">
 %for meta in metadata:
     <dt>
-        ${meta.title}
+        <div class="field-key">
+        %if "title" in meta:
+            Title: ${meta.title}
+        %elif "role" in meta:
+            Role: ${meta.role}
+        %else:
+            Rel: ${meta.rel}
+        %endif
+        </div>
     </dt>
     <dd>
         %if "href" in meta:

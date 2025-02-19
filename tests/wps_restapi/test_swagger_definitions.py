@@ -8,6 +8,7 @@ import colander
 import mock
 import pytest
 
+from weaver.execute import ExecuteMode
 from weaver.formats import EDAM_NAMESPACE, EDAM_NAMESPACE_URL, IANA_NAMESPACE, IANA_NAMESPACE_URL, ContentType
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWL_SPEC_ID,
@@ -444,3 +445,39 @@ def test_collection_input_filter_unresolved_error():
 
 def test_collection_input_filter_missing():
     assert sd.FilterSchema().deserialize({}) in [colander.drop, {}]
+
+
+@pytest.mark.parametrize(
+    ["test_value", "expect_result"],
+    [
+        (
+            {
+                "process": "https://example.com/processes/parent",
+                "inputs": {
+                    "process": "https://example.com/processes/nested",
+                    "inputs": {
+                        "process": "https://example.com/processes/child",
+                        "inputs": {"value": 123}
+                    }
+                }
+            },
+            {
+                "$schema": sd.Execute._schema,
+                "process": "https://example.com/processes/parent",
+                "inputs": {
+                    "process": "https://example.com/processes/nested",
+                    "inputs": {
+                        "process": "https://example.com/processes/child",
+                        "inputs": {"value": 123},
+                    }
+                },
+                "outputs": None,
+                "mode": ExecuteMode.AUTO,
+            },
+        )
+    ]
+)
+def test_nested_process_input(test_value, expect_result):
+    schema = sd.Execute()
+    result = schema.deserialize(test_value)
+    assert result == expect_result

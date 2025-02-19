@@ -101,6 +101,23 @@ they are optional and which default value or operation is applied in each situat
 
   .. versionadded:: 1.9
 
+.. _weaver-cwl-prov:
+
+- | ``weaver.cwl_prov = true|false`` [:class:`bool`-like]
+  | (default: ``true``)
+  |
+  | Configure whether :term:`W3C` |PROV|_ functionality using the :ref:`proc_op_job_prov` endpoints should be enabled
+    to collect :term:`Provenance` metadata when executing the underlying :term:`CWL` of a given :term:`Process`
+    or :term:`Workflow`.
+
+  .. note::
+
+     Any pre-existing :term:`Job` that was created when this option did not yet exist or that was executed while
+     it was disabled will not offer :term:`Provenance` metadata. This is intrinsic to the functionality that must obtain
+     timely metadata *while* executing to properly represent operational steps and :term:`Job` updates as they occur.
+
+  .. versionadded:: 6.1
+
 .. _weaver-wps:
 
 - | ``weaver.wps = true|false`` [:class:`bool`-like]

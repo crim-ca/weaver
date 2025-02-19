@@ -118,12 +118,12 @@ class WpsRestApiJobsTest(JobUtils):
         self.job_info = []  # type: List[Job]
         self.make_job(task_id="0000-0000-0000-0000",
                       process=self.process_public.identifier, service=None,
-                      user_id=self.user_editor1_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+                      user_id=self.user_editor1_id, status=Status.SUCCESSFUL, progress=100, access=Visibility.PUBLIC,
                       tags=["unique"],
                       logs=[
                           ("Start", logging.INFO, Status.ACCEPTED, 1),
                           ("Process", logging.INFO, Status.RUNNING, 10),
-                          ("Complete", logging.INFO, Status.SUCCEEDED, 100)
+                          ("Complete", logging.INFO, Status.SUCCESSFUL, 100)
                       ])
         self.make_job(task_id="0000-0000-0000-1111",
                       process=self.process_unknown, service=self.service_public.name, tags=["test-two", "other"],
@@ -260,7 +260,7 @@ class WpsRestApiJobsTest(JobUtils):
         for link_info in job["links"]:
             assert "href" in link_info and isinstance(link_info["href"], str)
         assert job["status"] in Status.values()
-        if job["status"] == Status.SUCCEEDED:
+        if job["status"] == Status.SUCCESSFUL:
             assert len([link for link in job["links"] if link["rel"].endswith("results")])
         elif job["status"] == Status.FAILED:
             assert len([link for link in job["links"] if link["rel"].endswith("exceptions")])
@@ -339,8 +339,6 @@ class WpsRestApiJobsTest(JobUtils):
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
 
-    @pytest.mark.html
-    @pytest.mark.oap_part1
     @parameterized.expand([
         ({}, ),  # detail omitted should apply it for HTML, unlike JSON that returns the simplified listing by default
         ({"detail": None}, ),
@@ -353,6 +351,8 @@ class WpsRestApiJobsTest(JobUtils):
         ({"detail": "False"}, ),
         ({"detail": "no"}, ),
     ])
+    @pytest.mark.html
+    @pytest.mark.oap_part1
     def test_get_jobs_detail_html_enforced(self, params):
         """
         Using :term:`HTML`, ``detail`` response is always enforced to allow rendering, regardless of the parameter.
@@ -779,7 +779,6 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 404
         assert resp.content_type == ContentType.APP_JSON
 
-    @pytest.mark.oap_part1
     @parameterized.expand([
         get_path_kvp(
             sd.jobs_service.path,
@@ -818,6 +817,7 @@ class WpsRestApiJobsTest(JobUtils):
             service="provider-2",
         ),
     ])
+    @pytest.mark.oap_part1
     def test_get_jobs_process_or_service_mismatch_in_path_or_query(self, path):
         # type: (str) -> None
         """
@@ -1304,7 +1304,7 @@ class WpsRestApiJobsTest(JobUtils):
 
     @pytest.mark.oap_part1
     def test_get_jobs_by_status_single(self):
-        test = {"status": Status.SUCCEEDED}
+        test = {"status": Status.SUCCESSFUL}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1322,7 +1322,7 @@ class WpsRestApiJobsTest(JobUtils):
 
     @pytest.mark.oap_part1
     def test_get_jobs_by_status_multi(self):
-        test = {"status": f"{Status.SUCCEEDED},{Status.RUNNING}"}
+        test = {"status": f"{Status.SUCCESSFUL},{Status.RUNNING}"}
         path = get_path_kvp(sd.jobs_service.path, **test)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -1438,7 +1438,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         job_success = self.job_info[0]
         job_failed = self.job_info[1]
-        assert job_success.status == Status.SUCCEEDED, "Job must be in successful state for test"
+        assert job_success.status == Status.SUCCESSFUL, "Job must be in successful state for test"
         assert job_failed.status == Status.FAILED, "Job must be in failed state for test"
 
         # create dummy files to validate results flush of successful job
@@ -1760,7 +1760,7 @@ class WpsRestApiJobsTest(JobUtils):
 
     def test_job_statistics_missing(self):
         job = self.job_info[0]
-        assert job.status == Status.SUCCEEDED, "invalid job status to run test"
+        assert job.status == Status.SUCCESSFUL, "invalid job status to run test"
         path = f"/jobs/{job.id}/statistics"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404, "even if job is successful, expects not found if no statistics are available"
@@ -1770,7 +1770,7 @@ class WpsRestApiJobsTest(JobUtils):
         job = self.make_job(
             add_info=False,
             task_id="2222-0000-0000-0000", process=self.process_public.identifier, service=None,
-            user_id=self.user_admin_id, status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+            user_id=self.user_admin_id, status=Status.SUCCESSFUL, progress=100, access=Visibility.PUBLIC,
             statistics=stats
         )
         try:
@@ -1811,7 +1811,7 @@ class WpsRestApiJobsTest(JobUtils):
     def test_job_outputs_response(self):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
-            status=Status.SUCCEEDED, progress=100, access=Visibility.PRIVATE, context="test/context",
+            status=Status.SUCCESSFUL, progress=100, access=Visibility.PRIVATE, context="test/context",
             results=[{"id": "test", "value": "data"}],
         )
 
@@ -1820,13 +1820,13 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
 
-    @pytest.mark.oap_part4
     @pytest.mark.xfail(reason="CWL PROV not implemented (https://github.com/crim-ca/weaver/issues/673)")
+    @pytest.mark.oap_part4
     def test_job_run_response(self):
         raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/673)
 
+    @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4
-    @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCEEDED])
     def test_job_update_locked(self, status):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
@@ -1919,8 +1919,8 @@ class WpsRestApiJobsTest(JobUtils):
         test_job = self.job_store.fetch_by_id(new_job.id)
         assert test_job.subscribers == {
             "callbacks": {
-                Status.SUCCEEDED: "https://example.com/success",
-                Status.FAILED: "https://example.com/failed",
+                StatusCategory.SUCCESS.value.lower(): "https://example.com/success",
+                StatusCategory.FAILED.value.lower(): "https://example.com/failed",
             }
         }
 
@@ -1929,11 +1929,13 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Test modification of the execution ``return`` and ``response`` options, going back-and-forth between approaches.
         """
+        test_inputs = {"message": "test"}
+        test_outputs = {"result": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.CREATED, progress=0, access=Visibility.PUBLIC,
-            execute_mode=ExecuteMode.AUTO,
-            execute_response=ExecuteResponse.DOCUMENT,
+            execute_mode=ExecuteMode.AUTO, execute_response=ExecuteResponse.DOCUMENT,
+            inputs=test_inputs, outputs=test_outputs,
         )
 
         body = {}
@@ -1950,6 +1952,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {"response": ExecuteResponse.DOCUMENT}
         path = f"/jobs/{new_job.id}"
@@ -1962,6 +1966,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.DOCUMENT
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.MINIMAL}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {}
         headers = {
@@ -1977,6 +1983,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
         body = {"response": ExecuteResponse.RAW}
         path = f"/jobs/{new_job.id}"
@@ -1989,6 +1997,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["mode"] == ExecuteMode.AUTO
         assert resp.json["response"] == ExecuteResponse.RAW
         assert resp.json["headers"]["Prefer"] == f"return={ExecuteReturnPreference.REPRESENTATION}"
+        assert resp.json["inputs"] == test_inputs
+        assert resp.json["outputs"] == test_outputs
 
     @pytest.mark.oap_part4
     def test_job_update_subscribers(self):
@@ -2076,7 +2086,7 @@ class WpsRestApiJobsTest(JobUtils):
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``Accept`` header.
         """
         job = self.job_info[0]
-        assert job.status == Status.SUCCEEDED, "Precondition invalid."
+        assert job.status == Status.SUCCESSFUL, "Precondition invalid."
         headers = {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"}
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
@@ -2119,7 +2129,7 @@ class WpsRestApiJobsTest(JobUtils):
         Validate retrieval of :term:`Job` status response with alternate value mapping by ``profile`` query parameter.
         """
         job = self.job_info[0]
-        assert job.status == Status.SUCCEEDED, "Precondition invalid."
+        assert job.status == Status.SUCCESSFUL, "Precondition invalid."
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=self.json_headers, params={"schema": JobStatusSchema.OPENEO})
         assert resp.status_code == 200

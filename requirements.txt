@@ -43,8 +43,10 @@ cryptography
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-##cwltool==3.1.20230906142556
-cwltool @ git+https://github.com/fmigneault/cwltool.git@fix-load-contents-array
+cwltool==3.1.20241217163858
+# for some reason, not the same release number,
+# but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
+cwlprov==0.1.1
 dnspython>=2.6.1  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.1
 duration
@@ -73,12 +75,10 @@ mako
 #mistune>=2.0.3,<2.1
 multipagetiff
 mypy_boto3_s3
-numpy>=1.22.2,<2; python_version < "3.10"
-numpy>=1.22.2; python_version >= "3.10"
+numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.29.3
-pandas
+owslib==0.32.1
 PasteDeploy>=3.1.0; python_version >= "3.12"
 Pillow
 pint
@@ -90,7 +90,7 @@ psutil
 #   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 # - extra 'backend-native' uses shapely for Python objects
 # - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
-pygeofilter[fes,backend-native]
+pygeofilter[fes,backend-native]>=0.3.1
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -125,10 +125,7 @@ schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
-# Python<3.10 error via pip, avoid endless package install lookup error with botocore
-# (https://github.com/pypa/pip/issues/12827#issuecomment-2211291150)
-urllib3>=2.2.2 ; python_version >= "3.10"  
-urllib3==1.26.19 ; python_version < "3.10"  # pyup: ignore
+urllib3>=2.2.2
 urlmatch
 xmltodict
 webob

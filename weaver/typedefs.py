@@ -78,6 +78,7 @@ if TYPE_CHECKING:
     from werkzeug.datastructures.structures import MultiDict as WerkzeugMultiDict
     from werkzeug.wrappers import Request as WerkzeugRequest
 
+    from weaver.database.base import DatabaseInterface
     from weaver.datatype import Process, Service
     from weaver.execute import AnyExecuteControlOption, AnyExecuteMode, AnyExecuteResponse, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -87,6 +88,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
     Path = Union[os.PathLike[str], str, bytes]
+    URL = str
 
     Default = TypeVar("Default")  # used for return value that is employed from a provided default value
     Params = ParamSpec("Params")  # use with 'Callable[Params, Return]', 'Params.args' and 'Params.kwargs'
@@ -327,12 +329,12 @@ if TYPE_CHECKING:
     CWL_Results = Dict[str, CWL_RuntimeOutput]
 
     # CWL loading
-    CWL_WorkflowInputs = CWL_RuntimeInputsMap   # mapping of ID:value (any type)
+    CWL_WorkflowInputs = Union[CWL_RuntimeInputsMap, CWL_RuntimeInputList]
     # mapping of ID:glob-pattern (File/Directory or string with loadContents)
     CWL_ExpectedOutputDef = TypedDict("CWL_ExpectedOutputDef", {
         "type": Literal["File", "Directory", "string"],
         "glob": str,
-    }, total=True)
+    }, total=False)
     CWL_ExpectedOutputs = Dict[str, CWL_ExpectedOutputDef]
     JobProcessDefinitionCallback = Callable[[str, Dict[str, str], Dict[str, Any]], WpsProcessInterface]
 
@@ -359,7 +361,7 @@ if TYPE_CHECKING:
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
-    AnyDatabaseContainer = AnyContainer
+    AnyDatabaseContainer = Union[AnyContainer, DatabaseInterface]
 
     AnyData = Union[str, bytes, bytearray]
     AnyDataStream = Union[AnyData, io.IOBase]
@@ -401,7 +403,7 @@ if TYPE_CHECKING:
     # update_status(message, progress, status, *args, **kwargs)
     UpdateStatusPartialFunction = TypeVar(
         "UpdateStatusPartialFunction",
-        bound=Callable[[str, Number, AnyStatusType, ..., Any], None]
+        bound=Callable[[str, Number, AnyStatusType, Any, Any], None]
     )
 
     DatetimeIntervalType = TypedDict("DatetimeIntervalType", {
@@ -456,6 +458,7 @@ if TYPE_CHECKING:
         "filter-lang": Optional[str],
         "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
     }, total=False)
+    JobValueNestedProcess = "ProcessExecution"  # type: TypeAlias
     JobValueData = TypedDict("JobValueData", {
         "data": Required[AnyValueType],
     }, total=False)
@@ -469,6 +472,7 @@ if TYPE_CHECKING:
         JobValueBbox,
         JobValueFile,
         JobValueCollection,
+        JobValueNestedProcess,
     ]
     JobValueFileItem = TypedDict("JobValueFileItem", {
         "id": Required[str],
@@ -511,14 +515,16 @@ if TYPE_CHECKING:
     JobOutputItem = Union[JobExpectItem, Dict[str, AnyValueType]]
     JobOutputs = List[JobOutputItem]
     JobResults = List[JobValueItem]
-    JobCustomInputs = TypeVar(
-        "JobCustomInputs",
-        bound=Any,
+    JobCustomInputObject = TypeVar(
+        "JobCustomInputObject",
+        bound=CWL_RuntimeInput,
     )
-    JobCustomOutputs = TypeVar(
-        "JobCustomOutputs",
-        bound=Any,
+    JobCustomInputs = Dict[str, JobCustomInputObject]
+    JobCustomOutputObject = TypeVar(
+        "JobCustomOutputObject",
+        bound=CWL_ExpectedOutputDef,  # custom output can have additional parameters, but CWL minimum fields are needed
     )
+    JobCustomOutputs = Dict[str, JobCustomOutputObject]
     JobMonitorReference = TypeVar(  # typically a URI of the remote job status or an execution object/handler
         "JobMonitorReference",
         bound=Any,

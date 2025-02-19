@@ -988,18 +988,9 @@ def test_schema_default_missing_validator_combinations(test_case):
     evaluate_test_cases([test_case])
 
 
-def test_schema_default_missing_validator_openapi():
-    """
-    Validate that resulting OpenAPI schema are as expected while still providing advanced deserialization features.
-
-    Resulting schema are very similar can often cannot be distinguished for some variants, but the various combination
-    of values for ``default``, ``missing`` and ``validator`` will provide very distinct behavior during parsing.
-
-    .. seealso::
-        :func:`test_schema_default_missing_validator_combinations`
-    """
-    converter = ce.ObjectTypeConverter(ce.OAS3TypeConversionDispatcher())
-    test_schemas = [
+@pytest.mark.parametrize(
+    "schema",
+    [
         Mapping,
         Missing,
         Default,
@@ -1011,9 +1002,20 @@ def test_schema_default_missing_validator_openapi():
         DefaultDropValidator,
         DefaultDropRequired,
     ]
-    for schema in test_schemas:
-        converted = converter.convert_type(schema())
-        assert converted == schema.schema_expected, f"Schema for [{schema.__name__}] not as expected"
+)
+def test_schema_default_missing_validator_openapi(schema):
+    """
+    Validate that resulting OpenAPI schema are as expected while still providing advanced deserialization features.
+
+    Resulting schema are very similar can often cannot be distinguished for some variants, but the various combination
+    of values for ``default``, ``missing`` and ``validator`` will provide very distinct behavior during parsing.
+
+    .. seealso::
+        :func:`test_schema_default_missing_validator_combinations`
+    """
+    converter = ce.ObjectTypeConverter(ce.OAS3TypeConversionDispatcher())
+    converted = converter.convert_type(schema())
+    assert converted == schema.schema_expected, f"Schema for [{schema.__name__}] not as expected"
 
 
 def test_dropable_variable_mapping():
@@ -1526,3 +1528,74 @@ def test_none_type_schema():
     node = ce.ExtendedSchemaNode(ce.NoneType(), title="test-null")
     schema = ce.NoneTypeConverter(None).convert_type(node)
     assert schema == {"type": "null", "title": "test-null"}
+
+
+def test_bind_keyword_schema():
+    """
+    Test binding feature extended to custom keyword schemas.
+
+    .. seealso::
+        - https://docs.pylonsproject.org/projects/colander/en/latest/binding.html
+    """
+    @colander.deferred
+    def get_title(node, kw):  # noqa
+        return Field(name="title", default="Field!")
+
+    @colander.deferred
+    def get_missing_dynamic(node, kw):  # noqa
+        if kw.get("missing"):
+            return colander.drop
+        return colander.required
+
+    class Field(ce.ExtendedSchemaNode):
+        schema_type = ce.ExtendedString
+
+    class Map(ce.ExtendedMappingSchema):
+        name_dont_care = get_title
+        other = Field()
+
+    class OneOf(ce.OneOfKeywordSchema):
+        _one_of = [Map()]
+
+        def after_bind(self, node, kw):
+            return
+
+    class MappingFieldDeferred(ce.ExtendedMappingSchema):
+        field = OneOf()
+
+    class OneOfDeferred(ce.OneOfKeywordSchema):
+        _one_of = [get_title]
+
+    class MappingKeywordDeferred(ce.ExtendedMappingSchema):
+        field = OneOfDeferred()
+
+    class PropertyKeywordDeferred(ce.ExtendedMappingSchema):
+        name = OneOf(missing=get_missing_dynamic)
+
+    schema = MappingFieldDeferred()
+    result = schema.deserialize({"field": {"other": "normal"}})
+    assert result == {"field": {"other": "normal"}}
+
+    schema.bind(**{})
+    result = schema.deserialize({"field": {"other": "normal"}})
+    assert result == {"field": {"title": "Field!", "other": "normal"}}
+
+    schema = MappingKeywordDeferred()
+    with pytest.raises(ce.ConversionTypeError):
+        # no bind applied not supported if directly under keyword
+        schema.deserialize({"field": ""})
+
+    schema.bind(**{})
+    result = schema.deserialize({"field": ""})
+    assert result == {"field": "Field!"}
+
+    schema = PropertyKeywordDeferred()
+    result = schema.deserialize({"name": {"other": "normal"}})
+    assert result == {"name": {"other": "normal", "title": "Field!"}}  # normal behavior
+
+    with pytest.raises(colander.Invalid):
+        schema.deserialize({})  # 'missing' property by default set as required
+
+    schema = schema.bind(missing=True)
+    result = schema.deserialize({})  # allowed because dynamic bind applied missing drop
+    assert result == {}

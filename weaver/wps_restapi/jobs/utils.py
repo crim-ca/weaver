@@ -14,6 +14,7 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPLocked,
     HTTPNoContent,
+    HTTPNotAcceptable,
     HTTPNotFound,
     HTTPOk
 )
@@ -45,7 +46,9 @@ from weaver.formats import (
     ContentType,
     clean_media_type_format,
     get_format,
-    repr_json)
+    guess_target_format,
+    repr_json
+)
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
@@ -348,7 +351,11 @@ def get_job_status_schema(request):
 
     def make_headers(resolved_schema):
         # type: (JobStatusSchemaType) -> HeadersType
-        content_type = clean_media_type_format(content_accept, strip_parameters=True)
+        content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
+        # FIXME: support HTML or XML
+        #  (allow transparently for browsers types since Accept did not raise earlier, and no other supported yet)
+        if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
+            content_type = ContentType.APP_JSON
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
         if resolved_schema == JobStatusSchema.OGC:
@@ -1312,7 +1319,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status != Status.SUCCEEDED:
+    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
@@ -1443,3 +1450,40 @@ def dismiss_job_task(job, container):
     job.status = map_status(Status.DISMISSED)
     job = store.update_job(job)
     return job
+
+
+def get_job_prov_response(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve specific :term:`Provenance` contents of a :term:`Job` based on the request.
+
+    The specific request path is redirected to the relevant command from :mod:`cwlprov`.
+    If applicable, request :term:`Media-Type` specifiers are considered to return alternate representations.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+
+    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
+    prov_path = request.path.rsplit("/prov", 1)[-1]
+    prov_path = f"/prov{prov_path}"
+    prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
+    if not prov_data:
+        prov_dir = job.prov_path(request)
+        prov_exists = os.path.isdir(prov_dir)
+        prov_err = HTTPNotAcceptable if prov_exists else JobGone
+        prov_body = {
+            "title": "NoJobProvenance",
+            "type": "no-job-provenance",  # unofficial
+            "detail": "Job provenance could not be retrieved for the specified job.",
+            "cause": "Missing or invalid provenance details."
+        }
+        if prov_exists and "run_id" in request.matchdict:
+            prov_err = JobNotFound
+            prov_body["error"] = "No such run ID for specified job provenance."
+            prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
+        prov_body["status"] = prov_err.code
+        return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
+    links = job.links(container=request, self_link="provenance")
+    headers = [("Link", make_link_header(link)) for link in links]
+    return HTTPOk(body=prov_data, headers=headers, content_type=prov_type, charset="utf-8")

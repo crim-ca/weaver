@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 
 class GenericUtils(unittest.TestCase):
     def fully_qualified_test_name(self, name=""):
+        # type: (str) -> str
         """
         Generates a unique name using the current test method full context name and the provided name, if any.
 
@@ -72,7 +73,10 @@ class GenericUtils(unittest.TestCase):
         """
         extra_name = f"-{name}" if name else ""
         class_name = fully_qualified_name(self)
-        test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        if hasattr(self, "_testMethodName"):
+            test_name = f"{class_name}.{self._testMethodName}{extra_name}"
+        else:
+            test_name = f"{class_name}{extra_name}"  # called from class method
         test_name = test_name.replace(".", "-").replace("-_", "_").replace("_-", "-")
         return test_name
 
@@ -266,7 +270,7 @@ class ResourcesUtil(GenericUtils):
                         with open(path_ext, mode="r", encoding="utf-8") as f:
                             json_payload = yaml.safe_load(f)  # both JSON/YAML
                             return json_payload
-                    if urlparse(path_ext).scheme != "":
+                    if urlparse(path_ext).scheme.startswith("http"):
                         if ref_found:
                             return path
                         resp = cls.request("GET", path, force_requests=True, ignore_errors=True)
@@ -449,24 +453,28 @@ class WpsConfigBase(GenericUtils):
             info.append(deepcopy(resp.json))
         return info  # type: ignore
 
-    def _try_get_logs(self, status_url):
-        _resp = self.app.get(f"{status_url}/logs", headers=dict(self.json_headers))
+    @classmethod
+    def _try_get_logs(cls, status_url):
+        _resp = cls.app.get(f"{status_url}/logs", headers=dict(cls.json_headers))
         if _resp.status_code == 200:
             _text = "\n".join(_resp.json)
             return f"Error logs:\n{_text}"
         return ""
 
     @overload
-    def monitor_job(self, status_url, **__):
+    @classmethod
+    def monitor_job(cls, status_url, **__):
         # type: (str, **Any) -> ExecutionResults
         ...
 
     @overload
-    def monitor_job(self, status_url, return_status=False, **__):
+    @classmethod
+    def monitor_job(cls, status_url, return_status=False, **__):
         # type: (str, Literal[True], **Any) -> JobStatusResponse
         ...
 
-    def monitor_job(self,
+    @classmethod
+    def monitor_job(cls,
                     status_url,                         # type: str
                     timeout=None,                       # type: Optional[int]
                     interval=None,                      # type: Optional[int]
@@ -485,7 +493,7 @@ class WpsConfigBase(GenericUtils):
             Monitor until the requested status is reached (default: when job is completed).
             If no value is specified and :paramref:`expect_failed` is enabled, completion status will be a failure.
             Otherwise, the successful status is used instead. Explicit intermediate status can be requested instead.
-            Whichever status is specified or defaulted, failed/succeeded statuses will break out of the monitoring loop,
+            Whichever status is specified or defaulted, failed/success statuses will break out of the monitoring loop,
             since no more status change is possible.
         :param expect_failed:
             If enabled, allow failing status to during status validation.
@@ -494,24 +502,24 @@ class WpsConfigBase(GenericUtils):
         :return: result of the successful job, or the status body if requested.
         :raises AssertionError: when job fails or took too long to complete.
         """
-        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCEEDED)
+        final_status = Status.FAILED if expect_failed else (wait_for_status or Status.SUCCESSFUL)
 
         def check_job_status(_resp, running=False):
             # type: (AnyResponseType, bool) -> bool
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
             statuses = [Status.ACCEPTED, Status.RUNNING, final_status] if running else [final_status]
-            assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{self._try_get_logs(status_url)}"
-            assert body["status"] in statuses, f"Error job info:\n{pretty}\n{self._try_get_logs(status_url)}"
-            return body["status"] in {final_status, Status.SUCCEEDED, Status.FAILED}  # break condition
+            assert _resp.status_code == 200, f"Execution failed:\n{pretty}\n{cls._try_get_logs(status_url)}"
+            assert body["status"] in statuses, f"Error job info:\n{pretty}\n{cls._try_get_logs(status_url)}"
+            return body["status"] in {final_status, Status.SUCCESSFUL, Status.FAILED}  # break condition
 
         time.sleep(1)  # small delay to ensure process execution had a chance to start before monitoring
-        left = timeout or self.monitor_timeout
-        delta = interval or self.monitor_interval
+        left = timeout or cls.monitor_timeout
+        delta = interval or cls.monitor_interval
         once = True
         resp = None
         while left >= 0 or once:
-            resp = self.app.get(status_url, headers=self.json_headers)
+            resp = cls.app.get(status_url, headers=cls.json_headers)
             if check_job_status(resp, running=True):
                 break
             time.sleep(delta)
@@ -521,7 +529,7 @@ class WpsConfigBase(GenericUtils):
         if return_status or expect_failed:
             return resp.json
         params = {"schema": JobInputsOutputsSchema.OGC}  # not strict to preserve old 'format' field
-        resp = self.app.get(f"{status_url}/results", params=params, headers=self.json_headers)
+        resp = cls.app.get(f"{status_url}/results", params=params, headers=cls.json_headers)
         assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 

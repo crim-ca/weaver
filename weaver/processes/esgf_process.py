@@ -65,7 +65,7 @@ class ESGFProcess(WpsProcessInterface):
         self,
         provider,       # type: str
         process,        # type: str
-        request,        # type: WorkerRequest
+        request,        # type: Optional[WorkerRequest]
         update_status,  # type: UpdateStatusPartialFunction
     ):                  # type: (...) -> None
         super().__init__(request=request, update_status=update_status)

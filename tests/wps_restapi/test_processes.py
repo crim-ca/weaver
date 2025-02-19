@@ -17,6 +17,7 @@ import pytest
 import stopit
 import webtest.app
 import yaml
+from parameterized import parameterized
 from pywps.inout import LiteralInput
 
 from tests import resources
@@ -52,15 +53,18 @@ from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_cont
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple
+    from typing import List, Optional, Tuple, TypeAlias
     from typing_extensions import Literal
 
     import _pytest  # noqa: W0212
 
     from weaver.processes.constants import ProcessSchemaType
     from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+
+    Marker: TypeAlias = "_pytest.mark.structures.Mark"  # noqa
 
 
 # noinspection PyTypeHints
@@ -96,13 +100,15 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     """
     yield caplog  # run the test and collect logs from it
 
-    marker = list(filter(
-        lambda _marker:
-            _marker.name == "parametrize"
-            and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,
-        request.keywords.get("pytestmark", [])
-    ))[0]  # type: "_pytest.mark.structures.Mark"
-    cwl_hint = marker.args[1][0]
+    markers = list(
+        filter(
+            lambda _marker:
+                _marker.name == "parametrize"
+                and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,  # noqa
+            request.keywords.get("pytestmark", [])
+        )
+    )  # type: List[Marker]
+    cwl_hint = markers[0].args[1][0]
 
     log_records = caplog.get_records(when="call")
     warn_hint = re.compile(rf".*unknown hint .*{cwl_hint}.*", re.IGNORECASE)
@@ -137,7 +143,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
         self.process_private = WpsTestProcess(identifier="process_private")
-        self.process_store.save_process(self.process_public)
+        weaver_api_url = get_wps_restapi_base_url(self.settings)
+        weaver_wps_url = get_wps_url(self.settings)
+        public_process = Process.convert(
+            self.process_public,
+            processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
+            processEndpointWPS1=weaver_wps_url,
+        )
+        self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
@@ -1063,7 +1076,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         })
         return cwl
 
-    def test_deploy_process_CWL_DockerRequirement_href(self):
+    @parameterized.expand([
+        ("mapping", ),
+        ("listing", ),
+    ])
+    @pytest.mark.oap_part2
+    def test_deploy_process_CWL_DockerRequirement_href(self, exec_unit_style):
+        # type: (Literal["mapping", "listing"]) -> None
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
@@ -1077,9 +1096,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 json.dump(cwl, cwl_file)
 
             p_id = "test-docker-python-version"
+            unit = [{"href": tmp_href}] if exec_unit_style == "listing" else {"href": tmp_href}
             body = {
                 "processDescription": {"process": {"id": p_id}},
-                "executionUnit": [{"href": tmp_href}],
+                "executionUnit": unit,
                 "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
@@ -2434,7 +2454,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         execute_data_tests[6][1]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
 
         def no_op(*_, **__):
-            return Status.SUCCEEDED
+            return Status.SUCCESSFUL
 
         path = f"/processes/{self.process_public.identifier}/jobs"
         with contextlib.ExitStack() as stack_exec:
@@ -2667,6 +2687,67 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 pass
             else:
                 self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")
+
+    @parameterized.expand([
+        ({}, {}, True),  # no outputs returned
+        ({}, {"result1": "data", "result2": 123}, True),  # too many outputs returned (not explicitly requested)
+        ({"result1": {}, "result2": {}}, {"result1": "data", "result2": 123}, False),  # too many outputs requested
+    ])
+    @pytest.mark.oap_part3
+    def test_execute_process_nested_invalid_results_amount(self, test_outputs, mock_result, expect_execute):
+        proc_path = f"/processes/{self.process_public.identifier}"
+        exec_path = f"{proc_path}/jobs"
+        exec_body = self.get_process_execute_template()
+        exec_body["process"] = f"{self.url}{proc_path}"
+        exec_body["mode"] = ExecuteMode.SYNC
+        exec_inputs = exec_body["inputs"]
+        exec_body["inputs"] = {
+            "test_input": {
+                "process": exec_body["process"],
+                "inputs": exec_inputs,
+                "outputs": test_outputs,
+            }
+        }
+
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+
+            # mock only the nested process monitoring (contrary to the usual strategy that mocks the entire execution)
+            # this way, we ensure parsing of the nested inputs/outputs is performed within 'execute_process' task
+            # that calls 'parse_wps_inputs', but we still avoid the nested execution to fail due to no actual workers
+            nested_monitor = stack.enter_context(
+                mock.patch(
+                    "weaver.processes.wps_process_base.OGCAPIRemoteProcessBase.monitor",
+                    return_Value=True,
+                ),
+            )
+            nested_results = stack.enter_context(
+                mock.patch(
+                    "weaver.processes.wps_process_base.OGCAPIRemoteProcessBase.get_results",
+                    return_value=mock_result,
+                ),
+            )
+
+            resp = mocked_sub_requests(self.app, "post", exec_path, json=exec_body, headers=self.json_headers)
+            assert resp.status_code == 400, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["location"].endswith(resp.json["jobID"])
+            assert resp.headers["Location"] == resp.json["location"]
+            try:
+                job = self.job_store.fetch_by_id(resp.json["jobID"])
+            except JobNotFound:
+                self.fail("Job should have been created and be retrievable.")
+            assert str(job.id) == resp.json["jobID"]
+
+            assert nested_monitor.called if expect_execute else not nested_monitor.called
+            assert nested_results.called if expect_execute else not nested_results.called
+
+        resp = self.app.get(f"/jobs/{job.id}/logs", headers={"Accept": ContentType.TEXT_PLAIN})
+        assert resp.status_code == 200
+        logs = resp.text
+        assert "Dispatching execution of nested process" in logs
+        assert "Abort execution." in logs
 
 
 # pylint: disable=C0103,invalid-name

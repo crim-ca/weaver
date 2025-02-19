@@ -61,6 +61,7 @@ from weaver.utils import (
     assert_sane_name,
     bytes2str,
     create_metalink,
+    explode_headers,
     fetch_directory,
     fetch_file,
     get_any_value,
@@ -412,16 +413,41 @@ def test_map_status_compliant(compliance, status):
     assert map_status(status, compliance) in JOB_STATUS_CATEGORIES[compliance]
 
 
-def test_map_status_back_compatibility_and_special_cases():
-    for c in (set(StatusCompliant.values()) - {StatusCompliant.OPENEO}):  # type: ignore
-        assert map_status("successful", c) == Status.SUCCEEDED
-    assert map_status("successful", StatusCompliant.OPENEO) == Status.FINISHED
+@pytest.mark.parametrize(
+    ["compliance", "status", "expected"],
+    list(
+        itertools.product(
+            [StatusCompliant.OGC],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.SUCCESSFUL],
+        )
+    ) + list(
+        itertools.product(
+            [StatusCompliant.OWSLIB, StatusCompliant.PYWPS],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.SUCCEEDED],
+        )
+    ) + list(
+        itertools.product(
+            [StatusCompliant.OPENEO],
+            [Status.SUCCESSFUL, Status.SUCCEEDED, Status.FINISHED],
+            [Status.FINISHED],
+        )
+    )
+)
+def test_map_status_back_compatibility_and_special_cases(compliance, status, expected):
+    result = map_status(status, compliance)
+    assert result == expected
 
 
-def test_map_status_pywps_compliant_as_int_statuses():
-    for s in range(len(WPS_STATUS)):
-        if STATUS_PYWPS_MAP[s] != Status.UNKNOWN:
-            assert map_status(s, StatusCompliant.PYWPS) in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
+@pytest.mark.parametrize(
+    ["status_index"],
+    [[idx] for idx in range(len(WPS_STATUS)) if STATUS_PYWPS_MAP[idx] != Status.UNKNOWN],
+)
+def test_map_status_pywps_compliant_as_int_statuses(status_index):
+    status = map_status(status_index, StatusCompliant.PYWPS)
+    assert status in JOB_STATUS_CATEGORIES[StatusCompliant.PYWPS]
+    assert status == STATUS_PYWPS_MAP[status_index]
 
 
 def test_map_status_pywps_back_and_forth():
@@ -655,7 +681,7 @@ def test_request_extra_intervals():
                 assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
 
 
-@pytest.mark.flaky(reruns=2, reruns_delay=1)
+@pytest.mark.flaky(retries=2, delay=1)
 def test_request_extra_zero_values():
     """
     Test that zero-value ``retries`` and ``backoff`` are not ignored.
@@ -2329,22 +2355,45 @@ def test_create_metalink():
 
 
 @pytest.mark.parametrize(
-    "href, kwargs, expected",
+    ["test_headers", "expect_headers", "expect_get_all"],
     [
-        # Test case where `output` is only in href dictionary
-        ({"href": "https://example.com", "rel": "self", "id": "output"},
-         {},
-         "<https://example.com>; rel=\"self\"; id=output"),
-
-        # Test case where `output` is only in kwargs
-        ("https://example.com", {"rel": "self", "id": "output"},
-         "<https://example.com>; rel=\"self\"; id=output"),
-
-        # Test case where `output2` in kwargs should override dict
-        ({"href": "https://example.com", "rel": "self", "id": "output"},
-         {"id": "output2"},
-         "<https://example.com>; rel=\"self\"; id=output2"),
+        # NOTE: casing of letters, quotes and parameter ordering are all important! this is being evaluated explicitly
+        (
+            {
+                "Link": "<https://example.com/test>; rel=\"test\", <https://example.com/test>; rel=\"other\"; title=OK"
+            },
+            [
+                ("Link", "<https://example.com/test>; rel=\"test\""),
+                ("Link", "<https://example.com/test>; rel=\"other\"; title=OK"),
+            ],
+            [
+                "<https://example.com/test>; rel=\"test\"",
+                "<https://example.com/test>; rel=\"other\"; title=OK",
+            ],
+        ),
+        (
+            {
+                "Link": "<#test>; rel=\"test\"; type=\"text/plain\", <./test>; rel=\"other\"; title=Alt",
+                "Content-Type": "application/json"
+            },
+            [
+                ("Link", "<#test>; rel=\"test\"; type=\"text/plain\""),
+                ("Link", "<./test>; rel=\"other\"; title=Alt"),
+                ("Content-Type", "application/json"),
+            ],
+            [
+                "<#test>; rel=\"test\"; type=\"text/plain\"",
+                "<./test>; rel=\"other\"; title=Alt",
+            ],
+        ),
+        (
+            {},
+            [],
+            [],
+        )
     ]
 )
-def test_make_link_header(href, kwargs, expected):
-    assert make_link_header(href, **kwargs) == expected
+def test_explode_headers(test_headers, expect_headers, expect_get_all):
+    results = explode_headers(test_headers)
+    assert list(results.items()) == expect_headers
+    assert results.getall("Link") == expect_get_all

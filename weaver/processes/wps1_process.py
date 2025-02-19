@@ -52,12 +52,13 @@ class Wps1RemoteJobProgress(RemoteJobProgress):
 
 
 class Wps1Process(WpsProcessInterface):
-    def __init__(self,
-                 provider,          # type: str
-                 process,           # type: str
-                 request,           # type: WorkerRequest
-                 update_status,     # type: UpdateStatusPartialFunction
-                 ):                 # type: (...) -> None
+    def __init__(
+        self,
+        provider,       # type: str
+        process,        # type: str
+        request,        # type: Optional[WorkerRequest]
+        update_status,  # type: UpdateStatusPartialFunction
+    ):                  # type: (...) -> None
         self.provider = provider
         self.process = process
         # following are defined after 'prepare' step
@@ -216,7 +217,7 @@ class Wps1Process(WpsProcessInterface):
                 num_retries = 0
                 run_step += 1
 
-        if not execution.isSucceded():
+        if not execution.isSucceeded():
             exec_msg = execution.statusMessage or "Job failed."
             exec_status = map_status(execution.getStatus())
             exec_status_url = execution.statusLocation

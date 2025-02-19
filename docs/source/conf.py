@@ -245,7 +245,7 @@ html_theme_options = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "../_static/crim.png"
+html_logo = "../../weaver/wps_restapi/templates/static/crim.png"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -460,6 +460,7 @@ linkcheck_anchors_ignore = [
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
     "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+    "issuecomment-[0-9]+",  # links to specific GitHub comments
 ]
 linkcheck_request_headers = {
     "https://github.com/": {

@@ -1,6 +1,7 @@
 # YAML representation supported by WeaverClient
 processDescription:
   process:
+    id: EchoResultsTester
     version: "1.0"  # must be string, avoid interpretation as float
 executionUnit:
   # note: This does not work by itself! The test suite injects the file dynamically.

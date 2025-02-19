@@ -173,7 +173,7 @@ through some parsing (e.g.: :ref:`proc_wps_12`) or with some requirement indicat
 special handling. The represented :term:`Process` is aligned with |ogc-api-proc|_ specifications.
 
 When deploying one such :term:`Process` directly, it is expected to have a definition specified
-with a :term:`CWL` `Application Package`_, which provides resources about one of the described :ref:`app_pkg_types`.
+with a :term:`CWL` :ref:`application-package`, which provides resources about one of the described :ref:`app_pkg_types`.
 
 This is most of the time employed to wrap operations packaged in a reference :term:`Docker` image, but it can also
 wrap :ref:`app_pkg_remote` to be executed on another server (i.e.: :term:`ADES`). When the :term:`Process` should be
@@ -414,13 +414,15 @@ Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/proc
 The request body requires mainly two components:
 
 - | ``processDescription``:
-  | Defines the process identifier, metadata, inputs, outputs, and some execution specifications. This mostly
-    corresponds to information that is provided by traditional :term:`WPS` definition.
+  | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
+    This mostly corresponds to information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions.
 - | ``executionUnit``:
-  | Defines the core details of the `Application Package`_. This corresponds to the explicit :term:`CWL` definition
-    that indicates how to execute the given application.
+  | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
+    or other :ref:`proc_types` references that indicates how to execute the underlying application.
 
-.. _Application Package: docs/source/package.rst
+.. |app_pkg| replace:: Application Package
+.. _app_pkg: docs/source/package.rst
 
 Upon deploy request, `Weaver` will either respond with a successful result, or with the appropriate error message,
 whether caused by conflicting ID, invalid definitions or other parsing issues. A successful process deployment will
@@ -488,6 +490,8 @@ the |getcap-req|_ request.
 Modify an Existing Process (Update, Replace, Undeploy)
 -----------------------------------------------------------------------------
 
+.. versionadded:: 4.20
+
 Since `Weaver` supports |ogc-api-proc-part2|_, it is able to remove a previously registered :term:`Process` using
 the :ref:`Deployment <proc_op_deploy>` request. The undeploy operation consist of a ``DELETE`` request targeting the
 specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
@@ -495,8 +499,6 @@ specific ``{WEAVER_URL}/processes/{processID}`` to be removed.
 .. note::
     The :term:`Process` must be accessible by the user considering any visibility configuration to perform this step.
     See :ref:`proc_op_deploy` section for details.
-
-.. versionadded:: 4.20
 
 Starting from version `4.20 <https://github.com/crim-ca/weaver/tree/4.20.0>`_, a :term:`Process` can be replaced or
 updated using respectively the ``PUT`` and ``PATCH`` requests onto the specific ``{WEAVER_URL}/processes/{processID}``
@@ -1085,7 +1087,7 @@ Once the :term:`Job` is submitted, its status should initially switch to ``accep
 status will change to ``started`` for preparation steps (i.e.: allocation resources, retrieving required
 parametrization details, etc.), followed by ``running`` when effectively reaching the execution step of the underlying
 :term:`Application Package` operation. This status will remain as such until the operation completes, either with
-``succeeded`` or ``failed`` status.
+``successful`` or ``failed`` status.
 
 At any moment during |asynchronous|_ execution, the :term:`Job` status can be requested using |status-req|_. Note that
 depending on the timing at which the user executes this request and the availability of task workers, it could be
@@ -1688,23 +1690,35 @@ depends on the negotiated :term:`Media-Types` required by the corresponding inpu
 in the :ref:`Process Description <proc_op_describe>`, any relevant ``format`` indication,
 and capabilities offered by the server referenced with the ``collection`` :term:`URL`.
 
-For example, if a :term:`Process` input indicated that it expects a :term:`GeoJSON` (``application/geo+json``)
-or contained a ``format: geojson-feature-collection`` indicate in its ``schema``, the referenced ``collection``
-would most probably be accessed
+For example, if a :term:`Process` input definition indicates that
+it accepts :term:`GeoJSON` (``application/geo+json``) as its contents :term:`Media-Type`,
+or contains a ``format: geojson-feature-collection`` indication within its ``schema`` definition,
+the referenced ``collection`` would most probably need to resolve access to the data
 using |ogc-api-features|_ (i.e.: with request ``GET /collections/dataset-features/items``),
-to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be passed to the corresponding
-input of the :term:`Process`.
-However, depending on the capabilities of the server (e.g.: a |stac-api-spec|_ instance or various extension support),
-the ``POST /search`` or the ``POST /collections/dataset-features/search`` could be considered as well.
+to retrieve relevant :term:`GeoJSON` items as a ``FeatureCollection``, which would then be
+passed to the corresponding input of the :term:`Process`.
+However, depending on the capabilities of the server (e.g.: a |stac-api|_ instance or various extension support),
+the ``POST /search`` or the ``POST /collections/dataset-features/search`` operations could be considered as well.
 
-Alternatively, if an array of ``image/tiff; application=geotiff`` was expected by the :term:`Process` while targeting
-the ``collection`` on a :term:`STAC` server, the |stac-assets|_ matching the requested :term:`Media-Types` could
-potentially be retrieved as input for the :ref:`Process Execution <proc_op_execute>`.
+Alternatively, if an array of ``image/tiff; application=geotiff`` is expected by the :term:`Process` input definition
+and the submitted input provides a ``collection`` referring to a |stac-api|_ endpoint,
+the |stac-assets|_ matching the requested :term:`Media-Type` could potentially be retrieved as input for
+the :ref:`Process Execution <proc_op_execute>`.
+
+Contrary to an ``href`` input where the referenced :term:`URL` (potentially pointing at a :term:`Collection`
+with predefined filtering query parameters) is directly accessed with a single request, the ``collection`` input offers
+the option to the server to further negotiate and resolve the targeted :term:`Collection` reference and the data it
+contains. In some situations, such as when a very large amount of data needs to be accessed and retrieved with an
+iterative paging or tiling approach, the ``collection`` input allows to automatically resolve this operation
+(as supported by the server), whereas the direct ``href`` reference would only return the limited content as directly
+responded by the server hosting the :term`Collection`, and potentially not reflecting the actual intent of the user
+submitting the :ref:`Process Execution <proc_op_execute>`. Therefore, the ``collection`` allows the resolution of more
+complex data access mechanisms that cannot be resolved by a single request or operation.
 
 In summary, the |ogc-api-proc-part3-collection-input|_ offers a lot of flexibility with its resolution compared to
 the typical :ref:`Input Types <cwl-io-types>` (i.e.: ``Literal``, ``BoundingBox``, ``Complex``) that must be explicitly
 specified. However, its capability to auto-resolve multiple :term:`Media-Types` negotiations, formats, data structures,
-data cardinality and :term:`API` protocols simultaneously can make its behavior hard to predict.
+data cardinality and :term:`API` access mechanisms simultaneously can make its behavior hard to predict.
 
 .. hint::
     In order to evaluate the expected resolution of a :term:`Collection`
@@ -1715,7 +1729,7 @@ data cardinality and :term:`API` protocols simultaneously can make its behavior 
     Since the :term:`Builtin Process` only performs the resolution of the ``collection`` into the corresponding
     data sources for the target :term:`Process`, without actually downloading the resolved :term:`URL` references,
     using it can potentially help identify and avoid unintended large processing, or allow users to validate that
-    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval for the
+    the defined ``filter`` (or any other below parameters) produces the appropriate data retrieval strategy for the
     desired execution purpose.
 
 .. seealso::
@@ -1749,7 +1763,7 @@ to hint the resolution toward certain outcomes.
       - Indicates the desired schema to resolve and extract from the |ogc-api-proc-part3-collection-input|_.
         This can be used similarly to ``type``, but can provide further resolution indications in cases where
         the ``type`` alone remains ambiguous, such as distinguishing between many different :term:`GeoJSON`
-        *feature types* which are all represented by the same ``application/geo+json`` media-type.
+        *feature types* which are all represented by the same ``application/geo+json`` :term:`Media-Type`.
     * - ``format``
       - Indicates the preferred data access mechanism to employ amongst
         :py:class:`weaver.execute.ExecuteCollectionFormat` supported values.
@@ -1975,7 +1989,7 @@ the configured :term:`WPS` output directory.
     Header ``X-WPS-Output-Context`` is ignored when using `S3` buckets for output location since they are stored
     individually per :term:`Job` UUID, and hold no relevant *context* location. See also :ref:`conf_s3_buckets`.
 
-.. versionadded:: 4.3
+.. versionchanged:: 4.3
     Addition of the ``X-WPS-Output-Context`` header.
 
 .. _proc_op_execute_subscribers:
@@ -2405,10 +2419,118 @@ Note again that the more the :term:`Process` is verbose, the more tracking will 
 Job Provenance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. fixme: CWL and Job Prov (https://github.com/crim-ca/weaver/issues/673)
-.. todo::
-    implement ``GET /jobs/{jobID}/run`` and/or ``GET /jobs/{jobID}/prov``
-    (see https://github.com/crim-ca/weaver/issues/673)
+.. versionadded:: 6.1
+
+The provenance endpoints allow to obtain :term:`W3C` |PROV|_ metadata from a successfully completed :term:`Job`
+using various representations. This provenance information can help identify traceability information such as the input
+data sources, validate output checksums, and understand all internal :term:`Process` data transformations that were
+involved within an executed :term:`Workflow`.
+
+The |PROV|_ metadata consists of information records about entities, activities, and people involved in producing a
+piece of data or thing |PROV-dfn|_, which can be used to form assessments about its quality, reliability or
+trustworthiness.
+
+.. |PROV-dfn| replace:: :sup:`[^]`
+.. _PROV-dfn: https://www.w3.org/TR/2013/REC-prov-dm-20130430/#dfn-provenance
+
+.. seealso::
+    - |PROV-overview|_
+    - |cwltool-cwlprov|_
+
+.. figure:: https://www.w3.org/TR/2013/REC-prov-o-20130430/diagrams/starting-points.svg
+    :alt: PROV-O Resources
+    :target: `PROV-O`_
+    :align: center
+    :width: 500px
+
+    Provenance Resource Relationships [|PROV-O|_]
+
+
+The provenance endpoints are provided in alignment with the |ogc-api-proc-part4|_ provenance class requirement.
+However, `Weaver` also provides additional functionalities in comparison to the minimal requirements from the
+:term:`OGC` specification.
+
+Following is a table of available formats and corresponding endpoints offered by `Weaver`.
+
+.. list-table:: Job Provenance Endpoints
+    :name: table-job-prov
+    :align: center
+    :header-rows: 1
+    :widths: 25,10,20,45
+
+    * - Endpoint
+      - |PROV|_ Format
+      - :term:`Media-Type`
+      - Description
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSON|_
+      - ``application/json``
+      - :term:`Provenance` metadata using :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSONLD|_
+      - ``application/ld+json``
+      - :term:`Provenance` metadata using |JSON-LD|_ representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-XML|_
+      - ``text/xml`` or ``application/xml``
+      - :term:`Provenance` metadata using :term:`XML` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-N|_
+      - ``text/provenance-notation``
+      - :term:`Provenance` metadata using the main |PROV|_ notation representation.
+    * - ``/jobs/{jobID}/prov``
+      - PROV-NT
+      - ``application/n-triples``
+      - :term:`Provenance` metadata using |rdf-n-triples|_ (NT) representation.
+    * - ``/jobs/{jobID}/prov``
+      - PROV-TURTLE
+      - ``text/turtle``
+      - :term:`Provenance` metadata using |rdf-turtle|_ (TTL) representation.
+    * - ``/jobs/{jobID}/prov/info``
+      - |na|
+      - ``text/plain``
+      - Metadata about the *Research Object* packaging information.
+    * - ``/jobs/{jobID}/prov/who``
+      - |na|
+      - ``text/plain``
+      - Metadata of who ran the :term:`Job`.
+    * - ``/jobs/{jobID}/prov/runs``
+      - |na|
+      - ``text/plain``
+      - Obtain the list of ``runID`` steps of the :term:`Workflow` within the :term:`Job`.
+    * - ``/jobs/{jobID}/prov/run``
+      - |na|
+      - ``text/plain``
+      - Metadata of the main :term:`Job` and any nested step runs in the case of a :term:`Workflow`.
+    * - ``/jobs/{jobID}/prov/inputs``
+      - |na|
+      - ``text/plain``
+      - Metadata about the :term:`Job` input IDs.
+    * - ``/jobs/{jobID}/prov/outputs``
+      - |na|
+      - ``text/plain``
+      - Metadata about the :term:`Job` output IDs.
+    * - ``/jobs/{jobID}/prov/[run|inputs|outputs]/{runID}``
+      - |na|
+      - ``text/plain``
+      - Same as their respective definitions above, but for a specific step of a :term:`Workflow`.
+
+.. seealso::
+    This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
+    can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
+
+Resulting metadata that is collected from :term:`Job` :term:`Provenance` will be stored under a similar endpoint
+as the :ref:`exec_output_location`, except with an additional ``-prov`` suffix applied after the :term:`Job` UUID,
+as shown below.
+This location is selected to conveniently offer the ``PROV`` metadata with a different parent directory than
+the :term:`Job` outputs, therefore allowing different endpoint access control schemes between the ``PROV`` metadata
+and actual output data, while also reusing the configured :ref:`exec_output_location` that can be used to quickly
+serve :term:`Provenance` contents without any additional configuration.
+
+.. code-block::
+
+    {WPS_OUTPUT_URL}[/{WPS_OUTPUT_CONTEXT}]/{JOB_UUID}-prov
+
 
 .. _proc_op_job_stats:
 

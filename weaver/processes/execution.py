@@ -24,6 +24,7 @@ from werkzeug.wrappers.request import Request as WerkzeugRequest
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
+from weaver.exceptions import JobExecutionError, WeaverExecutionError
 from weaver.execute import (
     ExecuteControlOption,
     ExecuteMode,
@@ -46,8 +47,9 @@ from weaver.processes.convert import (
     get_field,
     ows2json_output_data
 )
+from weaver.processes.ogc_api_process import OGCAPIRemoteProcess
 from weaver.processes.types import ProcessType
-from weaver.processes.utils import get_process
+from weaver.processes.utils import get_process, map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -91,7 +93,7 @@ from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
     from uuid import UUID
 
     from celery.app.task import Task
@@ -101,9 +103,10 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.execute import AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
-    from weaver.status import StatusType
+    from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
         AnyAcceptLanguageHeader,
+        AnyDatabaseContainer,
         AnyHeadersContainer,
         AnyProcessRef,
         AnyResponseType,
@@ -116,9 +119,11 @@ if TYPE_CHECKING:
         HeadersType,
         JobValueBbox,
         JSON,
+        Number,
         ProcessExecution,
         SettingsType,
-        Statistics
+        Statistics,
+        UpdateStatusPartialFunction
     )
     from weaver.visibility import AnyVisibility
 
@@ -130,11 +135,11 @@ class JobProgress(object):
     SETUP = 1
     DESCRIBE = 2
     GET_INPUTS = 3
-    GET_OUTPUTS = 4
-    EXECUTE_REQUEST = 5
-    EXECUTE_STATUS_LOCATION = 6
-    EXECUTE_MONITOR_START = 7
-    EXECUTE_MONITOR_LOOP = 8
+    GET_OUTPUTS = 10  # extra delta from inputs retrieval for more granular range by nested processes and collections
+    EXECUTE_REQUEST = 11
+    EXECUTE_STATUS_LOCATION = 12
+    EXECUTE_MONITOR_START = 13
+    EXECUTE_MONITOR_LOOP = 14
     EXECUTE_MONITOR_DONE = 96
     EXECUTE_MONITOR_END = 98
     NOTIFY = 99
@@ -186,7 +191,7 @@ def execute_process(task, job_id, wps_url, headers=None):
         # prepare inputs
         job.progress = JobProgress.GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
-        wps_inputs = parse_wps_inputs(wps_process, job)
+        wps_inputs = parse_wps_inputs(wps_process, job, container=db)
 
         # prepare outputs
         job.progress = JobProgress.GET_OUTPUTS
@@ -257,10 +262,10 @@ def execute_process(task, job_id, wps_url, headers=None):
 
                 if execution.isComplete():
                     msg_progress = f" (status: {job_msg})" if job_msg else ""
-                    if execution.isSucceded():
+                    if execution.isSucceeded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
-                        job.status = map_status(Status.SUCCEEDED)
-                        job.status_message = f"Job succeeded{msg_progress}."
+                        job.status = map_status(Status.SUCCESSFUL)
+                        job.status_message = f"Job {job.status}{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [
@@ -321,6 +326,8 @@ def execute_process(task, job_id, wps_url, headers=None):
         LOGGER.debug("Failed job [%s] raised an exception.", job, exc_info=exc)
         # note: don't update the progress here to preserve last one that was set
         job.status = map_status(Status.FAILED)
+        if isinstance(exc, WeaverExecutionError):
+            job.save_log(message=str(exc), logger=task_logger, level=logging.ERROR)
         job.status_message = f"Failed to run {job!s}."
         errors = f"{fully_qualified_name(exc)}: {exc!s}"
         job.save_log(errors=errors, logger=task_logger)
@@ -537,8 +544,49 @@ def parse_wps_input_literal(input_value):
     return str(input_value)
 
 
-def parse_wps_inputs(wps_process, job):
-    # type: (ProcessOWS, Job) -> List[Tuple[str, OWS_Input_Type]]
+def log_and_save_update_status_handler(
+    job,                    # type: Job
+    container,              # type: AnyDatabaseContainer
+    update_status=None,     # type: Callable[[AnyStatusType], StatusType]
+    update_progress=None,   # type: Callable[[Number], Number]
+):                          # type: (...) -> UpdateStatusPartialFunction
+    """
+    Creates a :term:`Job` status update function that will immediately reflect the log message in the database.
+
+    When log messages are generated and saved in the :term:`Job`, those details are not persisted to the database
+    until the updated :term:`Job` is entirely pushed to the database store. This causes clients querying the :term:`Job`
+    endpoints to not receive any latest update from performed operations until the execution returns to the main worker
+    monitoring loop, which will typically perform a :term:`Job` update "at some point".
+
+    Using this handler, each time a message is pushed to the :term:`Job`, that update is also persisted by maintaining
+    a local database connection handle. However, because updating the entire :term:`Job` each time can become costly
+    and inefficient for multiple subsequent logs, this operation should be applied only on "important milestones" of
+    the execution steps. Any intermediate/subsequent logs should use the usual :meth:`Job.save_log` to "accumulate" the
+    log messages for a following "batch update" of the :term:`Job`.
+
+    :param job: Reference :term:`Job` for which the status will be updated and saved with uncommitted log entries.
+    :param container: Container to retrieve the database connection.
+    :param update_status: Function to apply override status update operations. Skipped if omitted.
+    :param update_progress: Function to apply override progress update operations. Skipped if omitted.
+    """
+    db = get_db(container)
+    store = db.get_store(StoreJobs)
+
+    def log_and_update_status(message, progress=None, status=None, *_, **kwargs):  # pylint: disable=W1113
+        # type: (str, Optional[Number], Optional[AnyStatusType], Any, Any) -> None
+        if update_status and status:
+            status = update_status(status)
+        if update_progress and progress is not None:
+            progress = update_progress(progress)
+        if "error" in kwargs:
+            kwargs["errors"] = kwargs.pop("error")  # align with 'save_log' parameters
+        job.save_log(message=message, progress=progress, status=status, **kwargs)
+        store.update_job(job)
+    return log_and_update_status
+
+
+def parse_wps_inputs(wps_process, job, container=None):
+    # type: (ProcessOWS, Job, Optional[AnyDatabaseContainer]) -> List[Tuple[str, OWS_Input_Type]]
     """
     Parses expected :term:`WPS` process inputs against submitted job input values considering supported definitions.
 
@@ -554,6 +602,20 @@ def parse_wps_inputs(wps_process, job):
         elif process_input.dataType == WPS_BOUNDINGBOX_DATA:
             bbox_inputs[process_input.identifier] = process_input
 
+    job_log_update_status_func = log_and_save_update_status_handler(
+        job,
+        container,
+        # Because the operations that will be executed with this status handler can involve a nested process execution,
+        # successful execution of that nested process will log a 'succeeded' entry within this ongoing execution.
+        # Because it is a nested process, it is expected that further operations from the 'parent' process using it will
+        # log many more steps afterwards. Therefore, avoid the ambiguous entry within the context of the parent process.
+        update_status=lambda _status: (
+            Status.RUNNING if map_status(_status, category=True) == StatusCategory.SUCCESS else _status
+        ),
+        # Similarly, progress of the current job will be constraint within inputs retrieval and the following outputs
+        # retrieval for the nested progress execution. Mapping the progress will ensure overall gradual percent values.
+        update_progress=lambda _progress: map_progress(_progress, JobProgress.GET_INPUTS, JobProgress.GET_OUTPUTS),
+    )
     try:
         wps_inputs = []
         # parse both dict and list type inputs
@@ -591,18 +653,63 @@ def parse_wps_inputs(wps_process, job):
                     # this could refer to the desired collection ID rather than the input ID being mapped
                     input_info = dict(input_info)  # not 'deepcopy' to avoid 'data' or 'value' copy that could be large
                     input_info["id"] = input_id
+
+                # collection reference
                 if isinstance(input_value, dict) and "collection" in input_value:
                     col_path = os.path.join(job.tmpdir, "inputs", input_id)
                     col_files = process_collection(input_value, input_info, col_path, logger=job)
-                    resolved_inputs.extend([
+                    resolved_input_values = [
                         (
                             {"href": col_file["path"], "type": map_cwl_media_type(col_file["format"])},
                             input_info
                         )
                         for col_file in col_files
-                    ])
+                    ]
+
+                # nested process reference
+                elif isinstance(input_value, dict) and "process" in input_value:
+                    proc_uri = input_value["process"]
+                    job_log_update_status_func(
+                        message=(
+                            f"Dispatching execution of nested process [{proc_uri}] "
+                            f"for input [{input_id}] of [{job.process}]."
+                        ),
+                        logger=LOGGER,
+                        progress=JobProgress.GET_INPUTS,
+                    )
+                    inputs = copy.deepcopy(input_value.get("inputs", {}))
+                    outputs = copy.deepcopy(input_value.get("outputs"))
+                    out_ids = [get_any_id(out) for out in outputs] if isinstance(outputs, list) else (outputs or [])
+                    if len(input_value.get("outputs", {})) > 1:  # preemptive check to avoid wasting time/resources
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map multiple outputs {list(out_ids)} "
+                            f"from [{proc_uri}] to input [{input_id}] of [{job.process}]."
+                        )
+                    process = OGCAPIRemoteProcess(
+                        input_value,
+                        proc_uri,
+                        request=None,
+                        update_status=job_log_update_status_func,
+                    )
+                    out_dir = os.path.join(job.tmpdir, "inputs")
+                    results = process.execute(inputs, out_dir, outputs)
+                    if not results:
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map empty outputs from [{proc_uri}] "
+                            f"to input [{input_id}] of [{job.process}]."
+                        )
+                    if len(results) != 1:  # post-execution check since no explicit output specified could lead to many
+                        raise JobExecutionError(
+                            f"Abort execution. Cannot map multiple outputs {list(out_ids)} "
+                            f"from [{proc_uri}] to input [{input_id}] of [{job.process}]."
+                        )
+                    resolved_input_values = [(results[0], input_info)]
+
+                # typical file/data
                 else:
-                    resolved_inputs.append((input_value, input_info))
+                    resolved_input_values = [(input_value, input_info)]
+
+                resolved_inputs.extend(resolved_input_values)
 
             for input_value, input_info in resolved_inputs:
                 # if already resolved, skip parsing
@@ -622,9 +729,11 @@ def parse_wps_inputs(wps_process, job):
 
                 # re-validate the resolved data as applicable
                 if input_data is None:
-                    job.save_log(
+                    job_log_update_status_func(
                         message=f"Removing [{input_id}] data input from execution request, value was 'null'.",
-                        logger=LOGGER, level=logging.WARNING,
+                        logger=LOGGER,
+                        level=logging.WARNING,
+                        progress=JobProgress.GET_INPUTS,
                     )
                 else:
                     wps_inputs.append((input_id, input_data))
@@ -921,7 +1030,7 @@ def submit_job_dispatch_task(
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-            if job.status == Status.SUCCEEDED:
+            if job.status in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)
@@ -1275,21 +1384,25 @@ def validate_process_io(process, payload):
                                 "executionFormats": None,
                             }
                         })
+                # if a media-type was specified, allow it even if not
+                # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                io_accept += any_types
-                if not all(io_fmt in io_accept for io_fmt in io_ctypes):
-                    raise OWSInvalidParameterValue(json={
-                        "code": "InvalidParameterValue",
-                        "name": io_name,
-                        "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect "
-                            "supported formats specified by the process description."
-                        ),
-                        "value": {
-                            "supportedFormats": list(io_accept),
-                            "executionFormats": list(io_ctypes),
-                        }
-                    })
+                if not all(io_fmt in any_types for io_fmt in io_accept):
+                    # otherwise, all formats must be within allowed ones
+                    io_accept += any_types
+                    if not all(io_fmt in io_accept for io_fmt in io_ctypes):
+                        raise OWSInvalidParameterValue(json={
+                            "code": "InvalidParameterValue",
+                            "name": io_name,
+                            "description": (
+                                f"Submitted '{io_name}' requested Content-Types that do not respect "
+                                "supported formats specified by the process description."
+                            ),
+                            "value": {
+                                "supportedFormats": list(io_accept),
+                                "executionFormats": list(io_ctypes),
+                            }
+                        })
 
             if io_type == "inputs":
                 io_min = io_proc["minOccurs"]

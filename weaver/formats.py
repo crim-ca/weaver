@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import socket
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -17,7 +18,6 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
-from weaver.compat import cache
 
 if TYPE_CHECKING:
     from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
@@ -96,11 +96,13 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_JSONLD = "application/ld+json"
     APP_RAW_JSON = "application/raw+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"
+    APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
@@ -127,6 +129,8 @@ class ContentType(Constants):
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
+    TEXT_PROVN = "text/provenance-notation"
+    TEXT_TURTLE = "text/turtle"
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
@@ -831,7 +835,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         ``must_exist=False`` before providing it to the `CWL` I/O definition. Setting ``must_exist=False`` should be
         used only for literal string comparison or pre-processing steps to evaluate formats.
 
-    :param media_type: Some reference, namespace'd or literal (possibly extended) media-type string.
+    :param media_type: Some reference, namespaced or literal (possibly extended) media-type string.
     :param make_reference: Construct the full URL reference to the resolved media-type. Otherwise, return tuple details.
     :param must_exist:
         Return result only if it can be resolved to an official media-type (or synonym if enabled), otherwise ``None``.

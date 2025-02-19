@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from functools import cache
 from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
@@ -12,7 +13,6 @@ from cwltool.job import CommandLineJob, JobBase
 from cwltool.singularity import SingularityCommandLineJob
 
 from weaver import WEAVER_ROOT_DIR
-from weaver.compat import cache
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound

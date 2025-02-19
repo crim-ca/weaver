@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 5.9.0
+APP_VERSION ?= 6.3.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -91,6 +91,7 @@ endif
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
+ARCHIVE_DIR := $(APP_ROOT)/archive
 
 # end of configuration
 
@@ -187,7 +188,7 @@ conda-base:		## obtain and install a missing conda distribution
 		 echo "Make sure to add '$(CONDA_BIN_DIR)' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-clean
-clean-clean: 	## remove the conda environment
+conda-clean: 	## remove the conda environment
 	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n "$(CONDA_ENV)" --yes --all
 
@@ -311,7 +312,14 @@ install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint  ## i
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+clean-all: clean-archive clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+
+.PHONY: clean-archive
+clean-archive:	## remove archive files and directories
+	@-echo "Removing archives..."
+	@-rm "$(APP_ROOT)"/*.tar.gz
+	@-rm "$(APP_ROOT)"/*.zip
+	@-rm -fr "$(ARCHIVE_DIR)"
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -347,8 +355,8 @@ clean-docs-dirs:	## remove documentation artifacts (minimal)
 clean-src:		## remove all *.pyc files
 	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
-	@-rm -rf ./build
-	@-rm -rf ./src
+	@-rm -rf "$(APP_ROOT)/build"
+	@-rm -rf "$(APP_ROOT)/src"
 
 .PHONY: clean-test
 clean-test:		## remove files created by tests and coverage analysis
@@ -385,11 +393,27 @@ ifeq ($(filter $(TEST_VERBOSITY),"--capture"),)
   endif
 endif
 
+TEST_PROFILE ?= true
+ifneq ($(filter "$(TEST_PROFILE)","true"),)
+  override TEST_PROFILE_ARGS = --profile --profile-svg --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
+endif
+
+TEST_XARGS ?=
+override TEST_XARGS := $(TEST_VERBOSITY) $(TEST_PROFILE_ARGS) $(TEST_XARGS)
+
 # autogen tests variants with pre-install of dependencies using the '-only' target references
 TESTS := unit func cli workflow online offline no-tb14 spec coverage
 TESTS := $(addprefix test-, $(TESTS))
 
 $(TESTS): test-%: install-dev test-%-only
+
+define run_test =
+	$(eval $@_PYTEST_JUNIT = --junitxml "$(REPORTS_DIR)/test-results.xml")
+	$(eval $@_PYTEST_CASE = $(1))
+	$(eval $@_PYTEST_CMD = pytest tests ${$@_PYTEST_CASE} $(TEST_XARGS) ${$@__PYTEST_JUNIT})
+	@echo ">" '${$@_PYTEST_CMD}'
+	@bash -c '${$@_PYTEST_CMD}'
+endef
 
 .PHONY: test
 test: clean-test test-all   ## alias for 'test-all' target
@@ -400,57 +424,48 @@ test-all: install-dev test-only		## run all tests (including long running tests)
 .PHONY: test-only
 test-only: mkdir-reports			## run all tests but without prior validation of installed dependencies
 	@echo "Running all tests (including slow and online tests)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		--junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,)
 
 .PHONY: test-unit-only
 test-unit-only: mkdir-reports 		## run unit tests (skip long running and online tests)
 	@echo "Running unit tests (skip slow and online tests)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not slow and not online and not functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not slow and not online and not functional")
 
 .PHONY: test-func-only
 test-func-only: mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "functional")
 
 .PHONY: test-cli-only
 test-cli-only: mkdir-reports   		## run WeaverClient and CLI tests
 	@echo "Running CLI tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "cli" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "cli")
 
 .PHONY: test-workflow-only
 test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
 	@echo "Running workflow tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "workflow")
 
 .PHONY: test-online-only
 test-online-only: mkdir-reports  	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "online")
 
 .PHONY: test-offline-only
 test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not online")
 
 .PHONY: test-no-tb14-only
 test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not testbed14" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not testbed14")
 
 .PHONY: test-spec-only
 test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
 	@[ "${SPEC}" ] || ( echo ">> 'SPEC' is not set"; exit 1 )
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-k "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-k "${SPEC}")
 
 .PHONY: test-smoke
 test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of built docker images
@@ -458,10 +473,22 @@ test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of bu
 .PHONY: test-docker
 test-docker: docker-test    ## alias to 'docker-test' execution smoke test of built docker images
 
+# NOTE:
+#	if any test fails during coverage run, pytest exit code will be propagated to allow reporting of the failure
+#	this will cause coverage analysis reporting to be skipped from early exit from the failure
+#	if coverage reporting is still needed although failed tests occurred, call 'coverage-reports' target separately
 .PHONY: test-coverage-only
-test-coverage-only: mkdir-reports  ## run all tests using coverage analysis
+test-coverage-only: mkdir-reports coverage-run coverage-reports  ## run all tests with coverage analysis and reports
+
+.PHONY: coverage-run
+coverage-run: mkdir-reports  ## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
-	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" "$$(which pytest)" "$(APP_ROOT)/tests" || true'
+	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" \
+		"$$(which pytest)" "$(APP_ROOT)/tests"  $(TEST_XARGS) --junitxml="$(REPORTS_DIR)/coverage-junit.xml"'
+
+.PHONY: coverage-reports
+coverage-reports: mkdir-reports  ## generate coverage reports
+	@echo "Generate coverage reports..."
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
@@ -754,6 +781,67 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+
+.PHONY: extract-changes
+extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Extracting changes for ${VERSION} ..."
+	bash -c '\
+		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
+		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
+			| grep -n ".. _changes" \
+			| cut -d ":" -f 1 | head -n 1); \
+		tail -n +$${START:-0} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP:--1} \
+			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
+	'
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+
+# note:
+#	some text must be inserted before and between the first 'version heading' and the 'changes' sub-heading
+#	otherwise headers levels are not parsed correctly (they are considered sections all using H1)
+#	therefore, inject the contents needed to parse as desired, and remove the temp HTML content afterwards
+.PHONY: generate-changes-html
+generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Checking necessary documentation dependency ..."
+	@which rst2html >/dev/null || pip install docutils
+	@-echo "Converting changes for ${VERSION} ..."
+	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
+	@sed -i -e 's|Changes:|\\ \n\nChanges:|' "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@sed -i -e "s|^\`${VERSION}|   \n###\n\n\\ \n\n\`${VERSION}|" "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@rst2html \
+		--template "$(REPORTS_DIR)/html-body-template.txt" \
+		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+
+.PHONY: generate-archive
+generate-archive:	## generate ZIP and TAR.GZ archives using current contents
+	@-echo "Generating archives"
+	@tar \
+		-C "$(APP_ROOT)" \
+		--exclude-vcs \
+		--exclude-vcs-ignores \
+		--exclude=.git \
+		--exclude=.github \
+		--exclude=*.zip \
+		--exclude=*.tar.gz \
+		--exclude=node_modules \
+		--exclude="$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
+		--ignore-failed-read \
+		.
+	@cd "$(APP_ROOT)" && \
+		mkdir -p "$(ARCHIVE_DIR)" && \
+		cp "$(APP_NAME)-$(APP_VERSION).tar.gz" "$(ARCHIVE_DIR)/$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		cd "$(ARCHIVE_DIR)" && \
+		tar -xzf "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		rm "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		zip -r "$(APP_NAME)-$(APP_VERSION).zip" * && \
+		mv "$(APP_NAME)-$(APP_VERSION).zip" "$(APP_ROOT)" && \
+		cd "$(APP_ROOT)" && \
+		rm -fr "$(ARCHIVE_DIR)"
 
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 

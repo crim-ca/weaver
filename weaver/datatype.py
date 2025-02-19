@@ -6,6 +6,7 @@ import base64
 import copy
 import enum
 import inspect
+import io
 import json
 import os
 import re
@@ -26,6 +27,7 @@ import colander
 import pyramid.httpexceptions
 import requests.exceptions
 from cryptography.fernet import Fernet
+from cwlprov.tool import Tool as CWLProvTool
 from dateutil.parser import parse as dt_parse
 from docker.auth import decode_auth  # pylint: disable=E0611
 from owslib.util import ServiceException as OWSServiceException
@@ -55,6 +57,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
+from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -77,7 +80,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_client, get_wps_url
+from weaver.wps.utils import get_wps_client, get_wps_output_dir, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -95,8 +98,10 @@ if TYPE_CHECKING:
         AnyExecuteReturnPreference,
         AnyExecuteTransmissionMode
     )
+    from weaver.formats import AnyContentType
     from weaver.processes.constants import ProcessSchemaType
     from weaver.processes.types import AnyProcessType
+    from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -1404,18 +1409,20 @@ class Job(Base, LoggerHandler):
             response = xml_util.tostring(response)
         self["response"] = response
 
-    def _job_url(self, base_url):
-        # type: (str) -> str
-        if self.service is not None:
-            base_url += sd.provider_service.path.format(provider_id=self.service)
-        job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
-        return base_url + job_path
-
-    def job_url(self, container=None, extra_path=None):
+    def process_url(self, container=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> str
         settings = get_settings(container)
         base_url = get_wps_restapi_base_url(settings)
-        return self._job_url(base_url) + (extra_path or "")
+        if self.service is not None:
+            base_url += sd.provider_service.path.format(provider_id=self.service)
+        proc_url = sd.process_service.path.format(process_id=self.process)
+        return base_url + proc_url
+
+    def job_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> str
+        proc_url = self.process_url(container)
+        job_url = sd.job_service.path.format(job_id=self.id)
+        return proc_url + job_url + (extra_path or "")
 
     def status_url(self, container=None):
         # type: (Optional[AnySettingsContainer]) -> str
@@ -1489,6 +1496,74 @@ class Job(Base, LoggerHandler):
                             ])
         return links
 
+    def prov_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
+        extra_path = str(extra_path or "")
+        prov_path = f"/prov{extra_path}"
+        return self.job_url(container=container, extra_path=prov_path)
+
+    def prov_path(self, container=None, extra_path=None, prov_format=None):
+        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType], Optional[AnyProvenanceFormat]) -> str
+        """
+        Obtain the relative path of the ``PROV`` contents.
+        """
+        job_path = self.result_path()
+        prov_path = f"{job_path}-prov"
+        prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
+        _prov_path_mapping = {
+            (None, None): prov_path,  # the directory itself with all metadata
+            ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
+            ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
+            ("/prov", ProvenanceFormat.PROV_JSONLD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
+            ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
+            ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
+            ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
+            ("/prov", ProvenanceFormat.PROV_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
+        }  # type: Dict[Tuple[Optional[ProvenancePathType], ProvenanceFormat], str]
+        key = (extra_path, prov_format)
+        resolved_path = _prov_path_mapping.get(key)
+        if resolved_path:
+            out_dir = get_wps_output_dir(container)
+            return os.path.join(out_dir, resolved_path)
+        return resolved_path
+
+    def prov_data(
+        self,
+        container=None,     # type: Optional[AnySettingsContainer]
+        extra_path=None,    # type: Optional[Union[ProvenancePathType, str]]
+        prov_format=None,   # type: AnyContentType
+    ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
+        """
+        Read or retrieve data from the packaged provenance directory contents associated to the :term:`Job`.
+        """
+        prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
+        if prov_path and os.path.isfile(prov_path):
+            with open(prov_path, mode="r", encoding="utf-8") as prov_f:
+                data = prov_f.read()
+            fmt = prov_format
+        else:
+            prov_path = self.prov_path(container=container)
+            if not prov_path or not os.path.isdir(prov_path):
+                return None, None
+            path = str(extra_path).split("/prov/", 1)[-1]
+            frag = path.strip("/").split("/")
+            oper, params = frag[0], frag[1:]
+            args = ["-d", prov_path, oper]
+            if oper == "run":
+                args.extend(["--steps", "--start", "--end", "--duration", "--labels", "--inputs", "--outputs"])
+            elif oper in ["inputs", "outputs"]:
+                args.extend(["--parameters", "--format", "uris"])
+            args.extend(params)
+            tool = CWLProvTool(args)
+            tool.output = io.StringIO()  # override the buffer argument to "print"
+            result = tool.main()  # noqa  # function annotated to return nothing, but sometimes returns an error code
+            if result not in [0, None]:
+                return None, None
+            tool.output.seek(0)
+            data = tool.output.read()
+            fmt = ContentType.TEXT_PLAIN
+        return data, fmt
+
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
         """
@@ -1503,7 +1578,7 @@ class Job(Base, LoggerHandler):
         settings = get_settings(container)
         html_on = settings.get("weaver.wps_restapi_html", True)
         base_url = get_wps_restapi_base_url(settings)
-        job_url = self._job_url(base_url)  # full URL
+        job_url = self.job_url(settings)  # full URL
         job_path = base_url + sd.job_service.path.format(job_id=self.id)
         job_exec = f"{job_url.rsplit('/', 1)[0]}/execution"
         job_list = base_url + sd.jobs_service.path
@@ -1529,12 +1604,11 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
-
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
             job_status = map_status(self.status)
-            if job_status == Status.SUCCEEDED:
+            if job_status == Status.SUCCESSFUL:
                 job_links.extend([
                     {"href": f"{job_url}/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
@@ -1542,6 +1616,10 @@ class Job(Base, LoggerHandler):
                      "title": "Job results of successful process execution (direct output values mapping)."},
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
+                    {"href": f"{job_url}/prov", "rel": "provenance",  # unofficial
+                     "title": "Job provenance collected following process execution."},
+                    {"href": f"{job_url}/prov", "rel": "https://www.w3.org/ns/prov",  # unofficial
+                     "title": "Job provenance collected following process execution."},
                 ])
                 f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
                 if len(f_links) > 0:
@@ -1555,7 +1633,7 @@ class Job(Base, LoggerHandler):
             "href": f"{job_url}/logs", "rel": "logs",  # unofficial
             "title": "List of collected job logs during process execution."
         })
-        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
+        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions", "provenance"]:
             self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
             # back to specific job if we are in one of its sub-endpoints
@@ -1568,8 +1646,8 @@ class Job(Base, LoggerHandler):
         job_links.extend([self_link_body, self_link_up])
         link_meta = {"type": ContentType.APP_JSON, "hreflang": AcceptLanguage.EN_CA}
         for link in job_links:
-            for meta, parma in link_meta.items():
-                link.setdefault(meta, parma)
+            for meta, param in link_meta.items():
+                link.setdefault(meta, param)
         return job_links
 
     def json(self, container=None):  # pylint: disable=W0221,arguments-differ
@@ -1982,7 +2060,7 @@ class VaultFile(Authentication):
         return compare_digest(str(access), str(token))
 
     def encrypt(self, file):
-        # type: (IO[bytes|str]) -> BytesIO
+        # type: (IO[Union[bytes, str]]) -> BytesIO
         """
         Encrypt file data using a secret to avoid plain text contents during temporary :term:`Vault` storage.
 
@@ -1998,7 +2076,7 @@ class VaultFile(Authentication):
         return BytesIO(digest)
 
     def decrypt(self, file):
-        # type: (IO[bytes|str]) -> BytesIO
+        # type: (IO[Union[bytes, str]]) -> BytesIO
         """
         Decrypt file contents using secret.
         """
