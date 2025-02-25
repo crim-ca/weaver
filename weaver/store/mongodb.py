@@ -91,12 +91,22 @@ if TYPE_CHECKING:
         Dict[str, AnyValueType],
         Dict[str, List[AnyValueType]],
     ]
+    MongodbAggregateLogicalOp = TypedDict("MongodbAggregateLogicalOp", {
+        "$or": List[MongodbAggregateValue],
+        "$and": List[MongodbAggregateValue],
+        "$all": List[MongodbAggregateValue],
+        "$not": Dict[str, MongodbAggregateValue],
+    }, total=False)
     MongodbAggregateSortOrder = Dict[str, int]
     MongodbAggregateSortExpression = TypedDict("MongodbAggregateSortExpression", {
         "$sort": MongodbAggregateSortOrder,
     }, total=True)
+    MongodbAggregateFilterConditions = Union[
+        Dict[str, MongodbAggregateValue],
+        MongodbAggregateLogicalOp,
+    ]
     MongodbAggregateFilterExpression = TypedDict("MongodbAggregateFilterExpression", {
-        "$match": MongodbAggregateValue,
+        "$match": MongodbAggregateFilterConditions,
     }, total=True)
     MongodbAggregateExpression = Union[
         Dict[str, MongodbAggregateValue],
@@ -532,6 +542,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        total=False,         # type: bool
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
+                       identifiers=None,    # type: Optional[List[str]]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -543,18 +554,42 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param total: Request the total number of processes to be calculated (ignoring paging).
         :param revisions: Include all process revisions instead of only latest ones.
         :param process: Limit results only to specified process ID (makes sense mostly when combined with revisions).
+        :param identifiers:
+            Limit results only to specified explicit list of process IDs with revision tags as applicable.
+            Cannot be combined with the other :paramref:`process` and :paramref:`revisions` options.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        search_filters = {}  # type: MongodbAggregateExpression
+        search_filters = {}  # type: MongodbAggregateFilterConditions
+        insert_fields = []  # type: MongodbAggregatePipeline
 
         if process and revisions:
             search_filters["identifier"] = {"$regex": rf"^{process}(:.*)?$"}  # revisions of that process
         elif process and not revisions:
             search_filters["identifier"] = process  # not very relevant 'listing', but valid (explicit ID)
-        elif not process and not revisions:
+        elif not process and not revisions and not identifiers:
             search_filters["identifier"] = {"$regex": r"^[\w\-]+$"}  # exclude ':' to keep only latest (default)
+        elif identifiers:
+            insert_fields = [
+                # if the identifier is an older revision, it must have a version number explicitly no matter what
+                # however, the latest revision can either omit the version or provide it explicitly, as the same entity
+                # in this case, "align" the result with the search ID/version to resolve as expected by the query
+                {"$set": {"identifier": {"$cond": {
+                    "if": {
+                        # the only case that must be patched is when the version is explicitly indicated in query,
+                        # although not explicit set in the DB document since it corresponds to the latest revision
+                        "$and": [
+                            {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
+                            {"$not": {"$in": ["$identifier", identifiers]}}
+                        ]
+                    },
+                    "then": {"$concat": ["$identifier", ":", "$version"]},
+                    "else": "$identifier",
+                }}}},
+            ]
+            # identifiers will be matched as specified in the query with the above update, or the older revisions
+            search_filters["identifier"] = {"$in": identifiers}
         # otherwise, last case returns 'everything', so nothing to 'filter'
 
         if visibility is None:
@@ -566,7 +601,6 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             if vis not in Visibility:
                 raise ValueError(f"Invalid visibility value '{v!s}' is not one of {list(Visibility.values())!s}")
         search_filters["visibility"] = {"$in": list(visibility)}
-        insert_fields = []  # type: MongodbAggregatePipeline
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:
@@ -583,7 +617,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             # Work around this by dynamically reassigning 'id' by itself.
             insert_fields = [
                 {"$set": {"tag": {"$cond": {
-                    "if": {"identifier": "/^.*:.*$/"},
+                    "if": {"$regexMatch": {"input": "$identifier", "regex": "^.*:.*$"}},
                     "then": "$identifier",
                     "else": {"$concat": ["$identifier", ":", "$version"]},
                 }}}},

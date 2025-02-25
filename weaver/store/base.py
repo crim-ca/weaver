@@ -118,6 +118,7 @@ class StoreProcesses(StoreInterface):
                        total=False,         # type: bool
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
+                       identifiers=None,    # type: Optional[List[str]]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 

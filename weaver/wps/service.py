@@ -24,7 +24,15 @@ from weaver.processes.convert import get_field, wps2json_job_payload
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import extend_instance, get_header, get_registry, get_request_args, get_settings, get_weaver_url
+from weaver.utils import (
+    extend_instance,
+    get_header,
+    get_registry,
+    get_request_args,
+    get_settings,
+    get_weaver_url,
+    parse_kvp
+)
 from weaver.visibility import Visibility
 from weaver.wps.storage import ReferenceStatusLocationStorage
 from weaver.wps.utils import (
@@ -403,10 +411,17 @@ def get_pywps_service(environ=None, is_worker=False):
         if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
             load_pywps_config(settings, config=pywps_cfg)
 
+        # resolve pre-filtered list of process(es), and whether they require any explicit revision tag
+        # do this dynamically in advance since a lot of processes could require listing + conversion
+        # avoid unnecessary resolution of processes that will not be employed otherwise
+        proc_ids = parse_kvp(environ.get("QUERY_STRING") or "", pair_sep="&").get("identifier") or None
+
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
-        processes_wps = [process.wps() for process in
-                         process_store.list_processes(visibility=Visibility.PUBLIC)]
+        processes_wps = [
+            process.wps() for process in
+            process_store.list_processes(visibility=Visibility.PUBLIC, identifiers=proc_ids)
+        ]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")

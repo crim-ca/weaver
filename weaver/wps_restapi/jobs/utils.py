@@ -96,6 +96,7 @@ if TYPE_CHECKING:
         ExecutionResultValue,
         HeadersTupleType,
         HeadersType,
+        HTTPValid,
         JobValueFormat,
         JSON,
         PyramidRequest,
@@ -1118,6 +1119,12 @@ def get_job_results_multipart(job, results, *, headers, settings):
     resp = HTTPOk(detail=f"Multipart Response for {job}", headers=resp_headers)
     resp.body = res_multi.read()
     return resp
+
+
+@overload
+def get_job_submission_response(body, headers):
+    # type: (JSON, AnyHeadersContainer) -> HTTPValid
+    ...
 
 
 def get_job_submission_response(
