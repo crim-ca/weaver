@@ -2,7 +2,7 @@ import logging
 import os
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
@@ -414,7 +414,8 @@ def get_pywps_service(environ=None, is_worker=False):
         # resolve pre-filtered list of process(es), and whether they require any explicit revision tag
         # do this dynamically in advance since a lot of processes could require listing + conversion
         # avoid unnecessary resolution of processes that will not be employed otherwise
-        proc_ids = parse_kvp(environ.get("QUERY_STRING") or "", pair_sep="&").get("identifier") or None
+        query = unquote(environ.get("QUERY_STRING") or "")
+        proc_ids = parse_kvp(query, pair_sep="&").get("identifier") or None
 
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
