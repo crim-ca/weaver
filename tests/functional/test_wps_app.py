@@ -1,25 +1,30 @@
 """
-Based on tests from:
-
-* https://github.com/geopython/pywps/tree/master/tests
-* https://github.com/mmerickel/pyramid_services/tree/master/pyramid_services/tests
-* http://webtest.pythonpaste.org/en/latest/
-* http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
+Test WPS endpoint.
 """
 import contextlib
+import copy
+from typing import TYPE_CHECKING
 
 import pytest
 import xmltodict
+from parameterized import parameterized
 
-from tests.functional.utils import WpsConfigBase
+from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery
 from weaver import xml_util
+from weaver.execute import ExecuteControlOption
 from weaver.formats import ContentType
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.visibility import Visibility
 
+if TYPE_CHECKING:
+    from typing import List
 
+    from weaver.typedefs import JSON
+
+
+@pytest.mark.wps
 @pytest.mark.functional
 class WpsAppTest(WpsConfigBase):
     wps_path = "/ows/wps"
@@ -194,3 +199,133 @@ class WpsAppTest(WpsConfigBase):
         resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"service\">")
         err_desc = f"Process with ID '{self.process_private.identifier}' is not accessible."
         resp.mustcontain(f"<ExceptionText>{err_desc}</ExceptionText>")
+
+
+@pytest.mark.wps
+@pytest.mark.functional
+class WpsAppTestWithProcessRevisions(WpsConfigBase, ResourcesUtil):
+    wps_path = "/ows/wps"
+    settings = {
+        "weaver.url": "https://localhost",
+        "weaver.wps": True,
+        "weaver.wps_path": wps_path,
+        "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+        "weaver.wps_metadata_provider_name": "WpsAppTest"
+    }
+    process_id = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(WpsAppTestWithProcessRevisions, cls).setUpClass()
+        cls.process_id = cls.fully_qualified_test_name(cls)
+        cls.process_revisions = cls.deploy_process_revisions(cls, cls.process_id)
+
+    def deploy_process_revisions(self, process_id):
+        # type: (str) -> List[str]
+        """
+        Generates some revisions of a given process.
+        """
+        body = self.retrieve_payload("Echo", "deploy", local=True)
+        versions = ["1.2.0"]
+        body["processDescription"]["process"]["version"] = versions[0]
+        self.deploy_process(body, process_id=process_id)
+        data = {"title": "first revision", "version": "1.2.3"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "second revision", "version": "1.2.5"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "third revision", "version": "1.3.2", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = {"title": "fourth revision", "version": "1.3.4"}
+        resp = self.app.patch_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+        versions.append(data["version"])
+        data = copy.deepcopy(body)  # type: JSON
+        data_update = {"version": "2.0.0", "inputs": {"message": {"type": "string"}}}
+        data["processDescription"]["process"].update(data_update)
+        resp = self.app.put_json(f"/processes/{process_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 201
+        versions.append(data_update["version"])
+        return versions
+
+    @parameterized.expand([
+        "", "1.2.3", "1.2.5", "1.3.2", "1.3.4", "2.0.0"
+    ])
+    def test_describe_process_single_revision(self, process_revision):
+        headers = {"Accept": ContentType.APP_XML}
+        proc_id = f"{self.process_id}:{process_revision}" if process_revision else self.process_id
+        proc_ver = process_revision if process_revision else self.process_revisions[-1]
+        params = {
+            "service": "WPS",
+            "request": "DescribeProcess",
+            "version": "1.0.0",
+            "identifier": proc_id,
+        }
+        resp = self.app.get(self.wps_path, params=params, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+        resp.mustcontain(f"ProcessDescription wps:processVersion=\"{proc_ver}\"")  # reported regardless of ID:rev
+        resp.mustcontain(f"<ows:Identifier>{proc_id}</ows:Identifier>")  # ID as requested to match search criteria
+
+    @parameterized.expand([
+        (["1.2.3", "1.2.5"], ),
+        (["1.3.2", "1.3.4", "2.0.0"], ),
+        (["1.2.5", "", "2.0.0"], ),
+    ])
+    def test_describe_process_multi_revision_filter(self, process_revisions):
+        headers = {"Accept": ContentType.APP_XML}
+        proc_ids = [
+            f"{self.process_id}:{rev}" if rev else self.process_id
+            for rev in process_revisions
+        ]
+        proc_vers = [
+            rev if rev else self.process_revisions[-1]
+            for rev in process_revisions
+        ]
+        params = {
+            "service": "WPS",
+            "request": "DescribeProcess",
+            "version": "1.0.0",
+            "identifier": ",".join(proc_ids),
+        }
+        resp = self.app.get(self.wps_path, params=params, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("</wps:ProcessDescriptions>")
+        for proc_id, proc_ver in zip(proc_ids, proc_vers):
+            resp.mustcontain(f"ProcessDescription wps:processVersion=\"{proc_ver}\"")  # reported regardless of ID:rev
+            resp.mustcontain(f"<ows:Identifier>{proc_id}</ows:Identifier>")  # ID as requested to match search criteria
+
+        unrequested_versions = set(self.process_revisions) - set(proc_vers)
+        for proc_ver in unrequested_versions:
+            assert f"ProcessDescription wps:processVersion=\"{proc_ver}\"" not in resp.text, "filter did not work"
+
+    @parameterized.expand([
+        # 1st revision is an older version that must be specified to invoke it specifically
+        # 2 last versions are the same, but revision specified explicitly or not
+        "1.2.3", "2.0.0", ""
+    ])
+    def test_execute_single_revision(self, process_revision):
+        headers = {"Accept": ContentType.APP_XML}
+        proc_id = f"{self.process_id}:{process_revision}" if process_revision else self.process_id
+        params = {
+            "service": "WPS",
+            "request": "ExecuteProcess",
+            "version": "1.0.0",
+            "identifier": proc_id,
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(self.wps_path, params=params, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type in ContentType.ANY_XML
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain(f"PyWPS Process {proc_id}")
