@@ -586,26 +586,21 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 for idx, proc_id in enumerate(process_latest)
             }
             process_variants.update({
-                f"condition_{idx}": [
-                    {"$set": {"identifier": {"$cond": {
-                        "if": {
-                            # the only case that must be patched is when the version is explicitly indicated in query,
-                            # although not explicit set in the DB document since it corresponds to the latest revision
-                            "$and": [
-                                {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
-                                {"$not": {"$in": ["$identifier", list(process_ids)]}}
-                            ]
-                        },
-                        "then": {"$concat": ["$identifier", ":", "$version"]},
-                        "else": "$identifier",
-                    }}}},
-                    # then, search by 'ID:revision' whether it was the latest or an actual older revision
-                    {"$match": {"identifier": proc_id_rev}}
-                ]
+                f"condition_{idx}": [{"$match": {"identifier": proc_id_rev}}]
                 for idx, proc_id_rev in enumerate(process_revisions, start=len(process_variants))
             })
             process_variants.update({
-                f"condition_{idx}": [{"$match": {"identifier": proc_id, "version": proc_rev}}]
+                f"condition_{idx}": [
+                    {"$match": {"identifier": proc_id, "version": proc_rev}},
+                    # After resolutions, align any 'latest' process that indicates the explicit revision.
+                    # The only case that must be patched is when the version is explicitly indicated in query,
+                    # although not explicit set in the DB document since it corresponds to the latest revision.
+                    {"$set": {"identifier": {"$cond": {
+                        "if": {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
+                        "then": {"$concat": ["$identifier", ":", "$version"]},
+                        "else": "$identifier",
+                    }}}},
+                ]
                 for idx, (proc_id, proc_rev) in enumerate(process_id_version, start=len(process_variants))
             })
             resolve_filter = [

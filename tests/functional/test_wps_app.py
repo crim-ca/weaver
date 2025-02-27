@@ -307,7 +307,7 @@ class WpsAppTestWithProcessRevisions(WpsConfigBase, ResourcesUtil):
         ([(0, "1.3.2"), (1, "1.3.2"), (0, "1.3.4"), (1, "2.0.0")], ),
         # ensure optional tag returns both variants as pseudo-duplicates when the corresponding revision is also given
         # ("" == "2.0.0"), this is not the same as 'test_describe_process_multi_revision_duplicates' use case
-        ([(0, "1.2.5"), (0, ""), (0, "2.0.0"), (0, ""), (1, "2.0.0")], ),
+        ([(0, "1.2.5"), (0, ""), (0, "2.0.0"), (1, ""), (1, "2.0.0")], ),
     ])
     def test_describe_process_multi_revision_filter(self, process_revisions):
         headers = {"Accept": ContentType.APP_XML}
@@ -316,8 +316,8 @@ class WpsAppTestWithProcessRevisions(WpsConfigBase, ResourcesUtil):
             for idx, rev in process_revisions
         ]
         proc_vers = [
-            rev if rev else self.process_revisions[0][-1]
-            for rev in process_revisions
+            rev if rev else self.process_revisions[idx][-1]
+            for idx, rev in process_revisions
         ]
         params = {
             "service": "WPS",
@@ -333,15 +333,16 @@ class WpsAppTestWithProcessRevisions(WpsConfigBase, ResourcesUtil):
             resp.mustcontain(f"ProcessDescription wps:processVersion=\"{proc_ver}\"")  # reported regardless of ID:rev
             resp.mustcontain(f"<ows:Identifier>{proc_id}</ows:Identifier>")  # ID as requested to match search criteria
 
-        unrequested_versions = set(self.process_revisions[0]) - set(proc_vers)
-        for proc_ver in unrequested_versions:
-            assert f"ProcessDescription wps:processVersion=\"{proc_ver}\"" not in resp.text, "filter did not work"
-
         # number of identifiers must match the requested IDs/revisions that exist,
         # even if they represent the same process after optional-latest revision resolution
         # to ensure that PyWPS can resolve them against the specified query string ID values
         # (PyWPS does not have special 'revision' logic, it considers them distinct processes without relationships)
-        assert resp.text.count("<ows:Identifier>") == len(process_revisions)
+        assert sum(
+            # need to include process ID in check to disambiguate from I/O ID
+            # however, stop at the 'ID' only (no revision / end XML block) to count all revisions together
+            resp.text.count(f"<ows:Identifier>{p_id}")
+            for p_id in self.process_ids
+        ) == len(process_revisions)
 
     def test_describe_process_multi_revision_duplicates(self):
         headers = {"Accept": ContentType.APP_XML}
