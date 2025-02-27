@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Union
 
     from pywps.inout.basic import ComplexInput
+    from uuid import UUID
 
     from weaver.datatype import Job
     from weaver.typedefs import (
@@ -190,15 +191,21 @@ class WorkerService(ServiceWPS):
             return resp
         return None
 
-    def describe(self, wps_request, *_, **__):
-        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
+    def describe(self, wps_request, uuid, identifiers, *_, **__):
+        # type: (WPSRequest, UUID, List[str], *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``DescribeProcess`` KVP/XML request submitted on the WPS endpoint.
 
         Redirect to WPS-REST endpoint if requested ``Content-Type`` is JSON or handle ``DescribeProcess`` normally.
         """
+        # patch exact duplicate (ID/Revisions) to avoid redundant listing (PyWPS does not consider it)
+        # use list/dict trick to get unique IDs with preserved ordering in case others are specified
+        wps_request.identifiers = list({p_id: None for p_id in wps_request.identifiers})
+        if identifiers:
+            identifiers = wps_request.identifiers
+
         resp = self._describe_process_redirect(wps_request, *_, **__)
-        return resp or super(WorkerService, self).describe(wps_request, *_, **__)
+        return resp or super(WorkerService, self).describe(wps_request, uuid, identifiers, *_, **__)
 
     @handle_known_exceptions
     def _submit_job(self, wps_request):
