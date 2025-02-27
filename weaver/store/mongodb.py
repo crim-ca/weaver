@@ -594,7 +594,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                     {"$match": {"identifier": proc_id, "version": proc_rev}},
                     # After resolutions, align any 'latest' process that indicates the explicit revision.
                     # The only case that must be patched is when the version is explicitly indicated in query,
-                    # although not explicit set in the DB document since it corresponds to the latest revision.
+                    # although not explicitly set in the DB document since it corresponds to the latest revision.
                     {"$set": {"identifier": {"$cond": {
                         "if": {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
                         "then": {"$concat": ["$identifier", ":", "$version"]},

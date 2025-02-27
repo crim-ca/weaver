@@ -19,7 +19,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` when queried on the `WPS` endpoint.
+- Fix resolution of `Process` revisions when queried by multiple ID and/or version combinations on the `WPS` endpoint.
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` for execution by `OGC API - Processes` endpoint
+  (fixes `#799 <https://github.com/crim-ca/weaver/issues/799>`_).
 
 .. _changes_6.3.0:
 
