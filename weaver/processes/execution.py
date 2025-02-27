@@ -834,7 +834,9 @@ def submit_job(request, reference, tags=None, process_id=None):
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        proc_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
+        # use the request-provided reference (explicit 'id:version' process revision or simply 'id')
+        # if the latest, it resolves the same, but use the one the user will be aware of for clearer reporting of URLs
+        proc_id = process_id or resolve_process_tag(request)
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
@@ -900,7 +902,9 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
     # non-local is only a reference, no actual process object to validate
     provider_id = provider.id if isinstance(provider, Service) else provider
+    process_id = None
     if process and is_local and not isinstance(process, Process):
+        process_id = process
         proc_store = db.get_store(StoreProcesses)
         process = proc_store.fetch_by_id(process)
     if process and is_local:
@@ -911,6 +915,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
             process, provider_id
         )
+    process_id = process_id or process.id  # pass down the specified or resolved reference (possibly with revision tag)
 
     headers = headers or {}
     if is_local:
@@ -943,7 +948,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
+    job = store.save_job(task_id=job_status, process=process_id, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
                          execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,

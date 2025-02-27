@@ -55,6 +55,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     import datetime
@@ -737,9 +738,19 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         # update ID to allow direct fetch by ID using tagged version
         # this also clears the unique ID index requirement
         new_name = f"{sane_name}:{version}"
+        # resolve new endpoints
+        # assume that only local processes can be updated
+        restapi_url = get_wps_restapi_base_url(self.settings)
+        description_url = "/".join([restapi_url, "processes", new_name])
+        execute_endpoint = "/".join([description_url, "jobs"])
         process = self.collection.find_one_and_update(
             filter={"identifier": sane_name},
-            update={"$set": {"identifier": new_name, "version": version}},
+            update={"$set": {
+                "identifier": new_name,
+                "version": version,
+                "processDescriptionURL": execute_endpoint,
+                "executeEndpoint": execute_endpoint,
+            }},
             return_document=ReturnDocument.AFTER,
         )
         if not process:
