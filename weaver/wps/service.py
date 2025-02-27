@@ -4,6 +4,7 @@ from configparser import ConfigParser
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse, unquote
 
+import colander
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
@@ -19,7 +20,7 @@ from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
 from weaver.formats import ContentType, get_format, guess_target_format
-from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.owsexceptions import OWSException, OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes.convert import get_field, wps2json_job_payload
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
@@ -31,7 +32,8 @@ from weaver.utils import (
     get_request_args,
     get_settings,
     get_weaver_url,
-    parse_kvp
+    parse_kvp,
+    repr_json
 )
 from weaver.visibility import Visibility
 from weaver.wps.storage import ReferenceStatusLocationStorage
@@ -397,6 +399,26 @@ class WorkerService(ServiceWPS):
         return execution
 
 
+def check_invalid_ids(identifiers, content_type):
+    # type: (List[str], Optional[str]) -> None
+    try:
+        sd.ProcessNamesList().deserialize(identifiers)
+    except colander.Invalid as exc:
+        invalid_ids = [invalid.value for invalid in exc.children]
+        body = None
+        desc = "Invalid identifiers use disallowed characters."
+        if ContentType.APP_JSON in str(content_type):
+            body = {
+                "code": OWSInvalidParameterValue.code,
+                "name": "identifier",
+                "description": desc,
+                "value": repr_json(invalid_ids, force_string=False)
+            }
+        else:
+            desc = f"{desc} {repr_json(invalid_ids, force_string=True, indent=None)}"
+        raise OWSInvalidParameterValue(desc, locator="identifier", json=body)
+
+
 def get_pywps_service(environ=None, is_worker=False):
     # type: (SettingsType, bool) -> WorkerService
     """
@@ -416,6 +438,10 @@ def get_pywps_service(environ=None, is_worker=False):
         # avoid unnecessary resolution of processes that will not be employed otherwise
         query = unquote(environ.get("QUERY_STRING") or "")
         proc_ids = parse_kvp(query, pair_sep="&").get("identifier") or None
+        if proc_ids and not is_worker:
+            # pre-validate in case WPS endpoint invoked directly (non-worker, IDs not already validated)
+            # to avoid illegal search characters with DB
+            check_invalid_ids(proc_ids, environ.get("HTTP_ACCEPT"))
 
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
@@ -424,6 +450,8 @@ def get_pywps_service(environ=None, is_worker=False):
             process_store.list_processes(visibility=Visibility.PUBLIC, identifiers=proc_ids)
         ]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
+    except OWSException:
+        raise  # handled
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
         raise OWSNoApplicableCode(f"Failed setup of PyWPS Service and/or Processes. Error [{ex!r}]")

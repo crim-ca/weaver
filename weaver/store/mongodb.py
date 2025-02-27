@@ -561,8 +561,9 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        search_filters = {}  # type: MongodbAggregateFilterConditions
         insert_fields = []  # type: MongodbAggregatePipeline
+        search_filters = {}  # type: MongodbAggregateFilterConditions
+        resolve_filter = []  # type: MongodbAggregatePipeline
 
         if process and revisions:
             search_filters["identifier"] = {"$regex": rf"^{process}(:.*)?$"}  # revisions of that process
@@ -571,25 +572,51 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         elif not process and not revisions and not identifiers:
             search_filters["identifier"] = {"$regex": r"^[\w\-]+$"}  # exclude ':' to keep only latest (default)
         elif identifiers:
-            insert_fields = [
-                # if the identifier is an older revision, it must have a version number explicitly no matter what
-                # however, the latest revision can either omit the version or provide it explicitly, as the same entity
-                # in this case, "align" the result with the search ID/version to resolve as expected by the query
-                {"$set": {"identifier": {"$cond": {
-                    "if": {
-                        # the only case that must be patched is when the version is explicitly indicated in query,
-                        # although not explicit set in the DB document since it corresponds to the latest revision
-                        "$and": [
-                            {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
-                            {"$not": {"$in": ["$identifier", identifiers]}}
-                        ]
-                    },
-                    "then": {"$concat": ["$identifier", ":", "$version"]},
-                    "else": "$identifier",
-                }}}},
+            # If the identifier is an older revision, it must have a version number explicitly no matter what.
+            # However, the latest revision can either omit the version or provide it explicitly (same document).
+            # Since this latest "same document" could be represented by "duplicate" ID representations, and queried
+            # simultaneously with the distinct 'id'/'id:version' references, return it twice (if they exist of course)
+            # with both criteria to respect the search that will expect to find those ID variations respectively.
+            process_ids = set(identifiers)
+            process_latest = {proc_id for proc_id in identifiers if ":" not in proc_id}
+            process_revisions = process_ids - process_latest
+            process_id_version = [proc_rev.rsplit(":", 1) for proc_rev in process_revisions]
+            process_variants = {
+                f"condition_{idx}": [{"$match": {"identifier": proc_id}}]
+                for idx, proc_id in enumerate(process_latest)
+            }
+            process_variants.update({
+                f"condition_{idx}": [
+                    {"$set": {"identifier": {"$cond": {
+                        "if": {
+                            # the only case that must be patched is when the version is explicitly indicated in query,
+                            # although not explicit set in the DB document since it corresponds to the latest revision
+                            "$and": [
+                                {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
+                                {"$not": {"$in": ["$identifier", list(process_ids)]}}
+                            ]
+                        },
+                        "then": {"$concat": ["$identifier", ":", "$version"]},
+                        "else": "$identifier",
+                    }}}},
+                    # then, search by 'ID:revision' whether it was the latest or an actual older revision
+                    {"$match": {"identifier": proc_id_rev}}
+                ]
+                for idx, proc_id_rev in enumerate(process_revisions, start=len(process_variants))
+            })
+            process_variants.update({
+                f"condition_{idx}": [{"$match": {"identifier": proc_id, "version": proc_rev}}]
+                for idx, (proc_id, proc_rev) in enumerate(process_id_version, start=len(process_variants))
+            })
+            resolve_filter = [
+                # Using facets allows to distinct searches for each variant, which is needed to handle duplicate
+                # matches that would otherwise not be yielded individually per combinations within a single search.
+                # Unwrap these individual searches into a flattened result for following steps using root fields.
+                {"$facet": process_variants},
+                {"$project": {"combined": {"$concatArrays": [f"${condition}" for condition in process_variants]}}},
+                {"$unwind": "$combined"},
+                {"$replaceRoot": {"newRoot": "$combined"}},
             ]
-            # identifiers will be matched as specified in the query with the above update, or the older revisions
-            search_filters["identifier"] = {"$in": identifiers}
         # otherwise, last case returns 'everything', so nothing to 'filter'
 
         if visibility is None:
@@ -627,7 +654,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
         sort_method = [{"$sort": sort_fields}]
 
-        search_pipeline = insert_fields + [{"$match": search_filters}] + sort_method
+        search_pipeline = insert_fields + [{"$match": search_filters}] + resolve_filter + sort_method
         paging_pipeline = self._apply_paging_pipeline(page, limit)
         if total:
             pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
