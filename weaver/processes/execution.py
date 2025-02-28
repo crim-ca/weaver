@@ -905,10 +905,11 @@ def submit_job_handler(payload,             # type: ProcessExecution
     # non-local is only a reference, no actual process object to validate
     provider_id = provider.id if isinstance(provider, Service) else provider
     process_id = None
-    if process and is_local and not isinstance(process, Process):
+    if process and not isinstance(process, Process):
         process_id = process
-        proc_store = db.get_store(StoreProcesses)
-        process = proc_store.fetch_by_id(process)
+        if is_local:
+            proc_store = db.get_store(StoreProcesses)
+            process = proc_store.fetch_by_id(process)
     if process and is_local:
         validate_process_io(process, json_body)
         validate_process_id(process, json_body)
@@ -917,7 +918,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
             process, provider_id
         )
-    process_id = process_id or process.id  # pass down the specified or resolved reference (possibly with revision tag)
+    # pass down the specified or resolved reference (possibly with revision tag)
+    process_id = process_id or process.id
 
     headers = headers or {}
     if is_local:
