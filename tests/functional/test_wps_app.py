@@ -22,7 +22,7 @@ from weaver.visibility import Visibility
 if TYPE_CHECKING:
     from typing import List
 
-    from weaver.typedefs import JSON
+    from weaver.typedefs import AnyUUID, AnyVersion, JSON
 
 
 @pytest.mark.wps
@@ -231,8 +231,8 @@ class WpsAppTestWithProcessRevisions(WpsConfigBase, ResourcesUtil):
         "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
         "weaver.wps_metadata_provider_name": "WpsAppTest"
     }
-    process_ids = None
-    process_revisions = None
+    process_ids = []        # type: List[AnyUUID]
+    process_revisions = []  # type: List[List[AnyVersion]]
 
     @classmethod
     def setUpClass(cls):

@@ -123,8 +123,8 @@ class StoreProcesses(StoreInterface):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def fetch_by_id(self, process_id, visibility=None):
-        # type: (AnyProcessRef, Optional[AnyVisibility]) -> Process
+    def fetch_by_id(self, process_id, visibility=None, revision=False):
+        # type: (AnyProcessRef, Optional[AnyVisibility], bool) -> Process
         raise NotImplementedError
 
     @abc.abstractmethod

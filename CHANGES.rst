@@ -23,6 +23,8 @@ Fixes:
 - Fix resolution of `Process` revisions when queried by multiple ID and/or version combinations on the `WPS` endpoint.
 - Fix resolution of `Process` revisions by ``{processID}:{version}`` for execution by `OGC API - Processes` endpoint
   (fixes `#799 <https://github.com/crim-ca/weaver/issues/799>`_).
+- Fix ``jobControlOptions`` not respected in cases where resolution occurs against a restricted set of capabilities
+  for a given `Process` when the submitted `Job` requests an invalid combination by execution ``mode`` body parameter.
 
 .. _changes_6.3.0:
 

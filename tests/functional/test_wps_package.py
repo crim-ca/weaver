@@ -48,6 +48,7 @@ from tests.utils import (
 )
 from weaver.execute import (
     ExecuteCollectionFormat,
+    ExecuteControlOption,
     ExecuteMode,
     ExecuteResponse,
     ExecuteReturnPreference,
@@ -1869,6 +1870,86 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"]["values"]["literalDataDomains"][0]["dataType"]["name"] == "string"
         assert proc["outputs"]["out_file"]["title"] == "Result File"
         assert proc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
+
+    def test_execute_process_revision(self):
+        proc = self.fully_qualified_test_name()
+        old = "1.0.0"
+        rev = "1.1.0"
+        cwl = {
+            "s:version": old,
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"message": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "string", "outputBinding": {"outputEval": "$(inputs.message)"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": proc}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+
+        path = f"/processes/{proc}"
+        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        resp = self.app.patch_json(path, params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        exec_value = "test"
+        exec_body = {
+            # because it is updated above to be sync-only,
+            # using async below MUST fail with correctly resolved newer revision
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": [{"id": "message", "value": exec_value}],
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+
+            # test the newer revision with async, failure expected
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 422, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+
+            # use the older revision which allowed async, validating that the right process version is invoked
+            path = f"/processes/{proc}:{old}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            status_url = resp.headers.get("Location")
+            assert f"{proc}:{old}" in status_url
+            job_id = resp.json.get("jobID")
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{old}"
+            data = self.get_outputs(status_url, schema=JobInputsOutputsSchema.OGC)
+            assert data["outputs"]["output"]["value"] == exec_value
+
+            # counter-validate the assumption with the latest revision using permitted sync
+            # use the explicit version to be sure
+            exec_body["mode"] = ExecuteMode.SYNC
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            results_url = resp.headers.get("Content-Location")  # because sync returns directly, no 'Location' header
+            assert f"{proc}:{rev}" in results_url
+            job_id = results_url.split("/results", 1)[0].rsplit("/", 1)[-1]
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{rev}"
+            assert resp.json["output"] == exec_value
 
     def test_execute_job_with_accept_languages(self):
         """

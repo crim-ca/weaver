@@ -683,8 +683,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
         return search, version
 
-    def fetch_by_id(self, process_id, visibility=None):
-        # type: (AnyProcessRef, Optional[AnyVisibility]) -> Process
+    def fetch_by_id(self, process_id, visibility=None, revision=False):
+        # type: (AnyProcessRef, Optional[AnyVisibility], bool) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
 
@@ -692,6 +692,12 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         :param process_id: Process identifier (optionally with version tag).
         :param visibility: One value amongst :py:mod:`weaver.visibility`.
+        :param revision:
+            Request that the specified 'ID:revision' tag be applied to the retrieved process ID.
+            Applies only when an explicit 'revision' part is provided in :paramref:`process_id`,
+            and that the retrieved :class:`Process` corresponds to the latest resvision that is
+            stored without the ``version`` within its ID. For other revisions, they would already
+            be applied, and must be provided explicitly either way to retrieve them.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
         process_id = self._get_process_id(process_id)
@@ -702,6 +708,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         process = Process(process)
         if version:
             process.version = version  # ensure version was applied just in case
+            if revision:
+                process.identifier = process_id  # apply revision in case it was requested explicitly for latest ID
         if visibility is not None and process.visibility != visibility:
             raise ProcessNotAccessible(f"Process '{process_id}' cannot be accessed.")
         return process

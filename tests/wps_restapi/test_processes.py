@@ -149,6 +149,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             self.process_public,
             processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
             processEndpointWPS1=weaver_wps_url,
+            jobControlOptions=ExecuteControlOption.values(),
         )
         self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
@@ -223,7 +224,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
-            assert len(process["jobControlOptions"]) == 1
+            assert len(process["jobControlOptions"]) == 2
             assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
 
         processes_id = [p["id"] for p in resp.json["processes"]]
@@ -432,7 +433,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = resp.json
         assert len(body["processes"]) == proc_total
         proc_result = [(proc["id"], proc["version"]) for proc in body["processes"]]
-        proc_expect = [(proc_id, "0.0.0") for proc_id in proc_no_revs]
+        proc_expect = [(proc_id, self.process_public.version) for proc_id in proc_no_revs]
         proc_expect += [(tag, ver) for tag, ver in zip(proc1_tags, proc1_versions)]
         proc_expect += [(tag, ver) for tag, ver in zip(proc2_tags, proc2_versions)]
         assert proc_result == sorted(proc_expect)
@@ -2449,7 +2450,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         rev = "1.1.0"
         proc = self.process_public.identifier
         path = f"/processes/{proc}"
-        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.ASYNC]}
         resp = self.app.patch_json(path, params=data, headers=self.json_headers)
         assert resp.status_code == 200
 

@@ -2,7 +2,7 @@ import logging
 import os
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 import colander
 from owslib.wps import WPSExecution
@@ -51,9 +51,9 @@ from weaver.wps_restapi.jobs.utils import get_job_submission_response
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Union
+    from uuid import UUID
 
     from pywps.inout.basic import ComplexInput
-    from uuid import UUID
 
     from weaver.datatype import Job
     from weaver.typedefs import (
@@ -426,10 +426,17 @@ def check_invalid_ids(identifiers, content_type):
         raise OWSInvalidParameterValue(desc, locator="identifier", json=body)
 
 
-def get_pywps_service(environ=None, is_worker=False):
-    # type: (SettingsType, bool) -> WorkerService
+def get_pywps_service(environ=None, is_worker=False, process_id=None):
+    # type: (SettingsType, bool, str) -> WorkerService
     """
     Generates the PyWPS Service that provides WPS-1/2 XML endpoint.
+
+    :param environ: Environment variables containing application settings and the contextual HTTP request.
+    :param is_worker: Hint for managing active processes against :class:`WorkerService`.
+    :param process_id:
+        Pre-resolved :term:`Process` to use, skipping loading and resolution from the database.
+        This is typically employed when a previous :term:`WPS` request occurred to identify
+        the relevant process (i.e.: ``DescribeProcess``), and a following ``Execute`` request.
     """
     environ = environ or {}
     try:
@@ -453,8 +460,11 @@ def get_pywps_service(environ=None, is_worker=False):
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
         processes_wps = [
-            process.wps() for process in
-            process_store.list_processes(visibility=Visibility.PUBLIC, identifiers=proc_ids)
+            process.wps() for process in (
+                [process_store.fetch_by_id(visibility=Visibility.PUBLIC, process_id=process_id, revision=True)]
+                if process_id else
+                process_store.list_processes(visibility=Visibility.PUBLIC, identifiers=proc_ids)
+            )
         ]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except OWSException:

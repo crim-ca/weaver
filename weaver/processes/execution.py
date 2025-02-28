@@ -95,7 +95,7 @@ if TYPE_CHECKING:
     from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
-    from weaver.execute import AnyExecuteMode
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -195,16 +195,18 @@ def execute_process(task, job_id, wps_url, headers=None):
         # if process refers to a remote WPS provider, pass it down to avoid unnecessary re-fetch request
         if job.is_local:
             process = None  # already got all the information needed pre-loaded in PyWPS service
+            local_process_id = wps_process.identifier
         else:
             service = Service(name=job.service, url=wps_url)
             process = Process.from_ows(wps_process, service, settings)
+            local_process_id = None
 
         job.progress = JobProgress.EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
 
-        wps_worker = get_pywps_service(environ=settings, is_worker=True)
+        wps_worker = get_pywps_service(environ=settings, is_worker=True, process_id=local_process_id)
         execution = wps_worker.execute_job(job,
                                            wps_inputs=wps_inputs, wps_outputs=wps_outputs,
                                            remote_process=process, headers=headers)
@@ -931,6 +933,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
         execute_mode = mode
+    validate_process_exec_mode(job_ctl_opts, execute_mode)
+
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
@@ -1089,7 +1093,7 @@ def update_job_parameters(job, request):
                     if value == ExecuteMode.AUTO:
                         continue  # don't override previously set value that resolved with default value by omission
                     if value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
-                        job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                        job_ctrl_exec = ExecuteControlOption.from_mode(value)
                         if job_ctrl_exec not in job_process.jobControlOptions:
                             raise HTTPBadRequest(
                                 json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
@@ -1250,6 +1254,42 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_process_exec_mode(job_control_options, execution_mode):
+    # type: (List[AnyExecuteControlOption], Optional[AnyExecuteMode]) -> None
+    """
+    Verify that a certain :term:`Job` execution mode fulfills the :term:`Process` ``jobControlOptions`` prerequisite.
+
+    Assumes that any applicable resolution of the :term:`Job` execution mode (header, query, body, etc.)
+    and the relevant control options was already performed by any applicable upstream operations.
+
+    .. seealso::
+        - :ref:`proc_exec_mode`
+        - :func:`parse_prefer_header_execute_mode`
+
+    :raises HTTPUnprocessableEntity: If the execution mode is not permitted by the :term:`Process`.
+    """
+    job_ctrl_exec = ExecuteControlOption.from_mode(execution_mode)
+    if not (job_ctrl_exec in job_control_options or execution_mode in [ExecuteMode.AUTO, None]):
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "InvalidJobControlOptions",
+                    "title": "Invalid Job Execution Mode specified against permitted Process Job Control Options.",
+                    "detail": "Any hint of a job execution strategy must respect the process prerequisites.",
+                    "status": HTTPUnprocessableEntity.code,
+                    "cause": {"name": "process.jobControlOptions"},
+                    "value": repr_json(
+                        {
+                            "process.jobControlOptions": job_control_options,
+                            "job.mode": execution_mode,
+                        },
+                        force_string=False,
+                    ),
+                }
+            )
+        )
 
 
 def validate_process_id(job_process, payload):
