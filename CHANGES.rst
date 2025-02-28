@@ -25,6 +25,7 @@ Fixes:
   (fixes `#799 <https://github.com/crim-ca/weaver/issues/799>`_).
 - Fix ``jobControlOptions`` not respected in cases where resolution occurs against a restricted set of capabilities
   for a given `Process` when the submitted `Job` requests an invalid combination by execution ``mode`` body parameter.
+- Fix ``remote`` and ``local`` tags incorrectly applied to `Job` definition.
 
 .. _changes_6.3.0:
 

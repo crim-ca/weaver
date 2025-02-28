@@ -842,7 +842,7 @@ def submit_job(request, reference, tags=None, process_id=None):
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
-        tags += "local"
+        tags.append("local")
         support_lang = AcceptLanguage.offers()
         accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
         matched_lang = accepts_lang.lookup(support_lang, default="") or None
@@ -865,7 +865,7 @@ def submit_job(request, reference, tags=None, process_id=None):
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
-        tags += "remote"
+        tags.append("remote")
     else:  # pragma: no cover
         LOGGER.error("Expected process/service, got: %s", type(reference))
         raise TypeError("Invalid process or service reference to execute job.")
