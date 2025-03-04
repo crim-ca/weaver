@@ -22,6 +22,14 @@ body {
     padding-top: 0.5em;
 }
 
+.content-section-summary {
+    margin: 0.5em 0 1em;
+    font-style: italic;
+}
+
+.content-section-content {
+}
+
 .page-title {
     margin-bottom: 0.1em;
 }

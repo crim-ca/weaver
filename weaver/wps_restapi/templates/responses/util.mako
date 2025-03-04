@@ -275,12 +275,13 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     Once fetched, the job 'type' response contents are cached into to the code block element to avoid fetching again.
     Classes are dynamically attributed with the corresponding 'type' parameter to allow different styling as needed.
 -->
-<%def name="build_job_toggle_button_code(job, type, format, language)">
+<%def name="build_job_toggle_button_code(job, type, format, language, queries = '', name = '')">
 <div>
     <script>
-        async function fetch_job_${type}(format) {
+        async function fetch_job_${type}(format, queries) {
             const url = "${get_job_link(job.id)}";
-            const resp = await fetch(url + "/${type}?f=" + format);
+            const qs = queries ? "&" + queries : "";
+            const resp = await fetch(url + "/${type}?f=" + format + qs);
             let data = "";
             if ("${language}" == "json") {
                 data = await resp.json();
@@ -306,14 +307,17 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
         }
     </script>
     <button type="button" id="job-${type}-button-show"
-            onclick="fetch_job_${type}('${format}')">Display ${type.capitalize()}
+            onclick="fetch_job_${type}('${format}', '${queries}')"
+    >
+        Display ${name or type.capitalize()}
     </button>
     <button
         type="button"
         id="job-${type}-button-hide"
         onclick="toggle_job_${type}(false)"
         style="display: none"
-    >Hide ${type.capitalize()}
+    >
+        Hide ${name or type.capitalize()}
     </button>
     <pre style="display: none"><code id="job-${type}-content" class="language-${language}">></code></pre>
 </div>

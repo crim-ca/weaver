@@ -135,59 +135,101 @@
         <h3 id="inputs">
             <a href="#inputs">Inputs</a>
         </h3>
-        <p>Submitted request input values and output parametrization for the job execution.</p>
-        ${util.build_job_toggle_button_code(job, type="inputs", format="json", language="json")}
+        <div class="content-section-summary">
+            Submitted request input values and output parametrization for the job execution.
+        </div>
+        <div class="content-section-content">
+            ${util.build_job_toggle_button_code(job, type="inputs", format="json", language="json", queries="links=false")}
+        </div>
     </div>
 
     <div class="content-section">
         <h3 id="results">
             <a href="#results">Results</a>
         </h3>
-        %if job.success:
-            <p>Results produced by the job execution.</p>
-            ${util.build_job_toggle_button_code(job, type="results", format="json", language="json")}
-        %elif job.is_finished:
-            <p>No results available. Job is not finished.</p>
-        %else:
-            <p>No results available. Job did not succeed.</p>
-        %endif
+        <div class="content-section-summary">
+            Results produced by the job execution.
+        <div>
+        <div class="content-section-content">
+            %if job.success:
+                ${util.build_job_toggle_button_code(job, type="results", format="json", language="json")}
+            %elif job.is_finished:
+                No results available. Job is not <abbr title="status = ${job.status}">finished</span>.
+            %else:
+                No results available. Job did not <abbr title="status = ${job.status}">succeed</span>.
+            %endif
+        </div>
     </div>
 
     <div class="content-section">
         <h3 id="job-logs">
             <a href="#job-logs">Logs</a>
         </h3>
-        <p>Logs captured during the job execution.</p>
-        ${util.build_job_toggle_button_code(job, type="logs", format="text", language="accesslog")}
+        <div class="content-section-summary">
+            Logs captured during the job execution.
+        </div>
+        <div class="content-section-content">
+            ${util.build_job_toggle_button_code(job, type="logs", format="text", language="accesslog")}
+        </div>
     </div>
 
-    <!-- fixme: if not success : error/exception -->
     <div class="content-section">
         <h3 id="errors">
             <a href="#errors">Errors</a>
         </h3>
-        <p>Errors that occurred during the job execution.</p>
-        <!-- fill data here -->
+        <div class="content-section-summary">
+            Errors that occurred during the job execution.
+        </div>
+        <div class="content-section-content">
+            %if job.success:
+                <span class="undefined"><abbr title="No error!">n/a</abbr></span>
+            %elif job.is_finished:
+                ${util.build_job_toggle_button_code(job, type="exceptions", format="json", language="json")}
+            %else:
+                No errors available. Job is not <abbr title="status = ${job.status}">finished</span>.
+            %endif
+        </div>
     </div>
 
     <div class="content-section">
         <h3 id="statistics">
             <a href="#statistics">Statistics</a>
         </h3>
-        %if job.is_finished:
-            <p>Statistics collected during the job execution.</p>
-            ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
-        %else:
-            <p>No statistics available. Job is not finished.</p>
-        %endif
+        <div class="content-section-summary">
+            Statistics collected during the job execution.
+        </div>
+        <div class="content-section-content">
+            %if job.is_finished:
+                ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
+            %elif job.is_finished:
+                No statistics available. Job did not <abbr title="status = ${job.status}">succeed</span>.
+            %else:
+                No statistics available. Job is not <abbr title="status = ${job.status}">finished</span>.
+            %endif
+        </div>
     </div>
 
     <div class="content-section">
         <h3 id="provenance">
             <a href="#provenance">Provenance</a>
         </h3>
-        <p>Provenance metadata collected during the job execution request.</p>
-        <!-- fill data here -->
+        <div class="content-section-summary">
+            Provenance metadata collected during the job execution request.
+        </div>
+        <div class="content-section-content">
+            %if job.success:
+                ${util.build_job_toggle_button_code(job, type="prov", format="n", language="text", name="PROV-N")}
+                ${util.build_job_toggle_button_code(job, type="prov", format="nt", language="text", name="PROV-NT")}
+                ${util.build_job_toggle_button_code(job, type="prov", format="json", language="json", name="PROV-JSON")}
+                ${util.build_job_toggle_button_code(job, type="prov", format="jsonld", language="json", name="PROV-JSONLD")}
+                ${util.build_job_toggle_button_code(job, type="prov", format="xml", language="xml", name="PROV-XML")}
+                ${util.build_job_toggle_button_code(job, type="prov", format="turtle", language="text", name="PROV-TURTLE")}
+            %elif job.is_finished:
+                No provenance available. Job did not <abbr title="status = ${job.status}">succeed</span>.
+            %else:
+                No provenance available. Job is not <abbr title="status = ${job.status}">finished</span>.
+            %endif
+        </div>
     </div>
 
     <div class="content-section">

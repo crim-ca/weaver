@@ -11,6 +11,7 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
+from pyramid.settings import asbool
 
 from weaver import xml_util
 from weaver.database import get_db
@@ -586,13 +587,17 @@ def get_job_inputs(request):
         "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }
+    with_links = asbool(request.params.get("links", True))
+    job_links = None
+    if with_links:
+        job_links = job.links(request, self_link="inputs")
     body = {
         "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
-        "links": job.links(request, self_link="inputs"),
+        "links": job_links,
     }
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)
