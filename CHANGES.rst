@@ -16,7 +16,11 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Pin ``cryptography>=44.0.1`` to address vulnerabilities
+  `CVE-2023-50782 <https://nvd.nist.gov/vuln/detail/CVE-2023-50782>`_,
+  `CVE-2024-6119 <https://nvd.nist.gov/vuln/detail/CVE-2024-6119>`_,
+  `CVE-2024-26130 <https://nvd.nist.gov/vuln/detail/CVE-2024-26130>`_,
+  `CVE-2023-49083 <https://nvd.nist.gov/vuln/detail/CVE-2023-49083>`_.
 
 .. _changes_6.4.0:
 
