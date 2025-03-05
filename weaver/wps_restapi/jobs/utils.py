@@ -334,10 +334,8 @@ def get_job_status_schema(request):
     def make_headers(resolved_schema):
         # type: (JobStatusSchemaType) -> HeadersType
         content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
-        # FIXME: support HTML or XML
-        #  (allow transparently for browsers types since Accept did not raise earlier, and no other supported yet)
         if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
-            content_type = ContentType.APP_JSON
+            return {"Content-Type": content_type}
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
         if resolved_schema == JobStatusSchema.OGC:
@@ -357,7 +355,9 @@ def get_job_status_schema(request):
         return schema, headers
     ctype = get_header("Accept", request.headers)
     if not ctype:
-        return JobStatusSchema.OGC, {}
+        schema = JobStatusSchema.OGC
+        headers = make_headers(schema)
+        return schema, headers
     params = parse_kvp(ctype)
     profile = params.get("profile")
     if not profile:
@@ -1294,7 +1294,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+    if not job.success:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:

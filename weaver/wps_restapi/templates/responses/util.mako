@@ -3,32 +3,32 @@ Utilities for rendering elements in other pages.
 -->
 
 
-<%def name="get_provider_link(provider_id, query='')">
-    ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}
+<%def name="get_provider_link(provider_id, query='')">\
+${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_processes_link(provider_id='', query='')">
-    <%
-        _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
-    %>
-    ${_prefix}/processes${f"?{query}" if query else ""}
+<%def name="get_processes_link(provider_id='', query='')">\
+<%
+    _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
+%>
+${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_process_link(process_id, provider_id='', query='')">
-    ${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}
+<%def name="get_process_link(process_id, provider_id='', query='')">\
+${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">
-    ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}
+<%def name="get_jobs_link(query='')">\
+${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 
 
-<%def name="get_job_link(job_id, query='')">
-    ${weaver.wps_restapi_url}/jobs/${job_id}${f"?{query}" if query else ""}
+<%def name="get_job_link(job_id, query='')">\
+${weaver.wps_restapi_url}/jobs/${job_id}${f"?{query}" if query else ""}\
 </%def>
 
 
@@ -88,6 +88,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 -->
 <%def name="render_json(json_data, indent=2, **kwargs)">
     <pre><code class="language-json">${json.dumps(json_data, indent=indent, **kwargs)}</code></pre>
+</%def>
+<%def name="render_yaml(yaml_data, indent=2, **kwargs)">
+    <pre><code class="language-yaml">${yaml.safe_dumps(yaml_data, indent=indent, **kwargs)}</code></pre>
 </%def>
 
 
@@ -263,4 +266,59 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     </div>
 %endfor
 </dl>
+</%def>
+
+
+<!--
+    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a job sub-path.
+    The code block and button display visibility and text are dynamically controlled and populated by state functions.
+    Once fetched, the job 'type' response contents are cached into to the code block element to avoid fetching again.
+    Classes are dynamically attributed with the corresponding 'type' parameter to allow different styling as needed.
+-->
+<%def name="build_job_toggle_button_code(job, type, format, language, queries = '', name = '')">
+<div>
+    <script>
+        async function fetch_job_${type}(format, queries) {
+            const url = "${get_job_link(job.id)}";
+            const qs = queries ? "&" + queries : "";
+            const resp = await fetch(url + "/${type}?f=" + format + qs);
+            let data = "";
+            if ("${language}" == "json") {
+                data = await resp.json();
+                data = JSON.stringify(data, null, 4);
+            }
+            else {
+                data = await resp.text();
+            }
+            let code = hljs.highlight(data, {language: "${language}"}).value;
+            let code_block = document.getElementById("job-${type}-content");
+            toggle_job_${type}(true);
+            code_block.innerHTML = code;
+            let btn_show = document.getElementById("job-${type}-button-show");
+            btn_show.onclick = toggle_job_${type};
+        }
+        function toggle_job_${type}(show) {
+            let code_block = document.getElementById("job-${type}-content");
+            let btn_show = document.getElementById("job-${type}-button-show");
+            let btn_hide = document.getElementById("job-${type}-button-hide");
+            code_block.parentElement.style.display = show ? "unset" : "none";
+            btn_hide.style.display = show ? "unset" : "none";
+            btn_show.style.display = show ? "none" : "unset";
+        }
+    </script>
+    <button type="button" id="job-${type}-button-show"
+            onclick="fetch_job_${type}('${format}', '${queries}')"
+    >
+        Display ${name or type.capitalize()}
+    </button>
+    <button
+        type="button"
+        id="job-${type}-button-hide"
+        onclick="toggle_job_${type}(false)"
+        style="display: none"
+    >
+        Hide ${name or type.capitalize()}
+    </button>
+    <pre style="display: none"><code id="job-${type}-content" class="language-${language}">></code></pre>
+</div>
 </%def>
