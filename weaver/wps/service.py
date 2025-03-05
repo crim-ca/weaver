@@ -2,8 +2,9 @@ import logging
 import os
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
+import colander
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.request import Request as PyramidRequest
@@ -19,12 +20,21 @@ from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
 from weaver.formats import ContentType, get_format, guess_target_format
-from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.owsexceptions import OWSException, OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes.convert import get_field, wps2json_job_payload
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.store.base import StoreProcesses
-from weaver.utils import extend_instance, get_header, get_registry, get_request_args, get_settings, get_weaver_url
+from weaver.utils import (
+    extend_instance,
+    get_header,
+    get_registry,
+    get_request_args,
+    get_settings,
+    get_weaver_url,
+    parse_kvp,
+    repr_json
+)
 from weaver.visibility import Visibility
 from weaver.wps.storage import ReferenceStatusLocationStorage
 from weaver.wps.utils import (
@@ -41,6 +51,7 @@ from weaver.wps_restapi.jobs.utils import get_job_submission_response
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Union
+    from uuid import UUID
 
     from pywps.inout.basic import ComplexInput
 
@@ -180,15 +191,21 @@ class WorkerService(ServiceWPS):
             return resp
         return None
 
-    def describe(self, wps_request, *_, **__):
-        # type: (WPSRequest, *Any, **Any) -> Union[WPSResponse, HTTPValid]
+    def describe(self, wps_request, uuid, identifiers, *_, **__):
+        # type: (WPSRequest, UUID, List[str], *Any, **Any) -> Union[WPSResponse, HTTPValid]
         """
         Handles the ``DescribeProcess`` KVP/XML request submitted on the WPS endpoint.
 
         Redirect to WPS-REST endpoint if requested ``Content-Type`` is JSON or handle ``DescribeProcess`` normally.
         """
+        # patch exact duplicate (ID/Revisions) to avoid redundant listing (PyWPS does not consider it)
+        # use list/dict trick to get unique IDs with preserved ordering in case others are specified
+        wps_request.identifiers = list({p_id: None for p_id in wps_request.identifiers})
+        if identifiers:
+            identifiers = wps_request.identifiers
+
         resp = self._describe_process_redirect(wps_request, *_, **__)
-        return resp or super(WorkerService, self).describe(wps_request, *_, **__)
+        return resp or super(WorkerService, self).describe(wps_request, uuid, identifiers, *_, **__)
 
     @handle_known_exceptions
     def _submit_job(self, wps_request):
@@ -389,10 +406,37 @@ class WorkerService(ServiceWPS):
         return execution
 
 
-def get_pywps_service(environ=None, is_worker=False):
-    # type: (SettingsType, bool) -> WorkerService
+def check_invalid_ids(identifiers, content_type):
+    # type: (List[str], Optional[str]) -> None
+    try:
+        sd.ProcessNamesList().deserialize(identifiers)
+    except colander.Invalid as exc:
+        invalid_ids = [invalid.value for invalid in exc.children]
+        body = None
+        desc = "Invalid identifiers use disallowed characters."
+        if ContentType.APP_JSON in str(content_type):
+            body = {
+                "code": OWSInvalidParameterValue.code,
+                "name": "identifier",
+                "description": desc,
+                "value": repr_json(invalid_ids, force_string=False)
+            }
+        else:
+            desc = f"{desc} {repr_json(invalid_ids, force_string=True, indent=None)}"
+        raise OWSInvalidParameterValue(desc, locator="identifier", json=body)
+
+
+def get_pywps_service(environ=None, is_worker=False, process_id=None):
+    # type: (SettingsType, bool, str) -> WorkerService
     """
     Generates the PyWPS Service that provides WPS-1/2 XML endpoint.
+
+    :param environ: Environment variables containing application settings and the contextual HTTP request.
+    :param is_worker: Hint for managing active processes against :class:`WorkerService`.
+    :param process_id:
+        Pre-resolved :term:`Process` to use, skipping loading and resolution from the database.
+        This is typically employed when a previous :term:`WPS` request occurred to identify
+        the relevant process (i.e.: ``DescribeProcess``), and a following ``Execute`` request.
     """
     environ = environ or {}
     try:
@@ -403,11 +447,28 @@ def get_pywps_service(environ=None, is_worker=False):
         if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
             load_pywps_config(settings, config=pywps_cfg)
 
+        # resolve pre-filtered list of process(es), and whether they require any explicit revision tag
+        # do this dynamically in advance since a lot of processes could require listing + conversion
+        # avoid unnecessary resolution of processes that will not be employed otherwise
+        query = unquote(environ.get("QUERY_STRING") or "")
+        proc_ids = parse_kvp(query, pair_sep="&").get("identifier") or None
+        if proc_ids and not is_worker:
+            # pre-validate in case WPS endpoint invoked directly (non-worker, IDs not already validated)
+            # to avoid illegal search characters with DB
+            check_invalid_ids(proc_ids, environ.get("HTTP_ACCEPT"))
+
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(registry).get_store(StoreProcesses)  # type: StoreProcesses
-        processes_wps = [process.wps() for process in
-                         process_store.list_processes(visibility=Visibility.PUBLIC)]
+        processes_wps = [
+            process.wps() for process in (
+                [process_store.fetch_by_id(visibility=Visibility.PUBLIC, process_id=process_id, revision=True)]
+                if process_id else
+                process_store.list_processes(visibility=Visibility.PUBLIC, identifiers=proc_ids)
+            )
+        ]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
+    except OWSException:
+        raise  # handled
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
         raise OWSNoApplicableCode(f"Failed setup of PyWPS Service and/or Processes. Error [{ex!r}]")

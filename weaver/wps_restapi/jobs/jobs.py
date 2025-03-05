@@ -260,7 +260,6 @@ def create_job(request):
         ref = get_service(request, provider_id=prov_id)
     else:
         ref = get_process(process_id=proc_id)
-        proc_id = None  # ensure ref is used, process ID needed only for provider
     return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
 
 
