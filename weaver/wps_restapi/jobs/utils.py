@@ -54,7 +54,9 @@ from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.transform import transform
 from weaver.utils import (
+    create_content_id,
     data2str,
     fetch_file,
     get_any_id,
@@ -115,6 +117,22 @@ if TYPE_CHECKING:
     MultiPartFieldsType = Sequence[Tuple[str, MultiPartFieldsParamsType]]
 
 LOGGER = get_task_logger(__name__)
+
+
+def get_job_possible_output_formats(job):
+    """
+    Based on job output media-type, retrieve transformer possibilities (conversions).
+    """
+    outputs = []
+    for o in job.results:
+        mime_type = get_field(o, "mime_type", search_variations=True, default="")
+        identifier = get_any_id(o)
+        outputs.append({
+            "output_id": identifier,
+            "default_type": mime_type,
+            "alternatives": transform.CONVERSION_DICT.get(mime_type, [])
+        })
+    return outputs
 
 
 def get_job(request):
@@ -288,6 +306,7 @@ def get_job_list_links(job_total, filters, request):
             "href": parent_url, "rel": "up",
             "type": ContentType.APP_JSON, "title": "Parent collection for which listed jobs apply."
         })
+
     return links
 
 
@@ -396,8 +415,9 @@ def make_result_link(
         url = headers["Content-Location"]
         typ = headers["Content-Type"]
         enc = headers.get("Content-Encoding", None)
-        link_header = make_link_header(url, rel=result_id, type=typ, charset=enc)
-        links.append(link_header)
+        link_header_result = make_link_header(url, rel=result_id, type=typ, charset=enc)
+        link_header_output = make_link_header(url, rel="output", type=typ, charset=enc, id=result_id)
+        links.extend([link_header_result, link_header_output])
     return links
 
 
@@ -537,6 +557,32 @@ def get_results(  # pylint: disable=R1260
     return outputs, headers
 
 
+def get_job_output_transmission(job, output_id, is_reference):
+    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+    """
+    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    """
+    outputs = job.outputs or {}
+    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
+    out = outputs.get(output_id) or {}
+    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
+    out_fmt = cast("JobValueFormat", out.get("format"))
+
+    # raw/representation can change the output transmission mode if they are not overriding it
+    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
+    if (
+        not out_mode and
+        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
+        job.execution_response == ExecuteResponse.RAW
+    ):
+        return ExecuteTransmissionMode.VALUE, out_fmt
+
+    # because mode can be omitted, resolve their default explicitly
+    if not out_mode:
+        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
+    return out_mode, out_fmt
+
+
 def get_job_return(
     job=None,       # type: Optional[Job]
     body=None,      # type: Optional[JSON]
@@ -563,32 +609,6 @@ def get_job_return(
     if not job:
         return ExecuteResponse.DOCUMENT, ExecuteReturnPreference.MINIMAL
     return job.execution_response, job.execution_return
-
-
-def get_job_output_transmission(job, output_id, is_reference):
-    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
-    """
-    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
-    """
-    outputs = job.outputs or {}
-    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
-    out = outputs.get(output_id) or {}
-    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
-    out_fmt = cast("JobValueFormat", out.get("format"))
-
-    # raw/representation can change the output transmission mode if they are not overriding it
-    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
-    if (
-        not out_mode and
-        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
-        job.execution_response == ExecuteResponse.RAW
-    ):
-        return ExecuteTransmissionMode.VALUE, out_fmt
-
-    # because mode can be omitted, resolve their default explicitly
-    if not out_mode:
-        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
-    return out_mode, out_fmt
 
 
 def get_job_results_response(
@@ -751,13 +771,15 @@ def get_job_results_response(
         return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
+    print(out_transmissions)
+    # TODO CHECK THIS
     res_id = out_vals[0][0]
-    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
-    #   req_fmt = guess_target_format(container)   where container=request
-    #   out_fmt (see above)
-    #   out_type = result.get("type")
-    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
-    out_fmt = None
+    # check accept header
+    req_fmt = (request_headers or {}).get("accept")
+    out_fmt = out_transmissions[res_id][1]
+    out_type = get_field(results[res_id], "mime_type", search_variations=True, default=None) #a voir en debuggant 
+    out_select = req_fmt or out_fmt or out_type  # (resolution order/precedence)
+    out_fmt = out_select
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
 
 
@@ -767,7 +789,7 @@ def generate_or_resolve_result(
     result_id,      # type: str
     output_id,      # type: str
     output_mode,    # type: AnyExecuteTransmissionMode
-    output_format,  # type: Optional[JobValueFormat]  # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    output_format,  # type: Optional[JobValueFormat]
     settings,       # type: SettingsType
 ):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
@@ -788,7 +810,7 @@ def generate_or_resolve_result(
     is_val = bool(get_any_value(result, key=True, file=False, data=True))
     is_ref = bool(get_any_value(result, key=True, file=True, data=False))
     val = get_any_value(result)
-    cid = f"{result_id}@{job.id}"
+    cid = create_content_id(result_id, job.id)
     url = None
     loc = None
     res_data = None
@@ -813,6 +835,16 @@ def generate_or_resolve_result(
             loc = url  # remote storage, S3, etc.
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+
+    out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
+
+    # Apply transform if type is different from desired output and desired output is different from plain
+    if out and out not in transform.EXCLUDED_TYPES and out != typ:
+        file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+        typ = out
+        file_transform.get()
+        loc = file_transform.output_path
+        url = map_wps_output_location(loc, settings, exists=True, url=True)
 
     if not url:
         out_dir = get_wps_output_dir(settings)

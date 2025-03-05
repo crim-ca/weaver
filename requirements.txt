@@ -11,6 +11,7 @@ boto3-stubs[s3]
 # https://github.com/celery/billiard/issues/313
 billiard>2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
+cairosvg
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -52,6 +53,7 @@ duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
 # (https://github.com/KipCrossing/geotiff/pull/59)
+fpdf
 geotiff>=0.2.8
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # use pserve to continue supporting config.ini with paste settings
@@ -60,6 +62,7 @@ gunicorn>=22
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
 json2xml==4.1.0
 jsonschema>=3.0.1
+
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -70,12 +73,15 @@ mako
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
 #mistune>=2.0.3,<2.1
+multipagetiff
 mypy_boto3_s3
 numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.32.1
 PasteDeploy>=3.1.0; python_version >= "3.12"
+pandas
+Pillow
 pint
 psutil
 # notes: https://github.com/geopython/pygeofilter
@@ -103,9 +109,11 @@ pystac
 pystac_client
 python-box
 python-dateutil
+python-magic
 pytz
 pywps==4.6.0
 pyyaml>=5.2
+rasterio
 rdflib>=5  # pyup: ignore
 requests>=2.32.2
 requests_file

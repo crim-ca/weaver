@@ -17,6 +17,7 @@ DOCKER_REPO ?= pavics/weaver
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
+SUDO ?=
 
 # conda
 CONDA_CMD      ?= __EMPTY__
@@ -229,10 +230,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw install-dev install-transform ## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev  ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip install-dev install-transform ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -275,7 +276,7 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 install-npm:	## install npm package manager and dependencies if they cannot be found
 	@[ -f "$(shell which npm)" ] || ( \
 		echo "Binary package manager npm not found. Attempting to install it."; \
-		apt-get install npm \
+		$(SUDO) apt-get install npm \
 	)
 
 .PHONY: install-npm-stylelint
@@ -290,6 +291,16 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
 		echo "Install required dependencies for Markdown checks." && \
 		npm install --save-dev \
+	)
+
+.PHONY: install-transform
+install-transform: install-cairo-dependencies       # install-transform dependencies
+
+.PHONY: install-cairo-dependencies
+install-cairo-dependencies:   ## install required dependencies for Transformer
+	@[ -f "$(shell which cairo)" ] || ( \
+		echo "Binary package manager cairo not found. Attempting to install it."; \
+		$(SUDO) apt-get install libpangocairo-1.0-0 \
 	)
 
 .PHONY: install-dev-npm
