@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.4.0:
+
+`6.4.0 <https://github.com/crim-ca/weaver/tree/6.4.0>`_ (2025-03-04)
+========================================================================
+
+Changes:
+--------
 - Add resilient handling of `I/O` literal ``default`` values when parsing remote `OGC API - Processes` descriptions.
   Due to varying definitions from the standard revisions, some implementations could indicate a single literal default
   value as an array representation (e.g.: ``default: [1.23]``), leading to parsing "errors" in `Weaver` that expects a
