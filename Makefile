@@ -11,8 +11,6 @@ APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
 APP_VERSION ?= 6.4.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
-DOCKER_REPO ?= pavics/weaver
-#DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -834,6 +832,51 @@ generate-archive:	## generate ZIP and TAR.GZ archives using current contents
 
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 
+DOCKER_REPO ?= pavics/weaver
+#DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
+
+# NOTE:
+#	Because of the --push requirement when involving provenance/SBOM
+#	only full '[registry.uri/]org/weaver:tag' can be passed as '-t' label
+#	since the build must actively register the built image with a trusted authority.
+#	Additional "alias" tags provided for convenience must be applied separately.
+#	Also, any intermediate image used as base for derived ones must explicitly
+#	employ the remote registry reference to provide the relevant traceability.
+
+# whether to enable Provenance and SBOM tracking of built images
+DOCKER_PROV ?= true
+ifeq ($(DOCKER_PROV),true)
+  DOCKER_BUILDER_STEP := docker-builder
+  DOCKER_BUILDER_NAME ?= docker-prov
+  DOCKER_BUILDER_BASE ?= $(DOCKER_REPO):$(APP_VERSION)
+  DOCKER_BUILDER_ARGS ?= \
+  	--provenance=true \
+  	--sbom=true \
+  	--builder="$(DOCKER_BUILDER_NAME)" \
+  	--build-arg "DOCKER_BASE=$(DOCKER_BUILDER_BASE)" \
+  	--push
+  # tag aliases is not required since images are pushed directly to the registry
+  # if explicitly required, they need to be pulled as they won't resolve locally
+  DOCKER_BUILDER_PULL := docker pull
+  DOCKER_TAG_ALIASES  ?= false
+else
+  # tag aliases is required to obtain the 'weaver:base' name used by derived images
+  # use 'true' command to mute the arguments used in the other case
+  override DOCKER_BUILDER_PULL := true
+  override DOCKER_TAG_ALIASES  := true
+endif
+
+.PHONY: docker-builder
+docker-builder:
+	@echo "Checking docker-container builder required for Docker provenance..."
+	@( \
+		docker buildx inspect "$(DOCKER_BUILDER_NAME)" >/dev/null && \
+		echo "Container Builder [$(DOCKER_BUILDER_NAME)] already exists." \
+	) || ( \
+		echo "Creating Docker Container [$(DOCKER_BUILDER_NAME)]..." \
+		docker buildx create --name "$(DOCKER_BUILDER_NAME)" --driver=docker-container \
+	)
+
 .PHONY: docker-info
 docker-info:		## obtain docker image information
 	@echo "Docker image will be built as: "
@@ -842,25 +885,41 @@ docker-info:		## obtain docker image information
 	@echo "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build-base
-docker-build-base:							## build the base docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):base"
-	docker tag "$(APP_NAME):base" "$(APP_NAME):latest"
-	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):latest"
-	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):$(APP_VERSION)"
+docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-base" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)"
+	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(DOCKER_REPO):latest"
+	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):$(APP_VERSION)"
+	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):latest"
+	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):base"
 
 .PHONY: docker-build-manager
-docker-build-manager: docker-build-base		## build the manager docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME):$(APP_VERSION)-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(APP_NAME):latest-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
+docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the manager docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-manager" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)-manager"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(APP_NAME):$(APP_VERSION)-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(APP_NAME):latest-manager" \
+	) || true
 
 .PHONY: docker-build-worker
-docker-build-worker: docker-build-base		## build the worker docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME):$(APP_VERSION)-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(APP_NAME):latest-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
+docker-build-worker: $(DOCKER_BUILDER_STEP) docker-build-base		## build the worker docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-worker" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)-worker"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-worker" ] && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(APP_NAME):$(APP_VERSION)-worker" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(APP_NAME):latest-worker" \
+	) || true
 
 .PHONY: docker-build
 docker-build: docker-build-base docker-build-manager docker-build-worker		## build all docker images
