@@ -844,7 +844,10 @@ DOCKER_REPO ?= pavics/weaver
 #	employ the remote registry reference to provide the relevant traceability.
 
 # whether to enable Provenance and SBOM tracking of built images
-DOCKER_PROV ?= true
+#	Disable by default to ensure that any operation that needs a local docker (eg: 'docker-test' target)
+#	doesn't lead to an unintended push to the remote registry. This should be enabled explicitly only
+#	for tagged releases for which we explicitly want traceability.
+DOCKER_PROV ?= false
 ifeq ($(DOCKER_PROV),true)
   DOCKER_BUILDER_STEP := docker-builder
   DOCKER_BUILDER_NAME ?= docker-prov

@@ -158,6 +158,9 @@ jobs:
     needs: tests
     if: ${{ success() && (contains(github.ref, 'refs/tags') || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-latest
+    env:
+      # enabled provenance attestation during build/push (see Makefile for details)
+      DOCKER_PROV: "true"
     steps:
       - uses: actions/checkout@v2
         with:
