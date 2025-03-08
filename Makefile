@@ -873,7 +873,7 @@ docker-builder:
 		docker buildx inspect "$(DOCKER_BUILDER_NAME)" >/dev/null && \
 		echo "Container Builder [$(DOCKER_BUILDER_NAME)] already exists." \
 	) || ( \
-		echo "Creating Docker Container [$(DOCKER_BUILDER_NAME)]..." \
+		echo "Creating Docker Container [$(DOCKER_BUILDER_NAME)]..." && \
 		docker buildx create --name "$(DOCKER_BUILDER_NAME)" --driver=docker-container \
 	)
 
