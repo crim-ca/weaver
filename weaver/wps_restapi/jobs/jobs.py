@@ -36,7 +36,7 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, StatusCompliant, map_status
+from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd

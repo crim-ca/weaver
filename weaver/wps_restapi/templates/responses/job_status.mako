@@ -139,7 +139,9 @@
             Submitted request input values and output parametrization for the job execution.
         </div>
         <div class="content-section-content">
-            ${util.build_job_toggle_button_code(job, type="inputs", format="json", language="json", queries="links=false")}
+            ${util.build_job_toggle_button_code(
+                job, type="inputs", path="/inputs", format="json", language="json", queries="links=false"
+            )}
         </div>
     </div>
 
@@ -152,7 +154,9 @@
         <div>
         <div class="content-section-content">
             %if job.success:
-                ${util.build_job_toggle_button_code(job, type="results", format="json", language="json")}
+                ${util.build_job_toggle_button_code(
+                    job, type="results", path="/results", format="json", language="json"
+                )}
             %elif job.is_finished:
                 No results available. Job is not <abbr title="status = ${job.status}">finished</span>.
             %else:
@@ -169,7 +173,9 @@
             Logs captured during the job execution.
         </div>
         <div class="content-section-content">
-            ${util.build_job_toggle_button_code(job, type="logs", format="text", language="accesslog")}
+            ${util.build_job_toggle_button_code(
+                job, type="logs", path="/logs", format="text", language="accesslog"
+            )}
         </div>
     </div>
 
@@ -184,7 +190,9 @@
             %if job.success:
                 <span class="undefined"><abbr title="No error!">n/a</abbr></span>
             %elif job.is_finished:
-                ${util.build_job_toggle_button_code(job, type="exceptions", format="json", language="json")}
+                ${util.build_job_toggle_button_code(
+                    job, type="exceptions", path="/exceptions", format="json", language="json",
+                )}
             %else:
                 No errors available. Job is not <abbr title="status = ${job.status}">finished</span>.
             %endif
@@ -200,7 +208,9 @@
         </div>
         <div class="content-section-content">
             %if job.is_finished:
-                ${util.build_job_toggle_button_code(job, type="statistics", format="json", language="json")}
+                ${util.build_job_toggle_button_code(
+                    job, type="statistics", path="/statistics", format="json", language="json",
+                )}
             %elif job.is_finished:
                 No statistics available. Job did not <abbr title="status = ${job.status}">succeed</span>.
             %else:
@@ -218,12 +228,24 @@
         </div>
         <div class="content-section-content">
             %if job.success:
-                ${util.build_job_toggle_button_code(job, type="prov", format="n", language="text", name="PROV-N")}
-                ${util.build_job_toggle_button_code(job, type="prov", format="nt", language="text", name="PROV-NT")}
-                ${util.build_job_toggle_button_code(job, type="prov", format="json", language="json", name="PROV-JSON")}
-                ${util.build_job_toggle_button_code(job, type="prov", format="jsonld", language="json", name="PROV-JSONLD")}
-                ${util.build_job_toggle_button_code(job, type="prov", format="xml", language="xml", name="PROV-XML")}
-                ${util.build_job_toggle_button_code(job, type="prov", format="turtle", language="text", name="PROV-TURTLE")}
+                <%
+                    # needs to be separate, because newlines not allowed within '%for ... :'
+                    prov_variants = [
+                        ("n", "text", "PROV-N"),
+                        ("nt", "text", "PROV-NT"),
+                        ("json", "json", "PROV-JSON"),
+                        ("jsonld", "json", "PROV-JSONLD"),
+                        ("xml", "xml", "PROV-XML"),
+                        ("turtle", "text", "PROV-TURTLE"),
+                    ]
+                %>
+                %for (prov_fmt, prov_lang, prov_name) in prov_variants:
+                    ${util.build_job_toggle_button_code(
+                        job,
+                        type=prov_name.lower().replace("-", "_"),
+                        path="/prov", format=prov_fmt, language=prov_lang, name=prov_name,
+                    )}
+                %endfor
             %elif job.is_finished:
                 No provenance available. Job did not <abbr title="status = ${job.status}">succeed</span>.
             %else:

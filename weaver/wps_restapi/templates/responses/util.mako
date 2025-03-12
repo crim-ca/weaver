@@ -274,14 +274,15 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     The code block and button display visibility and text are dynamically controlled and populated by state functions.
     Once fetched, the job 'type' response contents are cached into to the code block element to avoid fetching again.
     Classes are dynamically attributed with the corresponding 'type' parameter to allow different styling as needed.
+    Note that the 'type' should be unique to avoid duplicate referencing of distinct button operations.
 -->
-<%def name="build_job_toggle_button_code(job, type, format, language, queries = '', name = '')">
+<%def name="build_job_toggle_button_code(job, type, path, format, language, queries = '', name = '')">
 <div>
     <script>
         async function fetch_job_${type}(format, queries) {
             const url = "${get_job_link(job.id)}";
             const qs = queries ? "&" + queries : "";
-            const resp = await fetch(url + "/${type}?f=" + format + qs);
+            const resp = await fetch(url + "${path}?f=" + format + qs);
             let data = "";
             if ("${language}" == "json") {
                 data = await resp.json();
