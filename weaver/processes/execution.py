@@ -101,7 +101,7 @@ if TYPE_CHECKING:
     from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
-    from weaver.execute import AnyExecuteMode
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -201,16 +201,18 @@ def execute_process(task, job_id, wps_url, headers=None):
         # if process refers to a remote WPS provider, pass it down to avoid unnecessary re-fetch request
         if job.is_local:
             process = None  # already got all the information needed pre-loaded in PyWPS service
+            local_process_id = wps_process.identifier
         else:
             service = Service(name=job.service, url=wps_url)
             process = Process.from_ows(wps_process, service, settings)
+            local_process_id = None
 
         job.progress = JobProgress.EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
 
-        wps_worker = get_pywps_service(environ=settings, is_worker=True)
+        wps_worker = get_pywps_service(environ=settings, is_worker=True, process_id=local_process_id)
         execution = wps_worker.execute_job(job,
                                            wps_inputs=wps_inputs, wps_outputs=wps_outputs,
                                            remote_process=process, headers=headers)
@@ -861,11 +863,13 @@ def submit_job(request, reference, tags=None, process_id=None):
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        proc_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
+        # use the request-provided reference (explicit 'id:version' process revision or simply 'id')
+        # if the latest, it resolves the same, but use the one the user will be aware of for clearer reporting of URLs
+        proc_id = process_id or resolve_process_tag(request)
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
-        tags += "local"
+        tags.append("local")
         support_lang = AcceptLanguage.offers()
         accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
         matched_lang = accepts_lang.lookup(support_lang, default="") or None
@@ -888,7 +892,7 @@ def submit_job(request, reference, tags=None, process_id=None):
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
-        tags += "remote"
+        tags.append("remote")
     else:  # pragma: no cover
         LOGGER.error("Expected process/service, got: %s", type(reference))
         raise TypeError("Invalid process or service reference to execute job.")
@@ -927,9 +931,12 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
     # non-local is only a reference, no actual process object to validate
     provider_id = provider.id if isinstance(provider, Service) else provider
-    if process and is_local and not isinstance(process, Process):
-        proc_store = db.get_store(StoreProcesses)
-        process = proc_store.fetch_by_id(process)
+    process_id = None
+    if process and not isinstance(process, Process):
+        process_id = process
+        if is_local:
+            proc_store = db.get_store(StoreProcesses)
+            process = proc_store.fetch_by_id(process)
     if process and is_local:
         validate_process_io(process, json_body)
         validate_process_id(process, json_body)
@@ -938,6 +945,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
             process, provider_id
         )
+    # pass down the specified or resolved reference (possibly with revision tag)
+    process_id = process_id or process.id
 
     headers = headers or {}
     if is_local:
@@ -953,6 +962,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
         execute_mode = mode
+    validate_process_exec_mode(job_ctl_opts, execute_mode)
+
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
@@ -970,7 +981,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
+    job = store.save_job(task_id=job_status, process=process_id, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
                          execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
@@ -1113,7 +1124,7 @@ def update_job_parameters(job, request):
                     if value == ExecuteMode.AUTO:
                         continue  # don't override previously set value that resolved with default value by omission
                     if value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
-                        job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                        job_ctrl_exec = ExecuteControlOption.from_mode(value)
                         if job_ctrl_exec not in job_process.jobControlOptions:
                             raise HTTPBadRequest(
                                 json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
@@ -1274,6 +1285,42 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_process_exec_mode(job_control_options, execution_mode):
+    # type: (List[AnyExecuteControlOption], Optional[AnyExecuteMode]) -> None
+    """
+    Verify that a certain :term:`Job` execution mode fulfills the :term:`Process` ``jobControlOptions`` prerequisite.
+
+    Assumes that any applicable resolution of the :term:`Job` execution mode (header, query, body, etc.)
+    and the relevant control options was already performed by any applicable upstream operations.
+
+    .. seealso::
+        - :ref:`proc_exec_mode`
+        - :func:`parse_prefer_header_execute_mode`
+
+    :raises HTTPUnprocessableEntity: If the execution mode is not permitted by the :term:`Process`.
+    """
+    job_ctrl_exec = ExecuteControlOption.from_mode(execution_mode)
+    if not (job_ctrl_exec in job_control_options or execution_mode in [ExecuteMode.AUTO, None]):
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "InvalidJobControlOptions",
+                    "title": "Invalid Job Execution Mode specified against permitted Process Job Control Options.",
+                    "detail": "Any hint of a job execution strategy must respect the process prerequisites.",
+                    "status": HTTPUnprocessableEntity.code,
+                    "cause": {"name": "process.jobControlOptions"},
+                    "value": repr_json(
+                        {
+                            "process.jobControlOptions": job_control_options,
+                            "job.mode": execution_mode,
+                        },
+                        force_string=False,
+                    ),
+                }
+            )
+        )
 
 
 def validate_process_id(job_process, payload):

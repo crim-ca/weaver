@@ -19,6 +19,22 @@ Changes:
   If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
   Link headers containing all possible output formats, allowing retrieval via query parameters
   (e.g., output?f=application/x-yaml). (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+
+Fixes:
+------
+- Pin ``cryptography>=44.0.1`` to address vulnerabilities
+  `CVE-2023-50782 <https://nvd.nist.gov/vuln/detail/CVE-2023-50782>`_,
+  `CVE-2024-6119 <https://nvd.nist.gov/vuln/detail/CVE-2024-6119>`_,
+  `CVE-2024-26130 <https://nvd.nist.gov/vuln/detail/CVE-2024-26130>`_,
+  `CVE-2023-49083 <https://nvd.nist.gov/vuln/detail/CVE-2023-49083>`_.
+
+.. _changes_6.4.0:
+
+`6.4.0 <https://github.com/crim-ca/weaver/tree/6.4.0>`_ (2025-03-04)
+========================================================================
+
+Changes:
+--------
 - Add resilient handling of `I/O` literal ``default`` values when parsing remote `OGC API - Processes` descriptions.
   Due to varying definitions from the standard revisions, some implementations could indicate a single literal default
   value as an array representation (e.g.: ``default: [1.23]``), leading to parsing "errors" in `Weaver` that expects a
@@ -26,7 +42,13 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` when queried on the `WPS` endpoint.
+- Fix resolution of `Process` revisions when queried by multiple ID and/or version combinations on the `WPS` endpoint.
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` for execution by `OGC API - Processes` endpoint
+  (fixes `#799 <https://github.com/crim-ca/weaver/issues/799>`_).
+- Fix ``jobControlOptions`` not respected in cases where resolution occurs against a restricted set of capabilities
+  for a given `Process` when the submitted `Job` requests an invalid combination by execution ``mode`` body parameter.
+- Fix ``remote`` and ``local`` tags incorrectly applied to `Job` definition.
 
 .. _changes_6.3.0:
 
