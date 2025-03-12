@@ -113,3 +113,10 @@ versions ``3.6``, ``4.0``, ``4.2``, ``4.4``, ``5.0``, etc., where ``VERSION`` is
 
 .. warning::
    Prior to ``6.0``, the ``mongo`` command is employed, whereas ``mongosh`` is used for later versions.
+
+.. warning:: 
+   With version ``7.0``, the command must also include a confirmation, since downgrade will not be possible anymore.
+
+   .. code-block:: shell
+
+        db.adminCommand( { setFeatureCompatibilityVersion: "7.0", confirm: true } )
