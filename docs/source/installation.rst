@@ -89,12 +89,13 @@ to be updated with the relevant versions.
 
 To simplify to process, the following procedure is recommended to avoid installing `MongoDB` libraries.
 Assuming the current version is ``3.4``, below operations must be executed iteratively for every migration step of
-versions ``3.6``, ``4.0``, ``4.2``, ``4.4`` and ``5.0``, where ``VERSION`` is the new version above the current one.
+versions ``3.6``, ``4.0``, ``4.2``, ``4.4``, ``5.0``, etc., where ``VERSION`` is the new version above the current one.
 
 .. code-block:: shell
 
+    cmd=mongo  # if <6.0, otherwise 'mongosh'
     docker run --name mongo -v <DB_DATA_PATH>:/data/db -d mongo:<VERSION>
-    docker exec -ti mongo mongo
+    docker exec -ti mongo ${cmd}
 
     # in docker, should answer with: { "ok" : 1 }
     db.adminCommand( { setFeatureCompatibilityVersion: "<VERSION>" } )
@@ -102,3 +103,13 @@ versions ``3.6``, ``4.0``, ``4.2``, ``4.4`` and ``5.0``, where ``VERSION`` is th
 
     # back in shell
     docker stop mongo && docker rm mongo
+
+.. note::
+   It is important to run the docker using use the *next* version to perform the migration
+   from the *current* feature (iteratively) to the next one.
+
+   The operation as been validated up to ``7.0``, but more recent version should be directly supported as well since
+   the `MongoDB`_ features employed by `Weaver` are fairly core definitions.
+
+.. warning::
+   Prior to ``6.0``, the ``mongo`` command is employed, whereas ``mongosh`` is used for later versions.
