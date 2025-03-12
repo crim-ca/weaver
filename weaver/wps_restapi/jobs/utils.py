@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
+from urllib.parse import unquote_plus
 
 import colander
 from celery.utils.log import get_task_logger
@@ -1437,8 +1438,14 @@ def get_job_prov_response(request):
     prov_path = f"/prov{prov_path}"
 
     def prov_format_handler(fmt):
-        if isinstance(fmt, str) and "/" not in fmt and not fmt.lower().startswith("prov-"):
-            fmt = "prov-" + fmt
+        if isinstance(fmt, str):
+            # special case of 'application/ld+json'
+            # if passed by query parameter, the '+' is escaped to a space
+            # also, consider if the %-escape was done explicitly for it
+            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+                fmt = ProvenanceFormat.PROV_JSONLD
+            if "/" not in fmt and not fmt.lower().startswith("prov-"):
+                fmt = "prov-" + fmt
         prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
         if prov_fmt:
             return ProvenanceFormat.as_media_type(prov_fmt)

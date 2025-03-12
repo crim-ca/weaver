@@ -1544,6 +1544,9 @@ class Job(Base, LoggerHandler):
             tool.output.seek(0)
             data = tool.output.read()
             fmt = ContentType.TEXT_PLAIN
+        if fmt == ContentType.APP_YAML:
+            data = json.loads(data)
+            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         return data, fmt
 
     def links(self, container=None, self_link=None):

@@ -235,6 +235,7 @@
                         ("nt", "text", "PROV-NT"),
                         ("json", "json", "PROV-JSON"),
                         ("jsonld", "json", "PROV-JSONLD"),
+                        ("yaml", "yaml", "PROV-YAML"),
                         ("xml", "xml", "PROV-XML"),
                         ("turtle", "text", "PROV-TURTLE"),
                     ]
