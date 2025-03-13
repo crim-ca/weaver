@@ -16,6 +16,9 @@ Changes:
 
 Fixes:
 ------
+- Fix resolution of the static endpoint when requesting CSS styles and favicon for `HTML` rendering
+  to employ the configured ``weaver.wps_restapi_url`` (or other settings to obtain it) instead of the
+  potentially unresolvable request URI, such as when behind a proxy.
 - Pin ``cryptography>=44.0.1`` to address vulnerabilities
   `CVE-2023-50782 <https://nvd.nist.gov/vuln/detail/CVE-2023-50782>`_,
   `CVE-2024-6119 <https://nvd.nist.gov/vuln/detail/CVE-2024-6119>`_,
