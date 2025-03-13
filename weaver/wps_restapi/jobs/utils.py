@@ -777,7 +777,7 @@ def get_job_results_response(
     # check accept header
     req_fmt = (request_headers or {}).get("accept")
     out_fmt = out_transmissions[res_id][1]
-    out_type = get_field(results[res_id], "mime_type", search_variations=True, default=None) #a voir en debuggant 
+    out_type = get_field(results[res_id], "mime_type", search_variations=True, default=None)  # a voir en debuggant
     out_select = req_fmt or out_fmt or out_type  # (resolution order/precedence)
     out_fmt = out_select
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)

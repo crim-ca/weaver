@@ -646,8 +646,8 @@ def get_job_output(request):
         raise HTTPNotFound(
             json={
                 "code": "",
-                "description": "The requested output format is not in the possible output formats.",
-                "cause": "Incompatible mime Types",
+                "description": "The requested output Id is not available in the job results.",
+                "cause": "The output ID is not available",
                 "error": "",
                 "value": ""
             }
@@ -656,7 +656,7 @@ def get_job_output(request):
     result_media_type = guess_target_format(request, default=result_media_type)
 
     # if format requested not equal to result media type and not in possible mediatypes...
-    #if result_media_type not in possible_media_types:
+    # if result_media_type not in possible_media_types:
     if accept != result_media_type and accept not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
