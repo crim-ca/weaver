@@ -802,6 +802,8 @@ generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML us
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<tt|<code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|</tt|</code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
 
 .PHONY: generate-archive
