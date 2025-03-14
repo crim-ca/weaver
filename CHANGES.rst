@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_6.4.1:
+
+`6.4.1 <https://github.com/crim-ca/weaver/tree/6.4.1>`_ (2025-03-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Fix resolution of the static endpoint when requesting CSS styles and favicon for `HTML` rendering
   to employ the configured ``weaver.wps_restapi_url`` (or other settings to obtain it) instead of the
   potentially unresolvable request URI, such as when behind a proxy.
