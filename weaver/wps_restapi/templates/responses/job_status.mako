@@ -158,9 +158,9 @@
                     job, type="results", path="/results", format="json", language="json"
                 )}
             %elif job.is_finished:
-                No results available. Job is not <abbr title="status = ${job.status}">finished</span>.
+                No results available. Job is not <abbr title="status = ${job.status}">finished</abbr>.
             %else:
-                No results available. Job did not <abbr title="status = ${job.status}">succeed</span>.
+                No results available. Job did not <abbr title="status = ${job.status}">succeed</abbr>.
             %endif
         </div>
     </div>
@@ -194,7 +194,7 @@
                     job, type="exceptions", path="/exceptions", format="json", language="json",
                 )}
             %else:
-                No errors available. Job is not <abbr title="status = ${job.status}">finished</span>.
+                No errors available. Job is not <abbr title="status = ${job.status}">finished</abbr>.
             %endif
         </div>
     </div>
@@ -207,14 +207,13 @@
             Statistics collected during the job execution.
         </div>
         <div class="content-section-content">
+            <!-- stats available for completed, either success or failed -->
             %if job.is_finished:
                 ${util.build_job_toggle_button_code(
                     job, type="statistics", path="/statistics", format="json", language="json",
                 )}
-            %elif job.is_finished:
-                No statistics available. Job did not <abbr title="status = ${job.status}">succeed</span>.
             %else:
-                No statistics available. Job is not <abbr title="status = ${job.status}">finished</span>.
+                No statistics available. Job is not <abbr title="status = ${job.status}">finished</abbr>.
             %endif
         </div>
     </div>
@@ -227,6 +226,7 @@
             Provenance metadata collected during the job execution request.
         </div>
         <div class="content-section-content">
+            <div class="tab-menu">
             %if job.success:
                 <%
                     # needs to be separate, because newlines not allowed within '%for ... :'
@@ -245,13 +245,15 @@
                         job,
                         type=prov_name.lower().replace("-", "_"),
                         path="/prov", format=prov_fmt, language=prov_lang, name=prov_name,
+                        btn_tabs="job-prov",
                     )}
                 %endfor
             %elif job.is_finished:
-                No provenance available. Job did not <abbr title="status = ${job.status}">succeed</span>.
+                No provenance available. Job did not <abbr title="status = ${job.status}">succeed</abbr>.
             %else:
-                No provenance available. Job is not <abbr title="status = ${job.status}">finished</span>.
+                No provenance available. Job is not <abbr title="status = ${job.status}">finished</abbr>.
             %endif
+            </div>
         </div>
     </div>
 

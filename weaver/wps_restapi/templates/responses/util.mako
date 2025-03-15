@@ -1,4 +1,4 @@
-<!---
+<!--
 Utilities for rendering elements in other pages.
 -->
 
@@ -275,11 +275,15 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     Once fetched, the job 'type' response contents are cached into to the code block element to avoid fetching again.
     Classes are dynamically attributed with the corresponding 'type' parameter to allow different styling as needed.
     Note that the 'type' should be unique to avoid duplicate referencing of distinct button operations.
+
+    An optional 'btn_tabs' class name can be provided to associate multiple buttons in a group to act as a tab menu.
+    In such case, because each call of this function can be done independently, therefore leading to unordered divs
+    of mixed button/contents per call, we employ 'flex' display (see CSS 'tab-menu') and 'order' to force all 'btn_tabs'
+    buttons to appear first, and force a breaking space for the single content being displayed below them.
 -->
-<%def name="build_job_toggle_button_code(job, type, path, format, language, queries = '', name = '')">
-<div>
+<%def name="build_job_toggle_button_code(job, type, path, format, language, queries='', name='', btn_tabs='')">
     <script>
-        async function fetch_job_${type}(format, queries) {
+        async function fetch_job_${type}(event, format, queries) {
             const url = "${get_job_link(job.id)}";
             const qs = queries ? "&" + queries : "";
             const resp = await fetch(url + "${path}?f=" + format + qs);
@@ -292,34 +296,58 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 data = await resp.text();
             }
             let code = hljs.highlight(data, {language: "${language}"}).value;
-            let code_block = document.getElementById("job-${type}-content");
-            toggle_job_${type}(true);
+            let code_block = document.getElementById("job-${type}-code");
+            toggle_job_${type}(event, true);
             code_block.innerHTML = code;
             let btn_show = document.getElementById("job-${type}-button-show");
-            btn_show.onclick = toggle_job_${type};
+            btn_show.onclick = function (ev) { toggle_job_${type}(ev, true) };
         }
-        function toggle_job_${type}(show) {
-            let code_block = document.getElementById("job-${type}-content");
+        function toggle_job_${type}(event, show) {
+            let content = document.getElementById("job-${type}-content");
             let btn_show = document.getElementById("job-${type}-button-show");
             let btn_hide = document.getElementById("job-${type}-button-hide");
-            code_block.parentElement.style.display = show ? "unset" : "none";
+            content.style.display = show ? "unset" : "none";
             btn_hide.style.display = show ? "unset" : "none";
             btn_show.style.display = show ? "none" : "unset";
+
+            %if btn_tabs:
+                event.target.style.display = "none";
+                var btn_and_tabs = document.getElementsByClassName("${btn_tabs}");
+                for (var item of btn_and_tabs) {
+                    if (item.id == content.id && item.style.display == "unset") {
+                        item.style.display = "unset";
+                        item.className += " active";
+                    }
+                    else {
+                        item.style.display = "none";
+                        item.className.replace(" active", "");
+                    }
+                };
+            %endif
         }
     </script>
-    <button type="button" id="job-${type}-button-show"
-            onclick="fetch_job_${type}('${format}', '${queries}')"
+    <button
+        type="button"
+        id="job-${type}-button-show"
+        onclick="fetch_job_${type}(event, '${format}', '${queries}')"
+        style="order: -2;"
     >
         Display ${name or type.capitalize()}
     </button>
     <button
         type="button"
         id="job-${type}-button-hide"
-        onclick="toggle_job_${type}(false)"
-        style="display: none"
+        onclick="toggle_job_${type}(event, false)"
+        style="display: none; order: -2;"
     >
         Hide ${name or type.capitalize()}
     </button>
-    <pre style="display: none"><code id="job-${type}-content" class="language-${language}">></code></pre>
-</div>
+    <div style="flex-basis: 100%; height: 0; display: none; order: -1;"><!--break--></div>
+    <div
+        id="job-${type}-content"
+        style="display: none"
+        class="${btn_tabs} code-container"
+    >
+        <pre><code id="job-${type}-code" class="language-${language}">></code></pre>
+    </div>
 </%def>
