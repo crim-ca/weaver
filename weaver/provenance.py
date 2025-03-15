@@ -86,6 +86,7 @@ class ProvenanceFormat(Constants):
 
     _media_types = {
         ContentType.APP_JSON: PROV_JSON,
+        ContentType.APP_YAML: PROV_JSON,
         ContentType.APP_JSONLD: PROV_JSONLD,
         ContentType.TEXT_TURTLE: PROV_TURTLE,
         ContentType.TEXT_PROVN: PROV_N,
@@ -142,7 +143,7 @@ class ProvenanceFormat(Constants):
             and the relevant error detail if they are incompatible.
         """
         prov = ProvenancePathType.get(prov, default=ProvenancePathType.PROV)
-        prov_format = ProvenanceFormat.get(prov_format)
+        prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         default_format = output_format
         output_format = OutputFormat.get(output_format)
 
@@ -183,8 +184,12 @@ class ProvenanceFormat(Constants):
             return prov_format, None
 
         if out_fmt in [OutputFormat.TEXT, OutputFormat.TXT]:
-            if prov_format not in [None, ProvenanceFormat.PROV_N, ProvenanceFormat.PROV_NT,
-                                   ProvenanceFormat.PROV_TURTLE]:
+            if prov_format not in [
+                None,
+                ProvenanceFormat.PROV_N,
+                ProvenanceFormat.PROV_NT,
+                ProvenanceFormat.PROV_TURTLE,
+            ]:
                 return err_mismatch
             if prov_format is None:
                 prov_format = ProvenanceFormat.PROV_N
