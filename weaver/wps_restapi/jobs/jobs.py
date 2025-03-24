@@ -38,6 +38,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, StatusCompliant, map_status
 from weaver.store.base import StoreJobs
+from weaver.transform import transform
 from weaver.utils import get_any_value, get_header, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
@@ -46,7 +47,6 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_io_schema_query,
     get_job_list_links,
     get_job_output_transmission,
-    get_job_possible_output_formats,
     get_job_results_response,
     get_job_results_single,
     get_job_status_schema,
@@ -636,12 +636,12 @@ def get_job_output(request):
     # Get requested media-type. "*/*" if omit
     accept = str(request.accept) if request.accept else "*/*"
     headers = request.headers
-    possible_media_types = get_job_possible_output_formats(job)
-    possible_media_types = next((o["alternatives"] for o in possible_media_types
-                                if str(o["output_id"]) == output_id), None)
     results = [o for o in job.results if str(o["identifier"]) == output_id]
     if results:
         result = results[0]
+        mime_type = get_field(result, "mime_type", search_variations=True, default="")
+        possible_media_types = transform.CONVERSION_DICT.get(mime_type, [])
+        possible_media_types.append(mime_type)
     else:
         raise HTTPNotFound(
             json={
@@ -655,9 +655,7 @@ def get_job_output(request):
     result_media_type = get_field(result, "mimeType", search_variations=True)
     result_media_type = guess_target_format(request, default=result_media_type)
 
-    # if format requested not equal to result media type and not in possible mediatypes...
-    # if result_media_type not in possible_media_types:
-    if accept != result_media_type and accept not in possible_media_types:
+    if result_media_type not in possible_media_types:
         raise HTTPUnprocessableEntity(json={
             "code": "InvalidMimeTypeRequested",
             "description": "The requested output format is not in the possible output formats.",

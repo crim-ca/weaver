@@ -119,22 +119,6 @@ if TYPE_CHECKING:
 LOGGER = get_task_logger(__name__)
 
 
-def get_job_possible_output_formats(job):
-    """
-    Based on job output media-type, retrieve transformer possibilities (conversions).
-    """
-    outputs = []
-    for o in job.results:
-        mime_type = get_field(o, "mime_type", search_variations=True, default="")
-        identifier = get_any_id(o)
-        outputs.append({
-            "output_id": identifier,
-            "default_type": mime_type,
-            "alternatives": transform.CONVERSION_DICT.get(mime_type, [])
-        })
-    return outputs
-
-
 def get_job(request):
     # type: (PyramidRequest) -> Job
     """
