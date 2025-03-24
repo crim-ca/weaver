@@ -2165,8 +2165,12 @@ class WeaverClient(object):
 
         # download links from headers
         LOGGER.debug("%s outputs in results link headers.", "Processing" if len(out_links) else "No")
+        downloaded_links = set()
         for _, link_header in ResponseHeaders(out_links).items():
             link = parse_link_header(link_header)
+            if link["href"] in downloaded_links:
+                continue
+            downloaded_links.add(link["href"])
             rel = link["rel"].rsplit(".", 1)
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
