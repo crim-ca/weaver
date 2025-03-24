@@ -530,7 +530,7 @@ def get_results(  # pylint: disable=R1260
                 else:
                     output["dataType"] = dtype
 
-            if schema == JobInputsOutputsSchema.OGC_STRICT:
+            if strict:
                 out_fmt = output.pop("format", {})
                 for fmt_key, fmt_val in out_fmt.items():
                     output.setdefault(fmt_key, fmt_val)
@@ -771,7 +771,6 @@ def get_job_results_response(
         return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-    print(out_transmissions)
     # TODO CHECK THIS
     res_id = out_vals[0][0]
     # check accept header

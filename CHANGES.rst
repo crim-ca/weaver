@@ -14,11 +14,11 @@ Changes:
 --------
 - Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
   (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
-- Add support for ``GET /results/{id}`` and `` GET /outputs/{id}`` routes to enable direct access to individual
-  job result items by ID. This enhancement includes: support alternate representations based on the Accept header.
+- Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
+  individual job result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
   If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
-  Link headers containing all possible output formats, allowing retrieval via query parameters
-  (e.g., output?f=application/x-yaml). (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Return `Link` headers containing all possible output formats, allowing retrieval via query parameters
+  (e.g., /jobs/{jobId}/outputs/{id}?f=application/x-yaml). (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
 
 Fixes:
 ------
