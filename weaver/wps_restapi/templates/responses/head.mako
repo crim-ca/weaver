@@ -12,9 +12,9 @@
     <meta name="version" content="${weaver.__meta__.__version__}">
     <meta name="source" content="https://github.com/crim-ca/weaver">
     <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Open+Sans" />
-    <link href="${request.static_url('weaver.wps_restapi:templates/static/style.css')}"
+    <link href="${request.static_url('weaver.wps_restapi:templates/static/style.css', _app_url=weaver.wps_restapi_url)}"
           rel="stylesheet" type="text/css" media="all" />
-    <link href="${request.static_url('weaver.wps_restapi:templates/static/favicon.ico')}"
+    <link href="${request.static_url('weaver.wps_restapi:templates/static/favicon.ico', _app_url=weaver.wps_restapi_url)}"
           rel="icon" type="image/x-icon" />
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <!--

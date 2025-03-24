@@ -1,7 +1,7 @@
 <%block name="header">
 <div class="inline">
     <img
-        src="${request.static_url('weaver.wps_restapi:templates/static/crim.png')}"
+        src="${request.static_url('weaver.wps_restapi:templates/static/crim.png', _app_url=weaver.wps_restapi_url)}"
         alt="logo" type="image/png" class="logo"
     >
     <h1 id="home" class="header-title">

@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 6.4.0
+APP_VERSION ?= 6.4.1
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
@@ -813,6 +813,8 @@ generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML us
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<tt|<code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|</tt|</code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
 
 .PHONY: generate-archive
