@@ -7,6 +7,8 @@ from typing import List, Union
 
 from celery.utils.log import get_task_logger
 from PIL import Image
+from processes.convert import get_field
+from transform import transform
 
 LOGGER = get_task_logger(__name__)
 
@@ -160,3 +162,38 @@ def write_images(images: List[Image.Image], output_file: str, ext: str = "png") 
                     tar.add(img_path, arcname=os.path.basename(img_path))
         else:
             shutil.copy(img_paths[0], output_file)
+
+
+def extend_alternate_formats(formats):
+    """
+    Extend a list of formats with missing alternate formats while preserving the original order.
+
+    Args:
+        formats (List[Dict[str, str]]): A list of format dictionaries containing
+            the "mediaType" key.
+
+    Returns:
+        List[Dict[str, str]]: The extended list of formats with alternate formats
+            added in a consistent order.
+    """
+    if not formats or not all(isinstance(fmt, dict) for fmt in formats):
+        return formats  # No formats or invalid structure, return as-is
+
+    # Extract existing media types while preserving order
+    existing_media_types = []
+    seen = set()
+    for format_entry in formats:
+        media_type = get_field(format_entry, "mediaType", search_variations=True)
+        if media_type and media_type not in seen:
+            existing_media_types.append(media_type)
+            seen.add(media_type)
+
+    # Collect missing alternate formats while preserving original order
+    missing_formats = []
+    for media_type in existing_media_types:
+        for alt_format in transform.CONVERSION_DICT.get(media_type, []):
+            if alt_format not in seen:
+                missing_formats.append({"mediaType": alt_format})
+                seen.add(alt_format)
+
+    return formats + missing_formats
