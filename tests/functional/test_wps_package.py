@@ -1525,13 +1525,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_XML
         assert proc["outputs"][0]["formats"][3]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][1]["id"] == "single_value_multi_format"
-        assert len(proc["outputs"][1]["formats"]) == 6  # Alternative format added in process
+        assert len(proc["outputs"][1]["formats"]) == 8  # Alternative format added in process
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][1]["formats"][3]["mediaType"] == ContentType.TEXT_CSV
         assert proc["outputs"][1]["formats"][4]["mediaType"] == ContentType.APP_XML
         assert proc["outputs"][1]["formats"][5]["mediaType"] == ContentType.APP_YAML
+        assert proc["outputs"][1]["formats"][6]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][7]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
@@ -1540,10 +1542,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][2]["formats"][0]["default"] is True
         assert proc["outputs"][3]["id"] == "multi_value_multi_format"
-        assert len(proc["outputs"][3]["formats"]) == 3
+        assert len(proc["outputs"][3]["formats"]) == 8
         assert proc["outputs"][3]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][3]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][3]["formats"][2]["mediaType"] == ContentType.APP_JSON
+        assert proc["outputs"][3]["formats"][3]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][3]["formats"][4]["mediaType"] == ContentType.APP_PDF
+        assert proc["outputs"][3]["formats"][5]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][3]["formats"][6]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][3]["formats"][7]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][3]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][3]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][3]["formats"][2].get("default", False) is False  # omission is allowed

@@ -1478,23 +1478,33 @@ class Job(Base, LoggerHandler):
     def get_all_possible_formats_links(self, url, results):
         """
         Get direct links to all outputs in any possible format.
+
+        Args:
+            url (str): The base URL for constructing links.
+            results (List[Dict[str, Any]]): A list of result dictionaries containing
+                "mimeType" and "identifier".
+
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries representing the links to
+                all possible output formats.
         """
         links = []
         for result in results:
             media_type = get_field(result, "mimeType", search_variations=True)
             if media_type and media_type not in transform.EXCLUDED_TYPES:
-                possible_formats = transform.CONVERSION_DICT.get(media_type, [])
                 id = get_field(result, "identifier", search_variations=True)
+                formats = [{"mediaType": media_type}]
+                extended_formats = extend_alternate_formats(formats)
                 links.extend([
                     {
-                        "href": f"{url}/{id}?f={media_type}",
+                        "href": f"{url}/{id}?f={fmt['mediaType']}",
                         "rel": "output",
                         "id": id,
-                        "type": media_type,
-                        "title": f"Link to job {id} result in alternate {media_type}"
+                        "type": fmt["mediaType"],
+                        "title": f"Link to job {id} result in {fmt['mediaType']}"
                     }
-                    for media_type in possible_formats
-                            ])
+                    for fmt in extended_formats
+                ])
         return links
 
     def prov_url(self, container=None, extra_path=None):
@@ -2875,7 +2885,8 @@ class Process(Base):
             for io_def in process[io_type].values():
                 if io_type == "outputs":
                     formats = io_def.get("formats", [])
-                    io_def["formats"] = extend_alternate_formats(formats)
+                    if formats:
+                        io_def["formats"] = extend_alternate_formats(formats)
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)

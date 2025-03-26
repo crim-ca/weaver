@@ -1496,6 +1496,13 @@ class TestWeaverCLI(TestWeaverClientBase):
             out_cwl_fmt = {"default": False, "mediaType": io_fmt}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
+            # Alternative format added in process description
+            out_alt_fmt = [
+                {"mediaType": ContentType.TEXT_CSV},
+                {"mediaType": ContentType.APP_XML},
+                {"mediaType": ContentType.APP_YAML},
+            ]
+            out_any_fmt.extend(out_alt_fmt)
             # ignore schema specifications for comparison only of contents
             for field in ["$id", "$schema"]:
                 in_schema.pop(field, None)
