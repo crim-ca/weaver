@@ -35,7 +35,6 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 from pywps.app import WPSRequest
 from pywps.response.describe import DescribeResponse
-from transform.utils import extend_alternate_formats
 from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
@@ -63,6 +62,7 @@ from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
 from weaver.transform import transform
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,

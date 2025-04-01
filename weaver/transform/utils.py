@@ -8,7 +8,8 @@ from typing import List, Union
 from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
-from transform import transform
+
+from weaver.transform import transform
 
 LOGGER = get_task_logger(__name__)
 
@@ -106,37 +107,6 @@ def write_content(file_path: str, content: Union[str, dict]) -> None:
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
-
-
-def get_file_extension(filename: str, dot: bool = True) -> str:
-    """
-    Retrieve the file extension from a filename.
-
-    Args:
-        filename (str): The file name or path.
-        dot (bool, optional): Whether to include the dot in the extension. Defaults to True.
-
-    Returns:
-        str: The file extension, optionally with a dot.
-    """
-    def _handle_dot(_ext: str) -> str:
-        """
-        Handle the dot in the file extension.
-
-        Args:
-            _ext (str): The file extension.
-
-        Returns:
-            str: The file extension, formatted based on the `dot` flag.
-        """
-        if dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
-            return f".{_ext}"
-        if not dot and _ext.startswith("."):
-            return _ext[1:]
-        return _ext
-
-    ext = os.path.splitext(filename.lower())[1]
-    return _handle_dot(ext)
 
 
 def write_images(images: List[Image.Image], output_file: str, ext: str = "png") -> None:

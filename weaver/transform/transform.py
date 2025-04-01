@@ -24,16 +24,7 @@ from pyramid.response import FileResponse
 from weaver.formats import ContentType, get_extension
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
-from weaver.transform.utils import (
-    get_content,
-    get_file_extension,
-    is_gif,
-    is_image,
-    is_png,
-    is_svg,
-    is_tiff,
-    write_content
-)
+from weaver.transform.utils import get_content, is_gif, is_image, is_png, is_svg, is_tiff, write_content
 
 LOGGER = get_task_logger(__name__)
 
@@ -129,7 +120,7 @@ def images_to_any(ims: List[Image.Image], out: str) -> None:
     """
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
-        _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_file_extension(out))
+        _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_extension(out))
         for img in ims:
             clrs = img.getpixel((0, 0))
             if not isinstance(clrs, tuple):
