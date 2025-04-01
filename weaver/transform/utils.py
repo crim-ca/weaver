@@ -9,8 +9,6 @@ from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
 
-from weaver.transform import transform
-
 LOGGER = get_task_logger(__name__)
 
 
@@ -134,13 +132,15 @@ def write_images(images: List[Image.Image], output_file: str, ext: str = "png") 
             shutil.copy(img_paths[0], output_file)
 
 
-def extend_alternate_formats(formats):
+def extend_alternate_formats(formats, conversion_dict):
     """
     Extend a list of formats with missing alternate formats while preserving the original order.
 
     Args:
         formats (List[Dict[str, str]]): A list of format dictionaries containing
             the "mediaType" key.
+        conversion_dict (dict[str, list[str]]): A dictionary mapping media types
+            to their alternate formats.
 
     Returns:
         List[Dict[str, str]]: The extended list of formats with alternate formats
@@ -161,7 +161,7 @@ def extend_alternate_formats(formats):
     # Collect missing alternate formats while preserving original order
     missing_formats = []
     for media_type in existing_media_types:
-        for alt_format in transform.CONVERSION_DICT.get(media_type, []):
+        for alt_format in conversion_dict.get(media_type, []):
             if alt_format not in seen:
                 missing_formats.append({"mediaType": alt_format})
                 seen.add(alt_format)

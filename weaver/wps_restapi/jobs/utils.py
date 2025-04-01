@@ -755,7 +755,6 @@ def get_job_results_response(
         return get_job_results_multipart(job, results, headers=headers, settings=settings)
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
-    # TODO CHECK THIS
     res_id = out_vals[0][0]
     # check accept header
     req_fmt = (request_headers or {}).get("accept")

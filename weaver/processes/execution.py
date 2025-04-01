@@ -1018,8 +1018,6 @@ def submit_job_dispatch_task(
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)
-                    # TODO resolution de get job output, passer
-                    # modifier le request headers avec le bon type
                 return get_job_results_response(
                     job,
                     request_headers=req_headers,
