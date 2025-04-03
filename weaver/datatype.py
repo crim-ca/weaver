@@ -61,6 +61,8 @@ from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
+from weaver.transform import transform
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,
@@ -1473,6 +1475,38 @@ class Job(Base, LoggerHandler):
         result_job_path = os.path.join(result_job_path, file_name)
         return result_job_path
 
+    def get_all_possible_formats_links(self, url, results):
+        """
+        Get direct links to all outputs in any possible format.
+
+        Args:
+            url (str): The base URL for constructing links.
+            results (List[Dict[str, Any]]): A list of result dictionaries containing
+                "mimeType" and "identifier".
+
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries representing the links to
+                all possible output formats.
+        """
+        links = []
+        for result in results:
+            media_type = get_field(result, "mimeType", search_variations=True)
+            if media_type and media_type not in transform.EXCLUDED_TYPES:
+                id = get_field(result, "identifier", search_variations=True)
+                formats = [{"mediaType": media_type}]
+                extended_formats = extend_alternate_formats(formats, transform.CONVERSION_DICT)
+                links.extend([
+                    {
+                        "href": f"{url}/{id}?f={fmt['mediaType']}",
+                        "rel": "output",
+                        "id": id,
+                        "type": fmt["mediaType"],
+                        "title": f"Link to job {id} result in {fmt['mediaType']}"
+                    }
+                    for fmt in extended_formats
+                ])
+        return links
+
     def prov_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
         extra_path = str(extra_path or "")
@@ -1598,6 +1632,9 @@ class Job(Base, LoggerHandler):
                     {"href": f"{job_url}/prov", "rel": "https://www.w3.org/ns/prov",  # unofficial
                      "title": "Job provenance collected following process execution."},
                 ])
+                f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
+                if len(f_links) > 0:
+                    job_links.extend(f_links)
             else:
                 job_links.append({
                     "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
@@ -2825,7 +2862,7 @@ class Process(Base):
         if schema == ProcessSchema.WPS:
             return self.xml(request)
 
-        process = self.dict()
+        process = copy.deepcopy(self.dict())
         links = self.links()
         process.update({
             "deploymentProfile": self.deployment_profile,
@@ -2846,6 +2883,10 @@ class Process(Base):
             # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
+                if io_type == "outputs":
+                    formats = io_def.get("formats", [])
+                    if formats:
+                        io_def["formats"] = extend_alternate_formats(formats, transform.CONVERSION_DICT)
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)
