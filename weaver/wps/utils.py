@@ -211,6 +211,7 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
     settings = get_settings(container)
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
+    wps_out_ref = None
     if url and reference.startswith("file://"):
         reference = reference[7:]
     if url and reference.startswith(wps_out_dir):
@@ -223,6 +224,19 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
             if file_scheme:
                 return f"file://{wps_out_ref}"
             return wps_out_ref
+    if not wps_out_ref:
+        LOGGER.warning(
+            "Attempted mapping of reference [%s] as WPS output, "
+            "but location does not correspond to a known WPS output configuration setting!",
+            reference,
+        )
+    elif exists:  # required but isn't
+        LOGGER.warning(
+            "Attempted mapping WPS output reference [%s] to location [%s] expected to exist, "
+            "but mapped location could not be found!",
+            reference,
+            wps_out_ref,
+        )
     return None
 
 

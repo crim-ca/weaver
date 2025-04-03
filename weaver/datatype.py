@@ -1000,6 +1000,11 @@ class Job(Base, LoggerHandler):
         self["user_id"] = user_id
 
     @property
+    def success(self):
+        # type: () -> bool
+        return map_status(self.status, category=True) == StatusCategory.SUCCESS
+
+    @property
     def status(self):
         # type: () -> Status
         return Status.get(self.get("status"), Status.UNKNOWN)
@@ -1539,6 +1544,9 @@ class Job(Base, LoggerHandler):
             tool.output.seek(0)
             data = tool.output.read()
             fmt = ContentType.TEXT_PLAIN
+        if fmt == ContentType.APP_YAML:
+            data = json.loads(data)
+            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         return data, fmt
 
     def links(self, container=None, self_link=None):
@@ -1624,8 +1632,8 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
-    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
+    def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
         Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
@@ -1659,6 +1667,7 @@ class Job(Base, LoggerHandler):
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
+        job_json.update(**kwargs)
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):

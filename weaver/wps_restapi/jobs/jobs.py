@@ -11,6 +11,7 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
+from pyramid.settings import asbool
 
 from weaver import xml_util
 from weaver.database import get_db
@@ -35,9 +36,9 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, StatusCompliant, map_status
+from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_header, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
@@ -316,6 +317,16 @@ def trigger_job_execution(request):
     return submit_job_dispatch_task(job, container=request, force_submit=True)
 
 
+@sd.provider_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_provider_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderJobStatus", description="Job status.")
+    ),
+)
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
@@ -327,7 +338,17 @@ def trigger_job_execution(request):
     response_schemas=sd.get_provider_single_job_status_responses,
 )
 @sd.process_job_service.get(
-    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessJobStatus", description="Job status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
@@ -335,6 +356,16 @@ def trigger_job_execution(request):
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLJobStatus", description="Job status.")
+    ),
 )
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
@@ -348,16 +379,34 @@ def trigger_job_execution(request):
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
-    # type: (PyramidRequest) -> HTTPOk
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve the status of a job.
     """
-    job = get_job(request)
-    job_body = job.json(request)
+    # resolve the job and the requested profile/schema representation
     schema, headers = get_job_status_schema(request)
+    job = get_job(request)
+
+    # apply additional properties that are profile-dependant
+    # properties applied in 'job_prop' must succeed schema validation as well
+    job_prop = {}
     if schema == JobStatusSchema.OPENEO:
+        cwl_url = get_path_kvp(job.process_url(request) + "/package", f=OutputFormat.JSON)
+        job_prop = {"process": {"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON}}
+    job_body = job.json(request, **job_prop)
+    if schema == JobStatusSchema.OPENEO:
+        # additional properties that are not validated explicitly
+        # align the content with metadata schema
+        # status is defined here to limit the combinations reported in OpenAPI as OGC-only statuses
+        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        job_body["type"] = JobStatusSchema.OPENEO
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
-    return HTTPOk(json=job_body, headers=headers)
+
+    # adjust response contents according to rendering
+    # provide 'job' object directly for HTML templating to allow extra operations dynamically
+    if ContentType.APP_JSON in str(headers.get("Content-Type")):
+        return HTTPOk(json=job_body, headers=headers)
+    return Box(**job_body, job=job, box_intact_types=[Job])
 
 
 @sd.provider_job_service.patch(
@@ -537,13 +586,17 @@ def get_job_inputs(request):
         "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }
+    with_links = asbool(request.params.get("links", True))
+    job_links = None
+    if with_links:
+        job_links = job.links(request, self_link="inputs")
     body = {
         "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
-        "links": job.links(request, self_link="inputs"),
+        "links": job_links,
     }
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)
@@ -740,7 +793,7 @@ def get_job_stats(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+    if not job.is_finished:
         raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial
