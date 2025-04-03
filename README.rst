@@ -362,6 +362,8 @@ explicitly in the |ogc-tb14-platform-er|_.
 
 The project has been employed for |ogc-tb15-ml|_ to demonstrate the use of Machine Learning interactions with OGC web
 standards in the context of natural resources applications. The advancements are reported through the |ogc-tb15-ml-er|_.
+The combination of |cwl-long| with the |ogc-api-proc|_ standard in the context of Machine Learning and Geomatics
+applications deployment was also presented at the |cwl-2021-conf|_ conference.
 
 Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
@@ -406,6 +408,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _`Common Workflow Language`: https://www.commonwl.org/
 .. |cwl| replace:: CWL
 .. _cwl: https://www.commonwl.org/
+.. |cwl-2021-conf| replace:: CWLcon 2021
+.. _cwl-2021-conf: https://cwl.discourse.group/t/ml-processing-pipelines-using-cwl-deployment-in-context-of-research-teams-and-ogc-api-integration/269
 .. _openEO: https://openeo.org/
 .. |jupyter-nb-app| replace:: Jupyter Notebook Applications
 .. _jupyter-nb-app: https://pavics-weaver.readthedocs.io/en/latest/package.html#jupyter-notebook-applications
