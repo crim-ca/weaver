@@ -378,11 +378,21 @@ close to the data.
 `Weaver` is employed in the |ogc-ospd|_ initiative to demonstrate reusability, portability, and transparency
 in the context of open science in Earth Observation, using |ogc-apppkg|_ encoded as |cwl|_ for interoperability
 and distributed processing workflows. Its related developments and demonstrations were presented at
-the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_.
+the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_ during the |ESIP-2024-panel|_.
+Video recordings and related outcomes are available under the following links:
 
-`Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the alignment of multiple
-community standards involved in workflow design, such as |cwl|_, `openEO`_ and |ogc-api-proc-part3|_, for
-processing of multidimensional data involved through GeoDataCube interactions.
+- **Report**: |ogc-ospd-er|_
+- **Video**: |ogc-ospd-demo-video|_
+- **Video**: |ogc-ospd-crim-video|_
+- **Video**: ESIP presentation |ESIP-2024-presentation|_
+
+`Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the integration of multiple
+community standards involved in workflow design, such as |cwl|_, `openEO`_, |ogc-api-proc-part3|_
+and |ogc-api-proc-part4|_, for processing of multidimensional data involved through *GeoDataCube* interactions.
+Outcomes were presented during the |ogc-tb20-demo-days|_.
+The reports are pending approval for publication.
+
+.. fixme: Add the OGC Testbed-20 report references when published (https://github.com/crim-ca/weaver/issues/812).
 
 The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
 initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
@@ -421,6 +431,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part2: https://docs.ogc.org/DRAFTS/20-044.html
 .. |ogc-api-proc-part3| replace:: *OGC API - Processes - Part 3: Workflows and Chaining*
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
+.. |ogc-api-proc-part4| replace:: *OGC API - Processes - Part 4: Job Management*
+.. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
 .. |ogc-tb13-cloud-er| replace:: *OGC Testbed-13 - Cloud Engineering Report*
 .. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
 .. |ogc-tb14| replace:: *OGC Testbed-14*
@@ -439,8 +451,16 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
 .. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-tb20-demo-days| replace:: OGC Testbed-20 Demonstration Days
+.. _ogc-tb20-demo-days: https://www.ogc.org/event/t20-demo-days/
 .. |ogc-ospd| replace:: *OGC Open Science Persistent Demonstrator*
 .. _ogc-ospd: https://www.ogc.org/initiatives/open-science/
+.. |ogc-ospd-demo-video| replace:: OGC Open Science Demonstrations - Part 1
+.. _ogc-ospd-demo-video: https://www.youtube.com/watch?v=CB_-Gn3eruM
+.. |ogc-ospd-crim-video| replace:: OGC OSPD CRIM Workflow Demonstration in Galaxy
+.. _ogc-ospd-crim-video: https://www.youtube.com/watch?v=68glSbzRIQI
+.. |ogc-ospd-er| replace:: OGC Open Science Persistent Demonstrator (OSPD) Report
+.. _ogc-ospd-er: http://docs.opengeospatial.org/per/24-022.html
 .. |ogc-eo-apps-pilot| replace:: *OGC Earth Observation Applications Pilot*
 .. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
 .. |ogc-eo-apps-pilot-er| replace:: *OGC Earth Observation Applications Pilot: CRIM Engineering Report*
@@ -448,13 +468,17 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |ogc-best-practices-eo-apppkg| replace:: *OGC Best Practice for Earth Observation Application Package*
 .. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
 .. |ogc-129th| replace:: *OGC 129th Member's Meeting*
-.. _ogc-129th: https://www.ogc.org/ogc-events/129th-ogc-member-meeting-montreal/
+.. _ogc-129th: https://portal.ogc.org/meet/?p=default&mid=95
 .. |ogc-apppkg| replace:: *OGC Application Package*
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. |ESIP| replace:: *Earth Science Information Partners*
 .. _ESIP: https://www.esipfed.org/
 .. |ESIP-2024| replace:: *Earth Science Information Partners* (ESIP) 2024 Meeting
 .. _ESIP-2024: https://2024julyesipmeeting.sched.com/
+.. |ESIP-2024-panel| replace:: *Cross-Platform Interoperability for Scalable Computing in Open Science Analysis and Algorithm Development*
+.. _ESIP-2024-panel: https://2024julyesipmeeting.sched.com/
+.. |ESIP-2024-presentation| replace:: *Perspectives on the integration of OGC standards to improve interoperability of open science data processing workflows*
+.. _ESIP-2024-presentation: https://www.youtube.com/watch?v=7gqkdRuy2AE&list=PL8X9E6I5_i8iIFrualb2PriPQoF52aIPh&index=36
 .. _CRIM: https://crim.ca/
 .. _Ouranos: https://www.ouranos.ca/
 .. _PAVICS: https://pavics.ouranos.ca/index.html
