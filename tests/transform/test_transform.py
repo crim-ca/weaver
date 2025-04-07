@@ -25,17 +25,13 @@ def using_mimes(func):
 
 @using_mimes
 def transform(f, cmt="", wmt=""):
-    try:
-        with tempfile.TemporaryDirectory() as tmp_path:
-            shutil.copy(f, os.path.join(tmp_path, os.path.basename(f)))
-            f = os.path.join(tmp_path, os.path.basename(f))
-            trans = Transform(file_path=f, current_media_type=cmt, wanted_media_type=wmt)
-            assert isinstance(trans.get(), FileResponse), f"{cmt} -> {wmt}"
-            print(f"{cmt} -> {wmt} passed")
-            return trans.output_path
-    except Exception as err:
-        print(f"{cmt} -> {wmt} failed")
-        assert False, f"{os.path.splitext(f)[1]} -> {f} {str(err)}"
+    with tempfile.TemporaryDirectory() as tmp_path:
+        shutil.copy(f, os.path.join(tmp_path, os.path.basename(f)))
+        f = os.path.join(tmp_path, os.path.basename(f))
+        trans = Transform(file_path=f, current_media_type=cmt, wanted_media_type=wmt)
+        assert isinstance(trans.get(), FileResponse), f"{cmt} -> {wmt}"
+        print(f"{cmt} -> {wmt} passed")
+        return trans.output_path
 
 
 @pytest.mark.parametrize("file_name", [f for f in os.listdir(TRANSFORM_PATH)
