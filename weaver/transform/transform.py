@@ -120,7 +120,18 @@ def images_to_any(ims: List[Image.Image], out: str) -> None:
             if not isinstance(clrs, tuple):
                 img = img.convert("RGB")
                 clrs = img.getpixel((0, 0))
-            if is_image(_o):
+            if is_svg(_o):
+                width, height = img.size
+                basewidth = 300
+                if max(width, height) > basewidth:
+                    wpercent = basewidth / float(img.size[0])
+                    hsize = int((float(img.size[1]) * float(wpercent)))
+                    img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+                if len(clrs) == 3:
+                    img.putalpha(0)
+
+                write_content(_o, rgba_image_to_svg_contiguous(img))
+            elif is_image(_o):
                 if is_png(_o) and len(clrs) == 3:
                     img.putalpha(0)
                     img.save(_o)
@@ -132,18 +143,8 @@ def images_to_any(ims: List[Image.Image], out: str) -> None:
                     rbg.save(_o)
                 else:
                     img.save(_o)
-
-            elif is_svg(_o):
-                width, height = img.size
-                basewidth = 300
-                if max(width, height) > basewidth:
-                    wpercent = basewidth / float(img.size[0])
-                    hsize = int((float(img.size[1]) * float(wpercent)))
-                    img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
-                if len(clrs) == 3:
-                    img.putalpha(0)
-
-                write_content(_o, rgba_image_to_svg_contiguous(img))
+            else:
+                raise RuntimeError(f"Unsupported format: {_o}")
             ret.append(_o)
 
         if len(ret) == 1:
@@ -192,7 +193,7 @@ def any_to_pdf(i: str, out: str) -> None:
     :param i: Input file path.
     :param out: Output PDF file path.
     """
-    image = Image.open(i) if is_image(i) else None
+    image = Image.open(i) if is_image(i) and not is_svg(i) else None
     new_pdf = FPDF(orientation="P", unit="pt", format="A4")
     if image is None:
         # If input is not an image, treat it as text

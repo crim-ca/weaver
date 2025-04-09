@@ -8,85 +8,79 @@ from typing import List, Union
 from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
+from weaver.formats import ContentType, get_content_type
 
 LOGGER = get_task_logger(__name__)
 
 
-def is_image(i: str) -> bool:
+def is_image(image: str) -> bool:
     """
-    Check if the file is an image based on its extension.
+    Check if the file is an image based on its MIME content type.
 
-    Args:
-        i (str): The file name or path.
-
-    Returns:
-        bool: True if the file is an image, False otherwise.
+    :param image: The file name or path.
+    :return: True if the file is an image, False otherwise.
     """
-    return i.lower().endswith((".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif"))
+    ext = os.path.splitext(image)[1]
+    content_type = get_content_type(ext)
+    return content_type.startswith("image/")
 
 
-def is_svg(i: str) -> bool:
+def is_svg(image: str) -> bool:
     """
-    Check if the file is an SVG image.
+    Check if the file is an SVG image based on its MIME content type.
 
-    Args:
-        i (str): The file name or path.
-
-    Returns:
-        bool: True if the file is an SVG, False otherwise.
+    :param image: The file name or path.
+    :return: True if the file is SVG, False otherwise.
     """
-    return i.lower().endswith(".svg")
+    ext = os.path.splitext(image)[1]
+    return get_content_type(ext) == ContentType.IMAGE_SVG_XML
 
 
-def is_png(i: str) -> bool:
+def is_png(image: str) -> bool:
     """
-    Check if the file is a PNG image.
+    Check if the file is a PNG image based on its MIME content type.
 
-    Args:
-        i (str): The file name or path.
-
-    Returns:
-        bool: True if the file is PNG, False otherwise.
+    :param image: The file name or path.
+    :return: True if the file is PNG, False otherwise.
     """
-    return i.lower().endswith(".png")
+    ext = os.path.splitext(image)[1]
+    return get_content_type(ext) == ContentType.IMAGE_PNG
 
 
-def is_tiff(i: str) -> bool:
+def is_tiff(image: str) -> bool:
     """
-    Check if the file is a TIFF image.
+    Check if the file is a TIFF image based on its MIME content type.
 
-    Args:
-        i (str): The file name or path.
-
-    Returns:
-        bool: True if the file is TIFF, False otherwise.
+    :param image: The file name or path.
+    :return: True if the file is TIFF, False otherwise.
     """
-    return i.lower().endswith(".tif") or i.lower().endswith(".tiff")
+    ext = os.path.splitext(image)[1]
+    return get_content_type(ext) in {
+        ContentType.IMAGE_TIFF,
+        ContentType.IMAGE_GEOTIFF,
+        ContentType.IMAGE_OGC_GEOTIFF,
+        ContentType.IMAGE_COG,
+    }
 
 
-def is_gif(i: str) -> bool:
+def is_gif(image: str) -> bool:
     """
-    Check if the file is a GIF image.
+    Check if the file is a GIF image based on its MIME content type.
 
-    Args:
-        i (str): The file name or path.
-
-    Returns:
-        bool: True if the file is GIF, False otherwise.
+    :param image: The file name or path.
+    :return: True if the file is GIF, False otherwise.
     """
-    return i.lower().endswith(".gif")
+    ext = os.path.splitext(image)[1]
+    return get_content_type(ext) == ContentType.IMAGE_GIF
 
 
 def get_content(file_path: str, mode: str = "r") -> str:
     """
     Retrieve the content of a file.
 
-    Args:
-        file_path (str): The path to the file.
-        mode (str, optional): The mode in which to open the file. Defaults to "r".
-
-    Returns:
-        str: The content of the file as a string.
+    :param file_path: The path to the file.
+    :param mode: The mode in which to open the file. Defaults to "r".
+    :return: The content of the file as a string.
     """
     with open(file_path, mode, encoding="utf-8") as f:
         return f.read()
@@ -96,9 +90,8 @@ def write_content(file_path: str, content: Union[str, dict]) -> None:
     """
     Write content to a file.
 
-    Args:
-        file_path (str): The path to the file.
-        content (Union[str, dict]): The content to write, can be a string or dictionary.
+    :param file_path: The path to the file.
+    :param content: The content to write, can be a string or dictionary.
     """
     if isinstance(content, dict):
         content = json.dumps(content)
@@ -111,10 +104,9 @@ def write_images(images: List[Image.Image], output_file: str, ext: str = "png") 
     """
     Save a list of images to an archive or single file.
 
-    Args:
-        images (List[Image.image]): A list of images to save.
-        output_file (str): The output file name or path.
-        ext (str, optional): The image format (extension). Defaults to "png".
+    :param images: A list of images to save.
+    :param output_file: The output file name or path.
+    :param ext: The image format (extension). Defaults to "png".
     """
     with tempfile.TemporaryDirectory() as tmp_path:
         img_paths = []
@@ -136,15 +128,9 @@ def extend_alternate_formats(formats, conversion_dict):
     """
     Extend a list of formats with missing alternate formats while preserving the original order.
 
-    Args:
-        formats (List[Dict[str, str]]): A list of format dictionaries containing
-            the "mediaType" key.
-        conversion_dict (dict[str, list[str]]): A dictionary mapping media types
-            to their alternate formats.
-
-    Returns:
-        List[Dict[str, str]]: The extended list of formats with alternate formats
-            added in a consistent order.
+    :param formats: A list of format dictionaries containing the "mediaType" key.
+    :param conversion_dict: A dictionary mapping media types to their alternate formats.
+    :return: The extended list of formats with alternate formats added in a consistent order.
     """
     if not formats or not all(isinstance(fmt, dict) for fmt in formats):
         return formats  # No formats or invalid structure, return as-is

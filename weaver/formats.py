@@ -497,9 +497,8 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
-    for name, ctype in locals().items()
-    if name.startswith("ContentType.")
-    and isinstance(ctype, str)
+    for ctype in ContentType.values()
+    if isinstance(ctype, str)
     and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
