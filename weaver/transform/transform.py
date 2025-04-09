@@ -59,9 +59,7 @@ def exception_handler(func):
     Decorator to handle exceptions in functions and log them.
 
     :param func: Function to wrap with exception handling.
-    :type func: Callable
     :return: The wrapped function.
-    :rtype: Callable
     """
     def inner_function(*args, **kwargs):
         try:
@@ -81,9 +79,7 @@ def image_to_any(i: str, out: str) -> None:
     Converts image files to a specified output format. If no conversion is needed, it copies the file.
 
     :param i: Input image file path.
-    :type i: str
     :param out: Output file path.
-    :type out: str
     """
     # exit if no transformation needed
     if os.path.splitext(i)[1] == os.path.splitext(out)[1]:
@@ -114,9 +110,7 @@ def images_to_any(ims: List[Image.Image], out: str) -> None:
     Processes a list of images and converts them to the desired format, saving them in the specified output path.
 
     :param ims: List of Image objects to process.
-    :type ims: List[Image.Image]
     :param out: Output file path.
-    :type out: str
     """
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
@@ -170,9 +164,7 @@ def any_to_html(i: str, out: str) -> None:
     Converts any content type (text or image) to HTML format.
 
     :param i: Input file path.
-    :type i: str
     :param out: Output file path.
-    :type out: str
     """
     try:
         if not is_image(i):
@@ -198,9 +190,7 @@ def any_to_pdf(i: str, out: str) -> None:
     Converts a file to PDF format. If the file is an image, it is embedded in the PDF, otherwise, it is treated as text.
 
     :param i: Input file path.
-    :type i: str
     :param out: Output PDF file path.
-    :type out: str
     """
     image = Image.open(i) if is_image(i) else None
     new_pdf = FPDF(orientation="P", unit="pt", format="A4")
@@ -258,9 +248,7 @@ def csv_to_json(i: str, out: str) -> None:
     Converts a CSV file to a JSON file with a 'datas' key containing the rows.
 
     :param i: Path to the input CSV file.
-    :type i: str
     :param out: Path to the output JSON file.
-    :type out: str
     """
     with open(i, encoding="utf-8") as csvf:
         csv_reader = csv.DictReader(csvf)
@@ -280,9 +268,7 @@ def csv_to_xml(i: str, out: str) -> None:
     Converts a CSV file to an XML file by first converting it to JSON.
 
     :param i: Path to the input CSV file.
-    :type i: str
     :param out: Path to the output XML file.
-    :type out: str
     """
     file = f"{i}.json"
     csv_to_json(i, file)
@@ -296,9 +282,7 @@ def json_to_xml(i: str, out: str) -> None:
     Converts a JSON file to an XML file.
 
     :param i: Path to the input JSON file.
-    :type i: str
     :param out: Path to the output XML file.
-    :type out: str
     """
     data = readfromjson(i)
     write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
@@ -310,9 +294,7 @@ def json_to_txt(i: str, out: str) -> None:
     Converts a JSON file to a text file.
 
     :param i: Path to the input JSON file.
-    :type i: str
     :param out: Path to the output text file.
-    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         data = json.load(file)
@@ -326,9 +308,7 @@ def json_to_yaml(i: str, out: str) -> None:
     Converts a JSON file to a YAML file.
 
     :param i: Path to the input JSON file.
-    :type i: str
     :param out: Path to the output YAML file.
-    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         configuration = json.load(file)
@@ -342,9 +322,7 @@ def yaml_to_json(i: str, out: str) -> None:
     Converts a YAML file to a JSON file.
 
     :param i: Path to the input YAML file.
-    :type i: str
     :param out: Path to the output JSON file.
-    :type out: str
     """
     with open(i, "r", encoding="utf-8") as file:
         configuration = yaml.safe_load(file)
@@ -358,9 +336,7 @@ def json_to_csv(i: str, out: str) -> None:
     Converts a JSON file to a CSV file.
 
     :param i: Path to the input JSON file.
-    :type i: str
     :param out: Path to the output CSV file.
-    :type out: str
     """
     with open(i, encoding="utf-8") as file:
         data_file = pd.read_json(file, encoding="utf-8")
@@ -373,9 +349,7 @@ def xml_to_json(i: str, out: str) -> None:
     Converts an XML file to a JSON file.
 
     :param i: Path to the input XML file.
-    :type i: str
     :param out: Path to the output JSON file.
-    :type out: str
     """
     write_content(out, xmltodict.parse(get_content(i)))
 
@@ -386,9 +360,7 @@ def html_to_txt(i: str, out: str) -> None:
     Converts an HTML file to a text file.
 
     :param i: Path to the input HTML file.
-    :type i: str
     :param out: Path to the output text file.
-    :type out: str
     """
     write_content(out, " ".join(BeautifulSoup(get_content(i), "html.parser").stripped_strings))
 
@@ -399,9 +371,7 @@ def yaml_to_csv(i: str, out: str) -> None:
     Converts a YAML file to a CSV file by first converting it to JSON.
 
     :param i: Path to the input YAML file.
-    :type i: str
     :param out: Path to the output CSV file.
-    :type out: str
     """
     yaml_to_json(i, f"{i}.json")
     json_to_csv(f"{i}.json", out)
@@ -413,9 +383,7 @@ def yaml_to_xml(i: str, out: str) -> None:
     Converts a YAML file to an XML file by first converting it to JSON.
 
     :param i: Path to the input YAML file.
-    :type i: str
     :param out: Path to the output XML file.
-    :type out: str
     """
     yaml_to_json(i, f"{i}.json")
     json_to_xml(f"{i}.json", out)
@@ -427,9 +395,7 @@ def xml_to_yaml(i: str, out: str) -> None:
     Converts an XML file to a YAML file by first converting it to JSON.
 
     :param i: Path to the input XML file.
-    :type i: str
     :param out: Path to the output YAML file.
-    :type out: str
     """
     xml_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
@@ -441,9 +407,7 @@ def csv_to_yaml(i: str, out: str) -> None:
     Converts a CSV file to a YAML file by first converting it to JSON.
 
     :param i: Path to the input CSV file.
-    :type i: str
     :param out: Path to the output YAML file.
-    :type out: str
     """
     csv_to_json(i, f"{i}.json")
     json_to_yaml(f"{i}.json", out)
