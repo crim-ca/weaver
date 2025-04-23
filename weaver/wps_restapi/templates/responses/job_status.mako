@@ -69,18 +69,18 @@
             <a href="#metadata">Metadata</a>
         </h3>
         <table class="table-job-status">
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Job ID</td>
                 <td class="table-job-status-field code">${job.id}</td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Process ID</td>
                 <td class="table-job-status-field code">
                     <a href="${util.get_process_link(job.process, job.service, query='f=html')}"
                     >${job.process}</a>
                 </td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Provider ID</td>
                 <td class="table-job-status-field code">
                     %if job.service:
@@ -92,32 +92,32 @@
                     %endif
                 </td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Status</td>
                 <td class="table-job-status-field">
                     ${util.render_status(status)}
                 </td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Message</td>
                 <td class="table-job-status-field">
                     ${message}
                 </td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Progress</td>
                 <td class="table-job-status-field">
                     ${util.render_progress(job.progress, job.status)}
                 </td>
             </tr>
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">Duration</td>
                 <td class="table-job-status-field code">
                     ${job.duration}
                 </td>
             </tr>
             %for field in ["created", "started", "updated", "finished"]:
-            <tr class="table-job-status-item ">
+            <tr class="table-job-status-item">
                 <td class="table-job-status-field field-key">${field.capitalize()}</td>
                 <td class="table-job-status-field code">
                     %if job.get(field):

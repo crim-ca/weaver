@@ -370,6 +370,6 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
         style="display: none"
         class="${btn_tabs} code-container"
     >
-        <pre><code id="job-${type}-code" class="language-${language}">></code></pre>
+        <pre><code id="job-${type}-code" class="language-${language}"></code></pre>
     </div>
 </%def>

@@ -2164,6 +2164,45 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         assert resp.json["status"] == Status.QUEUED
 
+    def test_job_status_html_success(self):
+        job = self.job_info[0]
+        assert job.status == Status.SUCCESSFUL, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.html_headers)
+        body = resp.text
+        assert body.startswith("<!DOCTYPE html>")
+
+        rows = resp.html.find_all("tr")
+        row_status = [row.text.strip() for row in rows if "Status" in row.text]
+        assert row_status and row_status[0].endswith(Status.SUCCESSFUL)
+
+        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_scripts = list(logs_divs[-1].find("script"))
+        assert "fetch_job_logs" in logs_scripts[-1]
+
+        error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
+        assert "n/a" in error_divs[-1].text, "When job succeeds, no errors buttons must be displayed on HTML page."
+
+    def test_job_status_html_failed(self):
+        job = self.job_info[1]
+        assert job.status == Status.FAILED, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=self.html_headers)
+        body = resp.text
+        assert body.startswith("<!DOCTYPE html>")
+
+        rows = resp.html.find_all("tr")
+        row_status = [row.text.strip() for row in rows if "Status" in row.text]
+        assert row_status and row_status[0].endswith(Status.FAILED)
+
+        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_scripts = list(logs_divs[-1].find("script"))
+        assert "fetch_job_logs" in logs_scripts[-1]
+
+        error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
+        error_scripts = list(error_divs[-1].find("script"))
+        assert error_scripts, "When job failed, errors buttons to retrieve them should be available on HTML page."
+
 
 @pytest.mark.oap_part1
 @pytest.mark.parametrize(
