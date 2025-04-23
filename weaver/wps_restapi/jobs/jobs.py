@@ -11,6 +11,7 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
+from pyramid.settings import asbool
 
 from weaver import xml_util
 from weaver.database import get_db
@@ -35,7 +36,7 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, StatusCategory, StatusCompliant, map_status
+from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
@@ -586,13 +587,17 @@ def get_job_inputs(request):
         "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }
+    with_links = asbool(request.params.get("links", True))
+    job_links = None
+    if with_links:
+        job_links = job.links(request, self_link="inputs")
     body = {
         "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
-        "links": job.links(request, self_link="inputs"),
+        "links": job_links,
     }
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)

@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
+from urllib.parse import unquote_plus
 
 import colander
 from celery.utils.log import get_task_logger
@@ -52,6 +53,7 @@ from weaver.formats import (
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
@@ -1432,9 +1434,29 @@ def get_job_prov_response(request):
     raise_job_dismissed(job, request)
     raise_job_bad_status_success(job, request)
 
-    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
     prov_path = request.path.rsplit("/prov", 1)[-1]
     prov_path = f"/prov{prov_path}"
+
+    def prov_format_handler(fmt):
+        if isinstance(fmt, str):
+            # special case of 'application/ld+json'
+            # if passed by query parameter, the '+' is escaped to a space
+            # also, consider if the %-escape was done explicitly for it
+            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+                fmt = ProvenanceFormat.PROV_JSONLD
+            if "/" not in fmt and not fmt.lower().startswith("prov-"):
+                fmt = "prov-" + fmt
+        prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
+        if prov_fmt:
+            return ProvenanceFormat.as_media_type(prov_fmt)
+        return prov_fmt
+
+    prov_type = guess_target_format(
+        request,
+        override_user_agent=True,
+        default=ContentType.APP_JSON,
+        format_handler=prov_format_handler,
+    )
     prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
     if not prov_data:
         prov_dir = job.prov_path(request)
