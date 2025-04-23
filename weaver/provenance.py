@@ -85,8 +85,8 @@ class ProvenanceFormat(Constants):
     PROV_NT = "PROV-NT"
 
     _media_types = {
-        ContentType.APP_JSON: PROV_JSON,
         ContentType.APP_YAML: PROV_JSON,
+        ContentType.APP_JSON: PROV_JSON,
         ContentType.APP_JSONLD: PROV_JSONLD,
         ContentType.TEXT_TURTLE: PROV_TURTLE,
         ContentType.TEXT_PROVN: PROV_N,
