@@ -1446,6 +1446,10 @@ def get_job_prov_response(request):
                 fmt = ProvenanceFormat.PROV_JSONLD
             if "/" not in fmt and not fmt.lower().startswith("prov-"):
                 fmt = "prov-" + fmt
+            # special case of YAML that is obtained from PROV-JSON
+            # early fix its media-type to resolve it correctly without ambiguity
+            if fmt.lower() == "prov-yaml":
+                return ContentType.APP_YAML
         prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
         if prov_fmt:
             return ProvenanceFormat.as_media_type(prov_fmt)
