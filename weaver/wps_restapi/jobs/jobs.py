@@ -391,7 +391,7 @@ def get_job_status(request):
     # properties applied in 'job_prop' must succeed schema validation as well
     job_prop = {}
     if schema == JobStatusSchema.OPENEO:
-        cwl_url = get_path_kvp(job.process_url(request) + "/package", f=OutputFormat.JSON)
+        cwl_url = get_path_kvp(f"{job.process_url(request)}/package", f=OutputFormat.JSON)
         job_prop = {"process": {"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON}}
     job_body = job.json(request, **job_prop)
     if schema == JobStatusSchema.OPENEO:

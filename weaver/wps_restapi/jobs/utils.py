@@ -1452,7 +1452,7 @@ def get_job_prov_response(request):
             if unquote_plus(fmt) in ["ld+json", "ld json"]:
                 fmt = ProvenanceFormat.PROV_JSONLD
             if "/" not in fmt and not fmt.lower().startswith("prov-"):
-                fmt = "prov-" + fmt
+                fmt = f"prov-{fmt}"
             # special case of YAML that is obtained from PROV-JSON
             # early fix its media-type to resolve it correctly without ambiguity
             if fmt.lower() == "prov-yaml":
