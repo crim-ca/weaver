@@ -2183,6 +2183,10 @@ class WpsRestApiJobsTest(JobUtils):
         error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
         assert "n/a" in error_divs[-1].text, "When job succeeds, no errors buttons must be displayed on HTML page."
 
+        results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
+        results_scripts = list(results_divs[-1].find("script"))
+        assert "fetch_job_results" in results_scripts[-1]
+
     def test_job_status_html_failed(self):
         job = self.job_info[1]
         assert job.status == Status.FAILED, "Precondition invalid."
@@ -2202,6 +2206,10 @@ class WpsRestApiJobsTest(JobUtils):
         error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
         error_scripts = list(error_divs[-1].find("script"))
         assert error_scripts, "When job failed, errors buttons to retrieve them should be available on HTML page."
+
+        results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
+        results_scripts = results_divs[-1].find("script")
+        assert not results_scripts, "When job failed, unavailable results causes no fetching button on the HTML page."
 
 
 @pytest.mark.oap_part1

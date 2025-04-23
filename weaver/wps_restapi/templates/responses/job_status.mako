@@ -151,7 +151,7 @@
         </h3>
         <div class="content-section-summary">
             Results produced by the job execution.
-        <div>
+        </div>
         <div class="content-section-content">
             %if job.success:
                 ${util.build_job_toggle_button_code(

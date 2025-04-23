@@ -348,6 +348,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <button
         type="button"
         id="job-${type}-button-show"
+        class="button-show"
         onclick="fetch_job_${type}(event, '${format}', '${queries}')"
         style="order: -2;"
     >
@@ -357,6 +358,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <button
         type="button"
         id="job-${type}-button-hide"
+        class="button-hide"
         onclick="toggle_job_${type}(event, false)"
         style="display: none; order: -2;"
     >

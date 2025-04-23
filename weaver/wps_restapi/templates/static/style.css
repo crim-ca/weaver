@@ -8,6 +8,18 @@ button {
     cursor: pointer;
 }
 
+button.active {
+    background-color: #CCCCCC;
+}
+
+.button-show {
+    font-weight: bold;
+}
+
+.button-hide {
+    font-weight: normal;
+}
+
 .header {
     padding: 0 0.25em 1.5em .5em;
     background-color: #ECEAEA;
@@ -237,10 +249,6 @@ button {
 
 /* Style the buttons inside the tab */
 .tab-menu button {
-}
-
-.tab-menu button.active {
-    background-color: #CCCCCC;
 }
 
 .tab-content {
