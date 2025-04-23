@@ -26,6 +26,65 @@ Fixes:
 - Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
 - Fix `Job` statistics not reported by the API in case of execution failure, although they might be partially available.
 
+.. _changes_6.4.1:
+
+`6.4.1 <https://github.com/crim-ca/weaver/tree/6.4.1>`_ (2025-03-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix resolution of the static endpoint when requesting CSS styles and favicon for `HTML` rendering
+  to employ the configured ``weaver.wps_restapi_url`` (or other settings to obtain it) instead of the
+  potentially unresolvable request URI, such as when behind a proxy.
+- Pin ``cryptography>=44.0.1`` to address vulnerabilities
+  `CVE-2023-50782 <https://nvd.nist.gov/vuln/detail/CVE-2023-50782>`_,
+  `CVE-2024-6119 <https://nvd.nist.gov/vuln/detail/CVE-2024-6119>`_,
+  `CVE-2024-26130 <https://nvd.nist.gov/vuln/detail/CVE-2024-26130>`_,
+  `CVE-2023-49083 <https://nvd.nist.gov/vuln/detail/CVE-2023-49083>`_.
+
+.. _changes_6.4.0:
+
+`6.4.0 <https://github.com/crim-ca/weaver/tree/6.4.0>`_ (2025-03-04)
+========================================================================
+
+Changes:
+--------
+- Add resilient handling of `I/O` literal ``default`` values when parsing remote `OGC API - Processes` descriptions.
+  Due to varying definitions from the standard revisions, some implementations could indicate a single literal default
+  value as an array representation (e.g.: ``default: [1.23]``), leading to parsing "errors" in `Weaver` that expects a
+  strict match between the ``default`` value and its ``type``.
+
+Fixes:
+------
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` when queried on the `WPS` endpoint.
+- Fix resolution of `Process` revisions when queried by multiple ID and/or version combinations on the `WPS` endpoint.
+- Fix resolution of `Process` revisions by ``{processID}:{version}`` for execution by `OGC API - Processes` endpoint
+  (fixes `#799 <https://github.com/crim-ca/weaver/issues/799>`_).
+- Fix ``jobControlOptions`` not respected in cases where resolution occurs against a restricted set of capabilities
+  for a given `Process` when the submitted `Job` requests an invalid combination by execution ``mode`` body parameter.
+- Fix ``remote`` and ``local`` tags incorrectly applied to `Job` definition.
+
+.. _changes_6.3.0:
+
+`6.3.0 <https://github.com/crim-ca/weaver/tree/6.3.0>`_ (2025-02-18)
+========================================================================
+
+Changes:
+--------
+- Update ``owslib==0.32.1`` for parameters fixes employed by *Collection Input* with ``format=ogc-coverage-collection``.
+- Drop support of Python 3.9 (required for ``owslib==0.32.1`` dependency).
+
+Fixes:
+------
+- Fix parsing of *Collection Input* ``format=ogc-coverage-collection`` and ``format=ogc-map-collection``
+  to provide additional parameters to the remote collection request.
+- Update ``pygeofilter>=0.3.1`` to resolve ``filter-lang=FES`` parser as per other filters
+  (relates to `geopython/pygeofilter#102 <https://github.com/geopython/pygeofilter/pull/102>`_).
+
 .. _changes_6.2.0:
 
 `6.2.0 <https://github.com/crim-ca/weaver/tree/6.2.0>`_ (2025-02-06)

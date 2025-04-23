@@ -28,6 +28,7 @@ import yaml
 from parameterized import parameterized
 
 from tests import resources
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
@@ -47,6 +48,7 @@ from tests.utils import (
 )
 from weaver.execute import (
     ExecuteCollectionFormat,
+    ExecuteControlOption,
     ExecuteMode,
     ExecuteResponse,
     ExecuteReturnPreference,
@@ -1869,6 +1871,86 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"]["out_file"]["title"] == "Result File"
         assert proc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
 
+    def test_execute_process_revision(self):
+        proc = self.fully_qualified_test_name()
+        old = "1.0.0"
+        rev = "1.1.0"
+        cwl = {
+            "s:version": old,
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"message": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "string", "outputBinding": {"outputEval": "$(inputs.message)"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": proc}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+
+        path = f"/processes/{proc}"
+        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        resp = self.app.patch_json(path, params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        exec_value = "test"
+        exec_body = {
+            # because it is updated above to be sync-only,
+            # using async below MUST fail with correctly resolved newer revision
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": [{"id": "message", "value": exec_value}],
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+
+            # test the newer revision with async, failure expected
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 422, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+
+            # use the older revision which allowed async, validating that the right process version is invoked
+            path = f"/processes/{proc}:{old}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            status_url = resp.headers.get("Location")
+            assert f"{proc}:{old}" in status_url
+            job_id = resp.json.get("jobID")
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{old}"
+            data = self.get_outputs(status_url, schema=JobInputsOutputsSchema.OGC)
+            assert data["outputs"]["output"]["value"] == exec_value
+
+            # counter-validate the assumption with the latest revision using permitted sync
+            # use the explicit version to be sure
+            exec_body["mode"] = ExecuteMode.SYNC
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            results_url = resp.headers.get("Content-Location")  # because sync returns directly, no 'Location' header
+            assert f"{proc}:{rev}" in results_url
+            job_id = results_url.split("/results", 1)[0].rsplit("/", 1)[-1]
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{rev}"
+            assert resp.json["output"] == exec_value
+
     def test_execute_job_with_accept_languages(self):
         """
         Test that different accept language matching supported languages all successfully execute and apply them.
@@ -2354,7 +2436,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 filter_match = responses.matchers.query_param_matcher({
                     "filter": filter_value,
                     "filter-lang": filter_lang,
-                    "timeout": "10",  # added internally by collection processor
                 })
             else:
                 filter_match = responses.matchers.json_params_matcher(filter_value)
@@ -2488,6 +2569,89 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         assert "features" in out_data and isinstance(out_data["features"], list)
         assert len(out_data["features"]) == 1
+
+    @parameterized.expand([
+        (
+            {"subset": "Lat(10:20),Lon(30:40)", "datetime": "2025-01-01/2025-01-02"},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+        (
+            {"subset": {"Lat": [10, 20], "Lon": [30, 40]}, "datetime": ["2025-01-01", "2025-01-02"]},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+    ])
+    def test_execute_job_with_collection_input_coverages_netcdf(self, coverage_parameters, coverage_request):
+        # type: (JSON, str) -> None
+        proc_name = "DockerNetCDF2Text"
+        body = self.retrieve_payload(proc_name, "deploy", local=True)
+        cwl = self.retrieve_payload(proc_name, "package", local=True)
+        body["executionUnit"] = [{"unit": cwl}]
+        proc_id = self.fully_qualified_test_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc_id)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_svr = stack.enter_context(responses.RequestsMock(assert_all_requests_are_fired=False))
+            test_file = "test.nc"
+            test_data = stack.enter_context(open(os.path.join(TEST_DATA_ROOT, test_file), mode="rb")).read()
+
+            # coverage request expected with resolved query parameters matching submitted collection input parameters
+            col_url = f"{tmp_host}/collections/climate-data"
+            col_cov_url = f"{col_url}/coverage"
+            col_cov_req = f"{col_cov_url}{coverage_request}"
+            tmp_svr.add("GET", col_cov_req, body=test_data)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "input_nc": {
+                        "collection": col_url,
+                        "format": ExecuteCollectionFormat.OGC_COVERAGE,  # NOTE: this is the test!
+                        "type": ContentType.APP_NETCDF,  # must align with process input media-type
+                        **coverage_parameters,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "output_txt" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        log_url = f"{status_url}/logs"
+        log_txt = self.app.get(log_url, headers={"Accept": ContentType.TEXT_PLAIN}).text
+        cov_col = "coverage.nc"  # file name applied by 'collection_processor' (resolved by 'format' + 'type' extension)
+        cov_out = "coverage.txt"  # extension modified by invoked process from input file name, literal copy of NetCDF
+        assert cov_col in log_txt, "Resolved NetCDF file from collection handler should have been logged."
+        assert cov_out in log_txt, "Chained NetCDF copied by the process as text should have been logged."
+
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "output_txt", cov_out)
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="rb") as out_fd:  # output, although ".txt" is actually a copy of the submitted NetCDF
+            out_data = out_fd.read(3)
+        assert out_data == b"CDF", "Output file from (collection + process) chain should contain the NetCDF header."
+
+        for file_path in [
+            os.path.join(job_dir, cov_col),
+            os.path.join(job_dir, "inputs", cov_col),
+            os.path.join(job_dir, "output_txt", cov_col),
+            os.path.join(job_out, cov_col),
+            os.path.join(job_out, "inputs", cov_col),
+            os.path.join(job_out, "output_txt", cov_col),
+        ]:
+            assert not os.path.exists(file_path), (
+                f"Intermediate collection coverage file should not exist: [{file_path}]"
+            )
 
     def test_execute_job_with_context_output_dir(self):
         cwl = {

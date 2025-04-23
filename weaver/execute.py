@@ -81,6 +81,13 @@ class ExecuteControlOption(Constants):
         """
         return [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
 
+    @classmethod
+    def from_mode(cls, mode):
+        # type: (Optional[AnyExecuteMode]) -> Optional[ExecuteControlOption]
+        mode = ExecuteMode.get(mode)
+        ctrl = cls.get(f"{mode}-execute")
+        return ctrl
+
 
 class ExecuteReturnPreference(Constants):
     MINIMAL = "minimal"                 # type: ExecuteReturnPreferenceMinimalType

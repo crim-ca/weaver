@@ -35,7 +35,7 @@ colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
-cryptography
+cryptography>=44.0.1
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
 #   - https://github.com/crim-ca/weaver/issues/138
@@ -71,11 +71,10 @@ mako
 # employed by cwltool -> schema-salad -> mistune
 #mistune>=2.0.3,<2.1
 mypy_boto3_s3
-numpy>=1.22.2,<2; python_version < "3.10"
-numpy>=1.22.2; python_version >= "3.10"
+numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.29.3
+owslib==0.32.1
 PasteDeploy>=3.1.0; python_version >= "3.12"
 pint
 psutil
@@ -86,7 +85,7 @@ psutil
 #   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 # - extra 'backend-native' uses shapely for Python objects
 # - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
-pygeofilter[fes,backend-native]
+pygeofilter[fes,backend-native]>=0.3.1
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
@@ -119,10 +118,7 @@ schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
-# Python<3.10 error via pip, avoid endless package install lookup error with botocore
-# (https://github.com/pypa/pip/issues/12827#issuecomment-2211291150)
-urllib3>=2.2.2 ; python_version >= "3.10"  
-urllib3==1.26.19 ; python_version < "3.10"  # pyup: ignore
+urllib3>=2.2.2
 urlmatch
 xmltodict
 webob

@@ -89,9 +89,9 @@
 .. |filter-cql-text| replace:: CQL-Text
 .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
-.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065.html#cql2-json
+.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
-.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
+.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-text
 .. |filter-ecql| replace:: ECQL (Extended CQL)
 .. _filter-ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
 .. |filter-fes| replace:: Filter Encoding Standard 2.0

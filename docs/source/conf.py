@@ -454,6 +454,8 @@ linkcheck_ignore = [
     # ignore links using archived web pages, which sometimes become unavailable briefly
     # since using an archive, they are already using "last resort" references
     "http[s]*://web.archive.org/.*",
+    # sporadic timeouts
+    "https://2024julyesipmeeting.sched.com/",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

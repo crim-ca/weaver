@@ -533,8 +533,8 @@ class WpsConfigBase(GenericUtils):
         assert resp.status_code == 200, f"Error job info:\n{resp.text}"
         return resp.json
 
-    def get_outputs(self, status_url):
-        path = get_path_kvp(f"{status_url}/outputs", schema=JobInputsOutputsSchema.OLD)
+    def get_outputs(self, status_url, schema=JobInputsOutputsSchema.OLD):
+        path = get_path_kvp(f"{status_url}/outputs", schema=schema)
         resp = self.app.get(path, headers=dict(self.json_headers))
         body = resp.json
         pretty = json.dumps(body, indent=2, ensure_ascii=False)

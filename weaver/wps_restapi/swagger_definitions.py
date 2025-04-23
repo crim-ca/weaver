@@ -22,6 +22,7 @@ import os
 import re
 from copy import copy
 from decimal import Decimal
+from functools import cache
 from typing import TYPE_CHECKING
 
 import colander
@@ -32,13 +33,9 @@ from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
-from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, jfe
-
-# FIXME: https://github.com/geopython/pygeofilter/pull/102
-from pygeofilter.parsers.fes.parser import parse as fes_parse
+from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
-from weaver.compat import cache
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
@@ -1673,7 +1670,7 @@ class FilterSchema(ExtendedMappingSchema):
         elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
             parsed_expr = ecql.parse(filter_expr)
         elif filter_lang == "fes":
-            parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
+            parsed_expr = fes.parse(filter_expr)
         elif filter_lang == "jfe":
             parsed_expr = jfe.parse(filter_expr)
         if not parsed_expr:
