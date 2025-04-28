@@ -39,7 +39,7 @@ pylint>=3,<4
 pylint_quotes @ git+https://github.com/marekhanus/pylint-quotes.git@0.3.0a2
 pylint-per-file-ignores
 responses
-safety
+safety>=3.4.0
 stopit
 typing_extensions
 WebTest
