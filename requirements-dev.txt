@@ -16,8 +16,6 @@ docformatter>=1.5.0     # add support of config file
 flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
 flynt
 isort>=5
-# FIXME: pin to resolve 'safety' compatibility (https://github.com/pyupio/safety/issues/711)
-marshmallow<4
 mock<4
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)
@@ -41,7 +39,6 @@ pylint>=3,<4
 pylint_quotes @ git+https://github.com/marekhanus/pylint-quotes.git@0.3.0a2
 pylint-per-file-ignores
 responses
-# FIXME: pin >3.3.1 when available to remove 'marshmallow' pin (https://github.com/pyupio/safety/issues/711)
 safety
 stopit
 typing_extensions
