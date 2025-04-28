@@ -40,7 +40,7 @@ from weaver.execute import (
 )
 from weaver.formats import ContentType
 from weaver.notify import decrypt_email
-from weaver.processes.constants import JobStatusSchema
+from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import get_path_kvp, now
@@ -2087,12 +2087,14 @@ class WpsRestApiJobsTest(JobUtils):
         """
         job = self.job_info[0]
         assert job.status == Status.SUCCESSFUL, "Precondition invalid."
-        headers = {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"}
+        headers = {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"}
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.FINISHED
 
         job = self.job_info[1]
@@ -2100,8 +2102,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.ERROR
 
         job = self.job_info[9]
@@ -2109,8 +2113,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.RUNNING
 
         job = self.job_info[11]
@@ -2118,8 +2124,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=headers)
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.QUEUED
 
     @pytest.mark.oap_part4
@@ -2131,10 +2139,12 @@ class WpsRestApiJobsTest(JobUtils):
         job = self.job_info[0]
         assert job.status == Status.SUCCESSFUL, "Precondition invalid."
         path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"schema": JobStatusSchema.OPENEO})
+        resp = self.app.get(path, headers=self.json_headers, params={"schema": JobStatusProfileSchema.OPENEO})
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusProfileSchema.OPENEO
         assert resp.json["status"] == Status.FINISHED
 
         job = self.job_info[1]
@@ -2142,8 +2152,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.ERROR
 
         job = self.job_info[9]
@@ -2151,8 +2163,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.RUNNING
 
         job = self.job_info[11]
@@ -2160,8 +2174,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{job.id}"
         resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
         assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
+        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"
         assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["$schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        assert resp.json["type"] == JobStatusType.OPENEO
         assert resp.json["status"] == Status.QUEUED
 
     def test_job_status_html_success(self):

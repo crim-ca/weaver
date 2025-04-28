@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobStatusType,
     ProcessSchema
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
@@ -941,8 +942,8 @@ class Job(Base, LoggerHandler):
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:
-            return "process"
-        return "provider"
+            return JobStatusType.PROCESS
+        return JobStatusType.PROVIDER
 
     @property
     def title(self):

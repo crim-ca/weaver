@@ -26,7 +26,7 @@ from weaver.formats import (
     guess_target_format,
     repr_json
 )
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.processes.execution import (
     submit_job,
@@ -332,7 +332,7 @@ def trigger_job_execution(request):
     schema=sd.GetProviderJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_single_job_status_responses,
@@ -352,7 +352,7 @@ def trigger_job_execution(request):
     schema=sd.GetProcessJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
@@ -372,7 +372,7 @@ def trigger_job_execution(request):
     schema=sd.GetJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
@@ -388,19 +388,20 @@ def get_job_status(request):
     job = get_job(request)
 
     # apply additional properties that are profile-dependant
-    # properties applied in 'job_prop' must succeed schema validation as well
-    job_prop = {}
-    if schema == JobStatusSchema.OPENEO:
+    if schema == JobStatusProfileSchema.OPENEO:
         cwl_url = get_path_kvp(f"{job.process_url(request)}/package", f=OutputFormat.JSON)
-        job_prop = {"process": {"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON}}
-    job_body = job.json(request, **job_prop)
-    if schema == JobStatusSchema.OPENEO:
-        # additional properties that are not validated explicitly
-        # align the content with metadata schema
-        # status is defined here to limit the combinations reported in OpenAPI as OGC-only statuses
+        job_body = job.json(
+            request,
+            process={"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON},
+            type=JobStatusType.OPENEO,
+        )
+        # additional properties that are not validated explicitly, or that contradict the 'OGC-API processes' definition
+        # must apply the properties after (not via 'kwargs' to 'job.json()') to avoid JSON validation error
+        # (i.e.: 'status' reported in OpenAPI is OGC-only statuses, and '$schema' is set by the class definition)
         job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        job_body["type"] = JobStatusSchema.OPENEO
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
+    else:
+        job_body = job.json(request)
 
     # adjust response contents according to rendering
     # provide 'job' object directly for HTML templating to allow extra operations dynamically

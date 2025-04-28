@@ -254,6 +254,12 @@ Glossary
         Entity that describes the required inputs, produced outputs, and any applicable metadata for the execution of
         the defined script, calculation, or operation.
 
+    Profile
+        Content representation of an entity (such as a :term:`Process` or :term:`Job`) under a certain
+        schema or established standard. In most cases, |content-negotiation-profile|_ will default to
+        an :term:`OGC API - Processes` representation in `Weaver`, but other alternatives can be provided
+        in certain cases, such as for corresponding :term:`WPS` or :term:`openEO` response contents.
+
     PROV
     Provenance
         Metadata using the :term:`W3C` |PROV|_ standard that is applied to a submitted :term:`Job` execution to allow

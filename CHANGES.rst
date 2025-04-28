@@ -24,6 +24,9 @@ Fixes:
   and their more verbose ``PROV``-specific representation (e.g.: ``f=prov-n``), all case-insensitive.
 - Fix ``/prov`` endpoint not correctly allowing the `YAML` equivalent representation of ``PROV-JSON`` contents.
 - Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
+- Fix reported ``type`` of the `openEO` *Batch Job* `OenAPI` definition as alternate to `OGC API - Processes` `Job`
+  status using new ``weaver.processes.constants.JobStatusType`` definition that includes previous
+  the ``process`` and ``provider`` values applied by ``weaver.datatype.Job.type``.
 - Fix `Job` statistics not reported by the API in case of execution failure, although they might be partially available.
 
 .. _changes_6.4.1:

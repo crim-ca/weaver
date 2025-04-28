@@ -51,7 +51,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
 from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
@@ -84,7 +84,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
@@ -328,21 +328,21 @@ def get_job_io_schema_query(
 
 
 def get_job_status_schema(request):
-    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
+    # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
     Identifies if a :term:`Job` status response schema applies for the request.
     """
 
     def make_headers(resolved_schema):
-        # type: (JobStatusSchemaType) -> HeadersType
+        # type: (JobStatusProfileSchemaType) -> HeadersType
         content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
         if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
             return {"Content-Type": content_type}
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
-        if resolved_schema == JobStatusSchema.OGC:
+        if resolved_schema == JobStatusProfileSchema.OGC:
             content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-        elif resolved_schema == JobStatusSchema.OPENEO:
+        elif resolved_schema == JobStatusProfileSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
 
@@ -351,24 +351,24 @@ def get_job_status_schema(request):
         content_accept = ContentType.APP_JSON
 
     params = get_request_args(request)
-    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
+    schema = JobStatusProfileSchema.get(params.get("profile") or params.get("schema"))
     if schema:
         headers = make_headers(schema)
         return schema, headers
     ctype = get_header("Accept", request.headers)
     if not ctype:
-        schema = JobStatusSchema.OGC
+        schema = JobStatusProfileSchema.OGC
         headers = make_headers(schema)
         return schema, headers
     params = parse_kvp(ctype)
     profile = params.get("profile")
     if not profile:
-        schema = JobStatusSchema.OGC
+        schema = JobStatusProfileSchema.OGC
         headers = make_headers(schema)
         return schema, headers
     schema = cast(
-        "JobStatusSchemaType",
-        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
+        "JobStatusProfileSchemaType",
+        JobStatusProfileSchema.get(profile[0], default=JobStatusProfileSchema.OGC)
     )
     headers = make_headers(schema)
     return schema, headers
@@ -1165,7 +1165,7 @@ def get_job_submission_response(
         else:
             http_class = response_class or HTTPOk
             http_desc = sd.CompletedJobResponse.description
-            body = sd.CompletedJobStatusSchema().deserialize(body)
+            body = sd.CompletedJobStatusProfileSchema().deserialize(body)
 
         body["description"] = http_desc
         return http_class(json=body, headerlist=headers)
@@ -1180,7 +1180,7 @@ def get_job_submission_response(
             "Job successfully submitted to processing queue. "
             "Execution should begin when resources are available."
         )
-    body = sd.CreatedJobStatusSchema().deserialize(body)
+    body = sd.CreatedJobStatusProfileSchema().deserialize(body)
     http_class = response_class or HTTPCreated
     return http_class(json=body, headerlist=headers)
 

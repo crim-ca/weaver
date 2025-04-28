@@ -111,7 +111,8 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
-    JobStatusSchema,
+    JobStatusProfileSchema,
+    JobStatusType,
     ProcessSchema
 )
 from weaver.provenance import ProvenanceFormat
@@ -2320,7 +2321,7 @@ class JobTypeEnum(ExtendedSchemaNode):
     title = "JobType"
     default = null
     example = "process"
-    validator = OneOf(["process", "provider", "service"])
+    validator = OneOf(JobStatusType.values())
 
 
 class JobTitle(ExtendedSchemaNode):
@@ -3407,9 +3408,9 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     description = "Selects the schema employed for representation of returned job status response."
     schema_type = String
     title = "JobStatusQuerySchema"
-    example = JobStatusSchema.OGC
-    default = JobStatusSchema.OGC
-    validator = OneOfCaseInsensitive(JobStatusSchema.values())
+    example = JobStatusProfileSchema.OGC
+    default = JobStatusProfileSchema.OGC
+    validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
 
 
 class GetJobQuery(ExtendedMappingSchema):
@@ -3938,7 +3939,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusSchema(DescriptionSchema):
+class CreatedJobStatusProfileSchema(DescriptionSchema):
     jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
@@ -4716,7 +4717,7 @@ class QuotationListSchema(PagingBodySchema):
     quotations = QuotationList()
 
 
-class CreatedQuotedJobStatusSchema(PartialQuoteSchema, CreatedJobStatusSchema):
+class CreatedQuotedJobStatusProfileSchema(PartialQuoteSchema, CreatedJobStatusProfileSchema):
     billID = UUID(description="ID of the created bill.")
 
 
@@ -7724,7 +7725,7 @@ class CreatedLaunchJobResponse(ExtendedMappingSchema):
         }
     }
     header = CreatedJobLocationHeader()
-    body = CreatedJobStatusSchema()
+    body = CreatedJobStatusProfileSchema()
 
 
 class CompletedJobLocationHeader(ResponseHeaders):
@@ -7732,14 +7733,14 @@ class CompletedJobLocationHeader(ResponseHeaders):
     prefer_applied = PreferenceAppliedHeader(missing=drop)
 
 
-class CompletedJobStatusSchema(DescriptionSchema, JobStatusInfo):
+class CompletedJobStatusProfileSchema(DescriptionSchema, JobStatusInfo):
     pass
 
 
 class CompletedJobResponse(ExtendedMappingSchema):
     description = "Job submitted and completed execution synchronously."
     header = CompletedJobLocationHeader()
-    body = CompletedJobStatusSchema()
+    body = CompletedJobStatusProfileSchema()
 
 
 class FailedSyncJobResponse(CompletedJobResponse):
@@ -7933,7 +7934,7 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
 
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = CreatedQuotedJobStatusSchema()
+    body = CreatedQuotedJobStatusProfileSchema()
 
 
 class CreatedQuoteResponse(ExtendedMappingSchema):
