@@ -889,14 +889,22 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 # if compose up succeeds, query weaver to get frontpage response
 DOCKER_COMPOSE_CMD ?= docker compose
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_CURL_RETRY_COUNT ?= 5
+DOCKER_TEST_CURL_RETRY_DELAY ?= 5
+DOCKER_TEST_CURL_RETRY_MAX_TIME ?= 60
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
-	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
-	@curl localhost:4001 | grep "Weaver Information" || \
+	@curl \
+			--retry $(DOCKER_TEST_CURL_RETRY_COUNT) \
+			--retry-delay $(DOCKER_TEST_CURL_RETRY_DELAY) \
+			--retry-max-time $(DOCKER_TEST_CURL_RETRY_MAX_TIME) \
+			--retry-connrefused \
+			localhost:4001 | \
+		grep "Weaver Information" || \
 		( $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop; exit 1 )
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
