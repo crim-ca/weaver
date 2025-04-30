@@ -118,11 +118,13 @@ class ContentType(Constants):
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
+    IMAGE_SVG_XML = "image/svg+xml"
     MULTIPART_ANY = "multipart/*"
     MULTIPART_FORM = "multipart/form-data"      # data/file upload
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
     MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
+    TEXT_CSV = "text/csv"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
@@ -456,6 +458,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
+    ContentType.IMAGE_SVG_XML: ".svg",
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
@@ -494,9 +497,8 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
-    for name, ctype in locals().items()
-    if name.startswith("ContentType.")
-    and isinstance(ctype, str)
+    for ctype in ContentType.values()
+    if isinstance(ctype, str)
     and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING

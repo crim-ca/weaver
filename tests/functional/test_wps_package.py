@@ -569,6 +569,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["formats"][0]["default"] = False
         expect_outputs["file"]["formats"][1]["default"] = True
         expect_outputs["file"]["formats"][2]["default"] = False
+        # Alternate type added automatically in offering.
+        alternative_formats = [
+            {"mediaType": ContentType.IMAGE_GIF},
+            {"mediaType": ContentType.IMAGE_TIFF},
+            {"mediaType": ContentType.IMAGE_SVG_XML},
+            {"mediaType": ContentType.APP_PDF}
+        ]
+        expect_outputs["file"]["formats"].extend(alternative_formats)
         expect_outputs["file"]["schema"] = {
             "oneOf": [
                 {"type": "string", "format": "binary",
@@ -1510,14 +1518,22 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 # assert "default" not in format_spec
 
         assert proc["outputs"][0]["id"] == "single_value_single_format"
-        assert len(proc["outputs"][0]["formats"]) == 1
+        assert len(proc["outputs"][0]["formats"]) == 4  # Alternative format added in process
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][0]["formats"][3]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][1]["id"] == "single_value_multi_format"
-        assert len(proc["outputs"][1]["formats"]) == 3
+        assert len(proc["outputs"][1]["formats"]) == 8  # Alternative format added in process
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.APP_JSON
         assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["outputs"][1]["formats"][3]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][1]["formats"][4]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][1]["formats"][5]["mediaType"] == ContentType.APP_YAML
+        assert proc["outputs"][1]["formats"][6]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][7]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
@@ -1526,10 +1542,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][2]["formats"][0]["default"] is True
         assert proc["outputs"][3]["id"] == "multi_value_multi_format"
-        assert len(proc["outputs"][3]["formats"]) == 3
+        assert len(proc["outputs"][3]["formats"]) == 8
         assert proc["outputs"][3]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][3]["formats"][1]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][3]["formats"][2]["mediaType"] == ContentType.APP_JSON
+        assert proc["outputs"][3]["formats"][3]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][3]["formats"][4]["mediaType"] == ContentType.APP_PDF
+        assert proc["outputs"][3]["formats"][5]["mediaType"] == ContentType.TEXT_CSV
+        assert proc["outputs"][3]["formats"][6]["mediaType"] == ContentType.APP_XML
+        assert proc["outputs"][3]["formats"][7]["mediaType"] == ContentType.APP_YAML
         assert proc["outputs"][3]["formats"][0]["default"] is True   # mandatory
         assert proc["outputs"][3]["formats"][1].get("default", False) is False  # omission is allowed
         assert proc["outputs"][3]["formats"][2].get("default", False) is False  # omission is allowed
@@ -3301,10 +3322,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
         assert isinstance(proc["outputs"][0]["formats"], list)
-        assert len(proc["outputs"][0]["formats"]) == 1
+        assert len(proc["outputs"][0]["formats"]) == 3
         assert isinstance(proc["outputs"][0]["formats"][0], dict)
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_PDF
         expect = KNOWN_PROCESS_DESCRIPTION_FIELDS
         fields = set(proc.keys()) - expect
         assert len(fields) == 0, f"Unexpected fields found:\n  Unknown: {fields}\n  Expected: {expect}"
@@ -3404,15 +3427,23 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert isinstance(proc["outputs"], list)
         assert len(proc["outputs"]) == 2
         assert proc["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
-        assert len(proc["outputs"][0]["formats"]) == 1, \
-            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert len(proc["outputs"][0]["formats"]) == 3, (
+            "Default format and alternate formats should be added "
+            "to process definition when omitted from both CWL and WPS"
+        )
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
-        assert len(proc["outputs"][1]["formats"]) == 1, \
-            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert len(proc["outputs"][1]["formats"]) == 3, (
+            "Default format and alternate formats should be added "
+            "to process definition when omitted from both CWL and WPS"
+        )
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
         assert proc["outputs"][1]["formats"][0]["default"] is True
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert proc["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
 
@@ -3530,9 +3561,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][1]["description"] == "Collected logs during process run."
         assert "minOccurs" not in proc["outputs"][1]
         assert "maxOccurs" not in proc["outputs"][1]
-        assert len(proc["outputs"][1]["formats"]) == 1
+        assert len(proc["outputs"][1]["formats"]) == 3
         assert proc["outputs"][1]["formats"][0]["default"] is True
         assert proc["outputs"][1]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
+        assert proc["outputs"][1]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert proc["outputs"][1]["formats"][2]["mediaType"] == ContentType.APP_PDF
 
     def test_deploy_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
@@ -3992,7 +4025,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             path = f"/processes/{p_id}/execution"
             resp = mocked_sub_requests(self.app, "post_json", path, timeout=5,
                                        data=exec_content, headers=exec_headers, only_local=True)
-            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4377,8 +4410,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert results.content_type is None
         assert results.headers["Content-Location"] == results_href
         assert ("Link", output_data_link) in results.headerlist
+        rel_pattern = re.compile(r"rel=\"?([^\"]+)\"?")
         assert not any(
-            any(out_id in link[-1] for out_id in ["output_json", "output_text"])
+            any(out_id in rel_pattern.search(link[1]).group(1) for out_id in ["output_json", "output_text"])
             for link in results.headerlist if link[0] == "Link"
         ), "Filtered outputs should not be found in results response links."
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
@@ -4604,9 +4638,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
     @pytest.mark.oap_part1
-    @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_multipart_accept_alt_format(self):
         """
         Validate the returned contents combining an ``Accept`` header as ``multipart`` and a ``format`` in ``outputs``.
@@ -4661,23 +4693,25 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.yml"
             Content-Type: {ContentType.APP_YAML}
+            Content-Location: {out_url}/{job_id}/output_json/result.yml
             Content-ID: <output_json@{job_id}>
-            Content-Length: 12
+            Content-Length: 11
 
             {output_json_as_yaml}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results_text == results_body
+        for line1, line2 in zip(results_text.splitlines(), results_body.splitlines()):
+            assert line1 == line2
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.yml",
-                "type": ContentType.APP_YAML,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
@@ -4687,9 +4721,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         assert result_json.content_type == ContentType.APP_JSON
         assert result_json.text == "{\"data\":\"test\"}"
 
-    # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
     @pytest.mark.oap_part1
-    @pytest.mark.xfail(reason="not implemented")
     def test_execute_single_output_response_document_alt_format_yaml(self):
         proc = "EchoResultsTester"
         p_id = self.fully_qualified_test_name(proc)
@@ -4738,27 +4770,29 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
+            Content-Disposition: attachment; name="output_json"; filename="result.yml"
             Content-Type: {ContentType.APP_YAML}
+            Content-Location: {out_url}/{job_id}/output_json/result.yml
             Content-ID: <output_json@{job_id}>
-            Content-Length: 12
+            Content-Length: 11
 
             {output_json_as_yaml}
             --{boundary}--
         """)
         results_text = self.remove_result_multipart_variable(results.text)
         assert results.content_type.startswith(ContentType.MULTIPART_MIXED)
-        assert results_text == results_body
+        for line1, line2 in zip(results_text.splitlines(), results_body.splitlines()):
+            assert line1 == line2
+
         outputs = self.app.get(f"/jobs/{job_id}/outputs", params={"schema": JobInputsOutputsSchema.OGC_STRICT})
         assert outputs.content_type.startswith(ContentType.APP_JSON)
         assert outputs.json["outputs"] == {
-            "output_data": "test",
             "output_json": {
-                "href": f"{out_url}/{job_id}/output_json/output.yml",
-                "type": ContentType.APP_YAML,
+                "href": f"{out_url}/{job_id}/output_json/result.json",
+                "type": ContentType.APP_JSON,
             },
         }
 
-        # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
         result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
         assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
@@ -4830,12 +4864,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-        # FIXME: add check of direct request of output (https://github.com/crim-ca/weaver/pull/548)
         # validate the results can be obtained with the "real" representation
-        # result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
-        # assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
-        # assert result_json.content_type == ContentType.APP_JSON
-        # assert result_json.json == {"data": "test"}
+        result_json = self.app.get(f"/jobs/{job_id}/results/output_json", headers=self.json_headers)
+        assert result_json.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+        assert result_json.content_type == ContentType.APP_JSON
+        assert result_json.json == {"data": "test"}
 
     @pytest.mark.oap_part1
     def test_execute_single_output_response_document_default_format_json_special(self):

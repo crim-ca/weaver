@@ -461,7 +461,7 @@ class WpsRestApiJobsTest(JobUtils):
         base_url = self.settings["weaver.url"]
         jobs_url = base_url + sd.jobs_service.path
         limit = 2  # expect 11 jobs to be visible, making 6 pages of 2 each (except last that is 1)
-        last = 5   # zero-based index of last page
+        last = 5  # zero-based index of last page
         last_page = f"page={last}"
         prev_last_page = f"page={last - 1}"
         limit_kvp = f"limit={limit}"
@@ -907,7 +907,7 @@ class WpsRestApiJobsTest(JobUtils):
                             service=self.service_public.name,
                             process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
-            for patch in mocked_remote_wps([]):    # process invisible (not returned by remote)
+            for patch in mocked_remote_wps([]):  # process invisible (not returned by remote)
                 stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
@@ -1378,7 +1378,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions"]:
+        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -1565,7 +1565,7 @@ class WpsRestApiJobsTest(JobUtils):
                 assert resp.status_code == code, case
                 assert resp.json["title"] == title, case
                 assert resp.json["cause"] == cause, case
-                assert resp.json["type"].endswith(error_type), case   # ignore http full reference, not always there
+                assert resp.json["type"].endswith(error_type), case  # ignore http full reference, not always there
                 assert "links" in resp.json
 
     def test_jobs_inputs_outputs_validations(self):

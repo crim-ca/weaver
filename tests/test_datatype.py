@@ -1,11 +1,14 @@
+import contextlib
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+import mock
 import pytest
 from visibility import Visibility
 
 from tests import resources
+from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Job, Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType
@@ -213,6 +216,49 @@ def test_process_io_schema_ignore_uri():
 ])
 def test_process_split_version(process_id, result):
     assert Process.split_version(process_id) == result
+
+
+def test_process_outputs_alt():
+
+    from weaver.processes.utils import get_settings as real_get_settings
+    setup_mongodb_processstore()
+
+    def _get_mocked(req=None):
+        return req.registry.settings if req else real_get_settings(None)
+
+    # mock db functions called by offering
+    with contextlib.ExitStack() as stack:
+
+        stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
+
+    process = Process(id=f"test-{uuid.uuid4()!s}", package={},
+                      outputs=[{"identifier": "output1", "formats": [{"mediaType": ContentType.IMAGE_TIFF}]}],
+                      inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
+    offer = process.offering()
+
+    # Assert that process outputs in offering contains alternate representation
+    assert offer["outputs"]["output1"]["formats"] == [
+        {
+            "mediaType": ContentType.IMAGE_TIFF
+        },
+        {
+            "mediaType": ContentType.IMAGE_PNG
+        },
+        {
+            "mediaType": ContentType.IMAGE_GIF
+        },
+        {
+            "mediaType": ContentType.IMAGE_JPEG
+        },
+        {
+            "mediaType": ContentType.IMAGE_SVG_XML
+        },
+        {
+            "mediaType": ContentType.APP_PDF
+        }]
+
+    # Assert that process outputs are unchanged
+    assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
 
 
 @pytest.mark.parametrize(
