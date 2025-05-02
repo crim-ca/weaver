@@ -124,4 +124,3 @@ xmltodict
 webob
 werkzeug>=3.0.3,<3.1
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
-setuptools>=78.1.1 # not directly required, pinned by Snyk to avoid a vulnerability
