@@ -1160,7 +1160,7 @@ def get_job_submission_response(
         else:
             http_class = response_class or HTTPOk
             http_desc = sd.CompletedJobResponse.description
-            body = sd.CompletedJobStatusProfileSchema().deserialize(body)
+            body = sd.CompletedJobStatusSchema().deserialize(body)
 
         body["description"] = http_desc
         return http_class(json=body, headerlist=headers)
@@ -1175,7 +1175,7 @@ def get_job_submission_response(
             "Job successfully submitted to processing queue. "
             "Execution should begin when resources are available."
         )
-    body = sd.CreatedJobStatusProfileSchema().deserialize(body)
+    body = sd.CreatedJobStatusSchema().deserialize(body)
     http_class = response_class or HTTPCreated
     return http_class(json=body, headerlist=headers)
 

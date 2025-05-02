@@ -3939,7 +3939,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusProfileSchema(DescriptionSchema):
+class CreatedJobStatusSchema(DescriptionSchema):
     jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
@@ -4717,7 +4717,7 @@ class QuotationListSchema(PagingBodySchema):
     quotations = QuotationList()
 
 
-class CreatedQuotedJobStatusProfileSchema(PartialQuoteSchema, CreatedJobStatusProfileSchema):
+class CreatedQuotedJobStatusSchema(PartialQuoteSchema, CreatedJobStatusSchema):
     billID = UUID(description="ID of the created bill.")
 
 
@@ -7725,7 +7725,7 @@ class CreatedLaunchJobResponse(ExtendedMappingSchema):
         }
     }
     header = CreatedJobLocationHeader()
-    body = CreatedJobStatusProfileSchema()
+    body = CreatedJobStatusSchema()
 
 
 class CompletedJobLocationHeader(ResponseHeaders):
@@ -7733,14 +7733,14 @@ class CompletedJobLocationHeader(ResponseHeaders):
     prefer_applied = PreferenceAppliedHeader(missing=drop)
 
 
-class CompletedJobStatusProfileSchema(DescriptionSchema, JobStatusInfo):
+class CompletedJobStatusSchema(DescriptionSchema, JobStatusInfo):
     pass
 
 
 class CompletedJobResponse(ExtendedMappingSchema):
     description = "Job submitted and completed execution synchronously."
     header = CompletedJobLocationHeader()
-    body = CompletedJobStatusProfileSchema()
+    body = CompletedJobStatusSchema()
 
 
 class FailedSyncJobResponse(CompletedJobResponse):
@@ -7934,7 +7934,7 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
 
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = CreatedQuotedJobStatusProfileSchema()
+    body = CreatedQuotedJobStatusSchema()
 
 
 class CreatedQuoteResponse(ExtendedMappingSchema):
