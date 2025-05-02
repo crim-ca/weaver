@@ -14,9 +14,9 @@ Changes:
 --------
 - Enable Docker `Provenance <https://docs.docker.com/build/metadata/attestations/slsa-provenance>`_
   and `Software Bill of Materials (SBOM) <https://docs.docker.com/build/metadata/attestations/sbom>`_
-  within the CI to release `pavics/weaver <https://hub.docker.com/repository/docker/pavics/weaver/>`_ images
-  including this tracking information by default for improved security and trust toward the software runtime,
-  as observed through the `Docker Scout Health Score <https://docs.docker.com/scout/policy/>`_.
+  within the CI to release |pavics_weaver|_ images including this tracking information by default for
+  improved security and trust toward the software runtime, as observed through
+  the `Docker Scout Health Score <https://docs.docker.com/scout/policy/>`_.
   Running ``make docker-build`` without arguments will build the images without these features by default.
   They can be enabled using ``DOCKER_PROV=true make docker-build``. Building the images with these features
   requires an intermediate step to setup a `builder` with
@@ -2772,7 +2772,7 @@ Changes:
   (`#74 <https://github.com/crim-ca/weaver/issues/74>`_).
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
-- Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
+- Change doc to point to DockerHub |pavics_weaver|_ images.
 - Adjust CI rule long-lasting failures until it gets patched by original reference
   (`gitleaks-actions#3 <https://github.com/eshork/gitleaks-action/issues/3>`_).
 
@@ -2925,3 +2925,6 @@ Fixes:
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 
 .. _Twitcher: https://github.com/Ouranosinc/Twitcher
+
+.. |pavics_weaver| replace:: pavics/weaver
+.. _pavics_weaver: https://hub.docker.com/r/pavics/weaver/tags
