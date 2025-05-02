@@ -773,7 +773,7 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Extracting changes for ${VERSION} ..."
-	bash -c '\
+	@bash -c '\
 		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
 		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
 			| grep -n ".. _changes" \
@@ -800,8 +800,8 @@ generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML us
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
-	@sed -i -e 's|<tt|<code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
-	@sed -i -e 's|</tt|</code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<tt|<code|g' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|</tt|</code|g' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
 
 .PHONY: generate-archive
