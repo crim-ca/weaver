@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Tuple, Union
 
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyContentType, AnyLogLevel, HeadersType, KVP, JobResults, JSON, Number, Statistics
+    from weaver.typedefs import AnyContentType, AnyLogLevel, HeadersType, JobResults, JSON, KVP, Number, Statistics
     from weaver.visibility import AnyVisibility
 
 
