@@ -895,10 +895,12 @@ docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
 		$(DOCKER_BUILDER_ARGS) \
 		-f "$(APP_ROOT)/docker/Dockerfile-base" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)"
-	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(DOCKER_REPO):latest"
-	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):$(APP_VERSION)"
-	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):latest"
-	docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):base"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		( [ "$(APP_VERSION)" = "latest" ] || docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(DOCKER_REPO):latest" ) && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):$(APP_VERSION)" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):latest" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):base" \
+	) || true
 
 .PHONY: docker-build-manager
 docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the manager docker image
