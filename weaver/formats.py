@@ -1044,10 +1044,8 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
 
 def default_format_handler(output_format):
     # type: (Union[str, AnyOutputFormat, AnyContentType]) -> Optional[AnyContentType]
-    out_fmt = OutputFormat.get(output_format, default=None, allow_version=False)
-    if out_fmt:
-        return get_content_type(out_fmt)
-    return None
+    out_fmt = OutputFormat.get(output_format, allow_version=False)  # JSON by default if unknown or missing
+    return get_content_type(out_fmt)
 
 
 @overload
