@@ -1,4 +1,5 @@
-FROM weaver:base
+ARG DOCKER_BASE="weaver:base"
+FROM ${DOCKER_BASE}
 LABEL description.short="Weaver Worker"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
