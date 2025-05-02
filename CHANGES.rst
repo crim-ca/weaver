@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.5.0:
+
+`6.5.0 <https://github.com/crim-ca/weaver/tree/6.5.0>`_ (2025-05-02)
+========================================================================
+
+Changes:
+--------
 - Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
 - Add the ``process`` property to `Job` status response when requesting ``profile=openEO``,
   with a direct reference to the underlying `CWL` `Application Package` of the main `Process` ran by the `Job`.
