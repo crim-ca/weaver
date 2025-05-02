@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
+from urllib.parse import unquote_plus
 
 import colander
 from celery.utils.log import get_task_logger
@@ -50,8 +51,9 @@ from weaver.formats import (
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
@@ -82,7 +84,7 @@ if TYPE_CHECKING:
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
@@ -326,47 +328,42 @@ def get_job_io_schema_query(
 
 
 def get_job_status_schema(request):
-    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
+    # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
-    Identifies if a :term:`Job` status response schema applies for the request.
+    Identifies if a :term:`Job` status response schema :term:`Profile` applies for the request.
     """
 
     def make_headers(resolved_schema):
-        # type: (JobStatusSchemaType) -> HeadersType
+        # type: (JobStatusProfileSchemaType) -> HeadersType
         content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
-        # FIXME: support HTML or XML
-        #  (allow transparently for browsers types since Accept did not raise earlier, and no other supported yet)
         if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
-            content_type = ContentType.APP_JSON
+            return {"Content-Type": content_type}
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
-        if resolved_schema == JobStatusSchema.OGC:
+        if resolved_schema == JobStatusProfileSchema.OGC:
             content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-        elif resolved_schema == JobStatusSchema.OPENEO:
+        elif resolved_schema == JobStatusProfileSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
 
-    content_accept = request.accept.header_value or ContentType.APP_JSON
+    content_accept = get_header("Accept", request.headers) or ContentType.APP_JSON
     if content_accept == ContentType.ANY:
         content_accept = ContentType.APP_JSON
 
     params = get_request_args(request)
-    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
+    schema = JobStatusProfileSchema.get(params.get("profile") or params.get("schema"))
     if schema:
         headers = make_headers(schema)
         return schema, headers
-    ctype = get_header("Accept", request.headers)
-    if not ctype:
-        return JobStatusSchema.OGC, {}
-    params = parse_kvp(ctype)
+    params = parse_kvp(content_accept)
     profile = params.get("profile")
     if not profile:
-        schema = JobStatusSchema.OGC
+        schema = JobStatusProfileSchema.OGC
         headers = make_headers(schema)
         return schema, headers
     schema = cast(
-        "JobStatusSchemaType",
-        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
+        "JobStatusProfileSchemaType",
+        JobStatusProfileSchema.get(profile[0], default=JobStatusProfileSchema.OGC)
     )
     headers = make_headers(schema)
     return schema, headers
@@ -1294,7 +1291,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+    if not job.success:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
@@ -1439,9 +1436,33 @@ def get_job_prov_response(request):
     raise_job_dismissed(job, request)
     raise_job_bad_status_success(job, request)
 
-    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
     prov_path = request.path.rsplit("/prov", 1)[-1]
     prov_path = f"/prov{prov_path}"
+
+    def prov_format_handler(fmt):
+        if isinstance(fmt, str):
+            # special case of 'application/ld+json'
+            # if passed by query parameter, the '+' is escaped to a space
+            # also, consider if the %-escape was done explicitly for it
+            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+                fmt = ProvenanceFormat.PROV_JSONLD
+            if "/" not in fmt and not fmt.lower().startswith("prov-"):
+                fmt = f"prov-{fmt}"
+            # special case of YAML that is obtained from PROV-JSON
+            # early fix its media-type to resolve it correctly without ambiguity
+            if fmt.lower() == "prov-yaml":
+                return ContentType.APP_YAML
+        prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
+        if prov_fmt:
+            return ProvenanceFormat.as_media_type(prov_fmt)
+        return prov_fmt
+
+    prov_type = guess_target_format(
+        request,
+        override_user_agent=True,
+        default=ContentType.APP_JSON,
+        format_handler=prov_format_handler,
+    )
     prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
     if not prov_data:
         prov_dir = job.prov_path(request)

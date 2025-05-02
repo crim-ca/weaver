@@ -93,6 +93,7 @@ class TestJobProvenance(TestJobProvenanceBase):
     @parameterized.expand([
         ({}, {}),  # default is JSON
         ({"f": OutputFormat.JSON}, {}),
+        ({"f": ProvenanceFormat.PROV_JSON}, {}),
         ({}, {"Accept": ContentType.APP_JSON}),
     ])
     def test_job_prov_json(self, queries, headers):
@@ -106,7 +107,39 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "wfprov" in prov["prefix"]
 
     @parameterized.expand([
+        ({"f": "ld+json"}, {}),
+        ({"f": "ld%2Bjson"}, {}),
+        ({"f": "jsonld"}, {}),
+        ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
+        ({}, {"Accept": ContentType.APP_JSONLD}),
+    ])
+    def test_job_prov_json_ld(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        assert resp.content_type == ContentType.APP_JSONLD
+        prov = resp.json
+        assert isinstance(prov, list)
+        assert bool(prov), "Must not be an empty list."
+        assert all(isinstance(obj, object) and "@id" in obj and "@type" in obj for obj in prov)
+
+    @parameterized.expand([
+        ({"f": OutputFormat.YAML}, {}),
+        ({}, {"Accept": ContentType.APP_YAML}),
+    ])
+    def test_job_prov_yaml(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        assert resp.content_type == ContentType.APP_YAML
+        prov = resp.text
+        assert "prefix:" in prov
+
+    @parameterized.expand([
         ({"f": OutputFormat.XML}, {}),
+        ({"f": ProvenanceFormat.PROV_XML}, {}),
         ({}, {"Accept": ContentType.TEXT_XML}),
         ({}, {"Accept": ContentType.APP_XML}),
     ])
@@ -119,18 +152,28 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
 
-    def test_job_prov_ttl(self):
+    @parameterized.expand([
+        ({"f": "turtle"}, {}),
+        ({"f": ProvenanceFormat.PROV_TURTLE}, {}),
+        ({}, {"Accept": ContentType.TEXT_TURTLE}),
+    ])
+    def test_job_prov_ttl(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
-        resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_TURTLE})
+        resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_TURTLE
         prov = resp.text
         assert "@prefix cwlprov: " in prov
 
-    def test_job_prov_nt(self):
+    @parameterized.expand([
+        ({"f": "nt"}, {}),
+        ({"f": ProvenanceFormat.PROV_NT}, {}),
+        ({}, {"Accept": ContentType.APP_NT}),
+    ])
+    def test_job_prov_nt(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
-        resp = self.app.get(prov_url, headers={"Accept": ContentType.APP_NT})
+        resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_NT
@@ -138,9 +181,14 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "_:N" in prov
         assert "wfprov" in prov
 
-    def test_job_prov_provn(self):
+    @parameterized.expand([
+        ({"f": "n"}, {}),
+        ({"f": ProvenanceFormat.PROV_N}, {}),
+        ({}, {"Accept": ContentType.TEXT_PROVN}),
+    ])
+    def test_job_prov_provn(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
-        resp = self.app.get(prov_url, headers={"Accept": ContentType.TEXT_PROVN})
+        resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.TEXT_PROVN

@@ -16,6 +16,46 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_6.5.0:
+
+`6.5.0 <https://github.com/crim-ca/weaver/tree/6.5.0>`_ (2025-05-02)
+========================================================================
+
+Changes:
+--------
+- Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
+- Add the ``process`` property to `Job` status response when requesting ``profile=openEO``,
+  with a direct reference to the underlying `CWL` `Application Package` of the main `Process` ran by the `Job`.
+
+Fixes:
+------
+- Fix `W3C PROV` endpoints not returning contents in appropriate type when using ``f`` or ``format`` query parameter.
+  On top of the supported explicit ``Accept`` header, the endpoints will now also allow either explicit ``Content-Type``
+  passed by ``f`` / ``format`` query parameter, their shorthand representations (e.g.: ``json`` for ``application/json``
+  and their more verbose ``PROV``-specific representation (e.g.: ``f=prov-n``), all case-insensitive.
+- Fix ``/prov`` endpoint not correctly allowing the `YAML` equivalent representation of ``PROV-JSON`` contents.
+- Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
+- Fix reported ``type`` of the `openEO` *Batch Job* `OenAPI` definition as alternate to `OGC API - Processes` `Job`
+  status using new ``weaver.processes.constants.JobStatusType`` definition that includes previous
+  the ``process`` and ``provider`` values applied by ``weaver.datatype.Job.type``.
+- Fix `Job` statistics not reported by the API in case of execution failure, although they might be partially available.
+
+.. _changes_6.4.1:
+
+`6.4.1 <https://github.com/crim-ca/weaver/tree/6.4.1>`_ (2025-03-14)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Fix resolution of the static endpoint when requesting CSS styles and favicon for `HTML` rendering
+  to employ the configured ``weaver.wps_restapi_url`` (or other settings to obtain it) instead of the
+  potentially unresolvable request URI, such as when behind a proxy.
 - Pin ``cryptography>=44.0.1`` to address vulnerabilities
   `CVE-2023-50782 <https://nvd.nist.gov/vuln/detail/CVE-2023-50782>`_,
   `CVE-2024-6119 <https://nvd.nist.gov/vuln/detail/CVE-2024-6119>`_,

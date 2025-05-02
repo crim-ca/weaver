@@ -19,6 +19,8 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |content_negotiation_profile| replace:: Content Negotiation by Profile
+.. _content_negotiation_profile: https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation
 .. |crs| replace:: Coordinate Reference System
 .. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
 .. |crs-def| replace:: Coordinate Reference System (CRS)
@@ -89,9 +91,9 @@
 .. |filter-cql-text| replace:: CQL-Text
 .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
-.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065.html#cql2-json
+.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
-.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
+.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-text
 .. |filter-ecql| replace:: ECQL (Extended CQL)
 .. _filter-ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
 .. |filter-fes| replace:: Filter Encoding Standard 2.0

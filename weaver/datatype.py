@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobStatusType,
     ProcessSchema
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
@@ -941,8 +942,8 @@ class Job(Base, LoggerHandler):
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:
-            return "process"
-        return "provider"
+            return JobStatusType.PROCESS
+        return JobStatusType.PROVIDER
 
     @property
     def title(self):
@@ -998,6 +999,11 @@ class Job(Base, LoggerHandler):
         if not isinstance(user_id, (int, str, uuid.UUID)) or user_id is None:
             raise TypeError(f"Type 'int', 'str' or a UUID is required for '{self.__name__}.user_id'")
         self["user_id"] = user_id
+
+    @property
+    def success(self):
+        # type: () -> bool
+        return map_status(self.status, category=True) == StatusCategory.SUCCESS
 
     @property
     def status(self):
@@ -1539,6 +1545,9 @@ class Job(Base, LoggerHandler):
             tool.output.seek(0)
             data = tool.output.read()
             fmt = ContentType.TEXT_PLAIN
+        if fmt == ContentType.APP_YAML:
+            data = json.loads(data)
+            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         return data, fmt
 
     def links(self, container=None, self_link=None):
@@ -1624,8 +1633,8 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
-    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
+    def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
         Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
@@ -1659,6 +1668,7 @@ class Job(Base, LoggerHandler):
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
+        job_json.update(**kwargs)
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):

@@ -68,6 +68,7 @@ def test_provenance_media_types():
     expect = [
         ContentType.APP_JSON,
         ContentType.APP_JSONLD,
+        ContentType.APP_YAML,
         ContentType.TEXT_TURTLE,
         ContentType.TEXT_PROVN,
         ContentType.TEXT_XML,

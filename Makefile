@@ -9,7 +9,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 6.4.0
+APP_VERSION ?= 6.5.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 
 # guess OS (Linux, Darwin,...)
@@ -800,6 +800,8 @@ generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML us
 		--template "$(REPORTS_DIR)/html-body-template.txt" \
 		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<tt|<code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|</tt|</code|' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
 	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
 
 .PHONY: generate-archive
@@ -949,14 +951,21 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 # if compose up succeeds, query weaver to get frontpage response
 DOCKER_COMPOSE_CMD ?= docker compose
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_CURL_RETRY_COUNT ?= 10
+DOCKER_TEST_CURL_RETRY_DELAY ?= 5
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
-	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
-	@curl localhost:4001 | grep "Weaver Information" || \
+	@wget \
+			-O - \
+			--tries $(DOCKER_TEST_CURL_RETRY_COUNT) \
+			--wait $(DOCKER_TEST_CURL_RETRY_DELAY) \
+			--retry-connrefused \
+			"http://localhost:4001" | \
+		grep "Weaver Information" || \
 		( $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop; exit 1 )
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
