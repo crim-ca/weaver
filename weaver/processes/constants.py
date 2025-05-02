@@ -387,6 +387,9 @@ ProcessSchemaOGCType = Literal["OGC", "ogc"]
 ProcessSchemaOLDType = Literal["OLD", "old"]
 ProcessSchemaWPSType = Literal["WPS", "wps"]
 ProcessSchemaType = Union[ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaWPSType]
+JobStatusTypeProcess = Literal["process"]
+JobStatusTypeService = Literal["service"]
+JobStatusTypeProvider = Literal["provider"]
 JobInputsOutputsSchemaType_OGC = Literal["OGC", "ogc"]
 JobInputsOutputsSchemaType_OLD = Literal["OLD", "old"]
 JobInputsOutputsSchemaType_OGC_STRICT = Literal["OGC+STRICT", "ogc+strict"]
@@ -394,9 +397,9 @@ JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
 JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
 JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
 JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
-JobStatusSchemaType_OGC = Literal["OGC", "ogc"]
-JobStatusSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
-JobStatusSchemaType = Union[JobStatusSchemaType_OGC, JobStatusSchemaType_OpenEO]
+JobStatusProfileSchemaType_OGC = Literal["OGC", "ogc"]
+JobStatusProfileSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
+JobStatusProfileSchemaType = Union[JobStatusProfileSchemaType_OGC, JobStatusProfileSchemaType_OpenEO]
 
 
 class ProcessSchema(Constants):
@@ -418,12 +421,31 @@ class JobInputsOutputsSchema(Constants):
     OLD = "old"                 # type: JobInputsOutputsSchemaType_OLD
 
 
-class JobStatusSchema(Constants):
+class JobStatusProfileSchema(Constants):
     """
-    Schema selector to represent a :term:`Job` status response.
+    Schema :term:`Profile` selector to represent a :term:`Job` status response.
     """
-    OGC = "ogc"         # type: JobStatusSchemaType_OGC
-    OPENEO = "openeo"   # type: JobStatusSchemaType_OpenEO
+    OGC = "ogc"         # type: JobStatusProfileSchemaType_OGC
+    OPENEO = "openeo"   # type: JobStatusProfileSchemaType_OpenEO
+
+
+class JobStatusType(Constants):
+    """
+    Type of :term:`Job` status response being represented.
+
+    The values consider teh originally submitted :term:`Process`, :term:`Provider` or :term:`Profile` representations.
+
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+    """
+    # backward compatibility
+    PROCESS = "process"     # type: JobStatusTypeProcess  # happens to be the same as newer 'OGC API - Processes' type
+    PROVIDER = "provider"   # type: JobStatusTypeProvider
+    # previous name used instead of 'provider', reflecting 'weaver.datatype.Service' explicitly
+    SERVICE = "service"     # type: JobStatusTypeService
+    # additional values as more specific variants of 'provider' or alternate 'profile' representations
+    WPS = "wps"             # type: ProcessSchemaWPSType
+    OPENEO = "openeo"       # type: JobStatusProfileSchemaType_OpenEO
 
 
 if TYPE_CHECKING:

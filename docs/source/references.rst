@@ -19,6 +19,8 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |content_negotiation_profile| replace:: Content Negotiation by Profile
+.. _content_negotiation_profile: https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation
 .. |crs| replace:: Coordinate Reference System
 .. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
 .. |crs-def| replace:: Coordinate Reference System (CRS)

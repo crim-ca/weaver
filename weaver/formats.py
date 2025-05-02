@@ -20,7 +20,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -1042,10 +1042,10 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
     return media_type
 
 
-@overload
-def guess_target_format(request):
-    # type: (AnyRequestType) -> ContentType
-    ...
+def default_format_handler(output_format):
+    # type: (Union[str, AnyOutputFormat, AnyContentType]) -> Optional[AnyContentType]
+    out_fmt = OutputFormat.get(output_format, allow_version=False)  # JSON by default if unknown or missing
+    return get_content_type(out_fmt)
 
 
 @overload
@@ -1066,12 +1066,19 @@ def guess_target_format(request, default, return_source, override_user_agent):
     ...
 
 
+@overload
+def guess_target_format(request, **kwargs):
+    # type: (AnyRequestType, Any) -> ContentType
+    ...
+
+
 def guess_target_format(
-    request,                        # type: AnyRequestType
-    default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
-    return_source=False,            # type: bool
-    override_user_agent=False,      # type: bool
-):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
+    request,                                # type: AnyRequestType
+    default=ContentType.APP_JSON,           # type: Optional[Union[ContentType, str]]
+    return_source=False,                    # type: bool
+    override_user_agent=False,              # type: bool
+    format_handler=default_format_handler,  # type: Callable[[Any], Optional[AnyContentType]]
+):                                          # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -1098,11 +1105,10 @@ def guess_target_format(
 
     format_query = request.params.get("format") or request.params.get("f")
     format_source = "default"  # type: FormatSource
-    content_type = None  # type: Optional[str]
+    content_type = None  # type: Optional[AnyContentType]
     if format_query:
-        content_type = OutputFormat.get(format_query, default=None, allow_version=False)
+        content_type = format_handler(format_query)
         if content_type:
-            content_type = get_content_type(content_type)
             format_source = "query"
     if not content_type:
         content_type = get_header("accept", request.headers, default=None)

@@ -38,9 +38,9 @@ from weaver.execute import (
     ExecuteReturnPreference,
     ExecuteTransmissionMode
 )
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
-from weaver.processes.constants import JobStatusSchema
+from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import get_path_kvp, now
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Tuple, Union
 
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyLogLevel, JobResults, JSON, Number, Statistics
+    from weaver.typedefs import AnyContentType, AnyLogLevel, HeadersType, JobResults, JSON, KVP, Number, Statistics
     from weaver.visibility import AnyVisibility
 
 
@@ -2079,90 +2079,449 @@ class WpsRestApiJobsTest(JobUtils):
             "job.process": f"https://localhost/processes/{proc_id}",
         }
 
+    @parameterized.expand(
+        [
+            # not providing any profile-related information (default: OGC)
+            # nor even any content media-type (default: JSON)
+            (
+                {},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # not providing any profile-related information (default: OGC)
+            (
+                {},
+                {"Accept": ContentType.APP_JSON},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_JSON},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_JSON},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_JSON},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # using '?schema=ogc' (explicitly rather than default)
+            (
+                {"schema": JobStatusProfileSchema.OGC},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC},
+                {"Accept": ContentType.APP_JSON},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC},
+                {"Accept": ContentType.APP_JSON},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC},
+                {"Accept": ContentType.APP_JSON},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # using '?schema=ogc&f=json' (explicitly rather than default)
+            (
+                {"schema": JobStatusProfileSchema.OGC, "f": OutputFormat.JSON},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC, "f": OutputFormat.JSON},
+                {},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC, "f": OutputFormat.JSON},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OGC, "f": OutputFormat.JSON},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # using 'Accept: ...; profile=ogc' (explicitly rather than default)
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}"},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}"},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}"},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}"},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # using '?schema=openeo&f=json'
+            (
+                {"schema": JobStatusProfileSchema.OPENEO, "f": OutputFormat.JSON},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.FINISHED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO, "f": OutputFormat.JSON},
+                {},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.ERROR,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO, "f": OutputFormat.JSON},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.RUNNING,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO, "f": OutputFormat.JSON},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.QUEUED,
+            ),
+            # using '?schema=openeo' (mixing query/headers to make sure they are interpreted separately and combined)
+            (
+                {"schema": JobStatusProfileSchema.OPENEO},
+                {"Accept": ContentType.APP_JSON},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.FINISHED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO},
+                {"Accept": ContentType.APP_JSON},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.ERROR,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO},
+                {"Accept": ContentType.APP_JSON},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.RUNNING,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.OPENEO},
+                {"Accept": ContentType.APP_JSON},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.QUEUED,
+            ),
+            # using 'Accept: ...; profile=openeo'
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.FINISHED,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.ERROR,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}"},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.OPENEO,
+                Status.QUEUED,
+            ),
+        ]
+    )
     @pytest.mark.oap_part4
     @pytest.mark.openeo
-    def test_job_status_alt_openeo_accept_response(self):
+    def test_job_status_profile_response(
+        self,
+        params,                 # type: KVP
+        headers,                # type: HeadersType
+        reference_job_index,    # type: int
+        reference_job_status,   # type: Status
+        expect_content_type,    # type: AnyContentType
+        expect_content_schema,  # type: str
+        expect_json_schema,     # type: str
+        expect_job_type,        # type: JobStatusType
+        expect_job_status,      # type: Status
+    ):                          # type: (...) -> None
         """
-        Validate retrieval of :term:`Job` status response with alternate value mapping by ``Accept`` header.
+        Validate retrieval of :term:`Job` status response with alternate :term:`Profile` by supported parameters.
+
+        Parameters to select the :term:`Profile` to return can be in query string, headers, or using defaults.
+        Validate that all of these representations are handled accordingly, regardless of the :term:`Job` ``status``.
+        However, according to the selected :term:`Profile`, the ``status`` should be mapped to its relevant value.
         """
+        job = self.job_info[reference_job_index]
+        assert job.status == reference_job_status, "Precondition invalid."
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, headers=headers, params=params)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Type"] == expect_content_type
+        assert resp.headers["Content-Schema"] == expect_content_schema
+        assert resp.json["$schema"] == expect_json_schema
+        assert resp.json["type"] == expect_job_type
+        assert resp.json["status"] == expect_job_status
+
+    def test_job_status_html_success(self):
         job = self.job_info[0]
         assert job.status == Status.SUCCESSFUL, "Precondition invalid."
-        headers = {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"}
         path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=headers)
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.FINISHED
+        resp = self.app.get(path, headers=self.html_headers)
+        body = resp.text
+        assert body.startswith("<!DOCTYPE html>")
 
+        rows = resp.html.find_all("tr")
+        row_status = [row.text.strip() for row in rows if "Status" in row.text]
+        assert row_status and row_status[0].endswith(Status.SUCCESSFUL)
+
+        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_scripts = list(logs_divs[-1].find("script"))
+        assert "fetch_job_logs" in logs_scripts[-1]
+
+        error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
+        assert "n/a" in error_divs[-1].text, "When job succeeds, no errors buttons must be displayed on HTML page."
+
+        results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
+        results_scripts = list(results_divs[-1].find("script"))
+        assert "fetch_job_results" in results_scripts[-1]
+
+    def test_job_status_html_failed(self):
         job = self.job_info[1]
         assert job.status == Status.FAILED, "Precondition invalid."
         path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=headers)
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.ERROR
+        resp = self.app.get(path, headers=self.html_headers)
+        body = resp.text
+        assert body.startswith("<!DOCTYPE html>")
 
-        job = self.job_info[9]
-        assert job.status == Status.RUNNING, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=headers)
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.RUNNING
+        rows = resp.html.find_all("tr")
+        row_status = [row.text.strip() for row in rows if "Status" in row.text]
+        assert row_status and row_status[0].endswith(Status.FAILED)
 
-        job = self.job_info[11]
-        assert job.status == Status.ACCEPTED, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=headers)
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.QUEUED
+        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_scripts = list(logs_divs[-1].find("script"))
+        assert "fetch_job_logs" in logs_scripts[-1]
 
-    @pytest.mark.oap_part4
-    @pytest.mark.openeo
-    def test_job_status_alt_openeo_profile_response(self):
-        """
-        Validate retrieval of :term:`Job` status response with alternate value mapping by ``profile`` query parameter.
-        """
-        job = self.job_info[0]
-        assert job.status == Status.SUCCESSFUL, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"schema": JobStatusSchema.OPENEO})
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.FINISHED
+        error_divs = list(resp.html.find("h3", id="errors").find_next_siblings("div"))
+        error_scripts = list(error_divs[-1].find("script"))
+        assert error_scripts, "When job failed, errors buttons to retrieve them should be available on HTML page."
 
-        job = self.job_info[1]
-        assert job.status == Status.FAILED, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.ERROR
-
-        job = self.job_info[9]
-        assert job.status == Status.RUNNING, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.RUNNING
-
-        job = self.job_info[11]
-        assert job.status == Status.ACCEPTED, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=self.json_headers, params={"schema": "openeo"})
-        assert resp.status_code == 200
-        assert resp.headers["Content-Type"] == f"{ContentType.APP_JSON}; profile={JobStatusSchema.OPENEO}"
-        assert resp.headers["Content-Schema"] == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        assert resp.json["status"] == Status.QUEUED
+        results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
+        results_scripts = results_divs[-1].find("script")
+        assert not results_scripts, "When job failed, unavailable results causes no fetching button on the HTML page."
 
 
 @pytest.mark.oap_part1

@@ -2403,6 +2403,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
         job.status = Status.SUCCESSFUL  # error if not completed
+        job.mark_finished()  # error if not considered finished (failed or successful)
         job = self.job_store.update_job(job)
 
         lines = mocked_sub_requests(
