@@ -12,7 +12,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Enable Docker `Provenance <https://docs.docker.com/build/metadata/attestations/slsa-provenance>`_
+  and `Software Bill of Materials (SBOM) <https://docs.docker.com/build/metadata/attestations/sbom>`_
+  within the CI to release `pavics/weaver <https://hub.docker.com/repository/docker/pavics/weaver/>`_ images
+  including this tracking information by default for improved security and trust toward the software runtime,
+  as observed through the `Docker Scout Health Score <https://docs.docker.com/scout/policy/>`_.
+  Running ``make docker-build`` without arguments will build the images without these features by default.
+  They can be enabled using ``DOCKER_PROV=true make docker-build``. Building the images with these features
+  requires an intermediate step to setup a `builder` with
+  the `docker-container <https://docs.docker.com/build/builders/drivers/docker-container>`_ driver.
 
 Fixes:
 ------
