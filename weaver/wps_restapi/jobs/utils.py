@@ -330,7 +330,7 @@ def get_job_io_schema_query(
 def get_job_status_schema(request):
     # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
-    Identifies if a :term:`Job` status response schema applies for the request.
+    Identifies if a :term:`Job` status response schema :term:`Profile` applies for the request.
     """
 
     def make_headers(resolved_schema):
@@ -346,7 +346,7 @@ def get_job_status_schema(request):
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
 
-    content_accept = request.accept.header_value or ContentType.APP_JSON
+    content_accept = get_header("Accept", request.headers) or ContentType.APP_JSON
     if content_accept == ContentType.ANY:
         content_accept = ContentType.APP_JSON
 
@@ -355,12 +355,7 @@ def get_job_status_schema(request):
     if schema:
         headers = make_headers(schema)
         return schema, headers
-    ctype = get_header("Accept", request.headers)
-    if not ctype:
-        schema = JobStatusProfileSchema.OGC
-        headers = make_headers(schema)
-        return schema, headers
-    params = parse_kvp(ctype)
+    params = parse_kvp(content_accept)
     profile = params.get("profile")
     if not profile:
         schema = JobStatusProfileSchema.OGC
