@@ -184,5 +184,8 @@ jobs:
         run: |
           make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-info docker-build
       - name: Push to DockerHub
+        # push does not apply if built with provenance since the build itself already pushes the layers
+        # the referenced repository and tagged version will not be available locally for push
+        if: ${{ env.DOCKER_PROV != 'true' }}
         run: |
           make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-push
