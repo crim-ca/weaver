@@ -19,6 +19,7 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPOk
 )
+from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
@@ -74,7 +75,12 @@ from weaver.utils import (
     parse_kvp
 )
 from weaver.visibility import Visibility
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps.utils import (
+    get_wps_local_status_location,
+    get_wps_output_dir,
+    get_wps_output_url,
+    map_wps_output_location
+)
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
@@ -83,7 +89,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
-    from weaver.formats import AnyContentEncoding
+    from weaver.formats import AnyContentEncoding, AnyContentType
     from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
@@ -331,42 +337,100 @@ def get_job_status_schema(request):
     # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
     Identifies if a :term:`Job` status response schema :term:`Profile` applies for the request.
+
+    :raises HTTPBadRequest: If an invalid combination :term:`Profile` and :term:`Media-Type` is requested.
     """
 
-    def make_headers(resolved_schema):
-        # type: (JobStatusProfileSchemaType) -> HeadersType
-        content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
-        if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
+    def make_headers(resolved_schema, content_type):
+        # type: (JobStatusProfileSchemaType, AnyContentType) -> HeadersType
+        if content_type == ContentType.TEXT_HTML:
             return {"Content-Type": content_type}
+        if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
+            content_type = ContentType.APP_JSON
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
         if resolved_schema == JobStatusProfileSchema.OGC:
             content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
         elif resolved_schema == JobStatusProfileSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        elif content_type in ContentType.ANY_XML:
+            if resolved_schema not in [JobStatusProfileSchema.WPS, None]:
+                raise HTTPBadRequest(
+                    json={
+                        "code": "InvalidParameterValue",
+                        "description": "Requested job schema profile cannot be combined with XML representation.",
+                        "cause": {"profile" if "profile" in request.params else "schema": schema},
+                    }
+                )
+            content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
         return content_headers
 
     content_accept = get_header("Accept", request.headers) or ContentType.APP_JSON
-    if content_accept == ContentType.ANY:
-        content_accept = ContentType.APP_JSON
+    content_media_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
 
     params = get_request_args(request)
     schema = JobStatusProfileSchema.get(params.get("profile") or params.get("schema"))
     if schema:
-        headers = make_headers(schema)
+        headers = make_headers(schema, content_media_type)
         return schema, headers
+
     params = parse_kvp(content_accept)
     profile = params.get("profile")
     if not profile:
-        schema = JobStatusProfileSchema.OGC
-        headers = make_headers(schema)
+        if content_media_type in ContentType.ANY_XML:
+            schema = JobStatusProfileSchema.WPS
+        else:
+            schema = JobStatusProfileSchema.OGC
+        headers = make_headers(schema, content_media_type)
         return schema, headers
-    schema = cast(
-        "JobStatusProfileSchemaType",
-        JobStatusProfileSchema.get(profile[0], default=JobStatusProfileSchema.OGC)
-    )
-    headers = make_headers(schema)
+
+    schema = JobStatusProfileSchema.get(profile[0], default=JobStatusProfileSchema.OGC)
+    headers = make_headers(schema, content_media_type)
     return schema, headers
+
+
+def get_job_status_wps_xml_response(job, request):
+    # type: (Job, AnyRequestType) -> AnyResponseType
+    """
+    Retrieve the :term:`WPS` :term:`XML` status file and return it as response.
+
+    Assumes that :func:`get_job_status_schema` was invoked to resolve any relevant schema :term:`Profile` and
+    content :term:`Media-Type` that is enforced by handling of the response representation from this function.
+
+    If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
+    an appropriate HTTP error will be raised.
+    """
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    headers = {
+        "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+        "Content-Schema": schema,
+    }
+    wps_status_file = get_wps_local_status_location(
+        job.status_location or job.status_url(request),
+        container=request,
+        must_exist=True,
+    )
+    if not wps_status_file:
+        accept_header = get_header("Accept", request.headers)
+        format_query = "f" if "f" in request.params else "format"
+        raise JobGone(
+            json={
+                "title": "JobStatusGone",
+                "type": "JobStatusGone",
+                "status": JobGone.code,
+                "detail": "Job status artifact in XML representation cannot be resolved.",
+                "cause": (
+                    {"in": "headers", "name": "Accept", "value": accept_header}
+                    if accept_header else
+                    {"in": "query", "name": format_query, "value": "xml"}
+                ),
+                "value": {"jobID": str(job.id), "status": job.status},
+            }
+        )
+    resp = FileResponse(wps_status_file, request=request)
+    resp.headers.update(headers)
+    return resp
 
 
 def make_result_link(

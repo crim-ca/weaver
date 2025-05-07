@@ -47,8 +47,11 @@ class Constants(object, metaclass=_Const):
         return [member for member in members if not isinstance(member, str) or not member.startswith("_")]
 
     @classmethod
-    def get(cls, key_or_value, default=None):
-        # type: (Union[AnyKey, EnumType, PropertyDataTypeT], Optional[Any]) -> PropertyDataTypeT
+    def get(
+        cls,            # type: Type[PropertyDataTypeT]
+        key_or_value,   # type: Union[AnyKey, EnumType, PropertyDataTypeT]
+        default=None,   # type: Optional[Any]
+    ):                  # type: (...) -> PropertyDataTypeT
         if isinstance(key_or_value, str):
             upper_key = key_or_value.upper()
             lower_key = key_or_value.lower()
