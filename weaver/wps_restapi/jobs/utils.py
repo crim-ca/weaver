@@ -89,7 +89,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
-    from weaver.formats import AnyContentType, AnyContentEncoding
+    from weaver.formats import AnyContentEncoding, AnyContentType
     from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
