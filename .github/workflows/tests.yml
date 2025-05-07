@@ -38,6 +38,10 @@ jobs:
       # override make command to install directly in active python
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
+      # active python version used by default by linters, main tests, and distributed docker
+      PYTHON_VERSION_DEFAULT: "3.12"
+      # next version being evaluated, typically still under bugfix/development (https://devguide.python.org/versions/)
+      PYTHON_VERSION_EXPERIMENTAL: "3.13"
     services:
       # Label used to access the service container
       mongodb:
@@ -53,36 +57,36 @@ jobs:
         include:
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: ${{ env.PYTHON_VERSION_EXPERIMENTAL }}
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: ${{ env.PYTHON_VERSION_EXPERIMENTAL }}
             allow-failure: true
             test-case: test-func-only
           # linter tests
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
             allow-failure: false
             test-case: check-all
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.10"  # doesn't matter which one (in docker), but match default of repo
+            python-version: ${{ env.PYTHON_VERSION_DEFAULT }}  # doesn't matter which one (in docker), only to report
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
             allow-failure: true
             test-case: test-workflow-only
     steps:

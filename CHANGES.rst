@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Update Docker builds and CI tests to use Python 3.12 by default.
 - Enable Docker `Provenance <https://docs.docker.com/build/metadata/attestations/slsa-provenance>`_
   and `Software Bill of Materials (SBOM) <https://docs.docker.com/build/metadata/attestations/sbom>`_
   within the CI to release |pavics_weaver|_ images including this tracking information by default for
