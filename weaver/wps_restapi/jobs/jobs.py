@@ -330,6 +330,15 @@ def trigger_job_execution(request):
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.provider_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
         for profile in JobStatusProfileSchema.values()
@@ -350,6 +359,15 @@ def trigger_job_execution(request):
 @sd.process_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
         for profile in JobStatusProfileSchema.values()
@@ -365,6 +383,15 @@ def trigger_job_execution(request):
     response_schemas=sd.derive_responses(
         sd.get_single_job_status_responses,
         sd.GenericHTMLResponse(name="HTMLJobStatus", description="Job status.")
+    ),
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
     ),
 )
 @sd.job_service.get(

@@ -3413,7 +3413,7 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
 
 
-class GetJobQuery(ExtendedMappingSchema):
+class GetJobQuery(FormatQuery):
     schema = JobStatusQueryProfileSchema(missing=drop)
     profile = JobStatusQueryProfileSchema(missing=drop)
 

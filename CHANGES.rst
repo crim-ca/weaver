@@ -24,7 +24,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Add missing ``f`` and ``format`` query parameters for `Job` status endpoints in `OpenAPI` schema.
 
 .. _changes_6.5.0:
 
