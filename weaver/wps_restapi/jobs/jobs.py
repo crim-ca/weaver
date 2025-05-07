@@ -47,6 +47,7 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_list_links,
     get_job_results_response,
     get_job_status_schema,
+    get_job_status_wps_xml_response,
     get_results,
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
@@ -330,6 +331,15 @@ def trigger_job_execution(request):
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.provider_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
         for profile in JobStatusProfileSchema.values()
@@ -345,6 +355,15 @@ def trigger_job_execution(request):
     response_schemas=sd.derive_responses(
         sd.get_single_job_status_responses,
         sd.GenericHTMLResponse(name="HTMLProcessJobStatus", description="Job status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
     ),
 )
 @sd.process_job_service.get(
@@ -370,6 +389,15 @@ def trigger_job_execution(request):
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
         for profile in JobStatusProfileSchema.values()
@@ -387,6 +415,11 @@ def get_job_status(request):
     schema, headers = get_job_status_schema(request)
     job = get_job(request)
 
+    content_type = str(headers.get("Content-Type"))
+    media_type = clean_media_type_format(content_type, strip_parameters=True)
+    if media_type in ContentType.ANY_XML or (media_type == ContentType.ANY and schema == JobStatusProfileSchema.WPS):
+        return get_job_status_wps_xml_response(job, request)
+
     # apply additional properties that are profile-dependant
     if schema == JobStatusProfileSchema.OPENEO:
         cwl_url = get_path_kvp(f"{job.process_url(request)}/package", f=OutputFormat.JSON)
@@ -400,12 +433,22 @@ def get_job_status(request):
         # (i.e.: 'status' reported in OpenAPI is OGC-only statuses, and '$schema' is set by the class definition)
         job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
+    elif schema == JobStatusProfileSchema.WPS:
+        job_body = job.json(
+            request,
+            type=JobStatusType.WPS,
+        )
+        # remove the schema reference since it is technically invalid with modified status,
+        # and we do not have a corresponding JSON-schema for the WPS-XML status values
+        # use the PyWPS mapping since this is what runs under the hood, with WPS-1 status values
+        job_body.pop("$schema", None)
+        job_body["status"] = map_status(job_body["status"], StatusCompliant.PYWPS)
     else:
         job_body = job.json(request)
 
     # adjust response contents according to rendering
     # provide 'job' object directly for HTML templating to allow extra operations dynamically
-    if ContentType.APP_JSON in str(headers.get("Content-Type")):
+    if ContentType.APP_JSON in content_type:
         return HTTPOk(json=job_body, headers=headers)
     return Box(**job_body, job=job, box_intact_types=[Job])
 

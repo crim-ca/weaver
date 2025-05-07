@@ -42,11 +42,13 @@ JOB_STATUS_CATEGORIES = {
     # note:
     #   OGC compliant (old): [Accepted, Running, successful, Failed]
     #   OGC compliant (new): [accepted, running, successful, failed, dismissed, created]  ('created' in Part 4 only)
-    #   PyWPS uses:          [Accepted, Started, Succeeded, Failed, Paused, Exception]
-    #   OWSLib uses:         [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
+    #   PyWPS uses:          [Accepted, Started, Succeeded, Failed, Paused, Exception]                  [WPS 1.0.0]
+    #   OWSLib uses:         [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)   [WPS 2.0]
     #   OpenEO uses:         [queued, running, finished, error, canceled, created]
     # https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusCode.yaml
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
+    # https://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd
+    # https://schemas.opengis.net/wps/2.0/wpsCommon.xsd
 
     # corresponding statuses are aligned vertically for 'COMPLIANT' groups
     StatusCompliant.OGC: frozenset([

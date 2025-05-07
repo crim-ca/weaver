@@ -235,6 +235,7 @@ OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WG
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
 
 OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
 OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
@@ -3253,7 +3254,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3413,7 +3414,7 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
 
 
-class GetJobQuery(ExtendedMappingSchema):
+class GetJobQuery(FormatQuery):
     schema = JobStatusQueryProfileSchema(missing=drop)
     profile = JobStatusQueryProfileSchema(missing=drop)
 

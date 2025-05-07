@@ -2442,6 +2442,234 @@ class WpsRestApiJobsTest(JobUtils):
                 JobStatusType.OPENEO,
                 Status.QUEUED,
             ),
+            # using '?schema=wps&f=json'
+            (
+                # this is a special combination that basically means to return
+                # the OGC Jobs schema representation, but using WPS status values
+                {"schema": JobStatusProfileSchema.WPS, "f": OutputFormat.JSON},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,  # not schema reported since they are not "valid references"
+                None,
+                JobStatusType.WPS,
+                Status.SUCCEEDED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS, "f": OutputFormat.JSON},
+                {},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS, "f": OutputFormat.JSON},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS, "f": OutputFormat.JSON},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
+            # using '?schema=wps' + Accept JSON
+            # (mixing query/headers to make sure they are interpreted separately and combined)
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {"Accept": ContentType.APP_JSON},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.SUCCEEDED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {"Accept": ContentType.APP_JSON},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {"Accept": ContentType.APP_JSON},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {"Accept": ContentType.APP_JSON},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
+            # using 'Accept: ...; profile=wps'
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}"},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.SUCCEEDED,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}"},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}"},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {},
+                {"Accept": f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}"},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.WPS}",
+                None,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
+            # using ONLY '?schema=wps' or '?profile=wps' (no Accept header nor format query)
+            # because WPS is typically XML, it should default to that representation instead of JSON
+            (
+                {"profile": JobStatusProfileSchema.WPS},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,  # schema provided in header
+                None,  # however, not returned in "type" property since not JSON
+                JobStatusType.WPS,
+                Status.SUCCEEDED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.SUCCEEDED,
+            ),
+            (
+                {"profile": JobStatusProfileSchema.WPS},
+                {},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {"profile": JobStatusProfileSchema.WPS},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {"profile": JobStatusProfileSchema.WPS},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
+            (
+                {"schema": JobStatusProfileSchema.WPS},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
         ]
     )
     @pytest.mark.oap_part4
@@ -2453,8 +2681,8 @@ class WpsRestApiJobsTest(JobUtils):
         reference_job_index,    # type: int
         reference_job_status,   # type: Status
         expect_content_type,    # type: AnyContentType
-        expect_content_schema,  # type: str
-        expect_json_schema,     # type: str
+        expect_content_schema,  # type: Optional[str]
+        expect_json_schema,     # type: Optional[str]
         expect_job_type,        # type: JobStatusType
         expect_job_status,      # type: Status
     ):                          # type: (...) -> None
@@ -2467,14 +2695,42 @@ class WpsRestApiJobsTest(JobUtils):
         """
         job = self.job_info[reference_job_index]
         assert job.status == reference_job_status, "Precondition invalid."
-        path = f"/jobs/{job.id}"
-        resp = self.app.get(path, headers=headers, params=params)
+
+        # mock creation of XML status file for test combinations that need it
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml") as tmp_xml_status:
+            xml_text = load_example("wps_execute_response.xml", text=True)
+            tmp_xml_status.write(xml_text)
+            tmp_xml_status.flush()
+            tmp_xml_status.seek(0)
+            with mock.patch(
+                "weaver.wps_restapi.jobs.utils.get_wps_local_status_location",
+                return_value=tmp_xml_status.name,
+            ):
+                path = f"/jobs/{job.id}"
+                resp = self.app.get(path, headers=headers, params=params)
+
         assert resp.status_code == 200
         assert resp.headers["Content-Type"] == expect_content_type
-        assert resp.headers["Content-Schema"] == expect_content_schema
-        assert resp.json["$schema"] == expect_json_schema
-        assert resp.json["type"] == expect_job_type
-        assert resp.json["status"] == expect_job_status
+        assert resp.headers.get("Content-Schema") == expect_content_schema
+        if ContentType.APP_JSON in expect_content_type:
+            assert resp.json.get("$schema") == expect_json_schema
+            assert resp.json["type"] == expect_job_type
+            assert resp.json["status"] == expect_job_status
+        elif ContentType.APP_XML in expect_content_type:
+            # just ensure that at least it is aligned with what is expected as WPS execution status response (not HTML)
+            # since we use a mock, the actual content is not important, as long as the schema/type resolution made sense
+            assert f"{expect_job_type}:" in resp.text, "type should be used as namespace in XML representation"
+            assert expect_content_schema.rsplit("/", 1)[-1] in resp.text, "Schema name should be in XML contents."
+        else:
+            raise AssertionError(f"Invalid response Content-Type [{expect_content_type}] is not expected.")
+
+    def test_job_status_xml_gone(self):
+        # this test considers that jobs are not created by actual execution
+        # therefore, the XML file does not actually exist
+        job = self.job_info[0]
+        path = f"/jobs/{job.id}"
+        resp = self.app.get(path, params={"f": OutputFormat.XML}, expect_errors=True)
+        assert resp.status_code == 410
 
     def test_job_status_html_success(self):
         job = self.job_info[0]

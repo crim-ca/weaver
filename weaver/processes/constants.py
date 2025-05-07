@@ -7,7 +7,7 @@ from typing_extensions import Literal, get_args
 from weaver.base import Constants
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Dict, TypeAlias
 
     from weaver.typedefs import CWL_NamespaceDefinition
 
@@ -386,20 +386,45 @@ OAS_DATA_TYPES = frozenset(
 ProcessSchemaOGCType = Literal["OGC", "ogc"]
 ProcessSchemaOLDType = Literal["OLD", "old"]
 ProcessSchemaWPSType = Literal["WPS", "wps"]
-ProcessSchemaType = Union[ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaWPSType]
+ProcessSchemaConstType = "ProcessSchema"  # type: TypeAlias
+ProcessSchemaType = Union[
+    ProcessSchemaOGCType,
+    ProcessSchemaOLDType,
+    ProcessSchemaWPSType,
+    ProcessSchemaConstType,
+]
 JobStatusTypeProcess = Literal["process"]
 JobStatusTypeService = Literal["service"]
 JobStatusTypeProvider = Literal["provider"]
+JobStatusConstType = "JobStatusType"  # type: TypeAlias
+JobStatusPropertyType = Union[
+    JobStatusTypeProcess,
+    JobStatusTypeService,
+    JobStatusTypeProvider,
+    JobStatusConstType,
+]
 JobInputsOutputsSchemaType_OGC = Literal["OGC", "ogc"]
 JobInputsOutputsSchemaType_OLD = Literal["OLD", "old"]
 JobInputsOutputsSchemaType_OGC_STRICT = Literal["OGC+STRICT", "ogc+strict"]
 JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
 JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
 JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
-JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
+JobInputsOutputsSchemaConstType = "JobInputsOutputsSchema"  # type: TypeAlias
+JobInputsOutputsSchemaType = Union[
+    JobInputsOutputsSchemaAnyOGCType,
+    JobInputsOutputsSchemaAnyOLDType,
+    JobInputsOutputsSchemaConstType,
+]
 JobStatusProfileSchemaType_OGC = Literal["OGC", "ogc"]
 JobStatusProfileSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
-JobStatusProfileSchemaType = Union[JobStatusProfileSchemaType_OGC, JobStatusProfileSchemaType_OpenEO]
+JobStatusProfileSchemaType_WPS = Literal["WPS", "wps"]
+JobStatusProfileSchemaConstType = "JobStatusProfileSchema"  # type: TypeAlias
+JobStatusProfileSchemaType = Union[
+    JobStatusProfileSchemaType_OGC,
+    JobStatusProfileSchemaType_OpenEO,
+    JobStatusProfileSchemaType_WPS,
+    JobStatusProfileSchemaConstType,
+]
 
 
 class ProcessSchema(Constants):
@@ -427,6 +452,7 @@ class JobStatusProfileSchema(Constants):
     """
     OGC = "ogc"         # type: JobStatusProfileSchemaType_OGC
     OPENEO = "openeo"   # type: JobStatusProfileSchemaType_OpenEO
+    WPS = "wps"         # type: JobStatusProfileSchemaType_WPS
 
 
 class JobStatusType(Constants):
