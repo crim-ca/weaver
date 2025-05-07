@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Update Docker builds and CI tests to use Python 3.12 by default.
 - Add ``f=xml`` support for `Job` status endpoints to directly retrieve the corresponding `WPS` `XML` status content.
 - Add ``schema=wps`` and ``profile=wps`` query parameter support for `Job` status endpoints.
   If used by themselves, these query parameter values will return the same `WPS` `XML` content as when using ``f=xml``.

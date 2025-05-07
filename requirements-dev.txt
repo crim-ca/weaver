@@ -13,7 +13,7 @@ codacy-coverage
 coverage
 doc8>=1.1.2
 docformatter>=1.5.0     # add support of config file
-flake8<6  # FIXME: false positive redefinition (https://github.com/PyCQA/pyflakes/issues/757)
+flake8>=7
 flynt
 isort>=5
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
@@ -26,6 +26,7 @@ mypy
 parameterized
 path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pytest-plugins/issues/224)
 pluggy>=0.7
+pycodestyle>=2.11.0; python_version >= "3.12"
 pytest
 pytest-httpserver>=1.0.7  # support werkzeug>=3
 pytest-profiling

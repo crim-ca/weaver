@@ -61,28 +61,31 @@ jobs:
             allow-failure: true
             test-case: test-func-only
           # linter tests
+          # limitation with nested f-string quote styles changed in Python 3.12 (https://peps.python.org/pep-0701/)
+          # forces us to pin Python 3.11 during linting checks in order to evaluate backward-compatible code styles
+          # (see https://github.com/edaniszewski/pylint-quotes/issues/32)
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             allow-failure: false
             test-case: check-all
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.10"  # doesn't matter which one (in docker), but match default of repo
+            python-version: "3.12"  # doesn't matter which one (defined in docker), use only to report matching version
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-workflow-only
     steps:
