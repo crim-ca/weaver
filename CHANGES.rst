@@ -12,6 +12,15 @@ Changes
 
 Changes:
 --------
+- Add ``f=xml`` support for `Job` status endpoints to directly retrieve the corresponding `WPS` `XML` status content.
+- Add ``schema=wps`` and ``profile=wps`` query parameter support for `Job` status endpoints.
+  If used by themselves, these query parameter values will return the same `WPS` `XML` content as when using ``f=xml``.
+  If combined with `JSON` format (i.e.: ``?f=json&profile=wps``), the `OGC API - Processes` `Job` status information
+  will be returned instead, but using the corresponding `WPS` ``status`` values. Specifically, this allows returning
+  the previous `WPS`  ``succeeded`` and ``started`` status values instead of the `OGC API - Processes` ``successful``
+  and ``running`` values respectively. This is provided to help clients that have to deal with the mixture of
+  properties until the standard is properly stabilized and released. However, the default status values returned
+  by ``profile=ogc`` should be preferred and employed whenever possible.
 - Enable Docker `Provenance <https://docs.docker.com/build/metadata/attestations/slsa-provenance>`_
   and `Software Bill of Materials (SBOM) <https://docs.docker.com/build/metadata/attestations/sbom>`_
   within the CI to release |pavics_weaver|_ images including this tracking information by default for
