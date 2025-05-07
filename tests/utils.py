@@ -1554,7 +1554,9 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
         def comparer(_res, _exp):  # pylint: disable=E0102
             return _res == _exp
 
-    assert type(result) == type(expect), "Expected types mismatch between iterable containers."  # pylint: disable=C0123
+    assert type(result) == type(expect), (  # pylint: disable=C0123  # noqa: E721
+        "Expected types mismatch between iterable containers."
+    )
     # in case of exhaustible iterators, compute them to get a copy once
     # also use the copy to remove items such that all must be matched
     result = list(result)

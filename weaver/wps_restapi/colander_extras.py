@@ -2343,7 +2343,10 @@ class OneOfKeywordSchema(KeywordMapper):
             # (e.g.: discriminate between float vs numerical string allowed schema variations)
             if not isinstance(cstruct, (dict, set, list, tuple)):
                 # pylint: disable=C0123
-                valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
+                valid_values = list(filter(
+                    lambda c: c == cstruct and type(c) == type(cstruct),  # noqa: E721
+                    valid_one_of
+                ))
                 if len(valid_values) == 1:
                     return valid_values[0]
                 message = (

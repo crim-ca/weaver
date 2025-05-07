@@ -1157,7 +1157,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             raise JobInvalidParameter(json={
                 "code": "JobInvalidParameter",
                 "description": "Visibility values not acceptable in 'tags', use 'access' instead.",
-                "cause": f"Invalid value{'s'[:len(bad_tags)^1]} in 'tags': {','.join(bad_tags)}",
+                "cause": f"Invalid value{'s'[:len(bad_tags) ^ 1]} in 'tags': {','.join(bad_tags)}",
                 "locator": "tags",
             })
         if tags:
