@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.6.0:
+
+`6.6.0 <https://github.com/crim-ca/weaver/tree/6.6.0>`_ (2025-05-08)
+========================================================================
+
+Changes:
+--------
 - Update Docker builds and CI tests to use Python 3.12 by default.
 - Add ``f=xml`` support for `Job` status endpoints to directly retrieve the corresponding `WPS` `XML` status content.
 - Add ``schema=wps`` and ``profile=wps`` query parameter support for `Job` status endpoints.
