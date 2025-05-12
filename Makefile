@@ -837,6 +837,8 @@ generate-archive:	## generate ZIP and TAR.GZ archives using current contents
 DOCKER_REPO ?= pavics/weaver
 #DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
 
+DOCKER_BUILD_XARGS ?=
+
 # NOTE:
 #	Because of the --push requirement when involving provenance/SBOM
 #	only full '[registry.uri/]org/weaver:tag' can be passed as '-t' label
@@ -893,6 +895,7 @@ docker-info:		## obtain docker image information
 docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
 		-f "$(APP_ROOT)/docker/Dockerfile-base" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
@@ -906,6 +909,7 @@ docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
 docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the manager docker image
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
 		-f "$(APP_ROOT)/docker/Dockerfile-manager" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)-manager"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
@@ -919,6 +923,7 @@ docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the man
 docker-build-worker: $(DOCKER_BUILDER_STEP) docker-build-base		## build the worker docker image
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
 		-f "$(APP_ROOT)/docker/Dockerfile-worker" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)-worker"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \

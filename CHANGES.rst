@@ -16,7 +16,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Remove additional software dependency in worker Docker image leading to outdated Python 3.11 and
+  its insecure dependencies to be installed along updated Python 3.12 with specific `Weaver` requirements.
+- Reduce all Docker image sizes by approximately 1/3 with post-install removal of build dependencies.
 
 .. _changes_6.6.0:
 
