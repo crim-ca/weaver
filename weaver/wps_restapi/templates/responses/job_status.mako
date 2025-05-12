@@ -22,12 +22,12 @@
         <ul>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${util.get_jobs_link(query='f=html')}">Jobs list</a>.
+                    Return to <a href="${util.get_jobs_link(query='f=html')}">Jobs Listing</a>
                 </div>
             </li>
             <li>
@@ -37,12 +37,12 @@
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#results">Job Results</a>
+                    Go to <a href="#inputs">Job Inputs</a>
                 </div>
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#statistics">Job Statistics</a>
+                    Go to <a href="#results">Job Results</a>
                 </div>
             </li>
             <li>
@@ -57,10 +57,19 @@
             </li>
             <li>
                 <div class="nav-link">
+                    Go to <a href="#statistics">Job Statistics</a>
+                </div>
+            </li>
+            <li>
+                <div class="nav-link">
                     Go to <a href="#provenance">Job Provenance</a>
                 </div>
             </li>
-            ${util.get_paging_links()}
+            <li>
+                <div class="nav-link">
+                    Go to <a href="#links">Job Links</a>
+                </div>
+            </li>
         </ul>
     </div>
 
@@ -166,8 +175,8 @@
     </div>
 
     <div class="content-section">
-        <h3 id="job-logs">
-            <a href="#job-logs">Logs</a>
+        <h3 id="logs">
+            <a href="#logs">Logs</a>
         </h3>
         <div class="content-section-summary">
             Logs captured during the job execution.

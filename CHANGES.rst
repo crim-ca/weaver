@@ -16,7 +16,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix missing link in `Job` status `HTML` page for ``inputs`` and ``links`` references.
+- Fix invalid link in `Job` status `HTML` page for ``logs`` reference.
+- Fix consistency between link names between `Job` status and `Process` description `HTML` pages.
 
 .. _changes_6.6.0:
 
