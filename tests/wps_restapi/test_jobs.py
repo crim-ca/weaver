@@ -2744,7 +2744,7 @@ class WpsRestApiJobsTest(JobUtils):
         row_status = [row.text.strip() for row in rows if "Status" in row.text]
         assert row_status and row_status[0].endswith(Status.SUCCESSFUL)
 
-        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_divs = list(resp.html.find("h3", id="logs").find_next_siblings("div"))
         logs_scripts = list(logs_divs[-1].find("script"))
         assert "fetch_job_logs" in logs_scripts[-1]
 
@@ -2767,7 +2767,7 @@ class WpsRestApiJobsTest(JobUtils):
         row_status = [row.text.strip() for row in rows if "Status" in row.text]
         assert row_status and row_status[0].endswith(Status.FAILED)
 
-        logs_divs = list(resp.html.find("h3", id="job-logs").find_next_siblings("div"))
+        logs_divs = list(resp.html.find("h3", id="logs").find_next_siblings("div"))
         logs_scripts = list(logs_divs[-1].find("script"))
         assert "fetch_job_logs" in logs_scripts[-1]
 
