@@ -141,7 +141,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         self.process_remote_WPS1 = "process_remote_wps1"
         self.process_remote_WPS3 = "process_remote_wps3"
-        self.process_public = WpsTestProcess(identifier="process_public")
+        self.process_public = WpsTestProcess(identifier="process_public", version="1.0.0")
         self.process_private = WpsTestProcess(identifier="process_private")
         weaver_api_url = get_wps_restapi_base_url(self.settings)
         weaver_wps_url = get_wps_url(self.settings)
@@ -149,6 +149,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             self.process_public,
             processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
             processEndpointWPS1=weaver_wps_url,
+            jobControlOptions=ExecuteControlOption.values(),
         )
         self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
@@ -223,7 +224,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
-            assert len(process["jobControlOptions"]) == 1
+            assert len(process["jobControlOptions"]) == 2
             assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
 
         processes_id = [p["id"] for p in resp.json["processes"]]
@@ -432,7 +433,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = resp.json
         assert len(body["processes"]) == proc_total
         proc_result = [(proc["id"], proc["version"]) for proc in body["processes"]]
-        proc_expect = [(proc_id, "0.0.0") for proc_id in proc_no_revs]
+        proc_expect = [(proc_id, self.process_public.version) for proc_id in proc_no_revs]
         proc_expect += [(tag, ver) for tag, ver in zip(proc1_tags, proc1_versions)]
         proc_expect += [(tag, ver) for tag, ver in zip(proc2_tags, proc2_versions)]
         assert proc_result == sorted(proc_expect)
@@ -1055,7 +1056,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         })
         return cwl
 
-    def test_deploy_process_CWL_DockerRequirement_href(self):
+    @parameterized.expand([
+        ("mapping", ),
+        ("listing", ),
+    ])
+    @pytest.mark.oap_part2
+    def test_deploy_process_CWL_DockerRequirement_href(self, exec_unit_style):
+        # type: (Literal["mapping", "listing"]) -> None
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             out_dir = self.settings["weaver.wps_output_dir"]
@@ -1069,9 +1076,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 json.dump(cwl, cwl_file)
 
             p_id = "test-docker-python-version"
+            unit = [{"href": tmp_href}] if exec_unit_style == "listing" else {"href": tmp_href}
             body = {
                 "processDescription": {"process": {"id": p_id}},
-                "executionUnit": [{"href": tmp_href}],
+                "executionUnit": unit,
                 "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
@@ -2336,7 +2344,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         execute_data_tests[6][1]["outputs"] = [{"id": "test_output", "transmissionMode": "random"}]
 
         def no_op(*_, **__):
-            return Status.SUCCEEDED
+            return Status.SUCCESSFUL
 
         path = f"/processes/{self.process_public.identifier}/jobs"
         with contextlib.ExitStack() as stack_exec:
@@ -2437,6 +2445,40 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
+
+    def test_execute_process_revision(self):
+        rev = "1.1.0"
+        proc = self.process_public.identifier
+        path = f"/processes/{proc}"
+        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.ASYNC]}
+        resp = self.app.patch_json(path, params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        data = self.get_process_execute_template()
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+            for proc_id in [
+                f"{proc}:{self.process_public.version}",
+                f"{proc}:{rev}",
+            ]:
+                path = f"/processes/{proc_id}/jobs"
+                resp = self.app.post_json(path, params=data, headers=self.json_headers)
+                assert resp.status_code == 201, f"Error: {resp.text}"
+                assert resp.content_type == ContentType.APP_JSON
+                assert resp.json["location"].endswith(resp.json["jobID"])
+                assert resp.headers["Location"] == resp.json["location"]
+                assert proc_id in resp.headers["Location"]
+                try:
+                    job = self.job_store.fetch_by_id(resp.json["jobID"])
+                except JobNotFound:
+                    self.fail("Job should have been created and be retrievable.")
+                assert str(job.id) == resp.json["jobID"]
+                assert job.task_id == Status.ACCEPTED  # temporary value until processed by celery
+                assert job.process == proc_id
 
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:
@@ -2570,12 +2612,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             else:
                 self.fail(f"Metadata is expected to be raised as invalid: (test: {i}, metadata: {meta})")
 
-    @pytest.mark.oap_part3
     @parameterized.expand([
         ({}, {}, True),  # no outputs returned
         ({}, {"result1": "data", "result2": 123}, True),  # too many outputs returned (not explicitly requested)
         ({"result1": {}, "result2": {}}, {"result1": "data", "result2": 123}, False),  # too many outputs requested
     ])
+    @pytest.mark.oap_part3
     def test_execute_process_nested_invalid_results_amount(self, test_outputs, mock_result, expect_execute):
         proc_path = f"/processes/{self.process_public.identifier}"
         exec_path = f"{proc_path}/jobs"

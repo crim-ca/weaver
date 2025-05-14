@@ -55,6 +55,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     import datetime
@@ -91,12 +92,22 @@ if TYPE_CHECKING:
         Dict[str, AnyValueType],
         Dict[str, List[AnyValueType]],
     ]
+    MongodbAggregateLogicalOp = TypedDict("MongodbAggregateLogicalOp", {
+        "$or": List[MongodbAggregateValue],
+        "$and": List[MongodbAggregateValue],
+        "$all": List[MongodbAggregateValue],
+        "$not": Dict[str, MongodbAggregateValue],
+    }, total=False)
     MongodbAggregateSortOrder = Dict[str, int]
     MongodbAggregateSortExpression = TypedDict("MongodbAggregateSortExpression", {
         "$sort": MongodbAggregateSortOrder,
     }, total=True)
+    MongodbAggregateFilterConditions = Union[
+        Dict[str, MongodbAggregateValue],
+        MongodbAggregateLogicalOp,
+    ]
     MongodbAggregateFilterExpression = TypedDict("MongodbAggregateFilterExpression", {
-        "$match": MongodbAggregateValue,
+        "$match": MongodbAggregateFilterConditions,
     }, total=True)
     MongodbAggregateExpression = Union[
         Dict[str, MongodbAggregateValue],
@@ -532,6 +543,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        total=False,         # type: bool
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
+                       identifiers=None,    # type: Optional[List[str]]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -543,18 +555,64 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param total: Request the total number of processes to be calculated (ignoring paging).
         :param revisions: Include all process revisions instead of only latest ones.
         :param process: Limit results only to specified process ID (makes sense mostly when combined with revisions).
+        :param identifiers:
+            Limit results only to specified explicit list of process IDs with revision tags as applicable.
+            Cannot be combined with the other :paramref:`process` and :paramref:`revisions` options.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
         """
-        search_filters = {}  # type: MongodbAggregateExpression
+        insert_fields = []  # type: MongodbAggregatePipeline
+        search_filters = {}  # type: MongodbAggregateFilterConditions
+        resolve_filter = []  # type: MongodbAggregatePipeline
 
         if process and revisions:
             search_filters["identifier"] = {"$regex": rf"^{process}(:.*)?$"}  # revisions of that process
         elif process and not revisions:
             search_filters["identifier"] = process  # not very relevant 'listing', but valid (explicit ID)
-        elif not process and not revisions:
+        elif not process and not revisions and not identifiers:
             search_filters["identifier"] = {"$regex": r"^[\w\-]+$"}  # exclude ':' to keep only latest (default)
+        elif identifiers:
+            # If the identifier is an older revision, it must have a version number explicitly no matter what.
+            # However, the latest revision can either omit the version or provide it explicitly (same document).
+            # Since this latest "same document" could be represented by "duplicate" ID representations, and queried
+            # simultaneously with the distinct 'id'/'id:version' references, return it twice (if they exist of course)
+            # with both criteria to respect the search that will expect to find those ID variations respectively.
+            process_ids = set(identifiers)
+            process_latest = {proc_id for proc_id in identifiers if ":" not in proc_id}
+            process_revisions = process_ids - process_latest
+            process_id_version = [proc_rev.rsplit(":", 1) for proc_rev in process_revisions]
+            process_variants = {
+                f"condition_{idx}": [{"$match": {"identifier": proc_id}}]
+                for idx, proc_id in enumerate(process_latest)
+            }
+            process_variants.update({
+                f"condition_{idx}": [{"$match": {"identifier": proc_id_rev}}]
+                for idx, proc_id_rev in enumerate(process_revisions, start=len(process_variants))
+            })
+            process_variants.update({
+                f"condition_{idx}": [
+                    {"$match": {"identifier": proc_id, "version": proc_rev}},
+                    # After resolutions, align any 'latest' process that indicates the explicit revision.
+                    # The only case that must be patched is when the version is explicitly indicated in query,
+                    # although not explicitly set in the DB document since it corresponds to the latest revision.
+                    {"$set": {"identifier": {"$cond": {
+                        "if": {"$regexMatch": {"input": "$identifier", "regex": r"^.*(?!:[0-9]+[^:]*)$"}},
+                        "then": {"$concat": ["$identifier", ":", "$version"]},
+                        "else": "$identifier",
+                    }}}},
+                ]
+                for idx, (proc_id, proc_rev) in enumerate(process_id_version, start=len(process_variants))
+            })
+            resolve_filter = [
+                # Using facets allows to distinct searches for each variant, which is needed to handle duplicate
+                # matches that would otherwise not be yielded individually per combinations within a single search.
+                # Unwrap these individual searches into a flattened result for following steps using root fields.
+                {"$facet": process_variants},
+                {"$project": {"combined": {"$concatArrays": [f"${condition}" for condition in process_variants]}}},
+                {"$unwind": "$combined"},
+                {"$replaceRoot": {"newRoot": "$combined"}},
+            ]
         # otherwise, last case returns 'everything', so nothing to 'filter'
 
         if visibility is None:
@@ -566,7 +624,6 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             if vis not in Visibility:
                 raise ValueError(f"Invalid visibility value '{v!s}' is not one of {list(Visibility.values())!s}")
         search_filters["visibility"] = {"$in": list(visibility)}
-        insert_fields = []  # type: MongodbAggregatePipeline
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:
@@ -583,7 +640,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             # Work around this by dynamically reassigning 'id' by itself.
             insert_fields = [
                 {"$set": {"tag": {"$cond": {
-                    "if": {"identifier": "/^.*:.*$/"},
+                    "if": {"$regexMatch": {"input": "$identifier", "regex": "^.*:.*$"}},
                     "then": "$identifier",
                     "else": {"$concat": ["$identifier", ":", "$version"]},
                 }}}},
@@ -593,7 +650,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
         sort_method = [{"$sort": sort_fields}]
 
-        search_pipeline = insert_fields + [{"$match": search_filters}] + sort_method
+        search_pipeline = insert_fields + [{"$match": search_filters}] + resolve_filter + sort_method
         paging_pipeline = self._apply_paging_pipeline(page, limit)
         if total:
             pipeline = self._apply_total_result(search_pipeline, paging_pipeline)
@@ -626,8 +683,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
         return search, version
 
-    def fetch_by_id(self, process_id, visibility=None):
-        # type: (AnyProcessRef, Optional[AnyVisibility]) -> Process
+    def fetch_by_id(self, process_id, visibility=None, revision=False):
+        # type: (AnyProcessRef, Optional[AnyVisibility], bool) -> Process
         """
         Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
 
@@ -635,6 +692,12 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
 
         :param process_id: Process identifier (optionally with version tag).
         :param visibility: One value amongst :py:mod:`weaver.visibility`.
+        :param revision:
+            Request that the specified 'ID:revision' tag be applied to the retrieved process ID.
+            Applies only when an explicit 'revision' part is provided in :paramref:`process_id`,
+            and that the retrieved :class:`Process` corresponds to the latest resvision that is
+            stored without the ``version`` within its ID. For other revisions, they would already
+            be applied, and must be provided explicitly either way to retrieve them.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
         process_id = self._get_process_id(process_id)
@@ -645,6 +708,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         process = Process(process)
         if version:
             process.version = version  # ensure version was applied just in case
+            if revision:
+                process.identifier = process_id  # apply revision in case it was requested explicitly for latest ID
         if visibility is not None and process.visibility != visibility:
             raise ProcessNotAccessible(f"Process '{process_id}' cannot be accessed.")
         return process
@@ -681,9 +746,19 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         # update ID to allow direct fetch by ID using tagged version
         # this also clears the unique ID index requirement
         new_name = f"{sane_name}:{version}"
+        # resolve new endpoints
+        # assume that only local processes can be updated
+        restapi_url = get_wps_restapi_base_url(self.settings)
+        description_url = "/".join([restapi_url, "processes", new_name])
+        execute_endpoint = "/".join([description_url, "jobs"])
         process = self.collection.find_one_and_update(
             filter={"identifier": sane_name},
-            update={"$set": {"identifier": new_name, "version": version}},
+            update={"$set": {
+                "identifier": new_name,
+                "version": version,
+                "processDescriptionURL": execute_endpoint,
+                "executeEndpoint": execute_endpoint,
+            }},
             return_document=ReturnDocument.AFTER,
         )
         if not process:
@@ -1082,7 +1157,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
             raise JobInvalidParameter(json={
                 "code": "JobInvalidParameter",
                 "description": "Visibility values not acceptable in 'tags', use 'access' instead.",
-                "cause": f"Invalid value{'s'[:len(bad_tags)^1]} in 'tags': {','.join(bad_tags)}",
+                "cause": f"Invalid value{'s'[:len(bad_tags) ^ 1]} in 'tags': {','.join(bad_tags)}",
                 "locator": "tags",
             })
         if tags:

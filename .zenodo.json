@@ -1,0 +1,138 @@
+{
+  "upload_type": "software",
+  "title": "crim-ca/weaver:6.6.0",
+  "description": "Weaver: Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES); OGC API - Processes; WPS; CWL Application Package",
+  "version": "6.6.0",
+  "creators": [
+    {
+      "name": "Charette-Migneault, Francis",
+      "orcid": "0000-0003-4862-3349",
+      "affiliation": "Computer Research Institute of Montréal"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Computer Research Institute of Montréal",
+      "type": "HostingInstitution"
+    },
+    {
+      "name": "Charette-Migneault, Francis",
+      "orcid": "0000-0003-4862-3349",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectLeader"
+    },
+    {
+      "name": "Byrns, David",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Caron, David",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Pelletier, Francis",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Gagnon-Grenier, Félix",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Azeli, Nazim",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Perron, Louis-David",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Cummings, Charles-William",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Trapsida, Nadir",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Lacoursière, Éric",
+      "affiliation": "Computer Research Institute of Montréal",
+      "type": "ProjectMember"
+    },
+    {
+      "name": "Schwartz, Misha",
+      "affiliation": "University of Toronto",
+      "type": "ProjectMember"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "crim"
+    },
+    {
+      "identifier": "birdhouse"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.14210717",
+      "relation": "isPartOf",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "https://github.com/crim-ca/weaver",
+      "scheme": "url",
+      "relation": "isMetadataFor",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://osf.io/d3esv/",
+      "scheme": "url",
+      "relation": "isVariantFormOf",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://pavics-weaver.readthedocs.io/",
+      "scheme": "url",
+      "relation": "isDocumentedBy",
+      "resource_type": "other"
+    }
+  ],
+  "custom": {
+    "code:codeRepository": "https://github.com/crim-ca/weaver",
+    "code:programmingLanguage": [
+      {
+        "id": "python",
+        "title": {"en": "Python"}
+      }
+    ],
+    "code:developmentStatus": [
+      {
+        "id": "active",
+        "title": {"en": "Active"}
+      }
+    ]
+  },
+  "language": "eng",
+  "keywords": [
+    "OGC",
+    "OGC API - Processes",
+    "CWL",
+    "Common Workflow Language",
+    "WPS",
+    "Web Processing Service",
+    "Workflow",
+    "Remote Execution",
+    "Web API",
+    "bird-house"
+  ],
+  "access_right": "open",
+  "license": "Apache-2.0"
+}

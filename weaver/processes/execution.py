@@ -95,7 +95,7 @@ if TYPE_CHECKING:
     from pywps.inout.inputs import BoundingBoxInput, ComplexInput
 
     from weaver.datatype import Job
-    from weaver.execute import AnyExecuteMode
+    from weaver.execute import AnyExecuteControlOption, AnyExecuteMode
     from weaver.processes.convert import OWS_Input_Type, ProcessOWS
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -195,16 +195,18 @@ def execute_process(task, job_id, wps_url, headers=None):
         # if process refers to a remote WPS provider, pass it down to avoid unnecessary re-fetch request
         if job.is_local:
             process = None  # already got all the information needed pre-loaded in PyWPS service
+            local_process_id = wps_process.identifier
         else:
             service = Service(name=job.service, url=wps_url)
             process = Process.from_ows(wps_process, service, settings)
+            local_process_id = None
 
         job.progress = JobProgress.EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
 
-        wps_worker = get_pywps_service(environ=settings, is_worker=True)
+        wps_worker = get_pywps_service(environ=settings, is_worker=True, process_id=local_process_id)
         execution = wps_worker.execute_job(job,
                                            wps_inputs=wps_inputs, wps_outputs=wps_outputs,
                                            remote_process=process, headers=headers)
@@ -256,10 +258,10 @@ def execute_process(task, job_id, wps_url, headers=None):
 
                 if execution.isComplete():
                     msg_progress = f" (status: {job_msg})" if job_msg else ""
-                    if execution.isSucceded():
+                    if execution.isSucceeded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
-                        job.status = map_status(Status.SUCCEEDED)
-                        job.status_message = f"Job succeeded{msg_progress}."
+                        job.status = map_status(Status.SUCCESSFUL)
+                        job.status_message = f"Job {job.status}{msg_progress}."
                         job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [
@@ -551,6 +553,8 @@ def log_and_save_update_status_handler(
             status = update_status(status)
         if update_progress and progress is not None:
             progress = update_progress(progress)
+        if "error" in kwargs:
+            kwargs["errors"] = kwargs.pop("error")  # align with 'save_log' parameters
         job.save_log(message=message, progress=progress, status=status, **kwargs)
         store.update_job(job)
     return log_and_update_status
@@ -580,7 +584,9 @@ def parse_wps_inputs(wps_process, job, container=None):
         # successful execution of that nested process will log a 'succeeded' entry within this ongoing execution.
         # Because it is a nested process, it is expected that further operations from the 'parent' process using it will
         # log many more steps afterwards. Therefore, avoid the ambiguous entry within the context of the parent process.
-        update_status=lambda _status: Status.RUNNING if _status == Status.SUCCEEDED else _status,
+        update_status=lambda _status: (
+            Status.RUNNING if map_status(_status, category=True) == StatusCategory.SUCCESS else _status
+        ),
         # Similarly, progress of the current job will be constraint within inputs retrieval and the following outputs
         # retrieval for the nested progress execution. Mapping the progress will ensure overall gradual percent values.
         update_progress=lambda _progress: map_progress(_progress, JobProgress.GET_INPUTS, JobProgress.GET_OUTPUTS),
@@ -830,11 +836,13 @@ def submit_job(request, reference, tags=None, process_id=None):
     lang = request.accept_language.header_value  # can only preemptively check if local process
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
-        proc_id = reference.identifier  # explicit 'id:version' process revision if available, otherwise simply 'id'
+        # use the request-provided reference (explicit 'id:version' process revision or simply 'id')
+        # if the latest, it resolves the same, but use the one the user will be aware of for clearer reporting of URLs
+        proc_id = process_id or resolve_process_tag(request)
         visibility = reference.visibility
         is_workflow = reference.type == ProcessType.WORKFLOW
         is_local = True
-        tags += "local"
+        tags.append("local")
         support_lang = AcceptLanguage.offers()
         accepts_lang = request.accept_language  # type: AnyAcceptLanguageHeader
         matched_lang = accepts_lang.lookup(support_lang, default="") or None
@@ -857,7 +865,7 @@ def submit_job(request, reference, tags=None, process_id=None):
         visibility = Visibility.PUBLIC
         is_workflow = False
         is_local = False
-        tags += "remote"
+        tags.append("remote")
     else:  # pragma: no cover
         LOGGER.error("Expected process/service, got: %s", type(reference))
         raise TypeError("Invalid process or service reference to execute job.")
@@ -896,9 +904,12 @@ def submit_job_handler(payload,             # type: ProcessExecution
 
     # non-local is only a reference, no actual process object to validate
     provider_id = provider.id if isinstance(provider, Service) else provider
-    if process and is_local and not isinstance(process, Process):
-        proc_store = db.get_store(StoreProcesses)
-        process = proc_store.fetch_by_id(process)
+    process_id = None
+    if process and not isinstance(process, Process):
+        process_id = process
+        if is_local:
+            proc_store = db.get_store(StoreProcesses)
+            process = proc_store.fetch_by_id(process)
     if process and is_local:
         validate_process_io(process, json_body)
         validate_process_id(process, json_body)
@@ -907,6 +918,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
             "Skipping validation of execution parameters for remote process [%s] on provider [%s]",
             process, provider_id
         )
+    # pass down the specified or resolved reference (possibly with revision tag)
+    process_id = process_id or process.id
 
     headers = headers or {}
     if is_local:
@@ -922,6 +935,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
         # as per https://datatracker.ietf.org/doc/html/rfc7240#section-2
         # Prefer header not resolved with a valid value should still resume without error
         execute_mode = mode
+    validate_process_exec_mode(job_ctl_opts, execute_mode)
+
     accept_type = validate_job_accept_header(headers, mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
@@ -939,7 +954,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     job_inputs = json_body.get("inputs")
     job_outputs = json_body.get("outputs")
     store = db.get_store(StoreJobs)  # type: StoreJobs
-    job = store.save_job(task_id=job_status, process=process, service=provider_id, status=job_status,
+    job = store.save_job(task_id=job_status, process=process_id, service=provider_id, status=job_status,
                          inputs=job_inputs, outputs=job_outputs, is_workflow=is_workflow, is_local=is_local,
                          execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
@@ -999,7 +1014,7 @@ def submit_job_dispatch_task(
             job = store.fetch_by_id(job.id)
             # when sync is successful, it must return the results direct instead of status info
             # see: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execute_response
-            if job.status == Status.SUCCEEDED:
+            if job.success:
                 _, _, sync_applied = parse_prefer_header_execute_mode(req_headers, [ExecuteControlOption.SYNC])
                 if sync_applied:
                     resp_headers.update(sync_applied)
@@ -1080,7 +1095,7 @@ def update_job_parameters(job, request):
                     if value == ExecuteMode.AUTO:
                         continue  # don't override previously set value that resolved with default value by omission
                     if value in [ExecuteMode.ASYNC, ExecuteMode.SYNC]:
-                        job_ctrl_exec = ExecuteControlOption.get(f"{value}-execute")
+                        job_ctrl_exec = ExecuteControlOption.from_mode(value)
                         if job_ctrl_exec not in job_process.jobControlOptions:
                             raise HTTPBadRequest(
                                 json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
@@ -1243,6 +1258,42 @@ def validate_job_accept_header(headers, execution_mode):
     )
 
 
+def validate_process_exec_mode(job_control_options, execution_mode):
+    # type: (List[AnyExecuteControlOption], Optional[AnyExecuteMode]) -> None
+    """
+    Verify that a certain :term:`Job` execution mode fulfills the :term:`Process` ``jobControlOptions`` prerequisite.
+
+    Assumes that any applicable resolution of the :term:`Job` execution mode (header, query, body, etc.)
+    and the relevant control options was already performed by any applicable upstream operations.
+
+    .. seealso::
+        - :ref:`proc_exec_mode`
+        - :func:`parse_prefer_header_execute_mode`
+
+    :raises HTTPUnprocessableEntity: If the execution mode is not permitted by the :term:`Process`.
+    """
+    job_ctrl_exec = ExecuteControlOption.from_mode(execution_mode)
+    if not (job_ctrl_exec in job_control_options or execution_mode in [ExecuteMode.AUTO, None]):
+        raise HTTPUnprocessableEntity(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "InvalidJobControlOptions",
+                    "title": "Invalid Job Execution Mode specified against permitted Process Job Control Options.",
+                    "detail": "Any hint of a job execution strategy must respect the process prerequisites.",
+                    "status": HTTPUnprocessableEntity.code,
+                    "cause": {"name": "process.jobControlOptions"},
+                    "value": repr_json(
+                        {
+                            "process.jobControlOptions": job_control_options,
+                            "job.mode": execution_mode,
+                        },
+                        force_string=False,
+                    ),
+                }
+            )
+        )
+
+
 def validate_process_id(job_process, payload):
     # type: (Process, ProcessExecution) -> None
     """
@@ -1351,21 +1402,25 @@ def validate_process_io(process, payload):
                                 "executionFormats": None,
                             }
                         })
+                # if a media-type was specified, allow it even if not
+                # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                io_accept += any_types
-                if not all(io_fmt in io_accept for io_fmt in io_ctypes):
-                    raise OWSInvalidParameterValue(json={
-                        "code": "InvalidParameterValue",
-                        "name": io_name,
-                        "description": (
-                            f"Submitted '{io_name}' requested Content-Types that do not respect "
-                            "supported formats specified by the process description."
-                        ),
-                        "value": {
-                            "supportedFormats": list(io_accept),
-                            "executionFormats": list(io_ctypes),
-                        }
-                    })
+                if not all(io_fmt in any_types for io_fmt in io_accept):
+                    # otherwise, all formats must be within allowed ones
+                    io_accept += any_types
+                    if not all(io_fmt in io_accept for io_fmt in io_ctypes):
+                        raise OWSInvalidParameterValue(json={
+                            "code": "InvalidParameterValue",
+                            "name": io_name,
+                            "description": (
+                                f"Submitted '{io_name}' requested Content-Types that do not respect "
+                                "supported formats specified by the process description."
+                            ),
+                            "value": {
+                                "supportedFormats": list(io_accept),
+                                "executionFormats": list(io_ctypes),
+                            }
+                        })
 
             if io_type == "inputs":
                 io_min = io_proc["minOccurs"]

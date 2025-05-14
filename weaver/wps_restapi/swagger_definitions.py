@@ -22,6 +22,7 @@ import os
 import re
 from copy import copy
 from decimal import Decimal
+from functools import cache
 from typing import TYPE_CHECKING
 
 import colander
@@ -32,13 +33,9 @@ from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
-from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, jfe
-
-# FIXME: https://github.com/geopython/pygeofilter/pull/102
-from pygeofilter.parsers.fes.parser import parse as fes_parse
+from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__
-from weaver.compat import cache
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
@@ -69,6 +66,18 @@ from weaver.processes.constants import (
     CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
     CWL_NAMESPACE_OGC_API_PROC_PART1_URL,
     CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+    CWL_NAMESPACE_SCHEMA_METADATA_EMAIL,
+    CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+    CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+    CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+    CWL_NAMESPACE_SCHEMA_METADATA_PERSON,
+    CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+    CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
     CWL_NAMESPACE_SCHEMA_URL,
     CWL_NAMESPACE_WEAVER_ID,
     CWL_NAMESPACE_WEAVER_URL,
@@ -102,9 +111,11 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
-    JobStatusSchema,
+    JobStatusProfileSchema,
+    JobStatusType,
     ProcessSchema
 )
+from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
@@ -224,6 +235,7 @@ OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WG
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
 
 OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
 OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
@@ -279,6 +291,30 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
+JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
+JOB_STATUS_FIELD_AFTER = [
+    "jobID",
+    "processID",
+    "providerID",
+    "type",
+    "status",
+    "message",
+    "created",
+    "started",
+    "finished",
+    "updated",
+    "duration",
+    "runningDuration",
+    "runningSeconds",
+    "expirationDate",
+    "estimatedCompletion",
+    "nextPoll",
+    "percentCompleted",
+    "progress",
+    "process",
+    "links",
+]
+
 JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
 JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
@@ -322,6 +358,7 @@ TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
 TAG_STATISTICS = "Statistics"
+TAG_PROVENANCE = "Provenance"
 TAG_VAULT = "Vault"
 TAG_WPS = "WPS"
 TAG_DEPRECATED = "Deprecated Endpoints"
@@ -347,11 +384,21 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
-job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
+job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
 job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
+job_prov_service = Service(name="job_prov", path=f"{job_service.path}/prov")
+job_prov_info_service = Service(name="job_prov_info", path=f"{job_prov_service.path}/info")
+job_prov_who_service = Service(name="job_prov_who", path=f"{job_prov_service.path}/who")
+job_prov_inputs_service = Service(name="job_prov_inputs", path=f"{job_prov_service.path}/inputs")
+job_prov_inputs_run_service = Service(name="job_prov_inputs_run", path=f"{job_prov_service.path}/inputs/{{run_id}}")
+job_prov_outputs_service = Service(name="job_prov_outputs", path=f"{job_prov_service.path}/outputs")
+job_prov_outputs_run_service = Service(name="job_prov_outputs_run", path=f"{job_prov_service.path}/outputs/{{run_id}}")
+job_prov_run_service = Service(name="job_prov_run", path=f"{job_prov_service.path}/run")
+job_prov_run_id_service = Service(name="job_prov_run_id", path=f"{job_prov_service.path}/run/{{run_id}}")
+job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.path}/runs")
 
 processes_service = Service(name="processes", path="/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
@@ -361,6 +408,7 @@ process_estimator_service = Service(name="process_estimator_service", path=f"{pr
 process_visibility_service = Service(name="process_visibility", path=f"{process_service.path}/visibility")
 process_package_service = Service(name="process_package", path=f"{process_service.path}/package")
 process_payload_service = Service(name="process_payload", path=f"{process_service.path}/payload")
+process_execution_service = Service(name="process_execution", path=f"{process_service.path}/execution")
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
@@ -369,23 +417,92 @@ process_outputs_service = Service(name="process_outputs", path=process_service.p
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
-process_execution_service = Service(name="process_execution", path=f"{process_service.path}/execution")
+process_prov_service = Service(name="process_prov", path=process_service.path + job_prov_service.path)
+process_prov_info_service = Service(name="process_prov_info", path=process_service.path + job_prov_info_service.path)
+process_prov_who_service = Service(name="process_prov_who", path=process_service.path + job_prov_who_service.path)
+process_prov_inputs_service = Service(
+    name="process_prov_inputs",
+    path=process_service.path + job_prov_inputs_service.path,
+)
+process_prov_inputs_run_service = Service(
+    name="process_prov_inputs_run",
+    path=process_service.path + job_prov_inputs_run_service.path,
+)
+process_prov_outputs_service = Service(
+    name="process_prov_outputs",
+    path=process_service.path + job_prov_outputs_service.path,
+)
+process_prov_outputs_run_service = Service(
+    name="process_prov_outputs_run",
+    path=process_service.path + job_prov_outputs_run_service.path,
+)
+process_prov_run_service = Service(
+    name="process_prov_run",
+    path=process_service.path + job_prov_run_service.path,
+)
+process_prov_run_id_service = Service(
+    name="process_prov_run_id",
+    path=process_service.path + job_prov_run_id_service.path,
+)
+process_prov_runs_service = Service(
+    name="process_prov_runs",
+    path=process_service.path + job_prov_runs_service.path,
+)
 
 providers_service = Service(name="providers", path="/providers")
 provider_service = Service(name="provider", path=f"{providers_service.path}/{{provider_id}}")
 provider_processes_service = Service(name="provider_processes", path=provider_service.path + processes_service.path)
 provider_process_service = Service(name="provider_process", path=provider_service.path + process_service.path)
 provider_process_package_service = Service(name="provider_process_pkg", path=f"{provider_process_service.path}/package")
+provider_execution_service = Service(name="provider_execution", path=f"{provider_process_service.path}/execution")
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
+provider_exceptions_service = Service(
+    name="provider_exceptions",
+    path=provider_service.path + process_exceptions_service.path,
+)
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_stats_service = Service(name="provider_stats", path=provider_service.path + process_stats_service.path)
-provider_exceptions_service = Service(name="provider_exceptions",
-                                      path=provider_service.path + process_exceptions_service.path)
-provider_execution_service = Service(name="provider_execution", path=f"{provider_process_service.path}/execution")
+provider_prov_service = Service(name="provider_prov", path=provider_service.path + process_prov_service.path)
+provider_prov_info_service = Service(
+    name="provider_prov_info",
+    path=provider_service.path + process_prov_info_service.path,
+)
+provider_prov_who_service = Service(
+    name="provider_prov_who",
+    path=provider_service.path + process_prov_who_service.path,
+)
+provider_prov_inputs_service = Service(
+    name="provider_prov_inputs",
+    path=provider_service.path + process_prov_inputs_service.path,
+)
+provider_prov_inputs_run_service = Service(
+    name="provider_prov_inputs_run",
+    path=provider_service.path + process_prov_inputs_run_service.path,
+)
+provider_prov_outputs_service = Service(
+    name="provider_prov_outputs",
+    path=provider_service.path + process_prov_outputs_service.path,
+)
+provider_prov_outputs_run_service = Service(
+    name="provider_prov_outputs_run",
+    path=provider_service.path + process_prov_outputs_run_service.path,
+)
+provider_prov_run_service = Service(
+    name="provider_prov_run",
+    path=provider_service.path + process_prov_run_service.path,
+)
+provider_prov_run_id_service = Service(
+    name="provider_prov_run_id",
+    path=provider_service.path + process_prov_run_id_service.path,
+)
+provider_prov_runs_service = Service(
+    name="provider_prov_runs",
+    path=provider_service.path + process_prov_runs_service.path,
+)
 
 # backward compatibility deprecated routes
 job_result_service = Service(name="job_result", path=f"{job_service.path}/result")
@@ -703,6 +820,12 @@ class ResponseContentTypeHeader(ContentTypeHeader):
     ])
 
 
+class ResponseContentTypePlainTextHeader(ContentTypeHeader):
+    example = ContentType.TEXT_PLAIN
+    default = ContentType.TEXT_PLAIN
+    validator = OneOf([ContentType.TEXT_PLAIN])
+
+
 class PreferHeader(ExtendedSchemaNode):
     summary = "Header that describes job execution parameters."
     description = (
@@ -729,6 +852,13 @@ class ResponseHeaders(ExtendedMappingSchema):
     Headers describing resulting response.
     """
     content_type = ResponseContentTypeHeader()
+
+
+class ResponsePlainTextHeaders(ResponseHeaders):
+    """
+    Headers describing resulting response.
+    """
+    content_type = ResponseContentTypePlainTextHeader()
 
 
 class RedirectHeaders(ResponseHeaders):
@@ -1542,7 +1672,7 @@ class FilterSchema(ExtendedMappingSchema):
         elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
             parsed_expr = ecql.parse(filter_expr)
         elif filter_lang == "fes":
-            parsed_expr = fes_parse(filter_expr)  # FIXME: https://github.com/geopython/pygeofilter/pull/102
+            parsed_expr = fes.parse(filter_expr)
         elif filter_lang == "jfe":
             parsed_expr = jfe.parse(filter_expr)
         if not parsed_expr:
@@ -2192,7 +2322,7 @@ class JobTypeEnum(ExtendedSchemaNode):
     title = "JobType"
     default = null
     example = "process"
-    validator = OneOf(["process", "provider", "service"])
+    validator = OneOf(JobStatusType.values())
 
 
 class JobTitle(ExtendedSchemaNode):
@@ -3124,7 +3254,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3279,12 +3409,12 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     description = "Selects the schema employed for representation of returned job status response."
     schema_type = String
     title = "JobStatusQuerySchema"
-    example = JobStatusSchema.OGC
-    default = JobStatusSchema.OGC
-    validator = OneOfCaseInsensitive(JobStatusSchema.values())
+    example = JobStatusProfileSchema.OGC
+    default = JobStatusProfileSchema.OGC
+    validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
 
 
-class GetJobQuery(ExtendedMappingSchema):
+class GetJobQuery(FormatQuery):
     schema = JobStatusQueryProfileSchema(missing=drop)
     profile = JobStatusQueryProfileSchema(missing=drop)
 
@@ -3746,8 +3876,18 @@ class DurationISO(ExtendedSchemaNode):
         return cstruct
 
 
+class JobProcess(AnyOfKeywordSchema):
+    _any_of = [
+        ReferenceURL(),
+        PermissiveMappingSchema(),
+    ]
+
+
 class JobStatusInfo(ExtendedMappingSchema):
     _schema = OGC_API_SCHEMA_JOB_STATUS_URL
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
@@ -3782,6 +3922,7 @@ class JobStatusInfo(ExtendedMappingSchema):
                               description="Completion percentage of the job as indicated by the process.")
     progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
                                   description="Completion progress of the job (alias to 'percentCompleted').")
+    process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
 
 
@@ -3804,7 +3945,7 @@ class CreatedJobStatusSchema(DescriptionSchema):
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
-    location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
+    location = ExtendedSchemaNode(String(), example="https://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
 
 
 class PagingBodySchema(ExtendedMappingSchema):
@@ -5752,17 +5893,71 @@ class CWLSchemas(ExtendedSequenceSchema):
     url = URL(title="CWLSchemaURL", description="Schema reference for the CWL definition.")
 
 
-class CWLMetadata(ExtendedMappingSchema):
+class CWLPerson(PermissiveMappingSchema):
+    _sort_first = [
+        "class",
+        CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+        CWL_NAMESPACE_SCHEMA_METADATA_EMAIL,
+        CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+    ]
+    _class = ExtendedSchemaNode(
+        String(),
+        name="class",
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_METADATA_PERSON]),
+        description="Author of the Application Package.",
+    )
+    _id = URI(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER,
+        description="Reference identifier of the person. Typically, an ORCID URI.",
+        missing=drop,
+    )
+    name = ExtendedSchemaNode(
+        String(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+        description="Name of the person.",
+        missing=drop,
+    )
+    email = ExtendedSchemaNode(
+        String(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_NAME,
+        description="Email of the person.",
+        missing=drop,
+    )
+
+
+class CWLAuthors(ExtendedSequenceSchema):
+    item = CWLPerson()
+    validator = Length(min=1)
+
+
+class CWLDateCreated(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(
+            DateTime(),
+            name=CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+            format="date-time",
+            description="Date-time of creation in ISO-8601 format.",
+        )
+    ]
+
+
+class CWLMetadata(PermissiveMappingSchema):
     _sort_first = [
         "cwlVersion",
         "class",
         "id",
-        "version",
         "label",
         "doc",
         "intent",
-        f"{CWL_NAMESPACE_SCHEMA_ID}:author",
-        f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
+        "version",
+        CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+        CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+        CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+        CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+        CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+        CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
     ]
     _sort_after = ["$namespaces", "$schemas"]
 
@@ -5770,16 +5965,43 @@ class CWLMetadata(ExtendedMappingSchema):
     label = ExtendedSchemaNode(String(), missing=drop)
     doc = ExtendedSchemaNode(String(), missing=drop)
     intent = ExtendedSchemaNode(String(), missing=drop)
-    author = ExtendedSchemaNode(
-        String(),
-        name=f"{CWL_NAMESPACE_SCHEMA_ID}:author",
+    version = Version(missing=drop)
+    s_version = Version(missing=drop, name=CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
+
+    author = CWLAuthors(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
         missing=drop,
-        description="Author of the Application Package.",
+        description="Author(s) of the Application Package.",
+    )
+    contributor = CWLAuthors(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+        missing=drop,
+        description="Contributor(s) of the Application Package.",
     )
     keywords = KeywordList(
-        name=f"{CWL_NAMESPACE_SCHEMA_ID}:keywords",
+        name=CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
         missing=drop,
         description="Keywords applied to the Application Package.",
+    )
+    license = URL(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+        missing=drop,
+        description=(
+            "License related to the Application Package. "
+            "Preferably an URL to the specific license, but generic license URL is allowed."
+        ),
+    )
+    code_repo = URL(
+        name=CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+        missing=drop,
+        description="URL to the original code repository providing the Application Package.",
+    )
+    date_created = ExtendedSchemaNode(
+        DateTime(),
+        name=CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+        format="date-time",
+        missing=drop,
+        description="Date-time of creation in ISO-8601 format.",
     )
     namespaces = CWLNamespaces(missing=drop)
     schemas = CWLSchemas(missing=drop)
@@ -5828,7 +6050,7 @@ class CWLTool(PermissiveMappingSchema):
 class CWLWorkflowStepRunDefinition(AnyOfKeywordSchema):
     _any_of = [
         AnyIdentifier(
-            title="CWLWorkflowStepRunID",
+            title="CWLWorkflowSteprun_id",
             description="Reference to local process ID, with or without '.cwl' extension."
         ),
         CWLFileName(),
@@ -6305,8 +6527,23 @@ class JobStatisticsSchema(ExtendedMappingSchema):
 class FrontpageParameterSchema(ExtendedMappingSchema):
     name = ExtendedSchemaNode(String(), example="api")
     enabled = ExtendedSchemaNode(Boolean(), example=True)
-    url = URL(description="Referenced parameter endpoint.", example="https://weaver-host", missing=drop)
-    doc = ExtendedSchemaNode(String(), example="https://weaver-host/api", missing=drop)
+    url = URL(
+        description="Referenced parameter endpoint. Root URL when the functionality implies multiple endpoints.",
+        example="https://weaver-host",
+        missing=drop,
+    )
+    doc = ExtendedSchemaNode(
+        String(),
+        description="Endpoint where additional documentation can be found about the functionality.",
+        example="https://weaver-host/api",
+        missing=drop
+    )
+    api = URL(
+        String(),
+        description="OpenAPI documentation endpoint about the functionality.",
+        example="https://weaver-host/api",
+        missing=drop,
+    )
 
 
 class FrontpageParameters(ExtendedSequenceSchema):
@@ -7584,6 +7821,82 @@ class GoneJobResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
+class JobProvAcceptHeader(AcceptHeader):
+    validator = OneOf(ProvenanceFormat.media_types())
+
+
+class JobProvRequestHeaders(RequestHeaders):
+    accept = JobProvAcceptHeader()
+
+
+class JobProvEndpoint(JobPath):
+    header = JobProvRequestHeaders()
+    querystring = FormatQuery()
+
+
+class ProcessJobProvEndpoint(JobProvEndpoint, LocalProcessPath):
+    pass
+
+
+class ProviderJobProvEndpoint(JobProvEndpoint, ProviderProcessPath):
+    pass
+
+
+class OkGetJobProvResponseHeaders(ResponseHeaders):
+    content_type = JobProvAcceptHeader()
+
+
+class OkGetJobProvResponse(ExtendedMappingSchema):
+    description = "Job provenance details in the requested format."
+    header = OkGetJobProvResponseHeaders()
+
+
+class JobProvMetadataRequestHeaders(ExtendedMappingSchema):
+    accept = ResponseContentTypePlainTextHeader()
+
+
+class JobProvMetadataEndpoint(JobPath):
+    header = JobProvMetadataRequestHeaders()
+
+
+class ProcessJobProvMetadataEndpoint(JobProvMetadataEndpoint, LocalProcessPath):
+    pass
+
+
+class ProviderJobProvMetadataEndpoint(JobProvMetadataEndpoint, ProviderProcessPath):
+    pass
+
+
+class JobProvMetadataResponseBody(ExtendedSchemaNode):
+    schema_type = String
+    description = "Multipart file contents for upload to the vault."
+
+
+class OkGetJobProvMetadataResponse(ExtendedMappingSchema):
+    description = "Job execution provenance metadata relative to the contextual request path."
+    header = ResponsePlainTextHeaders()
+    body = JobProvMetadataResponseBody()
+
+
+class NotFoundJobProvResponseSchema(NotFoundResponseSchema):
+    description = (
+        "Job reference UUID cannot be found, or a specified provenance "
+        "run UUID cannot be retrieved from the Workflow execution steps."
+    )
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class GoneJobProvResponseSchema(ExtendedMappingSchema):
+    description = (
+        "Job reference contents have been removed or does not contain PROV metadata. "
+        "This could be because the job was created before provenance support was enabled, "
+        "or because a job retention period deleted the contents."
+    )
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class OkGetJobInputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = JobInputsBody()
@@ -8103,8 +8416,8 @@ delete_jobs_responses = {
     "406": NotAcceptableErrorResponseSchema(),
     "422": UnprocessableEntityResponseSchema(),
 }
-get_prov_all_jobs_responses = copy(get_all_jobs_responses)
-get_prov_all_jobs_responses.update({
+get_provider_all_jobs_responses = copy(get_all_jobs_responses)
+get_provider_all_jobs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_single_job_status_responses = {
@@ -8124,8 +8437,8 @@ get_single_job_status_responses = {
     "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_single_job_status_responses = copy(get_single_job_status_responses)
-get_prov_single_job_status_responses.update({
+get_provider_single_job_status_responses = copy(get_single_job_status_responses)
+get_provider_single_job_status_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 patch_job_responses = {
@@ -8153,8 +8466,8 @@ delete_job_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-delete_prov_job_responses = copy(delete_job_responses)
-delete_prov_job_responses.update({
+delete_provider_job_responses = copy(delete_job_responses)
+delete_provider_job_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_job_inputs_responses = {
@@ -8170,8 +8483,8 @@ get_job_inputs_responses = {
     "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_inputs_responses = copy(get_job_inputs_responses)
-get_prov_inputs_responses.update({
+get_provider_inputs_responses = copy(get_job_inputs_responses)
+get_provider_inputs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_job_outputs_responses = {
@@ -8188,8 +8501,8 @@ get_job_outputs_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_outputs_responses = copy(get_job_outputs_responses)
-get_prov_outputs_responses.update({
+get_provider_outputs_responses = copy(get_job_outputs_responses)
+get_provider_outputs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_result_redirect_responses = {
@@ -8210,11 +8523,11 @@ get_job_results_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_results_responses = copy(get_job_results_responses)
-get_prov_results_responses.update({
+get_provider_results_responses = copy(get_job_results_responses)
+get_provider_results_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
-get_exceptions_responses = {
+get_job_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
         "JobExceptions": {
             "summary": "Job exceptions that occurred during failing process execution.",
@@ -8228,11 +8541,11 @@ get_exceptions_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_exceptions_responses = copy(get_exceptions_responses)
-get_prov_exceptions_responses.update({
+get_provider_exceptions_responses = copy(get_job_exceptions_responses)
+get_provider_exceptions_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
-get_logs_responses = {
+get_job_logs_responses = {
     "200": OkGetJobLogsResponse(description="success", examples={
         "JobLogs": {
             "summary": "Job logs registered and captured throughout process execution.",
@@ -8246,11 +8559,11 @@ get_logs_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_logs_responses = copy(get_logs_responses)
-get_prov_logs_responses.update({
+get_provider_logs_responses = copy(get_job_logs_responses)
+get_provider_logs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
-get_stats_responses = {
+get_job_stats_responses = {
     "200": OkGetJobStatsResponse(description="success", examples={
         "JobStatistics": {
             "summary": "Job statistics collected following process execution.",
@@ -8264,10 +8577,58 @@ get_stats_responses = {
     "410": GoneJobResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_prov_stats_responses = copy(get_stats_responses)
-get_prov_stats_responses.update({
+get_provider_stats_responses = copy(get_job_stats_responses)
+get_provider_stats_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+get_job_prov_responses = {
+    "200": OkGetJobProvResponse(
+        description="Successful job PROV details.",
+        examples={
+            "PROV-JSON": {
+                "summary": "Provenance details returned in PROV-JSON format.",
+                "value": EXAMPLES["job_prov.json"],
+            },
+            "PROV-N": {
+                "summary": "Provenance details returned in PROV-N format.",
+                "value": EXAMPLES["job_prov.txt"],
+            },
+            "PROV-XML": {
+                "summary": "Provenance details returned in PROV-XML format.",
+                "value": EXAMPLES["job_prov.xml"],
+            }
+        }
+    ),
+    "400": InvalidJobResponseSchema(),
+    "404": NotFoundJobProvResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobProvResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_job_prov_metadata_responses = {
+    "200": OkGetJobProvMetadataResponse(
+        description="Successful job PROV metadata retrieval.",
+        examples={
+            "PROV run": {
+                "summary": "Provenance metadata of the run execution.",
+                "value": EXAMPLES["job_prov_run.txt"],
+            },
+            "PROV who": {
+                "summary": "Provenance metadata of who ran the job.",
+                "value": EXAMPLES["job_prov_who.txt"],
+            },
+            "PROV info": {
+                "summary": "Provenance metadata about the Research Object packaging information.",
+                "value": EXAMPLES["job_prov_info.txt"],
+            }
+        }
+    ),
+    "400": InvalidJobResponseSchema(),
+    "404": NotFoundJobProvResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobProvResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "405": MethodNotAllowedErrorResponseSchema(),

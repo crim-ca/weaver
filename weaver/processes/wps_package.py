@@ -11,7 +11,6 @@ generate :term:`ADES`/:term:`EMS` deployable :term:`Application Package`.
     - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
     - :mod:`weaver.wps_restapi.api` conformance details
 """
-
 import copy
 import json
 import logging
@@ -21,6 +20,7 @@ import sys
 import tempfile
 import time
 import uuid
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import parse_qsl, urlparse
 
@@ -30,10 +30,12 @@ import cwltool.docker
 import cwltool.process
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
+from cwltool.cwlprov.writablebagfile import close_ro, packed_workflow
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
+from pyramid.settings import asbool
 from pywps import Process
 from pywps.inout.basic import SOURCE_TYPE, DataHandler, FileHandler, IOHandler, NoneIOHandler
 from pywps.inout.formats import Format
@@ -47,7 +49,6 @@ from pywps.validator.base import emptyvalidator
 from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 
-from weaver.compat import cache
 from weaver.config import WeaverConfiguration, WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import DockerAuthentication
@@ -74,6 +75,16 @@ from weaver.formats import (
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
+    CWL_NAMESPACE_SCHEMA_ID,
+    CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_PERSON,
+    CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+    CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED,
+    CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+    CWL_NAMESPACE_SCHEMA_URL,
     CWL_NAMESPACE_WEAVER_DEFINITION,
     CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -118,6 +129,7 @@ from weaver.processes.convert import (
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import load_package_file, map_progress, pull_docker
+from weaver.provenance import WeaverResearchObject
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import (
@@ -226,16 +238,6 @@ PACKAGE_PROGRESS_PREP_OUT = 98
 PACKAGE_PROGRESS_DONE = 100
 
 PACKAGE_SCHEMA_CACHE = {}  # type: Dict[str, Tuple[str, str]]
-
-SUPPORTED_METADATA_MAPPING = [
-    "s:author",
-    "s:citation",
-    "s:codeRepository",
-    "s:contributor",
-    "s:dateCreated",
-    "s:license",
-    "s:releaseNotes",
-]
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -772,81 +774,124 @@ def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
             _get_package_io(package_factory, io_select=IO_OUTPUT, as_json=as_json))
 
 
-def _update_package_metadata(wps_package_metadata, cwl_package_package):
+def _update_package_metadata(wps_metadata, cwl_package):
     # type: (JSON, CWL) -> None
     """
     Updates the package :term:`WPS` metadata dictionary from extractable `CWL` package definition.
     """
-    wps_package_metadata["title"] = wps_package_metadata.get("title", cwl_package_package.get("label", ""))
-    wps_package_metadata["abstract"] = wps_package_metadata.get("abstract", cwl_package_package.get("doc", ""))
+    wps_metadata["title"] = wps_metadata.get("title", cwl_package.get("label", ""))
+    wps_metadata["abstract"] = wps_metadata.get("abstract", cwl_package.get("doc", ""))
 
     if (
-        "$schemas" in cwl_package_package
-        and isinstance(cwl_package_package["$schemas"], list)
-        and "$namespaces" in cwl_package_package
-        and isinstance(cwl_package_package["$namespaces"], dict)
+        CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS in cwl_package and
+        isinstance(cwl_package[CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS], list)
     ):
-        metadata = wps_package_metadata.get("metadata", [])
-        namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"]}
-        for schema in cwl_package_package["$schemas"]:
-            for namespace_url in namespaces_inv:
-                if schema.startswith(namespace_url):
-                    metadata.append({"title": namespaces_inv[namespace_url], "href": schema})
-        wps_package_metadata["metadata"] = metadata
-
-    if "s:keywords" in cwl_package_package and isinstance(cwl_package_package["s:keywords"], list):
-        wps_package_metadata["keywords"] = list(
-            set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
+        wps_metadata["keywords"] = list(
+            set(wps_metadata.get("keywords", [])) |
+            set(cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS, []))
         )
 
     # specific use case with a different mapping
     # https://docs.ogc.org/bp/20-089r1.html#toc31
-    if "s:version" in cwl_package_package or "s:softwareVersion" in cwl_package_package:
+    if (
+        CWL_NAMESPACE_SCHEMA_METADATA_VERSION in cwl_package or
+        CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION in cwl_package
+    ):
         version_value = (
-            wps_package_metadata.get("version")
-            or cwl_package_package.get("s:version")
-            or cwl_package_package.get("s:softwareVersion")
+            wps_metadata.get("version")
+            or cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_VERSION)
+            or cwl_package.get(CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION)
         )
         # Only set the key if version_value is not empty or null
         if version_value:
-            wps_package_metadata["version"] = str(version_value)
+            wps_metadata["version"] = str(version_value)
     else:
-        version_value = wps_package_metadata.get("version")
+        version_value = wps_metadata.get("version")
         if version_value:
-            wps_package_metadata["version"] = str(version_value)
+            wps_metadata["version"] = str(version_value)
 
-    for metadata_mapping in SUPPORTED_METADATA_MAPPING:
-        if metadata_mapping in cwl_package_package:
-            metadata = wps_package_metadata.get("metadata", [])
+    schema_ns = f"{CWL_NAMESPACE_SCHEMA_ID}:"
+    metadata = wps_metadata.get("metadata", [])
+    for meta_name in CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED:
+        if meta_name in [  # skip handled above
+            CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+            CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+            CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+        ]:
+            continue
+
+        meta_uri = meta_name.replace(schema_ns, CWL_NAMESPACE_SCHEMA_URL)
+
+        # CWL package => WPS context
+        if meta_name in cwl_package:
             if (
-                isinstance((cwl_package_package[metadata_mapping]), str)
-                and urlparse(cwl_package_package[metadata_mapping]).scheme != ""
+                isinstance(cwl_package[meta_name], str)
+                and urlparse(cwl_package[meta_name]).scheme != ""
             ):
-                url = cwl_package_package[metadata_mapping]
-                if metadata_mapping == "s:codeRepository":
-                    type = "text/html"
+                url = cwl_package[meta_name]
+                if meta_name == CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY:
+                    ctype = ContentType.TEXT_HTML
                 else:
-                    type = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
+                    ctype = get_content_type(os.path.splitext(url)[-1], default=ContentType.TEXT_PLAIN)
                 metadata.append({
-                    "type": type,
-                    "rel": metadata_mapping.strip("s:"),
-                    "href": cwl_package_package[metadata_mapping]
+                    "type": ctype,
+                    "rel": meta_uri,
+                    "href": cwl_package[meta_name]
+                })
+            elif isinstance(cwl_package[meta_name], str):
+                metadata.append({
+                    "role": meta_uri,
+                    "value": cwl_package[meta_name]
                 })
             else:
-                for objects in cwl_package_package[metadata_mapping]:
-                    class_name = objects["class"].strip("s:")
+                for objects in cwl_package[meta_name]:
+                    class_name = objects["class"].strip(schema_ns)
                     value = {
-                        "$schema": f"https://schema.org/{class_name}"
+                        "$schema": f"{CWL_NAMESPACE_SCHEMA_URL}{class_name}"
                     }
                     for key, val in objects.items():
-                        if key.startswith("s:"):
-                            value[key.strip("s:")] = val
+                        if key.startswith(schema_ns):
+                            value[key.strip(schema_ns)] = val
                     metadata.append({
-                        "role": metadata_mapping.strip("s:"),
+                        "role": meta_uri,
                         "value": value
                     })
+            wps_metadata["metadata"] = metadata
 
-            wps_package_metadata["metadata"] = metadata
+        # CWL package <= WPS context
+        # note:
+        #   this mapping is accomplished only if the CWL did not already result in creating the other mapping
+        #   purposely avoid overriding a field already provided in CWL (the "truth"), even if they mismatch
+        #   this could be done on purpose, such as attributing different authors for the process vs package
+        else:
+            metadata_found = [meta for meta in metadata if (meta.get("role") or meta.get("rel")) == meta_uri]
+            if not metadata_found:
+                continue
+            metadata_found = copy.deepcopy(metadata_found)
+            if meta_name in [CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR, CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR]:
+                for meta in metadata_found:
+                    if "value" not in meta or not isinstance(meta["value"], dict):
+                        continue  # pragma: no cover  # sanity check, should not happen (fails validation)
+                    meta_schema = meta.get("$schema", "").replace(CWL_NAMESPACE_SCHEMA_URL, schema_ns)
+                    meta_schema = meta_schema or CWL_NAMESPACE_SCHEMA_METADATA_PERSON
+                    meta["class"] = meta_schema
+                    meta.pop("role", None)
+                    meta.pop("$schema", None)
+                    meta["value"].pop("$schema", None)
+                    meta_value = meta.pop("value")
+                    for field in list(meta_value):
+                        field_ns = f"{CWL_NAMESPACE_SCHEMA_ID}:{field}"
+                        meta[field_ns] = meta_value.pop(field)
+                cwl_package[meta_name] = metadata_found
+
+            # all other fields must be a single string
+            # ignore others to avoid injecting unknown structures that could break the CWL
+            elif len(metadata_found) == 1:
+                meta_key = get_any_value(metadata_found[0], key=True)
+                meta_value = metadata_found[0][meta_key]
+                if not isinstance(meta_value, str):
+                    continue  # pragma: no cover  # sanity check, should not happen (fails validation)
+                cwl_package[meta_name] = meta_value
 
 
 def _patch_wps_process_description_url(reference, process_hint):
@@ -1768,6 +1813,50 @@ class WpsPackage(Process):
         }
         return runtime_params
 
+    def setup_provenance(self, loading_context, runtime_context):
+        # type: (LoadingContext, RuntimeContext) -> None
+        """
+        Configure ``PROV`` runtime options.
+
+        .. seealso::
+            - https://www.w3.org/TR/prov-overview/
+            - https://cwltool.readthedocs.io/en/latest/CWLProv.html
+            - https://docs.ogc.org/DRAFTS/24-051.html#_requirements_class_provenance
+        """
+        weaver_cwl_prov = asbool(self.settings.get("weaver.cwl_prov", True))
+        if not weaver_cwl_prov:
+            loading_context.research_obj = None
+            runtime_context.research_obj = None
+            runtime_context.prov_obj = None
+            return
+
+        runtime_context.prov_user = loading_context.user_provenance = True
+        runtime_context.prov_host = loading_context.host_provenance = True
+
+        if not runtime_context.research_obj:
+            ro = WeaverResearchObject(
+                self.job,  # align the RO definition with the job (make the UUIDs equal)
+                self.settings,
+                runtime_context.make_fs_access(""),
+                temp_prefix_ro=runtime_context.tmpdir_prefix,
+                orcid=runtime_context.orcid,
+                full_name=runtime_context.cwl_full_name,
+            )
+
+            loading_context.research_obj = ro
+            runtime_context.research_obj = ro
+
+    def finalize_provenance(self, runtime_context):
+        # type: (RuntimeContext) -> None
+        if runtime_context.research_obj:
+            # perform packaging of the workflow
+            packed_wf_str = repr_json(self.package, force_string=True, indent=2)
+            packed_workflow(runtime_context.research_obj, packed_wf_str)
+
+            # sign-off and persist completed PROV
+            prov_dir = self.job.prov_path(self.settings)
+            close_ro(runtime_context.research_obj, prov_dir)
+
     def update_requirements(self):
         # type: () -> None
         """
@@ -1896,8 +1985,8 @@ class WpsPackage(Process):
                 level=logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
             )
 
-    def update_status(self, message, progress, status, error=None):
-        # type: (str, Number, AnyStatusType, Optional[Exception]) -> None
+    def update_status(self, message, progress, status, error=None, step=False):
+        # type: (str, Number, AnyStatusType, Optional[Exception], bool) -> None
         """
         Updates the :mod:`pywps` real job status from a specified parameters.
         """
@@ -1918,7 +2007,7 @@ class WpsPackage(Process):
             # therefore, use the '_update_status' to enforce the status
             # using protected method also avoids weird overrides of progress
             # percent on failure and final 'success' status
-            self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
+            self.response._update_status(pywps_status_id, message, self.percent, clean=not step)  # noqa: W0212
 
         if isinstance(error, Exception):
             self.exception_message(exception_type=type(error), exception=error,
@@ -1936,11 +2025,17 @@ class WpsPackage(Process):
                            status,                  # type: AnyStatusType
                            error=None,              # type: Optional[Exception]
                            ):                       # type: (...) -> None
+        # ensure the status of the current workflow is not changed to 'success' if up a step-update
+        # setting to 'success' will report the wrong value in the status XML document
+        # this would also trigger cleanup, which would remove an staged file needed by a future step
+        if status == Status.SUCCEEDED:
+            status = Status.RUNNING
         self.update_status(
             message=f"[provider: {target_host}, step: {step_name}] - {str(message).strip()}",
             progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
             error=error,
+            step=True,
         )
 
     def log(self, level, message, *args, **kwargs):
@@ -2064,13 +2159,10 @@ class WpsPackage(Process):
             elif config == WeaverConfiguration.HYBRID:
                 self.remote_execution = problem_needs_remote is not None
 
+            loading_context = LoadingContext()
             if self.remote_execution:
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS
-                loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
-            else:
-                # ADES/Hybrid execute the CWL/AppPackage locally
-                loading_context = None
 
             self.update_effective_user()
             self.update_requirements()
@@ -2083,6 +2175,7 @@ class WpsPackage(Process):
             )
             runtime_context = RuntimeContext(kwargs=runtime_params)
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
+            self.setup_provenance(loading_context, runtime_context)
             try:
                 self.step_launched = []
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -2154,6 +2247,15 @@ class WpsPackage(Process):
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, Status.RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+            try:
+                self.finalize_provenance(runtime_context)
+            except Exception as exc:  # pragma: no cover  # only safeguard, it's good if this branch never occurs!
+                self.exception_message(
+                    PackageExecutionError,
+                    exc,
+                    "Failed to save package PROV metadata. Ignoring error to avoid failing execution.",
+                    level=logging.WARN,
+                )
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             log_url = f"{get_wps_output_url(self.settings)}/{self.uuid}.log"
@@ -2698,6 +2800,11 @@ class WpsPackage(Process):
                             else:
                                 output.data_format.validate = format_extension_validator
                         return
+
+        # if the format is the "any" media-type default, allow override by explicit format defined by the result
+        if output.data_format.mime_type in [ContentType.TEXT_PLAIN, ContentType.ANY] and output.data_format.default:
+            output.supported_formats = (result_format_base, )
+            output.data_format = result_format_base
 
         # no match found, minimally check for extension
         if output.valid_mode != MODE.NONE and output.validator is emptyvalidator:

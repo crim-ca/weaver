@@ -20,7 +20,7 @@
         <ul>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>.
+                    Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
             ${util.get_paging_links()}

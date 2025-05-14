@@ -9,10 +9,8 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 5.9.0
+APP_VERSION ?= 6.6.0
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
-DOCKER_REPO ?= pavics/weaver
-#DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -90,6 +88,7 @@ endif
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
+ARCHIVE_DIR := $(APP_ROOT)/archive
 
 # end of configuration
 
@@ -186,7 +185,7 @@ conda-base:		## obtain and install a missing conda distribution
 		 echo "Make sure to add '$(CONDA_BIN_DIR)' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-clean
-clean-clean: 	## remove the conda environment
+conda-clean: 	## remove the conda environment
 	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n "$(CONDA_ENV)" --yes --all
 
@@ -300,7 +299,14 @@ install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint	## in
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-dist clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+clean-all: clean-archive clean-build clean-cache clean-dist clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
+
+.PHONY: clean-archive
+clean-archive:	## remove archive files and directories
+	@-echo "Removing archives..."
+	@-rm "$(APP_ROOT)"/*.tar.gz
+	@-rm "$(APP_ROOT)"/*.zip
+	@-rm -fr "$(ARCHIVE_DIR)"
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -337,8 +343,8 @@ clean-docs-dirs:	## remove documentation artifacts (minimal)
 clean-src:		## remove all *.pyc files
 	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
-	@-rm -rf ./build
-	@-rm -rf ./src
+	@-rm -rf "$(APP_ROOT)/build"
+	@-rm -rf "$(APP_ROOT)/src"
 
 .PHONY: clean-test
 clean-test:		## remove files created by tests and coverage analysis
@@ -375,11 +381,27 @@ ifeq ($(filter $(TEST_VERBOSITY),"--capture"),)
   endif
 endif
 
+TEST_PROFILE ?= true
+ifneq ($(filter "$(TEST_PROFILE)","true"),)
+  override TEST_PROFILE_ARGS = --profile --profile-svg --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
+endif
+
+TEST_XARGS ?=
+override TEST_XARGS := $(TEST_VERBOSITY) $(TEST_PROFILE_ARGS) $(TEST_XARGS)
+
 # autogen tests variants with pre-install of dependencies using the '-only' target references
 TESTS := unit func cli workflow online offline no-tb14 spec coverage
 TESTS := $(addprefix test-, $(TESTS))
 
 $(TESTS): test-%: install-dev test-%-only
+
+define run_test =
+	$(eval $@_PYTEST_JUNIT = --junitxml "$(REPORTS_DIR)/test-results.xml")
+	$(eval $@_PYTEST_CASE = $(1))
+	$(eval $@_PYTEST_CMD = pytest tests ${$@_PYTEST_CASE} $(TEST_XARGS) ${$@__PYTEST_JUNIT})
+	@echo ">" '${$@_PYTEST_CMD}'
+	@bash -c '${$@_PYTEST_CMD}'
+endef
 
 .PHONY: test
 test: clean-test test-all   ## alias for 'test-all' target
@@ -390,57 +412,48 @@ test-all: install-dev test-only		## run all tests (including long running tests)
 .PHONY: test-only
 test-only: mkdir-reports			## run all tests but without prior validation of installed dependencies
 	@echo "Running all tests (including slow and online tests)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		--junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,)
 
 .PHONY: test-unit-only
 test-unit-only: mkdir-reports 		## run unit tests (skip long running and online tests)
 	@echo "Running unit tests (skip slow and online tests)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not slow and not online and not functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not slow and not online and not functional")
 
 .PHONY: test-func-only
 test-func-only: mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "functional")
 
 .PHONY: test-cli-only
 test-cli-only: mkdir-reports   		## run WeaverClient and CLI tests
 	@echo "Running CLI tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "cli" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "cli")
 
 .PHONY: test-workflow-only
 test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
 	@echo "Running workflow tests..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "workflow")
 
 .PHONY: test-online-only
 test-online-only: mkdir-reports  	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "online")
 
 .PHONY: test-offline-only
 test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not online")
 
 .PHONY: test-no-tb14-only
 test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "not testbed14" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-m "not testbed14")
 
 .PHONY: test-spec-only
 test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
 	@[ "${SPEC}" ] || ( echo ">> 'SPEC' is not set"; exit 1 )
-	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-k "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+	@$(call run_test,-k "${SPEC}")
 
 .PHONY: test-smoke
 test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of built docker images
@@ -448,10 +461,22 @@ test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of bu
 .PHONY: test-docker
 test-docker: docker-test    ## alias to 'docker-test' execution smoke test of built docker images
 
+# NOTE:
+#	if any test fails during coverage run, pytest exit code will be propagated to allow reporting of the failure
+#	this will cause coverage analysis reporting to be skipped from early exit from the failure
+#	if coverage reporting is still needed although failed tests occurred, call 'coverage-reports' target separately
 .PHONY: test-coverage-only
-test-coverage-only: mkdir-reports  ## run all tests using coverage analysis
+test-coverage-only: mkdir-reports coverage-run coverage-reports  ## run all tests with coverage analysis and reports
+
+.PHONY: coverage-run
+coverage-run: mkdir-reports  ## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
-	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" "$$(which pytest)" "$(APP_ROOT)/tests" || true'
+	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" \
+		"$$(which pytest)" "$(APP_ROOT)/tests"  $(TEST_XARGS) --junitxml="$(REPORTS_DIR)/coverage-junit.xml"'
+
+.PHONY: coverage-reports
+coverage-reports: mkdir-reports  ## generate coverage reports
+	@echo "Generate coverage reports..."
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
@@ -752,7 +777,120 @@ dist-pypi: clean-dist
 	@-python setup.py bdist_wheel
 	@ls -l dist
 
+.PHONY: extract-changes
+extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Extracting changes for ${VERSION} ..."
+	@bash -c '\
+		START=$$(cat "$(APP_ROOT)/CHANGES.rst" | grep -n "crim-ca/weaver/tree/${VERSION}" | cut -d ":" -f 1); \
+		STOP=$$(tail -n +$$(($${START:-0} + 2)) "$(APP_ROOT)/CHANGES.rst" \
+			| grep -n ".. _changes" \
+			| cut -d ":" -f 1 | head -n 1); \
+		tail -n +$${START:-0} "$(APP_ROOT)/CHANGES.rst" | head -n $${STOP:--1} \
+			> "$(REPORTS_DIR)/CHANGES_${VERSION}.rst" \
+	'
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+
+# note:
+#	some text must be inserted before and between the first 'version heading' and the 'changes' sub-heading
+#	otherwise headers levels are not parsed correctly (they are considered sections all using H1)
+#	therefore, inject the contents needed to parse as desired, and remove the temp HTML content afterwards
+.PHONY: generate-changes-html
+generate-changes-html: extract-changes	## extract CHANGES.rst section as HTML using the specified VERSION
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
+	@-echo "Checking necessary documentation dependency ..."
+	@which rst2html >/dev/null || pip install docutils
+	@-echo "Converting changes for ${VERSION} ..."
+	@echo '%(body)s' > "$(REPORTS_DIR)/html-body-template.txt"
+	@sed -i -e 's|Changes:|\\ \n\nChanges:|' "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@sed -i -e "s|^\`${VERSION}|   \n###\n\n\\ \n\n\`${VERSION}|" "$(REPORTS_DIR)/CHANGES_${VERSION}.rst"
+	@rst2html \
+		--template "$(REPORTS_DIR)/html-body-template.txt" \
+		"$(REPORTS_DIR)/CHANGES_${VERSION}.rst" "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<p>###</p>||' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|<tt|<code|g' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@sed -i -e 's|</tt|</code|g' "$(REPORTS_DIR)/CHANGES_${VERSION}.html"
+	@-echo "Generated changes: $(REPORTS_DIR)/CHANGES_${VERSION}.html"
+
+.PHONY: generate-archive
+generate-archive:	## generate ZIP and TAR.GZ archives using current contents
+	@-echo "Generating archives"
+	@tar \
+		-C "$(APP_ROOT)" \
+		--exclude-vcs \
+		--exclude-vcs-ignores \
+		--exclude=.git \
+		--exclude=.github \
+		--exclude=*.zip \
+		--exclude=*.tar.gz \
+		--exclude=node_modules \
+		--exclude="$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		-cvzf "$(APP_NAME)-$(APP_VERSION).tar.gz" \
+		--transform 's,^\.,$(APP_NAME)-$(APP_VERSION),' \
+		--ignore-failed-read \
+		.
+	@cd "$(APP_ROOT)" && \
+		mkdir -p "$(ARCHIVE_DIR)" && \
+		cp "$(APP_NAME)-$(APP_VERSION).tar.gz" "$(ARCHIVE_DIR)/$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		cd "$(ARCHIVE_DIR)" && \
+		tar -xzf "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		rm "$(APP_NAME)-$(APP_VERSION).tar.gz" && \
+		zip -r "$(APP_NAME)-$(APP_VERSION).zip" * && \
+		mv "$(APP_NAME)-$(APP_VERSION).zip" "$(APP_ROOT)" && \
+		cd "$(APP_ROOT)" && \
+		rm -fr "$(ARCHIVE_DIR)"
+
 ## -- Docker targets ------------------------------------------------------------------------------------------------ ##
+
+DOCKER_REPO ?= pavics/weaver
+#DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
+
+DOCKER_BUILD_XARGS ?=
+
+# NOTE:
+#	Because of the --push requirement when involving provenance/SBOM
+#	only full '[registry.uri/]org/weaver:tag' can be passed as '-t' label
+#	since the build must actively register the built image with a trusted authority.
+#	Additional "alias" tags provided for convenience must be applied separately.
+#	Also, any intermediate image used as base for derived ones must explicitly
+#	employ the remote registry reference to provide the relevant traceability.
+
+# whether to enable Provenance and SBOM tracking of built images
+#	Disable by default to ensure that any operation that needs a local docker (eg: 'docker-test' target)
+#	doesn't lead to an unintended push to the remote registry. This should be enabled explicitly only
+#	for tagged releases for which we explicitly want traceability.
+DOCKER_PROV ?= false
+ifeq ($(DOCKER_PROV),true)
+  DOCKER_BUILDER_STEP := docker-builder
+  DOCKER_BUILDER_NAME ?= docker-prov
+  DOCKER_BUILDER_BASE ?= $(DOCKER_REPO):$(APP_VERSION)
+  DOCKER_BUILDER_ARGS ?= \
+  	--provenance=true \
+  	--sbom=true \
+  	--builder="$(DOCKER_BUILDER_NAME)" \
+  	--build-arg "DOCKER_BASE=$(DOCKER_BUILDER_BASE)" \
+  	--push
+  # tag aliases is not required since images are pushed directly to the registry
+  # if explicitly required, they need to be pulled as they won't resolve locally
+  DOCKER_BUILDER_PULL := docker pull
+  DOCKER_TAG_ALIASES  ?= false
+else
+  # tag aliases is required to obtain the 'weaver:base' name used by derived images
+  # use 'true' command to mute the arguments used in the other case
+  override DOCKER_BUILDER_PULL := true
+  override DOCKER_TAG_ALIASES  := true
+endif
+
+.PHONY: docker-builder
+docker-builder:
+	@echo "Checking docker-container builder required for Docker provenance..."
+	@( \
+		docker buildx inspect "$(DOCKER_BUILDER_NAME)" >/dev/null && \
+		echo "Container Builder [$(DOCKER_BUILDER_NAME)] already exists." \
+	) || ( \
+		echo "Creating Docker Container [$(DOCKER_BUILDER_NAME)]..." && \
+		docker buildx create --name "$(DOCKER_BUILDER_NAME)" --driver=docker-container \
+	)
 
 .PHONY: docker-info
 docker-info:		## obtain docker image information
@@ -762,25 +900,46 @@ docker-info:		## obtain docker image information
 	@echo "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build-base
-docker-build-base:							## build the base docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):base"
-	docker tag "$(APP_NAME):base" "$(APP_NAME):latest"
-	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):latest"
-	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):$(APP_VERSION)"
+docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-base" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		( [ "$(APP_VERSION)" = "latest" ] || docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(DOCKER_REPO):latest" ) && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):$(APP_VERSION)" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):latest" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(APP_NAME):base" \
+	) || true
 
 .PHONY: docker-build-manager
-docker-build-manager: docker-build-base		## build the manager docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME):$(APP_VERSION)-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(APP_NAME):latest-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
+docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the manager docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-manager" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)-manager"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(APP_NAME):$(APP_VERSION)-manager" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-manager" "$(APP_NAME):latest-manager" \
+	) || true
 
 .PHONY: docker-build-worker
-docker-build-worker: docker-build-base		## build the worker docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME):$(APP_VERSION)-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(APP_NAME):latest-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
+docker-build-worker: $(DOCKER_BUILDER_STEP) docker-build-base		## build the worker docker image
+	docker build "$(APP_ROOT)" \
+		$(DOCKER_BUILDER_ARGS) \
+		$(DOCKER_BUILD_XARGS) \
+		-f "$(APP_ROOT)/docker/Dockerfile-worker" \
+		-t "$(DOCKER_REPO):$(APP_VERSION)-worker"
+	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
+		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-worker" ] && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(APP_NAME):$(APP_VERSION)-worker" && \
+		docker tag "$(DOCKER_REPO):$(APP_VERSION)-worker" "$(APP_NAME):latest-worker" \
+	) || true
 
 .PHONY: docker-build
 docker-build: docker-build-base docker-build-manager docker-build-worker		## build all docker images
@@ -807,14 +966,21 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 # if compose up succeeds, query weaver to get frontpage response
 DOCKER_COMPOSE_CMD ?= docker compose
 DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
+DOCKER_TEST_CURL_RETRY_COUNT ?= 10
+DOCKER_TEST_CURL_RETRY_DELAY ?= 5
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
-	sleep 10  ## leave some time to boot
 	@echo "Pinging Weaver API entrypoint to validate response..."
-	@curl localhost:4001 | grep "Weaver Information" || \
+	@wget \
+			-O - \
+			--tries $(DOCKER_TEST_CURL_RETRY_COUNT) \
+			--wait $(DOCKER_TEST_CURL_RETRY_DELAY) \
+			--retry-connrefused \
+			"http://localhost:4001" | \
+		grep "Weaver Information" || \
 		( $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  $(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop; exit 1 )
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh

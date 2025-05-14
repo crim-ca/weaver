@@ -1,4 +1,9 @@
 # ignore custom configs
-*.*
+*.txt
+*.env
+*.cfg
+*.ini
+*.yml
+*.json
 !*.example
 !.gitignore

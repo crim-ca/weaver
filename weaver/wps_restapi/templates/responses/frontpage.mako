@@ -80,6 +80,22 @@
                     <div class="field-key">Enabled:</div>
                     ${util.render_bool(param.enabled)}
                 </div>
+                %if "api" in param:
+                <div class="field">
+                    <div class="field-key">OpenAPI:</div>
+                    <div class="code">
+                        <a href="${param.api}">${param.api}</a>
+                    </div>
+                </div>
+                %endif
+                %if "doc" in param:
+                <div class="field">
+                    <div class="field-key">DOC:</div>
+                    <div class="code">
+                        <a href="${param.doc}">${param.doc}</a>
+                    </div>
+                </div>
+                %endif
                 %if "url" in param:
                 <div class="field">
                     <div class="field-key">URL:</div>

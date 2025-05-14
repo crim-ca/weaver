@@ -11,6 +11,7 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
+from pyramid.settings import asbool
 
 from weaver import xml_util
 from weaver.database import get_db
@@ -25,7 +26,7 @@ from weaver.formats import (
     guess_target_format,
     repr_json
 )
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
 from weaver.processes.execution import (
     submit_job,
@@ -35,9 +36,9 @@ from weaver.processes.execution import (
 )
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
-from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, StatusCompliant, map_status
+from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_header, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
@@ -46,6 +47,7 @@ from weaver.wps_restapi.jobs.utils import (
     get_job_list_links,
     get_job_results_response,
     get_job_status_schema,
+    get_job_status_wps_xml_response,
     get_results,
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
@@ -71,7 +73,7 @@ LOGGER = get_task_logger(__name__)
     accept=ContentType.TEXT_HTML,
     renderer="weaver.wps_restapi:templates/responses/job_listing.mako",
     response_schemas=sd.derive_responses(
-        sd.get_prov_all_jobs_responses,
+        sd.get_provider_all_jobs_responses,
         sd.GenericHTMLResponse(name="HTMLProviderJobListing", description="Listing of jobs.")
     ),
 )
@@ -80,7 +82,7 @@ LOGGER = get_task_logger(__name__)
     schema=sd.GetProviderJobsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_all_jobs_responses,
+    response_schemas=sd.get_provider_all_jobs_responses,
 )
 @sd.process_jobs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_PROCESSES],
@@ -260,7 +262,6 @@ def create_job(request):
         ref = get_service(request, provider_id=prov_id)
     else:
         ref = get_process(process_id=proc_id)
-        proc_id = None  # ensure ref is used, process ID needed only for provider
     return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
 
 
@@ -317,22 +318,60 @@ def trigger_job_execution(request):
     return submit_job_dispatch_task(job, container=request, force_submit=True)
 
 
+@sd.provider_jobs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_provider_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderJobStatus", description="Job status.")
+    ),
+)
+@sd.provider_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
+    schema=sd.GetProviderJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_single_job_status_responses,
+    response_schemas=sd.get_provider_single_job_status_responses,
 )
 @sd.process_job_service.get(
-    tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS],
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLProcessJobStatus", description="Job status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
+    schema=sd.GetProcessJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.process_job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
@@ -340,25 +379,78 @@ def trigger_job_execution(request):
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetJobEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/job_status.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.GenericHTMLResponse(name="HTMLJobStatus", description="Job status.")
+    ),
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.derive_responses(
+        sd.get_single_job_status_responses,
+        sd.WPSExecuteResponse(description="Job XML status.")
+    ),
+)
+@sd.job_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_STATUS],
+    schema=sd.GetJobEndpoint(),
     accept=[ContentType.APP_JSON] + [
         f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusSchema.values()
+        for profile in JobStatusProfileSchema.values()
     ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_status(request):
-    # type: (PyramidRequest) -> HTTPOk
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Retrieve the status of a job.
     """
-    job = get_job(request)
-    job_body = job.json(request)
+    # resolve the job and the requested profile/schema representation
     schema, headers = get_job_status_schema(request)
-    if schema == JobStatusSchema.OPENEO:
+    job = get_job(request)
+
+    content_type = str(headers.get("Content-Type"))
+    media_type = clean_media_type_format(content_type, strip_parameters=True)
+    if media_type in ContentType.ANY_XML or (media_type == ContentType.ANY and schema == JobStatusProfileSchema.WPS):
+        return get_job_status_wps_xml_response(job, request)
+
+    # apply additional properties that are profile-dependant
+    if schema == JobStatusProfileSchema.OPENEO:
+        cwl_url = get_path_kvp(f"{job.process_url(request)}/package", f=OutputFormat.JSON)
+        job_body = job.json(
+            request,
+            process={"title": "CWL Application Package", "href": cwl_url, "type": ContentType.APP_CWL_JSON},
+            type=JobStatusType.OPENEO,
+        )
+        # additional properties that are not validated explicitly, or that contradict the 'OGC-API processes' definition
+        # must apply the properties after (not via 'kwargs' to 'job.json()') to avoid JSON validation error
+        # (i.e.: 'status' reported in OpenAPI is OGC-only statuses, and '$schema' is set by the class definition)
+        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
-    return HTTPOk(json=job_body, headers=headers)
+    elif schema == JobStatusProfileSchema.WPS:
+        job_body = job.json(
+            request,
+            type=JobStatusType.WPS,
+        )
+        # remove the schema reference since it is technically invalid with modified status,
+        # and we do not have a corresponding JSON-schema for the WPS-XML status values
+        # use the PyWPS mapping since this is what runs under the hood, with WPS-1 status values
+        job_body.pop("$schema", None)
+        job_body["status"] = map_status(job_body["status"], StatusCompliant.PYWPS)
+    else:
+        job_body = job.json(request)
+
+    # adjust response contents according to rendering
+    # provide 'job' object directly for HTML templating to allow extra operations dynamically
+    if ContentType.APP_JSON in content_type:
+        return HTTPOk(json=job_body, headers=headers)
+    return Box(**job_body, job=job, box_intact_types=[Job])
 
 
 @sd.provider_job_service.patch(
@@ -401,7 +493,7 @@ def update_pending_job(request):
     schema=sd.DeleteProviderJobEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.delete_prov_job_responses,
+    response_schemas=sd.delete_provider_job_responses,
 )
 @sd.process_job_service.delete(
     tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROCESSES],
@@ -499,7 +591,7 @@ def cancel_job_batch(request):
     schema=sd.ProviderInputsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_inputs_responses,
+    response_schemas=sd.get_provider_inputs_responses,
 )
 @sd.process_inputs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -538,13 +630,17 @@ def get_job_inputs(request):
         "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }
+    with_links = asbool(request.params.get("links", True))
+    job_links = None
+    if with_links:
+        job_links = job.links(request, self_link="inputs")
     body = {
         "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
         "outputs": job_outputs,
         "headers": job_headers,
-        "links": job.links(request, self_link="inputs"),
+        "links": job_links,
     }
     body = sd.JobInputsBody().deserialize(body)
     return HTTPOk(json=body)
@@ -555,7 +651,7 @@ def get_job_inputs(request):
     schema=sd.ProviderOutputsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_outputs_responses,
+    response_schemas=sd.get_provider_outputs_responses,
 )
 @sd.process_outputs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -593,7 +689,7 @@ def get_job_outputs(request):
     schema=sd.ProviderResultsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_results_responses,
+    response_schemas=sd.get_provider_results_responses,
 )
 @sd.process_results_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
@@ -625,21 +721,21 @@ def get_job_results(request):
     schema=sd.ProviderExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_exceptions_responses,
+    response_schemas=sd.get_provider_exceptions_responses,
 )
 @sd.process_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES],
     schema=sd.ProcessExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_exceptions_responses,
+    response_schemas=sd.get_job_exceptions_responses,
 )
 @sd.job_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS],
     schema=sd.JobExceptionsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_exceptions_responses,
+    response_schemas=sd.get_job_exceptions_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_exceptions(request):
@@ -664,7 +760,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_logs_responses,
+    response_schemas=sd.get_provider_logs_responses,
 )
 @sd.process_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES],
@@ -677,7 +773,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_logs_responses,
+    response_schemas=sd.get_job_logs_responses,
 )
 @sd.job_logs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_LOGS],
@@ -690,7 +786,7 @@ def get_job_exceptions(request):
         ContentType.TEXT_PLAIN,
     ],
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_logs_responses,
+    response_schemas=sd.get_job_logs_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_logs(request):
@@ -717,21 +813,21 @@ def get_job_logs(request):
     schema=sd.ProviderJobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_prov_stats_responses,
+    response_schemas=sd.get_provider_stats_responses,
 )
 @sd.process_stats_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATISTICS, sd.TAG_PROCESSES],
     schema=sd.ProcessJobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_stats_responses,
+    response_schemas=sd.get_job_stats_responses,
 )
 @sd.job_stats_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATISTICS],
     schema=sd.JobStatisticsEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_stats_responses,
+    response_schemas=sd.get_job_stats_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_stats(request):
@@ -741,7 +837,7 @@ def get_job_stats(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED] or job.status != Status.SUCCEEDED:
+    if not job.is_finished:
         raise JobStatisticsNotFound(json={
             "title": "NoJobStatistics",
             "type": "no-job-statistics",  # unofficial
@@ -805,14 +901,6 @@ def includeme(config):
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
     config.add_cornice_service(sd.job_stats_service)
-    config.add_cornice_service(sd.provider_job_service)
-    config.add_cornice_service(sd.provider_jobs_service)
-    config.add_cornice_service(sd.provider_results_service)
-    config.add_cornice_service(sd.provider_outputs_service)
-    config.add_cornice_service(sd.provider_inputs_service)
-    config.add_cornice_service(sd.provider_exceptions_service)
-    config.add_cornice_service(sd.provider_logs_service)
-    config.add_cornice_service(sd.provider_stats_service)
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
@@ -821,6 +909,14 @@ def includeme(config):
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
     config.add_cornice_service(sd.process_stats_service)
+    config.add_cornice_service(sd.provider_job_service)
+    config.add_cornice_service(sd.provider_jobs_service)
+    config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_inputs_service)
+    config.add_cornice_service(sd.provider_exceptions_service)
+    config.add_cornice_service(sd.provider_logs_service)
+    config.add_cornice_service(sd.provider_stats_service)
 
     # backward compatibility routes (deprecated)
     config.add_cornice_service(sd.job_result_service)

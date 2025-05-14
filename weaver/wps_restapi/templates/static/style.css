@@ -4,6 +4,22 @@ body {
     margin: 0;
 }
 
+button {
+    cursor: pointer;
+}
+
+button.active {
+    background-color: #CCCCCC;
+}
+
+.button-show {
+    font-weight: bold;
+}
+
+.button-hide {
+    font-weight: normal;
+}
+
 .header {
     padding: 0 0.25em 1.5em .5em;
     background-color: #ECEAEA;
@@ -20,6 +36,14 @@ body {
     border-top: 0.1em solid #BBBBBB;
     padding-bottom: 0.5em;
     padding-top: 0.5em;
+}
+
+.content-section-summary {
+    margin: 0.5em 0 1em;
+    font-style: italic;
+}
+
+.content-section-content {
 }
 
 .page-title {
@@ -143,6 +167,11 @@ body {
     font-family: monospace;
 }
 
+.code-container {
+    overflow: scroll;
+    min-width: 100%;
+}
+
 .true {
     color: green;
 }
@@ -168,6 +197,7 @@ body {
     margin-left: 1em;
 }
 
+.job-title > .code,
 .process-title .code {
     font-size: 130%;
 }
@@ -191,9 +221,41 @@ body {
     padding: 1em;
 }
 
-.table-jobs-field {
+.table-job-status,
+.table-job-status th,
+.table-job-status td {
+    border-style: solid;
+    border-width: 1px;
+    border-collapse: collapse;
+    padding: 1em;
+}
+
+.table-jobs-field,
+.table-job-status-field {
     font-size: 90%;
     text-align: justify;
+}
+
+/* --- Tab Menu --- */
+
+.tab-menu {
+    display: flex;
+    flex-flow: wrap;
+    gap: 0.25em;
+    padding: 0.25em;
+    border: 1px solid #CCCCCC;
+    background-color: #F1F1F1;
+}
+
+/* Style the buttons inside the tab */
+.tab-menu button {
+}
+
+.tab-content {
+    display: none;
+    padding: 6px 12px;
+    border: 1px solid #CCCCCC;
+    border-top: none;
 }
 
 /* --- Tooltip --- */
@@ -339,13 +401,13 @@ body {
 .status-success,
 .status-succeeded,
 .status-successful {
-    background-color: darkgreen;
+    background-color: forestgreen;
 }
 
 .progress-success,
 .progress-succeeded,
 .progress-successful {
-    accent-color: darkgreen;
+    accent-color: forestgreen;
 }
 
 /* --- Version Footer --- */

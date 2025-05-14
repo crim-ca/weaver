@@ -1,0 +1,267 @@
+<?xml version='1.0' encoding='ASCII'?>
+<prov:document
+        xmlns:wfprov="http://purl.org/wf4ever/wfprov#"
+        xmlns:wfdesc="http://purl.org/wf4ever/wfdesc#"
+        xmlns:cwlprov="https://w3id.org/cwl/prov#"
+        xmlns:foaf="http://xmlns.com/foaf/0.1/"
+        xmlns:schema="http://schema.org/"
+        xmlns:orcid="https://orcid.org/"
+        xmlns:id="urn:uuid:"
+        xmlns:data="urn:hash::sha1:"
+        xmlns:sha256="nih:sha-256;"
+        xmlns:researchobject="arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/"
+        xmlns:metadata="arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/metadata/"
+        xmlns:provenance="arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/metadata/provenance/"
+        xmlns:wf="arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/workflow/packed.cwl#"
+        xmlns:input="arcp://uuid,1c49f085-bbd7-410d-a801-81fd42469e8a/workflow/primary-job.json#"
+        xmlns:doi="https://doi.org/"
+        xmlns:wf4ever="http://purl.org/wf4ever/wf4ever#"
+        xmlns:prov="http://www.w3.org/ns/prov#"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+>
+  <prov:agent prov:id="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b"/>
+  <prov:agent prov:id="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b">
+    <prov:location xsi:type="xsd:string">http://localhost:4002</prov:location>
+    <prov:type xsi:type="xsd:QName">foaf:OnlineAccount</prov:type>
+    <cwlprov:hostname>localhost</cwlprov:hostname>
+  </prov:agent>
+  <prov:agent prov:id="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b">
+    <prov:label>crim-ca/weaver:6.0.0</prov:label>
+    <prov:type xsi:type="xsd:QName">foaf:OnlineAccount</prov:type>
+    <foaf:accountName>crim-ca/weaver:6.0.0</foaf:accountName>
+  </prov:agent>
+  <prov:person prov:id="id:b3a49ee7-f620-4154-9e4d-d2e948748deb">
+    <prov:label>crim-ca/weaver:6.0.0</prov:label>
+    <prov:type xsi:type="xsd:QName">schema:Person</prov:type>
+    <foaf:account xsi:type="xsd:QName">id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b</foaf:account>
+    <foaf:name>crim-ca/weaver:6.0.0</foaf:name>
+    <schema:name>crim-ca/weaver:6.0.0</schema:name>
+  </prov:person>
+  <prov:actedOnBehalfOf>
+    <prov:delegate prov:ref="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b"/>
+    <prov:responsible prov:ref="id:b3a49ee7-f620-4154-9e4d-d2e948748deb"/>
+  </prov:actedOnBehalfOf>
+  <prov:softwareAgent prov:id="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c">
+    <prov:label>cwltool 3.1.20240708091338.dev15+g9c05bb7d</prov:label>
+    <prov:type xsi:type="xsd:QName">wfprov:WorkflowEngine</prov:type>
+  </prov:softwareAgent>
+  <prov:wasStartedBy>
+    <prov:activity prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:starter prov:ref="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b"/>
+    <prov:time>2024-12-12T09:16:17.843783</prov:time>
+  </prov:wasStartedBy>
+  <prov:activity prov:id="id:1c49f085-bbd7-410d-a801-81fd42469e8a">
+    <prov:startTime>2024-12-12T09:16:17.843806</prov:startTime>
+    <prov:label>Run of workflow/packed.cwl#main</prov:label>
+    <prov:type xsi:type="xsd:QName">wfprov:WorkflowRun</prov:type>
+  </prov:activity>
+  <prov:wasAssociatedWith>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:agent prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:plan prov:ref="wf:main"/>
+  </prov:wasAssociatedWith>
+  <prov:wasStartedBy>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:starter prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:time>2024-12-12T09:16:17.843852</prov:time>
+  </prov:wasStartedBy>
+  <prov:hadPrimarySource prov:id="data:644e201526525f62152815a76a2dc773450f3dd9">
+    <prov:label>Source code repository</prov:label>
+    <prov:location xsi:type="xsd:string">https://github.com/crim-ca/weaver</prov:location>
+  </prov:hadPrimarySource>
+  <prov:softwareAgent prov:id="data:15401f8d937f5d526951c1bf20dcba16a1271d97">
+    <prov:label>Weaver internal WPS used for demo and testing.</prov:label>
+    <prov:label>crim-ca/weaver:6.0.0</prov:label>
+    <prov:location xsi:type="xsd:string">http://localhost:4002</prov:location>
+    <prov:generalEntity prov:ref="data:644e201526525f62152815a76a2dc773450f3dd9"/>
+    <prov:specificEntity prov:ref="doi:10.5281/zenodo.14210717"/>
+  </prov:softwareAgent>
+  <prov:organization prov:id="data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2">
+    <foaf:name>Computer Research Institute of Montr&#233;al</foaf:name>
+    <schema:name>Computer Research Institute of Montr&#233;al</schema:name>
+  </prov:organization>
+  <prov:organization prov:id="data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0">
+    <prov:label>Server Provider</prov:label>
+    <prov:location xsi:type="xsd:string">http://pavics-weaver.readthedocs.org/en/latest/</prov:location>
+    <foaf:name>CRIM</foaf:name>
+    <schema:name>CRIM</schema:name>
+  </prov:organization>
+  <prov:entity prov:id="id:1c49f085-bbd7-410d-a801-81fd42469e8a">
+    <prov:label>Job Information</prov:label>
+    <prov:location xsi:type="xsd:string">http://localhost:4002/processes/echo/jobs/1c49f085-bbd7-410d-a801-81fd42469e8a</prov:location>
+    <prov:type xsi:type="xsd:QName">wfdesc:ProcessRun</prov:type>
+  </prov:entity>
+  <prov:entity prov:id="data:15401f8d937f5d526951c1bf20dcba16a1271d97:echo">
+    <prov:label>Process Description</prov:label>
+    <prov:location xsi:type="xsd:string">http://localhost:4002/processes/echo</prov:location>
+    <prov:type xsi:type="xsd:QName">wfdesc:Process</prov:type>
+  </prov:entity>
+  <prov:hadPrimarySource>
+    <prov:generatedEntity prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+    <prov:usedEntity prov:ref="data:644e201526525f62152815a76a2dc773450f3dd9"/>
+  </prov:hadPrimarySource>
+  <prov:actedOnBehalfOf>
+    <prov:delegate prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+    <prov:responsible prov:ref="id:b3a49ee7-f620-4154-9e4d-d2e948748deb"/>
+  </prov:actedOnBehalfOf>
+  <prov:specializationOf>
+    <prov:specificEntity prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+    <prov:generalEntity prov:ref="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b"/>
+  </prov:specializationOf>
+  <prov:wasAttributedTo>
+    <prov:entity prov:ref="data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2"/>
+    <prov:agent prov:ref="data:644e201526525f62152815a76a2dc773450f3dd9"/>
+  </prov:wasAttributedTo>
+  <prov:wasDerivedFrom>
+    <prov:generatedEntity prov:ref="id:53a6e2b3-6ee3-4f37-a2e5-72af3e97c70b"/>
+    <prov:usedEntity prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+  </prov:wasDerivedFrom>
+  <prov:wasStartedBy>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:trigger prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+  </prov:wasStartedBy>
+  <prov:wasStartedBy>
+    <prov:activity prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:trigger prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T14:15:50.834000+00:00</prov:time>
+  </prov:wasStartedBy>
+  <prov:specializationOf>
+    <prov:specificEntity prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:generalEntity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+  </prov:specializationOf>
+  <prov:alternateOf>
+    <prov:alternate1 prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:alternate2 prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+  </prov:alternateOf>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:activity prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97:echo"/>
+  </prov:wasGeneratedBy>
+  <prov:wasDerivedFrom>
+    <prov:generatedEntity prov:ref="data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0"/>
+    <prov:usedEntity prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+  </prov:wasDerivedFrom>
+  <prov:wasAttributedTo>
+    <prov:entity prov:ref="data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0"/>
+    <prov:agent prov:ref="data:15401f8d937f5d526951c1bf20dcba16a1271d97"/>
+  </prov:wasAttributedTo>
+  <prov:plan prov:id="wf:main">
+    <prov:label>Prospective provenance</prov:label>
+    <prov:type xsi:type="xsd:QName">wfdesc:Process</prov:type>
+  </prov:plan>
+  <prov:entity prov:id="data:2ef7bde608ce5404e97d5f042f95f89f1c232871">
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+    <prov:value xsi:type="xsd:string">Hello World!</prov:value>
+  </prov:entity>
+  <prov:used>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:entity prov:ref="data:2ef7bde608ce5404e97d5f042f95f89f1c232871"/>
+    <prov:time>2024-12-12T09:16:17.846280</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/message</prov:role>
+  </prov:used>
+  <prov:softwareAgent prov:id="id:2148aee6-81e4-4bcd-9e48-78ff46a51ff1">
+    <prov:label>Container execution of image debian:stretch-slim</prov:label>
+    <cwlprov:image>debian:stretch-slim</cwlprov:image>
+  </prov:softwareAgent>
+  <prov:wasAssociatedWith>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:agent prov:ref="id:2148aee6-81e4-4bcd-9e48-78ff46a51ff1"/>
+  </prov:wasAssociatedWith>
+  <prov:entity prov:id="data:2ef7bde608ce5404e97d5f042f95f89f1c232871">
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+    <prov:value xsi:type="xsd:string">Hello World!</prov:value>
+  </prov:entity>
+  <prov:used>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:entity prov:ref="data:2ef7bde608ce5404e97d5f042f95f89f1c232871"/>
+    <prov:time>2024-12-12T09:16:17.863017</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/echo/message</prov:role>
+  </prov:used>
+  <prov:entity prov:id="data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b">
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+  </prov:entity>
+  <prov:entity prov:id="id:59967079-217e-4bdb-92d7-2ef2f784825c">
+    <prov:type xsi:type="xsd:QName">wf4ever:File</prov:type>
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+    <cwlprov:basename>stdout.log</cwlprov:basename>
+    <cwlprov:nameext>.log</cwlprov:nameext>
+    <cwlprov:nameroot>stdout</cwlprov:nameroot>
+  </prov:entity>
+  <prov:specializationOf>
+    <prov:specificEntity prov:ref="id:59967079-217e-4bdb-92d7-2ef2f784825c"/>
+    <prov:generalEntity prov:ref="data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b"/>
+  </prov:specializationOf>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:59967079-217e-4bdb-92d7-2ef2f784825c"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.867039</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/echo/output</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:entity prov:id="data:da39a3ee5e6b4b0d3255bfef95601890afd80709">
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+  </prov:entity>
+  <prov:entity prov:id="id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b">
+    <prov:type xsi:type="xsd:QName">wf4ever:File</prov:type>
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+    <cwlprov:basename>stderr.log</cwlprov:basename>
+    <cwlprov:nameext>.log</cwlprov:nameext>
+    <cwlprov:nameroot>stderr</cwlprov:nameroot>
+  </prov:entity>
+  <prov:specializationOf>
+    <prov:specificEntity prov:ref="id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b"/>
+    <prov:generalEntity prov:ref="data:da39a3ee5e6b4b0d3255bfef95601890afd80709"/>
+  </prov:specializationOf>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.867039</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:entity prov:id="data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b"/>
+  <prov:entity prov:id="id:6b04550d-c2bd-400b-858b-14e287bbf8c3">
+    <prov:type xsi:type="xsd:QName">wf4ever:File</prov:type>
+    <prov:type xsi:type="xsd:QName">wfprov:Artifact</prov:type>
+    <cwlprov:basename>stdout.log</cwlprov:basename>
+    <cwlprov:nameext>.log</cwlprov:nameext>
+    <cwlprov:nameroot>stdout</cwlprov:nameroot>
+  </prov:entity>
+  <prov:specializationOf>
+    <prov:specificEntity prov:ref="id:6b04550d-c2bd-400b-858b-14e287bbf8c3"/>
+    <prov:generalEntity prov:ref="data:a0b65939670bc2c010f4d5d6a0b3e4e4590fb92b"/>
+  </prov:specializationOf>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:6b04550d-c2bd-400b-858b-14e287bbf8c3"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.867039</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:wasEndedBy>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:ender prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.867034</prov:time>
+  </prov:wasEndedBy>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:59967079-217e-4bdb-92d7-2ef2f784825c"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.869180</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/primary/output</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:2ab450c1-7309-4c5b-b65b-b4dfa44f384b"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.869180</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:wasGeneratedBy>
+    <prov:entity prov:ref="id:6b04550d-c2bd-400b-858b-14e287bbf8c3"/>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:time>2024-12-12T09:16:18.869180</prov:time>
+    <prov:role xsi:type="xsd:QName">wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1</prov:role>
+  </prov:wasGeneratedBy>
+  <prov:wasEndedBy>
+    <prov:activity prov:ref="id:1c49f085-bbd7-410d-a801-81fd42469e8a"/>
+    <prov:ender prov:ref="id:eea8f699-1c08-47b2-8aed-8ad30e4eda4c"/>
+    <prov:time>2024-12-12T09:16:18.869299</prov:time>
+  </prov:wasEndedBy>
+</prov:document>

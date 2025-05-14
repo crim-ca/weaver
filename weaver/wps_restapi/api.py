@@ -103,6 +103,7 @@ def get_conformance(category, settings):
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
     ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))
     ogcapi_proc_html = asbool(settings.get("weaver.wps_restapi_html", True))
+    ogcapi_proc_prov = asbool(settings.get("weaver.cwl_prov", True))
     ogcapi_proc_conformance = ([
         f"{ogcapi_common}/conf/core",
         f"{ogcapi_common}/per/core/additional-link-relations",
@@ -500,41 +501,38 @@ def get_conformance(category, settings):
         # (see https://github.com/crim-ca/weaver/issues/56 and below '/conf/app-pck/cwl')
         f"{ogcapi_proc_part3}/req/cwl-workflows",
         f"{ogcapi_proc_part3}/conf/cwl-workflows",
-        # FIXME: support part 3: workflows (https://github.com/crim-ca/weaver/issues/412)
-        # f"{ogcapi_proc_part3}/conf/nested-processes",
-        # f"{ogcapi_proc_part3}/conf/remote-core-processes",
+        f"{ogcapi_proc_part3}/conf/nested-processes",
+        f"{ogcapi_proc_part3}/conf/remote-core-processes",
         f"{ogcapi_proc_part3}/conf/collection-input",
         f"{ogcapi_proc_part3}/conf/remote-collections",
         f"{ogcapi_proc_part3}/conf/input-fields-modifiers",
         # f"{ogcapi_proc_part3}/conf/output-fields-modifiers",
         # f"{ogcapi_proc_part3}/conf/deployable-workflows",
         # f"{ogcapi_proc_part3}/conf/collection-output",
-        # f"{ogcapi_proc_part3}/req/collection-input",
+        f"{ogcapi_proc_part3}/req/collection-input",
         # f"{ogcapi_proc_part3}/req/collection-output",
         # f"{ogcapi_proc_part3}/req/deployable-workflows",
         # f"{ogcapi_proc_part3}/req/input-fields-modifiers",
         # f"{ogcapi_proc_part3}/req/output-fields-modifiers",
-        # f"{ogcapi_proc_part3}/req/nested-processes",
-        # f"{ogcapi_proc_part3}/req/remote-collections",
-        # f"{ogcapi_proc_part3}/req/remote-core-processes",
-        # f"{ogcapi_proc_part3}/req/workflows",
-        # f"{ogcapi_proc_part3}/req/workflows/collection/body",
-        # f"{ogcapi_proc_part3}/req/workflows/collection/content-type",
-        # f"{ogcapi_proc_part3}/req/workflows/collection/post-op",
-        # f"{ogcapi_proc_part3}/req/workflows/collection/response-body",
-        # f"{ogcapi_proc_part3}/req/workflows/collection/response",
+        f"{ogcapi_proc_part3}/req/nested-processes",
+        f"{ogcapi_proc_part3}/req/remote-collections",
+        f"{ogcapi_proc_part3}/req/remote-collections/collection-access",
+        f"{ogcapi_proc_part3}/req/remote-collections/referenced-collection",
+        f"{ogcapi_proc_part3}/req/remote-collections/process-execution",
+        f"{ogcapi_proc_part3}/req/remote-core-processes",
+        f"{ogcapi_proc_part3}/req/remote-core-processes/referenced-process",
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part3}/conf/openeo-workflows",
         # f"{ogcapi_proc_part3}/req/openeo-workflows",
+        f"{ogcapi_proc_part4}/conf/job-management",
         f"{ogcapi_proc_part4}/conf/jm/create/post-op",
         f"{ogcapi_proc_part4}/per/job-management/additional-status-codes",  # see 'weaver.status.map_status'
         f"{ogcapi_proc_part4}/per/job-management/create-body",              # Weaver has XML for WPS
         f"{ogcapi_proc_part4}/per/job-management/create-content-schema",
         f"{ogcapi_proc_part4}/per/job-management/update-body",
         f"{ogcapi_proc_part4}/per/job-management/update-content-schema",
-        # FIXME: support part 3: Nested Workflow Execution request (https://github.com/crim-ca/weaver/issues/412)
-        # f"{ogcapi_proc_part4}/rec/job-management/create-body-ogcapi-processes",
-        # f"{ogcapi_proc_part4}/rec/job-management/update-body-ogcapi-processes",
+        f"{ogcapi_proc_part4}/rec/job-management/create-body-ogcapi-processes",
+        f"{ogcapi_proc_part4}/rec/job-management/update-body-ogcapi-processes",
         # FIXME: support openEO processes (https://github.com/crim-ca/weaver/issues/564)
         # f"{ogcapi_proc_part4}/rec/job-management/create-body-openeo",
         # f"{ogcapi_proc_part4}/rec/job-management/update-body-openeo",
@@ -543,6 +541,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/create-response-body",
         f"{ogcapi_proc_part4}/req/job-management/create-response-jobid",
         f"{ogcapi_proc_part4}/req/job-management/create-response-success",
+        # FIXME: support Content-Schema and Profile header negotiation (https://github.com/crim-ca/weaver/issues/754)
         # f"{ogcapi_proc_part4}/req/job-management/create-unsupported-schema",
         f"{ogcapi_proc_part4}/req/job-management/create-unsupported-media-type",
         f"{ogcapi_proc_part4}/req/job-management/definition-get-op",
@@ -555,6 +554,14 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/update-patch-op",
         f"{ogcapi_proc_part4}/req/job-management/update-response",
         f"{ogcapi_proc_part4}/req/job-management/update-response-locked",
+    ] + ([
+        f"{ogcapi_proc_part4}/req/provenance",
+        f"{ogcapi_proc_part4}/req/provenance/prov-get-op",
+        f"{ogcapi_proc_part4}/req/provenance/prov-response",
+        f"{ogcapi_proc_part4}/req/provenance/prov-content-negotiation",
+        f"{ogcapi_proc_part4}/req/provenance/inputs-get-op",
+        f"{ogcapi_proc_part4}/req/provenance/inputs-response",
+    ] if ogcapi_proc_prov else []) + [
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
@@ -663,6 +670,7 @@ def api_frontpage_body(settings):
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 
+    weaver_rtd_url = "https://pavics-weaver.readthedocs.io/en/latest"
     weaver_api = asbool(settings.get("weaver.wps_restapi", True))
     weaver_api_url = get_wps_restapi_base_url(settings)
     weaver_api_oas_ui = weaver_url + sd.api_openapi_ui_service.path if weaver_api else None
@@ -672,12 +680,19 @@ def api_frontpage_body(settings):
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_api_html = asbool(settings.get("weaver.wps_restapi_html", True)) and weaver_api
     weaver_api_html_url = f"{weaver_api_url}?f={OutputFormat.HTML}"
+    weaver_api_prov = asbool(settings.get("weaver.cwl_prov", True)) and weaver_api
+    weaver_api_prov_doc = f"{weaver_rtd_url}/processes.html#job-provenance"
+    weaver_api_prov_oas = f"{weaver_api_oas_ui}#/Provenance" if weaver_api_prov else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
+    weaver_wps_oas = f"{weaver_api_oas_ui}#/WPS" if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_api_url + sd.processes_service.path
     weaver_jobs_url = weaver_api_url + sd.jobs_service.path
     weaver_vault = asbool(settings.get("weaver.vault"))
+    weaver_vault_url = f"{weaver_api_url}/vault" if weaver_vault else None
+    weaver_vault_api = f"{weaver_api_oas_ui}#/Vault" if weaver_vault else None
+    weaver_vault_doc = f"{weaver_rtd_url}/processes.html#vault-upload"
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
         {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
@@ -781,10 +796,13 @@ def api_frontpage_body(settings):
             "description": __meta__.__description__,
             "attribution": __meta__.__author__,
             "parameters": [
-                {"name": "api", "enabled": weaver_api, "url": weaver_api_url, "api": weaver_api_oas_ui},
+                {"name": "api", "enabled": weaver_api, "url": weaver_api_url,
+                 "doc": weaver_rtd_url, "api": weaver_api_oas_ui},
                 {"name": "html", "enabled": weaver_api_html, "url": weaver_api_html_url, "api": weaver_api_oas_ui},
-                {"name": "vault", "enabled": weaver_vault},
-                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url, "api": weaver_api_oas_ui},
+                {"name": "prov", "enabled": weaver_api_prov, "doc": weaver_api_prov_doc, "api": weaver_api_prov_oas},
+                {"name": "vault", "enabled": weaver_vault, "url": weaver_vault_url,
+                 "doc": weaver_vault_doc, "api": weaver_vault_api},
+                {"name": "wps", "enabled": weaver_wps, "url": weaver_wps_url, "api": weaver_wps_oas},
             ],
             "links": weaver_links,
         }

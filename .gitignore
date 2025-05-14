@@ -96,8 +96,14 @@ response.varfile
 
 ## project process results
 *.tif
-*.zip
 ./workflow[s]
+
+## build/release
+archive
+*.zip
+*.tar.gz
+**/*.zip
+**/*.tag.gz
 
 ## old project sources
 [Bb]in

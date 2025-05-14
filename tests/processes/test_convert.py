@@ -1,6 +1,9 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
+import inspect
+import logging
+
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
 import json
@@ -532,6 +535,197 @@ def test_any2cwl_io_from_oas():
                 "inputBinding": {"valueFrom": _get_cwl_js_value_from([1, 2, 3], allow_unique=True, allow_array=True)},
             },
         ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 2,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 1,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": [
+                    {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    "type": "string",
+                    "enum": ["value-1", "value-2"]
+                },
+                "minOccurs": 0,
+                "maxOccurs": 4,
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "schema": {
+                    # explicitly array, MUST force CWL to be an array as well
+                    # doesn't matter that default min/max occurs = 1
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                # note: "type" as array of single mapping with "type: array" would also be valid ([] around the {})
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 1,  # same as previous, but explicitly specified rather than default
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["value-1", "value-2"],
+                    },
+                }
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,  # because optional, array must be combined with "null"
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        ),
+        (
+            # documentation example
+            IO_INPUT,
+            {
+                "id": "test",
+                "minOccurs": 0,  # same as previous
+                "maxOccurs": 4,  # explicitly specified should not change anything
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["value-1", "value-2"]
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["value-1", "value-2"],
+                        },
+                    }
+                ]
+            }
+        )
     ]
 )
 def test_any2cwl_io_enum_convert(io_select, test_io, expect):
@@ -813,6 +1007,89 @@ def test_cwl2wps_io_raise_mixed_types(test_type):
     io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
         cwl2wps_io(io_info, IO_INPUT)
+
+
+@pytest.mark.parametrize(
+    ["io_default", "io_expect", "is_erroneous"],
+    [
+        (
+            {"name": "data", "type": "string", "default": ["test"]},
+            "test",
+            True,
+        ),
+        (
+            {"name": "data", "type": "integer", "default": [1]},
+            1,
+            True,
+        ),
+        (
+            {"name": "data", "type": "float", "default": [3.1416]},
+            3.1416,
+            True,
+        ),
+        (
+            {"name": "data", "type": "boolean", "default": [True]},
+            True,
+            True,
+        ),
+        (
+            # empty considered as "null default"
+            {"name": "data", "type": "integer", "default": []},
+            None,
+            True,
+        ),
+        (
+            # explicitly "null default"
+            {"name": "data", "type": "integer", "default": [None]},
+            None,
+            True,
+        ),
+        (
+            # only 1 array element allowed for silent handling
+            {"name": "data", "type": "integer", "default": [1, 2, 3]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # don't allow nested lists, even if literal inside
+            # assume it is too much "lists" involved, and the intention is most probably wrong at this point
+            {"name": "data", "type": "integer", "default": [[1]]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # don't allow non-literals within list, even if single element
+            {"name": "data", "type": "integer", "default": [{}]},
+            PackageTypeError,
+            True,
+        ),
+        (
+            # sanity check valid case
+            {"name": "data", "type": "string", "default": "test"},
+            "test",
+            False,
+        ),
+        (
+            # sanity check valid case
+            {"name": "data", "type": "float", "default": 3.1416},
+            3.1416,
+            False,
+        )
+    ]
+)
+def test_cwl2wps_io_literal_handle_erroneous_defaults(io_default, io_expect, is_erroneous, caplog):
+    """
+    Given a remote :term:`OAP` process description with an erroneous ``default``, ensure parsing can mitigate silently.
+    """
+
+    if inspect.isclass(io_expect) and issubclass(io_expect, Exception):
+        with pytest.raises(io_expect):
+            cwl2wps_io(io_default, IO_INPUT)
+    else:
+        with caplog.at_level(logging.WARNING):
+            result = cwl2wps_io(io_default, IO_INPUT)
+            assert result.data == io_expect
+        assert not is_erroneous or (is_erroneous and "detected badly formed 'default'" in caplog.text.lower())
 
 
 def test_cwl2wps_io_record_format():
@@ -2045,29 +2322,34 @@ def test_ogcapi2cwl_process_without_extra():
 
 
 @pytest.mark.parametrize(
-    ["input_str", "input_int", "input_float"],
+    ["input_str", "input_int", "input_float", "input_time"],
     [
         # OpenAPI schema references
         (
             {"schema": {"type": "string", "enum": ["a", "b", "c"]}},
             {"schema": {"type": "integer", "enum": [1, 2, 3]}},
             {"schema": {"type": "number", "format": "float", "enum": [1.2, 3.4]}},
+            {"schema": {"type": "string", "format": "time", "enum": ["12:00", "24:00"]}},
         ),
         # OGC-API input definitions
         (
             {"data_type": "string", "allowed_values": ["a", "b", "c"]},
             {"data_type": "integer", "allowed_values": [1, 2, 3]},
             {"data_type": "float", "allowed_values": [1.2, 3.4]},
+            {"data_type": "string", "allowed_values": ["12:00", "24:00"]},
         ),
     ]
 )
-def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
+def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float, input_time):
     """
-    Test that a :term:`CWL` with pseudo-``Enum`` type has the necessary :term:`CWL` requirements to perform validation.
+    Test that a :term:`CWL` with pseudo-``enum`` type has the necessary :term:`CWL` requirements to perform validation.
 
     .. seealso::
         - :func:`test_any2cwl_io_enum_convert`
         - :func:`test_any2cwl_io_enum_validate`
+        - :func:`weaver.processes.convert._convert_cwl_io_enum`
+        - :func:`weaver.processes.convert._get_cwl_js_value_from`
+        - :func:`weaver.processes.convert._patch_cwl_enum_js_requirement`
     """
     href = "https://remote-server.com/processes/test-process"
     body = {
@@ -2075,6 +2357,7 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
             "enum-str": input_str,
             "enum-int": input_int,
             "enum-float": input_float,
+            "enum-time": input_time,
         },
         "outputs": {
             "output": {"schema": {"type": "string", "contentMediaType": ContentType.TEXT_PLAIN}},
@@ -2103,6 +2386,84 @@ def test_ogcapi2cwl_process_cwl_enum_updated(input_str, input_int, input_float):
     assert "[1.2, 3.4]" in cwl_value_from
     assert "values.includes(self)" in cwl_value_from
     assert "self.every(item => values.includes(item))" not in cwl_value_from
+
+    assert cwl["inputs"]["enum-time"] == {"type": {"type": "enum", "symbols": ["#12:00", "#24:00"]}}
+    assert "inputBinding" not in cwl["inputs"]["enum-time"]
+
+
+@pytest.mark.parametrize(
+    ["cwl_io", "wps_io_expected"],
+    [
+        (
+            {
+                "name": "test",
+                "type": "enum",
+                "symbols": ["#12:00", "#24:00"],
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": {
+                    "type": "enum",
+                    "symbols": ["#12:00", "#24:00"],
+                }
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "symbols": ["#12:00", "#24:00"],
+                    }
+                }
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+                "min_occurs": 1,
+            }
+        ),
+        (
+            {
+                "name": "test",
+                "type": [
+                    "null",
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "enum",
+                            "symbols": ["#12:00", "#24:00"],
+                        }
+                    }
+                ]
+            },
+            {
+                "id": "test",
+                "allowed_values": ["12:00", "24:00"],
+                "min_occurs": 1,
+            }
+        )
+    ]
+)
+def test_patched_cwl_enum_colon_back_conversion(cwl_io, wps_io_expected):
+    """
+    Given a :term:`CWL` ``enum`` that contains ``:`` characters patched with prefixed ``#`` test the inverse conversion.
+    """
+    wps_io = cwl2wps_io(cwl_io, IO_INPUT)
+    wps_allow = [allow.value for allow in wps_io.allowed_values]
+    assert wps_allow == ["12:00", "24:00"]
 
 
 @mocked_remote_server_requests_wps1([

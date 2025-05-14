@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
+from urllib.parse import unquote_plus
 
 import colander
 from celery.utils.log import get_task_logger
@@ -14,9 +15,11 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPLocked,
     HTTPNoContent,
+    HTTPNotAcceptable,
     HTTPNotFound,
     HTTPOk
 )
+from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
@@ -40,10 +43,18 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import ContentEncoding, ContentType, clean_media_type_format, get_format, repr_json
+from weaver.formats import (
+    ContentEncoding,
+    ContentType,
+    clean_media_type_format,
+    get_format,
+    guess_target_format,
+    repr_json
+)
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
@@ -64,7 +75,12 @@ from weaver.utils import (
     parse_kvp
 )
 from weaver.visibility import Visibility
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps.utils import (
+    get_wps_local_status_location,
+    get_wps_output_dir,
+    get_wps_output_url,
+    map_wps_output_location
+)
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
@@ -73,8 +89,8 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
-    from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
+    from weaver.formats import AnyContentEncoding, AnyContentType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
@@ -88,6 +104,7 @@ if TYPE_CHECKING:
         ExecutionResultValue,
         HeadersTupleType,
         HeadersType,
+        HTTPValid,
         JobValueFormat,
         JSON,
         PyramidRequest,
@@ -317,46 +334,103 @@ def get_job_io_schema_query(
 
 
 def get_job_status_schema(request):
-    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
+    # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
-    Identifies if a :term:`Job` status response schema applies for the request.
+    Identifies if a :term:`Job` status response schema :term:`Profile` applies for the request.
+
+    :raises HTTPBadRequest: If an invalid combination :term:`Profile` and :term:`Media-Type` is requested.
     """
 
-    def make_headers(resolved_schema):
-        # type: (JobStatusSchemaType) -> HeadersType
-        content_type = clean_media_type_format(content_accept, strip_parameters=True)
+    def make_headers(resolved_schema, content_type):
+        # type: (JobStatusProfileSchemaType, AnyContentType) -> HeadersType
+        if content_type == ContentType.TEXT_HTML:
+            return {"Content-Type": content_type}
+        if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
+            content_type = ContentType.APP_JSON
         content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
-        if resolved_schema == JobStatusSchema.OGC:
+        if resolved_schema == JobStatusProfileSchema.OGC:
             content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-        elif resolved_schema == JobStatusSchema.OPENEO:
+        elif resolved_schema == JobStatusProfileSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        elif content_type in ContentType.ANY_XML:
+            if resolved_schema not in [JobStatusProfileSchema.WPS, None]:
+                raise HTTPBadRequest(
+                    json={
+                        "code": "InvalidParameterValue",
+                        "description": "Requested job schema profile cannot be combined with XML representation.",
+                        "cause": {"profile" if "profile" in request.params else "schema": schema},
+                    }
+                )
+            content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
         return content_headers
 
-    content_accept = request.accept.header_value or ContentType.APP_JSON
-    if content_accept == ContentType.ANY:
-        content_accept = ContentType.APP_JSON
+    content_accept = get_header("Accept", request.headers) or ContentType.APP_JSON
+    content_media_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
 
     params = get_request_args(request)
-    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
+    schema = JobStatusProfileSchema.get(params.get("profile") or params.get("schema"))
     if schema:
-        headers = make_headers(schema)
+        headers = make_headers(schema, content_media_type)
         return schema, headers
-    ctype = get_header("Accept", request.headers)
-    if not ctype:
-        return JobStatusSchema.OGC, {}
-    params = parse_kvp(ctype)
+
+    params = parse_kvp(content_accept)
     profile = params.get("profile")
     if not profile:
-        schema = JobStatusSchema.OGC
-        headers = make_headers(schema)
+        if content_media_type in ContentType.ANY_XML:
+            schema = JobStatusProfileSchema.WPS
+        else:
+            schema = JobStatusProfileSchema.OGC
+        headers = make_headers(schema, content_media_type)
         return schema, headers
-    schema = cast(
-        "JobStatusSchemaType",
-        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
-    )
-    headers = make_headers(schema)
+
+    schema = JobStatusProfileSchema.get(profile[0], default=JobStatusProfileSchema.OGC)
+    headers = make_headers(schema, content_media_type)
     return schema, headers
+
+
+def get_job_status_wps_xml_response(job, request):
+    # type: (Job, AnyRequestType) -> AnyResponseType
+    """
+    Retrieve the :term:`WPS` :term:`XML` status file and return it as response.
+
+    Assumes that :func:`get_job_status_schema` was invoked to resolve any relevant schema :term:`Profile` and
+    content :term:`Media-Type` that is enforced by handling of the response representation from this function.
+
+    If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
+    an appropriate HTTP error will be raised.
+    """
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    headers = {
+        "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+        "Content-Schema": schema,
+    }
+    wps_status_file = get_wps_local_status_location(
+        job.status_location or job.status_url(request),
+        container=request,
+        must_exist=True,
+    )
+    if not wps_status_file:
+        accept_header = get_header("Accept", request.headers)
+        format_query = "f" if "f" in request.params else "format"
+        raise JobGone(
+            json={
+                "title": "JobStatusGone",
+                "type": "JobStatusGone",
+                "status": JobGone.code,
+                "detail": "Job status artifact in XML representation cannot be resolved.",
+                "cause": (
+                    {"in": "headers", "name": "Accept", "value": accept_header}
+                    if accept_header else
+                    {"in": "query", "name": format_query, "value": "xml"}
+                ),
+                "value": {"jobID": str(job.id), "status": job.status},
+            }
+        )
+    resp = FileResponse(wps_status_file, request=request)
+    resp.headers.update(headers)
+    return resp
 
 
 def make_result_link(
@@ -1108,6 +1182,12 @@ def get_job_results_multipart(job, results, *, headers, settings):
     return resp
 
 
+@overload
+def get_job_submission_response(body, headers):
+    # type: (JSON, AnyHeadersContainer) -> HTTPValid
+    ...
+
+
 def get_job_submission_response(
     body,                   # type: JSON
     headers,                # type: AnyHeadersContainer
@@ -1275,7 +1355,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status != Status.SUCCEEDED:
+    if not job.success:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
@@ -1406,3 +1486,64 @@ def dismiss_job_task(job, container):
     job.status = map_status(Status.DISMISSED)
     job = store.update_job(job)
     return job
+
+
+def get_job_prov_response(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve specific :term:`Provenance` contents of a :term:`Job` based on the request.
+
+    The specific request path is redirected to the relevant command from :mod:`cwlprov`.
+    If applicable, request :term:`Media-Type` specifiers are considered to return alternate representations.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+
+    prov_path = request.path.rsplit("/prov", 1)[-1]
+    prov_path = f"/prov{prov_path}"
+
+    def prov_format_handler(fmt):
+        if isinstance(fmt, str):
+            # special case of 'application/ld+json'
+            # if passed by query parameter, the '+' is escaped to a space
+            # also, consider if the %-escape was done explicitly for it
+            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+                fmt = ProvenanceFormat.PROV_JSONLD
+            if "/" not in fmt and not fmt.lower().startswith("prov-"):
+                fmt = f"prov-{fmt}"
+            # special case of YAML that is obtained from PROV-JSON
+            # early fix its media-type to resolve it correctly without ambiguity
+            if fmt.lower() == "prov-yaml":
+                return ContentType.APP_YAML
+        prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
+        if prov_fmt:
+            return ProvenanceFormat.as_media_type(prov_fmt)
+        return prov_fmt
+
+    prov_type = guess_target_format(
+        request,
+        override_user_agent=True,
+        default=ContentType.APP_JSON,
+        format_handler=prov_format_handler,
+    )
+    prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
+    if not prov_data:
+        prov_dir = job.prov_path(request)
+        prov_exists = os.path.isdir(prov_dir)
+        prov_err = HTTPNotAcceptable if prov_exists else JobGone
+        prov_body = {
+            "title": "NoJobProvenance",
+            "type": "no-job-provenance",  # unofficial
+            "detail": "Job provenance could not be retrieved for the specified job.",
+            "cause": "Missing or invalid provenance details."
+        }
+        if prov_exists and "run_id" in request.matchdict:
+            prov_err = JobNotFound
+            prov_body["error"] = "No such run ID for specified job provenance."
+            prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
+        prov_body["status"] = prov_err.code
+        return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
+    links = job.links(container=request, self_link="provenance")
+    headers = [("Link", make_link_header(link)) for link in links]
+    return HTTPOk(body=prov_data, headers=headers, content_type=prov_type, charset="utf-8")

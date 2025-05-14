@@ -19,6 +19,8 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |content_negotiation_profile| replace:: Content Negotiation by Profile
+.. _content_negotiation_profile: https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation
 .. |crs| replace:: Coordinate Reference System
 .. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
 .. |crs-def| replace:: Coordinate Reference System (CRS)
@@ -62,6 +64,8 @@
 .. |cwl-metadata-schema-org| replace:: RDF Schema Definitions
 .. _cwl-metadata-schema-org: https://schema.org/version/latest/schemaorg-current-https.rdf
 .. _docker: https://docs.docker.com/develop/
+.. |cwltool-cwlprov| replace:: CWLProv - Provenance Capture with :mod:`cwltool`
+.. _cwltool-cwlprov: https://cwltool.readthedocs.io/en/latest/CWLProv.html
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
@@ -87,9 +91,9 @@
 .. |filter-cql-text| replace:: CQL-Text
 .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
-.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065.html#cql2-json
+.. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
-.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065.html#cql2-text
+.. _filter-cql2-text: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-text
 .. |filter-ecql| replace:: ECQL (Extended CQL)
 .. _filter-ecql: https://github.com/geotools/geotools/blob/main/modules/library/cql/ECQL.md
 .. |filter-fes| replace:: Filter Encoding Standard 2.0
@@ -172,6 +176,26 @@
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
+.. |JSON-LD| replace:: JSON Linked Data
+.. _JSON-LD: https://json-ld.org/
+.. |PROV| replace:: PROV
+.. _PROV: https://www.w3.org/TR/prov-overview/
+.. |PROV-JSON| replace:: PROV-JSON
+.. _PROV-JSON: https://www.w3.org/submissions/prov-json/
+.. |PROV-JSONLD| replace:: PROV-JSONLD
+.. _PROV-JSONLD: https://www.w3.org/submissions/prov-jsonld/
+.. |PROV-N| replace:: PROV-N
+.. _PROV-N: https://www.w3.org/TR/prov-n/
+.. |PROV-overview| replace:: PROV Overview
+.. _PROV-overview: https://www.w3.org/TR/prov-overview/
+.. |PROV-O| replace:: PROV-O: The PROV Ontology
+.. _PROV-O: https://www.w3.org/TR/2013/REC-prov-o-20130430/
+.. |PROV-XML| replace:: PROV-XML
+.. _PROV-XML: https://www.w3.org/TR/2013/NOTE-prov-xml-20130430/
+.. |rdf-n-triples| replace:: RDF N-Triples
+.. _rdf-n-triples: https://www.w3.org/TR/n-triples/
+.. |rdf-turtle| replace:: RDF Turtle
+.. _rdf-turtle: https://www.w3.org/TR/rdf12-turtle/
 .. |pywps| replace:: PyWPS
 .. _pywps: https://github.com/geopython/pywps/
 .. |pywps-status| replace:: Progress and Status Report
@@ -184,10 +208,14 @@
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
+.. |w3c| replace:: W3C
+.. _w3c: https://www.w3.org/
 
 .. STAC
 .. |stac-spec| replace:: STAC Specification
 .. _stac-spec: https://stacspec.org/en/about/stac-spec/
+.. |stac-api| replace:: STAC API
+.. _stac-api: https://github.com/radiantearth/stac-api-spec
 .. |stac-api-spec| replace:: STAC API Specification
 .. _stac-api-spec: https://github.com/radiantearth/stac-api-spec
 .. |stac-collections| replace:: STAC Collections
@@ -200,7 +228,7 @@
 .. Example references
 .. |examples| replace:: Examples
 .. _examples: examples.rst
-.. |weaver-func-test-apps| replace:: Weaver functional tests
+.. |weaver-func-test-apps| replace:: Weaver functional tests Application Packages
 .. _weaver-func-test-apps: https://github.com/crim-ca/weaver/tree/master/tests/functional/application-packages
 .. |ogc-testbeds-apps| replace:: OGC-Testbeds Applications
 .. _ogc-testbeds-apps: https://github.com/crim-ca/application-packages

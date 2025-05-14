@@ -25,6 +25,7 @@ jobs:
         with:
           concurrent_skipping: "same_content_newer"
           skip_after_successful_duplicate: "true"
+          cancel_others: "true"
           do_not_skip: '["workflow_dispatch", "schedule", "release"]'
 
   # see: https://github.com/actions/setup-python
@@ -46,42 +47,45 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: true
             test-case: test-unit-only
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: true
             test-case: test-func-only
           # linter tests
+          # limitation with nested f-string quote styles changed in Python 3.12 (https://peps.python.org/pep-0701/)
+          # forces us to pin Python 3.11 during linting checks in order to evaluate backward-compatible code styles
+          # (see https://github.com/edaniszewski/pylint-quotes/issues/32)
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             allow-failure: false
             test-case: check-all
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.10"  # doesn't matter which one (in docker), but match default of repo
+            python-version: "3.12"  # doesn't matter which one (defined in docker), use only to report matching version
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-workflow-only
     steps:
@@ -130,6 +134,21 @@ jobs:
           env | sort
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
+
+      # manually invoke reporting in case of test failure to still generate them
+      # otherwise, they would have been generated automatically following the successful coverage run
+      - name: Handle Failed Coverage Report
+        if: ${{ failure() && matrix.test-case == 'test-coverage-only' }}
+        run: make coverage-reports
+      # flaky test analysis, which includes failed tests if applicable
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && matrix.test-case == 'test-coverage-only' }}
+        uses: codecov/test-results-action@v1
+        with:
+          files: reports/coverage-junit.xml,!./cache
+          flags: ${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+      # coverage test analysis
       - name: Upload coverage report
         uses: codecov/codecov-action@v2
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
@@ -170,6 +189,9 @@ jobs:
     needs: tests
     if: ${{ success() && (contains(github.ref, 'refs/tags') || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-latest
+    env:
+      # enabled provenance attestation during build/push (see Makefile for details)
+      DOCKER_PROV: "true"
     steps:
       - uses: actions/checkout@v2
         with:
@@ -183,14 +205,17 @@ jobs:
           else
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
-      - name: Build Docker
-        run: |
-          make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-info docker-build
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build Docker
+        run: |
+          make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-info docker-build
       - name: Push to DockerHub
+        # push does not apply if built with provenance since the build itself already pushes the layers
+        # the referenced repository and tagged version will not be available locally for push
+        if: ${{ env.DOCKER_PROV != 'true' }}
         run: |
           make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-push

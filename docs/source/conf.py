@@ -245,7 +245,7 @@ html_theme_options = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "../_static/crim.png"
+html_logo = "../../weaver/wps_restapi/templates/static/crim.png"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -454,12 +454,17 @@ linkcheck_ignore = [
     # ignore links using archived web pages, which sometimes become unavailable briefly
     # since using an archive, they are already using "last resort" references
     "http[s]*://web.archive.org/.*",
+    # sporadic timeouts
+    "https://2024julyesipmeeting.sched.com/",
+    # FIXME: OGC Drafts broken (https://github.com/opengeospatial/ogcapi-processes/issues/490)
+    "https://docs.ogc.org/DRAFTS/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
     "data-types",  # https://spec.openapis.org/oas/v3.1.0
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
     "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
+    "issuecomment-[0-9]+",  # links to specific GitHub comments
 ]
 linkcheck_request_headers = {
     "https://github.com/": {

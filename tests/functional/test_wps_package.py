@@ -28,6 +28,7 @@ import yaml
 from parameterized import parameterized
 
 from tests import resources
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
@@ -47,6 +48,7 @@ from tests.utils import (
 )
 from weaver.execute import (
     ExecuteCollectionFormat,
+    ExecuteControlOption,
     ExecuteMode,
     ExecuteResponse,
     ExecuteReturnPreference,
@@ -1869,6 +1871,86 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"]["out_file"]["title"] == "Result File"
         assert proc["outputs"]["out_file"]["formats"][0]["mediaType"] == "text/csv"
 
+    def test_execute_process_revision(self):
+        proc = self.fully_qualified_test_name()
+        old = "1.0.0"
+        rev = "1.1.0"
+        cwl = {
+            "s:version": old,
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {"message": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "string", "outputBinding": {"outputEval": "$(inputs.message)"}}}
+        }
+        body = {
+            "processDescription": {"process": {"id": proc}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+
+        path = f"/processes/{proc}"
+        data = {"version": rev, "title": "updated", "jobControlOptions": [ExecuteControlOption.SYNC]}
+        resp = self.app.patch_json(path, params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        exec_value = "test"
+        exec_body = {
+            # because it is updated above to be sync-only,
+            # using async below MUST fail with correctly resolved newer revision
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "inputs": [{"id": "message", "value": exec_value}],
+            "outputs": [{"id": "output", "transmissionMode": ExecuteTransmissionMode.VALUE}]
+        }
+
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+
+            # test the newer revision with async, failure expected
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 422, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+
+            # use the older revision which allowed async, validating that the right process version is invoked
+            path = f"/processes/{proc}:{old}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 201, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            status_url = resp.headers.get("Location")
+            assert f"{proc}:{old}" in status_url
+            job_id = resp.json.get("jobID")
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{old}"
+            data = self.get_outputs(status_url, schema=JobInputsOutputsSchema.OGC)
+            assert data["outputs"]["output"]["value"] == exec_value
+
+            # counter-validate the assumption with the latest revision using permitted sync
+            # use the explicit version to be sure
+            exec_body["mode"] = ExecuteMode.SYNC
+            path = f"/processes/{proc}:{rev}/execution"
+            resp = mocked_sub_requests(
+                self.app, "post_json", path,
+                data=exec_body, headers=self.json_headers,
+                timeout=5, only_local=True, expect_errors=True
+            )
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            results_url = resp.headers.get("Content-Location")  # because sync returns directly, no 'Location' header
+            assert f"{proc}:{rev}" in results_url
+            job_id = results_url.split("/results", 1)[0].rsplit("/", 1)[-1]
+            job = self.job_store.fetch_by_id(job_id)
+            assert job.process == f"{proc}:{rev}"
+            assert resp.json["output"] == exec_value
+
     def test_execute_job_with_accept_languages(self):
         """
         Test that different accept language matching supported languages all successfully execute and apply them.
@@ -2354,7 +2436,6 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 filter_match = responses.matchers.query_param_matcher({
                     "filter": filter_value,
                     "filter-lang": filter_lang,
-                    "timeout": "10",  # added internally by collection processor
                 })
             else:
                 filter_match = responses.matchers.json_params_matcher(filter_value)
@@ -2393,6 +2474,184 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         with open(job_out, mode="r", encoding="utf-8") as out_fd:
             out_data = json.load(out_fd)
         assert out_data["features"] == col_feats["features"]
+
+    @pytest.mark.oap_part3
+    def test_execute_job_with_collection_input_stac_items(self):
+        """
+        Validate parsing and handling of ``collection`` specified in an input with :term:`STAC` :term:`API` endpoint.
+
+        Ensures that ``format: stac-items`` can be used to return the Items directly rather than matched Assets
+        by corresponding :term:`Media-Type`.
+
+        .. versionadded:: 6.0
+            Fix resolution of STAC ItemSearch endpoint.
+        """
+        name = "EchoFeatures"
+        body = self.retrieve_payload(name, "deploy", local=True)
+        proc = self.fully_qualified_test_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_svr = stack.enter_context(
+                responses.RequestsMock(assert_all_requests_are_fired=False)
+            )
+            exec_body_val = self.retrieve_payload(name, "execute", local=True)
+            col_feats = exec_body_val["inputs"]["features"]["value"]  # type: JSON
+
+            # patch the original content to make it respect STAC validation
+            col_id = "test"
+            stac_feats_url = f"{tmp_host}/collections/{col_id}/items"
+            for idx, feat in enumerate(col_feats["features"]):
+                feat.update({
+                    "stac_version": "1.0.0",
+                    "stac_extensions": [],
+                    "collection": col_id,
+                    "id": f"{col_id}-{idx}",
+                    "properties": {
+                        "datetime": "2024-01-01T00:00:00Z",
+                    },
+                    "assets": {},
+                    "links": [{"rel": "self", "href": f"{stac_feats_url}/{col_id}-{idx}"}]
+                })
+
+            filter_lang = "cql2-json"
+            filter_value = {"op": "=", "args": [{"property": "name"}, "test"]}
+            search_datetime = "2024-01-01T00:00:00Z/2024-01-02T00:00:00Z"
+            search_body = {
+                "collections": [col_id],
+                "datetime": search_datetime,
+                "filter": filter_value,
+                "filter-lang": filter_lang,
+            }
+            search_match = responses.matchers.json_params_matcher(search_body)
+            tmp_svr.add("POST", f"{tmp_host}/search", json=col_feats, match=[search_match])
+
+            stac_item_body = col_feats["features"][0]
+            stac_item_id = stac_item_body["id"]
+            stac_item_url = f"{stac_feats_url}/{stac_item_id}"
+            tmp_svr.add("HEAD", stac_item_url, json=stac_item_body)
+            tmp_svr.add("GET", stac_item_url, json=stac_item_body)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "features": {
+                        "collection": f"{tmp_host}/collections/{col_id}",
+                        "format": ExecuteCollectionFormat.STAC_ITEMS,  # NOTE: this is the test!
+                        "type": ContentType.APP_GEOJSON,
+                        "datetime": search_datetime,
+                        "filter-lang": filter_lang,
+                        "filter": filter_value,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "features" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "features", "features.geojson")
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="r", encoding="utf-8") as out_fd:
+            out_data = json.load(out_fd)
+
+        assert "features" in out_data and isinstance(out_data["features"], list)
+        assert len(out_data["features"]) == 1
+
+    @parameterized.expand([
+        (
+            {"subset": "Lat(10:20),Lon(30:40)", "datetime": "2025-01-01/2025-01-02"},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+        (
+            {"subset": {"Lat": [10, 20], "Lon": [30, 40]}, "datetime": ["2025-01-01", "2025-01-02"]},
+            "?subset=Lat(10:20),Lon(30:40)&datetime=2025-01-01/2025-01-02",
+        ),
+    ])
+    def test_execute_job_with_collection_input_coverages_netcdf(self, coverage_parameters, coverage_request):
+        # type: (JSON, str) -> None
+        proc_name = "DockerNetCDF2Text"
+        body = self.retrieve_payload(proc_name, "deploy", local=True)
+        cwl = self.retrieve_payload(proc_name, "package", local=True)
+        body["executionUnit"] = [{"unit": cwl}]
+        proc_id = self.fully_qualified_test_name(self._testMethodName)
+        self.deploy_process(body, describe_schema=ProcessSchema.OGC, process_id=proc_id)
+
+        with contextlib.ExitStack() as stack:
+            tmp_host = "https://mocked-file-server.com"  # must match collection prefix hostnames
+            tmp_svr = stack.enter_context(responses.RequestsMock(assert_all_requests_are_fired=False))
+            test_file = "test.nc"
+            test_data = stack.enter_context(open(os.path.join(TEST_DATA_ROOT, test_file), mode="rb")).read()
+
+            # coverage request expected with resolved query parameters matching submitted collection input parameters
+            col_url = f"{tmp_host}/collections/climate-data"
+            col_cov_url = f"{col_url}/coverage"
+            col_cov_req = f"{col_cov_url}{coverage_request}"
+            tmp_svr.add("GET", col_cov_req, body=test_data)
+
+            col_exec_body = {
+                "mode": ExecuteMode.ASYNC,
+                "response": ExecuteResponse.DOCUMENT,
+                "inputs": {
+                    "input_nc": {
+                        "collection": col_url,
+                        "format": ExecuteCollectionFormat.OGC_COVERAGE,  # NOTE: this is the test!
+                        "type": ContentType.APP_NETCDF,  # must align with process input media-type
+                        **coverage_parameters,
+                    }
+                }
+            }
+
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=col_exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+
+            status_url = resp.json["location"]
+            results = self.monitor_job(status_url)
+            assert "output_txt" in results
+
+        job_id = status_url.rsplit("/", 1)[-1]
+        log_url = f"{status_url}/logs"
+        log_txt = self.app.get(log_url, headers={"Accept": ContentType.TEXT_PLAIN}).text
+        cov_col = "coverage.nc"  # file name applied by 'collection_processor' (resolved by 'format' + 'type' extension)
+        cov_out = "coverage.txt"  # extension modified by invoked process from input file name, literal copy of NetCDF
+        assert cov_col in log_txt, "Resolved NetCDF file from collection handler should have been logged."
+        assert cov_out in log_txt, "Chained NetCDF copied by the process as text should have been logged."
+
+        wps_dir = get_wps_output_dir(self.settings)
+        job_dir = os.path.join(wps_dir, job_id)
+        job_out = os.path.join(job_dir, "output_txt", cov_out)
+        assert os.path.isfile(job_out), f"Invalid output file not found: [{job_out}]"
+        with open(job_out, mode="rb") as out_fd:  # output, although ".txt" is actually a copy of the submitted NetCDF
+            out_data = out_fd.read(3)
+        assert out_data == b"CDF", "Output file from (collection + process) chain should contain the NetCDF header."
+
+        for file_path in [
+            os.path.join(job_dir, cov_col),
+            os.path.join(job_dir, "inputs", cov_col),
+            os.path.join(job_dir, "output_txt", cov_col),
+            os.path.join(job_out, cov_col),
+            os.path.join(job_out, "inputs", cov_col),
+            os.path.join(job_out, "output_txt", cov_col),
+        ]:
+            assert not os.path.exists(file_path), (
+                f"Intermediate collection coverage file should not exist: [{file_path}]"
+            )
 
     def test_execute_job_with_context_output_dir(self):
         cwl = {
@@ -2576,7 +2835,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert all(file.startswith(cwl_stage_dir) for file in output_listing)
             assert all(any(file.endswith(dir_file) for file in output_listing) for dir_file in expect_http_files)
 
-    @pytest.mark.flaky(reruns=2, reruns_delay=1)
+    @pytest.mark.flaky(retries=2, delay=1)
     def test_execute_with_json_listing_directory(self):
         """
         Test that HTTP returning JSON list of directory contents retrieves children files for the process.
@@ -3637,7 +3896,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -3684,7 +3943,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
             assert "Preference-Applied" in resp.headers
             assert resp.headers["Preference-Applied"] == prefer_header.replace(",", ";")
 
@@ -4000,7 +4259,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         results = self.app.get(f"/jobs/{job_id}/results")
@@ -4054,7 +4313,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         out_url = get_wps_output_url(self.settings)
         job_id = status["jobID"]
@@ -4104,7 +4363,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -4164,7 +4423,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -4655,11 +4914,11 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             },
         }
 
-    @pytest.mark.oap_part1
     @parameterized.expand([
         ContentType.MULTIPART_ANY,
         ContentType.MULTIPART_MIXED,
     ])
+    @pytest.mark.oap_part1
     def test_execute_multi_output_multipart_accept(self, multipart_header):
         """
         Requesting ``multipart`` explicitly should return it instead of default :term:`JSON` ``document`` response.
@@ -4870,7 +5129,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -4944,7 +5203,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5026,7 +5285,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5182,7 +5441,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             # request status instead of results since not expecting 'document' JSON in this case
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5271,7 +5530,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5341,7 +5600,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5417,7 +5676,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5484,7 +5743,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5642,7 +5901,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             status_url = resp.json["location"]
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         job_id = status["jobID"]
         out_url = get_wps_output_url(self.settings)
@@ -5720,7 +5979,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
 
             # retrieve the execution status
             status = self.monitor_job(status_url, return_status=True)
-            assert status["status"] == Status.SUCCEEDED
+            assert status["status"] == Status.SUCCESSFUL
 
         out_url = get_wps_output_url(self.settings)
         results = self.app.get(f"/jobs/{job_id}/results")

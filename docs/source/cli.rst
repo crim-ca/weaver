@@ -33,14 +33,29 @@ Python Client Commands
 For details about using the Python :py:class:`weaver.cli.WeaverClient`, please refer directly to its class
 documentation and its underlying methods.
 
+* :py:meth:`weaver.cli.WeaverClient.info`
+* :py:meth:`weaver.cli.WeaverClient.version`
+* :py:meth:`weaver.cli.WeaverClient.conformance`
+* :py:meth:`weaver.cli.WeaverClient.register`
+* :py:meth:`weaver.cli.WeaverClient.unregister`
 * :py:meth:`weaver.cli.WeaverClient.deploy`
 * :py:meth:`weaver.cli.WeaverClient.undeploy`
 * :py:meth:`weaver.cli.WeaverClient.capabilities`
 * :py:meth:`weaver.cli.WeaverClient.describe`
+* :py:meth:`weaver.cli.WeaverClient.package`
+* :py:meth:`weaver.cli.WeaverClient.jobs`
+* :py:meth:`weaver.cli.WeaverClient.trigger_job`
+* :py:meth:`weaver.cli.WeaverClient.update_job`
 * :py:meth:`weaver.cli.WeaverClient.execute`
 * :py:meth:`weaver.cli.WeaverClient.monitor`
-* :py:meth:`weaver.cli.WeaverClient.dismiss`
 * :py:meth:`weaver.cli.WeaverClient.status`
+* :py:meth:`weaver.cli.WeaverClient.inputs`
+* :py:meth:`weaver.cli.WeaverClient.outputs`
+* :py:meth:`weaver.cli.WeaverClient.logs`
+* :py:meth:`weaver.cli.WeaverClient.statistics`
+* :py:meth:`weaver.cli.WeaverClient.exceptions`
+* :py:meth:`weaver.cli.WeaverClient.provenance`
+* :py:meth:`weaver.cli.WeaverClient.dismiss`
 * :py:meth:`weaver.cli.WeaverClient.results`
 * :py:meth:`weaver.cli.WeaverClient.upload`
 
@@ -478,6 +493,59 @@ Sample Output:
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/job_results.json
     :language: json
+
+.. _cli_example_job_prov:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Job Provenance Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Accomplishes the :term:`Job` |PROV|_ request to obtain :term:`Provenance` metadata.
+
+Below examples employ the ``Echo`` :term:`Process` available in |weaver-func-test-apps|_
+and assume the referenced :term:`Job` was completed successfully.
+
+.. note::
+    There fore multiple alternative format representations offered by this operation.
+    Not all of them are presented below. See the various ``prov_type`` and ``prov_format``
+    parameters for the combinations.
+
+.. seealso::
+    - :ref:`proc_op_job_prov` provides more details about available endpoints, operations and metadata returned.
+
+.. code-block:: shell
+    :caption: Command Line
+
+    weaver prov -u ${WEAVER_URL} -j "1c49f085-bbd7-410d-a801-81fd42469e8a" --pT run
+
+.. code-block:: python
+    :caption: Python
+
+    from weaver.provenance import ProvenancePathType
+
+    client.prov("1c49f085-bbd7-410d-a801-81fd42469e8a", prov_type=ProvenancePathType.PROV_RUN)
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_prov_run.txt
+    :language: text
+
+.. code-block:: shell
+    :caption: Command Line
+
+    weaver prov -u ${WEAVER_URL} -nL --pF "PROV-JSON"
+
+.. code-block:: python
+    :caption: Python
+
+    from weaver.provenance import ProvenanceFormat
+
+    client.prov("1c49f085-bbd7-410d-a801-81fd42469e8a", prov_format=ProvenanceFormat.PROV_N)
+
+Sample Output:
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_prov.txt
+    :language: text
 
 .. _cli_example_upload:
 

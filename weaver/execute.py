@@ -46,12 +46,14 @@ if TYPE_CHECKING:
     ]
     # pylint: disable=C0103,invalid-name
     ExecuteCollectionFormatType_STAC = Literal["stac-collection"]
+    ExecuteCollectionFormatType_STAC_ITEMS = Literal["stac-items"]
     ExecuteCollectionFormatType_OGC_COVERAGE = Literal["ogc-coverage-collection"]
     ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]
     ExecuteCollectionFormatType_OGC_MAP = Literal["ogc-map-collection"]
     ExecuteCollectionFormatType_GEOJSON = Literal["geojson-feature-collection"]
     AnyExecuteCollectionFormat = Union[
         ExecuteCollectionFormatType_STAC,
+        ExecuteCollectionFormatType_STAC_ITEMS,
         ExecuteCollectionFormatType_OGC_COVERAGE,
         ExecuteCollectionFormatType_OGC_FEATURES,
         ExecuteCollectionFormatType_OGC_MAP,
@@ -79,6 +81,13 @@ class ExecuteControlOption(Constants):
         """
         return [ExecuteControlOption.ASYNC, ExecuteControlOption.SYNC]
 
+    @classmethod
+    def from_mode(cls, mode):
+        # type: (Optional[AnyExecuteMode]) -> Optional[ExecuteControlOption]
+        mode = ExecuteMode.get(mode)
+        ctrl = cls.get(f"{mode}-execute")
+        return ctrl
+
 
 class ExecuteReturnPreference(Constants):
     MINIMAL = "minimal"                 # type: ExecuteReturnPreferenceMinimalType
@@ -97,6 +106,7 @@ class ExecuteTransmissionMode(Constants):
 
 class ExecuteCollectionFormat(Constants):
     STAC = "stac-collection"                    # type: ExecuteCollectionFormatType_STAC
+    STAC_ITEMS = "stac-items"                   # type: ExecuteCollectionFormatType_STAC_ITEMS
     OGC_COVERAGE = "ogc-coverage-collection"    # type: ExecuteCollectionFormatType_OGC_COVERAGE
     OGC_FEATURES = "ogc-features-collection"    # type: ExecuteCollectionFormatType_OGC_FEATURES
     OGC_MAP = "ogc-map-collection"              # type: ExecuteCollectionFormatType_OGC_MAP

@@ -36,11 +36,12 @@ from weaver.processes.builtin.utils import (  # isort:skip # noqa: E402
     is_geojson_url,
     validate_reference
 )
+from weaver.processes.constants import PACKAGE_FILE_TYPE  # isort:skip # noqa: E402
 from weaver.utils import Lazify, get_any_id, load_file, repr_json, request_extra  # isort:skip # noqa: E402
 from weaver.wps_restapi import swagger_definitions as sd  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
-    from typing import List
+    from typing import Dict, List
 
     from pystac import Asset
 
@@ -89,11 +90,11 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     input_id = get_any_id(input_definition)
     logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
-        "Process [{}] Got arguments: collection_input={} output_dir=[{}], for input=[{}]",
+        "Process [{}] for input=[{}] got arguments:\ncollection_input={}\noutput_dir=[{}]",
         PACKAGE_NAME,
+        input_id,
         Lazify(lambda: repr_json(collection_input, indent=2)),
         output_dir,
-        input_id,
     )
     os.makedirs(output_dir, exist_ok=True)
 
@@ -126,8 +127,13 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
     api_url, col_id = col_parts if len(col_parts) == 2 else (None, col_parts[0])
     col_id_alt = get_any_id(col_input, pop=True)
     col_id = col_id or col_id_alt
+    timeout = col_args.pop("timeout", 10)
 
-    col_args.setdefault("timeout", 10)
+    # convert all query parameters to their corresponding function parameter name
+    for arg in list(col_args):
+        if "-" in arg:
+            col_args[arg.replace("-", "_")] = col_args.pop(arg)
+    col_args = parse_collection_parameters(col_args)
 
     logger.log(  # pylint: disable=E1205 # false positive
         logging.INFO,
@@ -143,7 +149,7 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             col_href,
             queries=col_args,
             headers={"Accept": f"{ContentType.APP_GEOJSON},{ContentType.APP_JSON}"},
-            timeout=col_args["timeout"],
+            timeout=timeout,
             retries=3,
             only_server_errors=False,
         )
@@ -156,22 +162,19 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             with open(path, mode="w", encoding="utf-8") as file:
                 json.dump(feat, file)
             _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
-            file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+            file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
             resolved_files.append(file_obj)
 
-    elif col_fmt == ExecuteCollectionFormat.STAC:
-        # convert all parameters to their corresponding name of the query utility, and ignore unknown ones
-        for arg in list(col_args):
-            if "-" in arg:
-                col_args[arg.replace("-", "_")] = col_args.pop(arg)
+    elif col_fmt in [ExecuteCollectionFormat.STAC, ExecuteCollectionFormat.STAC_ITEMS]:
+        # ignore unknown or enforced parameters
         known_params = set(inspect.signature(ItemSearch).parameters)
         known_params -= {"url", "method", "stac_io", "client", "collection", "ids", "modifier"}
         for param in set(col_args) - known_params:
             col_args.pop(param)
 
-        timeout = col_args.pop("timeout", 10)
+        search_url = f"{api_url}/search"
         search = ItemSearch(
-            url=api_url,
+            url=search_url,
             method="POST",
             stac_io=StacApiIO(timeout=timeout, max_retries=3),  # FIXME: add 'headers' with authorization/cookies?
             collections=col_id,
@@ -179,18 +182,30 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         )
         for item in search.items():
             for ctype in col_media_type:
+                if col_fmt == ExecuteCollectionFormat.STAC_ITEMS:
+                    # FIXME: could alternate Accept header for Items' representation be employed?
+                    _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
+                    file_obj = {"class": PACKAGE_FILE_TYPE, "path": item.get_self_href(), "format": file_fmt}
+                    resolved_files.append(file_obj)
+                    continue
                 for _, asset in item.get_assets(media_type=ctype):  # type: (..., Asset)
                     _, file_fmt = get_cwl_file_format(ctype)
-                    file_obj = {"class": "File", "path": asset.href, "format": file_fmt}
+                    file_obj = {"class": PACKAGE_FILE_TYPE, "path": asset.href, "format": file_fmt}
                     resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_FEATURES:
-        if str(col_args.get("filter-lang")) == "cql2-json":
+        if str(col_args.get("filter_lang")) == "cql2-json":
             col_args["cql"] = col_args.pop("filter")
+            col_args.pop("filter_lang")
+        else:
+            for arg in list(col_args):
+                if arg.startswith("filter_"):
+                    col_args[arg.replace("_", "-")] = col_args.pop(arg)
         search = Features(
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": f"{ContentType.APP_GEOJSON}, {ContentType.APP_VDN_GEOJSON}, {ContentType.APP_JSON}"},
+            json_="{}",  # avoid unnecessary request on init
         )
         items = search.collection_items(col_id, **col_args)
         if items.get("type") != "FeatureCollection" or "features" not in items:
@@ -205,14 +220,14 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
                 for _, asset in feat["assets"].items():  # type: (str, JSON)
                     if asset["type"] in col_media_type:
                         _, file_fmt = get_cwl_file_format(asset["type"])
-                        file_obj = {"class": "File", "path": asset["href"], "format": file_fmt}
+                        file_obj = {"class": PACKAGE_FILE_TYPE, "path": asset["href"], "format": file_fmt}
                         resolved_files.append(file_obj)
             else:
                 path = os.path.join(output_dir, f"feature-{i}.geojson")
                 with open(path, mode="w", encoding="utf-8") as file:
                     json.dump(feat, file)
                 _, file_fmt = get_cwl_file_format(ContentType.APP_GEOJSON)
-                file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+                file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
                 resolved_files.append(file_obj)
 
     elif col_fmt == ExecuteCollectionFormat.OGC_COVERAGE:
@@ -220,15 +235,16 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": ContentType.APP_JSON},
+            json_="{}",  # avoid unnecessary request on init
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype, dot=False)
-        path = os.path.join(output_dir, f"map.{ext}")
+        path = os.path.join(output_dir, f"coverage.{ext}")
         with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, cov.coverage(col_id)).getbuffer()
-            file.write(data)  # type: ignore
+            data = cast(io.BytesIO, cov.coverage(col_id, **col_args)).getbuffer()
+            file.write(data)
         _, file_fmt = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+        file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
 
     elif col_fmt in ExecuteCollectionFormat.OGC_MAP:
@@ -236,15 +252,16 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
             url=api_url,
             # FIXME: add 'auth' or 'headers' authorization/cookies?
             headers={"Accept": ContentType.APP_JSON},
+            json_="{}",  # avoid unnecessary request on init
         )
         ctype = (col_media_type or [ContentType.IMAGE_COG])[0]
         ext = get_extension(ctype[0], dot=False)
         path = os.path.join(output_dir, f"map.{ext}")
         with open(path, mode="wb") as file:
-            data = cast(io.BytesIO, maps.map(col_id)).getbuffer()
-            file.write(data)  # type: ignore
+            data = cast(io.BytesIO, maps.map(col_id, **col_args)).getbuffer()
+            file.write(data)
         _, file_fmt = get_cwl_file_format(ctype)
-        file_obj = {"class": "File", "path": f"file://{path}", "format": file_fmt}
+        file_obj = {"class": PACKAGE_FILE_TYPE, "path": f"file://{path}", "format": file_fmt}
         resolved_files.append(file_obj)
 
     else:
@@ -261,6 +278,27 @@ def process_collection(collection_input, input_definition, output_dir, logger=LO
         Lazify(lambda: repr_json(resolved_files, indent=2)),
     )
     return resolved_files
+
+
+def parse_collection_parameters(parameters):
+    # type: (Dict[str, JSON]) -> Dict[str, JSON]
+    """
+    Applies any relevant conversions of known parameters between allowed request format and expected utilities.
+    """
+    if not parameters:
+        return {}
+
+    subset = parameters.get("subset")
+    if subset and isinstance(subset, str):
+        subset_dims = {}
+        for item in subset.split(","):
+            dim, span = item.split("(", 1)
+            span = span.split(")", 1)[0]
+            ranges = span.split(":")
+            subset_dims[dim] = list(ranges)
+        parameters["subset"] = subset_dims
+
+    return parameters
 
 
 def process_cwl(collection_input, input_definition, output_dir):

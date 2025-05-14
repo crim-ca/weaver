@@ -7,7 +7,7 @@ from typing_extensions import Literal, get_args
 from weaver.base import Constants
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Dict, TypeAlias
 
     from weaver.typedefs import CWL_NamespaceDefinition
 
@@ -101,6 +101,35 @@ CWL_NAMESPACE_SCHEMA_DEFINITION = MappingProxyType({
 })  # type: CWL_NamespaceDefinition
 """
 Namespace used to reference :term:`CWL` definitions provided by ``schema.org`` typically used for additional metadata.
+"""
+CWL_NAMESPACE_SCHEMA_METADATA_NAME = f"{CWL_NAMESPACE_SCHEMA_ID}:name"
+CWL_NAMESPACE_SCHEMA_METADATA_EMAIL = f"{CWL_NAMESPACE_SCHEMA_ID}:email"
+CWL_NAMESPACE_SCHEMA_METADATA_IDENTIFIER = f"{CWL_NAMESPACE_SCHEMA_ID}:identifier"
+CWL_NAMESPACE_SCHEMA_METADATA_PERSON = f"{CWL_NAMESPACE_SCHEMA_ID}:Person"
+CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR = f"{CWL_NAMESPACE_SCHEMA_ID}:author"
+CWL_NAMESPACE_SCHEMA_METADATA_CITATION = f"{CWL_NAMESPACE_SCHEMA_ID}:citation"
+CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS = f"{CWL_NAMESPACE_SCHEMA_ID}:keywords"
+CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY = f"{CWL_NAMESPACE_SCHEMA_ID}:codeRepository"
+CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR = f"{CWL_NAMESPACE_SCHEMA_ID}:contributor"
+CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED = f"{CWL_NAMESPACE_SCHEMA_ID}:dateCreated"
+CWL_NAMESPACE_SCHEMA_METADATA_LICENSE = f"{CWL_NAMESPACE_SCHEMA_ID}:license"
+CWL_NAMESPACE_SCHEMA_METADATA_RELEASE_NOTES = f"{CWL_NAMESPACE_SCHEMA_ID}:releaseNotes"
+CWL_NAMESPACE_SCHEMA_METADATA_VERSION = f"{CWL_NAMESPACE_SCHEMA_ID}:version"
+CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION = f"{CWL_NAMESPACE_SCHEMA_ID}:softwareVersion"
+CWL_NAMESPACE_SCHEMA_METADATA_SUPPORTED = [
+    CWL_NAMESPACE_SCHEMA_METADATA_AUTHOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_CITATION,
+    CWL_NAMESPACE_SCHEMA_METADATA_CODE_REPOSITORY,
+    CWL_NAMESPACE_SCHEMA_METADATA_CONTRIBUTOR,
+    CWL_NAMESPACE_SCHEMA_METADATA_DATE_CREATED,
+    CWL_NAMESPACE_SCHEMA_METADATA_LICENSE,
+    CWL_NAMESPACE_SCHEMA_METADATA_RELEASE_NOTES,
+    CWL_NAMESPACE_SCHEMA_METADATA_KEYWORDS,
+    CWL_NAMESPACE_SCHEMA_METADATA_VERSION,
+    CWL_NAMESPACE_SCHEMA_METADATA_SOFTWARE_VERSION,
+]
+"""
+Fields that can be directly in the :term:`CWL` contents.
 """
 
 CWL_NAMESPACE_OGC_API_PROC_PART1_ID = "ogcapi-processes-1"
@@ -357,17 +386,45 @@ OAS_DATA_TYPES = frozenset(
 ProcessSchemaOGCType = Literal["OGC", "ogc"]
 ProcessSchemaOLDType = Literal["OLD", "old"]
 ProcessSchemaWPSType = Literal["WPS", "wps"]
-ProcessSchemaType = Union[ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaWPSType]
+ProcessSchemaConstType = "ProcessSchema"  # type: TypeAlias
+ProcessSchemaType = Union[
+    ProcessSchemaOGCType,
+    ProcessSchemaOLDType,
+    ProcessSchemaWPSType,
+    ProcessSchemaConstType,
+]
+JobStatusTypeProcess = Literal["process"]
+JobStatusTypeService = Literal["service"]
+JobStatusTypeProvider = Literal["provider"]
+JobStatusConstType = "JobStatusType"  # type: TypeAlias
+JobStatusPropertyType = Union[
+    JobStatusTypeProcess,
+    JobStatusTypeService,
+    JobStatusTypeProvider,
+    JobStatusConstType,
+]
 JobInputsOutputsSchemaType_OGC = Literal["OGC", "ogc"]
 JobInputsOutputsSchemaType_OLD = Literal["OLD", "old"]
 JobInputsOutputsSchemaType_OGC_STRICT = Literal["OGC+STRICT", "ogc+strict"]
 JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
 JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
 JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
-JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
-JobStatusSchemaType_OGC = Literal["OGC", "ogc"]
-JobStatusSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
-JobStatusSchemaType = Union[JobStatusSchemaType_OGC, JobStatusSchemaType_OpenEO]
+JobInputsOutputsSchemaConstType = "JobInputsOutputsSchema"  # type: TypeAlias
+JobInputsOutputsSchemaType = Union[
+    JobInputsOutputsSchemaAnyOGCType,
+    JobInputsOutputsSchemaAnyOLDType,
+    JobInputsOutputsSchemaConstType,
+]
+JobStatusProfileSchemaType_OGC = Literal["OGC", "ogc"]
+JobStatusProfileSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
+JobStatusProfileSchemaType_WPS = Literal["WPS", "wps"]
+JobStatusProfileSchemaConstType = "JobStatusProfileSchema"  # type: TypeAlias
+JobStatusProfileSchemaType = Union[
+    JobStatusProfileSchemaType_OGC,
+    JobStatusProfileSchemaType_OpenEO,
+    JobStatusProfileSchemaType_WPS,
+    JobStatusProfileSchemaConstType,
+]
 
 
 class ProcessSchema(Constants):
@@ -389,12 +446,32 @@ class JobInputsOutputsSchema(Constants):
     OLD = "old"                 # type: JobInputsOutputsSchemaType_OLD
 
 
-class JobStatusSchema(Constants):
+class JobStatusProfileSchema(Constants):
     """
-    Schema selector to represent a :term:`Job` status response.
+    Schema :term:`Profile` selector to represent a :term:`Job` status response.
     """
-    OGC = "ogc"         # type: JobStatusSchemaType_OGC
-    OPENEO = "openeo"   # type: JobStatusSchemaType_OpenEO
+    OGC = "ogc"         # type: JobStatusProfileSchemaType_OGC
+    OPENEO = "openeo"   # type: JobStatusProfileSchemaType_OpenEO
+    WPS = "wps"         # type: JobStatusProfileSchemaType_WPS
+
+
+class JobStatusType(Constants):
+    """
+    Type of :term:`Job` status response being represented.
+
+    The values consider teh originally submitted :term:`Process`, :term:`Provider` or :term:`Profile` representations.
+
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+    """
+    # backward compatibility
+    PROCESS = "process"     # type: JobStatusTypeProcess  # happens to be the same as newer 'OGC API - Processes' type
+    PROVIDER = "provider"   # type: JobStatusTypeProvider
+    # previous name used instead of 'provider', reflecting 'weaver.datatype.Service' explicitly
+    SERVICE = "service"     # type: JobStatusTypeService
+    # additional values as more specific variants of 'provider' or alternate 'profile' representations
+    WPS = "wps"             # type: ProcessSchemaWPSType
+    OPENEO = "openeo"       # type: JobStatusProfileSchemaType_OpenEO
 
 
 if TYPE_CHECKING:

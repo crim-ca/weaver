@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import socket
+from functools import cache
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -17,10 +18,9 @@ from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
 
 from weaver.base import Constants, classproperty
-from weaver.compat import cache
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -96,11 +96,13 @@ class ContentType(Constants):
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
+    APP_JSONLD = "application/ld+json"
     APP_RAW_JSON = "application/raw+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
     APP_NETCDF = "application/x-netcdf"
+    APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
@@ -125,6 +127,8 @@ class ContentType(Constants):
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
     TEXT_XML = "text/xml"
+    TEXT_PROVN = "text/provenance-notation"
+    TEXT_TURTLE = "text/turtle"
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
@@ -828,7 +832,7 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         ``must_exist=False`` before providing it to the `CWL` I/O definition. Setting ``must_exist=False`` should be
         used only for literal string comparison or pre-processing steps to evaluate formats.
 
-    :param media_type: Some reference, namespace'd or literal (possibly extended) media-type string.
+    :param media_type: Some reference, namespaced or literal (possibly extended) media-type string.
     :param make_reference: Construct the full URL reference to the resolved media-type. Otherwise, return tuple details.
     :param must_exist:
         Return result only if it can be resolved to an official media-type (or synonym if enabled), otherwise ``None``.
@@ -1038,10 +1042,10 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
     return media_type
 
 
-@overload
-def guess_target_format(request):
-    # type: (AnyRequestType) -> ContentType
-    ...
+def default_format_handler(output_format):
+    # type: (Union[str, AnyOutputFormat, AnyContentType]) -> Optional[AnyContentType]
+    out_fmt = OutputFormat.get(output_format, allow_version=False)  # JSON by default if unknown or missing
+    return get_content_type(out_fmt)
 
 
 @overload
@@ -1062,12 +1066,19 @@ def guess_target_format(request, default, return_source, override_user_agent):
     ...
 
 
+@overload
+def guess_target_format(request, **kwargs):
+    # type: (AnyRequestType, Any) -> ContentType
+    ...
+
+
 def guess_target_format(
-    request,                        # type: AnyRequestType
-    default=ContentType.APP_JSON,   # type: Optional[Union[ContentType, str]]
-    return_source=False,            # type: bool
-    override_user_agent=False,      # type: bool
-):                                  # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
+    request,                                # type: AnyRequestType
+    default=ContentType.APP_JSON,           # type: Optional[Union[ContentType, str]]
+    return_source=False,                    # type: bool
+    override_user_agent=False,              # type: bool
+    format_handler=default_format_handler,  # type: Callable[[Any], Optional[AnyContentType]]
+):                                          # type: (...) -> Union[AnyContentType, Tuple[AnyContentType, FormatSource]]
     """
     Guess the best applicable response ``Content-Type`` header from the request.
 
@@ -1094,11 +1105,10 @@ def guess_target_format(
 
     format_query = request.params.get("format") or request.params.get("f")
     format_source = "default"  # type: FormatSource
-    content_type = None  # type: Optional[str]
+    content_type = None  # type: Optional[AnyContentType]
     if format_query:
-        content_type = OutputFormat.get(format_query, default=None, allow_version=False)
+        content_type = format_handler(format_query)
         if content_type:
-            content_type = get_content_type(content_type)
             format_source = "query"
     if not content_type:
         content_type = get_header("accept", request.headers, default=None)
