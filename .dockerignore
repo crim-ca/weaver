@@ -51,6 +51,9 @@ tests
 testdata.json
 reports
 
+# PyPI distributions
+dist/
+
 ## R
 *.Rhistory
 

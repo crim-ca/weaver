@@ -76,8 +76,10 @@ LOGGER.info("test requirements: %s", TEST_REQUIREMENTS)
 LOGGER.info("link requirements: %s", LINKS)
 
 setup(
-    name=__meta__.__name__,
+    name=__meta__.__package__,
     version=__meta__.__version__,
+    provides=[__meta__.__name__],  # ensure that the package distribution alias maps to the importable package name
+    py_modules=[__meta__.__name__],
     description=__meta__.__description__,
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/x-rst",
@@ -115,9 +117,16 @@ setup(
     download_url=__meta__.__docker_repository__,
     license=__meta__.__license_type__,
     keywords=" ".join(__meta__.__keywords__),
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests*"]),
+    package_dir={
+        __meta__.__name__: "weaver",
+        __meta__.__package__: "weaver",
+    },
+    package_data={
+        "": ["*.mako"],
+        "weaver": ["*"],
+    },
     include_package_data=True,
-    package_data={"": ["*.mako"]},
     zip_safe=False,
     test_suite="tests",
     python_requires=">=3.10, <4",

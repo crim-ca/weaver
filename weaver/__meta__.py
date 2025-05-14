@@ -1,5 +1,6 @@
 __name__ = "weaver"
 __title__ = "Weaver"
+__package__ = "crim-weaver"
 __version__ = "6.6.0"
 __description__ = "Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)."
 __source_repository__ = "https://github.com/crim-ca/weaver"
@@ -15,7 +16,7 @@ __authors__ = [
 ]
 __author__ = ", ".join(__authors__)
 __emails__ = [
-    ""
+    "info@crim.ca"
 ]
 __keywords__ = [
     "buildout",
