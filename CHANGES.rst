@@ -19,6 +19,9 @@ Fixes:
 - Fix missing link in `Job` status `HTML` page for ``inputs`` and ``links`` references.
 - Fix invalid link in `Job` status `HTML` page for ``logs`` reference.
 - Fix consistency between link names between `Job` status and `Process` description `HTML` pages.
+- Remove additional software dependency in worker Docker image leading to outdated Python 3.11 and
+  its insecure dependencies to be installed along updated Python 3.12 with specific `Weaver` requirements.
+- Reduce all Docker image sizes by approximately 1/3 with post-install removal of build dependencies.
 
 .. _changes_6.6.0:
 
