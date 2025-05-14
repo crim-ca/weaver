@@ -54,28 +54,28 @@ Assume that the definitions will be inserted into a 'nav-menu' with a parent HTM
     %if first_page:
         <li>
             <div class="nav-link">
-                Go to <a href="${first_page}">first page</a>.
+                Go to <a href="${first_page}">First Page</a>
             </div>
         </li>
     %endif
     %if prev_page:
         <li>
             <div class="nav-link">
-                Go to <a href="${prev_page}">previous page</a>.
+                Go to <a href="${prev_page}">Previous Page</a>
             </div>
         </li>
     %endif
     %if next_page:
         <li>
             <div class="nav-link">
-                Go to <a href="${next_page}">next page</a>.
+                Go to <a href="${next_page}">Next Page</a>
             </div>
         </li>
     %endif
     %if last_page:
         <li>
             <div class="nav-link">
-                Go to <a href="${last_page}">last page</a>.
+                Go to <a href="${last_page}">Last Page</a>
             </div>
         </li>
     %endif
