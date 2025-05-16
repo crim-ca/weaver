@@ -951,13 +951,25 @@ class FileServer(SimpleHTTPTestServer):
         instance over multiple tests of a complete test suite rather than recreating a server for each test.
     """
     def __init__(self):  # pylint: disable=W0231
+        if sys.platform == "win32":
+            hostname = "localhost"
+        else:
+            hostname = "0.0.0.0"
         self._port = self.get_port()
-        self._uri = f"http://0.0.0.0:{self._port}"
+        self._uri = f"http://{hostname}:{self._port}"
 
         # purposely call 'HTTPTestServer' instead of 'SimpleHTTPTestServer' to enforce the URI hostname
         # otherwise, 'socket.gethostname()' is used (machine name), and the obtained URI fails our schema validation
-        HTTPTestServer.__init__(self, hostname="0.0.0.0", port=self._port, uri=self._uri)  # pylint: disable=W0233
+        HTTPTestServer.__init__(self, hostname=hostname, port=self._port, uri=self._uri)  # pylint: disable=W0233
         self.cwd = self.document_root
+
+    def _find_pids_by_port(self):
+        if sys.platform == "win32":
+            netstat_cmd = 'netstat -ano | findstr "%s:%s" | findstr "LISTEN" | findstr /r /c:"/[0-9]* " || exit /B 0'
+            pids = [p.strip() for p in self.run(netstat_cmd, capture=True, cd='/').split('\n') if p.strip()]
+            return pids
+        else:
+            super()._find_pids_by_port()
 
 
 def mocked_file_server(directory,                   # type: str
