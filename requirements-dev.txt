@@ -44,6 +44,7 @@ pylint-per-file-ignores
 responses
 safety
 stopit
+twine
 typing_extensions
 WebTest
 wsgiproxy

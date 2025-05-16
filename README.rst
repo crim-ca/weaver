@@ -48,7 +48,7 @@ for each process.
     * - citation
       - | |citation-zenodo| |citation-cff|
     * - build status
-      - | |readthedocs| |docker_build_mode| |docker_build_status|
+      - | |readthedocs_build_status| |docker_build_mode| |docker_build_status|
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
@@ -82,7 +82,7 @@ for each process.
     :alt: Github Actions CI Build Status (latest tag)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.6.0
 
-.. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
+.. |readthedocs_build_status| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
     :target: `ReadTheDocs`_
 
@@ -189,6 +189,8 @@ offered by |ades| and |ems| instances like `Weaver`.
 .. |kw12| image:: https://img.shields.io/badge/Open%20Science-blue
    :alt: Open Science
 
+.. remove-pypi-start
+
 Applications
 ~~~~~~~~~~~~~~~~
 
@@ -223,6 +225,10 @@ Observation data processing can evolve, and illustrates the advantages with appl
 .. note::
     See section `Extra Details & Sponsors`_ for further application examples and concrete demonstrations.
 
+.. remove-pypi-end
+
+.. remove-pypi-start
+
 Platform
 ~~~~~~~~~~~~~~~~
 
@@ -249,6 +255,8 @@ application stores, and shows the potential for multidisciplinary workflows in t
         </div>
     </div>
     <br>
+
+.. remove-pypi-end
 
 ----------------
 Links
