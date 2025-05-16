@@ -489,7 +489,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security security-code security-deps doc8 docf fstring docstring links imports
+CHECKS := pep8 lint security security-code security-deps dist-doc doc8 docf fstring docstring links imports
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
@@ -566,6 +566,16 @@ check-security-code-only: mkdir-reports clean-src ## run security checks on sour
 	@bash -c '$(CONDA_CMD) \
 		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
 		1> >(tee "$(REPORTS_DIR)/check-security-code.txt")'
+
+.PHONY: check-dist-doc-only
+check-dist-doc-only: mkdir-reports dist-pypi-only	## check that documentation is valid for PyPI package distribution
+	@echo "Running RST documentation checks for PyPI package distribution..."
+	@bash -c '$(CONDA_CMD) \
+		twine check dist/* \
+		1> >(tee "$(REPORTS_DIR)/check-dist-doc.txt")'
+
+.PHONY: check-dist-doc
+check-dist-doc: install-sys check-dist-doc-only
 
 .PHONY: check-doc8-only
 check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting
@@ -777,8 +787,8 @@ dist-pypi: install-sys dist-pypi-only
 .PHONY: dist-pypi-only
 dist-pypi-only: clean-dist	## publish package distribution on PyPI
 	@echo "Build distributions for PyPI ..."
-	@-python setup.py sdist
-	@-python setup.py bdist_wheel
+	@DOC_REMOVE_PYPI=true python setup.py sdist
+	@DOC_REMOVE_PYPI=true python setup.py bdist_wheel
 	@ls -l dist
 
 .PHONY: extract-changes

@@ -8,9 +8,28 @@ from setuptools import find_packages, setup
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 LONG_DESCRIPTION = None
 if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ["README.rst", "CHANGES.rst"]):
-    README = open(os.path.join(CUR_DIR, "README.rst")).read()
-    CHANGES = open(os.path.join(CUR_DIR, "CHANGES.rst")).read()
+    with open(os.path.join(CUR_DIR, "README.rst"), mode="r", encoding="utf-8") as readme_f:
+        README = readme_f.read()
+    with open(os.path.join(CUR_DIR, "CHANGES.rst"), mode="r", encoding="utf-8") as changes_f:
+        CHANGES = changes_f.read()
     LONG_DESCRIPTION = f"{README}\n\n{CHANGES}"
+
+    # remove RST contents that are not permitted within PyPI distributions
+    # any contents between '.. remove-pypi-[start|end]' comments will be removed
+    DOC_REMOVE_PYPI = str(os.getenv("DOC_REMOVE_PYPI", False)).lower() == "true"
+    while DOC_REMOVE_PYPI:
+        DOC_REMOVE_PYPI_START = LONG_DESCRIPTION.find(".. remove-pypi-start")
+        DOC_REMOVE_PYPI_END = LONG_DESCRIPTION.find(".. remove-pypi-end")
+        if (
+            DOC_REMOVE_PYPI_START > 0 and  # noqa
+            DOC_REMOVE_PYPI_END > 0 and
+            DOC_REMOVE_PYPI_START < DOC_REMOVE_PYPI_END
+        ):
+            DOC_REMOVE_PYPI_END += len(".. remove-pypi-end")
+            LONG_DESCRIPTION = LONG_DESCRIPTION[:DOC_REMOVE_PYPI_START] + LONG_DESCRIPTION[DOC_REMOVE_PYPI_END:]
+        else:
+            DOC_REMOVE_PYPI = False
+            break
 
 # ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
@@ -25,12 +44,6 @@ if logging.StreamHandler not in LOGGER.handlers:
     LOGGER.addHandler(logging.StreamHandler(sys.stdout))  # type: ignore # noqa
 LOGGER.setLevel(logging.INFO)
 LOGGER.info("starting setup")
-
-with open("README.rst") as readme_file:
-    README = readme_file.read()
-
-with open("CHANGES.rst") as changes_file:
-    CHANGES = changes_file.read().replace(".. :changelog:", "")
 
 
 def _parse_requirements(file_path, requirements, links):
@@ -116,6 +129,7 @@ setup(
     url=__meta__.__source_repository__,
     download_url=__meta__.__docker_repository__,
     license=__meta__.__license_type__,
+    license_files=["LICENSE.txt"],
     keywords=" ".join(__meta__.__keywords__),
     packages=find_packages(exclude=["tests*"]),
     package_dir={
@@ -128,7 +142,6 @@ setup(
     },
     include_package_data=True,
     zip_safe=False,
-    test_suite="tests",
     python_requires=">=3.10, <4",
     install_requires=REQUIREMENTS,
     dependency_links=LINKS,

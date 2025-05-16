@@ -2243,7 +2243,7 @@ Fixes:
 
 Changes:
 --------
-- Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
+- Add reference link to `ReadTheDocs` URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
 - Add ``datetime`` query parameter for job searches queries
@@ -2512,11 +2512,11 @@ Fixes:
 
 Changes:
 --------
-- Generate Weaver OpenAPI specification for readthedocs publication.
+- Generate Weaver OpenAPI specification for `ReadTheDocs` publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
-  and Readthedocs served pages.
-- Improve documentation links, ReadTheDocs format and TOC references.
+  and `ReadTheDocs` served pages.
+- Improve documentation links, `ReadTheDocs` format and TOC references.
 - Avoid logging ``stdout/stderr`` in workflows.
 - Add tests to make sure processes ``stdout/stderr`` are logged.
 - Remove Python 2.7 version as not *officially* supported.
@@ -2810,7 +2810,7 @@ Changes:
 Fixes:
 -------------
 
-- Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
+- Fix `ReadTheDocs` documentation generation.
 - Fix ``.travis`` docker image build condition.
 - Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support
   (`#62 <https://github.com/crim-ca/weaver/issues/62>`_).
