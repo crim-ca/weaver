@@ -100,11 +100,23 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     """
     yield caplog  # run the test and collect logs from it
 
+    def is_cwl_fixture(marker, fixture):  # pragma: no cover
+        mark = marker.name
+        if mark != "parametrize":
+            return False
+        name = getattr(fixture, "name", None)
+        func = None
+        if not name:
+            func = getattr(fixture, "_fixture_function_marker", None)
+        if not func:
+            func = getattr(fixture, "_pytestfixturefunction", None)
+        if func:
+            name = func.name
+        return name == marker.args[0]
+
     markers = list(
         filter(
-            lambda _marker:
-                _marker.name == "parametrize"
-                and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,  # noqa
+            lambda _marker: is_cwl_fixture(_marker, fixture_cwl_no_warn_unknown_hint),
             request.keywords.get("pytestmark", [])
         )
     )  # type: List[Marker]
