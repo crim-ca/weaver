@@ -25,7 +25,14 @@ The installation works on Linux 64 bit distributions (tested on Ubuntu 16.04).
 From GitHub Sources
 ===================
 
-Install weaver as normal user from GitHub sources:
+Install Weaver as normal user from GitHub sources:
+
+.. code-block:: sh
+
+   pip install https://github.com/crim-ca/weaver
+
+Alternatively, you can also clone the repository and install it from there.
+This is useful if you want to develop the code or contribute to the project.
 
 .. code-block:: sh
 

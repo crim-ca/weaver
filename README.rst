@@ -335,6 +335,19 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
     The test servers will **not** necessarily be up-to-date with the *latest* version.
 
 ----------------
+Installation
+----------------
+
+Installation of `Weaver` from source can be performed instead of using the Docker containers.
+
+.. code-block:: sh
+
+    pip install https://github.com/crim.ca/weaver
+
+For more details, please refer to the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
+section of the documentation.
+
+----------------
 Configuration
 ----------------
 
@@ -353,6 +366,9 @@ Documentation
 The REST API documentation is auto-generated and served under any running `Weaver` application on route
 ``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
 For the latest documentation, you can refer to the `OpenAPI Specification`_ served directly on `ReadTheDocs`_.
+
+For the |ogc-api-proc|_ compliant Python and Shell clients, please refer to
+the `Weaver CLI and Client <https://pavics-weaver.readthedocs.io/en/latest/cli.html>`_ documentation.
 
 More ample details about installation, configuration and usage are also provided on `ReadTheDocs`_.
 These are generated from corresponding information provided in `docs`_ source directory.
