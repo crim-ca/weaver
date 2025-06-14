@@ -458,6 +458,8 @@ linkcheck_ignore = [
     "https://2024julyesipmeeting.sched.com/",
     # FIXME: OGC Drafts broken (https://github.com/opengeospatial/ogcapi-processes/issues/490)
     "https://docs.ogc.org/DRAFTS/.*",
+    # URLs causing 403 (USer-Agent blocked or bot protection)
+    "https://www.iso.org/iso-4217-currency-codes.html",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
