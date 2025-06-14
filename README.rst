@@ -5,6 +5,7 @@ Weaver
 \| `Summary`_
 \| `Features`_
 \| `Links`_
+\| `Installation`_
 \| `Configuration`_
 \| `Documentation`_
 \| `Extra Details & Sponsors`_
