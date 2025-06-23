@@ -206,6 +206,13 @@ def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_ba
 
 
 @pytest.mark.cli
+@pytest.mark.parametrize(["'localhost:4001'", "\"localhost:4001\""])
+def test_cli_url_handle_quotes(url):
+    client = WeaverClient(url)
+    assert client._url == "localhost:4001"
+
+
+@pytest.mark.cli
 def test_parse_inputs_from_file():
     inputs = []
     mock_result = OperationResult(False, code=500)

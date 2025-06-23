@@ -495,6 +495,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_url(url):
+        url = url.strip("\"'")
         parsed = urlparse(f"http://{url}" if not url.startswith("http") else url)
         parsed_netloc_path = f"{parsed.netloc}{parsed.path}".replace("//", "/")
         parsed_url = f"{parsed.scheme}://{parsed_netloc_path}"
