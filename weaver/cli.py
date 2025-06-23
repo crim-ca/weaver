@@ -487,6 +487,8 @@ class WeaverClient(object):
         url = self._parse_url(url) if url else self._url
         if url.endswith("/processes") or url.endswith("/jobs"):
             url = url.rsplit("/", 1)[0]
+        if "/providers" in url:
+            url = url.split("/providers", 1)[0]
         if "/processes/" in url:
             url = url.split("/processes/", 1)[0]
         if "/jobs/" in url:
