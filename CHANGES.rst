@@ -22,6 +22,8 @@ Changes:
 
 Fixes:
 ------
+- Fix misconfigured ``/providers/{providerID}/processes/{processID}/jobs/{jobID}`` endpoint for the `HTML` response
+  (fixes `#840 <https://github.com/crim-ca/weaver/issues/840>`_).
 - Fix `CLI` bug where overly quoted URL from input arguments would not be handled correctly.
 - Fix `CLI` bug where ``/providers`` URL from input arguments would not be handled correctly.
 - Fix missing link in `Job` status `HTML` page for ``inputs`` and ``links`` references.
