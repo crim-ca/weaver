@@ -343,7 +343,6 @@ clean-docs-dirs:	## remove documentation artifacts (minimal)
 clean-src:		## remove all *.pyc files
 	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm -f {} \;
-	@-git clean -dfx -e *.bak -e Makefile.config
 	@-rm -rf "$(APP_ROOT)/build"
 	@-rm -rf "$(APP_ROOT)/src"
 
