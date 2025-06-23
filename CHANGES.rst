@@ -12,10 +12,13 @@ Changes
 
 Changes:
 --------
-- Update package distribution name to ``crim-weaver`` for release on PyPI.
+- Update package distribution name to ``crim-weaver`` for (eventual) release on PyPI.
   The Python package is still imported as ``weaver``, but ``pserve`` and ``celery`` looking for the package egg
   need to point at ``egg:crim-weaver``. For backward compatibility, provided Docker images create a system link
   that make this change transparent, but users need to update the INI configuration if running *Weaver* locally.
+  Note that given the explicit GitHub URI dependencies defined for certain packages with fixes not yet released
+  on PyPI, and for which direct dependency link are forbidden,  ``crim-weaver`` cannot be released at this time
+  (see `#838 <https://github.com/crim-ca/weaver/pull/838>`_).
 
 Fixes:
 ------
