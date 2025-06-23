@@ -241,7 +241,7 @@ def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_ba
 @pytest.mark.parametrize("url", ["'localhost:4001'", "\"localhost:4001\""])
 def test_cli_url_handle_quotes(url):
     client = WeaverClient(url)
-    assert client._url == "localhost:4001"
+    assert client._url == "http://localhost:4001"
 
 
 @pytest.mark.cli
