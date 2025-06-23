@@ -22,6 +22,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `CLI` bug where overly quoted URL from input arguments would not be handled correctly.
+- Fix `CLI` bug where ``/providers`` URL from input arguments would not be handled correctly.
 - Fix missing link in `Job` status `HTML` page for ``inputs`` and ``links`` references.
 - Fix invalid link in `Job` status `HTML` page for ``logs`` reference.
 - Fix consistency between link names between `Job` status and `Process` description `HTML` pages.

@@ -19,7 +19,7 @@
 #
 # Although still not great, this specification should be preferred over fully disabling SSL verification
 # (i.e.: 'weaver.ssl_verify = false')
-# It is recommend to make provided regex(es)/method as restrictive as possible to limit insecure connections.
+# It is recommended to make provided regex(es)/method as restrictive as possible to limit insecure connections.
 #
 requests:
   #- url:

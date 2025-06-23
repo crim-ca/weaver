@@ -130,6 +130,22 @@ def test_cli_url_override_by_operation():
             "https://oper-url.example.com",
             "https://oper-url.example.com/providers/test-provider/processes/test-process",
         ),
+        (
+            "https://init-url.example.com/providers/test-provider",
+            "https://oper-url.example.com/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+            "https://oper-url.example.com/processes/test-process/processes/test-process",
+            "test-process",
+            "test-provider",
+            "https://oper-url.example.com",
+            "https://oper-url.example.com/providers/test-provider/processes/test-process",
+        ),
         # Without operation URL (only init URL)
         (
             "https://init-url.example.com",
@@ -195,6 +211,22 @@ def test_cli_url_override_by_operation():
             "https://init-url.example.com",
             "https://init-url.example.com/providers/test-provider/processes/test-process",
         ),
+        (
+            "https://init-url.example.com/providers/test-provider",
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
+        (
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+            None,
+            "test-process",
+            "test-provider",
+            "https://init-url.example.com",
+            "https://init-url.example.com/providers/test-provider/processes/test-process",
+        ),
     ]
 )
 def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_base_url, expect_proc_url):
@@ -203,6 +235,13 @@ def test_cli_url_resolve_process(init_url, oper_url, proc_id, prov_id, expect_ba
     assert result == expect_base_url
     result = client._get_process_url(url=oper_url, process_id=proc_id, provider_id=prov_id)
     assert result == expect_proc_url
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize("url", ["'localhost:4001'", "\"localhost:4001\""])
+def test_cli_url_handle_quotes(url):
+    client = WeaverClient(url)
+    assert client._url == "http://localhost:4001"
 
 
 @pytest.mark.cli
