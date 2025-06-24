@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.6.1:
+
+`6.6.1 <https://github.com/crim-ca/weaver/tree/6.6.1>`_ (2025-06-24)
+========================================================================
+
+Changes:
+--------
 - Update ``urllib3>=2.5.0`` and ``requests>=2.32.4`` to address security vulnerabilities.
 - Update package distribution name to ``crim-weaver`` for (eventual) release on PyPI.
   The Python package is still imported as ``weaver``, but ``pserve`` and ``celery`` looking for the package egg
