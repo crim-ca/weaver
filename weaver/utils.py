@@ -673,6 +673,38 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
+def get_response_profile(request):
+    # type: (AnyRequestType) -> Optional[str]
+    """
+    Obtains the desired response profile based on request parameters.
+
+    Possible locations are, in order of precedence:
+
+        - ``profile`` query parameter.
+        - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
+        - ``Accept-Profile`` header directly providing the profile URI.
+    """
+    query_params = get_request_args(request)
+    profile_query = query_params.get("profile")
+    if profile_query:
+        return profile_query[0] or None
+
+    content_profile = get_header("Accept-Profile", request.headers)
+    if content_profile:
+        return content_profile.strip("<>").strip() or None
+
+    content_accept = get_header("Accept", request.headers) or ""
+    content_media_type = content_accept.split(",")[0]
+    content_profile = parse_kvp(
+        content_media_type,
+        key_value_sep="=",
+        pair_sep=";",
+        nested_pair_sep=None,
+        accumulate_keys=False,
+    )
+    return content_profile or None
+
+
 def get_request_args(request):
     # type: (AnyRequestType) -> AnyRequestQueryMultiDict
     """

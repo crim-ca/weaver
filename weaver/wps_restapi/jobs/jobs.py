@@ -176,7 +176,7 @@ def get_queried_jobs(request):
 
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request=request, group_by=groups, **filters)
-    body = {"total": total}
+    body = {"total": total}  # type: JSON
 
     def _job_list(_jobs):  # type: (Iterable[Job]) -> List[JSON]
         return [j.json(settings) if detail else j.id for j in _jobs]
@@ -678,7 +678,7 @@ def get_job_outputs(request):
     raise_job_bad_status_success(job, request)
     schema = get_job_io_schema_query(request.params.get("schema"), default=JobInputsOutputsSchema.OGC)
     results, _ = get_results(job, request, schema=schema, link_references=False)
-    outputs = {"outputs": results}
+    outputs = {"outputs": results}  # type: JSON
     outputs.update({"links": job.links(request, self_link="outputs")})
     outputs = sd.JobOutputsBody().deserialize(outputs)
     return HTTPOk(json=outputs)
@@ -712,7 +712,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    resp = get_job_results_response(job, container=request)
+    resp = get_job_results_response(job, request=request)
     return resp
 
 
