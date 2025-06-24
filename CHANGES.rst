@@ -12,7 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
+
+- Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
+  the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
+  (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).
+- Allow ``profile`` content negotiation for single result `Job` to be represented
+  using the multi-output `JSON` results representation instead of the default raw/direct value representation
+  (fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
 
 Fixes:
 ------

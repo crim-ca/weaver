@@ -858,22 +858,23 @@ Following is a detailed listing of the expected response structure according to 
     +=====================+==============+===============+===========+=================================================+
     | |any|               | |any|        | |na|          | 0         | |res-empty| [#resNoContent]_                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | |none|              | |none|       | |none|        | 1         | |res-accept| |res-fmt-warn|_                    |
+    | |none|              | |none|       | |none|        | 1         | - |res-accept| by default |res-fmt-warn|_       |
+    |                     |              |               |           | - |res-profile| if provided [#resProfile]_      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | |none|        | 1         | - |res-accept|                                  |
     | [#resPreferReturn]_ |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_                                   |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_                                   |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-data|_                                   |
+    |                     |              |               | (complex) | - |res-data|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_                                   |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | |none|       | |none|        | >1        | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content by default [#resCTypeMulti]_          |
@@ -899,14 +900,15 @@ Following is a detailed listing of the expected response structure according to 
     |                     |              |               |           |   a ``Link`` header for each requested output   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    |                     |              |               |           |   content                                       |
+    | [#resProfile]_      |              |               |           |   content                                       |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    |                     |              |               |           | - enforced when using |res-profile|             |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_                                   |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-link|_                                   |
+    |                     |              |               | (complex) | - |res-link|_ |res-profile-single|              |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | |none|        | |none|    | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               | or >1     |   content                                       |
@@ -934,7 +936,8 @@ Following is a detailed listing of the expected response structure according to 
 .. |out-mode| replace:: ``transmissionMode``
 .. |nReqOut| replace:: Amount and type of |br| *requested outputs*
 .. |res-empty| replace:: *empty*
-.. |res-accept| replace:: *as negotiated by* ``Accept`` *header or* ``format`` *parameter*
+.. |res-accept| replace:: *as negotiated by* ``format`` *query parameter or* ``Accept`` *header*
+.. |res-profile| replace:: *as negotiated by* ``profile`` *query parameter or* ``Accept-Profile`` *header*
 .. |res-auto| replace:: *using automatic resolution of data/link representation*
 
 .. |res-data| replace:: Results for a Single Output with Data
@@ -942,6 +945,8 @@ Following is a detailed listing of the expected response structure according to 
 
 .. |res-link| replace:: Results for a Single Output with Link
 .. _res-link: `job-results-raw-single-ref`_
+
+.. |res-profile-single| replace:: unless Results are requested by *Profile Content-Negotiation* [#resProfile]_
 
 .. important::
     Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
@@ -989,6 +994,11 @@ Following is a detailed listing of the expected response structure according to 
 
     To avoid ambiguity, it is recommended that the ``response: document`` or ``response: raw``
     is explicitly set for such cases to ensure the result matches the desired outcome.
+
+    In the event that the :ref:`Results Document <job-results-document-minimal>` representation is desired
+    as :term:`JSON` response for that single output result, |content_negotiation_profile|_ [#resProfile]_
+    can be employed to remove the ambiguity. Other :term:`Profile` definitions could be added to remove futher
+    ambiguities with other :term:`JSON`-like structures, but these are not explicitly handled by `Weaver` at this time.
 
 .. rubric:: Details
 
@@ -1068,11 +1078,23 @@ Following is a detailed listing of the expected response structure according to 
     the default data type representation of specified by ``transmissionMode``
     (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
+.. [#resProfile]
+    Using the |oap| v2.0 ``Accept-Profile`` header or the corresponding ``profile`` query parameter,
+    it is possible to request a specific :term:`Profile` for the results returned by the :term:`Process`.
+
+    This allows notably to enforce a :ref:`Results Document <job-results-document-minimal>` representation
+    to be returned, even when the :term:`Process` would otherwise return only a single result as *Data* or *Link*
+    according to the negociated preference [#resPreferReturn]_.
+
+    To perform this |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
+    :term:`URI` must be employed as :term:`Profile` identifier.
+
 In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
 The ``Prefer`` header is also used by |oap| v2.0 to control how the results are encoded, whereas v1.0 relies on a
 separate ``transmissionMode`` parameter. By reducing the amount of parameters involved, v2.0 makes the request easier
 to submit with a single header (also used to indicate the :ref:`proc_exec_mode`), but limits certain representation
-combinations only possible with v1.0.
+combinations only possible with v1.0. These limited representations can be retrieved by involving more advanced
+:term:`Profile` and :term:`Media-Type` *Content Negotiation* techniques.
 
 .. seealso::
     Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.

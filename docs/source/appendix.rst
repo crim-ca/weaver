@@ -256,7 +256,7 @@ Glossary
 
     Profile
         Content representation of an entity (such as a :term:`Process` or :term:`Job`) under a certain
-        schema or established standard. In most cases, |content-negotiation-profile|_ will default to
+        schema or established standard. In most cases, |content_negotiation_profile|_ will default to
         an :term:`OGC API - Processes` representation in `Weaver`, but other alternatives can be provided
         in certain cases, such as for corresponding :term:`WPS` or :term:`openEO` response contents.
 
