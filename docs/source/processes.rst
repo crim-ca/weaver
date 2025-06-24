@@ -1083,13 +1083,15 @@ Following is a detailed listing of the expected response structure according to 
     it is possible to request a specific :term:`Profile` of results to be returned by the :term:`Process`
     in a consistent fashion.
     
-    This allows notably to enforce a :ref:`Results Document <job-results-document-minimal>` representation
-    to be returned, even when the :term:`Process` would otherwise return only a single result
-    (either from explicit or implicit output resolution [#outN]_) represented as direct *Data* or *Link*
-    according to the negotiated preference [#resPreferReturn]_.
+    This allows, notably, to enforce a :ref:`Results Document <job-results-document-minimal>` representation
+    to be returned for a *single output*, even when the :term:`Process` would otherwise only return a single
+    result (resolved either explicitly or implicitly [#outN]_) directly as *Data* or *Link* according to
+    the resolved content negotiation [#resPreferReturn]_. This can be used to mimic the |oap| v1.0
+    behavior using ``response=document`` regardless of the anticipated number of produced outputs.
 
     To perform this |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
-    :term:`URI` must be employed as :term:`Profile` identifier.
+    :term:`URI` must be employed as :term:`Profile` identifier, using either the ``profile`` query parameter or
+    the ``Accept-Profile`` header in the execution request.
 
 In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
 The ``Prefer`` header is also used by |oap| v2.0 to control how the results are encoded, whereas v1.0 relies on a
