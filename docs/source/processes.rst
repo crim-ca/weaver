@@ -865,16 +865,16 @@ Following is a detailed listing of the expected response structure according to 
     | [#resPreferReturn]_ |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_ |res-profile-single|              |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_ |res-profile-single|              |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-data|_ |res-profile-single|              |
+    |                     |              |               | (complex) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_ |res-profile-single|              |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | |none|       | |none|        | >1        | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content by default [#resCTypeMulti]_          |
@@ -886,29 +886,30 @@ Following is a detailed listing of the expected response structure according to 
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     | [#resPreferReturn]_ |              | *and*         |           |   content [#resCTypeMulti]_                     |
-    |                     |              | ``reference`` |           | - using embedded content parts with data/link   |
+    |                     |              | ``reference`` |           | - using embedded content *Data* or *Link* parts |
     |                     |              | (``mixed``)   |           |   as requested by |out-mode| [#resValRefForce]_ |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     |                     |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
-    |                     |              |               |           | - using embedded content parts with data        |
+    |                     |              |               |           | - using embedded content *Data* parts           |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     | [#resPreferReturn]_ |              | (for *all*)   |           |   content with embedded part links if requested |
     |                     |              |               |           |   by ``Accept`` header [#resCTypeMulti]_        |
-    |                     |              |               |           | - otherwise, similar to |res-link|, but with    |
+    |                     |              |               |           | - otherwise, similar to |res-link|_, but with   |
     |                     |              |               |           |   a ``Link`` header for each requested output   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
-    | [#resProfile]_      |              |               |           |   content                                       |
+    |                     |              |               |           |   content                                       |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
-    |                     |              |               |           | - enforced when using |res-profile|             |
+    |                     |              |               |           | - equivalent result when explicitly using       |
+    |                     |              |               |           |   |content_negotiation_profile|_ [#resProfile]_ |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_ |res-profile-single|              |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-link|_ |res-profile-single|              |
+    |                     |              |               | (complex) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | |none|        | |none|    | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               | or >1     |   content                                       |
@@ -936,17 +937,16 @@ Following is a detailed listing of the expected response structure according to 
 .. |out-mode| replace:: ``transmissionMode``
 .. |nReqOut| replace:: Amount and type of |br| *requested outputs*
 .. |res-empty| replace:: *empty*
-.. |res-accept| replace:: *as negotiated by* ``format`` *query parameter or* ``Accept`` *header*
-.. |res-profile| replace:: *as negotiated by* ``profile`` *query parameter or* ``Accept-Profile`` *header*
-.. |res-auto| replace:: *using automatic resolution of data/link representation*
+.. |res-accept| replace:: as negotiated by ``format`` query parameter or ``Accept`` header
+.. |res-profile| replace:: as negotiated by ``profile`` query parameter or ``Accept-Profile`` header
+.. |res-profile-one| replace:: unless :ref:`Results <job-results-document-minimal>` are negotiated by :term:`Profile`
+.. |res-auto| replace:: using automatic resolution of *Data* or *Link* representation
 
 .. |res-data| replace:: Results for a Single Output with Data
 .. _res-data: `job-results-raw-single-data`_
 
 .. |res-link| replace:: Results for a Single Output with Link
 .. _res-link: `job-results-raw-single-ref`_
-
-.. |res-profile-single| replace:: unless Results are requested by *Profile Content-Negotiation* [#resProfile]_
 
 .. important::
     Typically, clients will not use ``Prefer`` header and ``response``/``transmissionMode`` body parameters
@@ -1080,11 +1080,13 @@ Following is a detailed listing of the expected response structure according to 
 
 .. [#resProfile]
     Using the |oap| v2.0 ``Accept-Profile`` header or the corresponding ``profile`` query parameter,
-    it is possible to request a specific :term:`Profile` for the results returned by the :term:`Process`.
-
+    it is possible to request a specific :term:`Profile` of results to be returned by the :term:`Process`
+    in a consistent fashion.
+    
     This allows notably to enforce a :ref:`Results Document <job-results-document-minimal>` representation
-    to be returned, even when the :term:`Process` would otherwise return only a single result as *Data* or *Link*
-    according to the negociated preference [#resPreferReturn]_.
+    to be returned, even when the :term:`Process` would otherwise return only a single result
+    (either from explicit or implicit output resolution [#outN]_) represented as direct *Data* or *Link*
+    according to the negotiated preference [#resPreferReturn]_.
 
     To perform this |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
     :term:`URI` must be employed as :term:`Profile` identifier.
