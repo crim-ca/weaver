@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Update ``urllib3>=2.5.0`` and ``requests>=2.32.4`` to address security vulnerabilities.
 - Update package distribution name to ``crim-weaver`` for (eventual) release on PyPI.
   The Python package is still imported as ``weaver``, but ``pserve`` and ``celery`` looking for the package egg
   need to point at ``egg:crim-weaver``. For backward compatibility, provided Docker images create a system link

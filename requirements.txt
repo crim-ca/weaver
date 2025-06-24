@@ -107,7 +107,7 @@ pytz
 pywps==4.6.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
-requests>=2.32.2
+requests>=2.32.4
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
