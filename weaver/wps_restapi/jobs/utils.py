@@ -106,6 +106,7 @@ if TYPE_CHECKING:
         HeadersType,
         HTTPValid,
         JobValueFormat,
+        JobValueItem,
         JSON,
         PyramidRequest,
         SettingsType
