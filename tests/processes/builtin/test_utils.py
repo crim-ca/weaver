@@ -4,6 +4,8 @@ import pytest
 
 from weaver.processes.builtin.utils import is_geojson_url, is_netcdf_url, validate_reference
 
+pytestmark = pytest.mark.builtin
+
 
 @pytest.mark.parametrize(
     "invalid_url",
