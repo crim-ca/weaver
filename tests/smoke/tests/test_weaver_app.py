@@ -19,15 +19,15 @@ def test_weaver_app_legacy_egg_config_ini() -> None:
         tmp_ini.writelines(inspect.cleandoc("""
             [app:main]
             use = egg:weaver
-            
+
             mongodb.host = mongodb-does-not-exist
             mongodb.port = 27017
             mongodb.db_name = weaver
             mongodb.timeoutMS = 10
-            
+
             [celery]
             broker_url = mongodb://mongodb-does-not-exist:27017/celery
-            
+
             [server:main]
             use = egg:gunicorn#main
             bind = 0.0.0.0:44444
