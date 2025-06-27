@@ -40,7 +40,9 @@ RUN pip install --no-dependencies -e ${APP_DIR}
 
 # backward-compatibility mapping for 'importlib.metadata' dist/package name resolution
 # this allows existing 'weaver.ini' to point at 'weaver' rather than 'crim-weaver' for pserve and celery INI
-RUN ln -s $( \
+# start with a 'cd /tmp' to avoid resolution by importlib to return only the current APP_DIR egg-info directory
+RUN cd /tmp && \
+    ln -s $( \
       python -c 'import importlib.metadata; DIST=importlib.metadata.Distribution.from_name("crim-weaver")._path; \
         print(DIST); \
         print(str(DIST).replace("crim_", ""))' \

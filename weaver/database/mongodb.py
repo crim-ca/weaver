@@ -230,6 +230,12 @@ def get_mongodb_connection(container):
         if settings.get(setting, None) is None:
             warnings.warn(f"Setting '{setting}' not defined in registry, using default [{default}].")
             settings[setting] = default
+    settings_default_names = [s[0] for s in settings_default]
+    settings_extras = {
+        name.split("mongodb.", 1)[-1]: value
+        for name, value in settings.items()
+        if name.startswith("mongodb.") and name not in settings_default_names
+    }
     client = pymongo.MongoClient(
         settings["mongodb.host"], int(settings["mongodb.port"]),
         connect=False,
@@ -242,6 +248,7 @@ def get_mongodb_connection(container):
         # for locale naive datetime objects, while MongoDB stores Date in ISO-8601 format.
         tz_aware=True,
         type_registry=TypeRegistry([DecimalCodec()]),
+        **settings_extras,
     )
     return client[settings["mongodb.db_name"]]
 
