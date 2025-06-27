@@ -48,9 +48,11 @@ if TYPE_CHECKING:
     ]
     ExecuteTransmissionModeReferenceType = Literal["reference"]
     ExecuteTransmissionModeValueType = Literal["value"]
+    ExecuteTransmissionModeConstantsType = "ExecuteTransmissionMode"  # type: TypeAlias
     AnyExecuteTransmissionMode = Union[
         ExecuteTransmissionModeReferenceType,
         ExecuteTransmissionModeValueType,
+        ExecuteTransmissionModeConstantsType,
     ]
     # pylint: disable=C0103,invalid-name
     ExecuteCollectionFormatType_STAC = Literal["stac-collection"]
@@ -59,6 +61,7 @@ if TYPE_CHECKING:
     ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]
     ExecuteCollectionFormatType_OGC_MAP = Literal["ogc-map-collection"]
     ExecuteCollectionFormatType_GEOJSON = Literal["geojson-feature-collection"]
+    ExecuteCollectionFormatConstantsType = "ExecuteCollectionFormat"  # type: TypeAlias
     AnyExecuteCollectionFormat = Union[
         ExecuteCollectionFormatType_STAC,
         ExecuteCollectionFormatType_STAC_ITEMS,
@@ -66,6 +69,7 @@ if TYPE_CHECKING:
         ExecuteCollectionFormatType_OGC_FEATURES,
         ExecuteCollectionFormatType_OGC_MAP,
         ExecuteCollectionFormatType_GEOJSON,
+        ExecuteCollectionFormatConstantsType,
     ]
 
 LOGGER = logging.getLogger(__name__)
