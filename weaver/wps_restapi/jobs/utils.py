@@ -499,7 +499,7 @@ def get_results(  # pylint: disable=R1260
         wps_url = f"{wps_url}/"
     schema = str(JobInputsOutputsSchema.get(str(schema).lower(), default=JobInputsOutputsSchema.OLD))
     strict = schema.endswith("+strict")
-    schema = schema.split("+")[0]
+    schema = schema.split("+", 1)[0]
     ogc_api = schema == JobInputsOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
@@ -662,7 +662,7 @@ def get_job_output_transmission(job, output_id, is_reference):
 def get_job_results_response(
     job,                        # type: Job
     *,                          # force named keyword arguments after
-    request,                    # type: AnyRequestType
+    container,                  # type: AnySettingsContainer
     request_headers=None,       # type: Optional[AnyHeadersContainer]
     response_headers=None,      # type: Optional[AnyHeadersContainer]
     results_headers=None,       # type: Optional[AnyHeadersContainer]
@@ -700,19 +700,22 @@ def get_job_results_response(
         - :ref:`proc_exec_results`
 
     :param job: Job for which to generate the results response, which contains the originally submitted parameters.
-    :param request: Request that was submitted for this response generation.
+    :param container:
+        Request that was submitted for this response generation or an application settings container.
+        If the object cannot be the request directly, additional parameters must be provided to resolve relevant
+        properties defined in the request, such as control headers that can affect the response format.
     :param request_headers: Original headers submitted to the request that leads to this response.
     :param response_headers: Additional headers to provide in the response.
     :param results_headers: Headers that override originally submitted job parameters when requesting results.
     :param results_contents: Body contents that override originally submitted job parameters when requesting results.
     """
-    raise_job_dismissed(job, request)
-    raise_job_bad_status_success(job, request)
-    settings = get_settings(request)
+    raise_job_dismissed(job, container)
+    raise_job_bad_status_success(job, container)
+    settings = get_settings(container)
 
     results, _ = get_results(
         job,
-        request,
+        container,
         value_key="value",
         schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
         # no link headers since they are represented differently based on request parameters
@@ -722,8 +725,8 @@ def get_job_results_response(
 
     headers = ResponseHeaders(response_headers or {})
     headers.pop("Location", None)
-    headers.setdefault("Content-Location", job.results_url(request))
-    for link in job.links(request, self_link="results"):
+    headers.setdefault("Content-Location", job.results_url(container))
+    for link in job.links(container, self_link="results"):
         link_header = make_link_header(link)
         headers.add("Link", link_header)
 
@@ -744,7 +747,7 @@ def get_job_results_response(
     )
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
-    profile = get_response_profile(request)
+    profile = get_response_profile(container, request_headers)
     is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS
 
     # document/minimal response, unless explicitly requested by profile content negotiation
