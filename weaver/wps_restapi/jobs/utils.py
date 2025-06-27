@@ -105,8 +105,8 @@ if TYPE_CHECKING:
         HeadersTupleType,
         HeadersType,
         HTTPValid,
-        JobValueItem,
         JobValueFormat,
+        JobValueItem,
         JSON,
         PyramidRequest,
         SettingsType
