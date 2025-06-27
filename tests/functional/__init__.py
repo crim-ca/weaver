@@ -1,4 +1,5 @@
 import os
+
 import pytest
 
 APP_PKG_ROOT = os.path.join(os.path.dirname(__file__), "application-packages")
