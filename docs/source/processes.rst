@@ -1082,7 +1082,7 @@ Following is a detailed listing of the expected response structure according to 
     Using the |oap| v2.0 ``Accept-Profile`` header or the corresponding ``profile`` query parameter,
     it is possible to request a specific :term:`Profile` of results to be returned by the :term:`Process`
     in a consistent fashion.
-    
+
     This allows, notably, to enforce a :ref:`Results Document <job-results-document-minimal>` representation
     to be returned for a *single output*, even when the :term:`Process` would otherwise only return a single
     result (resolved either explicitly or implicitly [#outN]_) directly as *Data* or *Link* according to
