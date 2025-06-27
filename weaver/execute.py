@@ -7,36 +7,44 @@ from weaver.base import Constants
 from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Union
+    from typing import List, Optional, Tuple, TypeAlias, Union
 
     from weaver.datatype import Job
-    from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal
+    from weaver.typedefs import AnyHeadersContainer, HeadersType, PreservedHeadersType, Literal
 
-    ExecutionModeAutoType = Literal["auto"]
-    ExecutionModeAsyncType = Literal["async"]
-    ExecutionModeSyncType = Literal["sync"]
+    ExecuteModeAutoType = Literal["auto"]
+    ExecuteModeAsyncType = Literal["async"]
+    ExecuteModeSyncType = Literal["sync"]
+    ExecuteModeConstantsType = "ExecuteMode"  # type: TypeAlias
     AnyExecuteMode = Union[
-        ExecutionModeAutoType,
-        ExecutionModeAsyncType,
-        ExecutionModeSyncType,
+        ExecuteModeAutoType,
+        ExecuteModeAsyncType,
+        ExecuteModeSyncType,
+        ExecuteModeConstantsType,
     ]
     ExecuteControlOptionAsyncType = Literal["async-execute"]
     ExecuteControlOptionSyncType = Literal["sync-execute"]
+    ExecuteControlOptionConstantsType = "ExecuteControlOption"  # type: TypeAlias
     AnyExecuteControlOption = Union[
         ExecuteControlOptionAsyncType,
         ExecuteControlOptionSyncType,
+        ExecuteControlOptionConstantsType,
     ]
     ExecuteReturnPreferenceMinimalType = Literal["minimal"]
     ExecuteReturnPreferenceRepresentationType = Literal["representation"]
+    ExecuteReturnPreferenceConstantsType = "ExecuteReturnPreference"  # type: TypeAlias
     AnyExecuteReturnPreference = Union[
         ExecuteReturnPreferenceMinimalType,
         ExecuteReturnPreferenceRepresentationType,
+        ExecuteReturnPreferenceConstantsType,
     ]
     ExecuteResponseDocumentType = Literal["document"]
     ExecuteResponseRawType = Literal["raw"]
+    ExecuteResponseConstantsType = "ExecuteResponse"  # type: TypeAlias
     AnyExecuteResponse = Union[
         ExecuteResponseDocumentType,
         ExecuteResponseRawType,
+        ExecuteResponseConstantsType,
     ]
     ExecuteTransmissionModeReferenceType = Literal["reference"]
     ExecuteTransmissionModeValueType = Literal["value"]
@@ -64,9 +72,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ExecuteMode(Constants):
-    AUTO = "auto"       # type: ExecutionModeAutoType
-    ASYNC = "async"     # type: ExecutionModeAsyncType
-    SYNC = "sync"       # type: ExecutionModeSyncType
+    AUTO = "auto"       # type: ExecuteModeAutoType
+    ASYNC = "async"     # type: ExecuteModeAsyncType
+    SYNC = "sync"       # type: ExecuteModeSyncType
 
 
 class ExecuteControlOption(Constants):
@@ -268,8 +276,8 @@ def rebuild_prefer_header(job):
 def update_preference_applied_return_header(
     job,                # type: Job
     request_headers,    # type: Optional[AnyHeadersContainer]
-    response_headers,   # type: Optional[AnyHeadersContainer]
-):                      # type: (...) -> AnyHeadersContainer
+    response_headers,   # type: Optional[PreservedHeadersType]
+):                      # type: (...) -> PreservedHeadersType
     """
     Updates the ``Preference-Applied`` header according to available information.
 
