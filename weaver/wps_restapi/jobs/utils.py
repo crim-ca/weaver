@@ -663,6 +663,7 @@ def get_job_results_response(
     job,                        # type: Job
     *,                          # force named keyword arguments after
     container,                  # type: AnySettingsContainer
+    request=None,               # type: Optional[AnyRequestType]
     request_headers=None,       # type: Optional[AnyHeadersContainer]
     response_headers=None,      # type: Optional[AnyHeadersContainer]
     results_headers=None,       # type: Optional[AnyHeadersContainer]
@@ -704,6 +705,7 @@ def get_job_results_response(
         Request that was submitted for this response generation or an application settings container.
         If the object cannot be the request directly, additional parameters must be provided to resolve relevant
         properties defined in the request, such as control headers that can affect the response format.
+    :param request: Request object to look for more parameters that could affect the generation of this response.
     :param request_headers: Original headers submitted to the request that leads to this response.
     :param response_headers: Additional headers to provide in the response.
     :param results_headers: Headers that override originally submitted job parameters when requesting results.
@@ -712,6 +714,8 @@ def get_job_results_response(
     raise_job_dismissed(job, container)
     raise_job_bad_status_success(job, container)
     settings = get_settings(container)
+    request = request or container
+    request = None if isinstance(request, dict) else request
 
     results, _ = get_results(
         job,
@@ -747,7 +751,7 @@ def get_job_results_response(
     )
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
-    profile = get_response_profile(container, request_headers)
+    profile = get_response_profile(request, request_headers)
     is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS
 
     # document/minimal response, unless explicitly requested by profile content negotiation
@@ -779,10 +783,10 @@ def get_job_results_response(
         # use deserialized contents such that only the applicable fields remain
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
-        headers.update({
-            "Content-Profile": sd.OGC_API_PROC_PROFILE_RESULTS,
-            "Link": make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS, rel="profile")
-        })
+        headers.extend([
+            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS),
+            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS, rel="profile")),
+        ])
         if is_doc_results:
             # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
             headers.update({"Content-Type": f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS}\""})
