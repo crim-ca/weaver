@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.6.2:
+
+`6.6.2 <https://github.com/crim-ca/weaver/tree/6.6.2>`_ (2025-06-27)
+========================================================================
+
+Changes:
+--------
 - Add ``mongodb.`` prefix parsing of configuration settings defined in Weaver INI file to provide additional
   parameters that could be required to setup the MongoDB connection.
 
