@@ -39,7 +39,7 @@ def test_weaver_app_legacy_egg_config_ini() -> None:
 
         with subprocess.Popen(["pserve", tmp_ini.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
             out, err = proc.communicate()
-            msg = out.decode("utf-8").strip() + "\n" + err.decode("utf-8").strip()
+            msg = f"{out.decode('utf-8').strip()}\n{err.decode('utf-8').strip()}"
         assert (
             "pymongo.errors.ServerSelectionTimeoutError" in msg
             and "distribution" not in msg
