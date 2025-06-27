@@ -12,11 +12,15 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``mongodb.`` prefix parsing of configuration settings defined in Weaver INI file to provide additional
+  parameters that could be required to setup the MongoDB connection.
 
 Fixes:
 ------
-- No change.
+- Fix automatic ``paste-deploy`` resolution from legacy INI configuration using ``egg:weaver`` package name
+  instead of the new ``crim-weaver`` distribution name to ensure ``pserve`` and ``celery`` applications always
+  resolve within Docker runtime regardless of the variant employed
+  (fixes `#847 <https://github.com/crim-ca/weaver/issues/847>`_).
 
 .. _changes_6.6.1:
 
