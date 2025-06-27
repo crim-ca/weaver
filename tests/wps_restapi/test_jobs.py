@@ -1547,13 +1547,16 @@ class WpsRestApiJobsTest(JobUtils):
             user_id=None, status=Status.DISMISSED, progress=50, access=Visibility.PUBLIC
         )
 
-        for code, job, title, error_type, cause in [
-            (404, job_accepted, "JobResultsNotReady", "result-not-ready", {"status": Status.ACCEPTED}),
-            (404, job_running, "JobResultsNotReady", "result-not-ready", {"status": Status.RUNNING}),
-            (400, job_failed_str, "JobResultsFailed", "MissingParameterValue", "400 MissingParameterValue: input"),
-            (400, job_failed_json, "JobResultsFailed", "InvalidParameterValue", "Input type invalid."),
-            (400, job_failed_none, "JobResultsFailed", "NoApplicableCode", "unknown"),
-            (410, job_dismissed, "JobDismissed", "JobDismissed", {"status": Status.DISMISSED}),
+        cause_missing = "400 MissingParameterValue: input"
+        cause_invalid = "Input type invalid."
+        cause_unknown = "unknown"  # random/unhandled error
+        for code, job, title, error_type, error_info, cause in [
+            (404, job_accepted, "JobResultsNotReady", "result-not-ready", None, {"status": Status.ACCEPTED}),
+            (404, job_running, "JobResultsNotReady", "result-not-ready", None, {"status": Status.RUNNING}),
+            (400, job_failed_str, "JobResultsFailed", "result-not-available", "MissingParameterValue", cause_missing),
+            (400, job_failed_json, "JobResultsFailed", "result-not-available", "InvalidParameterValue", cause_invalid),
+            (400, job_failed_none, "JobResultsFailed", "result-not-available", "NoApplicableCode", cause_unknown),
+            (410, job_dismissed, "JobDismissed", "result-not-available", None, {"status": Status.DISMISSED}),
         ]:
             for what in ["outputs", "results"]:
                 path = f"/jobs/{job.id}/{what}"
@@ -1566,6 +1569,10 @@ class WpsRestApiJobsTest(JobUtils):
                 assert resp.json["title"] == title, case
                 assert resp.json["cause"] == cause, case
                 assert resp.json["type"].endswith(error_type), case   # ignore http full reference, not always there
+                if error_info is not None:
+                    assert resp.json["error"] == error_info, case
+                else:
+                    assert "error" not in resp.json, case
                 assert "links" in resp.json
 
     def test_jobs_inputs_outputs_validations(self):
