@@ -3,7 +3,7 @@ LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
 LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
 LABEL vendor="CRIM"
-LABEL version="6.6.1"
+LABEL version="6.6.2"
 
 # setup paths
 ENV APP_DIR=/opt/local/src/weaver
@@ -40,7 +40,9 @@ RUN pip install --no-dependencies -e ${APP_DIR}
 
 # backward-compatibility mapping for 'importlib.metadata' dist/package name resolution
 # this allows existing 'weaver.ini' to point at 'weaver' rather than 'crim-weaver' for pserve and celery INI
-RUN ln -s $( \
+# start with a 'cd /tmp' to avoid resolution by importlib to return only the current APP_DIR egg-info directory
+RUN cd /tmp && \
+    ln -s $( \
       python -c 'import importlib.metadata; DIST=importlib.metadata.Distribution.from_name("crim-weaver")._path; \
         print(DIST); \
         print(str(DIST).replace("crim_", ""))' \

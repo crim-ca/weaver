@@ -1,8 +1,8 @@
 {
   "upload_type": "software",
-  "title": "crim-ca/weaver:6.6.1",
+  "title": "crim-ca/weaver:6.6.2",
   "description": "Weaver: Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES); OGC API - Processes; WPS; CWL Application Package",
-  "version": "6.6.1",
+  "version": "6.6.2",
   "creators": [
     {
       "name": "Charette-Migneault, Francis",

@@ -24,6 +24,23 @@ Fixes:
 ------
 - No change.
 
+.. _changes_6.6.2:
+
+`6.6.2 <https://github.com/crim-ca/weaver/tree/6.6.2>`_ (2025-06-27)
+========================================================================
+
+Changes:
+--------
+- Add ``mongodb.`` prefix parsing of configuration settings defined in Weaver INI file to provide additional
+  parameters that could be required to setup the MongoDB connection.
+
+Fixes:
+------
+- Fix automatic ``paste-deploy`` resolution from legacy INI configuration using ``egg:weaver`` package name
+  instead of the new ``crim-weaver`` distribution name to ensure ``pserve`` and ``celery`` applications always
+  resolve within Docker runtime regardless of the variant employed
+  (fixes `#847 <https://github.com/crim-ca/weaver/issues/847>`_).
+
 .. _changes_6.6.1:
 
 `6.6.1 <https://github.com/crim-ca/weaver/tree/6.6.1>`_ (2025-06-24)
