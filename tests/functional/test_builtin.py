@@ -33,7 +33,12 @@ if TYPE_CHECKING:
     from weaver.typedefs import ExecutionInputs, ExecutionOutputs, ExecutionResults, JSON, ProcessExecution
 
 
-@pytest.mark.functional
+pytestmark = [
+    pytest.mark.builtin,
+    pytest.mark.functional,
+]
+
+
 class BuiltinAppTest(WpsConfigBase):
     file_server = None  # type: FileServer
     """

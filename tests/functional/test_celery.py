@@ -34,6 +34,8 @@ def get_taskmeta_output(taskmeta_collection, output):
     return taskmeta.get("traceback", "") + taskmeta.get("result", "")
 
 
+@pytest.mark.slow
+@pytest.mark.functional
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_celery_registry_resolution():
     python_bin = sys.executable

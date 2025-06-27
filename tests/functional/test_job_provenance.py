@@ -302,6 +302,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.json["detail"] == "Job provenance could not be retrieved for the specified job."
 
 
+@pytest.mark.prov
+@pytest.mark.oap_part4
+@pytest.mark.functional
 class TestJobProvenanceDisabled(TestJobProvenanceBase):
     """
     Test handling of the application when :term:`Provenance` feature is disabled.
