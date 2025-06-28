@@ -390,10 +390,14 @@ if TYPE_CHECKING:
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
+    AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
+
+    # type that can be used to indicate that any container of headers is supported, but
+    # whichever type that is employed will persist (e.g.: function does not convert it
+    PreservedHeadersType = TypeVar("PreservedHeadersType", bound=AnyHeadersContainer)
+
     ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
-
-    AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessRef = Union[Process, str]
