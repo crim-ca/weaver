@@ -427,6 +427,8 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core2}/req/query-param-profile",
         f"{ogcapi_proc_core2}/req/query-param-profile/definition",
         f"{ogcapi_proc_core2}/req/query-param-profile/response",
+        f"{ogcapi_proc_core2}/rec/query-param-profile/link-header",
+        f"{ogcapi_proc_core2}/per/query-param-profile/profiles-of-media-type",
         # ------ Part 3 Collection definitions migrated to Part 1 Core v2.0 ------
         f"{ogcapi_proc_core2}/req/collection-input",
         f"{ogcapi_proc_core2}/req/collection-input/collection-access",

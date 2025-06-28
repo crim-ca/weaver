@@ -1590,6 +1590,7 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC, "rel": "profile", "title": "Job response profile."},
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -2718,6 +2719,7 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC, "rel": "profile", "title": "Process response profile."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]

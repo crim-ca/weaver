@@ -13,12 +13,19 @@ Changes
 Changes:
 --------
 
+.. FIXME: Add profile link tests
+.. FIXME: Ensure all 'OGC_API_PROC_PROFILE_...' links are returned in their respective responses
+.. FIXME: complete 'get_response_profile' implementation as per docs
+
+
 - Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
   the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
   (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).
 - Allow ``profile`` content negotiation for single result `Job` to be represented
   using the multi-output `JSON` results representation instead of the default raw/direct value representation
   (fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
+- Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
+  of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
 
 Fixes:
 ------

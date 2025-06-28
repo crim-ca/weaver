@@ -938,7 +938,7 @@ Following is a detailed listing of the expected response structure according to 
 .. |nReqOut| replace:: Amount and type of |br| *requested outputs*
 .. |res-empty| replace:: *empty*
 .. |res-accept| replace:: as negotiated by ``format`` query parameter or ``Accept`` header
-.. |res-profile| replace:: as negotiated by ``profile`` query parameter or ``Accept-Profile`` header
+.. |res-profile| replace:: as negotiated by :term:`Profile`
 .. |res-profile-one| replace:: unless :ref:`Results <job-results-document-minimal>` are negotiated by :term:`Profile`
 .. |res-auto| replace:: using automatic resolution of *Data* or *Link* representation
 
@@ -997,7 +997,7 @@ Following is a detailed listing of the expected response structure according to 
 
     In the event that the :ref:`Results Document <job-results-document-minimal>` representation is desired
     as :term:`JSON` response for that single output result, |content_negotiation_profile|_ [#resProfile]_
-    can be employed to remove the ambiguity. Other :term:`Profile` definitions could be added to remove futher
+    can be employed to remove the ambiguity. Other :term:`Profile` definitions could be added to remove further
     ambiguities with other :term:`JSON`-like structures, but these are not explicitly handled by `Weaver` at this time.
 
 .. rubric:: Details
@@ -1079,8 +1079,8 @@ Following is a detailed listing of the expected response structure according to 
     (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
 .. [#resProfile]
-    Using the |oap| v2.0 ``Accept-Profile`` header or the corresponding ``profile`` query parameter,
-    it is possible to request a specific :term:`Profile` of results to be returned by the :term:`Process`
+    Using :ref:`proc_content_negotiation`, it is possible to request a
+    specific :term:`Profile` representation of results to be returned by the :term:`Process`
     in a consistent fashion.
 
     This allows, notably, to enforce a :ref:`Results Document <job-results-document-minimal>` representation
@@ -1089,9 +1089,9 @@ Following is a detailed listing of the expected response structure according to 
     the resolved content negotiation [#resPreferReturn]_. This can be used to mimic the |oap| v1.0
     behavior using ``response=document`` regardless of the anticipated number of produced outputs.
 
-    To perform this |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
-    :term:`URI` must be employed as :term:`Profile` identifier, using either the ``profile`` query parameter or
-    the ``Accept-Profile`` header in the execution request.
+    To perform |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
+    :term:`URI` must be employed as :term:`Profile` identifier in the execution request. Refer to the
+    :ref:`proc_content_negotiation` section for more details on how to achieve this.
 
 In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
 The ``Prefer`` header is also used by |oap| v2.0 to control how the results are encoded, whereas v1.0 relies on a
@@ -2575,6 +2575,95 @@ internal :term:`Application Package` of the :term:`Process` represented by the :
     :language: json
     :caption: Example :term:`JSON` of :term:`Job` Statistics Response
     :name: job-statistics
+
+.. _proc_content_negotiation:
+
+Job Content Negotiation
+-----------------------------
+
+Content negotiation can be performed using multiple query parameters and headers when submitting a :term:`Job`
+execution request, when retrieving the :term:`Job` results, or when inspecting the :term:`Process` description
+to execute. Content negotiation also happens within the submitted :ref:`proc_exec_body` contents for respective
+:term:`Process` inputs and outputs that should be employed or produced by the corresponding :term:`Job` execution.
+Following is a summary of relevant parameters impacting content negotiation.
+
+.. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
+    :name: table-content-negotiation
+    :align: center
+    :header-rows: 1
+    :widths: 20,10,50,20
+
+    * - Parameter
+      - Location
+      - Description
+      - Example
+    * - ``f`` / ``format``
+      - Query
+      - Requested content :term:`Media-Type` (explictly or implicitly using a shorthand notation).
+        Equivalent to the ``Accept`` header, but with a higher precedence.
+      - ``/jobs/{jobID}?f=json``
+    * - ``profile``
+      - Query
+      - Requested :term:`Profile` representation of the contents in the response.
+        Equivalent to the various headers below involving a :term:`Profile` parameter, but with a higher precedence.
+        See also :ref:`proc_content_negotiation_profile_order` for details.
+      - ``/jobs/{jobID}?profile=ogc+strict``
+    * - ``schema``
+      - Query
+      - Alternate parameter to ``profile``, mostly used interchangeably for backward compatibility.
+        In very rare cases, could be used to distinguish a shared schema :term:`URI` representation and an underlying
+        :term:`Profile` representation contained within the same schema sharing multiple :term:`Profile` references.
+      - ``/processes/{jobID}?schema=OGC``
+    * - ``Accept``
+      - Header
+      - Requested content :term:`Media-Type` for the response.
+        Can include an optional ``profile`` parameter, if its provision is allowed by the underlying :term:`Media-Type`,
+        to request a specific :term:`Profile` representation for the response.
+      - ``Accept: image/tiff; application=geotiff; profile=cloud-optimized``
+    * - ``Accept-Profile``
+      - Header
+      - Alternate :term:`Profile` representation to request for the response when the :term:`Media-Type`
+        does not support the ``profile`` parameter directly in the ``Accept`` header.
+      - ``Accept-Profile: https://www.opengis.net/dev/profile/OGC/0/ogc-results``
+
+.. _proc_content_negotiation_profile_order:
+
+Profile Resolution Order
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Possible locations where :term:`Profile` can be specified are, in order of precedence:
+
+- ``profile`` query parameter.
+- ``Accept-Profile`` header directly providing the profile :term:`URI`.
+- ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
+- ``Prefer`` header including a ``profile`` parameter.
+- ``Link`` header including a ``profile`` parameter.
+
+.. seealso::
+    - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
+    - `Indicating, Discovering, Negotiating, and Writing Profiled Representations <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
+    - Logic implementation in `Weaver` is provided in :func:`weaver.utils.get_response_profile`.
+
+.. note::
+    The precedence requirement is mostly predominant regarding the use of a ``profile`` query parameter in contrast
+    to any other header variant. This is simply due to the fact that inserting a query parameter is the simplest
+    method to provide a :term:`Profile`, especially in the case of :term:`Web` browsers where headers are more
+    complicated to include in the request. Therefore, combining multiple headers approaches simultaneously with
+    distinct :term:`Profile` values is considered *undefined or random behavior* by referenced standards.
+
+In `Weaver`, the prioritization strategy is defined in terms of most explicit and most common header names to
+least probable ones regarding where the :term:`Profile` is potentially located. Another consideration for the order
+is the "*strictness requirement*" aspect of each header. The ``Accept`` header imposes a strict refusal of the
+request (``406 Not Acceptable``) if the :term:`Profile` is not supported for a given endpoint, while the ``Prefer``
+header is more relaxed and fulfillment is optional (the server is allowed to ignore it and respond succesfully).
+
+Finally, the ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
+respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
+submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
+clients and servers supporting different :term:`Profiles` interoperability. In this case, the ``Link`` header can be
+used to provide a fallback if the :term:`Profile` in ``Prefer`` cannot not be respected or resolved by the server for
+the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
+scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
 
 .. _vault_upload:
 
