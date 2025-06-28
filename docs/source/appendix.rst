@@ -319,18 +319,19 @@ Glossary
 
     URI
         | Uniform Resource Identifier
-        | Superset of :term:`URL` and :term:`URN` that uses a specific string format to identify a resource.
+        | Superset of :term:`URL` and :term:`URN` that uses a specific string format to identify a resource,
+          with their of their respective notations.
 
     URL
         | Uniform Resource Locator
-        | Subset of :term:`URI` that follows the ``<scheme>://<scheme-specific-part>`` format, as per :rfc:`1738`.
+        | Subset of :term:`URI` that follows the ``<scheme>://<scheme-specific-part>`` notation, as per :rfc:`1738`.
           Specifies where an identified resource is available and the protocol mechanism employed for retrieving it.
           This is employed in `Weaver` for ``http(s)://``, ``s3://`` and ``file://`` locations by :term:`I/O`, or in
           general to refer to :term:`API` locations.
 
     URN
         | Uniform Resource Name
-        | Subset of :term:`URI` that follows the ``urn:<namespace>:<specific-part>`` format, as per :rfc:`8141`.
+        | Subset of :term:`URI` that follows the ``urn:<namespace>:<specific-part>`` notation, as per :rfc:`8141`.
           It is used to register a unique reference to a named entity such as a :term:`UoM` or other common definitions.
 
         .. seealso::
