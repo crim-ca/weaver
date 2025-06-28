@@ -356,6 +356,7 @@ def get_job_status_schema(request):
         if resolved_schema == JobStatusProfileSchema.OGC:
             content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
             content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC
+            content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC, rel="profile")
         elif resolved_schema == JobStatusProfileSchema.OPENEO:
             content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         elif content_type in ContentType.ANY_XML:

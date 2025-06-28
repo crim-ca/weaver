@@ -1434,6 +1434,8 @@ def make_link_header(
         charset = charset or href.get("charset")  # noqa
         hreflang = hreflang or href.get("hreflang")
         href = href["href"]
+    if not rel:
+        raise ValueError(f"Missing required 'rel' parameter to form a valid 'Link' header for [{href}].")
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""

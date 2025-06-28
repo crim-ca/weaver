@@ -2730,6 +2730,13 @@ class WpsRestApiJobsTest(JobUtils):
             assert expect_content_schema.rsplit("/", 1)[-1] in resp.text, "Schema name should be in XML contents."
         else:
             raise AssertionError(f"Invalid response Content-Type [{expect_content_type}] is not expected.")
+        job_links = resp.headers.getall("Link")
+        job_profiles = [link for link in job_links if "rel=\"profile\"" in link]
+        if expect_job_type == JobStatusType.OGC:
+            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC in link]
+            assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
+        else:
+            assert not job_profiles, "Job status with non-OGC type did not expect any well-defined Link profile header."
 
     def test_job_status_xml_gone(self):
         # this test considers that jobs are not created by actual execution
