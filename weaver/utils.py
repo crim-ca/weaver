@@ -688,7 +688,8 @@ def get_response_profile(request, request_headers=None):
 
     .. seealso::
         - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
-        - `Indicating, Discovering, Negotiating, and Writing Profiled Representations <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
+        - `Indicating, Discovering, Negotiating, and Writing Profiled Representations
+          <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
         - :ref:`Weaver Content Negotiation by Profile <content-negotiation-profile>` in the documentation
           for specific detail about why the below code is implemented in this way.
 
