@@ -19,6 +19,7 @@ Changes:
 .. FIXME: Add single result as document response using OGC results profile
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
 .. FIXME: Add test for returned Link:profile=... header with various profile requests
+.. FIXME: Complete docs in 'processes.rst' about params that affect content negotiation + refs in order section
 
 - Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
   the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
