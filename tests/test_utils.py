@@ -69,6 +69,7 @@ from weaver.utils import (
     get_path_kvp,
     get_request_args,
     get_request_options,
+    get_response_profile,
     get_sane_name,
     get_secure_directory_name,
     get_secure_filename,
@@ -282,8 +283,9 @@ xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/
 
 
 class MockRequest(object):
-    def __init__(self, url):
+    def __init__(self, url, headers=None):
         self.url = url
+        self.headers = headers or {}
 
     @property
     def query_string(self):
@@ -2396,3 +2398,20 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
     results = explode_headers(test_headers)
     assert list(results.items()) == expect_headers
     assert results.getall("Link") == expect_get_all
+
+
+@pytest.mark.parametrize(
+    ["test_request", "test_headers", "expect_profile"],
+    [
+        (MockRequest("?profile=param", headers={"Profile": "header"}), {}, "param"),
+        (MockRequest("?profile=param", headers={"Accept-Profile": "header"}), {}, "param"),
+        (MockRequest("?random=param", headers={"Accept-Profile": "header"}), {}, "header"),
+        (MockRequest("/test", headers={"Accept-Profile": "header"}), {"Accept-Profile": "x-header"}, "x-header"),
+        (MockRequest("/test", headers={"Random": "other"}), {"Accept-Profile": "x-header"}, "x-header"),
+        (MockRequest("/test", headers={}), {"Accept-Profile": "x-header"}, "x-header"),
+        (MockRequest("/test", headers={}), {"Random-Profile": "default"}, None),
+    ]
+)
+def test_get_response_profile(test_request, test_headers, expect_profile):
+    profile = get_response_profile(test_request, test_headers)
+    assert profile == expect_profile

@@ -147,6 +147,8 @@
 .. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
 .. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
 .. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
+.. _ogc-api-proc-profiles: https://docs.ogc.org/DRAFTS/18-062r3.html#profile-uris
+.. |ogc-api-proc-profiles| replace:: *OGC API - Processes* - Profile Identifiers
 .. |ogc-api-proc-part2| replace:: *OGC API - Processes* - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-api-proc-part3| replace:: *OGC API - Processes* - Part 3: Workflows

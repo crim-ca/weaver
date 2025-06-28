@@ -236,7 +236,7 @@ class WorkerService(ServiceWPS):
         resp = submit_job_handler(
             data, self.settings, proc.processEndpointWPS1,
             process=proc, is_local=True, is_workflow=is_workflow, visibility=Visibility.PUBLIC,
-            language=wps_request.language, tags=tags, headers=headers, context=ctx
+            language=wps_request.language, tags=tags, headers=headers, context=ctx, request=req,
         )
         # enforced JSON results with submitted data that includes 'response=document'
         # use 'json_body' to work with any 'response' implementation

@@ -1547,13 +1547,16 @@ class WpsRestApiJobsTest(JobUtils):
             user_id=None, status=Status.DISMISSED, progress=50, access=Visibility.PUBLIC
         )
 
-        for code, job, title, error_type, cause in [
-            (404, job_accepted, "JobResultsNotReady", "result-not-ready", {"status": Status.ACCEPTED}),
-            (404, job_running, "JobResultsNotReady", "result-not-ready", {"status": Status.RUNNING}),
-            (400, job_failed_str, "JobResultsFailed", "MissingParameterValue", "400 MissingParameterValue: input"),
-            (400, job_failed_json, "JobResultsFailed", "InvalidParameterValue", "Input type invalid."),
-            (400, job_failed_none, "JobResultsFailed", "NoApplicableCode", "unknown"),
-            (410, job_dismissed, "JobDismissed", "JobDismissed", {"status": Status.DISMISSED}),
+        cause_missing = "400 MissingParameterValue: input"
+        cause_invalid = "Input type invalid."
+        cause_unknown = "unknown"  # random/unhandled error
+        for code, job, title, error_type, error_info, cause in [
+            (404, job_accepted, "JobResultsNotReady", "result-not-ready", None, {"status": Status.ACCEPTED}),
+            (404, job_running, "JobResultsNotReady", "result-not-ready", None, {"status": Status.RUNNING}),
+            (400, job_failed_str, "JobResultsFailed", "result-not-available", "MissingParameterValue", cause_missing),
+            (400, job_failed_json, "JobResultsFailed", "result-not-available", "InvalidParameterValue", cause_invalid),
+            (400, job_failed_none, "JobResultsFailed", "result-not-available", "NoApplicableCode", cause_unknown),
+            (410, job_dismissed, "JobDismissed", "result-not-available", None, {"status": Status.DISMISSED}),
         ]:
             for what in ["outputs", "results"]:
                 path = f"/jobs/{job.id}/{what}"
@@ -1566,6 +1569,10 @@ class WpsRestApiJobsTest(JobUtils):
                 assert resp.json["title"] == title, case
                 assert resp.json["cause"] == cause, case
                 assert resp.json["type"].endswith(error_type), case   # ignore http full reference, not always there
+                if error_info is not None:
+                    assert resp.json["error"] == error_info, case
+                else:
+                    assert "error" not in resp.json, case
                 assert "links" in resp.json
 
     def test_jobs_inputs_outputs_validations(self):
@@ -2723,6 +2730,13 @@ class WpsRestApiJobsTest(JobUtils):
             assert expect_content_schema.rsplit("/", 1)[-1] in resp.text, "Schema name should be in XML contents."
         else:
             raise AssertionError(f"Invalid response Content-Type [{expect_content_type}] is not expected.")
+        job_links = resp.headers.getall("Link")
+        job_profiles = [link for link in job_links if "rel=\"profile\"" in link]
+        if expect_job_type == JobStatusType.OGC:
+            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC in link]
+            assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
+        else:
+            assert not job_profiles, "Job status with non-OGC type did not expect any well-defined Link profile header."
 
     def test_job_status_xml_gone(self):
         # this test considers that jobs are not created by actual execution

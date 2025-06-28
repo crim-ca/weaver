@@ -179,7 +179,10 @@ def parse_prefer_header_execute_mode(
         mode = ExecuteMode.AUTO if return_auto else ExecuteMode.SYNC
         return mode, wait_max, {}
 
-    # allow both listing of multiple 'Prefer' headers and single 'Prefer' header with multi-param ';' separated
+    # allow both listing of multiple 'Prefer' headers and single 'Prefer' header with multi-param ';' or ',' separated
+    # see https://www.rfc-editor.org/rfc/rfc7240#section-2 that allows all three variants
+    # it also mentions that duplicates should be ignored in preference of the first occurrence
+    # therefore, merge into a single header where only the first value of corresponding parameter name is considered
     params = parse_kvp(prefer.replace(";", ","), pair_sep=",", multi_value_sep=None)
     wait = wait_max
     if "wait" in params:

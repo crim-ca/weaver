@@ -858,22 +858,23 @@ Following is a detailed listing of the expected response structure according to 
     +=====================+==============+===============+===========+=================================================+
     | |any|               | |any|        | |na|          | 0         | |res-empty| [#resNoContent]_                    |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
-    | |none|              | |none|       | |none|        | 1         | |res-accept| |res-fmt-warn|_                    |
+    | |none|              | |none|       | |none|        | 1         | - |res-accept| by default |res-fmt-warn|_       |
+    |                     |              |               |           | - |res-profile| if provided [#resProfile]_      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | |none|        | 1         | - |res-accept|                                  |
     | [#resPreferReturn]_ |              |               |           | - |res-auto| [#resValRef]_                      |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_                                   |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_                                   |
+    | [#resPreferReturn]_ |              |               | (complex) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-data|_                                   |
+    |                     |              |               | (complex) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | 1         | - |res-accept|                                  |
-    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_                                   |
+    | [#resPreferReturn]_ |              |               | (literal) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | |none|       | |none|        | >1        | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content by default [#resCTypeMulti]_          |
@@ -885,28 +886,30 @@ Following is a detailed listing of the expected response structure according to 
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     | [#resPreferReturn]_ |              | *and*         |           |   content [#resCTypeMulti]_                     |
-    |                     |              | ``reference`` |           | - using embedded content parts with data/link   |
+    |                     |              | ``reference`` |           | - using embedded content *Data* or *Link* parts |
     |                     |              | (``mixed``)   |           |   as requested by |out-mode| [#resValRefForce]_ |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``representation``  | ``raw``      | ``value``     | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     |                     |              | (for *all*)   |           |   content [#resCTypeMulti]_                     |
-    |                     |              |               |           | - using embedded content parts with data        |
+    |                     |              |               |           | - using embedded content *Data* parts           |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |na|                | ``raw``      | ``reference`` | >1        | - :ref:`Multipart <job-results-raw-multi>`      |
     | [#resPreferReturn]_ |              | (for *all*)   |           |   content with embedded part links if requested |
     |                     |              |               |           |   by ``Accept`` header [#resCTypeMulti]_        |
-    |                     |              |               |           | - otherwise, similar to |res-link|, but with    |
+    |                     |              |               |           | - otherwise, similar to |res-link|_, but with   |
     |                     |              |               |           |   a ``Link`` header for each requested output   |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | |none|              | ``document`` | |none|        | |any|     | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               |           |   content                                       |
     |                     |              |               |           | - |res-auto| [#resValRef]_                      |
+    |                     |              |               |           | - equivalent result when explicitly using       |
+    |                     |              |               |           |   |content_negotiation_profile|_ [#resProfile]_ |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (literal) | - |res-data|_                                   |
+    |                     |              |               | (literal) | - |res-data|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | |none|       | |none|        | 1         | - |res-accept|                                  |
-    |                     |              |               | (complex) | - |res-link|_                                   |
+    |                     |              |               | (complex) | - |res-link|_ |res-profile-one| [#resProfile]_  |
     +---------------------+--------------+---------------+-----------+-------------------------------------------------+
     | ``minimal``         | ``document`` | |none|        | |none|    | - :ref:`Results <job-results-document-minimal>` |
     |                     |              |               | or >1     |   content                                       |
@@ -934,8 +937,10 @@ Following is a detailed listing of the expected response structure according to 
 .. |out-mode| replace:: ``transmissionMode``
 .. |nReqOut| replace:: Amount and type of |br| *requested outputs*
 .. |res-empty| replace:: *empty*
-.. |res-accept| replace:: *as negotiated by* ``Accept`` *header or* ``format`` *parameter*
-.. |res-auto| replace:: *using automatic resolution of data/link representation*
+.. |res-accept| replace:: as negotiated by ``format`` query parameter or ``Accept`` header
+.. |res-profile| replace:: as negotiated by :term:`Profile`
+.. |res-profile-one| replace:: unless :ref:`Results <job-results-document-minimal>` are negotiated by :term:`Profile`
+.. |res-auto| replace:: using automatic resolution of *Data* or *Link* representation
 
 .. |res-data| replace:: Results for a Single Output with Data
 .. _res-data: `job-results-raw-single-data`_
@@ -989,6 +994,11 @@ Following is a detailed listing of the expected response structure according to 
 
     To avoid ambiguity, it is recommended that the ``response: document`` or ``response: raw``
     is explicitly set for such cases to ensure the result matches the desired outcome.
+
+    In the event that the :ref:`Results Document <job-results-document-minimal>` representation is desired
+    as :term:`JSON` response for that single output result, |content_negotiation_profile|_ [#resProfile]_
+    can be employed to remove the ambiguity. Other :term:`Profile` definitions could be added to remove further
+    ambiguities with other :term:`JSON`-like structures, but these are not explicitly handled by `Weaver` at this time.
 
 .. rubric:: Details
 
@@ -1068,11 +1078,27 @@ Following is a detailed listing of the expected response structure according to 
     the default data type representation of specified by ``transmissionMode``
     (i.e.: ``value`` for literal data, ``reference`` for complex data).
 
+.. [#resProfile]
+    Using :ref:`proc_content_negotiation`, it is possible to request a
+    specific :term:`Profile` representation of results to be returned by the :term:`Process`
+    in a consistent fashion.
+
+    This allows, notably, to enforce a :ref:`Results Document <job-results-document-minimal>` representation
+    to be returned for a *single output*, even when the :term:`Process` would otherwise only return a single
+    result (resolved either explicitly or implicitly [#outN]_) directly as *Data* or *Link* according to
+    the resolved content negotiation [#resPreferReturn]_. This can be used to mimic the |oap| v1.0
+    behavior using ``response=document`` regardless of the anticipated number of produced outputs.
+
+    To perform |content_negotiation_profile|_, the ``"https://www.opengis.net/dev/profile/OGC/0/ogc-results"``
+    :term:`URI` must be employed as :term:`Profile` identifier in the execution request. Refer to the
+    :ref:`proc_content_negotiation` section for more details on how to achieve this.
+
 In summary, the ``Prefer`` and ``response`` parameters define how to return the results produced by the :term:`Process`.
 The ``Prefer`` header is also used by |oap| v2.0 to control how the results are encoded, whereas v1.0 relies on a
 separate ``transmissionMode`` parameter. By reducing the amount of parameters involved, v2.0 makes the request easier
 to submit with a single header (also used to indicate the :ref:`proc_exec_mode`), but limits certain representation
-combinations only possible with v1.0.
+combinations only possible with v1.0. These limited representations can be retrieved by involving more advanced
+:term:`Profile` and :term:`Media-Type` *Content Negotiation* techniques.
 
 .. seealso::
     Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.
@@ -2549,6 +2575,199 @@ internal :term:`Application Package` of the :term:`Process` represented by the :
     :language: json
     :caption: Example :term:`JSON` of :term:`Job` Statistics Response
     :name: job-statistics
+
+.. _proc_content_negotiation:
+
+Content Negotiation
+-----------------------------
+
+Content negotiation can be performed using multiple query parameters and headers when submitting a :term:`Job`
+execution request, when retrieving the :term:`Job` results, or when inspecting the :term:`Process` description
+to execute. Content negotiation also happens within the submitted :ref:`proc_exec_body` contents for respective
+:term:`Process` inputs and outputs that should be employed or produced by the corresponding :term:`Job` execution.
+Following is a summary of relevant parameters impacting content negotiation.
+
+.. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
+    :name: table-content-negotiation
+    :align: center
+    :header-rows: 1
+    :widths: 10,10,50,15,15
+
+    * - Parameter
+      - Location
+      - Description
+      - Allowed Encoding [#noteParamEncoding]_
+      - Example
+    * - ``f`` / ``format``
+      - Query
+      - Requested content :term:`Media-Type` (explicitly or implicitly using a shorthand notation).
+        Equivalent to the ``Accept`` header, but with a higher precedence if both are provided.
+        This precedence allows ignoring automatically injected :term:`HTML`-like ``Accept`` headers
+        by some :term:`Web` browsers, in order to provide alternate response representations.
+      - |shorthand| or :term:`URI`
+      - ``/jobs/{jobID}?f=json``
+    * - ``profile``
+      - Query
+      - Requested :term:`Profile` representation of the contents in the response.
+        Equivalent to the various headers below involving a :term:`Profile` resolution, but with a higher precedence.
+        See :ref:`proc_content_negotiation_profile_order` for details.
+      - |shorthand| or :term:`URI`
+      - ``/jobs/{jobID}?profile=ogc+strict``
+    * - ``schema``
+      - Query
+      - Alternate parameter to ``profile``, mostly used interchangeably for backward compatibility.
+        In very rare cases, could be used to distinguish a shared schema :term:`URI` representation and an underlying
+        :term:`Profile` representation contained within the same schema sharing multiple :term:`Profile` references.
+      - |shorthand| or :term:`URI`
+      - ``/processes/{jobID}?schema=OGC``
+    * - ``Accept``
+      - Header
+      - Requested content :term:`Media-Type` for the response.
+        Can include an optional ``profile`` parameter, if its provision is allowed by the underlying :term:`Media-Type`,
+        to request a specific :term:`Profile` representation for the response.
+        See :ref:`proc_content_negotiation_profile_order` for details.
+      - :term:`Media-Type` with optional ``profile`` as |shorthand| or :term:`URI`
+      - ``Accept: image/tiff; application=geotiff; profile=cloud-optimized``
+    * - ``Accept-Profile``
+      - Header
+      - Alternate :term:`Profile` representation to request for the response when the :term:`Media-Type`
+        does not support the ``profile`` parameter directly in the ``Accept`` header.
+        See :ref:`proc_content_negotiation_profile_order` for details.
+      - :term:`URI`
+      - ``Accept-Profile: <https://www.opengis.net/dev/profile/OGC/0/ogc-results>``
+    * - ``Prefer``
+      - Header
+      - Typically involved in :ref:`proc_exec_mode` and :ref:`proc_exec_results` request strategies,
+        but it can simultaneously be used to request a specific :term:`Profile` representation of the response,
+        as per :rfc:`7240` that allows additional parameters to be specified.
+        Because it is a *preference*, its application is not guaranteed. The ``Preference-Applied`` header in
+        the response can be used to verify if the ``profile`` was resolved as desired or was ignored.
+      - |shorthand| or :term:`URI` (for ``profile`` parameter specifically)
+      - ``Prefer: profile="https://www.opengis.net/dev/profile/OGC/0/ogc-results", return=minimal``
+    * - ``Link: rel="profile"``
+      - Header
+      - Alternate method request a specific :term:`Profile` as per :rfc:`6906`.
+        See :ref:`proc_content_negotiation_profile_order` for details.
+      - :term:`URI`
+      - ``Link: <https://www.opengis.net/dev/profile/OGC/0/ogc-results>; rel="profile"``
+
+.. |shorthand| replace:: :ref:`Shorthand Notation <proc_content_negotiation_identifiers>`
+
+.. rubric:: Notes
+
+.. [#noteEncoding]
+    Depending on the location and the specific name of the query parameters or headers, certain encodings are enforced.
+    For example, the ``Link`` header is defined by :rfc:`6906`, which **requires** its ``href`` to be an :term:`URI`.
+    In such case, shorthand notation like ``rel=profile, href=cloud-optimized`` is **not allowed**.
+    Requesting this :term:`Profile` would require using the corresponding full :term:`URI` if available, or requires
+    using another header that allows the shorthand notation. See :ref:`proc_content_negotiation_identifiers` for
+    common values.
+
+.. seealso::
+    - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
+    - `Indicating, Discovering, Negotiating, and Writing Profiled Representations
+      <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
+
+.. _proc_content_negotiation_identifiers:
+
+Shorthand Notation Identifiers for Content Negotiation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Following is a non-exhaustive list of common shorthand notations that can be used when involving content negotiation
+and their corresponding fully-defined :term:`URI` or :term:`Media-Type` representation.
+
+.. note::
+    The shorthand notations are case-insensitive. Therefore, ``json`` and ``JSON`` are equivalent.
+    However, the corresponding :term:`URI` or :term:`Media-Type` representations must match *exactly*.
+
+.. list-table:: Common Shorthand Notations Identifiers for Content Negotiation
+    :name: table-content-negotiation
+    :align: center
+    :header-rows: 1
+    :widths: 10,30,60
+
+    * - Shorthand Notation
+      - Specific Definition
+      - Description and Usage
+    * - ``ogc``
+      - :term:`URI` of the relevant schema indicated by |ogc-api-proc-profiles|_.
+      - Typically employed with ``schema`` or ``profile`` query parameter to request
+        a :term:`OGC API - Processes` representation.
+        The applicable :term:`URI` depends on the context of the resource being requested.
+    * - ``ogc+strict``
+      - |na|
+      - Same as the above ``ogc``, but disallowing any additional parameters not specifically defined by
+        legacy :term:`OGC API - Processes` definitions. This applies only to the ``/jobs/{jobID}/results`` endpoint
+        to limit returned parameters (e.g.: ``format``), but should be equivalent to ``ogc`` for all other contexts.
+    * - ``old``
+      - |na|
+      - Typically employed with ``schema`` or ``profile`` query parameter to request the legacy
+        :term:`OGC API - Processes` representation using a listing notation of :term:`I/O` rather
+        than :term:`JSON` mapping. See :ref:`proc_op_execute` for more details and examples.
+    * - ``old+strict``
+      - |na|
+      - Same as previous elements by combining the ``old`` notation and ``strict`` consideration.
+    * - ``openEO``
+      - :term:`URI` of the schema under ``https://openeo.org/documentation/1.0/developers/api/openapi.yaml``.
+      - Typically employed with ``schema`` or ``profile`` query parameter to request a :term:`openEO` representation.
+        Can also be used as :term:`Profile` negotiation for parameters that allow non-:term:`URI` values.
+    * - ``wps``
+      - :term:`URI` of the relevant ``http://schemas.opengis.net/wps/1.0.0/`` schema
+        according to applicable resource context being requested.
+      - Typically employed with ``f`` or ``format`` query parameter to request a :term:`WPS` representation.
+    * - ``json``
+      - :term:`Media-Type` ``application/json``
+      - Typically employed with ``f`` or ``format`` query parameter to request a :term:`JSON` representation.
+    * - ``yaml``/``yml``
+      - :term:`Media-Type` ``application/x-yaml``
+      - Typically employed with ``f`` or ``format`` query parameter to request a :term:`YAML` representation.
+    * - ``xml``
+      - :term:`Media-Type` ``text/xml`` or ``application/xml``
+      - Typically employed with ``f`` or ``format`` query parameter to request a :term:`XML` representation.
+        Depending on the requested resource context, this can be interpreted as literal conversion from a corresponding
+        :term:`JSON` representation if possible, or can result in resolving the :term:`WPS` equivalent representation
+        of the resource (e.g.: :term:`Process` description as :term:`XML` ``ProcessDescription`` or :term:`Job` status
+        as :term:`XML` ``ExecuteResponse``).
+    * - ``html``
+      - :term:`Media-Type` ``text/html`` or ``application/html``
+      - Typically employed with ``f`` or ``format`` query parameter to request a :term:`HTML` representation.
+
+.. _proc_content_negotiation_profile_order:
+
+Profile Resolution Order
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Possible locations where :term:`Profile` can be specified are, in order of precedence:
+
+- ``profile`` query parameter.
+- ``Accept-Profile`` header directly providing the profile :term:`URI`.
+- ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
+- ``Prefer`` header including a ``profile`` parameter.
+- ``Link`` header including a ``profile`` parameter.
+
+.. seealso::
+    - Implementation of the resolution order in `Weaver` is provided in :func:`weaver.utils.get_response_profile`.
+
+.. note::
+    The precedence requirement is mostly predominant regarding the use of a ``profile`` query parameter in contrast
+    to any other header variant. This is simply due to the fact that inserting a query parameter is the simplest
+    method to provide a :term:`Profile`, especially in the case of :term:`Web` browsers where headers are more
+    complicated to include in the request. Therefore, combining multiple headers approaches simultaneously with
+    distinct :term:`Profile` values is considered *undefined or random behavior* by referenced standards.
+
+In `Weaver`, the prioritization strategy is defined in terms of most explicit and most common header names to
+least probable ones regarding where the :term:`Profile` is potentially located. Another consideration for the order
+is the "*strictness requirement*" aspect of each header. The ``Accept`` header imposes a strict refusal of the
+request (``406 Not Acceptable``) if the :term:`Profile` is not supported for a given endpoint, while the ``Prefer``
+header is more relaxed and fulfillment is optional (the server is allowed to ignore it and respond successfully).
+
+The ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
+respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
+submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
+clients and servers supporting different :term:`Profiles` interoperability. In this case, the ``Link`` header can be
+used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
+for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
+scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
 
 .. _vault_upload:
 

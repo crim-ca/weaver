@@ -103,6 +103,7 @@ if TYPE_CHECKING:
         AnyDatabaseContainer,
         AnyHeadersContainer,
         AnyProcessRef,
+        AnyRequestType,
         AnyResponseType,
         AnyServiceRef,
         AnySettingsContainer,
@@ -874,24 +875,28 @@ def submit_job(request, reference, tags=None, process_id=None):
     user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     headers = dict(request.headers)
     settings = get_settings(request)
-    return submit_job_handler(json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local,
-                              visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
+    return submit_job_handler(
+        json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local, visibility,
+        language=lang, request=request, headers=headers, tags=tags, user=user, context=context
+    )
 
 
-def submit_job_handler(payload,             # type: ProcessExecution
-                       settings,            # type: SettingsType
-                       wps_url,             # type: str
-                       provider=None,       # type: Optional[AnyServiceRef]
-                       process=None,        # type: AnyProcessRef
-                       is_workflow=False,   # type: bool
-                       is_local=True,       # type: bool
-                       visibility=None,     # type: Optional[AnyVisibility]
-                       language=None,       # type: Optional[str]
-                       headers=None,        # type: Optional[HeaderCookiesType]
-                       tags=None,           # type: Optional[List[str]]
-                       user=None,           # type: Optional[int]
-                       context=None,        # type: Optional[str]
-                       ):                   # type: (...) -> AnyResponseType
+def submit_job_handler(
+    payload,            # type: ProcessExecution
+    settings,           # type: SettingsType
+    wps_url,            # type: str
+    provider=None,      # type: Optional[AnyServiceRef]
+    process=None,       # type: AnyProcessRef
+    is_workflow=False,  # type: bool
+    is_local=True,      # type: bool
+    visibility=None,    # type: Optional[AnyVisibility]
+    language=None,      # type: Optional[str]
+    request=None,       # type: Optional[AnyRequestType]
+    headers=None,       # type: Optional[HeaderCookiesType]
+    tags=None,          # type: Optional[List[str]]
+    user=None,          # type: Optional[int]
+    context=None,       # type: Optional[str]
+):                      # type: (...) -> AnyResponseType
     """
     Parses parameters that defines the submitted :term:`Job`, and responds accordingly with the selected execution mode.
 
@@ -964,13 +969,14 @@ def submit_job_handler(payload,             # type: ProcessExecution
     job.wps_url = wps_url
     job = store.update_job(job)
 
-    return submit_job_dispatch_task(job, headers=req_headers, container=settings)
+    return submit_job_dispatch_task(job, request=request, headers=req_headers, container=settings)
 
 
 def submit_job_dispatch_task(
     job,                    # type: Job
     *,                      # force named keyword arguments after
     container,              # type: AnySettingsContainer
+    request=None,           # type: Optional[AnyRequestType]
     headers=None,           # type: AnyHeadersContainer
     force_submit=False,     # type: bool
 ):                          # type: (...) -> AnyResponseType
@@ -978,6 +984,11 @@ def submit_job_dispatch_task(
     Submits the :term:`Job` to the :mod:`celery` worker with provided parameters.
 
     Assumes that parameters have been pre-fetched, validated, and can be resolved from the :term:`Job`.
+
+    .. note::
+        Both the :paramref:`container` and :paramref:`request` parameters are provided, although they could contain the
+        same nested setting references in certain cases, because other implementations (e.g.: dispatch via :term:`WPS`)
+        might recreate their own :term:`HTTP` request object that doesn't include the application settings.
     """
     db = get_db(container)
     store = db.get_store(StoreJobs)
@@ -1020,6 +1031,7 @@ def submit_job_dispatch_task(
                     resp_headers.update(sync_applied)
                 return get_job_results_response(
                     job,
+                    request=request,
                     request_headers=req_headers,
                     response_headers=resp_headers,
                     container=container,
