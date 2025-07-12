@@ -7,11 +7,12 @@ import inspect
 from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, List, Optional, Type, TypeAlias, TypeVar, Union
 
     from weaver.typedefs import AnyKey
 
-    PropertyDataTypeT = TypeVar("PropertyDataTypeT")
+    ConstantsType: TypeAlias = "Constants"
+    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=ConstantsType)
 
 # pylint: disable=E1120,no-value-for-parameter
 
@@ -49,7 +50,7 @@ class Constants(object, metaclass=_Const):
     @classmethod
     def get(
         cls,            # type: Type[PropertyDataTypeT]
-        key_or_value,   # type: Union[AnyKey, EnumType, PropertyDataTypeT]
+        key_or_value,   # type: Union[AnyKey, EnumType, PropertyDataTypeT, None]
         default=None,   # type: Optional[Any]
     ):                  # type: (...) -> PropertyDataTypeT
         if isinstance(key_or_value, str):

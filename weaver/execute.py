@@ -7,42 +7,52 @@ from weaver.base import Constants
 from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, Union
+    from typing import List, Optional, Tuple, TypeAlias, Union
 
     from weaver.datatype import Job
-    from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal
+    from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal, PreservedHeadersType
 
-    ExecutionModeAutoType = Literal["auto"]
-    ExecutionModeAsyncType = Literal["async"]
-    ExecutionModeSyncType = Literal["sync"]
+    ExecuteModeAutoType = Literal["auto"]
+    ExecuteModeAsyncType = Literal["async"]
+    ExecuteModeSyncType = Literal["sync"]
+    ExecuteModeConstantsType: TypeAlias = "ExecuteMode"
     AnyExecuteMode = Union[
-        ExecutionModeAutoType,
-        ExecutionModeAsyncType,
-        ExecutionModeSyncType,
+        ExecuteModeAutoType,
+        ExecuteModeAsyncType,
+        ExecuteModeSyncType,
+        ExecuteModeConstantsType,
     ]
     ExecuteControlOptionAsyncType = Literal["async-execute"]
     ExecuteControlOptionSyncType = Literal["sync-execute"]
+    ExecuteControlOptionConstantsType: TypeAlias = "ExecuteControlOption"
     AnyExecuteControlOption = Union[
         ExecuteControlOptionAsyncType,
         ExecuteControlOptionSyncType,
+        ExecuteControlOptionConstantsType,
     ]
     ExecuteReturnPreferenceMinimalType = Literal["minimal"]
     ExecuteReturnPreferenceRepresentationType = Literal["representation"]
+    ExecuteReturnPreferenceConstantsType: TypeAlias = "ExecuteReturnPreference"
     AnyExecuteReturnPreference = Union[
         ExecuteReturnPreferenceMinimalType,
         ExecuteReturnPreferenceRepresentationType,
+        ExecuteReturnPreferenceConstantsType,
     ]
     ExecuteResponseDocumentType = Literal["document"]
     ExecuteResponseRawType = Literal["raw"]
+    ExecuteResponseConstantsType: TypeAlias = "ExecuteResponse"
     AnyExecuteResponse = Union[
         ExecuteResponseDocumentType,
         ExecuteResponseRawType,
+        ExecuteResponseConstantsType,
     ]
     ExecuteTransmissionModeReferenceType = Literal["reference"]
     ExecuteTransmissionModeValueType = Literal["value"]
+    ExecuteTransmissionModeConstantsType: TypeAlias = "ExecuteTransmissionMode"
     AnyExecuteTransmissionMode = Union[
         ExecuteTransmissionModeReferenceType,
         ExecuteTransmissionModeValueType,
+        ExecuteTransmissionModeConstantsType,
     ]
     # pylint: disable=C0103,invalid-name
     ExecuteCollectionFormatType_STAC = Literal["stac-collection"]
@@ -51,6 +61,7 @@ if TYPE_CHECKING:
     ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]
     ExecuteCollectionFormatType_OGC_MAP = Literal["ogc-map-collection"]
     ExecuteCollectionFormatType_GEOJSON = Literal["geojson-feature-collection"]
+    ExecuteCollectionFormatConstantsType: TypeAlias = "ExecuteCollectionFormat"
     AnyExecuteCollectionFormat = Union[
         ExecuteCollectionFormatType_STAC,
         ExecuteCollectionFormatType_STAC_ITEMS,
@@ -58,15 +69,16 @@ if TYPE_CHECKING:
         ExecuteCollectionFormatType_OGC_FEATURES,
         ExecuteCollectionFormatType_OGC_MAP,
         ExecuteCollectionFormatType_GEOJSON,
+        ExecuteCollectionFormatConstantsType,
     ]
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ExecuteMode(Constants):
-    AUTO = "auto"       # type: ExecutionModeAutoType
-    ASYNC = "async"     # type: ExecutionModeAsyncType
-    SYNC = "sync"       # type: ExecutionModeSyncType
+    AUTO = "auto"       # type: ExecuteModeAutoType
+    ASYNC = "async"     # type: ExecuteModeAsyncType
+    SYNC = "sync"       # type: ExecuteModeSyncType
 
 
 class ExecuteControlOption(Constants):
@@ -268,8 +280,8 @@ def rebuild_prefer_header(job):
 def update_preference_applied_return_header(
     job,                # type: Job
     request_headers,    # type: Optional[AnyHeadersContainer]
-    response_headers,   # type: Optional[AnyHeadersContainer]
-):                      # type: (...) -> AnyHeadersContainer
+    response_headers,   # type: Optional[PreservedHeadersType]
+):                      # type: (...) -> PreservedHeadersType
     """
     Updates the ``Preference-Applied`` header according to available information.
 
