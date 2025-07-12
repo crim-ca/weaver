@@ -80,6 +80,7 @@ from weaver.utils import (
     is_valid_url,
     localize_datetime,
     make_dirs,
+    make_link_header,
     null,
     parse_kvp,
     parse_number_with_unit,
@@ -2415,3 +2416,11 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
 def test_get_response_profile(test_request, test_headers, expect_profile):
     profile = get_response_profile(test_request, test_headers)
     assert profile == expect_profile
+
+
+def test_make_link_header():
+    with pytest.raises(ValueError):
+        make_link_header("https://example.com/test", type="text/plain")
+
+    link = make_link_header("https://example.com/test", type="text/plain", rel="test")
+    assert link == '<https://example.com/test>; rel="test"; type="text/plain"'

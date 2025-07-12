@@ -353,13 +353,7 @@ def get_job_status_schema(request):
         else:
             content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
-        if resolved_schema == JobStatusProfileSchema.OGC:
-            content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-            content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC
-            content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC, rel="profile")
-        elif resolved_schema == JobStatusProfileSchema.OPENEO:
-            content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
-        elif content_type in ContentType.ANY_XML:
+        if content_type in ContentType.ANY_XML:
             if resolved_schema not in [JobStatusProfileSchema.WPS, None]:
                 raise HTTPBadRequest(
                     json={
@@ -370,6 +364,13 @@ def get_job_status_schema(request):
                 )
             content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
             content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+        else:
+            if resolved_schema == JobStatusProfileSchema.OGC:
+                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
+                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC
+                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC, rel="profile")
+            elif resolved_schema == JobStatusProfileSchema.OPENEO:
+                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
 
     profile = get_response_profile(request)

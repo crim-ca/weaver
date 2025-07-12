@@ -13,11 +13,13 @@ import colander
 import mock
 import pytest
 from dateutil import parser as date_parser
+from pyramid.httpexceptions import HTTPBadRequest
 from parameterized import parameterized
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
 from tests.utils import (
+    MockedRequest,
     get_links,
     get_module_version,
     get_test_weaver_app,
@@ -47,7 +49,7 @@ from weaver.utils import get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_document
+from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -2269,6 +2271,96 @@ class WpsRestApiJobsTest(JobUtils):
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
+            # using '?profile=...' with fully defined Profile URI explicitly
+            (
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
+            # using 'Accept-Profile' header with fully defined Profile URI explicitly
+            (
+                {},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                2,
+                Status.FAILED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                JobStatusType.PROVIDER,
+                Status.ACCEPTED,
+            ),
             # using 'Accept: ...; profile=ogc' (explicitly rather than default)
             (
                 {},
@@ -2677,6 +2769,143 @@ class WpsRestApiJobsTest(JobUtils):
                 JobStatusType.WPS,
                 Status.ACCEPTED,
             ),
+            # using only 'Accept' header resolving to XML without schema/profile should default to WPS
+            (
+                {},
+                {"Accept": ContentType.APP_XML},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_XML},
+                1,
+                Status.FAILED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_XML},
+                9,
+                Status.RUNNING,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.STARTED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.APP_XML},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                None,
+                JobStatusType.WPS,
+                Status.ACCEPTED,
+            ),
+            # HTML responses should respect the requested Profile to return appropriate Job 'status' values for them.
+            # However, 'Content-Type' will not include the 'profile' parameter to avoid breaking parsing by browsers.
+            # Furthermore, the 'Content-Schema' and varous 'profile' references will NOT be included in HTML response,
+            # since they are technically not respecting the JSON schema and structure of the profile.
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OGC},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.PROCESS,
+                Status.SUCCESSFUL,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OGC},
+                1,
+                Status.FAILED,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.PROCESS,
+                Status.FAILED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OGC},
+                9,
+                Status.RUNNING,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.PROCESS,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OGC},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.PROCESS,
+                Status.ACCEPTED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OPENEO},
+                0,
+                Status.SUCCESSFUL,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.OPENEO,
+                Status.FINISHED,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OPENEO},
+                1,
+                Status.FAILED,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.OPENEO,
+                Status.ERROR,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OPENEO},
+                9,
+                Status.RUNNING,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.OPENEO,
+                Status.RUNNING,
+            ),
+            (
+                {},
+                {"Accept": ContentType.TEXT_HTML, "Accept-Profile": JobStatusProfileSchema.OPENEO},
+                11,
+                Status.ACCEPTED,
+                f"{ContentType.TEXT_HTML}; charset=UTF-8",
+                None,
+                None,
+                JobStatusType.OPENEO,
+                Status.QUEUED,
+            ),
         ]
     )
     @pytest.mark.oap_part4
@@ -2728,11 +2957,19 @@ class WpsRestApiJobsTest(JobUtils):
             # since we use a mock, the actual content is not important, as long as the schema/type resolution made sense
             assert f"{expect_job_type}:" in resp.text, "type should be used as namespace in XML representation"
             assert expect_content_schema.rsplit("/", 1)[-1] in resp.text, "Schema name should be in XML contents."
+        elif ContentType.TEXT_HTML in expect_content_type:
+            # ensure that the resolved 'status' (in HTML table) is reflected in the response according to the profile
+            html_text = resp.text.replace("\n", "").replace(" ", "")
+            status_field = html_text.split("Status</td>", 1)[-1].split("</td>", 1)[0]
+            assert expect_job_status in status_field, "status from profile should be used in HTML representation"
         else:
             raise AssertionError(f"Invalid response Content-Type [{expect_content_type}] is not expected.")
         job_links = resp.headers.getall("Link")
         job_profiles = [link for link in job_links if "rel=\"profile\"" in link]
-        if expect_job_type in [JobStatusType.PROCESS, JobStatusType.PROVIDER, JobStatusType.SERVICE]:
+        if (
+            expect_job_type in [JobStatusType.PROCESS, JobStatusType.PROVIDER, JobStatusType.SERVICE]
+            and ContentType.TEXT_HTML not in expect_content_type  # "JSON" profile not respected, therefore no Link
+        ):
             ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC in link]
             assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
         else:
@@ -2839,3 +3076,19 @@ def test_get_job_results_document(results, expected):
     job = Job(task_id="test", outputs={})
     output = get_job_results_document(job, results, settings={})
     assert output == expected
+
+
+@pytest.mark.parametrize(
+    ["accept_type", "accept_profile"],
+    [
+        (ContentType.APP_XML, JobStatusProfileSchema.OGC),
+        (ContentType.APP_XML, JobStatusProfileSchema.OPENEO),
+    ]
+)
+def test_get_job_status_profile_invalid(accept_type, accept_profile):
+    """
+    Test invalid combinations of :term:`Job` status :term:`Profile`.
+    """
+    request = MockedRequest(headers={"Accept": accept_type, "Accept-Profile": accept_profile})
+    with pytest.raises(HTTPBadRequest):
+        get_job_status_schema(request)
