@@ -19,7 +19,8 @@ Changes:
 .. FIXME: Add test for returned Link:profile=... header with various profile requests
 
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
-- Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations.
+- Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_).
 - Changed `CWL` ``/processes/{processID}/package`` response to be ``application/cwl+json`` by default
   (previously plain ``application/json``) to better represent the returned contents with registered `IANA Media-Type`.
   Other variants (`CWL+YAML` or plain `JSON`) can be requested using the ``Accept`` header or ``f``/``format`` query.
@@ -28,7 +29,8 @@ Changes:
   (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).
 - Allow ``profile`` content negotiation for single result `Job` to be represented
   using the multi-output `JSON` results representation instead of the default raw/direct value representation
-  (fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_,
+  fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
 - Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
   of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
 
