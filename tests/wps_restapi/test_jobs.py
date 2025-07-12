@@ -2732,7 +2732,7 @@ class WpsRestApiJobsTest(JobUtils):
             raise AssertionError(f"Invalid response Content-Type [{expect_content_type}] is not expected.")
         job_links = resp.headers.getall("Link")
         job_profiles = [link for link in job_links if "rel=\"profile\"" in link]
-        if expect_job_type == JobStatusType.OGC:
+        if expect_job_type in [JobStatusType.PROCESS, JobStatusType.PROVIDER, JobStatusType.SERVICE]:
             ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC in link]
             assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
         else:
