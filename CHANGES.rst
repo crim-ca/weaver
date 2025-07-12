@@ -13,13 +13,16 @@ Changes
 Changes:
 --------
 
-.. FIXME: Add profile link tests
 .. FIXME: Ensure all 'OGC_API_PROC_PROFILE_...' links are returned in their respective responses
-.. FIXME: complete 'get_response_profile' implementation as per docs + unit test it (enforce URI requirements?)
-.. FIXME: Add single result as document response using OGC results profile
+.. FIXME: Add test requesting single result as document response using OGC results profile instead of 'response' param
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
 .. FIXME: Add test for returned Link:profile=... header with various profile requests
 
+- Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
+- Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations.
+- Changed `CWL` ``/processes/{processID}/package`` response to be ``application/cwl+json`` by default
+  (previously plain ``application/json``) to better represent the returned contents with registered `IANA Media-Type`.
+  Other variants (`CWL+YAML` or plain `JSON`) can be requested using the ``Accept`` header or ``f``/``format`` query.
 - Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
   the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
   (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).

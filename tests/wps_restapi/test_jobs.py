@@ -13,8 +13,8 @@ import colander
 import mock
 import pytest
 from dateutil import parser as date_parser
-from pyramid.httpexceptions import HTTPBadRequest
 from parameterized import parameterized
+from pyramid.httpexceptions import HTTPBadRequest
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example

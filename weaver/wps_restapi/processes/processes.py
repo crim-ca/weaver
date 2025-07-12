@@ -31,7 +31,7 @@ from weaver.processes.execution import submit_job, submit_job_dispatch_wps
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header
+from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
@@ -303,7 +303,14 @@ def get_local_process(request):
 @sd.process_package_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessPackageEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[
+        ContentType.APP_JSON,
+        ContentType.APP_YAML,
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_process_package_responses,
 )
@@ -314,7 +321,20 @@ def get_local_process_package(request):
     Get a registered local process package definition.
     """
     process = get_process(request=request)
-    return HTTPOk(json=process.package or {})
+    content_type = get_header("Accept", request.headers, default=ContentType.APP_CWL_JSON)
+    # ignore default browser request injecting HTML
+    # ignore 'weaver.wps_restapi_html_override_user_agent' as well since HTML cannot apply here
+    if all(ctype in content_type for ctype in [ContentType.TEXT_HTML, ContentType.ANY]):
+        content_type = ContentType.APP_CWL_JSON
+    headers = {
+        "Link": make_link_header(sd.CWL_SCHEMA_URL, rel="profile", type=ContentType.APP_YAML),
+        "Content-Schema": sd.CWL_SCHEMA_URL,
+        "Content-Profile": sd.CWL_SCHEMA_URL,
+    }
+    yml_fmt = [ContentType.APP_YAML, ContentType.APP_CWL_YAML]
+    cwl_fmt = OutputFormat.YAML if any(ctype in content_type for ctype in yml_fmt) else OutputFormat.JSON
+    package = OutputFormat.convert(process.package, cwl_fmt)
+    return HTTPOk(json=package or {}, headers=headers, content_type=content_type)
 
 
 @sd.process_payload_service.get(
