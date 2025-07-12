@@ -2423,4 +2423,4 @@ def test_make_link_header():
         make_link_header("https://example.com/test", type="text/plain")
 
     link = make_link_header("https://example.com/test", type="text/plain", rel="test")
-    assert link == '<https://example.com/test>; rel="test"; type="text/plain"'
+    assert link == "<https://example.com/test>; rel=\"test\"; type=\"text/plain\""
