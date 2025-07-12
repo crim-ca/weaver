@@ -353,21 +353,27 @@ button.active {
 /* --- Job Status and Progress --- */
 
 .status-unknown,
+.status-error,
 .status-failed,
 .status-exception {
     background-color: darkred;
 }
 
 .progress-unknown,
+.progress-error,
 .progress-failed,
 .progress-exception {
     accent-color: darkred;
 }
 
+.status-canceled,
+.status-cancelled,
 .status-dismissed {
     background-color: #EE5F5B;
 }
 
+.progress-canceled,
+.progress-cancelled,
 .progress-dismissed {
     accent-color: #EE5F5B;
 }
@@ -380,11 +386,15 @@ button.active {
     accent-color: darkorange;
 }
 
-.status-accepted {
+.status-accepted,
+.status-created,
+.status-queued {
     background-color: #808080;
 }
 
-.progress-accepted {
+.progress-accepted,
+.progress-created,
+.progress-queued {
     accent-color: #808080;
 }
 
@@ -400,13 +410,15 @@ button.active {
 
 .status-success,
 .status-succeeded,
-.status-successful {
+.status-successful,
+.status-finished {
     background-color: forestgreen;
 }
 
 .progress-success,
 .progress-succeeded,
-.progress-successful {
+.progress-successful,
+.progress-finished {
     accent-color: forestgreen;
 }
 

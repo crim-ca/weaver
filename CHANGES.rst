@@ -31,7 +31,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix missing `HTML` CSS styles for `Job` status responses using `openEO` profile.
 
 .. _changes_6.6.2:
 
