@@ -560,7 +560,7 @@ def get_results(  # pylint: disable=R1260
             elif value_key:
                 out_key = value_key
 
-            output = {out_key: val_data}
+            output = cast("ExecutionResultObject", {out_key: val_data})
 
             # required for the rest to be there, other fields optional
             if is_ref:
