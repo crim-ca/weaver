@@ -10,12 +10,12 @@ if TYPE_CHECKING:
     from typing import List, Optional, Tuple, TypeAlias, Union
 
     from weaver.datatype import Job
-    from weaver.typedefs import AnyHeadersContainer, HeadersType, PreservedHeadersType, Literal
+    from weaver.typedefs import AnyHeadersContainer, HeadersType, Literal, PreservedHeadersType
 
     ExecuteModeAutoType = Literal["auto"]
     ExecuteModeAsyncType = Literal["async"]
     ExecuteModeSyncType = Literal["sync"]
-    ExecuteModeConstantsType = "ExecuteMode"  # type: TypeAlias
+    ExecuteModeConstantsType: TypeAlias = "ExecuteMode"
     AnyExecuteMode = Union[
         ExecuteModeAutoType,
         ExecuteModeAsyncType,
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     ]
     ExecuteControlOptionAsyncType = Literal["async-execute"]
     ExecuteControlOptionSyncType = Literal["sync-execute"]
-    ExecuteControlOptionConstantsType = "ExecuteControlOption"  # type: TypeAlias
+    ExecuteControlOptionConstantsType: TypeAlias = "ExecuteControlOption"
     AnyExecuteControlOption = Union[
         ExecuteControlOptionAsyncType,
         ExecuteControlOptionSyncType,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     ]
     ExecuteReturnPreferenceMinimalType = Literal["minimal"]
     ExecuteReturnPreferenceRepresentationType = Literal["representation"]
-    ExecuteReturnPreferenceConstantsType = "ExecuteReturnPreference"  # type: TypeAlias
+    ExecuteReturnPreferenceConstantsType: TypeAlias = "ExecuteReturnPreference"
     AnyExecuteReturnPreference = Union[
         ExecuteReturnPreferenceMinimalType,
         ExecuteReturnPreferenceRepresentationType,
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     ]
     ExecuteResponseDocumentType = Literal["document"]
     ExecuteResponseRawType = Literal["raw"]
-    ExecuteResponseConstantsType = "ExecuteResponse"  # type: TypeAlias
+    ExecuteResponseConstantsType: TypeAlias = "ExecuteResponse"
     AnyExecuteResponse = Union[
         ExecuteResponseDocumentType,
         ExecuteResponseRawType,
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     ]
     ExecuteTransmissionModeReferenceType = Literal["reference"]
     ExecuteTransmissionModeValueType = Literal["value"]
-    ExecuteTransmissionModeConstantsType = "ExecuteTransmissionMode"  # type: TypeAlias
+    ExecuteTransmissionModeConstantsType: TypeAlias = "ExecuteTransmissionMode"
     AnyExecuteTransmissionMode = Union[
         ExecuteTransmissionModeReferenceType,
         ExecuteTransmissionModeValueType,
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     ExecuteCollectionFormatType_OGC_FEATURES = Literal["ogc-features-collection"]
     ExecuteCollectionFormatType_OGC_MAP = Literal["ogc-map-collection"]
     ExecuteCollectionFormatType_GEOJSON = Literal["geojson-feature-collection"]
-    ExecuteCollectionFormatConstantsType = "ExecuteCollectionFormat"  # type: TypeAlias
+    ExecuteCollectionFormatConstantsType: TypeAlias = "ExecuteCollectionFormat"
     AnyExecuteCollectionFormat = Union[
         ExecuteCollectionFormatType_STAC,
         ExecuteCollectionFormatType_STAC_ITEMS,

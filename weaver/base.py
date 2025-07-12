@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import AnyKey
 
-    ConstantsType = "Constants"  # type: TypeAlias
+    ConstantsType: TypeAlias = "Constants"
     PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=ConstantsType)
 
 # pylint: disable=E1120,no-value-for-parameter
