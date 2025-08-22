@@ -682,6 +682,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json
 
+    def test_describe_process_yaml_accept_header(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.yaml_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
+    def test_describe_process_yaml_format_query(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, params={"f": OutputFormat.YAML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, headers=self.json_headers)
@@ -920,6 +938,39 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         else:
             valid_urls = [provider_url, f"{provider_url}/"]
         assert req_hint["provider"] in valid_urls
+
+    @parameterized.expand([
+        (ContentType.APP_JSON, None),
+        (ContentType.APP_CWL_JSON, None),
+        (ContentType.APP_CWL, None),
+        (None, OutputFormat.JSON),
+    ])
+    def test_get_process_package_cwl_json(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_JSON)
+        assert "cwlVersion" in resp.json
+        assert "class" in resp.json
+        assert resp.json["class"] == "CommandLineTool"
+
+    @parameterized.expand([
+        (ContentType.APP_YAML, None),
+        (ContentType.APP_CWL_YAML, None),
+        (None, OutputFormat.YAML),
+        (None, OutputFormat.YML),
+    ])
+    def test_get_process_package_cwl_yaml(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_YAML)
+        assert "cwlVersion: " in resp.text
+        assert "class: CommandLineTool" in resp.text
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """

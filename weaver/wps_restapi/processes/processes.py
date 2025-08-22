@@ -248,13 +248,13 @@ def patch_local_process(request):
 @sd.process_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessEndpoint(),
-    accept=ContentType.TEXT_XML,
+    accept=ContentType.ANY_XML,
     response_schemas=sd.get_process_responses,
 )
 @sd.process_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProcessEndpoint(),
-    accept=ContentType.APP_XML,
+    accept=ContentType.APP_YAML,
     response_schemas=sd.get_process_responses,
 )
 @sd.process_service.get(
@@ -276,6 +276,7 @@ def get_local_process(request):
         schema = request.params.get("schema")
         ctype = guess_target_format(request)
         ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+        ctype_yaml = add_content_type_charset(ContentType.APP_YAML, "UTF-8")
         ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
         ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
         proc_url = process.href(request)
@@ -284,14 +285,26 @@ def get_local_process(request):
             headers = [
                 ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
                 ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
+                ("Link", f"<{proc_url}?f=yaml>; rel=\"alternate\"; type={ctype_yaml}"),
                 ("Content-Type", ctype_xml),
             ]
             return Response(offering, headerlist=headers)
+        elif ctype == ContentType.APP_YAML:
+            offering = process.offering(schema)
+            content = OutputFormat.convert(offering, OutputFormat.YAML)
+            headers = [
+                ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
+                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
+                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+                ("Content-Type", ctype_yaml),
+            ]
+            return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
         else:
             offering = process.offering(schema)
             fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
             request.response.headers.extend([
                 ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+                ("Link", f"<{proc_url}?f=yaml>; rel=\"alternate\"; type={ctype_yaml}"),
                 ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
             ])
             return Box(offering)
@@ -334,7 +347,9 @@ def get_local_process_package(request):
     yml_fmt = [ContentType.APP_YAML, ContentType.APP_CWL_YAML]
     cwl_fmt = OutputFormat.YAML if any(ctype in content_type for ctype in yml_fmt) else OutputFormat.JSON
     package = OutputFormat.convert(process.package, cwl_fmt)
-    return HTTPOk(json=package or {}, headers=headers, content_type=content_type)
+    content = {"json": package} if cwl_fmt == OutputFormat.JSON else {"body": package}
+    content = content if package else {}
+    return HTTPOk(headers=headers, content_type=content_type, charset="utf-8", **content)
 
 
 @sd.process_payload_service.get(

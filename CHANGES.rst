@@ -22,6 +22,9 @@ Changes:
 .. FIXME: Add test for returned Link:profile=... header with various profile requests
 
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
+- Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,
+  header and any query parameter combination ``?f=yaml``, ``?f=yml``, ``?format=yaml`` and ``?format=yml``
+  (fixes `#456 <https://github.com/crim-ca/weaver/issues/456>`_).
 - Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations
   (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_).
 - Changed `CWL` ``/processes/{processID}/package`` response to be ``application/cwl+json`` by default
