@@ -69,7 +69,7 @@
 .. |docker| replace:: Docker
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
-.. _esgf: https://esgf.llnl.gov/
+.. _esgf: https://esgf.github.io/
 .. |esgf-cwt-git| replace:: ESGF Compute API
 .. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
