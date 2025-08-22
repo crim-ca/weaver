@@ -15,10 +15,10 @@ Changes:
 
 .. FIXME: Ensure all 'OGC_API_PROC_PROFILE_...' links are returned in their respective responses
 .. FIXME: Add profile negotiation for 'process' (#456, #754)
-.. FIXME: Add test for invalid profile (within request context)
-          respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema otherwise
+.. FIXME: Add test for returned Link:profile=... and Content-Profile header for ProcessDescription request
+.. FIXME: Add test for invalid profile (within request context) + enable conformance link when done (#754)
+          must respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
-.. FIXME: Add test for returned Link:profile=... header with various profile requests
 
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
 - Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,
