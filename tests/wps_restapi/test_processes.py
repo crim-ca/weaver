@@ -162,6 +162,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
             processEndpointWPS1=weaver_wps_url,
             jobControlOptions=ExecuteControlOption.values(),
+            package={"cwlVersion": "v1.2", "class": "CommandLineTool"},  # to test requesting it, but not executable
         )
         self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
@@ -940,9 +941,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert req_hint["provider"] in valid_urls
 
     @parameterized.expand([
+        (ContentType.ANY, None),  # endpoint's default if none explicit
+        (ContentType.APP_CWL, None),  # interchangeable catch-all YAML/JSON CWL, resolve to endpoint's default JSON
         (ContentType.APP_JSON, None),
         (ContentType.APP_CWL_JSON, None),
-        (ContentType.APP_CWL, None),
         (None, OutputFormat.JSON),
     ])
     def test_get_process_package_cwl_json(self, accept_header, format_query):
@@ -952,9 +954,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.get(path, params=query, headers=headers)
         assert resp.status_code == 200
         assert resp.content_type == (accept_header or ContentType.APP_JSON)
-        assert "cwlVersion" in resp.json
-        assert "class" in resp.json
-        assert resp.json["class"] == "CommandLineTool"
+        content = json.loads(resp.text)  # avoid 'resp.json' since not handled by non-explicitly JSON types
+        assert "cwlVersion" in content
+        assert "class" in content
+        assert content["class"] == "CommandLineTool"
 
     @parameterized.expand([
         (ContentType.APP_YAML, None),
