@@ -76,7 +76,16 @@ from weaver.processes.constants import (
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, get_header, get_path_kvp, is_uuid, load_file, parse_kvp
+from weaver.utils import (
+    explode_headers,
+    fetch_file,
+    get_any_value,
+    get_header,
+    get_path_kvp,
+    is_uuid,
+    load_file,
+    parse_kvp
+)
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -4912,6 +4921,68 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
+        }
+
+    @parameterized.expand([
+        (sd.OGC_API_PROC_PROFILE_RESULTS, None),
+        (None, sd.OGC_API_PROC_PROFILE_RESULTS),
+    ])
+    @pytest.mark.oap_part1
+    def test_execute_single_output_response_results_profile_content_negotiation(self, profile_header, profile_query):
+        """
+        Validate that a :term:`JSON` ``document`` response is returned for single output if using the `Results` profile.
+
+        Otherwise, when requesting only a single output, and omitting any other content negotiation method
+        (``Prefer: return=...`` header, ``Accept`` header or ``response`` parameter), the default behavior is to
+        return the single output directly in its ``raw`` content :term:`Media-Type` (see :ref:`proc_exec_results`).
+
+        .. seealso::
+            - :ref:`proc_exec_results`
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_default`
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
+            - :func:`test_execute_single_output_response_raw_value_literal`
+            - :func:`test_execute_single_output_response_raw_value_complex`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {"Accept-Profile": profile_header} if profile_header else {}
+        exec_queries = {"profile": profile_query} if profile_query else {}
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5, only_local=True,
+                                       data=exec_content, headers=exec_headers, params=exec_queries)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_RESULTS in profile[0]
+
+        profile = get_header("Content-Profile", resp.headers)
+        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS
+
+        # validate the results based on original execution request
+        results = resp.json
+        assert results == {
+            "output_json": {
+                "mediaType": ContentType.APP_JSON,
+                "value": {"data": "test"},
+            }
         }
 
     @parameterized.expand([

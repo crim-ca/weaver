@@ -14,10 +14,9 @@ Changes:
 --------
 
 .. FIXME: Ensure all 'OGC_API_PROC_PROFILE_...' links are returned in their respective responses
-.. FIXME: Add profile negotiation for 'process' (including YAML) (#456, #754)
+.. FIXME: Add profile negotiation for 'process' (#456, #754)
 .. FIXME: Add test for invalid profile (within request context)
           respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema otherwise
-.. FIXME: Add test request single result as document response using OGC results by profile (#815)
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
 .. FIXME: Add test for returned Link:profile=... header with various profile requests
 
