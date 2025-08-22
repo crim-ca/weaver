@@ -393,16 +393,16 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             if not isinstance(cls.logger_level, int):
                 cls.logger_level = logging.getLevelName(cls.logger_level)
             make_dirs(cls.logger_result_dir, exist_ok=True)
-            log_path = os.path.abspath(os.path.join(cls.logger_result_dir, cls.__name__ + ".log"))
+            log_path = os.path.abspath(os.path.join(cls.logger_result_dir, f"{cls.__name__}.log"))
             log_fmt = logging.Formatter("%(message)s")  # only message to avoid 'log-name INFO' offsetting outputs
             log_file = logging.FileHandler(log_path)
             log_file.setFormatter(log_fmt)
             log_term = logging.StreamHandler()
             log_term.setFormatter(log_fmt)
-            cls.logger_separator_calls = cls.logger_character_calls * 80 + "\n"
-            cls.logger_separator_steps = cls.logger_character_steps * 80 + "\n"
-            cls.logger_separator_tests = cls.logger_character_tests * 80 + "\n"
-            cls.logger_separator_cases = cls.logger_character_cases * 80 + "\n"
+            cls.logger_separator_calls = f"{cls.logger_character_calls * 80}\n"
+            cls.logger_separator_steps = f"{cls.logger_character_calls * 80}\n"
+            cls.logger_separator_tests = f"{cls.logger_character_calls * 80}\n"
+            cls.logger_separator_cases = f"{cls.logger_character_calls * 80}\n"
             cls.logger = logging.getLogger(cls.__name__)
             cls.logger.setLevel(cls.logger_level)
             cls.logger.addHandler(log_file)
@@ -451,7 +451,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         Logs an indented string representation of a JSON payload according to settings.
         """
         sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
-        log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
+        log_payload = ("\n" if cls.logger_json_indent else "") + json.dumps(payload, indent=cls.logger_json_indent)
         log_payload.replace("\n", f"\n{sub_indent}")
         if log_payload.endswith("\n"):
             return log_payload[:-1]  # remove extra line, let logger message generation add it explicitly
@@ -465,7 +465,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         if dictionary is None:
             return None
 
-        tab = "\n" + cls.get_indent(indent_level)
+        tab = f"\n{cls.get_indent(indent_level)}"
         return tab + tab.join([f"{k}: {dictionary[k]}" for k in sorted(dictionary)])
 
     @classmethod
@@ -642,7 +642,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         code = response.status_code
         reason = getattr(response, "reason", "")
-        reason = str(reason) + " " if reason else ""
+        reason = str(reason) + (" " if reason else "")
         content = getattr(response, "content", "")
         req_url = ""
         req_body = ""
@@ -1035,9 +1035,10 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
             if resp.status_code == 200 and isinstance(resp.json, list):
                 logs = resp.json
                 job_id = workflow_job_url.split("/")[-1]
-                tab_n = "\n" + self.indent("", 1)
+                indent = self.indent("", 1)
+                tab_n = f"\n{indent}"
                 workflow_logs = tab_n.join(logs)
-                msg += f"Workflow logs [JobID: {job_id}]" + tab_n + workflow_logs
+                msg += f"Workflow logs [JobID: {job_id}]{tab_n}{workflow_logs}"
                 if detailed_results:
                     details[job_id] = self.extract_job_details(workflow_job_url, workflow_logs)
                 log_matches = set(re.findall(r".*(https?://.+/jobs/.+(?:/logs)?).*", workflow_logs))
@@ -1052,7 +1053,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
                         if detailed_results:
                             step_job_url = log_url.split("/logs", 1)[0]
                             details[job_id] = self.extract_job_details(step_job_url, step_logs)
-                        msg += f"\nStep process logs [JobID: {job_id}]" + tab_n + step_logs
+                        msg += f"\nStep process logs [JobID: {job_id}]{tab_n}{step_logs}"
         except Exception:  # noqa
             return "Could not retrieve job logs.", {}
         return msg, details
@@ -1139,7 +1140,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             nc_refs = []
             for i in range(3):
                 nc_name = f"test-file-{i}.nc"
-                nc_refs.append(os.path.join("file://" + tmp_dir, nc_name))
+                nc_refs.append(os.path.join(f"file://{tmp_dir}", nc_name))
                 with open(os.path.join(tmp_dir, nc_name), mode="w", encoding="utf-8") as tmp_file:
                     tmp_file.write(f"DUMMY NETCDF DATA #{i}")
             with open(os.path.join(tmp_dir, "netcdf-array.json"), mode="w", encoding="utf-8") as tmp_file:
