@@ -14,7 +14,6 @@ Changes:
 --------
 
 .. FIXME: Add profile negotiation for 'process' (#456, #754)
-.. FIXME: Add test for returned Link:profile=... and Content-Profile header for ProcessDescription request
 .. FIXME: Add test for invalid profile (within request context) + enable conformance link when done (#754)
           must respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
@@ -37,6 +36,7 @@ Changes:
   fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
 - Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
   of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
+- Return `Content-Profile` header for responses with corresponding ``Link: rel="profile"``.
 
 Fixes:
 ------

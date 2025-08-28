@@ -108,6 +108,7 @@ if TYPE_CHECKING:
         JobValueFormat,
         JobValueItem,
         JSON,
+        Link,
         PyramidRequest,
         SettingsType
     )
@@ -211,8 +212,8 @@ def get_job(request):
     return job
 
 
-def get_job_list_links(job_total, filters, request):
-    # type: (int, Dict[str, AnyValueType], AnyRequestType) -> List[JSON]
+def get_job_list_links(job_total, filters, grouped, request):
+    # type: (int, Dict[str, AnyValueType], Any, AnyRequestType) -> List[Link]
     """
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
 
@@ -259,14 +260,20 @@ def get_job_list_links(job_total, filters, request):
     if cur_page < 0 or cur_page > max_page:
         raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
 
-    alt_links = []
+    links = []
     if alt_path:
-        alt_links = [{
+        links.append({
             "href": get_path_kvp(alt_path, page=cur_page, **alt_kvp), "rel": "alternate",
             "type": ContentType.APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
-        }]
+        })
 
-    links = alt_links + [
+    if not grouped:
+        links.append({
+            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST, "rel": "profile",
+            "title": "OGC API - Processes - Job List Profile reference."
+        })
+
+    links.extend([
         {"href": job_path, "rel": "collection",
          "type": ContentType.APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
         {"href": base_url + sd.jobs_service.path, "rel": "search",
@@ -281,7 +288,7 @@ def get_job_list_links(job_total, filters, request):
          "type": ContentType.APP_JSON, "title": "First page of job query listing."},
         {"href": get_path_kvp(job_path, page=max_page, **kvp_params), "rel": "last",
          "type": ContentType.APP_JSON, "title": "Last page of job query listing."},
-    ]
+    ])
     if cur_page > 0:
         links.append({
             "href": get_path_kvp(job_path, page=cur_page - 1, **kvp_params), "rel": "prev",

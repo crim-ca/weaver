@@ -283,9 +283,9 @@ def get_local_process(request):
         if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
             offering = process.offering(ProcessSchema.WPS, request=request)
             headers = [
-                ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
-                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
-                ("Link", f"<{proc_url}?f=yaml>; rel=\"alternate\"; type={ctype_yaml}"),
+                ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
+                ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
+                ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
                 ("Content-Type", ctype_xml),
             ]
             return Response(offering, headerlist=headers)
@@ -293,19 +293,31 @@ def get_local_process(request):
             offering = process.offering(schema)
             content = OutputFormat.convert(offering, OutputFormat.YAML)
             headers = [
-                ("Link", f"<{proc_url}?f=json>; rel=\"alternate\"; type={ctype_json}"),
-                ("Link", f"<{proc_url}?f=html>; rel=\"alternate\"; type={ctype_html}"),
-                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
+                ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
+                ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
+                ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC),
                 ("Content-Type", ctype_yaml),
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
-        else:
+        elif ctype == ctype == ContentType.APP_JSON:
             offering = process.offering(schema)
-            fmt_alt, ctype_alt = ("html", ctype_html) if ctype == ContentType.APP_JSON else ("json", ctype_json)
             request.response.headers.extend([
-                ("Link", f"<{proc_url}?f=xml>; rel=\"alternate\"; type={ctype_xml}"),
-                ("Link", f"<{proc_url}?f=yaml>; rel=\"alternate\"; type={ctype_yaml}"),
-                ("Link", f"<{proc_url}?f={fmt_alt}>; rel=\"alternate\"; type={ctype_alt}")
+                ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
+                ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
+                ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC),
+                ("Content-Type", ctype_json),
+            ])
+            return Box(offering)
+        else:  # HTML
+            offering = process.offering(schema)
+            request.response.headers.extend([
+                ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
+                ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
+                ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
             ])
             return Box(offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)

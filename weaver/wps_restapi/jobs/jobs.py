@@ -194,7 +194,7 @@ def get_queried_jobs(request):
         paging = {"page": filters["page"], "limit": filters["limit"], "count": len(jobs)}
         body.update({"jobs": jobs, **paging})
     try:
-        body.update({"links": get_job_list_links(total, filters, request)})
+        body.update({"links": get_job_list_links(total, filters, groups, request)})
     except IndexError as exc:
         raise HTTPBadRequest(json={
             "code": "JobInvalidParameter",
@@ -204,6 +204,10 @@ def get_queried_jobs(request):
             "value": repr_json(paging, force_string=False)
         })
     body = sd.GetQueriedJobsSchema().deserialize(body)
+    request.response.headers.extend([
+        ("Link", make_link_header(link))
+        for link in body["links"]
+    ])
     return Box(body)
 
 
