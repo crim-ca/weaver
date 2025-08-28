@@ -313,3 +313,14 @@ def update_preference_applied_return_header(
 
     response_headers.update({"Preference-Applied": applied_prefer_header})
     return response_headers
+
+
+def update_preference_applied_profile_header(
+    job,                # type: Job
+    request_headers,    # type: Optional[AnyHeadersContainer]
+    response_headers,   # type: Optional[PreservedHeadersType]
+):                      # type: (...) -> PreservedHeadersType
+
+    response_headers = response_headers or {}
+    if not request_headers:
+        return response_headers

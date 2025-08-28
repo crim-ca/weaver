@@ -238,6 +238,7 @@ OGC_API_PROC_PROFILE_PROC_DESC = "https://www.opengis.net/dev/profile/OGC/0/ogc-
 OGC_API_PROC_PROFILE_PROC_LIST = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
 OGC_API_PROC_PROFILE_EXECUTE = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
 OGC_API_PROC_PROFILE_RESULTS = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
 OGC_API_PROC_PROFILE_JOB_DESC = "https://www.opengis.net/dev/profile/OGC/0/job-description"
 OGC_API_PROC_PROFILE_JOB_LIST = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
 
@@ -758,7 +759,6 @@ class AcceptHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Accept"
     schema_type = String
-    # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
         ContentType.APP_JSON,
         ContentType.APP_YAML,
@@ -777,8 +777,12 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     name = "Accept-Language"
     schema_type = String
     missing = drop
-    default = AcceptLanguage.EN_CA
-    # FIXME: oneOf validator for supported languages (?)
+    default = AcceptLanguage.EN_CA  # FIXME: oneOf validator for supported languages (?)
+
+
+class AcceptProfileHeader(URI):
+    name = "Accept-Profile"
+    default = None
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -839,6 +843,7 @@ class PreferHeader(ExtendedSchemaNode):
         "Header that describes the desired execution mode of the process job and desired results. "
         "Parameter 'return' indicates the structure and contents how results should be returned. "
         "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
+        "Parameter 'profile' can indicate an alternate results representation than the resolved one by the context. "
         f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
     )
     name = "Prefer"
@@ -6444,6 +6449,7 @@ class JobExecuteHeaders(ExtendedMappingSchema):
     description = "Indicates the relevant headers that were supplied for job execution or a null value if omitted."
     accept = AcceptHeader(missing=None)
     accept_language = AcceptLanguageHeader(missing=None)
+    accept_profile = AcceptProfileHeader(missing=None)
     content_type = RequestContentTypeHeader(missing=None, default=None)
     prefer = PreferHeader(missing=None)
     x_wps_output_context = WpsOutputContextHeader(missing=None)

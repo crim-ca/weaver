@@ -1091,10 +1091,22 @@ class Job(Base, LoggerHandler):
 
     @accept_language.setter
     def accept_language(self, language):
-        # type: (Optional[Union[str]]) -> None
+        # type: (Optional[str]) -> None
         if not isinstance(language, str):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_language'")
         self["accept_language"] = language
+
+    @property
+    def accept_profile(self):
+        # type: () -> Optional[str]
+        return self.get("accept_profile")
+
+    @accept_profile.setter
+    def accept_profile(self, profile):
+        # type: (Optional[str]) -> None
+        if not isinstance(profile, str):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_profile'")
+        self["accept_profile"] = profile
 
     @property
     def execute_async(self):
@@ -1689,6 +1701,7 @@ class Job(Base, LoggerHandler):
             "status_message": self.status_message,
             "status_location": self.status_location,
             "execution_response": self.execution_response,
+            "execution_response_profile": self.execution_response_profile,
             "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
             "execution_wait": self.execution_wait,
@@ -1710,6 +1723,7 @@ class Job(Base, LoggerHandler):
             "subscribers": self.subscribers,
             "accept_type": self.accept_type,
             "accept_language": self.accept_language,
+            "accept_profile": self.accept_profile,
         }
 
 

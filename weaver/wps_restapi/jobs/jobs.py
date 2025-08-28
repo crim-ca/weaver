@@ -631,6 +631,7 @@ def get_job_inputs(request):
     job_headers = {
         "Accept": job.accept_type,
         "Accept-Language": job.accept_language,
+        "Accept-Profile": job.accept_profile,
         "Prefer": job_prefer,
         "X-WPS-Output-Context": job.context,
     }

@@ -17,6 +17,7 @@ Changes:
 .. FIXME: Add test for invalid profile (within request context) + enable conformance link when done (#754)
           must respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema
 .. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
+.. FIXME: Validate chain of 'Accept-Profile' and 'Prefer' profile to /job/{id}/inputs
 
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
 - Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,

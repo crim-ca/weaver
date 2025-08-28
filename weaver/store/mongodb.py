@@ -876,6 +876,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                  subscribers=None,          # type: Optional[ExecutionSubscribers]
                  accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
+                 accept_profile=None,       # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  status=None,               # type: Optional[AnyStatusType]
                  ):                         # type: (...) -> Job
@@ -920,6 +921,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                 "subscribers": subscribers,
                 "accept_type": accept_type,
                 "accept_language": accept_language,
+                "accept_profile": accept_profile,
             })
             self.collection.insert_one(new_job.params())
             job = self.fetch_by_id(job_id=new_job.id)
