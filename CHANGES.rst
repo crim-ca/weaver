@@ -13,7 +13,6 @@ Changes
 Changes:
 --------
 
-.. FIXME: Ensure all 'OGC_API_PROC_PROFILE_...' links are returned in their respective responses
 .. FIXME: Add profile negotiation for 'process' (#456, #754)
 .. FIXME: Add test for returned Link:profile=... and Content-Profile header for ProcessDescription request
 .. FIXME: Add test for invalid profile (within request context) + enable conformance link when done (#754)

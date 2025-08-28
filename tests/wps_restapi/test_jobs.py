@@ -45,7 +45,7 @@ from weaver.notify import decrypt_email
 from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import get_path_kvp, now
+from weaver.utils import explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
@@ -565,6 +565,23 @@ class WpsRestApiJobsTest(JobUtils):
         assert links["next"] is None, "no next page on last"
         assert links["first"].startswith(jobs_url) and limit_kvp in links["first"] and "page=0" in links["first"]
         assert links["last"].startswith(jobs_url) and limit_kvp in links["last"] and "page=0" in links["last"]
+
+    @pytest.mark.oap_part1
+    def test_get_jobs_link_profile_ogc_job_list(self):
+        path = "/jobs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_LIST
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_JOB_LIST in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_jobs_page_out_of_range(self):
@@ -1368,6 +1385,23 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.content_type == ContentType.APP_JSON
 
         assert resp.json["processID"] == "process-public"
+
+    @pytest.mark.oap_part1
+    def test_get_job_status_link_profile_ogc_job_description(self):
+        path = f"/jobs/{self.job_info[0].id}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_DESC
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_JOB_DESC in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_job_invalid_uuid(self):
