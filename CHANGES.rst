@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
 
 .. _changes_6.6.2:
 
