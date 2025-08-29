@@ -248,10 +248,10 @@ def get_conformance(category, settings):
         # FIXME: KVP exec (https://github.com/crim-ca/weaver/issues/607, https://github.com/crim-ca/weaver/issues/445)
         # f"{ogcapi_proc_core1}/conf/kvp-execute",
         f"{ogcapi_proc_core1}/conf/oas30",
-        # FIXME: https://github.com/crim-ca/weaver/issues/231
-        #  List all supported requirements, recommendations and abstract tests
         f"{ogcapi_proc_core1}/conf/ogc-process-description",
         f"{ogcapi_proc_core1}/conf/ogc-process-description/links",
+        # FIXME: https://github.com/crim-ca/weaver/issues/231
+        #  List all supported requirements, recommendations and abstract tests
         f"{ogcapi_proc_core1}/per/core/additional-status-codes",
         f"{ogcapi_proc_core1}/per/core/alternative-process-description",
         f"{ogcapi_proc_core1}/per/core/alternative-process-paths",
@@ -272,6 +272,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/rec/core/html",
     ] if ogcapi_proc_html else []) + [
         f"{ogcapi_proc_core1}/rec/core/http-head",
+        f"{ogcapi_proc_core2}/rec/core/job-links",
         f"{ogcapi_proc_core1}/rec/core/job-status",
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-none",
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-minimal",
@@ -371,9 +372,6 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/html/content",
         f"{ogcapi_proc_core1}/req/html/definition",
     ] if ogcapi_proc_html else []) + [
-        # FIXME: https://github.com/crim-ca/weaver/issues/231
-        #  List all supported requirements, recommendations and abstract tests
-        f"{ogcapi_proc_core1}/conf/ogc-process-description",
         f"{ogcapi_proc_core1}/req/json",
         f"{ogcapi_proc_core1}/req/json/definition",
         f"{ogcapi_proc_core1}/req/job-list/datetime-definition",

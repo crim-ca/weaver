@@ -1625,10 +1625,17 @@ class Job(Base, LoggerHandler):
                     "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
                     "title": "List of job exceptions if applicable in case of failing job."
                 })
-        job_links.append({
-            "href": f"{job_url}/logs", "rel": "logs",  # unofficial
-            "title": "List of collected job logs during process execution."
-        })
+        job_links.extend([
+            {
+                "href": f"{job_url}/logs", "rel": "logs",  # unofficial
+                "title": "List of collected job logs during process execution."
+            },
+            {
+                # official, same as 'rel="[ogc-rel:log]"'
+                "href": f"{job_url}/logs", "rel": "http://www.opengis.net/def/rel/ogc/1.0/log",
+                "title": "List of collected job logs during process execution."
+            }
+        ])
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions", "provenance"]:
             self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
