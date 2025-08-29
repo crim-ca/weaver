@@ -5,7 +5,7 @@ Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied on :mod:`
 objects.
 """
 
-# pylint: disable=E0241,duplicate-bases
+# pylint: disable=R1729,E0241,duplicate-bases
 
 import copy
 import inspect
