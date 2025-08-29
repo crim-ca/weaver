@@ -156,6 +156,10 @@ def get_processes(request):
         body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
+        request.response.headers.extend([
+            ("Link", make_link_header(link))
+            for link in body["links"]
+        ])
         return Box(body)
 
     except ServiceException as exc:

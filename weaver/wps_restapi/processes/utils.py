@@ -9,7 +9,7 @@ from pyramid.settings import asbool
 from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat, guess_target_format
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_path_kvp, get_settings
 from weaver.visibility import Visibility
@@ -123,6 +123,10 @@ def get_process_list_links(request, paging, total, provider=None):
     else:
         proc_path = sd.processes_service.path
     proc_url = base_url + proc_path
+    req_fmt, req_src = guess_target_format(request, default=ContentType.APP_JSON, return_source=True)
+    req_params = dict(request.params)
+    if req_src == "header":
+        req_params["f"] = OutputFormat.get(req_fmt)
     links.extend([
         {"href": proc_url, "rel": "collection",
          "type": ContentType.APP_JSON, "title": "Process listing (no filtering queries applied)."},
@@ -130,16 +134,19 @@ def get_process_list_links(request, paging, total, provider=None):
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to list processes."},
         {"href": f"{proc_url}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
-        {"href": proc_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+        {"href": f"{proc_url}?f=json", "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
          "type": ContentType.APP_JSON, "title": "List of registered local processes."},
-        {"href": get_path_kvp(proc_url, **request.params), "rel": "self",
-         "type": ContentType.APP_JSON, "title": "Current process listing."},
+        {"href": get_path_kvp(proc_url, **req_params), "rel": "self",
+         "type": req_fmt, "title": "Current process listing."},
     ])
     if provider:
         prov_url = proc_url.rsplit("/", 1)[0]
         links.append({"href": prov_url, "rel": "up", "type": ContentType.APP_JSON, "title": "Provider description."})
     else:
-        links.append({"href": base_url, "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."})
+        links.extend([
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URL, "rel": "profile", "title": "Process listing profile."},
+            {"href": base_url, "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."}
+        ])
 
     cur_page = paging.get("page", None)
     per_page = paging.get("limit", None)

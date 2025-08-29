@@ -75,6 +75,7 @@ from weaver.utils import (
     get_log_fmt,
     get_path_kvp,
     get_settings,
+    is_valid_url,
     now,
     request_extra
 )
@@ -1106,6 +1107,8 @@ class Job(Base, LoggerHandler):
         # type: (Optional[str]) -> None
         if not (isinstance(profile, str) or profile is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_profile'")
+        if profile and not is_valid_url(profile):
+            raise ValueError(f"Valid URI is required for '{self.__name__}.accept_profile'")
         self["accept_profile"] = profile or None
 
     @property
