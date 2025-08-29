@@ -1981,6 +1981,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
+            "Accept-Profile": None,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": None,
@@ -2015,6 +2016,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
+            "Accept-Profile": None,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.REPRESENTATION}; wait=5",
             "X-WPS-Output-Context": None
