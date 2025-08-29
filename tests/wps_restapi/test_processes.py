@@ -213,7 +213,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         Contents correspond to required I/O for WPS process :class:`weaver.processes.wps_testing.WpsTestProcess`.
         """
-        return cast(ProcessExecution, {
+        return cast("ProcessExecution", {
             "inputs": [
                 {"id": "test_input",
                  "data": test_input},

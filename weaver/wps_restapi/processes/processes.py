@@ -301,7 +301,7 @@ def get_local_process(request):
                 ("Content-Type", ctype_yaml),
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
-        elif ctype == ctype == ContentType.APP_JSON:
+        elif ctype == ContentType.APP_JSON:
             offering = process.offering(schema)
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),

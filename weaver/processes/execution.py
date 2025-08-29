@@ -1327,7 +1327,7 @@ def validate_job_accept_profile(headers, execution_mode):
                 }
             )
         )
-    elif (
+    if (
         execution_mode == ExecuteMode.ASYNC and
         profile not in profile_allowed_async
     ):
