@@ -1701,7 +1701,6 @@ class Job(Base, LoggerHandler):
             "status_message": self.status_message,
             "status_location": self.status_location,
             "execution_response": self.execution_response,
-            "execution_response_profile": self.execution_response_profile,
             "execution_return": self.execution_return,
             "execution_mode": self.execution_mode,
             "execution_wait": self.execution_wait,

@@ -904,7 +904,7 @@ def submit_job_handler(
     desired inputs and outputs from the :term:`Job`. The selected execution mode looks up the various combinations
     of headers and body parameters available across :term:`API` implementations and revisions.
     """
-    json_body = validate_job_schema(payload)
+    json_body = validate_job_schema(payload, headers)
     db = get_db(settings)
 
     # non-local is only a reference, no actual process object to validate
@@ -942,7 +942,8 @@ def submit_job_handler(
         execute_mode = mode
     validate_process_exec_mode(job_ctl_opts, execute_mode)
 
-    accept_type = validate_job_accept_header(headers, mode)
+    accept_type = validate_job_accept_header(headers, execute_mode)
+    accept_profile = validate_job_accept_profile(headers, execute_mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
@@ -964,7 +965,7 @@ def submit_job_handler(
                          execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
                          custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
-                         accept_type=accept_type, accept_language=language)
+                         accept_type=accept_type, accept_language=language, accept_profile=accept_profile)
     job.save_log(logger=LOGGER, message=job_message, status=job_status, progress=0)
     job.wps_url = wps_url
     job = store.update_job(job)
@@ -1079,7 +1080,7 @@ def update_job_parameters(job, request):
     Updates an existing :term:`Job` with new request parameters.
     """
     body = validate_job_json(request)
-    body = validate_job_schema(body, sd.PatchJobBodySchema)
+    body = validate_job_schema(body, request.headers, sd.PatchJobBodySchema)
 
     value = field = loc = None
     job_process = get_process(job.process)
@@ -1216,11 +1217,33 @@ def validate_job_json(request):
     return json_body
 
 
-def validate_job_schema(payload, body_schema=sd.Execute):
-    # type: (Any, Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]) -> ProcessExecution
+def validate_job_schema(
+    payload,                    # type: Any
+    headers,                    # type: Optional[AnyHeadersContainer]
+    body_schema=sd.Execute,     # type: Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]
+):                              # type: (...) -> ProcessExecution
     """
     Validates that the input :term:`Job` payload is valid :term:`JSON` for an execution request.
     """
+    if headers:
+        schema = get_header("Content-Schema", headers)
+        if schema not in [None, body_schema._schema]:
+            raise HTTPUnprocessableEntity(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema",
+                    "title": "Invalid Job Execution Schema",
+                    "detail": "Specified Content-Schema reference is unsupported for job creation.",
+                    "status": HTTPUnprocessableEntity.code,
+                    "error": "Unsupported content schema.",
+                    "cause": {
+                        "name": "Content-Schema",
+                        "in": "headers",
+                        "schema": {"const": body_schema._schema}
+                    },
+                    "value": repr_json(schema),
+                })
+            )
+
     try:
         json_body = body_schema().deserialize(payload)
     except colander.Invalid as ex:
@@ -1259,8 +1282,8 @@ def validate_job_accept_header(headers, execution_mode):
             "type": "NotAcceptable",
             "title": "Execution request is not acceptable.",
             "detail": (
-                "When running asynchronously, the Accept header must correspond"
-                "to the Job Status response instead of the desired Result response"
+                "When running asynchronously, the Accept header must correspond "
+                "to the Job Status response instead of the desired Result response "
                 "returned when executing synchronously."
             ),
             "status": HTTPNotAcceptable.code,
@@ -1268,6 +1291,67 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_job_accept_profile(headers, execution_mode):
+    # type: (AnyHeadersContainer, AnyExecuteMode) -> Optional[str]
+    """
+    Validate the ``Accept-Profile`` header against known :term:`Job` execution results if any is provided.
+    """
+    profile = get_header("Accept-Profile", headers)
+    if not profile:
+        return
+    profile_allowed_sync = [sd.OGC_API_PROC_PROFILE_RESULTS, sd.OGC_API_PROC_PROFILE_RESULTS_REL]
+    profile_allowed_async = [sd.OGC_API_PROC_PROFILE_JOB_DESC]
+    if (
+        execution_mode in [ExecuteMode.SYNC, ExecuteMode.AUTO, None] and
+        profile not in profile_allowed_sync
+    ):
+        raise HTTPNotAcceptable(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": (
+                        "When running synchronously, the Accept-Profile header must correspond "
+                        "to the desired Results response to be returned directly or be omitted "
+                        "for automatic resolution of the relevant Results representation."
+                    ),
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {
+                        "name": "Accept-Profile",
+                        "in": "headers",
+                        "schema": {"type": "string", "enum": profile_allowed_sync},
+                    },
+                    "value": repr_json(profile, force_string=False),
+                }
+            )
+        )
+    elif (
+        execution_mode == ExecuteMode.ASYNC and
+        profile not in profile_allowed_async
+    ):
+        raise HTTPNotAcceptable(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": (
+                        "When running asynchronously, the Accept-Profile header must correspond "
+                        "to the Job Status response from the submission instead of the desired "
+                        "Result response returned when executing synchronously."
+                    ),
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {
+                        "name": "Accept-Profile",
+                        "in": "headers",
+                        "schema": {"type": "string", "enum": profile_allowed_async},
+                    },
+                    "value": repr_json(profile, force_string=False),
+                }
+            )
+        )
+    return profile
 
 
 def validate_process_exec_mode(job_control_options, execution_mode):

@@ -24,8 +24,10 @@ from tests.utils import (
     get_module_version,
     get_test_weaver_app,
     mocked_dismiss_process,
+    mocked_execute_celery,
     mocked_process_job_runner,
     mocked_remote_wps,
+    mocked_sub_requests,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
     setup_mongodb_processstore,
@@ -1544,6 +1546,71 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.status_code == 200
             assert resp.json["status"] == Status.DISMISSED, "Job status should have been updated to dismissed."
 
+    @parameterized.expand([
+        sd.OGC_API_PROC_PROFILE_JOB_DESC,  # not valid for sync, must be job results
+        "https://example.com/profile/unknown",
+    ])
+    @pytest.mark.oap_part1
+    def test_job_execute_accept_profile_sync_invalid(self, profile):
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            body = {
+                "inputs": {"test_input": "test"},
+                "mode": ExecuteMode.SYNC,
+            }
+            headers = {"Accept-Profile": profile}
+            headers.update(self.json_headers)
+            path = f"/processes/{self.process_public.identifier}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
+            assert resp.status_code == 406, resp.text
+            assert resp.content_type == ContentType.APP_JSON
+            assert sd.OGC_API_PROC_PROFILE_RESULTS in resp.json["cause"]["schema"]["enum"]
+            assert resp.json["cause"]["name"] == "Accept-Profile"
+
+    @parameterized.expand([
+        sd.OGC_API_PROC_PROFILE_RESULTS,  # not valid for async, must be job status
+        "https://example.com/profile/unknown",
+    ])
+    @pytest.mark.oap_part1
+    def test_job_execute_accept_profile_async_invalid(self, profile):
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            body = {
+                "inputs": {"test_input": "test"},
+                "mode": ExecuteMode.ASYNC,
+            }
+            headers = {"Accept-Profile": profile}
+            headers.update(self.json_headers)
+            path = f"/processes/{self.process_public.identifier}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
+            assert resp.status_code == 406, resp.text
+            assert resp.content_type == ContentType.APP_JSON
+            assert sd.OGC_API_PROC_PROFILE_JOB_DESC in resp.json["cause"]["schema"]["enum"]
+            assert resp.json["cause"]["name"] == "Accept-Profile"
+
+    @pytest.mark.oap_part4
+    def test_job_execute_content_schema_invalid(self):
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            body = {
+                "inputs": {"test_input": "test"},
+                "mode": ExecuteMode.ASYNC,
+            }
+            headers = {"Content-Schema": "https://example.com/random/schema.json"}
+            headers.update(self.json_headers)
+            path = f"/processes/{self.process_public.identifier}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
+            assert resp.status_code == 422, resp.text
+            assert resp.content_type == ContentType.APP_JSON
+            assert resp.json["cause"]["schema"] == {"const": sd.Execute._schema}
+            assert resp.json["cause"]["name"] == "Content-Schema"
+            assert resp.json["type"] == (
+                "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema"
+            )
+
     def test_job_results_errors(self):
         """
         Validate errors returned for an incomplete, failed or dismissed job when requesting its results.
@@ -1831,6 +1898,7 @@ class WpsRestApiJobsTest(JobUtils):
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
             inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS,
         )
 
         path = f"/jobs/{new_job.id}/inputs"
@@ -1841,6 +1909,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
+            "Accept-Profile": sd.OGC_API_PROC_PROFILE_RESULTS,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": "test/context",
@@ -1862,11 +1931,6 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
-
-    @pytest.mark.xfail(reason="CWL PROV not implemented (https://github.com/crim-ca/weaver/issues/673)")
-    @pytest.mark.oap_part4
-    def test_job_run_response(self):
-        raise NotImplementedError  # FIXME (https://github.com/crim-ca/weaver/issues/673)
 
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4

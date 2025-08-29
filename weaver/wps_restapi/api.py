@@ -578,8 +578,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/create-response-body",
         f"{ogcapi_proc_part4}/req/job-management/create-response-jobid",
         f"{ogcapi_proc_part4}/req/job-management/create-response-success",
-        # FIXME: support Content-Schema and Profile header negotiation (https://github.com/crim-ca/weaver/issues/754)
-        # f"{ogcapi_proc_part4}/req/job-management/create-unsupported-schema",
+        f"{ogcapi_proc_part4}/req/job-management/create-unsupported-schema",
         f"{ogcapi_proc_part4}/req/job-management/create-unsupported-media-type",
         f"{ogcapi_proc_part4}/req/job-management/definition-get-op",
         f"{ogcapi_proc_part4}/req/job-management/definition-response-body",

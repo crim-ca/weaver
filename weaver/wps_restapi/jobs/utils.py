@@ -109,6 +109,7 @@ if TYPE_CHECKING:
         JobValueItem,
         JSON,
         Link,
+        ProcessExecution,
         PyramidRequest,
         SettingsType
     )
@@ -616,7 +617,7 @@ def get_results(  # pylint: disable=R1260
 
 def get_job_return(
     job=None,       # type: Optional[Job]
-    body=None,      # type: Optional[JSON]
+    body=None,      # type: Optional[ProcessExecution]
     headers=None,   # type: Optional[AnyHeadersContainer]
 ):                  # type: (...) -> Tuple[AnyExecuteResponse, AnyExecuteReturnPreference]
     """

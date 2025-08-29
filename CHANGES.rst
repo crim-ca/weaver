@@ -13,12 +13,6 @@ Changes
 Changes:
 --------
 
-.. FIXME: Add profile negotiation for 'process' (#456, #754)
-.. FIXME: Add test for invalid profile (within request context) + enable conformance link when done (#754)
-          must respond http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema
-.. FIXME: Add test for returned Preference-Applied header with Prefer:profile=...
-.. FIXME: Validate chain of 'Accept-Profile' and 'Prefer' profile to /job/{id}/inputs
-
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
 - Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,
   header and any query parameter combination ``?f=yaml``, ``?f=yml``, ``?format=yaml`` and ``?format=yml``
@@ -38,6 +32,11 @@ Changes:
 - Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
   of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
 - Return `Content-Profile` header for responses with corresponding ``Link: rel="profile"``.
+- Validate that, if provided during `Job` creation for `Process` execution, a ``Content-Schema`` header different than
+  supported representations will return *HTTP 422 Unprocessable Content*. At this point, only the `OGC API - Processes`
+  ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/execute.yaml`` is allowed for `JSON` content.
+  If other representations are needed and supported at a later point, ``Content-Schema`` can be omitted to avoid this
+  additional verification.
 
 Fixes:
 ------
