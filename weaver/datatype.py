@@ -1079,10 +1079,10 @@ class Job(Base, LoggerHandler):
 
     @accept_type.setter
     def accept_type(self, content_type):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(content_type, str):
+        # type: (Optional[str]) -> None
+        if not (isinstance(content_type, str) or content_type is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_type'")
-        self["accept_type"] = content_type
+        self["accept_type"] = content_type or None
 
     @property
     def accept_language(self):
@@ -1092,9 +1092,9 @@ class Job(Base, LoggerHandler):
     @accept_language.setter
     def accept_language(self, language):
         # type: (Optional[str]) -> None
-        if not isinstance(language, str):
+        if not (isinstance(language, str) or language is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_language'")
-        self["accept_language"] = language
+        self["accept_language"] = language or None
 
     @property
     def accept_profile(self):
@@ -1104,9 +1104,9 @@ class Job(Base, LoggerHandler):
     @accept_profile.setter
     def accept_profile(self, profile):
         # type: (Optional[str]) -> None
-        if not isinstance(profile, str):
+        if not (isinstance(profile, str) or profile is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_profile'")
-        self["accept_profile"] = profile
+        self["accept_profile"] = profile or None
 
     @property
     def execute_async(self):
@@ -1602,7 +1602,7 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
-                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC, "rel": "profile", "title": "Job response profile."},
+                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, "rel": "profile", "title": "Job response profile."},
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -2739,7 +2739,7 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
-            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC, "rel": "profile", "title": "Process response profile."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "rel": "profile", "title": "Process response profile."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]

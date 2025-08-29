@@ -4924,8 +4924,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         }
 
     @parameterized.expand([
-        (sd.OGC_API_PROC_PROFILE_RESULTS, None),
-        (None, sd.OGC_API_PROC_PROFILE_RESULTS),
+        (sd.OGC_API_PROC_PROFILE_RESULTS_URL, None),
+        (None, sd.OGC_API_PROC_PROFILE_RESULTS_URL),
     ])
     @pytest.mark.oap_part1
     def test_execute_single_output_response_results_profile_content_negotiation(self, profile_header, profile_query):
@@ -4971,10 +4971,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_RESULTS in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_RESULTS_URL in profile[0]
 
         profile = get_header("Content-Profile", resp.headers)
-        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS
+        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
 
         # validate the results based on original execution request
         results = resp.json

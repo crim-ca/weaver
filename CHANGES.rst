@@ -13,6 +13,8 @@ Changes
 Changes:
 --------
 
+- Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
+  using ``profile`` or ``schema`` query parameter for values ``ogc``, ``openeo``, and ``wps``.
 - Add additional ``rel="http://www.opengis.net/def/rel/ogc/1.0/log"`` (i.e.: ``rel="[ogc-rel:log]"``)
   to `Job` status response links to respect ``http://www.opengis.net/spec/ogcapi-processes-1/2.0/rec/core/job-links``.
 - Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.

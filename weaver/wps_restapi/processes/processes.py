@@ -296,8 +296,8 @@ def get_local_process(request):
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
-                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC, rel="profile")),
-                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URL),
                 ("Content-Type", ctype_yaml),
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
@@ -307,8 +307,8 @@ def get_local_process(request):
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
                 ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
                 ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
-                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC, rel="profile")),
-                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URL),
                 ("Content-Type", ctype_json),
             ])
             return Box(offering)

@@ -578,12 +578,12 @@ class WpsRestApiJobsTest(JobUtils):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_LIST
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_LIST_URL
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_JOB_LIST in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_JOB_LIST_URL in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_jobs_page_out_of_range(self):
@@ -1398,12 +1398,12 @@ class WpsRestApiJobsTest(JobUtils):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_DESC
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_JOB_DESC in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_job_invalid_uuid(self):
@@ -1547,7 +1547,7 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.json["status"] == Status.DISMISSED, "Job status should have been updated to dismissed."
 
     @parameterized.expand([
-        sd.OGC_API_PROC_PROFILE_JOB_DESC,  # not valid for sync, must be job results
+        sd.OGC_API_PROC_PROFILE_JOB_DESC_URL,  # not valid for sync, must be job results
         "https://example.com/profile/unknown",
     ])
     @pytest.mark.oap_part1
@@ -1565,11 +1565,11 @@ class WpsRestApiJobsTest(JobUtils):
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
             assert resp.content_type == ContentType.APP_JSON
-            assert sd.OGC_API_PROC_PROFILE_RESULTS in resp.json["cause"]["schema"]["enum"]
+            assert sd.OGC_API_PROC_PROFILE_RESULTS_URL in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
     @parameterized.expand([
-        sd.OGC_API_PROC_PROFILE_RESULTS,  # not valid for async, must be job status
+        sd.OGC_API_PROC_PROFILE_RESULTS_URL,  # not valid for async, must be job status
         "https://example.com/profile/unknown",
     ])
     @pytest.mark.oap_part1
@@ -1587,7 +1587,7 @@ class WpsRestApiJobsTest(JobUtils):
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
             assert resp.content_type == ContentType.APP_JSON
-            assert sd.OGC_API_PROC_PROFILE_JOB_DESC in resp.json["cause"]["schema"]["enum"]
+            assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
     @pytest.mark.oap_part4
@@ -1898,7 +1898,7 @@ class WpsRestApiJobsTest(JobUtils):
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
             inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
-            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS,
+            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URL,
         )
 
         path = f"/jobs/{new_job.id}/inputs"
@@ -1909,7 +1909,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
-            "Accept-Profile": sd.OGC_API_PROC_PROFILE_RESULTS,
+            "Accept-Profile": sd.OGC_API_PROC_PROFILE_RESULTS_URL,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": "test/context",
@@ -2373,7 +2373,7 @@ class WpsRestApiJobsTest(JobUtils):
             ),
             # using '?profile=...' with fully defined Profile URI explicitly
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
                 {},
                 0,
                 Status.SUCCESSFUL,
@@ -2384,7 +2384,7 @@ class WpsRestApiJobsTest(JobUtils):
                 Status.SUCCESSFUL,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
                 {},
                 2,
                 Status.FAILED,
@@ -2395,7 +2395,7 @@ class WpsRestApiJobsTest(JobUtils):
                 Status.FAILED,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
                 {},
                 9,
                 Status.RUNNING,
@@ -2406,7 +2406,7 @@ class WpsRestApiJobsTest(JobUtils):
                 Status.RUNNING,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
                 {},
                 11,
                 Status.ACCEPTED,
@@ -2419,7 +2419,7 @@ class WpsRestApiJobsTest(JobUtils):
             # using 'Accept-Profile' header with fully defined Profile URI explicitly
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
@@ -2430,7 +2430,7 @@ class WpsRestApiJobsTest(JobUtils):
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
@@ -2441,7 +2441,7 @@ class WpsRestApiJobsTest(JobUtils):
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
@@ -2452,7 +2452,7 @@ class WpsRestApiJobsTest(JobUtils):
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
@@ -3070,7 +3070,7 @@ class WpsRestApiJobsTest(JobUtils):
             expect_job_type in [JobStatusType.PROCESS, JobStatusType.PROVIDER, JobStatusType.SERVICE]
             and ContentType.TEXT_HTML not in expect_content_type  # "JSON" profile not respected, therefore no Link
         ):
-            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC in link]
+            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in link]
             assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
         else:
             assert not job_profiles, "Job status with non-OGC type did not expect any well-defined Link profile header."

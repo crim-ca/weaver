@@ -283,12 +283,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URL
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_LIST in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URL in profile[0]
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -740,12 +740,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URL
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_DESC in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URL in profile[0]
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_name()

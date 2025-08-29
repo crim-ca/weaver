@@ -234,13 +234,14 @@ OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
 OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
-OGC_API_PROC_PROFILE_PROC_DESC = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
-OGC_API_PROC_PROFILE_PROC_LIST = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
-OGC_API_PROC_PROFILE_EXECUTE = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
-OGC_API_PROC_PROFILE_RESULTS = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
 OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
-OGC_API_PROC_PROFILE_JOB_DESC = "https://www.opengis.net/dev/profile/OGC/0/job-description"
-OGC_API_PROC_PROFILE_JOB_LIST = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
+OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
+OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
 
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
 OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
@@ -783,6 +784,16 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
 class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
+    validator = OneOf([
+        OGC_API_PROC_PROFILE_PROC_DESC_URL,
+        OGC_API_PROC_PROFILE_PROC_LIST_URL,
+        OGC_API_PROC_PROFILE_EXECUTE_URL,
+        OGC_API_PROC_PROFILE_RESULTS_URL,
+        OGC_API_PROC_PROFILE_JOB_DESC_URL,
+        OGC_API_PROC_PROFILE_JOB_LIST_URL,
+        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+        OPENEO_API_SCHEMA_JOB_STATUS_URL,
+    ])
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -856,6 +867,7 @@ class RequestHeaders(ExtendedMappingSchema):
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
+    accept_profile = AcceptProfileHeader(missing=drop)
     content_type = RequestContentTypeHeader()
 
 
