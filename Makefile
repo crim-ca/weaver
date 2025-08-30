@@ -488,16 +488,16 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
-CHECKS := $(addprefix check-, $(CHECKS))
+CHECKS_PY ?= pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
+CHECKS_PY := $(addprefix check-, $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
-CHECKS_NO_PY := css md
+CHECKS_NO_PY ?= css md
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
-CHECKS_ALL := $(CHECKS) $(CHECKS_NO_PY)
+CHECKS ?= $(CHECKS_PY) $(CHECKS_NO_PY)
 
-$(CHECKS): check-%: install-dev check-%-only
+$(CHECKS_PY): check-%: install-dev check-%-only
 
 .PHONY: mkdir-reports
 mkdir-reports:
@@ -507,10 +507,10 @@ mkdir-reports:
 check: check-all    ## alias for 'check-all' target
 
 .PHONY: check-only
-check-only: $(addsuffix -only, $(CHECKS_ALL))
+check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
-check-all: install-dev $(CHECKS_ALL) 	## check all code linters
+check-all: install-dev $(CHECKS) 	## check all code linters
 
 .PHONY: check-pep8-only
 check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
