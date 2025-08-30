@@ -488,7 +488,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security security-code security-deps dist-doc doc8 docf fstring docstring links imports
+CHECKS := pep8 imports lint security security-code security-deps dist-doc doc8 docf fstring docstring links
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
