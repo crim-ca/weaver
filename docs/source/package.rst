@@ -1355,7 +1355,7 @@ the :ref:`oas_json_types` and :ref:`oas_file_references` sections. This is done
 on purpose, since the auto-resolution of :term:`CWL` types would lead to too much
 ambiguity when considering all combinations of array dimensionality, value cardinality and nested properties.
 Defining an explicit :term:`Media-Type` registered within a naming authority registry will ensure that all
-parties interacting with the :term:`Processes` will have a common understanding of their :term:`I/O` definition.
+parties interacting with any :term:`Process` will have a common understanding of their :term:`I/O` definition.
 
 Below is a summary of fields that are equivalent or considered to identify similar specifications
 (corresponding fields are aligned in the table).

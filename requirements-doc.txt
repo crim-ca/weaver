@@ -4,7 +4,8 @@
 # (see 'docs/source/conf.py')
 -r requirements.txt
 jinja2
-sphinx>=7,<8
+sphinx>=7,<8; python_version<="3.9"
+sphinx>=7,<9; python_version>="3.10"
 sphinx-argparse!=0.5.0
 sphinx-autoapi>=1.7.0
 sphinx-paramlinks>=0.4.1

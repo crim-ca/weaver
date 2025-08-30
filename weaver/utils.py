@@ -19,7 +19,6 @@ import warnings
 from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
 from datetime import datetime
-from pkgutil import get_loader
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
@@ -1116,7 +1115,11 @@ def open_module_resource_file(module, file_path):
 
     :returns: File stream handler to read contents as needed.
     """
-    loader = get_loader(module)
+    if isinstance(module, str):
+        spec = importlib.util.find_spec(module)
+        loader = spec.loader
+    else:
+        loader = module.__loader__
     # Python <=3.6, no 'get_resource_reader' or 'open_resource' on loader/reader
     # Python >=3.10, no 'open_resource' directly on loader
     # Python 3.7-3.9, both permitted in combination

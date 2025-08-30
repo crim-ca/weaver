@@ -155,7 +155,7 @@ info:		## display make information
 	@echo "  Docker Repository  $(DOCKER_REPO)"
 
 .PHONY: fixme-list-only
-fixme-list-only: mkdir-reports  	## list all FIXME/TODO/HACK items that require attention in the code
+fixme-list-only: | mkdir-reports  	## list all FIXME/TODO/HACK items that require attention in the code
 	@echo "Listing code that requires fixes..."
 	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
 	@bash -c '$(CONDA_CMD) \
@@ -410,22 +410,22 @@ test: clean-test test-all   ## alias for 'test-all' target
 test-all: install-dev test-only		## run all tests (including long running tests)
 
 .PHONY: test-only
-test-only: mkdir-reports			## run all tests but without prior validation of installed dependencies
+test-only: | mkdir-reports			## run all tests but without prior validation of installed dependencies
 	@echo "Running all tests (including slow and online tests)..."
 	@$(call run_test,)
 
 .PHONY: test-unit-only
-test-unit-only: mkdir-reports 		## run unit tests (skip long running and online tests)
+test-unit-only: | mkdir-reports 		## run unit tests (skip long running and online tests)
 	@echo "Running unit tests (skip slow and online tests)..."
 	@$(call run_test,-m "not slow and not online and not functional")
 
 .PHONY: test-func-only
-test-func-only: mkdir-reports   	## run functional tests (online and usage specific)
+test-func-only: | mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
 	@$(call run_test,-m "functional")
 
 .PHONY: test-cli-only
-test-cli-only: mkdir-reports   		## run WeaverClient and CLI tests
+test-cli-only: | mkdir-reports   		## run WeaverClient and CLI tests
 	@echo "Running CLI tests..."
 	@$(call run_test,-m "cli")
 
@@ -435,17 +435,17 @@ test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
 	@$(call run_test,-m "workflow")
 
 .PHONY: test-online-only
-test-online-only: mkdir-reports  	## run online tests (running instance required)
+test-online-only: | mkdir-reports  	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
 	@$(call run_test,-m "online")
 
 .PHONY: test-offline-only
-test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
+test-offline-only: | mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
 	@$(call run_test,-m "not online")
 
 .PHONY: test-no-tb14-only
-test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
+test-no-tb14-only: | mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
 	@$(call run_test,-m "not testbed14")
 
@@ -466,16 +466,16 @@ test-docker: docker-test    ## alias to 'docker-test' execution smoke test of bu
 #	this will cause coverage analysis reporting to be skipped from early exit from the failure
 #	if coverage reporting is still needed although failed tests occurred, call 'coverage-reports' target separately
 .PHONY: test-coverage-only
-test-coverage-only: mkdir-reports coverage-run coverage-reports  ## run all tests with coverage analysis and reports
+test-coverage-only: | mkdir-reports coverage-run coverage-reports  ## run all tests with coverage analysis and reports
 
 .PHONY: coverage-run
-coverage-run: mkdir-reports  ## run all tests using coverage analysis
+coverage-run: | mkdir-reports  ## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
 	@bash -c '$(CONDA_CMD) coverage run --rcfile="$(APP_ROOT)/setup.cfg" \
 		"$$(which pytest)" "$(APP_ROOT)/tests"  $(TEST_XARGS) --junitxml="$(REPORTS_DIR)/coverage-junit.xml"'
 
 .PHONY: coverage-reports
-coverage-reports: mkdir-reports  ## generate coverage reports
+coverage-reports: | mkdir-reports  ## generate coverage reports
 	@echo "Generate coverage reports..."
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
@@ -488,16 +488,16 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security security-code security-deps dist-doc doc8 docf fstring docstring links imports
-CHECKS := $(addprefix check-, $(CHECKS))
+CHECKS_PY ?= pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
+CHECKS_PY := $(addprefix check-, $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
-CHECKS_NO_PY := css md
+CHECKS_NO_PY ?= css md
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
-CHECKS_ALL := $(CHECKS) $(CHECKS_NO_PY)
+CHECKS ?= $(CHECKS_PY) $(CHECKS_NO_PY)
 
-$(CHECKS): check-%: install-dev check-%-only
+$(CHECKS_PY): check-%: install-dev check-%-only
 
 .PHONY: mkdir-reports
 mkdir-reports:
@@ -507,25 +507,24 @@ mkdir-reports:
 check: check-all    ## alias for 'check-all' target
 
 .PHONY: check-only
-check-only: $(addsuffix -only, $(CHECKS_ALL))
+check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
-check-all: install-dev $(CHECKS_ALL) 	## check all code linters
+check-all: install-dev $(CHECKS) 	## check all code linters
 
 .PHONY: check-pep8-only
-check-pep8-only: mkdir-reports 		## check for PEP8 code style issues
+check-pep8-only: | mkdir-reports 		## check for PEP8 code style issues
 	@echo "Running PEP8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
 .PHONY: check-lint-only
-check-lint-only: mkdir-reports  	## check linting of code style
+check-lint-only: | mkdir-reports  	## check linting of code style
 	@echo "Running linting code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
 		pylint \
-			--load-plugins pylint_quotes \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
 			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
@@ -544,7 +543,7 @@ SAFETY_IGNORE := 42194 42498 43738 45185
 SAFETY_IGNORE := $(addprefix "-i ",$(SAFETY_IGNORE))
 
 .PHONY: check-security-deps-only
-check-security-deps-only: mkdir-reports  ## run security checks on package dependencies
+check-security-deps-only: | mkdir-reports  ## run security checks on package dependencies
 	@echo "Running security checks of dependencies..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-deps.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -559,7 +558,7 @@ check-security-deps-only: mkdir-reports  ## run security checks on package depen
 
 # FIXME: bandit excludes not working (https://github.com/PyCQA/bandit/issues/657), clean-src beforehand to avoid error
 .PHONY: check-security-code-only
-check-security-code-only: mkdir-reports clean-src ## run security checks on source code
+check-security-code-only: | mkdir-reports clean-src ## run security checks on source code
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-code.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -567,7 +566,7 @@ check-security-code-only: mkdir-reports clean-src ## run security checks on sour
 		1> >(tee "$(REPORTS_DIR)/check-security-code.txt")'
 
 .PHONY: check-dist-doc-only
-check-dist-doc-only: mkdir-reports dist-pypi-only	## check that documentation is valid for PyPI package distribution
+check-dist-doc-only: | mkdir-reports dist-pypi-only	## check that documentation is valid for PyPI package distribution
 	@echo "Running RST documentation checks for PyPI package distribution..."
 	@bash -c '$(CONDA_CMD) \
 		twine check dist/* \
@@ -577,7 +576,7 @@ check-dist-doc-only: mkdir-reports dist-pypi-only	## check that documentation is
 check-dist-doc: install-sys check-dist-doc-only
 
 .PHONY: check-doc8-only
-check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting
+check-doc8-only: | mkdir-reports	  ## check documentation RST styles and linting
 	@echo "Running doc8 doc style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -585,7 +584,7 @@ check-doc8-only: mkdir-reports	  ## check documentation RST styles and linting
 		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
 
 .PHONY: check-docf-only
-check-docf-only: mkdir-reports	## run PEP8 code documentation format checks
+check-docf-only: | mkdir-reports	## run PEP8 code documentation format checks
 	@echo "Checking PEP8 doc formatting problems..."
 	@-rm -fr "$(REPORTS_DIR)/check-docf.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -602,7 +601,7 @@ ifeq ($(shell test $(PYTHON_VERSION_MAJOR) -eq 3 && test $(PYTHON_VERSION_MINOR)
 endif
 
 .PHONY: check-fstring-only
-check-fstring-only: mkdir-reports	## check f-string format definitions
+check-fstring-only: | mkdir-reports	## check f-string format definitions
 	@echo "Running code f-string formats substitutions..."
 	@-rm -f "$(REPORTS_DIR)/check-fstring.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -610,7 +609,7 @@ check-fstring-only: mkdir-reports	## check f-string format definitions
 		1> >(tee "$(REPORTS_DIR)/check-fstring.txt")'
 
 .PHONY: check-docstring-only
-check-docstring-only: mkdir-reports  ## check code docstring style and linting
+check-docstring-only: | mkdir-reports  ## check code docstring style and linting
 	@echo "Running docstring checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -623,7 +622,7 @@ check-links-only:       	## check all external links in documentation for integr
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports-only
-check-imports-only: mkdir-reports 	## check imports ordering and styles
+check-imports-only: | mkdir-reports 	## check imports ordering and styles
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -631,7 +630,7 @@ check-imports-only: mkdir-reports 	## check imports ordering and styles
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: check-css-only
-check-css-only: mkdir-reports  	## check CSS linting
+check-css-only: | mkdir-reports  	## check CSS linting
 	@echo "Running CSS style checks..."
 	@npx --no-install stylelint \
 		--config "$(APP_ROOT)/package.json" \
@@ -643,7 +642,7 @@ check-css: install-npm-stylelint check-css-only	## check CSS linting after depen
 
 # must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
 .PHONY: check-md-only
-check-md-only: mkdir-reports 	## check Markdown linting
+check-md-only: | mkdir-reports 	## check Markdown linting
 	@echo "Running Markdown style checks..."
 	@npx --no-install remark \
 		--inspect --frail \
@@ -722,7 +721,7 @@ fix-fstring-only: mkdir-reports
 		1> >(tee "$(REPORTS_DIR)/fixed-fstring.txt")'
 
 .PHONY: fix-css-only
-fix-css-only: mkdir-reports 	## fix CSS linting problems automatically
+fix-css-only: | mkdir-reports 	## fix CSS linting problems automatically
 	@echo "Fixing CSS style problems..."
 	@npx --no-install stylelint \
 		--fix \
@@ -735,7 +734,7 @@ fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after d
 
 # must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
 .PHONY: fix-md-only
-fix-md-only: mkdir-reports 	## fix Markdown linting problems automatically
+fix-md-only: | mkdir-reports 	## fix Markdown linting problems automatically
 	@echo "Running Markdown style checks..."
 	@npx --no-install remark \
 		--output --frail \
@@ -791,7 +790,7 @@ dist-pypi-only: clean-dist	## publish package distribution on PyPI
 	@ls -l dist
 
 .PHONY: extract-changes
-extract-changes: mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
+extract-changes: | mkdir-reports	## uses the specified VERSION to extract its sub-section in CHANGES.rst
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set. It is required to extract changes."; exit 1 )
 	@-echo "Extracting changes for ${VERSION} ..."
 	@bash -c '\

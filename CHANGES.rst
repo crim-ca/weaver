@@ -1935,7 +1935,7 @@ Changes:
 - Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
   of ``minDuration`` and ``maxDuration``. Please refer
   to `Database Migration <https://pavics-weaver.readthedocs.io/en/latest/installation.html#database-migration>`_
-  and `MongoDB official documentation <https://docs.mongodb.com/manual>`_ for migration methods.
+  and `MongoDB official documentation <https://www.mongodb.com/docs/manual/>`_ for migration methods.
 - Refactor ``Job`` search method to facilitate its extension in the event of future filter parameters.
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
   When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
