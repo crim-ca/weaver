@@ -234,6 +234,15 @@ OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
 OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
+OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
+OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
+OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
+
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
 OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
 
@@ -751,7 +760,6 @@ class AcceptHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Accept"
     schema_type = String
-    # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
         ContentType.APP_JSON,
         ContentType.APP_YAML,
@@ -770,8 +778,22 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     name = "Accept-Language"
     schema_type = String
     missing = drop
-    default = AcceptLanguage.EN_CA
-    # FIXME: oneOf validator for supported languages (?)
+    default = AcceptLanguage.EN_CA  # FIXME: oneOf validator for supported languages (?)
+
+
+class AcceptProfileHeader(URI):
+    name = "Accept-Profile"
+    default = None
+    validator = OneOf([
+        OGC_API_PROC_PROFILE_PROC_DESC_URL,
+        OGC_API_PROC_PROFILE_PROC_LIST_URL,
+        OGC_API_PROC_PROFILE_EXECUTE_URL,
+        OGC_API_PROC_PROFILE_RESULTS_URL,
+        OGC_API_PROC_PROFILE_JOB_DESC_URL,
+        OGC_API_PROC_PROFILE_JOB_LIST_URL,
+        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+        OPENEO_API_SCHEMA_JOB_STATUS_URL,
+    ])
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -832,6 +854,7 @@ class PreferHeader(ExtendedSchemaNode):
         "Header that describes the desired execution mode of the process job and desired results. "
         "Parameter 'return' indicates the structure and contents how results should be returned. "
         "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
+        "Parameter 'profile' can indicate an alternate results representation than the resolved one by the context. "
         f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
     )
     name = "Prefer"
@@ -844,6 +867,7 @@ class RequestHeaders(ExtendedMappingSchema):
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
+    accept_profile = AcceptProfileHeader(missing=drop)
     content_type = RequestContentTypeHeader()
 
 
@@ -6437,6 +6461,7 @@ class JobExecuteHeaders(ExtendedMappingSchema):
     description = "Indicates the relevant headers that were supplied for job execution or a null value if omitted."
     accept = AcceptHeader(missing=None)
     accept_language = AcceptLanguageHeader(missing=None)
+    accept_profile = AcceptProfileHeader(missing=None)
     content_type = RequestContentTypeHeader(missing=None, default=None)
     prefer = PreferHeader(missing=None)
     x_wps_output_context = WpsOutputContextHeader(missing=None)

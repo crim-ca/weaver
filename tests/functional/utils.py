@@ -339,6 +339,7 @@ class JobUtils(GenericUtils):
 class WpsConfigBase(GenericUtils):
     json_headers = MappingProxyType({"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON})
     html_headers = MappingProxyType({"Accept": ContentType.TEXT_HTML})
+    yaml_headers = MappingProxyType({"Accept": ContentType.APP_YAML})
     xml_headers = MappingProxyType({"Content-Type": ContentType.TEXT_XML})
     monitor_timeout = 30
     monitor_interval = 1

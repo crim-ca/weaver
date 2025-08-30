@@ -8,7 +8,7 @@ import re
 import tempfile
 import uuid
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import colander
 import mock
@@ -49,14 +49,14 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
+from weaver.utils import explode_headers, fully_qualified_name, get_path_kvp, load_file, ows_context_href
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, TypeAlias
+    from typing import Any, Generator, List, Optional, Tuple, TypeAlias
     from typing_extensions import Literal
 
     import _pytest  # noqa: W0212
@@ -69,8 +69,10 @@ if TYPE_CHECKING:
 
 # noinspection PyTypeHints
 @pytest.fixture(name="assert_cwl_no_warn_unknown_hint")
-def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
-    # type: (pytest.LogCaptureFixture, pytest.FixtureRequest) -> None
+def fixture_cwl_no_warn_unknown_hint(
+    caplog,     # type: pytest.LogCaptureFixture
+    request,    # type: pytest.FixtureRequest
+) -> None:      # type: (...) -> Generator[pytest.LogCaptureFixture, Any, None]
     """
     Looks for a warning related to unknown :term:`CWL` requirement thrown by :mod:`cwltool`.
 
@@ -162,6 +164,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
             processEndpointWPS1=weaver_wps_url,
             jobControlOptions=ExecuteControlOption.values(),
+            package={"cwlVersion": "v1.2", "class": "CommandLineTool"},  # to test requesting it, but not executable
         )
         self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
@@ -210,7 +213,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         Contents correspond to required I/O for WPS process :class:`weaver.processes.wps_testing.WpsTestProcess`.
         """
-        return {
+        return cast("ProcessExecution", {
             "inputs": [
                 {"id": "test_input",
                  "data": test_input},
@@ -221,7 +224,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             ],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
-        }
+        })
 
     def test_get_processes(self):
         path = "/processes"
@@ -270,6 +273,22 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(resp.json["processes"])
         for process in resp.json["processes"]:
             assert "links" not in process
+
+    def test_get_processes_link_profile_ogc_process_listing(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URL
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URL in profile[0]
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -682,6 +701,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json
 
+    def test_describe_process_yaml_accept_header(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.yaml_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
+    def test_describe_process_yaml_format_query(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, params={"f": OutputFormat.YAML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, headers=self.json_headers)
@@ -693,6 +730,22 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
+
+    def test_describe_process_link_profile_ogc_process_description(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URL
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URL in profile[0]
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_name()
@@ -920,6 +973,41 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         else:
             valid_urls = [provider_url, f"{provider_url}/"]
         assert req_hint["provider"] in valid_urls
+
+    @parameterized.expand([
+        (ContentType.ANY, None),  # endpoint's default if none explicit
+        (ContentType.APP_CWL, None),  # interchangeable catch-all YAML/JSON CWL, resolve to endpoint's default JSON
+        (ContentType.APP_JSON, None),
+        (ContentType.APP_CWL_JSON, None),
+        (None, OutputFormat.JSON),
+    ])
+    def test_get_process_package_cwl_json(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_JSON)
+        content = json.loads(resp.text)  # avoid 'resp.json' since not handled by non-explicitly JSON types
+        assert "cwlVersion" in content
+        assert "class" in content
+        assert content["class"] == "CommandLineTool"
+
+    @parameterized.expand([
+        (ContentType.APP_YAML, None),
+        (ContentType.APP_CWL_YAML, None),
+        (None, OutputFormat.YAML),
+        (None, OutputFormat.YML),
+    ])
+    def test_get_process_package_cwl_yaml(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_YAML)
+        assert "cwlVersion: " in resp.text
+        assert "class: CommandLineTool" in resp.text
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """

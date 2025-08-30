@@ -103,6 +103,7 @@ if TYPE_CHECKING:
         AnyDatabaseContainer,
         AnyHeadersContainer,
         AnyProcessRef,
+        AnyRequestType,
         AnyResponseType,
         AnyServiceRef,
         AnySettingsContainer,
@@ -874,24 +875,28 @@ def submit_job(request, reference, tags=None, process_id=None):
     user = request.authenticated_userid  # FIXME: consider other methods to provide the user
     headers = dict(request.headers)
     settings = get_settings(request)
-    return submit_job_handler(json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local,
-                              visibility, language=lang, headers=headers, tags=tags, user=user, context=context)
+    return submit_job_handler(
+        json_body, settings, service_url, prov_id, proc_id, is_workflow, is_local, visibility,
+        language=lang, request=request, headers=headers, tags=tags, user=user, context=context
+    )
 
 
-def submit_job_handler(payload,             # type: ProcessExecution
-                       settings,            # type: SettingsType
-                       wps_url,             # type: str
-                       provider=None,       # type: Optional[AnyServiceRef]
-                       process=None,        # type: AnyProcessRef
-                       is_workflow=False,   # type: bool
-                       is_local=True,       # type: bool
-                       visibility=None,     # type: Optional[AnyVisibility]
-                       language=None,       # type: Optional[str]
-                       headers=None,        # type: Optional[HeaderCookiesType]
-                       tags=None,           # type: Optional[List[str]]
-                       user=None,           # type: Optional[int]
-                       context=None,        # type: Optional[str]
-                       ):                   # type: (...) -> AnyResponseType
+def submit_job_handler(
+    payload,            # type: ProcessExecution
+    settings,           # type: SettingsType
+    wps_url,            # type: str
+    provider=None,      # type: Optional[AnyServiceRef]
+    process=None,       # type: AnyProcessRef
+    is_workflow=False,  # type: bool
+    is_local=True,      # type: bool
+    visibility=None,    # type: Optional[AnyVisibility]
+    language=None,      # type: Optional[str]
+    request=None,       # type: Optional[AnyRequestType]
+    headers=None,       # type: Optional[HeaderCookiesType]
+    tags=None,          # type: Optional[List[str]]
+    user=None,          # type: Optional[int]
+    context=None,       # type: Optional[str]
+):                      # type: (...) -> AnyResponseType
     """
     Parses parameters that defines the submitted :term:`Job`, and responds accordingly with the selected execution mode.
 
@@ -899,7 +904,7 @@ def submit_job_handler(payload,             # type: ProcessExecution
     desired inputs and outputs from the :term:`Job`. The selected execution mode looks up the various combinations
     of headers and body parameters available across :term:`API` implementations and revisions.
     """
-    json_body = validate_job_schema(payload)
+    json_body = validate_job_schema(payload, headers)
     db = get_db(settings)
 
     # non-local is only a reference, no actual process object to validate
@@ -937,7 +942,8 @@ def submit_job_handler(payload,             # type: ProcessExecution
         execute_mode = mode
     validate_process_exec_mode(job_ctl_opts, execute_mode)
 
-    accept_type = validate_job_accept_header(headers, mode)
+    accept_type = validate_job_accept_header(headers, execute_mode)
+    accept_profile = validate_job_accept_profile(headers, execute_mode)
     exec_resp, exec_return = get_job_return(job=None, body=json_body, headers=headers)  # job 'None' since still parsing
     req_headers = copy.deepcopy(headers or {})
     get_header("prefer", headers, pop=True)  # don't care about value, just ensure removed with any header container
@@ -959,18 +965,19 @@ def submit_job_handler(payload,             # type: ProcessExecution
                          execute_mode=execute_mode, execute_wait=wait,
                          execute_response=exec_resp, execute_return=exec_return,
                          custom_tags=tags, user_id=user, access=visibility, context=context, subscribers=subscribers,
-                         accept_type=accept_type, accept_language=language)
+                         accept_type=accept_type, accept_language=language, accept_profile=accept_profile)
     job.save_log(logger=LOGGER, message=job_message, status=job_status, progress=0)
     job.wps_url = wps_url
     job = store.update_job(job)
 
-    return submit_job_dispatch_task(job, headers=req_headers, container=settings)
+    return submit_job_dispatch_task(job, request=request, headers=req_headers, container=settings)
 
 
 def submit_job_dispatch_task(
     job,                    # type: Job
     *,                      # force named keyword arguments after
     container,              # type: AnySettingsContainer
+    request=None,           # type: Optional[AnyRequestType]
     headers=None,           # type: AnyHeadersContainer
     force_submit=False,     # type: bool
 ):                          # type: (...) -> AnyResponseType
@@ -978,6 +985,11 @@ def submit_job_dispatch_task(
     Submits the :term:`Job` to the :mod:`celery` worker with provided parameters.
 
     Assumes that parameters have been pre-fetched, validated, and can be resolved from the :term:`Job`.
+
+    .. note::
+        Both the :paramref:`container` and :paramref:`request` parameters are provided, although they could contain the
+        same nested setting references in certain cases, because other implementations (e.g.: dispatch via :term:`WPS`)
+        might recreate their own :term:`HTTP` request object that doesn't include the application settings.
     """
     db = get_db(container)
     store = db.get_store(StoreJobs)
@@ -1020,6 +1032,7 @@ def submit_job_dispatch_task(
                     resp_headers.update(sync_applied)
                 return get_job_results_response(
                     job,
+                    request=request,
                     request_headers=req_headers,
                     response_headers=resp_headers,
                     container=container,
@@ -1067,7 +1080,7 @@ def update_job_parameters(job, request):
     Updates an existing :term:`Job` with new request parameters.
     """
     body = validate_job_json(request)
-    body = validate_job_schema(body, sd.PatchJobBodySchema)
+    body = validate_job_schema(body, request.headers, sd.PatchJobBodySchema)
 
     value = field = loc = None
     job_process = get_process(job.process)
@@ -1204,11 +1217,33 @@ def validate_job_json(request):
     return json_body
 
 
-def validate_job_schema(payload, body_schema=sd.Execute):
-    # type: (Any, Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]) -> ProcessExecution
+def validate_job_schema(
+    payload,                    # type: Any
+    headers,                    # type: Optional[AnyHeadersContainer]
+    body_schema=sd.Execute,     # type: Union[Type[sd.Execute], Type[sd.PatchJobBodySchema]]
+):                              # type: (...) -> ProcessExecution
     """
     Validates that the input :term:`Job` payload is valid :term:`JSON` for an execution request.
     """
+    if headers:
+        schema = get_header("Content-Schema", headers)
+        if schema not in [None, body_schema._schema]:
+            raise HTTPUnprocessableEntity(
+                json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
+                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema",
+                    "title": "Invalid Job Execution Schema",
+                    "detail": "Specified Content-Schema reference is unsupported for job creation.",
+                    "status": HTTPUnprocessableEntity.code,
+                    "error": "Unsupported content schema.",
+                    "cause": {
+                        "name": "Content-Schema",
+                        "in": "headers",
+                        "schema": {"const": body_schema._schema}
+                    },
+                    "value": repr_json(schema),
+                })
+            )
+
     try:
         json_body = body_schema().deserialize(payload)
     except colander.Invalid as ex:
@@ -1247,8 +1282,8 @@ def validate_job_accept_header(headers, execution_mode):
             "type": "NotAcceptable",
             "title": "Execution request is not acceptable.",
             "detail": (
-                "When running asynchronously, the Accept header must correspond"
-                "to the Job Status response instead of the desired Result response"
+                "When running asynchronously, the Accept header must correspond "
+                "to the Job Status response instead of the desired Result response "
                 "returned when executing synchronously."
             ),
             "status": HTTPNotAcceptable.code,
@@ -1256,6 +1291,74 @@ def validate_job_accept_header(headers, execution_mode):
             "value": repr_json(accept, force_string=False),
         })
     )
+
+
+def validate_job_accept_profile(headers, execution_mode):
+    # type: (AnyHeadersContainer, AnyExecuteMode) -> Optional[str]
+    """
+    Validate the ``Accept-Profile`` header against known :term:`Job` execution results if any is provided.
+    """
+    profile = get_header("Accept-Profile", headers)
+    if not profile:
+        return
+    profile_allowed_sync = [
+        sd.OGC_API_PROC_PROFILE_RESULTS_URL,
+        sd.OGC_API_PROC_PROFILE_RESULTS_REL,
+    ]
+    profile_allowed_async = [
+        sd.OGC_API_PROC_PROFILE_JOB_DESC_URL,
+        sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+        sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+    ]
+    if (
+        execution_mode in [ExecuteMode.SYNC, ExecuteMode.AUTO, None] and
+        profile not in profile_allowed_sync
+    ):
+        raise HTTPNotAcceptable(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": (
+                        "When running synchronously, the Accept-Profile header must correspond "
+                        "to the desired Results response to be returned directly or be omitted "
+                        "for automatic resolution of the relevant Results representation."
+                    ),
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {
+                        "name": "Accept-Profile",
+                        "in": "headers",
+                        "schema": {"type": "string", "enum": profile_allowed_sync},
+                    },
+                    "value": repr_json(profile, force_string=False),
+                }
+            )
+        )
+    if (
+        execution_mode == ExecuteMode.ASYNC and
+        profile not in profile_allowed_async
+    ):
+        raise HTTPNotAcceptable(
+            json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize(
+                {
+                    "type": "NotAcceptable",
+                    "title": "Execution request is not acceptable.",
+                    "detail": (
+                        "When running asynchronously, the Accept-Profile header must correspond "
+                        "to the Job Status response from the submission instead of the desired "
+                        "Result response returned when executing synchronously."
+                    ),
+                    "status": HTTPNotAcceptable.code,
+                    "cause": {
+                        "name": "Accept-Profile",
+                        "in": "headers",
+                        "schema": {"type": "string", "enum": profile_allowed_async},
+                    },
+                    "value": repr_json(profile, force_string=False),
+                }
+            )
+        )
+    return profile
 
 
 def validate_process_exec_mode(job_control_options, execution_mode):

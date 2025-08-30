@@ -50,6 +50,7 @@ from weaver.processes.constants import (
 from weaver.processes.wps_package import (
     WpsPackage,
     _load_package_content,
+    _patch_wps_process_description_url,
     _update_package_compatibility,
     _update_package_metadata,
     format_extension_validator,
@@ -1269,3 +1270,42 @@ def test_process_metadata(cwl_package, wps_metadata, process_metadata_expected, 
     # resolved CWL metadata must not raise and must be unmodified after validation
     cwl_package_validated = sd.CWLMetadata().deserialize(cwl_package)
     assert cwl_package_validated == cwl_metadata_expected
+
+
+@pytest.mark.parametrize(
+    ["url", "hints", "expect"],
+    [
+        # if no queries are in the URI, it MUST remain intact
+        # (assumption of following code using the result)
+        ("https://example.com/processes", {}, "https://example.com/processes"),
+        # otherwise, it should be augmented to WPS parameters accordingly
+        (
+            "https://example.com/wps?service=WPS",
+            {},
+            "https://example.com/wps?service=WPS",
+        ),
+        (
+            "https://example.com/wps?service=WPS&request=DescribeProcess&identifier=test",
+            {},
+            "https://example.com/wps?service=WPS&request=DescribeProcess&identifier=test",
+        ),
+        (
+            "https://example.com/wps?service=WPS",
+            {"id": "test"},
+            "https://example.com/wps?service=WPS&identifier=test&request=DescribeProcess",
+        ),
+        (
+            "https://example.com/wps?service=WPS&request=DescribeProcess",
+            {"id": "test"},
+            "https://example.com/wps?service=WPS&request=DescribeProcess&identifier=test",
+        ),
+        (
+            "https://example.com/wps?service=WPS&request=GetCapabilities",
+            {"id": "test"},
+            "https://example.com/wps?service=WPS&request=DescribeProcess&identifier=test",
+        ),
+    ],
+)
+def test_patch_wps_process_description_url(url, hints, expect):
+    result = _patch_wps_process_description_url(url, hints)
+    assert result == expect

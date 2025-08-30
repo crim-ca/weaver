@@ -1087,7 +1087,7 @@ def guess_target_format(
     (i.e.: :term:`JSON`, :term:`XML`, etc.), with case-insensitive names.
 
     Defaults to :py:data:`ContentType.APP_JSON` if none was specified as :paramref:`default` explicitly and that no
-    ``Accept` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
+    ``Accept`` header or ``format``/``f`` queries were provided. Otherwise, applies the specified :paramref:`default`
     format specifiers were not provided in the request.
 
     Can apply ``User-Agent`` specific logic to override automatically added ``Accept`` headers by many browsers such
