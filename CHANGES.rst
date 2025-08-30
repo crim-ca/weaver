@@ -16,6 +16,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `Job` listing not returning adequate paging links when `Weaver` is running behind a proxied URL prefix
+  (fixes `#854 <https://github.com/crim-ca/weaver/issues/854>`_).
 - Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
 
 .. _changes_6.6.2:
