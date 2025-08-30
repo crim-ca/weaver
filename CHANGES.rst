@@ -45,6 +45,9 @@ Changes:
 Fixes:
 ------
 - Fix missing `HTML` CSS styles for `Job` status responses using `openEO` profile.
+- Fix `Process` deployment using an ``href`` assuming response contents to be one of the supported formats.
+  For example, ``/processes/{processID}`` was assumed to return `JSON` by default, but it is often `HTML`
+  if no format specifier or acceptable media-type is specified.
 
 .. _changes_6.6.2:
 
