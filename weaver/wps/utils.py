@@ -496,8 +496,11 @@ def load_pywps_config(container, config=None):
         settings["weaver.wps_output_url"] = output_url
     # apply workdir if provided, otherwise use default
     if "weaver.wps_workdir" in settings:
-        make_dirs(settings["weaver.wps_workdir"], exist_ok=True)
-        pywps_config.CONFIG.set("server", "workdir", settings["weaver.wps_workdir"])
+        if not settings["weaver.wps_workdir"]:  # in case empty by mistake or invalid parsing
+            del settings["weaver.wps_workdir"]  # let pywps handle the default
+        else:
+            make_dirs(settings["weaver.wps_workdir"], exist_ok=True)
+            pywps_config.CONFIG.set("server", "workdir", settings["weaver.wps_workdir"])
 
     # configure AWS S3 bucket if requested, storage of all process outputs
     # note:

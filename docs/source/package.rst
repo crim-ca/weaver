@@ -171,7 +171,7 @@ a :term:`Docker` container. To do this, the utility uses two strategies under th
 
 .. note::
     Because |jupyterhub-repo2docker|_ is employed, which is highly adaptable to many use cases, all typical Python
-    project `Configuration Files <https://repo2docker.readthedocs.io/en/latest/config_files.html>`_,
+    project `Configuration Files <https://repo2docker.readthedocs.io/en/latest/configuration/>`_,
     such as ``requirements.txt``, ``environment.yml``, ``setup.py``, ``pyproject.toml``, etc. can be employed.
     The :term:`Docker` container dependencies can be provided with an explicit ``Dockerfile`` as well.
     Please refer to the official documentation for all advanced configuration options.

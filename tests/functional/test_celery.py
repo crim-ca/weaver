@@ -1,6 +1,9 @@
 """
 Tests to validate that :mod:`celery` execution behaves as intended.
 """
+
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 import contextlib
 import inspect
 import json
