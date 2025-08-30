@@ -1465,7 +1465,7 @@ def dismiss_job_task(job, container):
     job_out_xml = os.path.join(wps_out_dir, f"{str(job.id)}.xml")
     if os.path.isdir(job_out_dir):
         LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
-        shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(
+        shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(  # pylint: disable=W4903
             "Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_dir, _exc
         ))
     if os.path.isfile(job_out_log):

@@ -460,6 +460,7 @@ linkcheck_ignore = [
     "https://docs.ogc.org/DRAFTS/.*",
     # URLs causing 403 (USer-Agent blocked or bot protection)
     "https://www.iso.org/iso-4217-currency-codes.html",
+    "https://www.mongodb.com/.*",
     # ignore the various weaver instances that could be down temporarily from the hosting server
     # their corresponding version checks in the readme's shields will indicate if such an error occurs
     "https://hirondelle.crim.ca/weaver",

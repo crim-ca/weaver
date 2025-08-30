@@ -743,7 +743,7 @@ def test_output_format_version(test_format, allow_version, expect_type):
             inspect.cleandoc("""
             data:
             - 123
-            """) + "\n"
+            """) + "\n"  # noqa: flynt
         ),
         (
             f.OutputFormat.XML,

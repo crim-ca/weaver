@@ -239,7 +239,7 @@
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _MongoDB: https://www.mongodb.com/
 .. |mongodb-docs| replace:: MongoDB official documentation
-.. _mongodb-docs: https://docs.mongodb.com/manual
+.. _mongodb-docs: https://www.mongodb.com/docs/manual/
 .. |media-types| replace:: Media-Types
 .. _media-types: https://www.iana.org/assignments/media-types/media-types.xhtml
 
