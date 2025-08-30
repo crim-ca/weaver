@@ -204,7 +204,7 @@ def get_queried_jobs(request):
             "value": repr_json(paging, force_string=False)
         })
     body = sd.GetQueriedJobsSchema().deserialize(body)
-    return Box(body)
+    return Box(body, service=service, process=process)  # pass queries for contextual HTML elements
 
 
 @sd.jobs_service.post(

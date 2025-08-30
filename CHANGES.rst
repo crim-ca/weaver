@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
+  if referenced by the request.
 
 Fixes:
 ------

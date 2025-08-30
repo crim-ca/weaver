@@ -40,6 +40,11 @@
         </li>
         <li>
             <div class="nav-link">
+                Go to <a href="${util.get_jobs_link(query=f'f=html&process={id}')}">Process Jobs</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
                 Go to <a href="#metadata">Process Metadata</a>
             </div>
         </li>

@@ -3,6 +3,10 @@
 
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
+%if process:
+<li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
+<li><a href="${util.get_process_link(process, query='f=html')}"><span class="code">${process}</span></a></li>
+%endif
 <li><a href="${util.get_jobs_link(query='f=html')}">Jobs</a></li>
 </%block>
 
@@ -23,6 +27,13 @@
                     Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
+            %if process:
+                <li>
+                    <div class="nav-link">
+                        Return to <a href="${util.get_process_link(process, query='f=html')}">Process Description</a>
+                    </div>
+                </li>
+            %endif
             ${util.get_paging_links()}
         </ul>
     </div>
