@@ -17,6 +17,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `HTML` pages main header link referring to the current page instead of the intended landing page
+  (fixes `#855 <https://github.com/crim-ca/weaver/issues/855>`_).
 - Fix `Job` listing not returning adequate paging links when `Weaver` is running behind a proxied URL prefix
   (fixes `#854 <https://github.com/crim-ca/weaver/issues/854>`_).
 - Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
