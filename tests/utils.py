@@ -556,9 +556,9 @@ def mocked_sub_requests(app,                # type: TestApp
         if (
             (get_header("Content-Type", headers) == ContentType.APP_JSON or isinstance(content, (dict, list)))
             and allow_json
-            and hasattr(app, method + "_json")
+            and hasattr(app, f"{method}_json")
         ):
-            method = method + "_json"
+            method = f"{method}_json"
             if isinstance(content, str):
                 req_kwargs["params"] = json.loads(req_kwargs["params"])
         req = getattr(app, method)
@@ -904,7 +904,7 @@ def mocked_dir_listing(local_directory,             # type: str
         ("</td></tr>" if include_table_format else "")
         for href in dir_files
     ]
-    dir_refs = "\n" + "\n".join(ref_files)
+    dir_refs = "\n" + "\n".join(ref_files)  # noqa: flynt
     dir_base = directory_path if directory_path.startswith("/") else f"/{directory_path}"
     dir_base = dir_base if dir_base.endswith("/") else f"{dir_base}/"
     dir_title = f"<h1>Index of {dir_base}</h1>" if include_dir_heading else ""
@@ -1011,7 +1011,8 @@ def mocked_file_server(directory,                   # type: str
         Operation called when the file-server URL is matched against incoming requests that have been mocked.
         """
         if (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
-            file_url = "file://" + request.url.replace(url, directory, 1)
+            dir_path = request.url.replace(url, directory, 1)
+            file_url = f"file://{dir_path}"
             resp = request_extra(request.method, file_url, settings=settings)
             if resp.status_code == 200:
                 headers = resp.headers
@@ -1539,7 +1540,7 @@ def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
             os.makedirs(dir_path, exist_ok=True)
     listing = []
     for path, dirs, files in os.walk(test_root_dir):
-        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))
+        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))  # noqa: flynt
         listing.extend((os.path.join(path, file_name) for file_name in files))
     return sorted(listing)
 
