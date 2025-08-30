@@ -488,7 +488,7 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS := pep8 lint security security-code security-deps dist-doc doc8 docf fstring docstring links imports
+CHECKS := pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
 CHECKS := $(addprefix check-, $(CHECKS))
 
 # items that should not install python dev packages should be added here instead
@@ -525,7 +525,6 @@ check-lint-only: mkdir-reports  	## check linting of code style
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
 		pylint \
-			--load-plugins pylint_quotes \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
 			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \

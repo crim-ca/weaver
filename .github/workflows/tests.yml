@@ -65,7 +65,7 @@ jobs:
           # forces us to pin Python 3.11 during linting checks in order to evaluate backward-compatible code styles
           # (see https://github.com/edaniszewski/pylint-quotes/issues/32)
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             allow-failure: false
             test-case: check-all
           # documentation build
