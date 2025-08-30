@@ -150,7 +150,6 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_date_fmt,
     get_log_fmt,
-    get_path_kvp,
     get_sane_name,
     get_secure_directory_name,
     get_settings,
