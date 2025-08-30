@@ -677,7 +677,7 @@ fix-only: $(addsuffix -only, $(FIXES))	## run all automatic fixes without develo
 fix-all: install-dev $(FIXES_ALL)  ## fix all code check problems automatically after install of dependencies
 
 .PHONY: fix-imports-only
-fix-imports-only: | mkdir-reports	## apply import code checks corrections
+fix-imports-only: mkdir-reports	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-imports.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -694,7 +694,7 @@ _DEFAULT_SETUP_ERROR := E126,E226,E402,F401,W503,W504
 _EXTRA_SETUP_ERROR := E241,E731
 
 .PHONY: fix-lint-only
-fix-lint-only: | mkdir-reports  ## fix some PEP8 code style problems automatically
+fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
 	@echo "Fixing PEP8 code style problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-lint.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -705,7 +705,7 @@ fix-lint-only: | mkdir-reports  ## fix some PEP8 code style problems automatical
 		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
 
 .PHONY: fix-docf-only
-fix-docf-only: | mkdir-reports  ## fix some PEP8 code documentation style problems automatically
+fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems automatically
 	@echo "Fixing PEP8 code documentation problems..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
 	@bash -c '$(CONDA_CMD) \
@@ -713,7 +713,7 @@ fix-docf-only: | mkdir-reports  ## fix some PEP8 code documentation style proble
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
 
 .PHONY: fix-fstring-only
-fix-fstring-only: | mkdir-reports
+fix-fstring-only: mkdir-reports
 	@echo "Fixing code string formats substitutions to f-string definitions..."
 	@-rm -f "$(REPORTS_DIR)/fixed-fstring.txt"
 	@bash -c '$(CONDA_CMD) \
