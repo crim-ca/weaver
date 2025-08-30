@@ -803,7 +803,9 @@ def get_job_results_response(
         ])
         if is_doc_results:
             # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
-            headers.update([("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URL}\"")])
+            headers.update([
+                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URL}\"")
+            ])
         return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference
