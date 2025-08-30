@@ -48,6 +48,7 @@ Fixes:
 - Fix `Process` deployment using an ``href`` assuming response contents to be one of the supported formats.
   For example, ``/processes/{processID}`` was assumed to return `JSON` by default, but it is often `HTML`
   if no format specifier or acceptable media-type is specified.
+- Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
 
 .. _changes_6.6.2:
 
