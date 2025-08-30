@@ -34,12 +34,7 @@ pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
 pydocstyle
-# FIXME: pylint-quotes failing with pylint==3 (https://github.com/edaniszewski/pylint-quotes/issues/29)
-# FIXME: use temporary unofficial version working with pylint>3 (https://github.com/edaniszewski/pylint-quotes/pull/30)
-# pylint>=2.15.4,<3
-# pylint_quotes
 pylint>=3,<4
-pylint_quotes @ git+https://github.com/marekhanus/pylint-quotes.git@0.3.0a2
 pylint-per-file-ignores
 responses
 safety
