@@ -64,6 +64,7 @@ from weaver.exceptions import (
 from weaver.formats import (
     DEFAULT_FORMAT,
     ContentType,
+    OutputFormat,
     clean_media_type_format,
     get_content_type,
     get_cwl_file_format,
@@ -911,7 +912,7 @@ def _patch_wps_process_description_url(reference, process_hint):
             process_id = get_any_id(process_hint or {})
             if process_id:
                 params["identifier"] = process_id
-        if process_id and params.get("request", "").lower() == "getcapabilities":
+        if process_id and params.get("request", "").lower() in ["getcapabilities", ""]:
             params["request"] = "DescribeProcess"
         query = "&".join([f"{key}={val}" for key, val in params.items()])
         reference = f"{url}?{query}"
@@ -961,16 +962,6 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
     # match reference against WPS-1/2 or WPS-3/OGC-API (with CWL href) or CWL (without extension, e.g.: API endpoint)
     if not cwl_package:
         settings = get_settings()
-        # since WPS-1/2 servers can sometimes reply with an error if missing query parameters, provide them
-        # even in the case of potential *OGC API - Processes* reference since we don't know yet what it refers to
-        ref_wps = _patch_wps_process_description_url(reference, process_hint)
-        response = request_extra("GET", ref_wps, retries=3, settings=settings)
-        if response.status_code != HTTPOk.code:
-            raise HTTPServiceUnavailable(
-                f"Couldn't obtain a valid response from [{ref_wps}]. "
-                f"Service response: [{response.status_code} {response.reason}]"
-            )
-        content_type = get_header("Content-Type", response.headers, default="")
         ogc_api_ctypes = {
             ContentType.APP_JSON,
             ContentType.APP_YAML,
@@ -978,6 +969,30 @@ def _generate_process_with_cwl_from_reference(reference, process_hint=None):
             ContentType.APP_OGC_PKG_YAML,
         }.union(ContentType.ANY_CWL)
         ogc_api_json = {ctype for ctype in ogc_api_ctypes if ctype.endswith("json")}
+        supported_types = ogc_api_ctypes.union(ContentType.ANY_XML).union({ContentType.TEXT_PLAIN})
+
+        ref_wps = _patch_wps_process_description_url(reference, process_hint)
+        response = None
+        attempts = [
+            # try WPS variant first in case 'GetCapabilities' with process ID was specified
+            # that would yield a valid XML response, but not formed as expected 'DescribeProcess'
+            # however, if no query is provided (as basic OGC API - Processes endpoint), no WPS params are applied
+            (ref_wps, {}, {}),
+            (reference, {"f": OutputFormat.JSON}, {}),
+            (reference, {}, {"Accept": ContentType.APP_JSON}),
+        ]
+        for url, params, headers in attempts:
+            response = request_extra("GET", url, params=params, headers=headers, retries=3, settings=settings)
+            content_type = get_header("Content-Type", response.headers, default="")
+            media_type = clean_media_type_format(content_type, strip_parameters=True)
+            if response.status_code == HTTPOk.code and media_type in supported_types:
+                break
+        else:
+            detail = f"{response.status_code} {response.reason}" if response else "all request attempt failed"
+            raise HTTPServiceUnavailable(
+                f"Couldn't obtain a valid response from any URI: {[ref[0] for ref in attempts]}. "
+                f"Service response: [{detail}]"
+            )
 
         # try to detect incorrectly reported media-type using common structures
         if ContentType.TEXT_PLAIN in content_type or not content_type:

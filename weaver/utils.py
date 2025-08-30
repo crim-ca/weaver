@@ -672,6 +672,60 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
+def get_response_profile(request, request_headers=None):
+    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+    """
+    Obtains the desired response profile based on request parameters.
+
+    Possible locations are, in order of precedence:
+
+        - ``profile`` query parameter.
+        - ``Accept-Profile`` header directly providing the profile :term:`URI`.
+        - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
+        - ``Prefer`` header including a ``profile`` parameter.
+        - ``Link`` header including a ``profile`` parameter.
+
+    .. seealso::
+        - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
+        - `Indicating, Discovering, Negotiating, and Writing Profiled Representations
+          <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
+        - :ref:`Weaver Content Negotiation by Profile <content-negotiation-profile>` in the documentation
+          for specific detail about why the below code is implemented in this way.
+
+    :param request: Request to retrieve relevant profile information.
+    :param request_headers: Additional headers to consider for profile extraction.
+    :return: Matched profile value if found.
+    """
+    query_params = get_request_args(request)
+    profile_query = query_params.get("profile")
+    if profile_query:
+        return profile_query or None
+
+    headers = {}
+    if hasattr(request, "headers"):
+        headers.update(request.headers)
+    if request_headers:
+        headers.update(request_headers)
+
+    content_profile = get_header("Accept-Profile", headers)
+    if content_profile:
+        return content_profile.strip("<>").strip() or None
+
+    for header_name in ["Accept", "Prefer", "Link"]:
+        content_accept = get_header(header_name, headers) or ""
+        content_media_type = content_accept.split(",")[0]
+        content_params = parse_kvp(
+            content_media_type,
+            key_value_sep="=",
+            pair_sep=";",
+            nested_pair_sep=None,
+            accumulate_keys=False,
+        )
+        content_profile = content_params.get("profile")
+        if content_profile:
+            return content_profile[0].strip("<>").strip() or None
+
+
 def get_request_args(request):
     # type: (AnyRequestType) -> AnyRequestQueryMultiDict
     """
@@ -1383,6 +1437,8 @@ def make_link_header(
         charset = charset or href.get("charset")  # noqa
         hreflang = hreflang or href.get("hreflang")
         href = href["href"]
+    if not rel:
+        raise ValueError(f"Missing required 'rel' parameter to form a valid 'Link' header for [{href}].")
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""

@@ -12,10 +12,42 @@ Changes
 
 Changes:
 --------
-- No change.
+
+- Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
+  using ``profile`` or ``schema`` query parameter for values ``ogc``, ``openeo``, and ``wps``.
+- Add additional ``rel="http://www.opengis.net/def/rel/ogc/1.0/log"`` (i.e.: ``rel="[ogc-rel:log]"``)
+  to `Job` status response links to respect ``http://www.opengis.net/spec/ogcapi-processes-1/2.0/rec/core/job-links``.
+- Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
+- Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,
+  header and any query parameter combination ``?f=yaml``, ``?f=yml``, ``?format=yaml`` and ``?format=yml``
+  (fixes `#456 <https://github.com/crim-ca/weaver/issues/456>`_).
+- Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_).
+- Changed `CWL` ``/processes/{processID}/package`` response to be ``application/cwl+json`` by default
+  (previously plain ``application/json``) to better represent the returned contents with registered `IANA Media-Type`.
+  Other variants (`CWL+YAML` or plain `JSON`) can be requested using the ``Accept`` header or ``f``/``format`` query.
+- Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
+  the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
+  (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).
+- Allow ``profile`` content negotiation for single result `Job` to be represented
+  using the multi-output `JSON` results representation instead of the default raw/direct value representation
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_,
+  fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
+- Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
+  of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
+- Return `Content-Profile` header for responses with corresponding ``Link: rel="profile"``.
+- Validate that, if provided during `Job` creation for `Process` execution, a ``Content-Schema`` header different than
+  supported representations will return *HTTP 422 Unprocessable Content*. At this point, only the `OGC API - Processes`
+  ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/execute.yaml`` is allowed for `JSON` content.
+  If other representations are needed and supported at a later point, ``Content-Schema`` can be omitted to avoid this
+  additional verification.
 
 Fixes:
 ------
+- Fix missing `HTML` CSS styles for `Job` status responses using `openEO` profile.
+- Fix `Process` deployment using an ``href`` assuming response contents to be one of the supported formats.
+  For example, ``/processes/{processID}`` was assumed to return `JSON` by default, but it is often `HTML`
+  if no format specifier or acceptable media-type is specified.
 - Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
 
 .. _changes_6.6.2:
