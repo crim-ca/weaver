@@ -208,7 +208,7 @@ def get_queried_jobs(request):
         ("Link", make_link_header(link))
         for link in body["links"]
     ])
-    return Box(body)
+    return Box(body, service=service, process=process)  # pass queries for contextual HTML elements
 
 
 @sd.jobs_service.post(

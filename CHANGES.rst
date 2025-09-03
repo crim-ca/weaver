@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-
+- Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
+  if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
   using ``profile`` or ``schema`` query parameter for values ``ogc``, ``openeo``, and ``wps``.
 - Add additional ``rel="http://www.opengis.net/def/rel/ogc/1.0/log"`` (i.e.: ``rel="[ogc-rel:log]"``)
@@ -44,6 +45,10 @@ Changes:
 
 Fixes:
 ------
+- Fix `HTML` pages main header link referring to the current page instead of the intended landing page
+  (fixes `#855 <https://github.com/crim-ca/weaver/issues/855>`_).
+- Fix `Job` listing not returning adequate paging links when `Weaver` is running behind a proxied URL prefix
+  (fixes `#854 <https://github.com/crim-ca/weaver/issues/854>`_).
 - Fix missing `HTML` CSS styles for `Job` status responses using `openEO` profile.
 - Fix `Process` deployment using an ``href`` assuming response contents to be one of the supported formats.
   For example, ``/processes/{processID}`` was assumed to return `JSON` by default, but it is often `HTML`

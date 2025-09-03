@@ -70,7 +70,6 @@ from weaver.utils import (
     get_sane_name,
     get_secure_path,
     get_settings,
-    get_weaver_url,
     is_uuid,
     make_link_header
 )
@@ -84,6 +83,7 @@ from weaver.wps.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
@@ -106,7 +106,6 @@ if TYPE_CHECKING:
         HeadersType,
         HTTPValid,
         JobValueFormat,
-        JobValueItem,
         JSON,
         Link,
         ProcessExecution,
@@ -220,7 +219,7 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     :raises IndexError: if the paging values are out of bounds compared to available total :term:`Job` matching search.
     """
-    base_url = get_weaver_url(request)
+    base_url = get_wps_restapi_base_url(request)
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
@@ -248,7 +247,9 @@ def get_job_list_links(job_total, filters, grouped, request):
     # path is whichever specific service/process endpoint, jobs are pre-filtered by them
     # transform sub-endpoints into matching query parameters and use generic path as alternate location
     else:
-        job_path = base_url + request.path
+        # remove query and ensure API prefix is preserved if any, but not duplicated either
+        req_path = request.route_url(request.matched_route.name, _app_url="", **request.matchdict)
+        job_path = base_url + req_path
         alt_path = base_url + sd.jobs_service.path
         alt_kvp["process"] = filters["process"]
         if filters["service"]:
