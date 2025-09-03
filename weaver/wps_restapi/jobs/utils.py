@@ -70,7 +70,6 @@ from weaver.utils import (
     get_sane_name,
     get_secure_path,
     get_settings,
-    get_weaver_url,
     is_uuid,
     make_link_header
 )
