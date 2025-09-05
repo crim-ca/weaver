@@ -411,7 +411,7 @@ close to the data.
 `Weaver` is employed in the |ogc-ospd|_ initiative to demonstrate reusability, portability, and transparency
 in the context of open science in Earth Observation, using |ogc-apppkg|_ encoded as |cwl|_ for interoperability
 and distributed processing workflows. Its related developments and demonstrations were presented at
-the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_ during the |ESIP-2024-panel|_.
+the |ogc-129th-mm|_ (2024, Montréal) and the |ESIP-2024|_ during the |ESIP-2024-panel|_.
 Video recordings and related outcomes are available under the following links:
 
 - **Report**: |ogc-ospd-er|_
@@ -425,7 +425,7 @@ and |ogc-api-proc-part4|_, for processing of multidimensional data involved thro
 Support of extended traceability and provenance metadata using |w3c-prov|_ over executed processing jobs has also
 been implemented during this effort to provide data lineage and better integrity, provenance and trust (IPT)
 of derived products resulting from processing workflows.
-Outcomes were presented during the |ogc-tb20-demo-days|_.
+Outcomes were presented during the |ogc-tb20-demo-days|_ and the |ogc-131st-mm|_ events.
 Corresponding reports are available online at the following locations:
 
 - |ogc-tb20-gdc-api-file-report|_
@@ -517,8 +517,10 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
 .. |ogc-best-practices-eo-apppkg| replace:: *OGC Best Practice for Earth Observation Application Package*
 .. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
-.. |ogc-129th| replace:: *OGC 129th Member's Meeting*
-.. _ogc-129th: https://portal.ogc.org/meet/?p=default&mid=95
+.. |ogc-129th-mm| replace:: *OGC 129th Member's Meeting*
+.. _ogc-129th-mm: https://portal.ogc.org/meet/?p=default&mid=95
+.. |ogc-131st-mm| replace:: *OGC 131st Member's Meeting*
+.. _ogc-131st-mm: https://events.ogc.org/131MM#/agenda?day=3&lang=en&sessionId=126498000002166220
 .. |ogc-apppkg| replace:: *OGC Application Package*
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. |ESIP| replace:: *Earth Science Information Partners*
