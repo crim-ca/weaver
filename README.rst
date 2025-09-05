@@ -422,8 +422,15 @@ Video recordings and related outcomes are available under the following links:
 `Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the integration of multiple
 community standards involved in workflow design, such as |cwl|_, `openEO`_, |ogc-api-proc-part3|_
 and |ogc-api-proc-part4|_, for processing of multidimensional data involved through *GeoDataCube* interactions.
+Support of extended traceability and provenance metadata using |w3c-prov|_ over executed processing jobs has also
+been implemented during this effort to provide data lineage and better integrity, provenance and trust (IPT)
+of derived products resulting from processing workflows.
 Outcomes were presented during the |ogc-tb20-demo-days|_.
-The reports are pending approval for publication.
+Corresponding reports are available online at the following locations:
+
+- |ogc-tb20-gdc-api-file-report|_
+- |ogc-tb20-gdc-prov-demo-report|_
+- |ogc-tb20-gdc-usage-test-report|_
 
 .. fixme: Add the OGC Testbed-20 report references when published (https://github.com/crim-ca/weaver/issues/812).
 
@@ -490,6 +497,12 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
 .. |ogc-tb20-demo-days| replace:: OGC Testbed-20 Demonstration Days
 .. _ogc-tb20-demo-days: https://www.ogc.org/event/t20-demo-days/
+.. |ogc-tb20-gdc-api-file-report| replace:: OGC Testbed 20 GeoDataCube (GDC) API Profile Report
+.. _ogc-tb20-gdc-api-file-report: https://docs.ogc.org/per/24-035.html
+.. |ogc-tb20-gdc-prov-demo-report| replace:: OGC Testbed 20 GDC Provenance Demonstration Report
+.. _ogc-tb20-gdc-prov-demo-report: https://docs.ogc.org/per/24-036.html
+.. |ogc-tb20-gdc-usage-test-report| replace:: OGC Testbed 20 GDC Usability Testing Report
+.. _ogc-tb20-gdc-usage-test-report: https://docs.ogc.org/per/24-037.html
 .. |ogc-ospd| replace:: *OGC Open Science Persistent Demonstrator*
 .. _ogc-ospd: https://www.ogc.org/initiatives/open-science/
 .. |ogc-ospd-demo-video| replace:: OGC Open Science Demonstrations - Part 1
@@ -541,3 +554,5 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |PCC| replace:: Prairie Climate Centre (PCC)
 .. _PCC: https://prairieclimatecentre.ca/
 .. _Pyramid: http://www.pylonsproject.org
+.. |w3c-prov| replace:: W3C PROV
+.. _w3c-prov: https://www.w3.org/TR/prov-overview
