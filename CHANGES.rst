@@ -49,6 +49,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `HTML` links when requesting `Process` listing that could fail schema validation due to additional media-types
+  injected by the web browser.
 - Fix `HTML` pages main header link referring to the current page instead of the intended landing page
   (fixes `#855 <https://github.com/crim-ca/weaver/issues/855>`_).
 - Fix `Job` listing not returning adequate paging links when `Weaver` is running behind a proxied URL prefix

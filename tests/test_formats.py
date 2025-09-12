@@ -589,6 +589,46 @@ def test_clean_media_type_format_default(suffix_subtype, strip_parameters):
 
 
 @pytest.mark.parametrize(
+    ["test_content_type", "strip_parameters", "expect_content_type"],
+    [
+        (
+            f"{f.ContentType.APP_JSON}, {f.ContentType.TEXT_HTML}; q=0.9, {f.ContentType.ANY}; q=0.8",
+            True,
+            f.ContentType.APP_JSON,
+        ),
+        (
+            f"{f.ContentType.TEXT_HTML}; q=0.9, {f.ContentType.APP_JSON}; q=1.0, {f.ContentType.ANY}; q=0.8",
+            True,
+            f.ContentType.TEXT_HTML,
+        ),
+        (
+            f" {f.ContentType.APP_JSON} ; q=1.0 , {f.ContentType.TEXT_HTML} ; q=0.9 ",
+            True,
+            f.ContentType.APP_JSON,
+        ),
+        (
+            f"{f.ContentType.TEXT_HTML}, {f.ContentType.APP_JSON}",
+            True,
+            f.ContentType.TEXT_HTML,
+        ),
+        (
+            f"{f.ContentType.APP_JSON}, {f.ContentType.TEXT_HTML}; charset=UTF-8",
+            True,
+            f.ContentType.APP_JSON,
+        ),
+        (
+            f"{f.ContentType.APP_JSON}, {f.ContentType.TEXT_HTML}; charset=UTF-8",
+            False,
+            f"{f.ContentType.APP_JSON}; charset=UTF-8",
+        ),
+    ]
+)
+def test_clean_media_type_format_multiple(test_content_type, strip_parameters, expect_content_type):
+    res_type = f.clean_media_type_format(test_content_type, strip_parameters=strip_parameters)
+    assert res_type == expect_content_type
+
+
+@pytest.mark.parametrize(
     ["accept", "query", "default", "user_agent", "source", "expect"],
     [
         (None, None, None, None, "default", f.ContentType.APP_JSON),
