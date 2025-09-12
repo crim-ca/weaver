@@ -997,6 +997,10 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
 
     .. note::
         Parameters :paramref:`suffix_subtype` and :paramref:`strip_parameters` are not necessarily exclusive.
+
+    .. versionchanged:: 6.3.0
+        If :paramref:`media_type` contains multiple entries (such as when many acceptable :term:`Media-Type` are
+        specified), only the first one will be considered.
     """
     if not media_type:  # avoid mismatching empty string with random type
         return None
@@ -1006,6 +1010,15 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
         media_type = media_type.split("#")[-1]
     if strip_parameters:
         media_type = media_type.split(";")[0]
+    if "," in media_type:
+        if ";" in media_type:
+            colon_pos = media_type.index(";")
+            comma_pos = media_type.index(",")
+            if comma_pos < colon_pos:
+                media_type = media_type.split(",", 1)[0] + media_type[colon_pos:]
+        else:
+            media_type = media_type.split(",", 1)[0]
+    media_type = media_type.strip()
     if suffix_subtype and "+" in media_type:
         # parameters are not necessarily stripped, need to re-append them after if any
         parts = media_type.split(";", 1)

@@ -9,7 +9,7 @@ from pyramid.settings import asbool
 from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
-from weaver.formats import ContentType, OutputFormat, guess_target_format
+from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_path_kvp, get_settings
 from weaver.visibility import Visibility
@@ -126,6 +126,7 @@ def get_process_list_links(request, paging, total, provider=None):
     req_fmt, req_src = guess_target_format(request, default=ContentType.APP_JSON, return_source=True)
     req_params = dict(request.params)
     if req_src == "header":
+        req_fmt = clean_media_type_format(req_fmt)
         req_params["f"] = OutputFormat.get(req_fmt)
     links.extend([
         {"href": proc_url, "rel": "collection",
