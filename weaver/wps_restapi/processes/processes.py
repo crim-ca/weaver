@@ -35,7 +35,8 @@ from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id,
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
-from weaver.wps_restapi.providers.utils import get_provider_services
+from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
+from weaver.wps_restapi.providers.providers import describe_provider_process
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
@@ -275,7 +276,11 @@ def get_local_process(request):
     Get a registered local process information (DescribeProcess).
     """
     try:
-        process = get_process(request=request)
+        provider = get_provider_id(request)
+        if provider:
+            process = describe_provider_process(request)
+        else:
+            process = get_process(request=request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
         ctype = guess_target_format(request)

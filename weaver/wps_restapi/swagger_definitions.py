@@ -3374,7 +3374,18 @@ class ProviderProcessEndpoint(ProviderProcessPath):
     querystring = ProcessDescriptionQuery()
 
 
-class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
+class ProviderServiceQuery(ExtendedMappingSchema):
+    provider = ProcessIdentifier(
+        default=None, missing=drop,
+        description="Request a process offered by a specific provider."
+    )
+    service = ProcessIdentifier(
+        default=None, missing=drop, deprecated=True,
+        description="Request a process offered by a specific provider (alias to 'provider' for legacy reasons)."
+    )
+
+
+class LocalProcessDescriptionQuery(ProviderServiceQuery, ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
     pass
 
 

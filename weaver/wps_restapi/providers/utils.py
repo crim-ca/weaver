@@ -22,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 def get_provider_services(container, check=True, ignore=True):
     # type: (AnySettingsContainer, bool, bool) -> List[Service]
     """
-    Obtain the list of remote provider services.
+    Obtain the list of remote :term:`Provider` services.
 
     :param container: definition to retrieve settings and database connection.
     :param check: request that all provider services are remotely accessible to fetch metadata from them.
@@ -71,12 +71,25 @@ def check_provider_requirements(func):
 def get_service(request, provider_id=None):
     # type: (AnyRequestType, Optional[str]) -> Service
     """
-    Get the request service using provider_id from the service store.
+    Get the request :term:`Service` using provider_id from the service store.
     """
     store = get_db(request).get_store(StoreServices)
-    prov_id = provider_id or request.matchdict.get("provider_id")
+    prov_id = provider_id or get_provider_id(request)
     try:
         service = store.fetch_by_name(prov_id)
     except ServiceNotFound:
         raise HTTPNotFound(f"Provider {prov_id} cannot be found.")
     return service
+
+
+def get_provider_id(request):
+    # type: (AnyRequestType) -> Optional[str]
+    """
+    Get any :term:`Provider` reference from the request.
+    """
+    return (
+        request.matchdict.get("provider_id")
+        or request.params.get("provider")
+        or request.params.get("service")
+        or None
+    )
