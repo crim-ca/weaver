@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, List, Optional
 
     from weaver.datatype import Service
-    from weaver.typedefs import AnyRequestType, AnySettingsContainer
+    from weaver.typedefs import AnyRequestType, AnySettingsContainer, Params, Return
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,16 +55,17 @@ def forbid_local_only(container):
         })
 
 
-def check_provider_requirements(func):
-    # type: (Callable[[AnySettingsContainer], Any]) -> Callable[[AnySettingsContainer], Any]
+def check_provider_requirements(
+    func    # type: Callable[[AnySettingsContainer, ..., Any], Return]
+):          # type: (...) -> Callable[[AnySettingsContainer, Any], Return]
     """
     Decorator to validate if :term:`Provider` operations are applicable for the current `Weaver` instance.
     """
     @functools.wraps(func)
-    def forbid_local(container):
-        # type: (AnySettingsContainer) -> Any
+    def forbid_local(container, *_, **__):
+        # type: (AnySettingsContainer, Params.args, Params.kwargs) -> Return
         forbid_local_only(container)
-        return func(container)
+        return func(container, *_, **__)
     return forbid_local
 
 

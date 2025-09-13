@@ -267,7 +267,8 @@ PROCESS_DESCRIPTION_FIELD_FIRST = [
     "keywords",
     "metadata",
     "inputs",
-    "outputs"
+    "outputs",
+    "provider",
 ]
 PROCESS_DESCRIPTION_FIELD_AFTER = [
     "processDescriptionURL",
@@ -277,7 +278,7 @@ PROCESS_DESCRIPTION_FIELD_AFTER = [
     "links"
 ]
 # fields ordering for nested process definition of OLD schema format of ProcessDescription
-PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process"]
+PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process", "provider"]
 PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
@@ -3806,7 +3807,11 @@ class Process(
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
-class ProcessDescriptionOLD(ProcessControl, ProcessDeploymentProfile, DescriptionLinks):
+class ProcessDescriptionProvider(ExtendedMappingSchema):
+    provider = ProviderSummarySchema(missing=drop)
+
+
+class ProcessDescriptionOLD(ProcessDescriptionProvider, ProcessControl, ProcessDeploymentProfile, DescriptionLinks):
     """
     Old schema for process description.
     """
@@ -3820,6 +3825,7 @@ class ProcessDescriptionOLD(ProcessControl, ProcessDeploymentProfile, Descriptio
 class ProcessDescriptionOGC(
     ProcessSummary,
     ProcessContext,
+    ProcessDescriptionProvider,
     ProcessVisibility,
     ProcessLocations,
     ProcessDeploymentProfile,

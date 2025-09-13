@@ -2843,8 +2843,8 @@ class Process(Base):
         proc_desc = base_url + sd.process_service.path.format(process_id=self.id)
         return proc_desc
 
-    def offering(self, schema=ProcessSchema.OGC, request=None):
-        # type: (ProcessSchemaType, AnyRequestType) -> JSON
+    def offering(self, schema=ProcessSchema.OGC, request=None, **additional_properties):
+        # type: (ProcessSchemaType, AnyRequestType, **JSON) -> JSON
         """
         Obtains the :term:`JSON` or :term:`XML` serializable offering/description representation of the :term:`Process`.
 
@@ -2852,6 +2852,9 @@ class Process(Base):
         :param schema:
             One of values defined by :class:`sd.ProcessDescriptionSchemaQuery` to select which
             process description representation to generate (see each schema for details).
+        :param additional_properties:
+            Additional properties to include in the JSON representation.
+            These properties still need to validate against the resolved schema if explicitly defined in it.
 
         .. note::
             Property name ``offering`` is employed to differentiate from the string process ``description`` field.
@@ -2890,9 +2893,10 @@ class Process(Base):
             # fields nested under 'process' + I/O as lists
             for io_type in ["inputs", "outputs"]:
                 process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
-            process.update({"process": dict(process)})
+            process.update({"process": dict(process), **additional_properties})
             return sd.ProcessDescriptionOLD(schema_meta_include=True).deserialize(process)
         # process fields directly at root + I/O as mappings
+        process.update(additional_properties)
         return sd.ProcessDescriptionOGC(schema_meta_include=True).deserialize(process)
 
     def summary(self, revision=False, links=True, container=None):

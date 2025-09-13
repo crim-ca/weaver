@@ -16,6 +16,8 @@ Changes:
 - Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
 - Add ``?provider={providerID}`` and ``?service={providerID}`` query parameters to ``/processes/{processID}`` request
   as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
+- Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
+  or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
