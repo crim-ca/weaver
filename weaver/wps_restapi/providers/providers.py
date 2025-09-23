@@ -20,13 +20,14 @@ from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.execution import submit_job
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id
-from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links
 from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
 from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
 if TYPE_CHECKING:
+    from typing import Optional, Tuple
+
     from pyramid.config import Configurator
 
     from weaver.typedefs import AnyViewResponse, PyramidRequest
@@ -203,19 +204,19 @@ def get_provider_processes(request):
 
 
 @check_provider_requirements
-def describe_provider_process(request):
-    # type: (PyramidRequest) -> Process
+def describe_provider_process(request, provider_id=None):
+    # type: (PyramidRequest, Optional[str]) -> Tuple[Process, Service]
     """
     Obtains a remote service process description in a compatible local process format.
 
     Note: this processes won't be stored to the local process storage.
     """
-    service = get_service(request)
+    service = get_service(request, provider_id=provider_id)
     # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = get_wps_client(service.url, request)
+    wps = service.wps(request)  # will cache, returned 'service' can reuse metadata without re-fetch
     proc_id = request.matchdict.get("process_id")
     process = wps.describeprocess(proc_id)
-    return Process.convert(process, service, container=request)
+    return Process.convert(process, service, container=request), service
 
 
 @sd.provider_process_service.get(
@@ -233,7 +234,7 @@ def get_provider_process(request):
     """
     Retrieve a remote provider's process description (DescribeProcess).
     """
-    process = describe_provider_process(request)
+    process, _ = describe_provider_process(request)
     schema = request.params.get("schema")
     offering = process.offering(schema)
     return HTTPOk(json=offering)
@@ -253,7 +254,7 @@ def get_provider_process_package(request):
     """
     Retrieve a remote provider's process Application Package definition.
     """
-    process = describe_provider_process(request)
+    process, _ = describe_provider_process(request)
     return HTTPOk(json=process.package or {})
 
 
