@@ -51,23 +51,24 @@
             all_processes = [(None, proc) for proc in processes]
             if providers:
                 all_processes.extend([
-                    (prov, proc)
+                    (prov.id, proc)
                     for prov in providers
-                    for proc in provider["processes"]
+                    for proc in prov["processes"]
                 ])
+            all_processes.sort(key=lambda x: (x[1]["id"]).lower())
         %>
-        %for provider, process in all_processes:
+        %for prov, process in all_processes:
         <dt class="process-list-item ">
             <div class="field-id inline code">
-                <a href="${util.get_process_link(process.id, provider_id=provider, query='f=html')}">${process.id}</a>
+                <a href="${util.get_process_link(process.id, provider_id=prov, query='f=html')}">${process.id}</a>
             </div>
             %if process.get("title"):
                 <span class="dash">&#8212;</span>
                 <span class="field-title">${process.title}</span>
             %endif
             <div class="format-link">
-                (<a href="${util.get_process_link(process.id, provider_id=provider, query='f=json')}">OGC JSON</a>,
-                 <a href="${util.get_process_link(process.id, provider_id=provider, query='f=xml')}">WPS XML</a>)
+                (<a href="${util.get_process_link(process.id, provider_id=prov, query='f=json')}">OGC JSON</a>,
+                 <a href="${util.get_process_link(process.id, provider_id=prov, query='f=xml')}">WPS XML</a>)
             </div>
         </dt>
         <dd>
