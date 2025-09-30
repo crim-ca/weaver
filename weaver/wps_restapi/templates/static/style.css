@@ -111,6 +111,11 @@ button.active {
     text-decoration: underline;
 }
 
+/* Breadcrumbs ID */
+.breadcrumbs li a .code {
+    font-size: 1.25em;
+}
+
 /* --- Generic Formats --- */
 
 .undefined {
@@ -157,6 +162,10 @@ button.active {
 
 .field > .code {
     margin-top: 0.2em;
+}
+
+.field > .uri {
+    margin-top: 0;
 }
 
 .field > .language {

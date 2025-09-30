@@ -16,7 +16,7 @@ from weaver.compat import Version
 from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
-from weaver.formats import ContentType
+from weaver.formats import ContentType, OutputFormat
 from weaver.processes.constants import ProcessSchema
 
 
@@ -43,6 +43,7 @@ class WpsProviderBase(GenericUtils):
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
+        cls.html_headers = {"Accept": ContentType.TEXT_HTML}
 
     def setUp(self):
         # rebuild clean db on each test
@@ -287,6 +288,36 @@ class WpsRestApiProvidersTest(WpsProviderBase):
             remote_processes.append(process["id"])
         assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in remote_processes
 
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_processes_with_providers_query(self):
+        self.register_provider()
+
+        path = "/processes"
+        query = {"providers": True}
+        resp = self.app.get(path, headers=self.json_headers, params=query)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        assert "providers" in resp.json and isinstance(resp.json["providers"], list)
+        assert len(resp.json["providers"]) == 1
+        provider = resp.json["providers"][0]
+        assert "processes" in provider and isinstance(provider["processes"], list)
+        assert len(provider["processes"]) == 2
+        remote_processes = []
+        for process in resp.json["processes"]:
+            assert "id" in process and isinstance(process["id"], str)
+            assert "title" in process and isinstance(process["title"], str)
+            assert "version" in process and isinstance(process["version"], str)
+            assert "keywords" in process and isinstance(process["keywords"], list)
+            assert "metadata" in process and isinstance(process["metadata"], list)
+            assert len(process["jobControlOptions"]) == 1
+            assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
+            remote_processes.append(process["id"])
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in remote_processes
+
     @pytest.mark.xfail(condition=Version(owslib.__version__) <= Version("0.25.0"),
                        reason="OWSLib fix for retrieval of processVersion from DescribeProcess not yet available "
                               "(https://github.com/geopython/OWSLib/pull/794)")
@@ -389,6 +420,58 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "outputs" in process and isinstance(process["outputs"], dict)
         assert all(isinstance(p_io, str) and isinstance(process["outputs"][p_io], dict) for p_io in process["outputs"])
         assert all("id" not in process["outputs"][p_io] for p_io in process["outputs"])
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_html(self):
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+        assert self.remote_provider_name in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_html_with_provider_query_ogc_schema(self):
+        self.register_provider()
+
+        path = f"/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        query = {"provider": self.remote_provider_name, "f": OutputFormat.HTML}
+        resp = self.app.get(path, params=query)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+        assert self.remote_provider_name in resp.text
+        assert resources.TEST_REMOTE_SERVER_URL in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_html_with_provider_query_old_schema(self):
+        self.register_provider()
+
+        path = f"/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        query = {"provider": self.remote_provider_name, "f": OutputFormat.HTML, "schema": ProcessSchema.OLD}
+        resp = self.app.get(path, params=query)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+        assert self.remote_provider_name in resp.text
+        assert resources.TEST_REMOTE_SERVER_URL in resp.text
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

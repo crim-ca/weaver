@@ -16,8 +16,12 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_process_link(process_id, provider_id='', query='')">\
-${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}\
+<%def name="get_process_link(process_id, provider_id='', provider_uri=False, query='')">\
+<%
+    _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
+    _suffix = f"&provider={provider_id}" if provider_id and not provider_uri else ""
+%>
+${_prefix}/${process_id}${f"?{query}{_suffix}" if query or _suffix else ""}\
 </%def>
 
 
@@ -193,6 +197,65 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
         %endif
     </dd>
 %endfor
+</dl>
+</%def>
+
+
+<%def name="render_provider(provider, detail=False)">
+<dl class="indent">
+    <div class="process-provider">
+        <dt id="provider-id">
+            <div class="field-id inline code">
+                <a href="#provider-id">${provider.id}</a>
+            </div>
+            %if "title" in provider:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${provider.title}</span>
+            %endif
+        </dt>
+        <dd>
+            <div class="field">
+                <div class="field-key">Type:</div>
+                <div class="label label-info">${provider.type}</div>
+            </div>
+            <div class="field">
+                <div class="field-key">Location:</div>
+                <div class="code"><a href="${provider.url}">${provider.url}</a></div>
+            </div>
+            %if provider.get("description"):
+                <div class="field">
+                    <div class="field-key">Description:</div>
+                    <div class="field-description">${provider.description}</div>
+                </div>
+            %endif
+            %if "version" in provider:
+                <div class="field">
+                    <div class="field-key">Version:</div>
+                    <div class="label label-info version-tag">${provider.version}</div>
+                </div>
+            %endif
+            %if "keywords" in provider:
+                <div class="field">
+                    <div class="field-key">Keywords:</div>
+                    %for keyword in provider.keywords:
+                        <div class="label label-note">${keyword}</div>
+                    %endfor
+                </div>
+            %endif
+            %if detail and provider.get("metadata"):
+                <div class="field">
+                    <div class="field-key">Metadata:</div>
+                    ${render_metadata(provider.metadata)}
+                </div>
+            %endif
+            %if detail and provider.get("links"):
+                <div class="field">
+                    <div class="field-key">Links:</div>
+                    ${render_links(provider.links)}
+                </div>
+            %endif
+        </dd>
+    </div>
 </dl>
 </%def>
 
