@@ -533,7 +533,8 @@ class Service(Base):
         Obtains the keywords relevant to the service provider.
         """
         wps = self.wps(container=container)
-        return wps.identification.keywords
+        keywords = [kw.strip() for kw in wps.identification.keywords]
+        return keywords
 
     def summary(self, container, fetch=True, ignore=False):
         # type: (AnySettingsContainer, bool, bool) -> Optional[JSON]
@@ -2306,6 +2307,7 @@ class Process(Base):
     def keywords(self):
         # type: () -> List[str]
         keywords = self.setdefault("keywords", [])
+        keywords = list({key.strip(): None for key in keywords})
         if self.type not in keywords:
             keywords.append(self.type)
             self["keywords"] = keywords
@@ -2314,7 +2316,8 @@ class Process(Base):
     @keywords.setter
     def keywords(self, keywords):
         # type: (List[str]) -> None
-        self["keywords"] = list(set(sd.KeywordList().deserialize(keywords)))
+        keywords = {key.strip(): None for key in keywords}
+        self["keywords"] = list(sd.KeywordList().deserialize(list(keywords)))
 
     @property
     def metadata(self):
