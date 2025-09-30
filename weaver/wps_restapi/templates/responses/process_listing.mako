@@ -92,6 +92,14 @@
                     %endfor
                 </div>
             %endif
+            %if prov:
+                <div class="field">
+                    <div class="field-key">Provider:</div>
+                    <div class="field-id inline code uri">
+                        <a href="${util.get_provider_link(provider_id=prov, query='f=html')}">${prov}</a>
+                    </div>
+                </div>
+            %endif
         </dd>
         %endfor
     </dl>

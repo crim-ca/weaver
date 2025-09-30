@@ -13,6 +13,7 @@ Changes
 Changes:
 --------
 - Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
+- Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
 - Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
 - Add ``?provider={providerID}`` and ``?service={providerID}`` query parameters to ``/processes/{processID}`` request
   as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.

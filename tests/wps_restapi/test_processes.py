@@ -640,6 +640,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         assert process_name in resp.json.get("description")
 
+    @pytest.mark.html
     def test_get_processes_html_accept_header(self):
         path = "/processes"
         resp = self.app.get(path, headers=self.html_headers)
@@ -649,6 +650,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "</body>" in resp.text
         assert "Processes" in resp.text
 
+    @pytest.mark.html
     def test_get_processes_html_format_query(self):
         path = "/processes"
         resp = self.app.get(path, params={"f": OutputFormat.HTML})
@@ -658,6 +660,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "</body>" in resp.text
         assert "Processes" in resp.text
 
+    @pytest.mark.html
     def test_describe_process_html_accept_header(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, headers=self.html_headers)
@@ -668,6 +671,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Process:" in resp.text
         assert self.process_public.identifier in resp.text
 
+    @pytest.mark.html
     def test_describe_process_html_format_query(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, params={"f": OutputFormat.HTML})
@@ -678,6 +682,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Process:" in resp.text
         assert self.process_public.identifier in resp.text
 
+    @pytest.mark.html
     def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
         path = "/processes"
         headers = copy.deepcopy(dict(self.html_headers))
@@ -689,6 +694,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "</body>" in resp.text
         assert "Processes" in resp.text
 
+    @pytest.mark.html
     def test_get_processes_html_accept_header_user_agent_browser_override(self):
         path = "/processes"
         headers = copy.deepcopy(dict(self.html_headers))
@@ -2776,6 +2782,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.functional
+@pytest.mark.html
 class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
     settings = {
         "weaver.url": "https://localhost",
