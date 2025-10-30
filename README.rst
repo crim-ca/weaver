@@ -22,8 +22,8 @@ Weaver
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
-* |w3c-prov|_ through |ogc-api-proc| and |cwl|
-* |jupyter-nb-app|_ as |ogc-apppkg|_
+* |w3c-prov|_ for provenance metadata tracking through |ogc-api-proc| and |cwl|
+* |jupyter-nb-app|_ deployment as |ogc-apppkg|_
 * |ems-long| for dispatching distributed workflow processing
 * |ades-long| for processing close to the data
 
