@@ -14,9 +14,15 @@ Weaver
 **Implementations**
 
 * |ogc-api-proc-long|
+    - |ogc-api-proc-part1-v1|_
+    - |ogc-api-proc-part1-v2|_
+    - |ogc-api-proc-part2|_
+    - |ogc-api-proc-part3|_
+    - |ogc-api-proc-part4|_ (including Provenance)
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
+* |w3c-prov|_ through |ogc-api-proc| and |cwl|
 * |jupyter-nb-app|_ as |ogc-apppkg|_
 * |ems-long| for dispatching distributed workflow processing
 * |ades-long| for processing close to the data
@@ -470,7 +476,11 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-long: https://www.ogc.org/
 .. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
-.. |ogc-api-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
+.. |ogc-api-proc-long| replace:: |ogc-api-proc|_
+.. |ogc-api-proc-part1-v1| replace:: *OGC API - Processes - Part 1: Core (v1.0)*
+.. _ogc-api-proc-part1-v1: https://docs.ogc.org/is/18-062r2/18-062r2.html
+.. |ogc-api-proc-part1-v2| replace:: *OGC API - Processes - Part 1: Core (v2.0)*
+.. _ogc-api-proc-part1-v2: https://docs.ogc.org/DRAFTS/18-062r3.html
 .. |ogc-api-proc-part2| replace:: *OGC API - Processes - Part 2: Deploy, Replace, Undeploy (DRU)*
 .. _ogc-api-proc-part2: https://docs.ogc.org/DRAFTS/20-044.html
 .. |ogc-api-proc-part3| replace:: *OGC API - Processes - Part 3: Workflows and Chaining*
