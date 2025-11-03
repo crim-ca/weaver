@@ -267,7 +267,8 @@ PROCESS_DESCRIPTION_FIELD_FIRST = [
     "keywords",
     "metadata",
     "inputs",
-    "outputs"
+    "outputs",
+    "provider",
 ]
 PROCESS_DESCRIPTION_FIELD_AFTER = [
     "processDescriptionURL",
@@ -277,7 +278,7 @@ PROCESS_DESCRIPTION_FIELD_AFTER = [
     "links"
 ]
 # fields ordering for nested process definition of OLD schema format of ProcessDescription
-PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process"]
+PROCESS_DESCRIPTION_FIELD_FIRST_OLD_SCHEMA = ["process", "provider"]
 PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
@@ -3374,7 +3375,18 @@ class ProviderProcessEndpoint(ProviderProcessPath):
     querystring = ProcessDescriptionQuery()
 
 
-class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
+class ProviderServiceQuery(ExtendedMappingSchema):
+    provider = ProcessIdentifier(
+        default=None, missing=drop,
+        description="Request a process offered by a specific provider."
+    )
+    service = ProcessIdentifier(
+        default=None, missing=drop, deprecated=True,
+        description="Request a process offered by a specific provider (alias to 'provider' for legacy reasons)."
+    )
+
+
+class LocalProcessDescriptionQuery(ProviderServiceQuery, ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
     pass
 
 
@@ -3795,7 +3807,11 @@ class Process(
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
-class ProcessDescriptionOLD(ProcessControl, ProcessDeploymentProfile, DescriptionLinks):
+class ProcessDescriptionProvider(ExtendedMappingSchema):
+    provider = ProviderSummarySchema(missing=drop)
+
+
+class ProcessDescriptionOLD(ProcessDescriptionProvider, ProcessControl, ProcessDeploymentProfile, DescriptionLinks):
     """
     Old schema for process description.
     """
@@ -3809,6 +3825,7 @@ class ProcessDescriptionOLD(ProcessControl, ProcessDeploymentProfile, Descriptio
 class ProcessDescriptionOGC(
     ProcessSummary,
     ProcessContext,
+    ProcessDescriptionProvider,
     ProcessVisibility,
     ProcessLocations,
     ProcessDeploymentProfile,
