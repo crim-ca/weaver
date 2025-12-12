@@ -118,7 +118,7 @@ services:
     #    constraints: [node.role == manager]
 
   mongodb:
-    image: mongo:5.0
+    image: mongo:7.0
     container_name: mongodb
     volumes:
       - /data/mongodb_persist:/data/db

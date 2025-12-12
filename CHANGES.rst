@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Update docker with Python 3.13.
+- Add Python 3.13 and 3.14 to CI and project setup.
+- Use Mongo v7 in CI and tests.
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
@@ -45,6 +48,7 @@ Changes:
 
 Fixes:
 ------
+- Fix security dependencies for `requests`, `urllib`, `werkzeug`.
 - Fix `HTML` links when requesting `Process` listing that could fail schema validation due to additional media-types
   injected by the web browser.
 - Fix `HTML` pages main header link referring to the current page instead of the intended landing page
