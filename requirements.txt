@@ -43,7 +43,6 @@ cryptography>=44.0.1
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
 cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-cwltool<=3.1.20251031082601;  python_version <= "3.9"  # last release providing Python 3.9
 cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
