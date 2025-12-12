@@ -16,6 +16,19 @@ Changes:
 - Add Python 3.13 and 3.14 to CI and project setup.
 - Unpin `cwltool==3.1.20241217163858` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
 - Use Mongo v7 in CI and tests.
+- Update security dependencies for `requests`, `urllib` and `werkzeug`.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.7.0:
+
+`6.7.0 <https://github.com/crim-ca/weaver/tree/6.7.0>`_ (2025-12-12)
+========================================================================
+
+Changes:
+--------
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
@@ -49,7 +62,6 @@ Changes:
 
 Fixes:
 ------
-- Fix security dependencies for `requests`, `urllib`, `werkzeug`.
 - Fix `HTML` links when requesting `Process` listing that could fail schema validation due to additional media-types
   injected by the web browser.
 - Fix `HTML` pages main header link referring to the current page instead of the intended landing page
