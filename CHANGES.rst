@@ -14,6 +14,7 @@ Changes:
 --------
 - Update docker with Python 3.13.
 - Add Python 3.13 and 3.14 to CI and project setup.
+- Unpin `cwltool==3.1.20241217163858` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
 - Use Mongo v7 in CI and tests.
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
