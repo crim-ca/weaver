@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.7.0:
+
+`6.7.0 <https://github.com/crim-ca/weaver/tree/6.7.0>`_ (2025-12-12)
+========================================================================
+
+Changes:
+--------
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
