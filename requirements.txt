@@ -107,7 +107,7 @@ pystac_client
 python-box
 python-dateutil
 pytz
-pywps==4.6.0
+pywps==4.7.0
 pyyaml>=5.2
 rdflib>=5  # pyup: ignore
 requests>=2.32.5

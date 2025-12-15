@@ -13,8 +13,9 @@ Changes
 Changes:
 --------
 - Update docker with Python 3.13.
-- Add Python 3.13 and 3.14 to CI and project setup.
+- Add Python 3.13 to CI and project setup. Python 3.14 tentatively added to CI but unsupported from by dependencies.
 - Unpin `cwltool==3.1.20241217163858` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
+- Pin ``pywps==4.7.0``
 - Use Mongo v7 in CI and tests.
 - Update security dependencies for `requests`, `urllib` and `werkzeug`.
 
