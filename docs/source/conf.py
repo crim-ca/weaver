@@ -123,7 +123,7 @@ redoc = [{
     }
 }]
 # must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
-redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"
+redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
