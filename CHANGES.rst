@@ -17,7 +17,7 @@ Changes:
 - Unpin `cwltool==3.1.20241217163858` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
 - Pin ``pywps==4.7.0``.
 - Use Mongo v7 in CI and tests.
-- Update security dependencies for ``pyyaml``, ``requests``, ``urllib`` and ``werkzeug``.
+- Update security dependencies for ``pip``, ``pyyaml``, ``requests``, ``urllib`` and ``werkzeug``.
 
 Fixes:
 ------
