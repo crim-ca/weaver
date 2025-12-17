@@ -1,3 +1,3 @@
-pip>=22.0.4  # pyup: ignore
+pip>=25.3  # pyup: ignore
 setuptools>=78.1.1
 packaging>=22.0

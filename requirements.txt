@@ -42,7 +42,8 @@ cryptography>=44.0.1
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-cwltool==3.1.20241217163858
+cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
+cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.1.1
@@ -106,10 +107,10 @@ pystac_client
 python-box
 python-dateutil
 pytz
-pywps==4.6.0
-pyyaml>=5.2
+pywps==4.7.0
+pyyaml>=5.4
 rdflib>=5  # pyup: ignore
-requests>=2.32.4
+requests>=2.32.5
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
@@ -120,9 +121,9 @@ schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
-urllib3>=2.5.0
+urllib3>=2.6.0
 urlmatch
 xmltodict
 webob
-werkzeug>=3.0.3,<3.1
+werkzeug>=3.1.4
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

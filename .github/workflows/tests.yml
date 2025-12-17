@@ -41,25 +41,26 @@ jobs:
     services:
       # Label used to access the service container
       mongodb:
-        image: mongo:5.0  # DockerHub
+        image: mongo:7.0  # DockerHub
         ports:
           - "27017:27017"
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
-          - os: ubuntu-latest
-            python-version: "3.13"
-            allow-failure: true
-            test-case: test-unit-only
-          - os: ubuntu-latest
-            python-version: "3.13"
-            allow-failure: true
-            test-case: test-func-only
+          # not yet ready due to pywps->fiona dependency missing (https://github.com/Toblerity/Fiona/issues/1504)
+          #- os: ubuntu-latest
+          #  python-version: "3.14"
+          #  allow-failure: true
+          #  test-case: test-unit-only
+          #- os: ubuntu-latest
+          #  python-version: "3.14"
+          #  allow-failure: true
+          #  test-case: test-func-only
           # linter tests
           # limitation with nested f-string quote styles changed in Python 3.12 (https://peps.python.org/pep-0701/)
           # forces us to pin Python 3.11 during linting checks in order to evaluate backward-compatible code styles
