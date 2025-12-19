@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.8.0:
+
+`6.8.0 <https://github.com/crim-ca/weaver/tree/6.8.0>`_ (2025-12-18)
+========================================================================
+
+Changes:
+--------
 - Update docker with Python 3.13.
 - Add Python 3.13 to CI and project setup. Python 3.14 tentatively added to CI but unsupported from by dependencies.
 - Unpin ``cwltool==3.1.20241217163858`` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
