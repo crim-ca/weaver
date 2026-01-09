@@ -17,6 +17,7 @@ Changes:
 Fixes:
 ------
 - Pin ``urllib3>=2.6.3`` for security fix.
+- Pin ``werkzeug>=3.1.5`` for security fix.
 - Pin ``xmltodict>=1.0.2`` for security fix.
 
 .. _changes_6.8.0:
