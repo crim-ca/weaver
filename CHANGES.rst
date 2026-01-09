@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_6.8.1:
+
+`6.8.1 <https://github.com/crim-ca/weaver/tree/6.8.1>`_ (2026-01-09)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Pin ``urllib3>=2.6.3`` for security fix.
 - Pin ``werkzeug>=3.1.5`` for security fix.
 - Pin ``xmltodict>=1.0.2`` for security fix.
