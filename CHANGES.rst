@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
+- Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
 
 Fixes:
 ------

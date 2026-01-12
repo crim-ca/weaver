@@ -688,7 +688,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
