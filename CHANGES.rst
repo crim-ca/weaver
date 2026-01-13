@@ -12,51 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
-
-Fixes:
-------
-- No change.
-
-.. _changes_6.9.0:
-
-`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-01-13)
-========================================================================
-
-Changes:
---------
-- No change.
-
-Fixes:
-------
-- No change.
-
-.. _changes_6.9.0:
-
-`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-01-13)
-========================================================================
-
-Changes:
---------
-- No change.
-
-Fixes:
-------
-- No change.
-
-.. _changes_6.9.0:
-
-`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-01-13)
-========================================================================
-
-Changes:
---------
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
+- Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions``module.
 
 Fixes:
 ------
-- No change.
+- Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 
 .. _changes_6.8.1:
 

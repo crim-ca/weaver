@@ -28,7 +28,7 @@ from pywps.validator.mode import MODE
 
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
-from weaver import xml_util
+from weaver import ogc_definitions as ogc_def, xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
     DEFAULT_FORMAT,
@@ -92,7 +92,8 @@ from weaver.processes.convert import (
     xml_wps2cwl
 )
 from weaver.utils import null
-from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
+from weaver.ogc_definitions import OGC_DEF_BBOX_FORMAT
+from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_SCHEMA
 
 if TYPE_CHECKING:
     from typing import List
@@ -2859,9 +2860,9 @@ def test_ows_wps_json_default_complex_format():
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": "urn:ogc:def:crs:EPSG::4326",
+                    "crs": ogc_def.OGC_DEF_BBOX_CRS_EPSG4326_URN,
                     "bbox": [2., 1., 4., 3.],
-                    "format": OGC_API_BBOX_FORMAT,
+                    "format": OGC_DEF_BBOX_FORMAT,
                     "schema": OGC_API_BBOX_SCHEMA,
                 }
             },
@@ -2873,7 +2874,7 @@ def test_ows_wps_json_default_complex_format():
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": "urn:ogc:def:crs:CRS::84",
+                    "crs": ogc_def.OGC_DEF_BBOX_CRS_84_URN,
                     "bbox": [1., 2., 3., 4.],
                 }
             },

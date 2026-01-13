@@ -35,7 +35,7 @@ from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
-from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver import WEAVER_SCHEMA_DIR, __meta__, ogc_definitions as ogc_def
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
@@ -231,17 +231,6 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 # or any generic JSON-object data, define common constants that can be reused across the code.
 # If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
 OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
-OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
-OGC_API_BBOX_EPSG = "EPSG:4326"
-
-OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
-OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
-OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
-OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
-OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
-OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
-OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
-OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
 
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
 OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
@@ -785,12 +774,12 @@ class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
     validator = OneOf([
-        OGC_API_PROC_PROFILE_PROC_DESC_URL,
-        OGC_API_PROC_PROFILE_PROC_LIST_URL,
-        OGC_API_PROC_PROFILE_EXECUTE_URL,
-        OGC_API_PROC_PROFILE_RESULTS_URL,
-        OGC_API_PROC_PROFILE_JOB_DESC_URL,
-        OGC_API_PROC_PROFILE_JOB_LIST_URL,
+        ogc_def.OGC_API_PROC_PROFILE_PROC_DESC_URI,
+        ogc_def.OGC_API_PROC_PROFILE_PROC_LIST_URI,
+        ogc_def.OGC_API_PROC_PROFILE_EXECUTE_URI,
+        ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI,
+        ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI,
+        ogc_def.OGC_API_PROC_PROFILE_JOB_LIST_URI,
         OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
         OPENEO_API_SCHEMA_JOB_STATUS_URL,
     ])

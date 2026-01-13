@@ -296,8 +296,20 @@ button.active {
     border-color: transparent black transparent transparent;
 }
 
-.tooltip:hover .tooltip-text {
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    z-index: 1;
+    transition: opacity 0.3s;
+    pointer-events: none; /* Prevent interaction when hidden */
+}
+
+.tooltip:hover .tooltip-text,
+.tooltip:focus-within .tooltip-text {
     visibility: visible;
+    opacity: 1;
+    pointer-events: auto; /* Allow interaction when visible */
+    transition-delay: 0.2s; /* Delay hiding after hover ends */
 }
 
 /* --- Labels --- */

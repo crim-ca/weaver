@@ -24,6 +24,7 @@ from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
 
+from weaver import ogc_definitions as ogc_def
 from weaver.database import get_db
 from weaver.datatype import Job, Process
 from weaver.exceptions import (
@@ -767,7 +768,7 @@ def get_job_results_response(
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
     profile = get_response_profile(request, request_headers)
-    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
+    is_doc_results = profile == ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI
 
     # document/minimal response, unless explicitly requested by profile content negotiation
     if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
@@ -799,13 +800,13 @@ def get_job_results_response(
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
         headers.extend([
-            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URL),
-            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URL, rel="profile")),
+            ("Content-Profile", ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI),
+            ("Link", make_link_header(ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
         ])
         if is_doc_results:
             # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
             headers.update([
-                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URL}\"")
+                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI}\"")
             ])
         return HTTPOk(json=results_json, headers=headers)
 

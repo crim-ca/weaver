@@ -22,6 +22,7 @@ from pyramid.httpexceptions import (
 from pyramid_celery import celery_app as app
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
+from weaver import ogc_definitions as ogc_def 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import JobExecutionError, WeaverExecutionError
@@ -1302,11 +1303,12 @@ def validate_job_accept_profile(headers, execution_mode):
     if not profile:
         return
     profile_allowed_sync = [
-        sd.OGC_API_PROC_PROFILE_RESULTS_URL,
-        sd.OGC_API_PROC_PROFILE_RESULTS_REL,
+        ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI,
+        ogc_def.curie(ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI),
     ]
     profile_allowed_async = [
-        sd.OGC_API_PROC_PROFILE_JOB_DESC_URL,
+        ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI,
+        ogc_def.curie(ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI),
         sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
         sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
     ]
