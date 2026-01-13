@@ -120,7 +120,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert conf_core in self.conforms_to
         assert conf_json in self.conforms_to
 
-    @pytest.mark.dependency(depends=["test_conformance_classes_core"])
+    @pytest.mark.dependency(
+        name="test_service_desc_link_and_oas_validation",
+        depends=["test_conformance_classes_core"],
+    )
     def test_service_desc_link_and_oas_validation(self):
         conf_oasXX = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
         conf_oas30 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas30"
@@ -151,7 +154,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
                 "3."
             ), f"service-desc href {service_desc_link['href']} is not OAS 3.x (openapi={oas_json['openapi']})"
 
-    @pytest.mark.dependency(depends=["test_service_desc_link_and_oas_validation"])
+    @pytest.mark.dependency(
+        name="test_process_list_schema_and_links",
+        depends=["test_service_desc_link_and_oas_validation"],
+    )
     def test_process_list_schema_and_links(self):
         result = self.client.processes(detail=True)
         assert result.code == 200
@@ -171,7 +177,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         paged_rels = [link.get("rel") for link in paged_links]
         assert any(rel in paged_rels for rel in ["next", "prev", "self"])
 
-    @pytest.mark.dependency(depends=["test_process_list_schema_and_links"])
+    @pytest.mark.dependency(
+        name="test_process_description_and_profile_link",
+        depends=["test_process_list_schema_and_links"],
+    )
     def test_process_description_and_profile_link(self):
         if not self.processes:
             pytest.skip("No processes available to test description.")
@@ -186,7 +195,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
         assert profile == profile_rel
 
-    @pytest.mark.dependency(depends=["test_process_description"])
+    @pytest.mark.dependency(
+        name="test_sync_execute_all_outputs",
+        depends=["test_process_description"],
+    )
     def test_sync_execute_all_outputs(self):
         process_echo = [
             proc for proc in self.processes
@@ -202,7 +214,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         # If outputs empty, verify response is empty
         # More tests for async, preferences, etc. can be added as stubs
 
-    @pytest.mark.dependency(depends=["test_process_description"])
+    @pytest.mark.dependency(
+        name="test_job_status",
+        depends=["test_process_description"],
+    )
     def test_job_status(self, openapi_job_status):
         result = self.client.jobs(limit=1)
         assert result.code == 200
@@ -216,7 +231,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert "status" in status_result.body
         assert "jobId" in status_result.body and status_result.body["jobId"] == job_id
 
-    @pytest.mark.dependency(depends=["test_process_description"])
+    @pytest.mark.dependency(
+        name="test_job_results_async",
+        depends=["test_process_description"],
+    )
     def test_job_results_async(self):
         result = self.client.processes()
         process_list = result.body.get("processes", [])
@@ -269,15 +287,24 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
     def test_conformance_classes_dru(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy" in self.conforms_to
 
-    @pytest.mark.dependency(depends=["test_conformance_classes_dru"])
+    @pytest.mark.dependency(
+        name="test_conformance_classes_dru_ogcapppkg",
+        depends=["test_conformance_classes_dru"],
+    )
     def test_conformance_classes_dru_ogcapppkg(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/ogcapppkg" in self.conforms_to
 
-    @pytest.mark.dependency(depends=["test_conformance_classes_dru"])
+    @pytest.mark.dependency(
+        name="test_conformance_classes_dru_cwl",
+        depends=["test_conformance_classes_dru"],
+    )
     def test_conformance_classes_dru_cwl(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/cwl" in self.conforms_to
 
-    @pytest.mark.dependency(depends=["test_conformance_classes_dru_ogcapppkg"])
+    @pytest.mark.dependency(
+        name="test_deploy_process_ogcapppkg",
+        depends=["test_conformance_classes_dru_ogcapppkg"],
+    )
     def test_deploy_process_ogcapppkg(self):
         process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
@@ -301,7 +328,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         assert desc_json["inputs"][0]["id"] == ogc_app_pkg["inputs"][0]["id"]
         assert desc_json["outputs"][0]["id"] == ogc_app_pkg["outputs"][0]["id"]
 
-    @pytest.mark.dependency(depends=["test_conformance_classes_dru_cwl"])
+    @pytest.mark.dependency(
+        name="test_deploy_process_cwl",
+        depends=["test_conformance_classes_dru_cwl"],
+    )
     def test_deploy_process_cwl(self):
         process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
@@ -327,7 +357,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         assert desc_json["id"] == process_id
         assert "inputs" in desc_json and "outputs" in desc_json
 
-    @pytest.mark.dependency(depends=["test_deploy_process_ogcapppkg"])
+    @pytest.mark.dependency(
+        name="test_retrieve_application_package_ogcapppkg",
+        depends=["test_deploy_process_ogcapppkg"],
+    )
     def test_retrieve_application_package_ogcapppkg(self):
         mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
         assert mutable_proc, "No mutable process found."
@@ -348,7 +381,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         assert set(pkg_inputs) == set(oap_inputs)
         assert set(pkg_outputs) == set(oap_outputs)
 
-    @pytest.mark.dependency(depends=["test_deploy_process_cwl"])
+    @pytest.mark.dependency(
+        name="test_retrieve_application_package_cwl",
+        depends=["test_deploy_process_cwl"],
+    )
     def test_retrieve_application_package_cwl(self):
         mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
         assert mutable_proc, "No mutable process found."
@@ -369,7 +405,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         assert set(pkg_inputs) == set(oap_inputs)
         assert set(pkg_outputs) == set(oap_outputs)
 
-    @pytest.mark.dependency(depends=["test_deploy_process_ogcapppkg"])
+    @pytest.mark.dependency(
+        name="test_replace_process_ogcapppkg",
+        depends=["test_deploy_process_ogcapppkg"],
+    )
     def test_replace_process_ogcapppkg(self):
         result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
         assert result.code == 200
@@ -406,7 +445,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         pkg_replaced = result.body
         assert pkg_replaced == revised_pkg
 
-    @pytest.mark.dependency(depends=["test_deploy_process_cwl"])
+    @pytest.mark.dependency(
+        name="test_replace_process_cwl",
+        depends=["test_deploy_process_cwl"],
+    )
     def test_replace_process_cwl(self):
         result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
         assert result.code == 200
@@ -438,7 +480,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         pkg_replaced = result.body
         assert pkg_replaced == revised_pkg
 
-    @pytest.mark.dependency()
+    @pytest.mark.dependency(name="test_delete_process")
     def test_delete_process(self, request):
         depends_or(request, ["test_deploy_process_ogcapppkg", "test_deploy_process_cwl"])
 
