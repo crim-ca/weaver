@@ -239,7 +239,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         result = self.client.processes()
         process_list = result.body.get("processes", [])
         if not process_list:
-            pytest.skip("No processes available to test job results.")
+            pytest.fail("No processes available to test job results.")
         process_id = process_list[0].get("id")
         result = self.client.describe(process_id)
         process_description = result.body
