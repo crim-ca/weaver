@@ -2850,8 +2850,9 @@ class ValidateAuthHandlerAction(argparse.Action):
     """
     Action that will validate that the input argument references an authentication handler that can be resolved.
     """
-    def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
-        # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
+    @staticmethod
+    def validate(auth_handler_ref):
+        # type: (Optional[str]) -> Optional[Union[AuthHandler, AuthBase]]
         """
         Validate the referenced authentication handler implementation.
         """
@@ -2868,6 +2869,14 @@ class ValidateAuthHandlerAction(argparse.Action):
                 "not of appropriate sub-type: oneOf[AuthHandler, AuthBase]."
             )
             raise argparse.ArgumentError(self, error)
+        return auth_handler
+
+    def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
+        # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
+        """
+        Argparse action interface to validate the referenced authentication handler implementation.
+        """
+        auth_handler = self.validate(auth_handler_ref)
         setattr(namespace, self.dest, auth_handler)
 
 

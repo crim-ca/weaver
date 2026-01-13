@@ -18,7 +18,7 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-from weaver.cli import WeaverClient
+from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
 from weaver.formats import OutputFormat
 
 from pytest_dependency import depends
@@ -28,14 +28,30 @@ if TYPE_CHECKING:
 
 
 TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002")
-TEST_OAP_CORE_VERSION = os.getenv("TEST_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
-TEST_OAP_CORE_PROCESS_ID = os.getenv("TEST_OAP_CORE_PROCESS_ID", "echo")
-TEST_OAP_DRU_PROCESS_ID = os.getenv("TEST_OAP_DRU_PROCESS_ID", "test-echo")
+TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
+TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "echo")
+TEST_SERVER_OAP_DRU_PROCESS_ID = os.getenv("TEST_SERVER_OAP_DRU_PROCESS_ID", "test-echo")
 
 
-@pytest.fixture(scope="module")
+def setup_client():
+    # fully-qualified name (eg: 'weaver.cli.BasicAuthHandler', 'requests.auth.HTTPBasicAuth')
+    auth_handler_ref = os.getenv("TEST_SERVER_AUTH_HANDLER")
+    auth_handler = ValidateAuthHandlerAction.validate(auth_handler_ref)
+    auth = None if not auth_handler else parse_auth(dict(
+        auth_handler=auth_handler,
+        auth_identity=os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
+        auth_password=os.getenv("TEST_SERVER_AUTH_PASSWORD"),
+        auth_url=os.getenv("TEST_SERVER_AUTH_URL"),
+        auth_method=os.getenv("TEST_SERVER_AUTH_method"),
+        auth_headers=os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
+        auth_token=os.getenv("TEST_SERVER_AUTH_TOKEN"),
+    ))
+    return WeaverClient(url=TEST_SERVER_BASE_URL, auth=auth)
+
+
+@pytest.fixture(scope="module", autouse=True)
 def client():
-    return WeaverClient(url=TEST_SERVER_BASE_URL)
+    return setup_client()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -64,7 +80,7 @@ class ServerOGCAPIProcessesBase:
 
     @classmethod
     def setup_class(cls):
-        cls.client = WeaverClient(url=TEST_SERVER_BASE_URL)
+        cls.client = setup_client()
 
     @cached_property
     def conforms_to(self):
@@ -85,6 +101,10 @@ class ServerOGCAPIProcessesBase:
 @pytest.mark.oap_part1
 class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
+    @classmethod
+    def setup_class(cls):
+        super().setup_class()
+
     def test_landing_page_links(self):
         result = self.client.info()
         assert result.code == 200
@@ -95,14 +115,18 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(name="test_conformance_classes_core")
     def test_conformance_classes_core(self):
-        assert f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_OAP_CORE_VERSION}/conf/core" in self.conforms_to
-        assert f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_OAP_CORE_VERSION}/conf/json" in self.conforms_to
+        conf_core = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/core"
+        conf_json = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/json"
+        assert conf_core in self.conforms_to
+        assert conf_json in self.conforms_to
 
     @pytest.mark.dependency(depends=["test_conformance_classes_core"])
     def test_service_desc_link_and_oas_validation(self):
-        oas_conformance_uri = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_OAP_CORE_VERSION}/conf/oas30"
-        conforms_oas = [uri for uri in self.conforms_to if uri == oas_conformance_uri]
-        assert conforms_oas, f"Server does not declare conformance to OAS 3.0 ({oas_conformance_uri})"
+        conf_oasXX = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
+        conf_oas30 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas30"
+        conf_oas31 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas31"
+        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oasXX, conf_oas30, conf_oas31]]
+        assert conforms_oas, "Server does not declare conformance to OAS"
 
         result = self.client.info()
         assert result.code == 200
@@ -166,7 +190,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
     def test_sync_execute_all_outputs(self):
         process_echo = [
             proc for proc in self.processes
-            if proc.get("id") in [TEST_OAP_CORE_PROCESS_ID, "echo", "Echo", "EchoProcess"]
+            if proc.get("id") in [TEST_SERVER_OAP_CORE_PROCESS_ID, "echo", "Echo", "EchoProcess"]
         ]
         assert process_echo, "No process available to test execution."
         process_id = process_echo[0].get("id")
@@ -231,6 +255,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @classmethod
     def setup_class(cls):
+        super().setup_class()
         cls.cleanup_processes = set()
 
     @classmethod
@@ -254,7 +279,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_conformance_classes_dru_ogcapppkg"])
     def test_deploy_process_ogcapppkg(self):
-        process_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
         ogc_app_pkg = {
             "id": process_id,
@@ -278,7 +303,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_conformance_classes_dru_cwl"])
     def test_deploy_process_cwl(self):
-        process_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
         cwl_app_pkg = cast(
             "CWL",
@@ -304,7 +329,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_deploy_process_ogcapppkg"])
     def test_retrieve_application_package_ogcapppkg(self):
-        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_OAP_DRU_PROCESS_ID)), None)
+        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
         assert mutable_proc, "No mutable process found."
         process_id = mutable_proc["id"]
         pkg_response = self.client.package(process_id)
@@ -325,7 +350,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_deploy_process_cwl"])
     def test_retrieve_application_package_cwl(self):
-        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_OAP_DRU_PROCESS_ID)), None)
+        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
         assert mutable_proc, "No mutable process found."
         process_id = mutable_proc["id"]
         pkg_response = self.client.package(process_id)
@@ -346,16 +371,16 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_deploy_process_ogcapppkg"])
     def test_replace_process_ogcapppkg(self):
-        result = self.client.package(TEST_OAP_DRU_PROCESS_ID)
+        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
         assert result.code == 200
 
         pkg = result.body
-        new_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(new_id)
         result = self.client.deploy(process_id=new_id, cwl=pkg)
         assert result.code == 200
 
-        replace_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(replace_id)
         revised_pkg = pkg.copy()
         revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
@@ -383,16 +408,16 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(depends=["test_deploy_process_cwl"])
     def test_replace_process_cwl(self):
-        result = self.client.package(TEST_OAP_DRU_PROCESS_ID)
+        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
         assert result.code == 200
 
         pkg = result.body
-        new_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(new_id)
         result = self.client.deploy(process_id=new_id, cwl=pkg)
         assert result.code == 200
 
-        replace_id = f"{TEST_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(replace_id)
         revised_pkg = pkg.copy()
         revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
