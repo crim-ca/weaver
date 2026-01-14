@@ -1591,19 +1591,9 @@ class AnyCRS(AnyOfKeywordSchema):
         ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), validator=OneOf([
-            # equivalent forms of EPSG:4326, 2D or 3D
-            "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84",
-            "urn:ogc:def:crs:OGC:2:84",
-            "WGS84",
-        ])),
+        ExtendedSchemaNode(String(), validator=OneOf(ogc_def.OGC_DEF_CRS_ANY_EPSG4326)),
     ]
-    default = OGC_API_BBOX_EPSG
+    default = ogc_def.OGC_DEF_CRS_EPSG4326_SHORT
 
 
 class AnyFilterExpression(AnyOfKeywordSchema):

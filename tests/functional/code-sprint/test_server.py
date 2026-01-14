@@ -18,12 +18,12 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
+from weaver import ogc_definitions as ogc_defs
 from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
 from weaver.formats import OutputFormat
 from weaver.wps_restapi.swagger_definitions import (
     OGC_API_COMMON_PART1_BASE,
 )
-from weaver.conformance import normalize_conformance_url
 
 from pytest_dependency import depends
 
@@ -90,7 +90,9 @@ class ServerOGCAPIProcessesBase:
     def conforms_to(self):
         result = self.client.conformance()
         assert result.code == 200
-        return result.body.get("conformsTo", [])
+        conform = result.body.get("conformsTo", [])
+        conform = [ogc_defs.normalize(uri, revision=TEST_SERVER_OAP_CORE_VERSION) for uri in conform]
+        return conform
 
     @cached_property
     def processes(self):
