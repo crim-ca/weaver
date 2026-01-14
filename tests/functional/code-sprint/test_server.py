@@ -18,19 +18,20 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-from weaver import ogc_definitions as ogc_defs
-from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
-from weaver.formats import OutputFormat
-from weaver.wps_restapi.swagger_definitions import (
-    OGC_API_COMMON_PART1_BASE,
-)
-
+from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
 from pytest_dependency import depends
 
+from weaver import ogc_definitions as ogc_defs
+from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
+from weaver.execute import ExecuteControlOption
+from weaver.formats import ContentType, OutputFormat
+from weaver.status import Status
+
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
+    from weaver.typedefs import CWL, JSON
 
 
+TEST_SERVER = os.getenv("TEST_SERVER")
 TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002")
 TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
 TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "echo")
@@ -59,6 +60,19 @@ def client():
 
 
 @pytest.fixture(scope="module", autouse=True)
+def check_server():
+    if not TEST_SERVER:
+        pytest.fail("No TEST_SERVER defined. Cannot resolve test resources for specific server tests.")
+
+
+@pytest.fixture(scope="module")
+def process_execute_body() -> "JSON":
+    path = os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER)
+    body = load_resource("process-execute.json", dir=path)
+    return body
+
+
+@pytest.fixture(scope="module", autouse=True)
 def openapi_job_status():
     schema_url = "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml"
     response = requests.get(schema_url)
@@ -68,7 +82,7 @@ def openapi_job_status():
     return schema_yaml
 
 
-def depends_or(request, other, scope='module'):
+def depends_or(request, other, scope="module"):
     item = request.node
     for o in other:
         try:
@@ -83,16 +97,14 @@ def depends_or(request, other, scope='module'):
 class ServerOGCAPIProcessesBase:
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(cls, check_server=None):
         cls.client = setup_client()
 
     @cached_property
     def conforms_to(self):
         result = self.client.conformance()
         assert result.code == 200
-        conform = result.body.get("conformsTo", [])
-        conform = [ogc_defs.normalize(uri, revision=TEST_SERVER_OAP_CORE_VERSION) for uri in conform]
-        return conform
+        return result.body.get("conformsTo", [])
 
     @cached_property
     def processes(self):
@@ -109,7 +121,7 @@ class ServerOGCAPIProcessesBase:
 class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(cls, check_server=None):
         super().setup_class()
 
     def test_landing_page_links(self):
@@ -200,11 +212,12 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
         assert profile == profile_rel
 
+    # FIXME: more test variants, for async, preferences, N outputs, etc. to be added...
     @pytest.mark.dependency(
         name="test_sync_execute_all_outputs",
-        depends=["test_process_description"],
+        depends=["test_process_description_and_profile_link"],
     )
-    def test_sync_execute_all_outputs(self):
+    def test_sync_execute_all_outputs(self, process_execute_body):
         process_echo = [
             proc for proc in self.processes
             if proc.get("id") in [TEST_SERVER_OAP_CORE_PROCESS_ID, "echo", "Echo", "EchoProcess"]
@@ -213,28 +226,34 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         process_id = process_echo[0].get("id")
 
         # Build minimal execute request
-        execute_result = self.client.execute(process_id, inputs={})
+        execute_inputs = process_execute_body.get("inputs", {})
+        execute_result = self.client.execute(process_id, inputs=execute_inputs)  # FIXME: request sync
         assert execute_result.code in (200, 201)
-        # If outputs omitted, verify all outputs present
-        # If outputs empty, verify response is empty
-        # More tests for async, preferences, etc. can be added as stubs
+        assert execute_result.headers.get("Content-Type", "").startswith("application/json")
+        results = execute_result.body
+        assert "outputs" in results
+        assert results["outputs"], "At least one output expected"
 
     @pytest.mark.dependency(
         name="test_job_status",
         depends=["test_process_description"],
     )
-    def test_job_status(self, openapi_job_status):
-        result = self.client.jobs(limit=1)
-        assert result.code == 200
-        jobs_list = result.body.get("jobs", [])
-        assert jobs_list, "No jobs available to test job status."
-        job_id = jobs_list[0].get("id")
-        status_result = self.client.status(job_id)
-        assert status_result.code == 200
+    def test_job_status(self, process_execute_body, openapi_job_status):
+        execute_inputs = process_execute_body.get("inputs", {})
+        execute_result = self.client.execute(
+            process_id,
+            inputs=execute_inputs,
+            monitor=True,  # automatically start polling the job status until completion
+            timeout=30,
+            interval=2,
+        )
+        assert execute_result.code in (200, 201)
+        status = execute_result.body
+
         # Validate against the statusInfo.yaml schema
-        jsonschema.validate(instance=status_result.body, schema=openapi_job_status)
-        assert "status" in status_result.body
-        assert "jobId" in status_result.body and status_result.body["jobId"] == job_id
+        jsonschema.validate(instance=status, schema=openapi_job_status)
+        assert "status" in status
+        assert status["status"] == Status.SUCCEEDED
 
     @pytest.mark.dependency(
         name="test_job_results_async",
@@ -278,7 +297,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(cls, check_server=None):
         super().setup_class()
         cls.cleanup_processes = set()
 
@@ -315,16 +334,26 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
         ogc_app_pkg = {
+            "type": "docker",
+            "image": "hello-world:latest",
+            "deployment": "local",
+            "config": {
+                "cpuMin": 1,
+                "cpuMax": 1,
+            }
+        }
+        body = {
             "id": process_id,
             "version": "1.0.0",
             "inputs": [{"id": "input", "type": "string"}],
             "outputs": [{"id": "output", "type": "string"}],
-            "jobControlOptions": ["sync-execute"],
+            "jobControlOptions": [ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC],
             "executionUnit": [
-                {"unit": {}}
+                {"unit": ogc_app_pkg}
             ]
         }
-        result = self.client.deploy(process_id=process_id, body=ogc_app_pkg)
+        headers = {"Content-Type": ContentType.APP_OGC_PKG_JSON}
+        result = self.client.deploy(process_id=process_id, body=ogc_app_pkg, headers=headers)
         assert result.code == 200
         location = result.headers.get("Location")
         assert location
