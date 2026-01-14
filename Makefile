@@ -6,10 +6,12 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Include custom config if it is available
 -include Makefile.config
 
+override CURRENT_VERSION := 6.9.0-dev1
+
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= APP_VERSION ?= 6.9.0
+APP_VERSION ?= $(if $(VERSION),$(VERSION),$(CURRENT_VERSION))
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 
 # guess OS (Linux, Darwin,...)
@@ -763,12 +765,19 @@ docs: install-doc clean-docs docs-only	## generate HTML documentation with Sphin
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 
+# tool to use for bumping version
+BUMP_TOOL ?= bump-my-version bump  # or 'bump2version'
+
 # Bumpversion 'dry' config
 # if 'dry' is specified as target, any bumpversion call using 'BUMP_XARGS' will not apply changes
 BUMP_XARGS ?= --verbose --allow-dirty
 ifeq ($(filter dry, $(MAKECMDGOALS)), dry)
 	BUMP_XARGS := $(BUMP_XARGS) --dry-run
 endif
+ifeq ($(BUMP_TOOL),bump2version)
+	BUMP_XARGS := $(BUMP_XARGS) patch
+endif
+
 .PHONY: dry
 dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VERSION=<x.y.z> bump dry]
 	@-echo > /dev/null
@@ -777,7 +786,7 @@ dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VER
 bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.z> bump]
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
-	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+	@-bash -c '$(CONDA_CMD) $(BUMP_TOOL) $(BUMP_XARGS) --new-version "${VERSION}";'
 
 .PHONY: dist-pypi	## publish package distribution on PyPI with dependencies preinstall
 dist-pypi: install-sys dist-pypi-only
