@@ -11,11 +11,11 @@ import mock
 import pytest
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
 
-from weaver import ogc_definitions as ogc_def
 from weaver.datatype import Job
 from weaver.formats import ContentEncoding, ContentType
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, WPS_LITERAL, WPS_CategoryType
 from weaver.processes.execution import parse_wps_inputs
+from weaver.wps_restapi.swagger_definitions import OGC_API_PROC_BBOX_CRS
 
 if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type
@@ -57,11 +57,11 @@ class MockProcess:
             "1",
         ),
         (
-            {"bbox": [1, 2, 3, 4], "crs": ogc_def.OGC_DEF_BBOX_CRS_EPSG4326_URN},
+            {"bbox": [1, 2, 3, 4], "crs": OGC_API_PROC_BBOX_CRS},
             MockInputDefinition(dataType=WPS_BOUNDINGBOX_DATA),
             BoundingBoxDataInput(
                 [1, 2, 3, 4],
-                crs=ogc_def.OGC_DEF_BBOX_CRS_EPSG4326_URN,
+                crs=OGC_API_PROC_BBOX_CRS,
                 dimensions=2,
             )
         ),

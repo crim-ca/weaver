@@ -555,7 +555,7 @@ class BuiltinAppTest(WpsConfigBase):
             # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
             "boundingBoxInput": {
                 "bbox": [51.9, 7., 52., 7.1],
-                "crs": ogc_def.OGC_DEF_CRS84_URI,
+                "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
             },
             "imagesInput": [
                 {

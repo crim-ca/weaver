@@ -102,6 +102,7 @@ class ServerOGCAPIProcessesBase:
         return result.body.get("processes", [])
 
 
+@pytest.mark.code_sprint
 @pytest.mark.functional
 @pytest.mark.remote
 @pytest.mark.oap_part1
@@ -270,6 +271,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert resp.status_code == 200
 
 
+@pytest.mark.code_sprint
 @pytest.mark.functional
 @pytest.mark.remote
 @pytest.mark.oap_part2

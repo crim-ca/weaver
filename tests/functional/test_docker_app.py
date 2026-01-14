@@ -13,7 +13,7 @@ from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
 from weaver.utils import fetch_file, get_any_value, load_file, str2bytes
 from weaver.wps.utils import get_wps_url
-from weaver.wps_restapi.swagger_definitions import CWL_SCHEMA_URL
+from weaver.wps_restapi.swagger_definitions import CWL_SCHEMA_URL, OGC_API_PROC_PROFILE_DOCKER_APP_URI
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 
@@ -64,7 +64,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
             "processDescription": {
                 "process": {"id": cls.process_id}
             },
-            "deploymentProfileName": ogc_def.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
+            "deploymentProfileName": OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         return body
@@ -341,7 +341,7 @@ class WpsPackageDockerAppTest(WpsConfigBase):
                 }
             },
             "executionUnit": [{"unit": cwl}],
-            "deploymentProfileName": ogc_def.OGC_API_PROC_PROFILE_DOCKER_APP_URI
+            "deploymentProfileName": OGC_API_PROC_PROFILE_DOCKER_APP_URI
         }
         self.deploy_process(body)
 

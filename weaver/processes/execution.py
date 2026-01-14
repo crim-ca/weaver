@@ -1303,14 +1303,14 @@ def validate_job_accept_profile(headers, execution_mode):
     if not profile:
         return
     profile_allowed_sync = [
-        ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI,
-        ogc_def.curie(ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI),
+        sd.OGC_API_PROC_PROFILE_RESULTS_URI,
+        ogc_def.curie(sd.OGC_API_PROC_PROFILE_RESULTS_URI),
     ]
     profile_allowed_async = [
-        ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI,
-        ogc_def.curie(ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI),
-        sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
-        sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+        sd.OGC_API_PROC_PROFILE_JOB_DESC_URI,
+        ogc_def.curie(sd.OGC_API_PROC_PROFILE_JOB_DESC_URI),
+        sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+        sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
     ]
     if (
         execution_mode in [ExecuteMode.SYNC, ExecuteMode.AUTO, None] and

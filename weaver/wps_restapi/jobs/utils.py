@@ -272,7 +272,7 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     if not grouped:
         links.append({
-            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URL, "rel": "profile",
+            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URI, "rel": "profile",
             "title": "OGC API - Processes - Job List Profile reference."
         })
 
@@ -358,7 +358,7 @@ def get_job_status_schema(request):
             return {"Content-Type": content_type}
         if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
             content_type = ContentType.APP_JSON
-        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
             content_profile = f"{content_type}; profile=\"{resolved_profile}\""
         else:
             content_profile = f"{content_type}; profile={resolved_schema}"
@@ -373,22 +373,22 @@ def get_job_status_schema(request):
                     }
                 )
             content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
-            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
         else:
             if resolved_schema == JobStatusProfileSchema.OGC:
-                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
-                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, rel="profile")
+                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URI
+                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URI
+                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URI, rel="profile")
             elif resolved_schema == JobStatusProfileSchema.OPENEO:
-                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URI
         return content_headers
 
     profile = get_response_profile(request)
-    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
         schema = sd.JobStatusProfileSchema.OGC
-    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.WPS
-    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.OPENEO
     else:
         params = get_request_args(request)
@@ -424,7 +424,7 @@ def get_job_status_wps_xml_response(job, request):
     If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
     an appropriate HTTP error will be raised.
     """
-    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     headers = {
         "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
         "Content-Schema": schema,
@@ -768,7 +768,7 @@ def get_job_results_response(
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
     profile = get_response_profile(request, request_headers)
-    is_doc_results = profile == ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI
+    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URI
 
     # document/minimal response, unless explicitly requested by profile content negotiation
     if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
@@ -800,13 +800,13 @@ def get_job_results_response(
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
         headers.extend([
-            ("Content-Profile", ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI),
-            ("Link", make_link_header(ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
+            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI),
+            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
         ])
         if is_doc_results:
             # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
             headers.update([
-                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI}\"")
+                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URI}\"")
             ])
         return HTTPOk(json=results_json, headers=headers)
 

@@ -92,8 +92,11 @@ from weaver.processes.convert import (
     xml_wps2cwl
 )
 from weaver.utils import null
-from weaver.ogc_definitions import OGC_DEF_BBOX_FORMAT
-from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_SCHEMA
+from weaver.wps_restapi.swagger_definitions import (
+    OGC_API_PROC_BBOX_CRS,
+    OGC_API_PROC_BBOX_FORMAT,
+    OGC_API_PROC_BBOX_SCHEMA,
+)
 
 if TYPE_CHECKING:
     from typing import List
@@ -2860,10 +2863,10 @@ def test_ows_wps_json_default_complex_format():
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": ogc_def.OGC_DEF_BBOX_CRS_EPSG4326_URN,
+                    "crs": OGC_API_PROC_BBOX_CRS,
                     "bbox": [2., 1., 4., 3.],
-                    "format": OGC_DEF_BBOX_FORMAT,
-                    "schema": OGC_API_BBOX_SCHEMA,
+                    "format": OGC_API_PROC_BBOX_FORMAT,
+                    "schema": OGC_API_PROC_BBOX_SCHEMA,
                 }
             },
         ),
@@ -2874,7 +2877,7 @@ def test_ows_wps_json_default_complex_format():
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": ogc_def.OGC_DEF_BBOX_CRS_84_URN,
+                    "crs": OGC_API_PROC_BBOX_CRS,
                     "bbox": [1., 2., 3., 4.],
                 }
             },

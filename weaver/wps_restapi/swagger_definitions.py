@@ -230,13 +230,33 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 # Because this type has special handling functionalities to distinguish it from any other usual 'complex' I/O
 # or any generic JSON-object data, define common constants that can be reused across the code.
 # If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
-OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_PROC_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_PROC_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
+OGC_API_PROC_BBOX_CRS = ogc_def.OGC_DEF_CRS_CRS84_URI
 
-OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
-OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+OGC_API_PROC_REL_EXCEPTIONS_URI = "http://www.opengis.net/def/rel/ogc/1.0/exceptions"
+OGC_API_PROC_REL_EXECUTE_URI = "http://www.opengis.net/def/rel/ogc/1.0/execute"
+OGC_API_PROC_REL_PROCESSES_URI = "http://www.opengis.net/def/rel/ogc/1.0/processes"
+OGC_API_PROC_REL_PROCESS_DESC_URI = "http://www.opengis.net/def/rel/ogc/1.0/process-desc"
+OGC_API_PROC_REL_JOB_RESULTS_URI = "http://www.opengis.net/def/rel/ogc/1.0/results"
+OGC_API_PROC_REL_JOB_LIST_URI = "http://www.opengis.net/def/rel/ogc/1.0/job-list"
+OGC_API_PROC_REL_JOB_LOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/log"
 
-OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
-OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
+OGC_API_PROC_PROFILE_PROC_DESC_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_JOB_DESC_URI = "http://www.opengis.net/def/profile/OGC/0/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URI = "http://www.opengis.net/def/profile/OGC/0/jobs-list"
+
+OGC_API_PROC_PROFILE_DOCKER_APP_URI = "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+OGC_API_PROC_PROFILE_WPS_APP_URI = "http://www.opengis.net/profiles/eoc/wpsApplication"
+
+OGC_API_SCHEMA_JOB_STATUS_URI = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URI = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+
+OPENEO_API_SCHEMA_URI = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
+OPENEO_API_SCHEMA_JOB_STATUS_URI = f"{OPENEO_API_SCHEMA_URI}#/components/schemas/batch_job"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
@@ -774,14 +794,14 @@ class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
     validator = OneOf([
-        ogc_def.OGC_API_PROC_PROFILE_PROC_DESC_URI,
-        ogc_def.OGC_API_PROC_PROFILE_PROC_LIST_URI,
-        ogc_def.OGC_API_PROC_PROFILE_EXECUTE_URI,
-        ogc_def.OGC_API_PROC_PROFILE_RESULTS_URI,
-        ogc_def.OGC_API_PROC_PROFILE_JOB_DESC_URI,
-        ogc_def.OGC_API_PROC_PROFILE_JOB_LIST_URI,
-        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
-        OPENEO_API_SCHEMA_JOB_STATUS_URL,
+        OGC_API_PROC_PROFILE_PROC_DESC_URI,
+        OGC_API_PROC_PROFILE_PROC_LIST_URI,
+        OGC_API_PROC_PROFILE_EXECUTE_URI,
+        OGC_API_PROC_PROFILE_RESULTS_URI,
+        OGC_API_PROC_PROFILE_JOB_DESC_URI,
+        OGC_API_PROC_PROFILE_JOB_LIST_URI,
+        OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+        OPENEO_API_SCHEMA_JOB_STATUS_URI,
     ])
 
 
@@ -3257,7 +3277,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3887,7 +3907,7 @@ class JobProcess(AnyOfKeywordSchema):
 
 
 class JobStatusInfo(ExtendedMappingSchema):
-    _schema = OGC_API_SCHEMA_JOB_STATUS_URL
+    _schema = OGC_API_SCHEMA_JOB_STATUS_URI
     _sort_first = JOB_STATUS_FIELD_FIRST
     _sort_after = JOB_STATUS_FIELD_AFTER
 
@@ -4266,14 +4286,14 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class BoundingBoxObject(StrictMappingSchema):
-    _schema = OGC_API_BBOX_SCHEMA
+    _schema = OGC_API_PROC_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
-    format = OGC_API_BBOX_FORMAT
+    format = OGC_API_PROC_BBOX_FORMAT
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )
     crs = AnyCRS(
-        default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        default=OGC_API_PROC_BBOX_CRS,
         description="Coordinate Reference System of the Bounding Box points.",
     )
 

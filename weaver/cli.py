@@ -2493,7 +2493,7 @@ def add_listing_options(parser, item):
 
 
 def parse_auth(kwargs):
-    # type: (Dict[str, Union[Type[AuthHandler], str, None]]) -> Optional[AuthHandler]
+    # type: (Dict[str, Union[Type[AuthHandler], Type[AuthBase], str, None]]) -> Optional[AuthHandler]
     """
     Parses arguments that can define an authentication handler and remove them from dictionary for following calls.
     """
@@ -2852,7 +2852,7 @@ class ValidateAuthHandlerAction(argparse.Action):
     """
     @staticmethod
     def validate(auth_handler_ref):
-        # type: (Optional[str]) -> Optional[Union[AuthHandler, AuthBase]]
+        # type: (Optional[str]) -> Optional[Union[Type[AuthHandler], Type[AuthBase]]]
         """
         Validate the referenced authentication handler implementation.
         """
@@ -2861,14 +2861,14 @@ class ValidateAuthHandlerAction(argparse.Action):
         auth_handler = import_target(auth_handler_ref)
         if not auth_handler:
             error = f"Could not resolve class reference to specified Authentication Handler: [{auth_handler_ref}]."
-            raise argparse.ArgumentError(self, error)
+            raise ValueError(error)
         auth_handler_name = fully_qualified_name(auth_handler)
         if not issubclass(auth_handler, (AuthHandler, AuthBase)):
             error = (
                 f"Resolved Authentication Handler [{auth_handler_name}] is "
                 "not of appropriate sub-type: oneOf[AuthHandler, AuthBase]."
             )
-            raise argparse.ArgumentError(self, error)
+            raise ValueError(error)
         return auth_handler
 
     def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
@@ -2876,7 +2876,10 @@ class ValidateAuthHandlerAction(argparse.Action):
         """
         Argparse action interface to validate the referenced authentication handler implementation.
         """
-        auth_handler = self.validate(auth_handler_ref)
+        try:
+            auth_handler = self.validate(auth_handler_ref)
+        except ValueError as exc:
+            raise argparse.ArgumentError(self, str(exc)) from exc
         setattr(namespace, self.dest, auth_handler)
 
 
