@@ -105,8 +105,8 @@ if TYPE_CHECKING:
     from responses import _Body as BodyType  # noqa: W0212
 
     from tests.utils import S3Scheme
-    from weaver.typedefs import AnyRequestType, HeadersType
-    from weaver.utils import AnyDownloadOutputMethod
+    from weaver.typedefs import AnyRequestType, HeadersType, SettingsType
+    from weaver.utils import AnyDownloadOutputMethod, AnyRequestMethod, RequestOptions
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
@@ -605,30 +605,115 @@ def test_get_ssl_verify_option():
         assert get_ssl_verify_option(method, url, any_wps_conf)
 
 
-def test_get_request_options():
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://test.com/*", "verify": False}
-        ]}
-    }) == {"verify": False}
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://other.com/*", "verify": False},
-            {"url": "http://test.com/*", "verify": True, "timeout": 30}
-        ]}
-    }) == {"verify": True, "timeout": 30}
-    assert get_request_options("get", "http://test.com/random", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://*/random", "verify": False},  # stop at first match
-            {"url": "http://test.com/*", "verify": True, "timeout": 30}
-        ]}
-    }) == {"verify": False}
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://*.com", "method": "post", "verify": False},
-            {"url": "http://test.com/*", "timeout": 30}
-        ]}
-    }) == {"timeout": 30}
+@pytest.mark.parametrize(
+    ["method", "url", "request_options_spec", "expect_request_options"],
+    [
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "verify": False}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "timeout": 10, "method": "POST"},
+                        {"url": "http://*", "timeout": 20, "method": "*"},
+                    ]
+                }
+            },
+            {"timeout": 20}
+        ),
+        (
+            "POST",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "timeout": 10, "method": "POST"},
+                        {"url": "http://*", "timeout": 20, "method": "*"},
+                    ]
+                }
+            },
+            {"timeout": 10}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://test.com/*", "verify": False}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://test.com/*", "verify": False, "timeout": 10}
+                    ]
+                }
+            },
+            {"verify": False, "timeout": 10}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://other.com/*", "verify": False},
+                        {"url": "http://test.com/*", "verify": True, "timeout": 30}
+                    ]
+                }
+            },
+            {"verify": True, "timeout": 30}
+        ),
+        (
+            "GET",
+            "http://test.com/random",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*/random", "verify": False},  # stop at first match
+                        {"url": "http://test.com/*", "verify": True, "timeout": 30}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com/random",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*.com", "method": "post", "verify": False},
+                        {"url": "http://test.com/*", "timeout": 30}
+                    ]
+                }
+            },
+            {"timeout": 30}
+        ),
+    ],
+)
+def test_get_request_options(method, url, request_options_spec, expect_request_options):
+    # type: (AnyRequestMethod, str, SettingsType, RequestOptions) -> None
+    assert get_request_options(method, url, request_options_spec) == expect_request_options
 
 
 def test_request_extra_allowed_codes():

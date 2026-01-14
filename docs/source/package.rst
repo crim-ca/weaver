@@ -1,5 +1,4 @@
 .. include:: references.rst
-.. _package:
 .. _application-package:
 
 .. shortcuts for visualization

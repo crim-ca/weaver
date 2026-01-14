@@ -18,9 +18,10 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
+from pyramid.settings import asbool
 from pytest_dependency import depends
 
+from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
 from weaver import ogc_definitions as ogc_defs
 from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
 from weaver.execute import ExecuteControlOption
@@ -36,6 +37,8 @@ TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002"
 TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
 TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "echo")
 TEST_SERVER_OAP_DRU_PROCESS_ID = os.getenv("TEST_SERVER_OAP_DRU_PROCESS_ID", "test-echo")
+TEST_SERVER_OAP_OAS_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_OAS_UNSUPPORTED", "false"))
+TEST_SERVER_REQUEST_TIMEOUT = int(os.getenv("TEST_SERVER_REQUEST_TIMEOUT", "5"))  # default match internal util timeout
 
 
 def setup_client():
@@ -173,7 +176,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(
         name="test_process_list_schema_and_links",
-        depends=["test_service_desc_link_and_oas_validation"],
+        depends=(
+            # allow bypass if it is known that the server does not support valid OAS, just to resume the test suite
+            [] if TEST_SERVER_OAP_OAS_UNSUPPORTED else ["test_service_desc_link_and_oas_validation"]
+        ),
     )
     def test_process_list_schema_and_links(self):
         result = self.client.processes(detail=True)

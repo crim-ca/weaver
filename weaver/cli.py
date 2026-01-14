@@ -69,12 +69,12 @@ if TYPE_CHECKING:
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
         from weaver.typedefs import (
-            URL,
             AnyHeadersContainer,
             AnyRequestMethod,
             AnyRequestType,
             AnyResponseType,
             AnyUUID,
+            AnyValueType,
             CookiesType,
             CWL,
             CWL_IO_ValueMap,
@@ -85,33 +85,26 @@ if TYPE_CHECKING:
             ExecutionResultValue,
             HeadersType,
             JobSubscribers,
+            JobValueFile,
             JSON,
-            SettingsType
+            SettingsType,
+            URL,
         )
     except ImportError:
         # pylint: disable=C0103,invalid-name
         # avoid linter issue
-        AnyRequestMethod = str
-        AnyHeadersContainer = AnyRequestType = AnyResponseType = Any
-        CookiesType = Dict[str, str]
-        CWL = JSON = Dict[str, Any]
-        CWL_IO_ValueMap = ExecutionInputsMap = ExecutionResults = ExecutionResultObjectRef = SettingsType = JSON
-        ExecutionInputs = Union[JSON, List[JSON]]
-        ExecutionResultValue = Union[ExecutionResultObjectRef, List[ExecutionResultObjectRef]]
-        JobSubscribers = Dict[str, Any]
-        HeadersType = Dict[str, str]
-        URL = str
-        AnyUUID = str
+        pass
     try:
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
         from weaver.status import AnyStatusSearch
+        from weaver.utils import RequestOptions, RequestOptionsConfigEntry, RequestOptionsSpecification
         from weaver.wps_restapi.constants import AnyConformanceCategory
     except ImportError:
         AnyOutputFormat = str
         AnyStatusSearch = str
-        ProcessSchemaType = str
         AnyConformanceCategory = str
+        ProcessSchemaType = str
 
     ConditionalGroup = Tuple[argparse._ActionsContainer, bool, bool]  # noqa
     PostHelpFormatter = Callable[[str], str]
@@ -204,7 +197,7 @@ class OperationResult(AutoBase):
         return link_headers
 
 
-class AuthHandler(AuthBase):
+class AuthHandler(AuthBase, abc.ABC):
     url = None       # type: Optional[str]
     method = "GET"   # type: AnyRequestMethod
     headers = {}     # type: Optional[AnyHeadersContainer]
@@ -416,8 +409,8 @@ class WeaverClient(object):
     monitor_interval = 5    # interval between monitor pooling job status requests
     auth = None  # type: AuthHandler
 
-    def __init__(self, url=None, auth=None):
-        # type: (Optional[str], Optional[AuthBase]) -> None
+    def __init__(self, url=None, auth=None, **request_kwargs):
+        # type: (Optional[str], Optional[AuthBase], **Union[AnyValueType, RequestOptions]) -> None
         """
         Initialize the client with predefined parameters.
 
@@ -426,6 +419,11 @@ class WeaverClient(object):
             Instance authentication handler that will be applied for every request.
             For specific authentication method on per-request basis, parameter should be provided to respective methods.
             Should perform required adjustments to request to allow access control of protected contents.
+        :param request_kwargs:
+            Additional request keyword arguments that will be passed to every request call.
+            Only arguments prefixed by ``request_`` will be considered.
+            For per-request specific options, parameter ``request_options`` can  be used to provide
+            a dictionary of desired configuration representing :term:`Request Options`.
         """
         self._url = None
         if url:
@@ -437,8 +435,38 @@ class WeaverClient(object):
         self.auth = cast(AuthHandler, auth)
         self._headers = {"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON}
         self._settings = {
-            "weaver.request_options": {}
-        }  # FIXME: load from INI, overrides as input (cumul arg '--setting weaver.x=value') ?
+            "weaver.request_options": self._request_options_setup(**request_kwargs)
+        }
+
+    def _request_options_setup(self, **request_kwargs):
+        # type: (**Union[AnyValueType, RequestOptions]) -> RequestOptionsSpecification
+        req_opts = cast(
+            "Union[RequestOptionsSpecification, RequestOptions]",
+            request_kwargs.pop("request_options", {}),
+        )
+        if "requests" not in req_opts:
+            if "url" not in req_opts:
+                if self._url:
+                    url = self._url.rstrip("/")
+                    url = f"{url}/*"
+                else:
+                    url = ["http://*", "https://*"]
+                req_opts["url"] = url
+            req_opts = {"requests": [req_opts]}
+        req_kwargs = {
+            _k.replace("request_", ""): _v
+            for _k, _v in request_kwargs.items()
+            if _k.startswith("request_")
+        }
+        if req_kwargs:
+            req_opts_any = cast("RequestOptionsConfigEntry", {
+                "url": ["http://*", "https://*"],
+                "method": "*",
+                **req_kwargs,
+            })
+            req_opts.setdefault("requests", [])
+            req_opts["requests"].append(req_opts_any)
+        return req_opts
 
     def _request(
         self,
@@ -448,7 +476,8 @@ class WeaverClient(object):
         x_headers=None,         # type: Optional[AnyHeadersContainer]
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
-        **kwargs                # type: Any
+        request_options=None,   # type: Optional[RequestOptionsSpecification]
+        **kwargs                # type: Any  # both request options explicitly and extra request parameters
     ):                          # type: (...) -> AnyResponseType
         if self.auth is not None and kwargs.get("auth") is None:
             kwargs["auth"] = self.auth
@@ -464,6 +493,9 @@ class WeaverClient(object):
             kwargs.setdefault("timeout", request_timeout)
         if isinstance(request_retries, int) and request_retries > 0:
             kwargs.setdefault("retries", request_retries)
+        if isinstance(request_options, dict) and request_options:
+            kwargs.setdefault("settings", {})
+            kwargs["settings"]["weaver.request_options"] = request_options
 
         if LOGGER.isEnabledFor(logging.DEBUG):
             fields = set(inspect.signature(Session.request).parameters) - {"params", "url", "method", "json", "body"}
@@ -625,7 +657,7 @@ class WeaverClient(object):
                     raise PackageRegistrationError("Failed parsing or invalid CWL from expected literal JSON string.")
                 proc = get_process_definition(  # validate
                     info,
-                    package=pkg,
+                    package=cast("CWL", pkg),
                     headers=headers,
                     container=settings,
                 )
@@ -634,7 +666,7 @@ class WeaverClient(object):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
                 get_process_definition(  # validate
                     info,
-                    package=cwl,
+                    package=cast("CWL", cwl),
                     headers=headers,
                     container=settings,
                 )
@@ -724,7 +756,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -770,7 +802,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -817,7 +849,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -858,7 +890,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -993,7 +1025,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1037,7 +1069,7 @@ class WeaverClient(object):
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
         :param with_providers: Indicate if remote providers should be listed as well along with local processes.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param sort: Sorting field to list processes. Name must be one of the fields supported by process objects.
@@ -1112,7 +1144,7 @@ class WeaverClient(object):
         :param schema: Representation schema of the returned process description.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1169,7 +1201,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1206,7 +1238,7 @@ class WeaverClient(object):
                     inputs = repr2json_input_values(inputs)
                 # list of single file from CLI (because of 'nargs')
                 elif len(inputs) == 1 and "=" not in inputs[0]:
-                    inputs = load_file(inputs[0])
+                    inputs = load_file(cast(str, inputs[0]))
                 elif len(inputs) == 1 and inputs[0] == "":
                     inputs = []
             if isinstance(inputs, list):
@@ -1311,10 +1343,10 @@ class WeaverClient(object):
                 token = res.body["access_token"]
                 auth_tokens[vault_id] = token
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
-                input_vault_href = {
+                input_vault_href = cast("JobValueFile", {
                     "href": vault_href,
                     "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
-                }
+                })
                 if input_array:
                     update_inputs[input_id][input_index] = input_vault_href
                 else:
@@ -1461,7 +1493,7 @@ class WeaverClient(object):
             The request type behave the same way regardless of the selected endpoint when targeting a `Weaver` instance.
             Selection is provided in case the choice impacts another non-`Weaver` instance for which a specific endpoint
             must be employed by the client. This option is enforced to ``"jobs"`` if :paramref:`pending` is requested.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_refs:
@@ -1567,7 +1599,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :return: Result of the :term:`Job` trigger operation.
@@ -1632,7 +1664,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_refs:
@@ -1732,7 +1764,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1820,7 +1852,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
@@ -1895,7 +1927,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Retrieved status of the :term:`Job`.
@@ -1938,7 +1970,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Retrieved information from the :term:`Job`.
@@ -2084,7 +2116,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :return: Result of the successful or failed job, or timeout of monitoring process.
@@ -2216,7 +2248,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_links:
@@ -2289,7 +2321,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Obtained result from the operation.
@@ -2388,7 +2420,7 @@ def add_shared_options(parser):
     req_grp.add_argument(
         "-rT", "--request-timeout", dest="request_timeout", action=ValidateNonZeroPositiveNumberAction, type=int,
         default=5, help=(
-            "Maximum timout duration (seconds) to wait for a response when "
+            "Maximum timeout duration (seconds) to wait for a response when "
             "performing HTTP requests (default: %(default)ss)."
         )
     )
@@ -2397,10 +2429,22 @@ def add_shared_options(parser):
         help="Amount of attempt to retry HTTP requests in case of failure (default: no retry)."
     )
     req_grp.add_argument(
+        "-rO", "--request-option", action=ValidateSettingAction, nargs=1, dest="request_options", metavar="OPTION",
+        help=(
+            "Additional request options to apply for sending requests toward the service. "
+            "This parameter can be provided multiple times, each with a value formatted as:"
+            "\n\n``setting_name=setting_value``\n\n"
+            "Setting names are case-insensitive. "
+            "Quotes can be used in the ``setting_value`` portion to delimit it. "
+            "Surrounding spaces are trimmed. "
+            "Refer to the documentation for supported request option names."
+        )
+    )
+    req_grp.add_argument(
         "-H", "--header", action=ValidateHeaderAction, nargs=1, dest="headers", metavar="HEADER",
         help=(
             "Additional headers to apply for sending requests toward the service. "
-            "This option can be provided multiple times, each with a value formatted as:"
+            "This parameter can be provided multiple times, each with a value formatted as:"
             "\n\n``Header-Name: value``\n\n"
             "Header names are case-insensitive. "
             "Quotes can be used in the ``value`` portion to delimit it. "
@@ -2484,7 +2528,7 @@ def add_listing_options(parser, item):
         "-D", "--detail", dest="detail", action="store_true", default=False,
         help=f"Obtain detailed {item} descriptions instead of only their ID (default: %(default)s)."
     )
-    sort_methods = SortMethods.get(item)
+    sort_methods = cast("List[SortMethods]", SortMethods.get(item))
     if sort_methods:
         parser.add_argument(
             "-O", "--order", "--sort", dest="sort", choices=sort_methods, type=str.lower,
@@ -2900,6 +2944,42 @@ class ValidateMethodAction(argparse.Action):
             raise argparse.ArgumentError(self, error)
         setattr(namespace, self.dest, values)
 
+
+class ValidateSettingAction(argparse._AppendAction):  # noqa: W0212
+    """
+    Action that will validate that the input argument is a correctly formed as setting/value pair.
+
+    .. code-block:: text
+
+        setting_name=setting_value
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+        # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
+        """
+        Validate the header value.
+        """
+        # items are received one by one with successive calls to this method on each matched (repeated) option
+        # gradually convert them to header representation
+        super(ValidateSettingAction, self).__call__(parser, namespace, values, option_string)
+        values = getattr(namespace, self.dest, [])
+        settings = []
+        if values:
+            for val in values:
+                if isinstance(val, tuple):  # skip already processed
+                    settings.append(val)
+                    continue
+                match = re.match(r"^\s*(?P<name>[\w+\-]+)\s*\=\s*(?P<value>.*)$", val)
+                if not match:
+                    error = f"Invalid option setting '{val}' is missing name or value separated by '='."
+                    raise argparse.ArgumentError(self, error)
+                if len(match["value"]) >= 2 and match["value"][0] in ["\"'"] and match["value"][-1] in ["\"'"]:
+                    value = match["value"][1:-1]
+                else:
+                    value = match["value"]
+                name = match["name"].replace("-", "_").lower()
+                settings.append((name, value))
+        setattr(namespace, self.dest, settings)
+    
 
 class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
     """
@@ -3685,7 +3765,8 @@ def main(*args):
         return 0
     url = kwargs.pop("url", None)
     auth = parse_auth(kwargs)
-    client = WeaverClient(url, auth=auth)
+    req_opts = kwargs.pop("request_options", {})
+    client = WeaverClient(url, auth=auth, request_options=req_opts)
     try:
         result = getattr(client, oper)(**kwargs)
     except Exception as exc:

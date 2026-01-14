@@ -245,6 +245,12 @@ def test_cli_url_handle_quotes(url):
 
 
 @pytest.mark.cli
+def test_cli_request_options():
+    client = WeaverClient("http://localhost:4001", request_options={"verify": False, "timeout": 10})
+    assert client._url == "http://localhost:4001"
+
+
+@pytest.mark.cli
 def test_parse_inputs_from_file():
     inputs = []
     mock_result = OperationResult(False, code=500)

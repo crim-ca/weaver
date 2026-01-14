@@ -653,8 +653,8 @@ It is possible to define :term:`Request Options` that consist of additional argu
 :func:`weaver.utils.request_extra`, which essentially call a traditional request using :mod:`requests` module, but
 with extended handling capabilities such as caching, retrying, and file reference support. The specific parameters
 that are passed down for individual requests depend whether a match based on URL (optionally with regex rules) and
-method definitions can be found in the :term:`Request Options` file. This file should be provided using
-the ``weaver.request_options`` configuration setting. Using this definition, it is possible to provide specific
+method definitions can be found in the :term:`Request Options` file (see example below). This file should be provided
+using the ``weaver.request_options`` configuration setting. Using this definition, it is possible to provide specific
 requests handling options, such as extended timeout, authentication arguments, SSL certification verification setting,
 etc. on a per-request basis, leave other requests unaffected and generally more secure.
 
@@ -664,6 +664,12 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
 
 .. seealso::
     Please refer to :func:`weaver.utils.request_extra` documentation directly for supported parameters and capabilities.
+
+.. note::
+    To define a match of *any URL*, the ``http://*`` and/or ``https://*`` patterns can be used as the ``url`` field.
+
+.. note::
+    The :ref:`cli` also accepts similar arguments to define :term:`Request Options`.
 
 .. _weaver-request-options:
 
