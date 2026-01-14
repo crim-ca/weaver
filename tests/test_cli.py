@@ -245,9 +245,147 @@ def test_cli_url_handle_quotes(url):
 
 
 @pytest.mark.cli
-def test_cli_request_options():
-    client = WeaverClient("http://localhost:4001", request_options={"verify": False, "timeout": 10})
-    assert client._url == "http://localhost:4001"
+@pytest.mark.parametrize(
+    ["parameters", "expect_settings"],
+    [
+        # provided with specific 'request_' prefixed options
+        (
+            {"request_timeout": 10, "ignored": True},
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://localhost:4001/*",
+                            "method": "*",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        ),
+        # provided with specific 'request_' prefixed options, including special HTTP method/URL
+        (
+            {"request_timeout": 10, "ignored": True, "request_method": "GET,POST", "request_url": "http://*"},
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://*",
+                            "method": "GET,POST",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        ),
+        # provided with predefined 'request_options'
+        (
+            {"request_options": {"timeout": 10}},
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://localhost:4001/*",
+                            "method": "*",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        ),
+        # provided with predefined 'request_options' with extra definitions
+        (
+            {"request_options": {"timeout": 10, "method": "GET"}},
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://localhost:4001/*",
+                            "method": "GET",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        ),
+        # provided with predefined 'request_options' with alternate URL
+        (
+            {"request_options": {"timeout": 10, "url": ["http://other.com/*", "https://*"]}},
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": ["http://other.com/*", "https://*"],
+                            "method": "*",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        ),
+        # provided with explicit settings structure
+        (
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://localhost:4001/*",
+                            "method": "*",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            },
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {
+                            "url": "http://localhost:4001/*",
+                            "method": "*",
+                            "timeout": 10,
+                        }
+                    ]
+                }
+            }
+        )
+    ]
+)
+def test_cli_request_options_setup(parameters, expect_settings):
+    client = WeaverClient("http://localhost:4001", **parameters)
+    assert client._settings == expect_settings
+
+
+def test_cli_request_options_parsing():
+    with mock.patch(
+        "weaver.cli.WeaverClient._request",
+        side_effect=lambda *_, **__: MockedResponse(json={}),
+    ) as mocked_oper:
+        run_command([
+            # weaver
+            "info",
+            # request options
+            "--request-timeout", "15",  # backward support / existing option before '--request-option'
+            "--request-option", "method=GET,POST",
+            "--request-option", "url=http://*",
+            "--request-option", "cache_enabled=false",
+            # operation URL
+            "-u", "https://fake.domain.com",
+            "-q",  # avoid logging info which would be confusing if debugging logs
+        ], entrypoint=weaver_cli)
+
+    mocked_oper.assert_called_once()
+    mocked_oper.assert_called_with(
+        "GET",
+        "https://fake.domain.com",
+        auth=None,
+        headers={"Accept": ContentType.APP_JSON, "Content-Type": ContentType.APP_JSON},
+        x_headers=None,
+        request_timeout=15,
+        request_retries=None,
+        settings={"weaver.request_options": {
+            "requests": [{"method": "GET,POST", "url": "http://*", "cache_enabled": "false"}]}
+        }
+    )
 
 
 @pytest.mark.cli

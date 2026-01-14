@@ -1941,7 +1941,7 @@ def get_no_cache_option(request_headers, **cache_options):
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
     cache_params = ["cache", "cache_enabled"]
-    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
+    no_cache = no_cache is True or any(asbool(cache_options.get(cache, True)) is False for cache in cache_params)
     return no_cache
 
 

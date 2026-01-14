@@ -54,7 +54,11 @@ def setup_client():
         auth_headers=os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
         auth_token=os.getenv("TEST_SERVER_AUTH_TOKEN"),
     ))
-    return WeaverClient(url=TEST_SERVER_BASE_URL, auth=auth)
+    request_options = {
+        # all must be prefixed by 'request_', options as applicable in 'weaver.utils.request_extra'
+        "request_timeout": TEST_SERVER_REQUEST_TIMEOUT,
+    }
+    return WeaverClient(url=TEST_SERVER_BASE_URL, auth=auth, **request_options)
 
 
 @pytest.fixture(scope="module", autouse=True)

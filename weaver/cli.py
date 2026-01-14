@@ -440,33 +440,40 @@ class WeaverClient(object):
 
     def _request_options_setup(self, **request_kwargs):
         # type: (**Union[AnyValueType, RequestOptions]) -> RequestOptionsSpecification
-        req_opts = cast(
+        if "weaver.request_options" in request_kwargs:
+            return cast("RequestOptionsSpecification", request_kwargs["weaver.request_options"])
+        req_opts_spec = cast(
             "Union[RequestOptionsSpecification, RequestOptions]",
             request_kwargs.pop("request_options", {}),
         )
-        if "requests" not in req_opts:
-            if "url" not in req_opts:
-                if self._url:
-                    url = self._url.rstrip("/")
-                    url = f"{url}/*"
-                else:
-                    url = ["http://*", "https://*"]
-                req_opts["url"] = url
-            req_opts = {"requests": [req_opts]}
+        req_opts = {}
+        if req_opts_spec and "requests" not in req_opts_spec:
+            req_opts = req_opts_spec.copy()
         req_kwargs = {
             _k.replace("request_", ""): _v
             for _k, _v in request_kwargs.items()
             if _k.startswith("request_")
         }
         if req_kwargs:
-            req_opts_any = cast("RequestOptionsConfigEntry", {
-                "url": ["http://*", "https://*"],
-                "method": "*",
-                **req_kwargs,
-            })
-            req_opts.setdefault("requests", [])
-            req_opts["requests"].append(req_opts_any)
-        return req_opts
+            req_opts.update(req_kwargs)
+        if req_opts:
+            if "url" not in req_opts:
+                req_url = self._url
+                if req_url:
+                    req_url = req_url.rstrip("/")
+                    req_url = f"{req_url}/*"
+                else:
+                    req_url = ["http://*", "https://*"]
+                req_opts["url"] = req_url
+            if "method" not in req_opts:
+                req_opts["method"] = "*"
+            req_opts_spec.setdefault("requests", [])
+            req_opts_spec["requests"].append(req_opts)
+        if req_opts_spec.get("requests") and len(req_opts_spec) > 1:
+            req_opts_spec = {"requests": req_opts_spec["requests"]}
+        elif req_opts_spec and "requests" not in req_opts_spec:
+            req_opts_spec = {"requests": [req_opts]}
+        return req_opts_spec
 
     def _request(
         self,
@@ -489,12 +496,12 @@ class WeaverClient(object):
             x_headers = CaseInsensitiveDict(x_headers)
             headers.update(x_headers)
 
+        kwargs.setdefault("settings", self._settings.copy())
         if isinstance(request_timeout, int) and request_timeout > 0:
             kwargs.setdefault("timeout", request_timeout)
         if isinstance(request_retries, int) and request_retries > 0:
             kwargs.setdefault("retries", request_retries)
         if isinstance(request_options, dict) and request_options:
-            kwargs.setdefault("settings", {})
             kwargs["settings"]["weaver.request_options"] = request_options
 
         if LOGGER.isEnabledFor(logging.DEBUG):
@@ -2965,10 +2972,12 @@ class ValidateSettingAction(argparse._AppendAction):  # noqa: W0212
         settings = []
         if values:
             for val in values:
-                if isinstance(val, tuple):  # skip already processed
+                if isinstance(val, tuple):  # skip already processed (each option is called with all appended values)
                     settings.append(val)
                     continue
-                match = re.match(r"^\s*(?P<name>[\w+\-]+)\s*\=\s*(?P<value>.*)$", val)
+                if isinstance(val, list) and len(val) == 1:  # when nargs=1, each option is wrapped in its own list
+                    val = val[0]
+                match = re.match(r"^\s*(?P<name>[\w+\-_]+)\s*\=\s*(?P<value>.*)$", val)
                 if not match:
                     error = f"Invalid option setting '{val}' is missing name or value separated by '='."
                     raise argparse.ArgumentError(self, error)
@@ -3003,10 +3012,10 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
         headers = []
         if values:
             for val in values:
-                if isinstance(val, tuple):  # skip already processed
+                if isinstance(val, tuple):  # skip already processed (each option is called with all appended values)
                     headers.append(val)
                     continue
-                if isinstance(val, list) and len(val) == 1:  # if nargs=1
+                if isinstance(val, list) and len(val) == 1:  # when nargs=1, each option is wrapped in its own list
                     val = val[0]
                 hdr = re.match(r"^\s*(?P<name>[\w+\-]+)\s*\:\s*(?P<value>.*)$", val)
                 if not hdr:
@@ -3765,7 +3774,7 @@ def main(*args):
         return 0
     url = kwargs.pop("url", None)
     auth = parse_auth(kwargs)
-    req_opts = kwargs.pop("request_options", {})
+    req_opts = cast("RequestOptions", dict(kwargs.pop("request_options", {})))
     client = WeaverClient(url, auth=auth, request_options=req_opts)
     try:
         result = getattr(client, oper)(**kwargs)
