@@ -249,6 +249,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             inputs=execute_inputs,
             execute_mode=ExecuteMode.SYNC,
             execute_return=ExecuteReturnPreference.MINIMAL,
+            timeout=TEST_SERVER_REQUEST_TIMEOUT,
         )
         assert execute_result.code == 200, "Execution should be successful and immediately executed synchronously"
         assert execute_result.headers.get("Content-Type", "").startswith(ContentType.APP_JSON)
