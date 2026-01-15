@@ -17,6 +17,9 @@ Changes:
 - Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.
 - Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions`` module.
   This module also provides utilities to allow conversion between various equivalent representations of the definitions.
+- Add ``Preference-Applied: profile=<http://www.opengis.net/def/profile/OGC/0/ogc-results>`` header to responses
+  when a corresponding ``Prefer`` header profile is requested for the `Job` results representation as `JSON`
+  (resolves `#853 <https://github.com/crim-ca/weaver/issues/853>`_).
 
 Fixes:
 ------

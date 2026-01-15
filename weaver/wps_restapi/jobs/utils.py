@@ -768,7 +768,10 @@ def get_job_results_response(
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
     profile = get_response_profile(request, request_headers)
-    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+    is_doc_results = (
+        profile and
+        ogc_def.normalize(profile, version="0") == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+    )
 
     # document/minimal response, unless explicitly requested by profile content negotiation
     if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
@@ -808,6 +811,17 @@ def get_job_results_response(
             headers.update([
                 ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URI}\"")
             ])
+            # indicate applied preference profile if it was explicitly requested
+            applied = headers.get("Preference-Applied", "")
+            prefer = (
+                get_header("Prefer", request_headers or {}) or
+                get_header("Prefer", request) if request else ""
+            )
+            prefer_profile = get_response_profile(request_headers={"Prefer": prefer})
+            if prefer_profile:
+                applied += "; " if applied else ""
+                applied += f"profile=<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"
+                headers["Preference-Applied"] = applied
         return HTTPOk(json=results_json, headers=headers)
 
     if not results:  # avoid schema validation error if all by reference

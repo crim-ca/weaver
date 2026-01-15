@@ -680,8 +680,8 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
-def get_response_profile(request, request_headers=None):
-    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+def get_response_profile(request=None, request_headers=None):
+    # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer]) -> Optional[str]
     """
     Obtains the desired response profile based on request parameters.
 
@@ -704,16 +704,18 @@ def get_response_profile(request, request_headers=None):
     :param request_headers: Additional headers to consider for profile extraction.
     :return: Matched profile value if found.
     """
-    query_params = get_request_args(request)
+    query_params = get_request_args(request) if request else {}
     profile_query = query_params.get("profile")
     if profile_query:
         return profile_query or None
 
     headers = {}
-    if hasattr(request, "headers"):
+    if request and hasattr(request, "headers"):
         headers.update(request.headers)
     if request_headers:
         headers.update(request_headers)
+    if not headers:
+        return None
 
     content_profile = get_header("Accept-Profile", headers)
     if content_profile:
@@ -728,6 +730,8 @@ def get_response_profile(request, request_headers=None):
             pair_sep=";",
             nested_pair_sep=None,
             accumulate_keys=False,
+            unescape_quotes=True,
+            strip_spaces=True,
         )
         content_profile = content_params.get("profile")
         if content_profile:
