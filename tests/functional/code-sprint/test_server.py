@@ -24,7 +24,7 @@ from pytest_dependency import depends
 from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
 from weaver import ogc_definitions as ogc_defs
 from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
-from weaver.execute import ExecuteControlOption
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
 from weaver.status import Status
 
@@ -237,7 +237,12 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
         # Build minimal execute request
         execute_inputs = process_execute_body.get("inputs", {})
-        execute_result = self.client.execute(process_id, inputs=execute_inputs)  # FIXME: request sync
+        execute_result = self.client.execute(
+            process_id,
+            inputs=execute_inputs,
+            execute_mode=ExecuteMode.SYNC,
+            execute_return=ExecuteReturnPreference.MINIMAL,
+        )
         assert execute_result.code in (200, 201)
         assert execute_result.headers.get("Content-Type", "").startswith("application/json")
         results = execute_result.body

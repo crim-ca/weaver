@@ -173,6 +173,12 @@ class ProcessInstanceError(HTTPInternalServerError, OWSNoApplicableCode, Process
     """
 
 
+class ProcessInvalidParameter(HTTPBadRequest, OWSInvalidParameterValue, ProcessException):
+    """
+    Error related to an invalid parameter not respecting a :term:`Process` description.
+    """
+
+
 class JobException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Job`.

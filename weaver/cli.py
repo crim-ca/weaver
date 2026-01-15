@@ -24,7 +24,13 @@ from yaml.scanner import ScannerError
 from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import AuthenticationError, PackageRegistrationError
-from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteReturnPreference, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode,
+    resolve_execution_parameters
+)
 from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
@@ -1429,6 +1435,8 @@ class WeaverClient(object):
         timeout=None,           # type: Optional[int]
         interval=None,          # type: Optional[int]
         subscribers=None,       # type: Optional[JobSubscribers]
+        execute_mode=None,      # type: Optional[ExecuteMode]
+        execute_return=None,    # type: Optional[ExecuteReturnPreference]
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1454,15 +1462,35 @@ class WeaverClient(object):
         All values should be provided directly under the key (including arrays), except for ``File`` type that must
         include details as the ``class: File`` and ``path`` with location.
 
-        .. seealso::
-            - :ref:`proc_op_execute`
-            - :ref:`exec_output_location`
+        .. warning::
+            Execution requests are accomplished *asynchronously* by default, unless unsupported
+            by the target :term:`Process` as indicated in its description response. This offers more flexibility over
+            servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection errors
+            of the request that could occur for long-running processes, since :term:`Job` status is pooled iteratively
+            rather than waiting over a single long request. It also limits the amount of data transferred in the
+            response, allows better recovery from connection interruptions, and reduces the complexity of handling
+            different response formats as in the case of *synchronous* execution.
+
+            To obtain the final :term:`Job` status as if the :term:`Process` execution was submitted synchronously
+            (although submitted *asynchronously* to the server), provide the :paramref:`monitor` argument with ``True``.
 
         .. note::
-            Execution requests are always accomplished asynchronously. To obtain the final :term:`Job` status as if
-            they were executed synchronously, provide the :paramref:`monitor` argument. This offers more flexibility
-            over servers that could decide to ignore sync/async preferences, and avoids closing/timeout connection
-            errors that could occur for long-running processes, since status is pooled iteratively rather than waiting.
+            To actually submit the execution request as *synchronous*, provide the :paramref:`execute_mode` argument
+            with :attr:`weaver.process.execute.ExecuteMode.SYNC`. However, this mode is not guaranteed to be supported
+            by the target :term:`Process`, and could lead to the request falling back to *asynchronous* execution.
+            This execution mode is still subject to connection timeouts imposed by the remote server. Consider
+            increasing :paramref:`timeout` in such case if the server allows it, or revert to *asynchronous* using
+            the :paramref:`monitor` otherwise.
+
+        .. warning::
+            Due to the nature of *synchronous* responses (different :term:`Media-Type` representations and contents,
+            see :ref:`proc_exec_results` details), the client cannot guarantee proper parsing of the response
+
+        .. seealso::
+            - :ref:`proc_exec_body`, :ref:`proc_exec_mode` and :ref:`proc_exec_results` documentation provides more
+              details regarding the execution request parameters and their resulting responses formats.
+            - :ref:`exec_output_location` provide additional consideration about output storage and retrieval.
+            - :ref:`proc_op_execute_subscribers` provides definitions about :term:`Job` execution subscribers.
 
         :param process_id: Identifier of the local or remote process to execute.
         :param provider_id: Identifier of the provider from which to locate a remote process to execute.
@@ -1484,6 +1512,10 @@ class WeaverClient(object):
         :param subscribers:
             Job status subscribers to obtain email or callback request notifications.
             The subscriber keys indicate which type of subscriber and for which status the notification will be sent.
+        :param execute_mode:
+            Preferred execution mode to request from the server if supported by the :term:`Process`.
+        :param execute_return:
+            Preferred execution return response to request from the server if supported by the :term:`Process`.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1523,10 +1555,7 @@ class WeaverClient(object):
             return result
         values, auth_headers = result
         exec_data = {
-            # NOTE: Backward compatibility for servers that only know ``mode`` and don't handle ``Prefer`` header.
-            "mode": ExecuteMode.ASYNC,
             "inputs": values,
-            "response": ExecuteResponse.DOCUMENT,
             "outputs": {},
         }
         if subscribers:
@@ -1537,23 +1566,45 @@ class WeaverClient(object):
         LOGGER.debug("Looking up process [%s] (provider: %s) to execute on [%s]", process_id, provider_id, base)
         desc_url = self._get_process_url(url or base, process_id=process_id, provider_id=provider_id)
         result = self.describe(url=desc_url, process_id=process_id, provider_id=provider_id, auth=auth)
+        proc_desc = result.body
         if not result.success:
             return OperationResult(False, "Could not obtain process description for execution.",
-                                   body=result.body, headers=result.headers, code=result.code, text=result.text)
+                                   body=proc_desc, headers=result.headers, code=result.code, text=result.text)
 
         output_ids = list(result.body.get("outputs") or {})
         exec_data = self._prepare_outputs(
             exec_data,
             output_ids=output_ids,
             output_refs=output_refs,
+            # outputs_types=outputs_types,  # FIXME: https://github.com/crim-ca/weaver/pull/548
             output_filter=output_filter,
         )
 
+        # resolve execution methods based on parameters and process capabilities
+        exec_headers = {}
+        exec_headers.update(self._headers)
+        exec_headers.update(headers or {})
+        job_control_options = proc_desc.get("jobControlOptions") or []
+        exec_mode, exec_resp, exec_prefer_headers = resolve_execution_parameters(
+            job_control_options,
+            exec_headers,
+            execute_mode=execute_mode,
+            execute_return=execute_return,
+            execute_max_wait=timeout,
+        )
+        LOGGER.debug(
+            "Resolved execution parameters: mode=[%s], response=[%s], prefer=[%s]",
+            exec_mode, exec_resp, exec_prefer_headers
+        )
+        # NOTE: Backward compatibility for servers that only know ``mode``/``response`` rather than ``Prefer`` header.
+        exec_data.setdefault("mode", exec_mode)
+        exec_data.setdefault("response", exec_resp)  # maybe overridden by output transmission mode during preparation
+        exec_headers = exec_prefer_headers  # for more recent servers, OGC-API compliant async request
+        exec_headers.update(auth_headers)
+        exec_headers.update(self._headers)
+
         LOGGER.info("Executing [%s] with inputs:\n%s", process_id, OutputFormat.convert(values, OutputFormat.JSON_STR))
         exec_url = f"{desc_url}/execution"  # use OGC-API compliant endpoint (not '/jobs')
-        exec_headers = {"Prefer": "respond-async"}  # for more recent servers, OGC-API compliant async request
-        exec_headers.update(self._headers)
-        exec_headers.update(auth_headers)
         if output_context:
             exec_headers["X-WPS-Output-Context"] = str(output_context)
         if pending:
