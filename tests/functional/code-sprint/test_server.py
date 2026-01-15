@@ -27,6 +27,7 @@ from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
 from weaver.status import Status
+from weaver.utils import get_any_value
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON
@@ -136,8 +137,8 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert result.code == 200
         links = result.body.get("links", [])
         rel_by_name = {link.get("rel"): link for link in links}
-        assert f"http://www.opengis.net/def/rel/ogc/1.0/conformance" in rel_by_name
-        assert f"http://www.opengis.net/def/rel/ogc/1.0/processes" in rel_by_name
+        assert "http://www.opengis.net/def/rel/ogc/1.0/conformance" in rel_by_name
+        assert "http://www.opengis.net/def/rel/ogc/1.0/processes" in rel_by_name
 
     @pytest.mark.dependency(name="test_conformance_classes_core")
     def test_conformance_classes_core(self):
@@ -233,7 +234,13 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             if proc.get("id") in [TEST_SERVER_OAP_CORE_PROCESS_ID, "echo", "Echo", "EchoProcess"]
         ]
         assert process_echo, "No process available to test execution."
-        process_id = process_echo[0].get("id")
+        process_desc = self.client.describe(process_echo[0]["id"]).body
+        process_id = process_desc.get("id")
+        process_outputs = process_desc.get("outputs", {})
+        assert process_outputs, (
+            f"No outputs defined for process [{process_id}]. "
+            "Cannot test execution result without at least one."
+        )
 
         # Build minimal execute request
         execute_inputs = process_execute_body.get("inputs", {})
@@ -243,17 +250,23 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             execute_mode=ExecuteMode.SYNC,
             execute_return=ExecuteReturnPreference.MINIMAL,
         )
-        assert execute_result.code in (200, 201)
-        assert execute_result.headers.get("Content-Type", "").startswith("application/json")
+        assert execute_result.code == 200, "Execution should be successful and immediately executed synchronously"
+        assert execute_result.headers.get("Content-Type", "").startswith(ContentType.APP_JSON)
         results = execute_result.body
-        assert "outputs" in results
-        assert results["outputs"], "At least one output expected"
+        assert set(process_outputs) == set(results)
+        assert all(
+            get_any_value(results[out_id])
+            if isinstance(results[out_id], dict)
+            else isinstance(results[out_id], (bool, int, float, str))
+            for out_id in process_outputs
+        )
 
     @pytest.mark.dependency(
         name="test_job_status",
         depends=["test_process_description"],
     )
     def test_job_status(self, process_execute_body, openapi_job_status):
+        process_id = TEST_SERVER_OAP_CORE_PROCESS_ID
         execute_inputs = process_execute_body.get("inputs", {})
         execute_result = self.client.execute(
             process_id,
@@ -368,7 +381,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
             ]
         }
         headers = {"Content-Type": ContentType.APP_OGC_PKG_JSON}
-        result = self.client.deploy(process_id=process_id, body=ogc_app_pkg, headers=headers)
+        result = self.client.deploy(process_id=process_id, body=body, headers=headers)
         assert result.code == 200
         location = result.headers.get("Location")
         assert location
@@ -414,9 +427,12 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_ogcapppkg"],
     )
     def test_retrieve_application_package_ogcapppkg(self):
-        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
+        mutable_proc = (
+            p for p in self.processes
+            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+        )
         assert mutable_proc, "No mutable process found."
-        process_id = mutable_proc["id"]
+        process_id = next(mutable_proc)["id"]
         pkg_response = self.client.package(process_id)
         assert pkg_response.code == 200
         content_type = pkg_response.headers.get("Content-Type", "")
@@ -438,9 +454,12 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_cwl"],
     )
     def test_retrieve_application_package_cwl(self):
-        mutable_proc = next((p for p in self.processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
+        mutable_proc = (
+            p for p in self.processes
+            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+        )
         assert mutable_proc, "No mutable process found."
-        process_id = mutable_proc["id"]
+        process_id = next(mutable_proc)["id"]
         pkg_response = self.client.package(process_id)
         assert pkg_response.code == 200
         content_type = pkg_response.headers.get("Content-Type", "")

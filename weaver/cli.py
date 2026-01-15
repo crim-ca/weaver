@@ -101,6 +101,7 @@ if TYPE_CHECKING:
         # avoid linter issue
         pass
     try:
+        from weaver.execute import AnyExecuteMode, AnyExecuteReturnPreference
         from weaver.formats import AnyOutputFormat
         from weaver.processes.constants import ProcessSchemaType
         from weaver.status import AnyStatusSearch
@@ -1435,8 +1436,8 @@ class WeaverClient(object):
         timeout=None,           # type: Optional[int]
         interval=None,          # type: Optional[int]
         subscribers=None,       # type: Optional[JobSubscribers]
-        execute_mode=None,      # type: Optional[ExecuteMode]
-        execute_return=None,    # type: Optional[ExecuteReturnPreference]
+        execute_mode=None,      # type: Optional[AnyExecuteMode]
+        execute_return=None,    # type: Optional[AnyExecuteReturnPreference]
         url=None,               # type: Optional[str]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
@@ -1592,7 +1593,7 @@ class WeaverClient(object):
             execute_return=execute_return,
             execute_max_wait=timeout,
         )
-        LOGGER.debug(
+        LOGGER.info(
             "Resolved execution parameters: mode=[%s], response=[%s], prefer=[%s]",
             exec_mode, exec_resp, exec_prefer_headers
         )
@@ -3039,7 +3040,7 @@ class ValidateSettingAction(argparse._AppendAction):  # noqa: W0212
                 name = match["name"].replace("-", "_").lower()
                 settings.append((name, value))
         setattr(namespace, self.dest, settings)
-    
+
 
 class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
     """

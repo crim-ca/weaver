@@ -22,7 +22,7 @@ from pyramid.httpexceptions import (
 from pyramid_celery import celery_app as app
 from werkzeug.wrappers.request import Request as WerkzeugRequest
 
-from weaver import ogc_definitions as ogc_def 
+from weaver import ogc_definitions as ogc_def
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import JobExecutionError, WeaverExecutionError
