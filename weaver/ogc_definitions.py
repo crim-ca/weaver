@@ -46,7 +46,7 @@ def normalize(uri: str, version: Optional[str] = None, secure: bool = False) -> 
     uri = uri.rstrip("/")
     uri = uri.replace("http://", "https://") if secure else uri.replace("https://", "http://")
     parts = uri.rsplit("/", 2)
-    if parts[-2] != version:
+    if len(parts) > 1 and parts[-2] != version:
         uri = f"{parts[0]}/{version}/{parts[2]}"
     return uri
 

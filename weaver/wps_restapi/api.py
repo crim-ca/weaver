@@ -288,7 +288,11 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-minimal",
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-representation",
         f"{ogcapi_proc_core1}/per/core/job-results-async-many-other-formats",
-        f"{ogcapi_proc_core2}/req/core/job-results-exception/results-not-available",
+        f"{ogcapi_proc_core2}/req/core/job-results-exception-results-not-available",
+        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
+        #   see https://github.com/opengeospatial/ogcapi-processes/pull/531
+        #   when the requested outputID is not present within available results (originally requested)
+        # f"{ogcapi_proc_core2}/req/core/job-results-exception-no-such-output",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-none",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-minimal",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-representation",
@@ -317,8 +321,8 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/core/http",
         f"{ogcapi_proc_core1}/req/core/job",
         f"{ogcapi_proc_core1}/req/core/job-exception-no-such-job",
-        f"{ogcapi_proc_core1}/req/core/job-results-exception/no-such-job",
-        f"{ogcapi_proc_core1}/req/core/job-results-exception/results-not-ready",
+        f"{ogcapi_proc_core1}/req/core/job-results-exception-no-such-job",
+        f"{ogcapi_proc_core1}/req/core/job-results-exception-results-not-ready",
         f"{ogcapi_proc_core1}/req/core/job-results-failed",
         f"{ogcapi_proc_core1}/req/core/job-results",
         f"{ogcapi_proc_core1}/req/core/job-results-async-document",

@@ -87,7 +87,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -807,10 +807,6 @@ def get_job_results_response(
             ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
         ])
         if is_doc_results:
-            # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
-            headers.update([
-                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URI}\"")
-            ])
             # indicate applied preference profile if it was explicitly requested
             applied = headers.get("Preference-Applied", "")
             prefer = (
@@ -822,7 +818,10 @@ def get_job_results_response(
                 applied += "; " if applied else ""
                 applied += f"profile=<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"
                 headers["Preference-Applied"] = applied
-        return HTTPOk(json=results_json, headers=headers)
+
+        # avoid duplicate content-type header due to how pyramid response handles it
+        ctype = get_header("Content-Type", headers, pop=True)
+        return HTTPOk(json=results_json, headers=headers, content_type=ctype)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
@@ -926,6 +925,8 @@ def generate_or_resolve_result(
             url = os.path.join(wps_out_url, url[1:])
         if url.startswith(wps_out_url):
             loc = map_wps_output_location(url, settings, exists=True, url=False)
+            if not loc:
+                raise_job_result_gone(job, settings)
             loc = get_secure_path(loc)
         else:
             loc = url  # remote storage, S3, etc.
@@ -1455,7 +1456,7 @@ def raise_job_bad_status_success(job, container=None):
                 }
             )
 
-        # /req/core/job-results-exception/results-not-ready
+        # /req/core/job-results-exception-results-not-ready
         # must use OWS instead of HTTP class to preserve provided JSON body
         # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
         raise OWSNotFound(
@@ -1469,6 +1470,28 @@ def raise_job_bad_status_success(job, container=None):
                 "links": links
             }
         )
+
+
+def raise_job_result_gone(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> NoReturn
+    """
+    Raise a messages indicating that results of an existing and successful :term:`Job` are gone.
+    """
+    settings = get_settings(container)
+    job_links = job.links(settings, self_link="results")
+    job_links = [link for link in job_links if link["rel"] in ["status", "collection", "up", "results"]]
+    headers = [("Link", make_link_header(link)) for link in job_links]
+    raise JobGone(
+        headers=headers,
+        json={
+            "title": "JobResultGone",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+            "status": JobGone.code,
+            "detail": "One or more output data references in Job Results cannot be found.",
+            "value": str(job.id),
+            "links": job_links
+        }
+    )
 
 
 def raise_job_dismissed(job, container=None):

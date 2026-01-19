@@ -33,10 +33,17 @@ Changes:
 - Add ``Preference-Applied: profile=<http://www.opengis.net/def/profile/OGC/0/ogc-results>`` header to responses
   when a corresponding ``Prefer`` header profile is requested for the `Job` results representation as `JSON`
   (resolves `#853 <https://github.com/crim-ca/weaver/issues/853>`_).
+- Add ``http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available`` error with HTTP 410
+  for ``../jobs/{jobID}/results`` responses if one of the `Job` result files has been detected as removed from cleanup.
+  This case happens only if the `Job` itself is still available and successful, but its results have been deleted.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` response
+  of `Job` results requesting this profile to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` header to determine if this profile was applied.
 
 Fixes:
 ------
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
+- Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
 
 .. _changes_6.8.1:
 

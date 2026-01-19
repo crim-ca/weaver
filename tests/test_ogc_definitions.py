@@ -6,6 +6,7 @@ from weaver import ogc_definitions as ogc_defs
 @pytest.mark.parametrize(
     ["input_uri", "expect_uri"],
     [
+        ("http://www.opengis.net/def/profile/OGC/0/ogc-results", "[ogc-profile:ogc-results]"),
         ("http://www.opengis.net/def/rel/ogc/1.0/process-desc", "[ogc-rel:process-desc]"),
         ("http://www.opengis.net/def/crs/OGC/0/CRS84h", "[ogc-crs:CRS84h]"),
         ("[ogc-rel:process-desc]", "[ogc-rel:process-desc]"),
