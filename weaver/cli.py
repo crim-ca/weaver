@@ -25,7 +25,6 @@ from weaver import __meta__
 from weaver.datatype import AutoBase
 from weaver.exceptions import AuthenticationError, PackageRegistrationError
 from weaver.execute import (
-    ExecuteMode,
     ExecuteResponse,
     ExecuteReturnPreference,
     ExecuteTransmissionMode,
@@ -75,6 +74,7 @@ if TYPE_CHECKING:
     # https://github.com/ashb/sphinx-argparse/issues/7
     try:
         from weaver.typedefs import (
+            URL,
             AnyHeadersContainer,
             AnyRequestMethod,
             AnyRequestType,
@@ -93,8 +93,7 @@ if TYPE_CHECKING:
             JobSubscribers,
             JobValueFile,
             JSON,
-            SettingsType,
-            URL,
+            SettingsType
         )
     except ImportError:
         # pylint: disable=C0103,invalid-name

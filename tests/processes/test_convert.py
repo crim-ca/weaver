@@ -28,7 +28,7 @@ from pywps.validator.mode import MODE
 
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
-from weaver import ogc_definitions as ogc_def, xml_util
+from weaver import xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
     DEFAULT_FORMAT,
@@ -95,7 +95,7 @@ from weaver.utils import null
 from weaver.wps_restapi.swagger_definitions import (
     OGC_API_PROC_BBOX_CRS,
     OGC_API_PROC_BBOX_FORMAT,
-    OGC_API_PROC_BBOX_SCHEMA,
+    OGC_API_PROC_BBOX_SCHEMA
 )
 
 if TYPE_CHECKING:

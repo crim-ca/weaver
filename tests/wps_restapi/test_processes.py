@@ -31,7 +31,7 @@ from tests.utils import (
     mocked_sub_requests,
     mocked_wps_output
 )
-from weaver import WEAVER_ROOT_DIR, ogc_definitions as ogc_def
+from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode

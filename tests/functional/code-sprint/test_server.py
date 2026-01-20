@@ -9,21 +9,21 @@ https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman
 """
 
 import os
-import pytest
-import requests
-import yaml
 import uuid
-import jsonschema
 import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
+import jsonschema
+import pytest
+import requests
+import yaml
 from pyramid.settings import asbool
 from pytest_dependency import depends
 
 from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
 from weaver import ogc_definitions as ogc_defs
-from weaver.cli import WeaverClient, ValidateAuthHandlerAction, parse_auth
+from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
 from weaver.status import Status
@@ -99,7 +99,7 @@ def depends_or(request, other, scope="module"):
             continue
         else:
             return
-    pytest.skip("%s depends on any of %s" % (item.name, ", ".join(other)))
+    pytest.skip(f"{item.name} depends on any of {', '.join(other)}")
 
 
 class ServerOGCAPIProcessesBase:

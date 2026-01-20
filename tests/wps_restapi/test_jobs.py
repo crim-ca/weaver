@@ -33,7 +33,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver import ogc_definitions as ogc_def
 from weaver.compat import Version
 from weaver.datatype import Job, Process, Service
 from weaver.execute import (

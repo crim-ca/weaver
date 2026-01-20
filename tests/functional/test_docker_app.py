@@ -7,7 +7,7 @@ from owslib.wps import ComplexDataInput, WPSExecution
 
 from tests.functional.utils import WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
-from weaver import WEAVER_ROOT_DIR, ogc_definitions as ogc_def, xml_util
+from weaver import WEAVER_ROOT_DIR, xml_util
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentType
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER

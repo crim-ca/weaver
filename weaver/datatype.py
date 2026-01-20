@@ -37,7 +37,7 @@ from pywps.app import WPSRequest
 from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
-from weaver import ogc_definitions as ogc_def, xml_util
+from weaver import xml_util
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     ExecuteControlOption,

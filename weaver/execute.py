@@ -360,7 +360,7 @@ def resolve_execution_parameters(
         if exec_mode == ExecuteMode.SYNC:
             exec_headers["Prefer"] = f"wait={execute_max_wait}"
 
-    mode, wait, applied = parse_prefer_header_execute_mode(exec_headers, job_control_options, execute_max_wait)
+    mode, _, applied = parse_prefer_header_execute_mode(exec_headers, job_control_options, execute_max_wait)
     if exec_mode and mode != exec_mode:
         raise ProcessInvalidParameter(
             f"Requested execution mode '{exec_mode}' does not match supported modes: {job_control_options}."
