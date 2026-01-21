@@ -18,9 +18,9 @@ Fixes:
 ------
 - No change.
 
-.. _changes_6.9.0-dev2:
+.. _changes_6.9.0-dev3:
 
-`6.9.0-dev2 <https://github.com/crim-ca/weaver/tree/6.9.0-dev2>`_ (2026-01-15)
+`6.9.0-dev3 <https://github.com/crim-ca/weaver/tree/6.9.0-dev3>`_ (2026-01-21)
 ========================================================================
 
 Changes:
