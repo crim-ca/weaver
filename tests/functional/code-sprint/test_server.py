@@ -8,6 +8,8 @@ Definitions are based off the Test Suite Strawman located at:
 https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman
 """
 
+import glob
+import itertools
 import os
 import uuid
 import warnings
@@ -30,16 +32,28 @@ from weaver.status import Status
 from weaver.utils import get_any_value
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL, JSON
+    from weaver.typedefs import CWL, JSON, Path
 
 
 TEST_SERVER = os.getenv("TEST_SERVER")
 TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002")
+TEST_SERVER_REQUEST_TIMEOUT = int(os.getenv("TEST_SERVER_REQUEST_TIMEOUT", "5"))  # default match internal util timeout
 TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
 TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "echo")
 TEST_SERVER_OAP_DRU_PROCESS_ID = os.getenv("TEST_SERVER_OAP_DRU_PROCESS_ID", "test-echo")
+
+# bypass dependencies of certain tests known to fail a certain prerequisite
+TEST_SERVER_OAP_DRU_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_UNSUPPORTED", "false"))
 TEST_SERVER_OAP_OAS_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_OAS_UNSUPPORTED", "false"))
-TEST_SERVER_REQUEST_TIMEOUT = int(os.getenv("TEST_SERVER_REQUEST_TIMEOUT", "5"))  # default match internal util timeout
+TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED", "false")
+)
+TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED", "false")
+)
+TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED", "false")
+)
 
 
 def setup_client():
@@ -223,27 +237,35 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
         assert profile == profile_rel
 
-    # FIXME: more test variants, for async, preferences, N outputs, etc. to be added...
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED,
+        reason="Asynchronous process execution not supported by the test server.",
+    )
     @pytest.mark.dependency(
         name="test_sync_execute_all_outputs",
-        depends=["test_process_description_and_profile_link"],
+        depends=(
+            []
+            if TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED
+            else ["test_process_description_and_profile_link"]
+        ),
     )
-    def test_sync_execute_all_outputs(self, process_execute_body):
-        process_echo = [
-            proc for proc in self.processes
-            if proc.get("id") in [TEST_SERVER_OAP_CORE_PROCESS_ID, "echo", "Echo", "EchoProcess"]
-        ]
-        assert process_echo, "No process available to test execution."
-        process_desc = self.client.describe(process_echo[0]["id"]).body
-        process_id = process_desc.get("id")
+    @pytest.mark.parametrize(
+        "process_execute_json_file",
+        glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json"))
+    )
+    def test_sync_execute_all_outputs(self, process_execute_json_file):
+        """
+        Test synchronous execution for each discovered process execution of the test server.
+        """
+        body = load_resource(process_execute_json_file)
+        process_id = body.get("process") or TEST_SERVER_OAP_CORE_PROCESS_ID
+        process_desc = self.client.describe(process_id).body
         process_outputs = process_desc.get("outputs", {})
         assert process_outputs, (
             f"No outputs defined for process [{process_id}]. "
             "Cannot test execution result without at least one."
         )
-
-        # Build minimal execute request
-        execute_inputs = process_execute_body.get("inputs", {})
+        execute_inputs = body.get("inputs", {})
         execute_result = self.client.execute(
             process_id,
             inputs=execute_inputs,
@@ -251,7 +273,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             execute_return=ExecuteReturnPreference.MINIMAL,
             timeout=TEST_SERVER_REQUEST_TIMEOUT,
         )
-        assert execute_result.code == 200, "Execution should be successful and immediately executed synchronously"
+        assert execute_result.code == 200, f"Execution should be successful for {process_execute_json_file}"
         assert execute_result.headers.get("Content-Type", "").startswith(ContentType.APP_JSON)
         results = execute_result.body
         assert set(process_outputs) == set(results)
@@ -262,13 +284,40 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             for out_id in process_outputs
         )
 
-    @pytest.mark.dependency(
-        name="test_job_status",
-        depends=["test_process_description"],
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED,
+        reason="Asynchronous process execution not supported by the test server.",
     )
-    def test_job_status(self, process_execute_body, openapi_job_status):
-        process_id = TEST_SERVER_OAP_CORE_PROCESS_ID
-        execute_inputs = process_execute_body.get("inputs", {})
+    @pytest.mark.dependency(
+        name="test_job_results_async",
+        depends=(
+            []
+            if TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED
+            else ["test_process_description_and_profile_link"]
+        ),
+    )
+    @pytest.mark.parametrize(
+        ["process_execute_json_file", "result_profile"],
+        itertools.product(
+            glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json")),
+            [
+                None,
+                "http://www.opengis.net/def/profile/OGC/0/ogc-results",
+            ]
+        ),
+    )
+    def test_job_results_async(self, process_execute_json_file, result_profile):
+        # type: (Path, str) -> None
+        """
+        Test asynchronous execution for each discovered process execution of the test server.
+        """
+        body = load_resource(process_execute_json_file)
+        process_id = body.get("process") or TEST_SERVER_OAP_CORE_PROCESS_ID
+        process_desc = self.client.describe(process_id).body
+        process_outputs = process_desc.get("outputs", {})
+
+        # Async execute (no outputs/prefer args)
+        execute_inputs = body.get("inputs", {})
         execute_result = self.client.execute(
             process_id,
             inputs=execute_inputs,
@@ -276,43 +325,19 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             timeout=30,
             interval=2,
         )
-        assert execute_result.code in (200, 201)
-        status = execute_result.body
+        assert execute_result.success, f"Job execution failed or monitoring timed out: {execute_result.message}"
+        assert execute_result.code == 200
 
-        # Validate against the statusInfo.yaml schema
-        jsonschema.validate(instance=status, schema=openapi_job_status)
-        assert "status" in status
-        assert status["status"] == Status.SUCCEEDED
-
-    @pytest.mark.dependency(
-        name="test_job_results_async",
-        depends=["test_process_description"],
-    )
-    def test_job_results_async(self):
-        result = self.client.processes()
-        process_list = result.body.get("processes", [])
-        if not process_list:
-            pytest.fail("No processes available to test job results.")
-        process_id = process_list[0].get("id")
-        result = self.client.describe(process_id)
-        process_description = result.body
-        process_outputs = process_description.get("outputs", [])
-        # Async execute (no outputs/prefer args)
-        execute_result = self.client.execute(process_id, inputs={})
-        assert execute_result.code in (200, 201)
-        job_location = execute_result.headers.get("Location")
-        if not job_location:
-            job_location = execute_result.body.get("location")
-        assert job_location, "No job location provided in async response."
-        job_id = job_location.rstrip("/").split("/")[-1]
-        # Get job results (no public method, use _request)
-        results_url = f"{TEST_SERVER_BASE_URL}/jobs/{job_id}/results"
-        results_result = self.client.results(results_url)
-        assert results_result.code == 200
-        job_results_data = results_result.body
-        assert "outputs" in job_results_data
+        # validate job result
+        job_id = execute_result.body.get("id")
+        result = self.client.results(job_id, results_profile=result_profile, with_headers=True, with_links=True)
+        assert result.code == 200
+        if result_profile:
+            job_results_data = result.body
+            assert "outputs" in job_results_data
 
         # FIXME: no public method to get individual output, use _request
+        results_url = f"{TEST_SERVER_BASE_URL}/jobs/{job_id}/results"
         output_id = process_outputs[0].get("id")
         path = f"{results_url}/{output_id}"
         resp = self.client._request("GET", path)

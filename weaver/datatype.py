@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobProcessingEntityType,
     JobStatusType,
     ProcessSchema
 )
@@ -100,7 +101,7 @@ if TYPE_CHECKING:
         AnyExecuteTransmissionMode
     )
     from weaver.formats import AnyContentType
-    from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.constants import AnyJobProcessingEntityType, ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
     from weaver.quotation.status import AnyQuoteStatus
@@ -933,6 +934,11 @@ class Job(Base, LoggerHandler):
         self["process"] = process
 
     @property
+    def processing_entity_type(self):
+        # type: () -> AnyJobProcessingEntityType
+        return JobProcessingEntityType.OGC_API_PROCESSES
+
+    @property
     def type(self):
         # type: () -> str
         """
@@ -1656,6 +1662,20 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
+    def summary(self, validate=True, **kwargs):
+        # type: (bool, **JSON) -> JSON
+        job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
+            "jobID": self.id,
+            "processID": self.process,
+            "providerID": self.service,  # dropped by validator if not applicable
+            "type": self.type,
+            "status": map_status(self.status),
+            "processingEntityType": self.processing_entity_type,
+        }
+        job_json.update(**kwargs)
+        return sd.JobSummary().deserialize(job_json) if validate else job_json
+
     def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
@@ -1667,9 +1687,11 @@ class Job(Base, LoggerHandler):
         """
         settings = get_settings(container) if container else {}
         job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
             "jobID": self.id,
             "processID": self.process,
             "providerID": self.service,
+            "processingEntityType": self.processing_entity_type,
             "type": self.type,
             "title": self.title,
             "status": map_status(self.status),

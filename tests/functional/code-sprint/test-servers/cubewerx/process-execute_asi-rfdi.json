@@ -1,0 +1,14 @@
+{
+  "process": "https://www.pvretano.com/cubewerx/cubeserv/default/ogcapi/processing/processes/asi.RFDI",
+  "inputs": {
+    "product": [
+      {
+        "href": "https://www.pvretano.com/repositories/tep_demo/rcm/RCM1_OK1943578_PK2106665_1_SC50MA_20220530_095150_HH_HV_GRD/"
+      },
+      {
+        "href": "https://www.pvretano.com/repositories/tep_demo/rcm/RCM1_OK1951017_PK2106654_1_SC50MC_20220530_095004_HH_HV_GRD/"
+      }
+    ],
+    "applyColormap": true
+  }
+}

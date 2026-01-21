@@ -851,7 +851,7 @@ class WeaverClient(object):
         .. note::
             This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
-        :param provider_id: Identifier to employ for registering the new :term:`Provider`.
+        :param provider_id: Identifier or :term:`URI` to employ for registering the new :term:`Provider`.
         :param provider_url: Endpoint location to register the new remote :term:`Provider`.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
@@ -893,7 +893,7 @@ class WeaverClient(object):
         .. note::
             This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
-        :param provider_id: Identifier to employ for unregistering the :term:`Provider`.
+        :param provider_id: Identifier or :term:`URI` to employ for unregistering the :term:`Provider`.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1028,7 +1028,7 @@ class WeaverClient(object):
         """
         Undeploy an existing :term:`Process`.
 
-        :param process_id: Identifier of the process to undeploy.
+        :param process_id: Identifier or :term:`URI` of the process to undeploy.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1145,8 +1145,8 @@ class WeaverClient(object):
         .. seealso::
             :ref:`proc_op_describe`
 
-        :param process_id: Identifier of the local or remote process to describe.
-        :param provider_id: Identifier of the provider from which to locate a remote process to describe.
+        :param process_id: Identifier or :term:`URI` of the local or remote process to describe.
+        :param provider_id: Identifier or :term:`URI` of the provider from which to locate a remote process to describe.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1178,7 +1178,11 @@ class WeaverClient(object):
     def _get_process_url(self, url, process_id, provider_id=None):
         # type: (str, str, Optional[str]) -> str
         base = self._get_url(url)
+        if "/processes/" in process_id:
+            process_id = process_id.rsplit("/processes/", 1)[-1].split("/", 1)[0]
         if provider_id:
+            if "/providers/" in provider_id:
+                provider_id = provider_id.rsplit("/providers/", 1)[-1].split("/", 1)[0]
             path = f"{base}/providers/{provider_id}/processes/{process_id}"
         else:
             path = f"{base}/processes/{process_id}"
@@ -1203,8 +1207,8 @@ class WeaverClient(object):
         .. note::
             This operation is specific to `Weaver`. It is not supported by standard :term:`OGC API - Processes`.
 
-        :param process_id: Identifier of the local or remote process to describe.
-        :param provider_id: Identifier of the provider from which to locate a remote process to describe.
+        :param process_id: Identifier or :term:`URI` of the local or remote process to describe.
+        :param provider_id: Identifier or :term:`URI` of the provider from which to locate a remote process to describe.
         :param url: Instance URL if not already provided during client creation.
         :param auth:
             Instance authentication handler if not already created during client creation.
@@ -1492,8 +1496,8 @@ class WeaverClient(object):
             - :ref:`exec_output_location` provide additional consideration about output storage and retrieval.
             - :ref:`proc_op_execute_subscribers` provides definitions about :term:`Job` execution subscribers.
 
-        :param process_id: Identifier of the local or remote process to execute.
-        :param provider_id: Identifier of the provider from which to locate a remote process to execute.
+        :param process_id: Identifier or :term:`URI` of the local or remote process to execute.
+        :param provider_id: Identifier or :term:`URI` of the provider from which to locate a remote process to execute.
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
             using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
@@ -2288,6 +2292,7 @@ class WeaverClient(object):
         with_headers=False,     # type: bool
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
+        results_profile=null,   # type: Union[Type[null], Optional[str]]
         output_format=None,     # type: Optional[AnyOutputFormat]
         output_links=None,      # type: Optional[Sequence[str]]
     ):                          # type: (...) -> OperationResult
@@ -2308,6 +2313,7 @@ class WeaverClient(object):
         :param with_headers: Indicate if response headers should be returned in result output.
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param results_profile: Alternate profile to request as HTTP Content-Negotiation of the results representation.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_links:
             Output IDs that are expected in ``Link`` headers, and that should be retrieved (or downloaded) as results.
@@ -2329,6 +2335,10 @@ class WeaverClient(object):
             "Accept": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
         })
+        if results_profile is null:
+            headers["Accept-Profile"] = sd.OGC_API_PROC_PROFILE_RESULTS_URI
+        elif results_profile:
+            headers["Accept-Profile"] = results_profile
         resp = self._request("GET", result_url,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)

@@ -1063,13 +1063,8 @@ def submit_job_dispatch_task(
             resp_headers.update(async_applied)
 
     LOGGER.debug("Celery task submitted to run async.")
-    body = {
-        "jobID": job.id,
-        "processID": job.process,
-        "providerID": job.service,  # dropped by validator if not applicable
-        "status": map_status(job.status),
-        "location": location_url,   # for convenience/backward compatibility, but official is Location *header*
-    }
+    # for convenience/backward-compatibility, add a 'location' property, but official is Location *header*
+    body = job.summary(location=location_url, validate=False)  # will be checked by following response function
     resp_headers = update_preference_applied_return_header(job, req_headers, resp_headers)
     resp = get_job_submission_response(body, resp_headers, response_class=response_class)
     return resp

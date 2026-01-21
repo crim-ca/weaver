@@ -111,6 +111,7 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
+    JobProcessingEntityType,
     JobStatusProfileSchema,
     JobStatusType,
     ProcessSchema
@@ -309,13 +310,17 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
-JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
-JOB_STATUS_FIELD_AFTER = [
+JOB_STATUS_FIELD_FIRST = [
+    "id",
     "jobID",
     "processID",
     "providerID",
+    "processingEntityType",
     "type",
     "status",
+]
+JOB_STATUS_FIELD_AFTER = [
+    "title",
     "message",
     "created",
     "started",
@@ -2348,6 +2353,14 @@ class JobTypeEnum(ExtendedSchemaNode):
     validator = OneOf(JobStatusType.values())
 
 
+class JobProcessingEntityTypeEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobProcessingEntityType"
+    default = null
+    example = JobProcessingEntityType.OGC_API_PROCESSES
+    validator = OneOf(JobProcessingEntityType.values())
+
+
 class JobTitle(ExtendedSchemaNode):
     schema_type = String
     description = "Title assigned to the job for user-readable identification."
@@ -3906,19 +3919,25 @@ class JobProcess(AnyOfKeywordSchema):
     ]
 
 
-class JobStatusInfo(ExtendedMappingSchema):
-    _schema = OGC_API_SCHEMA_JOB_STATUS_URI
-    _sort_first = JOB_STATUS_FIELD_FIRST
-    _sort_after = JOB_STATUS_FIELD_AFTER
-
+class JobSummary(ExtendedMappingSchema):
+    id = JobID()
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
+    processingEntityType = JobProcessingEntityTypeEnum(missing=None,  # allowed omit for backward compatibility
+                                                       description="Represents the entity that executed the job.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
     title = JobTitle(missing=drop)
     status = JobStatusEnum(description="Last updated status.")
+
+
+class JobStatusInfo(JobSummary):
+    _schema = OGC_API_SCHEMA_JOB_STATUS_URI
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
                                  description="Timestamp when the process execution job was created.")
@@ -3941,9 +3960,9 @@ class JobStatusInfo(ExtendedMappingSchema):
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will be prompted for updated status details.")
-    percentCompleted = Number(example=0, validator=Range(min=0, max=100),
+    percentCompleted = Number(example=0, validator=Range(min=0, max=100), missing=drop,
                               description="Completion percentage of the job as indicated by the process.")
-    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
+    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100), missing=drop,
                                   description="Completion progress of the job (alias to 'percentCompleted').")
     process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
@@ -3963,7 +3982,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusSchema(DescriptionSchema):
+class CreatedJobStatusSchema(JobSummary, DescriptionSchema):
     jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)

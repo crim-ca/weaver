@@ -1,0 +1,8 @@
+{
+  "process": "https://www.pvretano.com/cubewerx/cubeserv/default/ogcapi/processing/processes/dsi",
+  "inputs": {
+    "product": {
+      "href": "https://www.pvretano.com/repositories/tep_demo/radarsat/RS2_OK95449_IK624854_PEK008721491_OSVN_20180318_223433_VV_VH_SCF/"
+    }
+  }
+}

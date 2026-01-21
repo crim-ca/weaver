@@ -28,8 +28,10 @@ Changes:
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
 - Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.
+- Allow ``WeaverClient`` and the `CLI` to accept `Process` and `Provider` IDs as their full URI.
 - Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions`` module.
   This module also provides utilities to allow conversion between various equivalent representations of the definitions.
+- Add ``processingEntityType`` (always ``ogc-api-processes`` in this case) and ``id`` to `Job` response for conformance.
 - Add ``Preference-Applied: profile=<http://www.opengis.net/def/profile/OGC/0/ogc-results>`` header to responses
   when a corresponding ``Prefer`` header profile is requested for the `Job` results representation as `JSON`
   (resolves `#853 <https://github.com/crim-ca/weaver/issues/853>`_).
