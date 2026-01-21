@@ -32,6 +32,7 @@ Changes:
 - Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions`` module.
   This module also provides utilities to allow conversion between various equivalent representations of the definitions.
 - Add ``processingEntityType`` (always ``ogc-api-processes`` in this case) and ``id`` to `Job` response for conformance.
+- Add ``Content-Profile: http://www.opengis.net/def/profile/OGC/0/ogc-process-list`` to ``/processes`` response headers.
 - Add ``Preference-Applied: profile=<http://www.opengis.net/def/profile/OGC/0/ogc-results>`` header to responses
   when a corresponding ``Prefer`` header profile is requested for the `Job` results representation as `JSON`
   (resolves `#853 <https://github.com/crim-ca/weaver/issues/853>`_).

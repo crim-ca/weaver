@@ -160,6 +160,7 @@ def get_processes(request):
             ("Link", make_link_header(link))
             for link in body["links"]
         ])
+        request.response.headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
         return Box(body)
 
     except ServiceException as exc:
