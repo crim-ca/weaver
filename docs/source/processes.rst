@@ -415,11 +415,23 @@ The request body requires mainly two components:
 
 - | ``processDescription``:
   | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
-    This mostly corresponds to information that is provided by traditional :term:`WPS`
-    or :term:`OGC API - Processes` definitions.
+    This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
+    following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
+    such as a :term:`Media-Type` or :ref:`file-format` not explicitly handled by :term:`CWL`.
+
+    .. seealso::
+        Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
+        could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
+
 - | ``executionUnit``:
   | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
     or other :ref:`proc_types` references that indicates how to execute the underlying application.
+
+.. note::
+    If the :term:`Process` can be directly represented and converted from the :term:`CWL` with regard to
+    all :ref:`cwl-wps-mapping` considerations, the :term:`CWL` might be directly deployed with the
+    appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
 
 .. |app_pkg| replace:: Application Package
 .. _app_pkg: docs/source/package.rst
