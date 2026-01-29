@@ -144,7 +144,7 @@
 .. |ogc-api-proc-exec-outputs| replace:: *OGC API - Processes* - Execution Outputs
 .. _ogc-api-proc-exec-outputs: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs
 .. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
-.. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. _ogc-ets-weaver-impl-ref: https://portal.ogc.org/public_ogc/compliance/product.php?pid=1825
 .. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
 .. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
 .. _ogc-api-proc-profiles: https://docs.ogc.org/DRAFTS/18-062r3.html#profile-uris
