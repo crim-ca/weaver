@@ -418,7 +418,7 @@ The request body requires mainly two components:
     This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
     or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
     following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
-    such as a :term:`Media-Type` or :ref:`file-format` not explicitly handled by :term:`CWL`.
+    such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
 
     .. seealso::
         Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
