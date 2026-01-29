@@ -284,27 +284,71 @@ def test_parse_inputs_from_file():
             }
         ),
         (
+            # CWL remote directory reference
+            {
+                "in-dir": {
+                    "class": "Directory",
+                    "path": "https://fake.domain.com/test/",
+                },
+            },
+            {
+                "in-dir": {
+                    "href": "https://fake.domain.com/test/",
+                    "type": ContentType.APP_DIR,
+                },
+            }
+        ),
+        (
+            # OGC remote directory reference with explicit 'type' field
+            {
+                "in-dir": {
+                    "href": "https://fake.domain.com/test/",
+                    "type": ContentType.APP_DIR
+                },
+            },
+            {
+                "in-dir": {
+                    "href": "https://fake.domain.com/test/",
+                    "type": ContentType.APP_DIR,
+                },
+            }
+        ),
+        (
+            # CWL remote directory reference inferred from '/' suffix
+            {
+                "in-dir": {
+                    "href": "https://fake.domain.com/test/",
+                },
+            },
+            {
+                "in-dir": {
+                    "href": "https://fake.domain.com/test/",
+                    "type": ContentType.APP_DIR,
+                },
+            }
+        ),
+        (
             # OGC execution body with explicit 'inputs' to be interpreted as is
             {
                 "inputs": {
                     "in-1": {"value": "data"},
-                    "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                    "in-2": {"href": "https://fake.domain.com/some-file.json", "type": ContentType.APP_JSON},
                 },
             },
             {
                 "in-1": {"value": "data"},
-                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": ContentType.APP_JSON},
             }
         ),
         (
             # OGC execution mapping that must not be confused as a CWL mapping
             {
                 "in-1": {"value": "data"},
-                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": ContentType.APP_JSON},
             },
             {
                 "in-1": {"value": "data"},
-                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": "application/json"},
+                "in-2": {"href": "https://fake.domain.com/some-file.json", "type": ContentType.APP_JSON},
             }
         )
     ]
@@ -323,6 +367,19 @@ def test_parse_inputs(data_inputs, expect_inputs):
     assert result is mock_result
     assert len(inputs) == 1
     assert inputs[0] == expect_inputs
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize("data_inputs", [
+    {"href": "../some-local-dir/"},
+    {"href": "../some-local-dir/", "type": ContentType.APP_DIR},
+    {"href": "file:///tmp/some-local-dir/"},
+])
+def test_parse_inputs_unsupported_directory_upload(data_inputs):
+    result = WeaverClient(url="https://fake.domain.com").execute("fake_process", inputs=data_inputs)
+    assert result.success is False
+    assert result.code == 500
+    assert "Cannot upload local directory" in result.message
 
 
 @pytest.mark.cli
@@ -438,6 +495,7 @@ def mocked_auth_response(token_name, token_value, *_, **__):
     return resp
 
 
+@pytest.mark.cli
 def test_auth_handler_basic():
     req = WebTestRequest({})
     auth = BasicAuthHandler(username="test", password=str(uuid.uuid4()))
@@ -446,6 +504,7 @@ def test_auth_handler_basic():
     assert resp.headers["Authorization"].startswith("Basic")
 
 
+@pytest.mark.cli
 def test_auth_handler_bearer():
     req = WebTestRequest({})
     auth = BearerAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
@@ -459,6 +518,7 @@ def test_auth_handler_bearer():
     assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
 
 
+@pytest.mark.cli
 def test_auth_handler_bearer_explicit_token():
     req = WebTestRequest({})
     token = str(uuid.uuid4())
@@ -470,6 +530,7 @@ def test_auth_handler_bearer_explicit_token():
     assert resp.headers["Authorization"].startswith("Bearer") and resp.headers["Authorization"].endswith(token)
 
 
+@pytest.mark.cli
 def test_auth_handler_bearer_explicit_token_matches_request_token():
     req_explicit_token = WebTestRequest({})
     req_request_token = WebTestRequest({})
@@ -488,6 +549,7 @@ def test_auth_handler_bearer_explicit_token_matches_request_token():
     assert resp_explicit_token.headers["Authorization"] == resp_request_token.headers["Authorization"]
 
 
+@pytest.mark.cli
 def test_auth_handler_cookie():
     req = WebTestRequest({})
     auth = CookieAuthHandler(identity=str(uuid.uuid4()), url="https://example.com")
@@ -502,6 +564,7 @@ def test_auth_handler_cookie():
     assert resp.headers["Cookie"] == token
 
 
+@pytest.mark.cli
 def test_auth_handler_cookie_explicit_token_string():
     req = WebTestRequest({})
     token = str(uuid.uuid4())
@@ -514,6 +577,7 @@ def test_auth_handler_cookie_explicit_token_string():
     assert resp.headers["Cookie"] == token
 
 
+@pytest.mark.cli
 def test_auth_handler_cookie_explicit_token_mapping_single():
     req = WebTestRequest({})
     cookie_key = "auth_example"
@@ -528,6 +592,7 @@ def test_auth_handler_cookie_explicit_token_mapping_single():
     assert resp.headers["Cookie"] == f"{cookie_key}={cookie_value}"
 
 
+@pytest.mark.cli
 def test_auth_handler_cookie_explicit_token_mapping_multi():
     req = WebTestRequest({})
     token = {"auth_example": str(uuid.uuid4()), "auth_example2": str(uuid.uuid4())}
@@ -541,6 +606,7 @@ def test_auth_handler_cookie_explicit_token_mapping_multi():
     assert f"auth_example2={token['auth_example2']}" in resp.headers["Cookie"].split("; ")
 
 
+@pytest.mark.cli
 def test_auth_handler_cookie_explicit_token_matches_request_token():
     req_explicit_token = WebTestRequest({})
     req_request_token = WebTestRequest({})
@@ -559,6 +625,7 @@ def test_auth_handler_cookie_explicit_token_matches_request_token():
     assert resp_explicit_token.headers["Cookie"] == resp_request_token.headers["Cookie"]
 
 
+@pytest.mark.cli
 def test_auth_request_handler_no_url_or_token_init():
     with pytest.raises(AuthenticationError):
         BearerAuthHandler(identity=str(uuid.uuid4()))
@@ -570,6 +637,7 @@ def test_auth_request_handler_no_url_or_token_init():
         pytest.fail(msg=f"Expected no init error from valid combinations. Got [{exc}]")
 
 
+@pytest.mark.cli
 def test_auth_request_handler_no_url_ignored_request():
     req = WebTestRequest({})
     auth = BearerAuthHandler(
@@ -583,6 +651,7 @@ def test_auth_request_handler_no_url_ignored_request():
     assert not resp.headers, "No headers should have been added since URL could not be resolved."
 
 
+@pytest.mark.cli
 def test_upload_file_not_found():
     with tempfile.NamedTemporaryFile() as tmp_file_deleted:
         pass   # delete on close
@@ -706,6 +775,7 @@ def test_file_inputs_not_uploaded_to_vault():
     assert result is mock_result, "WeaverCLient.upload is expected to be called and should return a failed result."
 
 
+@pytest.mark.cli
 @pytest.mark.parametrize(
     ["expect_error", "subscriber_option", "subscriber_dest", "subscriber_value", "subscriber_result"],
     [
