@@ -314,7 +314,7 @@ def test_parse_inputs_from_file():
             }
         ),
         (
-            # CWL remote directory reference inferred from '/' suffix
+            # OGC remote "directory" reference with '/' suffix
             {
                 "in-dir": {
                     "href": "https://fake.domain.com/test/",
@@ -323,7 +323,7 @@ def test_parse_inputs_from_file():
             {
                 "in-dir": {
                     "href": "https://fake.domain.com/test/",
-                    "type": ContentType.APP_DIR,
+                    # NOTE: 'type' not injected for backward compatibility of servers using it as API request endpoint
                 },
             }
         ),
@@ -370,15 +370,18 @@ def test_parse_inputs(data_inputs, expect_inputs):
 
 
 @pytest.mark.cli
-@pytest.mark.parametrize("data_inputs", [
+@pytest.mark.parametrize("inputs_value", [
     {"href": "../some-local-dir/"},
     {"href": "../some-local-dir/", "type": ContentType.APP_DIR},
     {"href": "file:///tmp/some-local-dir/"},
+    {"path": "../some-local-dir/", "class": "Directory"},
+    {"path": "file:///tmp/some-local-dir/", "class": "Directory"},
 ])
-def test_parse_inputs_unsupported_directory_upload(data_inputs):
-    result = WeaverClient(url="https://fake.domain.com").execute("fake_process", inputs=data_inputs)
+def test_parse_inputs_unsupported_directory_upload(inputs_value):
+    inputs = {"test": inputs_value}
+    result = WeaverClient(url="https://fake.domain.com")._prepare_inputs(inputs=inputs)
     assert result.success is False
-    assert result.code == 500
+    assert result.code == 501
     assert "Cannot upload local directory" in result.message
 
 

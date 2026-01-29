@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Support `CLI` parsing of `CWL` ``Directory`` input value if provided using ``path`` with a remote reference URL.
+  Only remote references are supported since the `Vault` feature cannot be used to upload multiple files in a directory.
 
 Fixes:
 ------

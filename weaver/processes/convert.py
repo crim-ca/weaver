@@ -1863,16 +1863,18 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     :raises ValueError: if any input value could not be parsed with expected schema.
     :returns: converted inputs for :term:`Job` submission either in ``OGC`` or ``OLD`` format.
     """
-    def _get_file_input(input_data):
+    def _get_href_input(input_data):
         # type: (CWL_IO_FileValue) -> JobValueFile
-        input_file = {"href": input_data.get("path")}
+        input_href = {"href": input_data.get("path")}  # type: JobValueFile
         cwl_fmt_type = input_data.get("format")
         if isinstance(cwl_fmt_type, str):
             fmt = get_format(cwl_fmt_type)
             if "encoding" in input_data:
                 fmt.encoding = input_data["encoding"]  # type: ignore
-            input_file["format"] = fmt.json
-        return input_file
+            input_href["format"] = fmt.json
+        if input_data.get("class") == PACKAGE_DIRECTORY_TYPE:
+            input_href["type"] = ContentType.APP_DIR
+        return input_href
 
     if not isinstance(data, dict):
         data_type = fully_qualified_name(data)
@@ -1880,16 +1882,17 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
     inputs = {}
     for input_id, input_value in data.items():
         # single file
-        if isinstance(input_value, dict) and input_value.get("class") == PACKAGE_FILE_TYPE:
-            inputs[input_id] = _get_file_input(input_value)
+        if isinstance(input_value, dict) and input_value.get("class") in (PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE):
+            inputs[input_id] = _get_href_input(input_value)
         # single literal value
         elif isinstance(input_value, (str, int, float, bool)):
             inputs[input_id] = {"value": input_value}
         # multiple files
         elif isinstance(input_value, list) and all(
-            isinstance(val, dict) and val.get("class") == PACKAGE_FILE_TYPE for val in input_value
+            isinstance(val, dict) and val.get("class") in (PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE)
+            for val in input_value
         ):
-            inputs[input_id] = [_get_file_input(val) for val in input_value]
+            inputs[input_id] = [_get_href_input(val) for val in input_value]
         # multiple literal values
         elif isinstance(input_value, list) and all(
             isinstance(val, (str, int, float, bool)) for val in input_value
