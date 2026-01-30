@@ -20,7 +20,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, cast, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -152,6 +152,14 @@ if TYPE_CHECKING:
         "cache": NotRequired[bool],
         "cache_enabled": NotRequired[bool],
     }, total=False)
+    RequestOptionsConfigMatcher = TypedDict("RequestOptionsConfigMatcher", {
+        "url": Required[Union[str, List[str]]],
+        "method": NotRequired[Union[AnyRequestMethod, Literal["*"], List[Union[AnyRequestMethod, Literal["*"]]]]],
+    }, total=True)
+    RequestOptionsConfigEntry = Union[RequestOptions, RequestOptionsConfigMatcher]
+    RequestOptionsSpecification = TypedDict("RequestOptionsSpecification", {
+        "requests": List[RequestOptionsConfigEntry],
+    }, total=True)
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
 
@@ -672,8 +680,8 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
-def get_response_profile(request, request_headers=None):
-    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+def get_response_profile(request=None, request_headers=None):
+    # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer]) -> Optional[str]
     """
     Obtains the desired response profile based on request parameters.
 
@@ -696,16 +704,18 @@ def get_response_profile(request, request_headers=None):
     :param request_headers: Additional headers to consider for profile extraction.
     :return: Matched profile value if found.
     """
-    query_params = get_request_args(request)
+    query_params = get_request_args(request) if request else {}
     profile_query = query_params.get("profile")
     if profile_query:
         return profile_query or None
 
     headers = {}
-    if hasattr(request, "headers"):
+    if request and hasattr(request, "headers"):
         headers.update(request.headers)
     if request_headers:
         headers.update(request_headers)
+    if not headers:
+        return None
 
     content_profile = get_header("Accept-Profile", headers)
     if content_profile:
@@ -720,6 +730,8 @@ def get_response_profile(request, request_headers=None):
             pair_sep=";",
             nested_pair_sep=None,
             accumulate_keys=False,
+            unescape_quotes=True,
+            strip_spaces=True,
         )
         content_profile = content_params.get("profile")
         if content_profile:
@@ -1933,7 +1945,7 @@ def get_no_cache_option(request_headers, **cache_options):
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
     cache_params = ["cache", "cache_enabled"]
-    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
+    no_cache = no_cache is True or any(asbool(cache_options.get(cache, True)) is False for cache in cache_params)
     return no_cache
 
 
@@ -1961,21 +1973,21 @@ def get_request_options(method, url, settings):
         )
         return {}
     settings = get_settings(settings)  # ensure settings, could be any container
-    req_opts_specs = settings.get("weaver.request_options", None)
+    req_opts_specs = cast("RequestOptionsSpecification", settings.get("weaver.request_options", None))
     if not isinstance(req_opts_specs, dict):
         # empty request options is valid (no file specified),
         # but none pre-processed by app means the settings come from unexpected source
         LOGGER.warning("Settings container provided by [%s] missing request options specification. "
                        "Request might not be executed with expected configuration.", get_caller_name(skip=2))
         return {}
-    request_options = {}
+    request_options = cast("RequestOptions", {})
     request_entries = req_opts_specs.get("requests", []) or []
     for req_opts in request_entries:
         req_meth = req_opts.get("method", "")
         if req_meth:
-            methods = req_meth if isinstance(req_meth, list) else [req_meth]
+            methods = req_meth if isinstance(req_meth, list) else req_meth.split(",")
             methods = [meth.upper() for meth in methods]
-            if method.upper() not in methods:
+            if method.upper() not in methods and "*" not in methods:
                 continue
         req_urls = req_opts.get("url")
         req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls

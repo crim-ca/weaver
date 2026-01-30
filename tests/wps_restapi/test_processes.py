@@ -183,7 +183,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             process_id = self.fully_qualified_test_name()
         body = {
             "processDescription": {},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": []
         }
         meta = {
@@ -283,12 +283,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URI in profile[0]
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -740,12 +740,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URI in profile[0]
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_name()
@@ -1083,7 +1083,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         headers = {"Content-Type": content_type}
         desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, process_id, headers=headers, assert_io=False)
         pkg = self.get_application_package(process_id)
-        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+        assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
@@ -1180,11 +1180,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": unit,
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1224,7 +1224,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {"processDescription": {"process": ows_ctx}}  # optional 'executionUnit' since 'owsContext' has href
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1254,11 +1254,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": [{"unit": cwl}],
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1292,11 +1292,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": cwl,
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1330,11 +1330,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": {"unit": cwl, "type": ContentType.APP_CWL_JSON},
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1396,11 +1396,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": [{"unit": cwl}],
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
             assert desc["process"]["id"] == p_id
             assert pkg["hints"]["cwltool:CUDARequirement"] == cuda_requirements
             assert pkg["hints"]["DockerRequirement"] == docker_requirement
@@ -1433,11 +1433,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 body = {
                     "processDescription": {"process": {"id": p_id}},
                     "executionUnit": [{"unit": cwl}],
-                    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                    "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
                 }
                 desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
                 pkg = self.get_application_package(p_id)
-                assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+                assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
                 assert desc["process"]["id"] == p_id
                 assert pkg[req_type]["NetworkAccess"] == network_access_requirement
                 assert pkg[req_type]["DockerRequirement"] == docker_requirement
@@ -1489,7 +1489,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"unit": cwl}],
             # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -1551,7 +1551,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
                 "executionUnit": [{"href": tmp_href}],
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
             self.validate_wps1_package(
@@ -1614,7 +1614,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 }},
                 "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}],  # just to fulfill schema validation
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             ows_ctx = ows_context_href(tmp_http)
             body["processDescription"]["process"].update(ows_ctx)
@@ -1668,7 +1668,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             }},
             "executionUnit": [{"unit": cwl}],
             # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -1726,7 +1726,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -1786,7 +1786,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
@@ -1913,7 +1913,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         data = {
             "processDescription": {"process": {"id": "invalid-process:1.2.3"}},
             "executionUnit": [{"unit": cwl}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
         }
         resp = self.app.post_json("/processes", params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422]
@@ -2205,7 +2205,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "title": "Updated CWL"
             }},
             "executionUnit": [{"unit": cwl_v2}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
         }
         v2 = "2.0.0"  # not explicitly provided, expected resolved MAJOR update for revision
         resp = self.app.put_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
