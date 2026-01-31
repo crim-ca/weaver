@@ -1881,13 +1881,13 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
         raise TypeError(f"Invalid CWL input values format must be a dictionary of keys to values. Got [{data_type}].")
     inputs = {}
     for input_id, input_value in data.items():
-        # single file
+        # single file/dir
         if isinstance(input_value, dict) and input_value.get("class") in (PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE):
             inputs[input_id] = _get_href_input(input_value)
         # single literal value
         elif isinstance(input_value, (str, int, float, bool)):
             inputs[input_id] = {"value": input_value}
-        # multiple files
+        # multiple files/dirs
         elif isinstance(input_value, list) and all(
             isinstance(val, dict) and val.get("class") in (PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE)
             for val in input_value
