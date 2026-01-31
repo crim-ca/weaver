@@ -143,7 +143,7 @@ class OperationResult(AutoBase):
 
     def __init__(
         self,
-        success=None,   # type: Optional[bool]
+        success=False,  # type: bool
         message=None,   # type: Optional[str]
         body=None,      # type: Optional[Union[str, JSON]]
         headers=None,   # type: Optional[AnyHeadersContainer]
@@ -1282,8 +1282,13 @@ class WeaverClient(object):
                     continue
                 if href.startswith("file://"):
                     href = href[7:]
-                if os.path.isdir(href):
+                if "://" not in href and (
+                    os.path.isdir(href) or
+                    href.endswith("/") or
+                    data.get("type") == ContentType.APP_DIR
+                ):
                     return OperationResult(
+                        success=False,
                         message=f"Cannot upload local directory to vault: [{file}]. Aborting operation.",
                         title="Directory upload not implemented.",
                         code=HTTPNotImplemented.code,
@@ -1748,6 +1753,7 @@ class WeaverClient(object):
         file_path = os.path.abspath(os.path.expanduser(file_path))
         if os.path.isdir(file_path):
             return OperationResult(
+                success=False,
                 message=f"Cannot upload local directory to vault: [{file_path}]. Aborting operation.",
                 title="Directory upload not implemented.",
                 code=HTTPNotImplemented.code,
