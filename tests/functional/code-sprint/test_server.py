@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON, Path
 
 
-TEST_SERVER = os.getenv("TEST_SERVER")
+TEST_SERVER = os.getenv("TEST_SERVER") or ""
 TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002")
 TEST_SERVER_REQUEST_TIMEOUT = int(os.getenv("TEST_SERVER_REQUEST_TIMEOUT", "5"))  # default match internal util timeout
 TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
