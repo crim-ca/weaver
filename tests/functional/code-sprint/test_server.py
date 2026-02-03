@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """
 Tests for verifying the functionality of a web server implementing a *OGC API - Processes*.
 
