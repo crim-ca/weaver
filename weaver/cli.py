@@ -3835,7 +3835,7 @@ def main(*args):
         return 0
     url = kwargs.pop("url", None)
     auth = parse_auth(kwargs)
-    req_opts = cast("RequestOptions", dict(kwargs.pop("request_options", {})))
+    req_opts = cast("RequestOptions", dict(kwargs.pop("request_options", None) or {}))
     client = WeaverClient(url, auth=auth, request_options=req_opts)
     try:
         result = getattr(client, oper)(**kwargs)
