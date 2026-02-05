@@ -486,7 +486,7 @@ class TestWeaverClient(TestWeaverClientBase):
         inputs_param,           # type: Union[JSON, str]
         process="Echo",         # type: str
         preload=False,          # type: bool
-        location=False,         # type: Optional[str]
+        location=False,         # type: bool
         expect_success=True,    # type: bool
         expect_status=None,     # type: Optional[AnyStatusType]
         mock_exec=True,         # type: bool

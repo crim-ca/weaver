@@ -811,7 +811,7 @@ def get_job_results_response(
             applied = headers.get("Preference-Applied", "")
             prefer = (
                 get_header("Prefer", request_headers or {}) or
-                get_header("Prefer", request) if request else ""
+                get_header("Prefer", request.headers) if request else ""
             )
             prefer_profile = get_response_profile(request_headers={"Prefer": prefer})
             if prefer_profile:
