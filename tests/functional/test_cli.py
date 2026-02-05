@@ -1720,7 +1720,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:5])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):

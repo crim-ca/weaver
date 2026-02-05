@@ -2335,7 +2335,10 @@ class WeaverClient(object):
             "Accept": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
         })
-        if results_profile is null:
+        # if profile was omitted but outputs were explicitly requested as links,
+        # consider that the user intends to retrieve them as Link headers, and therefore
+        # the Results JSON response profile embedding outputs is not expected behaviour
+        if results_profile is null and not output_links:
             headers["Accept-Profile"] = sd.OGC_API_PROC_PROFILE_RESULTS_URI
         elif results_profile:
             headers["Accept-Profile"] = results_profile
