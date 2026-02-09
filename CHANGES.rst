@@ -17,7 +17,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
 
 .. _changes_6.8.1:
 

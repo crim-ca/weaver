@@ -2394,7 +2394,7 @@ def add_shared_options(parser):
     req_grp.add_argument(
         "-rT", "--request-timeout", dest="request_timeout", action=ValidateNonZeroPositiveNumberAction, type=int,
         default=5, help=(
-            "Maximum timout duration (seconds) to wait for a response when "
+            "Maximum timeout duration (seconds) to wait for a response when "
             "performing HTTP requests (default: %(default)ss)."
         )
     )
@@ -3267,25 +3267,23 @@ def make_parser():
         title=docker_auth_title,
         description=docker_auth_desc,
     )
-    op_deploy_token = op_deploy_group.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_creds = op_deploy_token.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_tkt = op_deploy_token.add_argument(
+    op_deploy_tkt = op_deploy_group.add_argument(
         "-T", "--token", dest="token",
         help="Authentication token to retrieve a Docker image reference from a protected registry during execution."
     )
-    op_deploy_usr = op_deploy_creds.add_argument(
+    op_deploy_usr = op_deploy_group.add_argument(
         "-U", "--username", dest="username",
         help="Username to compute the authentication token for Docker image retrieval from a protected registry."
     )
-    op_deploy_pwd = op_deploy_creds.add_argument(
+    op_deploy_pwd = op_deploy_group.add_argument(
         "-P", "--password", dest="password",
         help="Password to compute the authentication token for Docker image retrieval from a protected registry."
     )
-
     # when actions are evaluated for actual executions, conditional 'required' will consider them as options
     # when actions are printed in help, they will be considered required, causing ( ) to be added to form the
     # rendered group of *mutually required* arguments
-    parser.add_help_conditional(op_deploy_creds)
+    parser.add_help_conditional(op_deploy_group)
+
     # following adjust references in order to make arguments appear within sections/groups as intended
     op_deploy_mutex_usr_tkt = op_deploy_group.add_mutually_exclusive_group()
     op_deploy_mutex_usr_tkt._group_actions.append(op_deploy_usr)
