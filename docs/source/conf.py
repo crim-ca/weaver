@@ -468,6 +468,8 @@ linkcheck_ignore = [
     "https://pavics.ouranos.ca/weaver/",
     "https://redoak.cs.toronto.edu/weaver/",
     "https://pavics.climatedata.ca/",
+    # FIXME: openEO API direct link access error (https://github.com/Open-EO/openeo.org/issues/101)
+    "https://openeo.org/documentation/1.0/developers/api/reference.html",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

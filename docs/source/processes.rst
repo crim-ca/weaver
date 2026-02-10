@@ -2085,7 +2085,7 @@ the :ref:`proc_exec_results` options. However, an *additional* ``process`` :term
 to indicate which :term:`Process` should be executed by the :term:`Job`.
 
 The |job-exec-req|_ operation allows interoperability alignement with other execution strategies, such as defined
-by the |openeo-api|_ and the |ogc-tb20-gdc|_ *GDC API Profile*. It also opens the door for advanced :term:`Workflow`
+by the |openeo-api-profile|_ and the |ogc-tb20-gdc-profile|_. It also opens the door for advanced :term:`Workflow`
 definitions from a common :term:`Job` endpoint interface, as described by the |ogc-api-proc-part4|_ extension.
 
 Furthermore, an optional ``"status": "create"`` request body parameter can be supplied to indicate to the :term:`Job`
@@ -2196,7 +2196,7 @@ the |status-req|_ request.
 - Specify a ``profile`` parameter within the ``Accept`` header (e.g.: ``Accept: application/json; profile=openeo``).
 
 Using the |openeo|_ profile for example, will allow returning ``status`` values that are appropriate
-as per the |openeo-api|_ definition.
+as per the |openeo-api-profile|_ definition.
 
 When performing :ref:`Job Status <proc_op_job_status>` requests, the received response should
 contain a ``Content-Schema`` header indicating which of the applied ``profile`` is being represented.
