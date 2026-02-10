@@ -438,7 +438,14 @@ Corresponding reports are available online at the following locations:
 - |ogc-tb20-gdc-prov-demo-report|_
 - |ogc-tb20-gdc-usage-test-report|_
 
-.. fixme: Add the OGC Testbed-20 report references when published (https://github.com/crim-ca/weaver/issues/812).
+`Weaver` has been employed in the context of the |ogc-api-proc-code-sprint-2026-event|_, where it was used
+to validate its conformance implementation and test interoperability capabilities of the |ogc-api-proc-part1-v2|_
+and |ogc-api-proc-part2|_ standards. Feedback was provided, allowing improvements related to advanced
+content negotiation capabilities with to complex `Results Profile` representations in `Job` management.
+Amongst evaluated server implementations over the |ogc-api-proc-code-sprint-2026-test-suite|_, `Weaver` was able
+to strongly align with other participant and demonstrated the standard's capabilities. The ``WeaverClient`` was
+also employed to communicate with the participant's implementations, demonstrating its capacity to interoperate
+and interact with other non-`Weaver` |ogc-api-proc|_ compliant servers.
 
 The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
 initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
@@ -487,6 +494,10 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes - Part 4: Job Management*
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
+.. |ogc-api-proc-code-sprint-2026-event| replace:: *OGC API - Processes January 2026 Code Sprint*
+.. _ogc-api-proc-code-sprint-2026-event: https://github.com/opengeospatial/developer-events/wiki/OGC-API-Processes-January-2026-Code-Sprint
+.. |ogc-api-proc-code-sprint-2026-test-suite| replace:: *Code Sprint Test Suite Matrix*
+.. _ogc-api-proc-code-sprint-2026-test-suite: https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman
 .. |ogc-tb13-cloud-er| replace:: *OGC Testbed-13 - Cloud Engineering Report*
 .. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
 .. |ogc-tb14| replace:: *OGC Testbed-14*
