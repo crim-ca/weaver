@@ -20,7 +20,9 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid```
+  (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_
+  and `pypa/setuptools#5007 <https://github.com/pypa/setuptools/pull/5007>`_).
 
 .. _changes_6.8.1:
 
