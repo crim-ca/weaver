@@ -94,6 +94,11 @@ pygeofilter[fes,backend-native]>=0.3.1
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
 pymongo>=4.6.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
+# FIXME: setuptools/pkg_resources deprecated dependency
+#   (https://github.com/Pylons/pyramid/issues/3731, https://github.com/pypa/setuptools/pull/5007)
+# below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
+# aligned with its upstream 'pyramid' dependency expecting 'pkg_resources' that has official been removed
+setuptools<82
 pyramid>=1.7.3
 pyramid_beaker>=0.8
 # see https://github.com/sontek/pyramid_celery/pull/102 to fix Python 3.12 support and other improvements
