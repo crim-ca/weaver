@@ -157,8 +157,10 @@
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
-.. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
+.. |ogc-tb20-gdc| replace:: *OGC Testbed-20* - GeoDataCubes
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-tb20-gdc-profile| replace:: *OGC Testbed-20* - GeoDataCubes (GDC) API Profile
+.. _ogc-tb20-gdc-profile: https://docs.ogc.org/per/24-035.html
 .. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
 .. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
@@ -176,6 +178,8 @@
 .. _openeo: https://openeo.org/
 .. |openeo-api| replace:: openEO API
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
+.. |openeo-api-profile| replace:: openEO API Profiles
+.. _openeo-api-profile: https://openeo.org/documentation/1.0/developers/profiles/api.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |JSON-LD| replace:: JSON Linked Data
