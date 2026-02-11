@@ -2367,7 +2367,7 @@ class WpsPackage(Process):
         """
         Convert a Bounding Box to a compatible :term:`CWL` ``File`` using corresponding IOHandler of a Complex input.
         """
-        input_definition.data_format = Format(ContentType.APP_JSON, schema=sd.OGC_API_BBOX_FORMAT)
+        input_definition.data_format = Format(ContentType.APP_JSON, schema=sd.OGC_API_PROC_BBOX_FORMAT)
         input_location = IOHandler._build_file_name(input_definition)
         input_definition._iohandler = FileHandler(input_location, input_definition)
         input_value = {"bbox": input_definition.data, "crs": input_definition.crs or input_definition.crss[0]}

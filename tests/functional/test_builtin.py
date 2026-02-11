@@ -18,6 +18,7 @@ from tests.utils import (
     mocked_file_server,
     mocked_sub_requests
 )
+from weaver import ogc_definitions as ogc_def
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import ContentEncoding, ContentType, get_format, repr_json
 from weaver.processes.builtin import file_index_selector, jsonarray2netcdf, metalink2netcdf, register_builtin_processes
@@ -554,7 +555,7 @@ class BuiltinAppTest(WpsConfigBase):
             # https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml
             "boundingBoxInput": {
                 "bbox": [51.9, 7., 52., 7.1],
-                "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
             },
             "imagesInput": [
                 {

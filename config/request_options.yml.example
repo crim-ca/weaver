@@ -4,9 +4,11 @@
 #       URL(s) for which to apply other specified options.
 #       Can be any combination of comma/space-delimited single or list of regex string URL.
 #       Supported regex rules as defined by: https://pypi.org/project/urlmatch/
+#       If an option should be applied to "any URL", 'http://*', 'https://*', or both can be used as desired.
 #   method:
 #       Request method(s) (GET, POST, etc.) to further filter which request should apply the provided options.
-#       If not provided, matches any method for the given URL(s). Can be a single or list of case-insensitive string.
+#       If not provided or explicitly '*', matches any method for the given URL(s).
+#       Can be a single value, a list of methods, or a comma-separated list of methods, all as case-insensitive string.
 #   <option>:
 #       Any keyword/value combination supported by 'requests' module and/or function 'weaver.utils.request_extra'.
 #       Value of the option must match the expected format (e.g.: bool parameter should be one of true|false).

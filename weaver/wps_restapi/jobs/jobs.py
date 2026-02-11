@@ -435,7 +435,7 @@ def get_job_status(request):
         # additional properties that are not validated explicitly, or that contradict the 'OGC-API processes' definition
         # must apply the properties after (not via 'kwargs' to 'job.json()') to avoid JSON validation error
         # (i.e.: 'status' reported in OpenAPI is OGC-only statuses, and '$schema' is set by the class definition)
-        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URI
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
     elif schema == JobStatusProfileSchema.WPS:
         job_body = job.json(

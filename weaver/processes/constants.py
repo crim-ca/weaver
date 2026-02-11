@@ -393,6 +393,14 @@ ProcessSchemaType = Union[
     ProcessSchemaWPSType,
     ProcessSchemaConstType,
 ]
+JobProcessingEntityOGCAPIProcessesType = Literal["ogc-api-processes"]
+JobProcessingEntityOpenEOType = Literal["openeo"]
+JobProcessingEntityConstType = "JobProcessingEntityType"  # type: TypeAlias
+AnyJobProcessingEntityType = Union[
+    JobProcessingEntityOGCAPIProcessesType,
+    JobProcessingEntityOpenEOType,
+    JobProcessingEntityConstType,
+]
 JobStatusTypeProcess = Literal["process"]
 JobStatusTypeService = Literal["service"]
 JobStatusTypeProvider = Literal["provider"]
@@ -434,6 +442,19 @@ class ProcessSchema(Constants):
     OGC = "OGC"  # type: ProcessSchemaOGCType
     OLD = "OLD"  # type: ProcessSchemaOLDType
     WPS = "WPS"  # type: ProcessSchemaWPSType
+
+
+class JobProcessingEntityType(Constants):
+    """
+    Entity that represent an "*executor*" that ran the :term:`Job` from a certain :term:`Process` definition.
+
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/apis.yaml
+    """
+    # technically, other OGC APIs are allowed, but they do not make sense in this context
+    OGC_API_PROCESSES = "ogc-api-processes"     # type: JobProcessingEntityOGCAPIProcessesType
+    OPENEO = "openeo"                           # type: JobProcessingEntityOpenEOType
 
 
 class JobInputsOutputsSchema(Constants):
