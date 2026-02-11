@@ -9,7 +9,13 @@ class WeaverWarning(Warning):
     """
 
 
-class UndefinedContainerWarning(WeaverWarning):
+class WeaverConfigurationWarning(WeaverWarning, UserWarning):
+    """
+    Base class of :class:`Warning` defined by :mod:`weaver` package.
+    """
+
+
+class UndefinedContainerWarning(WeaverConfigurationWarning):
     """
     Warn when settings or the registry could not be resolved from an explicit container reference.
     """
