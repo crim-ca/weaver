@@ -357,6 +357,7 @@ if TYPE_CHECKING:
     KVP = Dict[str, List[KVP_Item]]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
+    EnvContainer = Dict[str, AnyValueType]
     SettingValue = Optional[Union[JSON, AnyValueType]]
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]

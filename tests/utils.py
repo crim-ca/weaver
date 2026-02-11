@@ -85,6 +85,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        EnvContainer,
         HeadersType,
         JSON,
         Path,
@@ -327,8 +328,8 @@ def get_links(resp_links):
     return link_dict
 
 
-def run_command(command, trim=True, expect_error=False, entrypoint=None):
-    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType]) -> List[str]
+def run_command(command, trim=True, expect_error=False, entrypoint=None, env=None):
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType], Optional[EnvContainer]) -> List[str]
     """
     Run a CLI operation and retrieve the produced output.
 
@@ -347,6 +348,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
         Python context to preserve any active mocks.
+    :param env:
+        Environment variables to override for the command execution.
     :return: retrieved command standard output or error as applicable.
     """
     # pylint: disable=R1732
@@ -361,7 +364,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
             out = sys.executable  # fallback for some systems that fail above call
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
-        env = {"PATH": f"{python_path}:{debug_path}"}
+        env = env or {}
+        env.update({"PATH": f"{python_path}:{debug_path}"})
         std = {"stderr": subprocess.PIPE, "stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
@@ -370,7 +374,11 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
-            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+            with (
+                contextlib.redirect_stderr(stderr),
+                contextlib.redirect_stdout(stdout),
+                mock.patch.dict(os.environ, env or {}),
+            ):
                 ret = entrypoint(*tuple(command))
         except SystemExit as exc:
             ret = exc.code
