@@ -20,6 +20,10 @@ Changes:
 
 Fixes:
 ------
+- Remove duplicate ``Content-Type`` header in response of `Job` results leading to errors on certain clients/proxies.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` header in
+  response of `Job` results to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` headers to determine if this profile was applied.
 - Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
 - Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid```
   (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_

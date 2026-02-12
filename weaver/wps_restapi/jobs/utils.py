@@ -802,12 +802,10 @@ def get_job_results_response(
             ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URL),
             ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URL, rel="profile")),
         ])
-        if is_doc_results:
-            # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
-            headers.update([
-                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URL}\"")
-            ])
-        return HTTPOk(json=results_json, headers=headers)
+
+        # avoid duplicate content-type header due to how pyramid response handles it
+        ctype = get_header("Content-Type", headers, pop=True, default=ContentType.APP_JSON)
+        return HTTPOk(json=results_json, headers=headers, content_type=ctype)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
