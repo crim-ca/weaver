@@ -16,7 +16,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Pin ``cryptography>=46.0.5`` for security fix.
 
 .. _changes_6.8.2:
 
