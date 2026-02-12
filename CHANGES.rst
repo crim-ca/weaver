@@ -16,6 +16,19 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+.. _changes_6.8.3:
+
+`6.8.3 <https://github.com/crim-ca/weaver/tree/6.8.3>`_ (2026-02-12)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Remove duplicate ``Content-Type`` header in response of `Job` status endpoint.
 - Pin ``cryptography>=46.0.5`` for security fix.
 

@@ -1,4 +1,4 @@
-VERSION ?= 6.8.2
+VERSION ?= 6.8.3
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
