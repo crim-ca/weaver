@@ -16,6 +16,7 @@ Changes:
 
 Fixes:
 ------
+- Remove duplicate ``Content-Type`` header in response of `Job` status endpoint.
 - Pin ``cryptography>=46.0.5`` for security fix.
 
 .. _changes_6.8.2:
