@@ -419,7 +419,7 @@ def get_job_status(request):
     schema, headers = get_job_status_schema(request)
     job = get_job(request)
 
-    content_type = str(headers.get("Content-Type"))
+    content_type = str(get_header("Content-Type", headers, pop=True, default=""))
     media_type = clean_media_type_format(content_type, strip_parameters=True)
     if media_type in ContentType.ANY_XML or (media_type == ContentType.ANY and schema == JobStatusProfileSchema.WPS):
         return get_job_status_wps_xml_response(job, request)
@@ -453,7 +453,7 @@ def get_job_status(request):
     # adjust response contents according to rendering
     # provide 'job' object directly for HTML templating to allow extra operations dynamically
     if ContentType.APP_JSON in content_type:
-        return HTTPOk(json=job_body, headers=headers)
+        return HTTPOk(json=job_body, headers=headers, content_type=content_type)
     return Box(**job_body, job=job, box_intact_types=[Job])
 
 
