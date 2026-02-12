@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.8.2:
+
+`6.8.2 <https://github.com/crim-ca/weaver/tree/6.8.2>`_ (2026-02-11)
+========================================================================
+
+Changes:
+--------
 - Support `CLI` parsing of `CWL` ``Directory`` input value if provided using ``path`` with a remote reference URL.
   Only remote references are supported since the `Vault` feature cannot be used to upload multiple files in a directory.
 - Emit a ``WeaverConfigurationWarning`` if ``weaver.wps_output_dir`` and ``weaver.wps_output_url`` (or its value
