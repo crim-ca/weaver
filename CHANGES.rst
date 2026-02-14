@@ -16,7 +16,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
+  correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
+  (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures ``File`` array values.
 
 .. _changes_6.8.3:
 

@@ -1220,8 +1220,8 @@ class WeaverClient(object):
                 # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
                 #   unless 'value/href/collection/process' (known OGC structures)
                 #   are present AND their sub-dict don't have CWL 'class'
-                # - if value of 'inputs' is a mapping with nested objects,
-                #   they must be interpreted as the CWL form if a 'class' is found
+                # - if value of 'inputs' is a mapping with nested objects or an array of objects,
+                #   they must be interpreted as the CWL form if a 'class' is found in the object
                 #   (literals would be interpreted the same regardless of OGC or CWL form)
                 # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
                 #   unless 'value/href/collection/process' (and also 'id' technically) are present
@@ -1233,11 +1233,16 @@ class WeaverClient(object):
                         "class" in values
                     ) or
                     (
-                        isinstance(values, (dict, list)) and
+                        isinstance(values, (dict, list)) and  # main container OGC/OLD style
                         any(
-                            isinstance(v, dict) and
-                            get_any_value(v, default=null, extras=["collection", "processes"]) is null
-                            for v in (values if isinstance(values, list) else values.values())
+                            (
+                                isinstance(val, dict) and  # CWL Object
+                                get_any_value(val, default=null, extras=["collection", "processes"]) is null
+                            ) or (
+                                isinstance(val, list) and  # CWL Array
+                                any("class" in (item if isinstance(item, dict) else {}) for item in val)
+                            )
+                            for val in (values if isinstance(values, list) else values.values())
                         )
                     )
                 )

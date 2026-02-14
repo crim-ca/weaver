@@ -28,7 +28,7 @@ from weaver.cli import (
     main as weaver_cli
 )
 from weaver.exceptions import AuthenticationError
-from weaver.formats import ContentEncoding, ContentType
+from weaver.formats import ContentEncoding, ContentType, get_cwl_file_format
 
 
 @pytest.mark.cli
@@ -270,6 +270,24 @@ def test_parse_inputs_from_file():
     ["data_inputs", "expect_inputs"],
     [
         (
+            # CWL definition with an input literal
+            {
+                "in": 1,
+            },
+            {
+                "in": 1,
+            }
+        ),
+        (
+            # CWL definition with an input array of literals
+            {
+                "in": [1, 2, 3],
+            },
+            {
+                "in": [1, 2, 3],
+            }
+        ),
+        (
             # CWL definition with an input named 'inputs' not to be confused with OGC execution body
             {
                 "inputs": {
@@ -281,6 +299,55 @@ def test_parse_inputs_from_file():
                 "inputs": {
                     "href": "https://fake.domain.com/some-file.txt",
                 },
+            }
+        ),
+        (
+            # CWL definition with media-type format of the file
+            {
+                "in": {
+                    "class": "File",
+                    "path": "https://fake.domain.com/netcdf.nc",
+                    "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                },
+            },
+            {
+                "in": {
+                    "href": "https://fake.domain.com/netcdf.nc",
+                    "type": ContentType.APP_NETCDF,
+                    "format": {"mediaType": ContentType.APP_NETCDF},
+                },
+            }
+        ),
+        (
+            # CWL definition with array of files
+            {
+                "in": [
+                    {
+                        "class": "File",
+                        "path": "https://fake.domain.com/netcdf-1.nc",
+                        "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                    },
+
+                    {
+                        "class": "File",
+                        "path": "https://fake.domain.com/netcdf-2.nc",
+                        "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                    }
+                ],
+            },
+            {
+                "in": [
+                    {
+                        "href": "https://fake.domain.com/netcdf-1.nc",
+                        "type": ContentType.APP_NETCDF,
+                        "format": {"mediaType": ContentType.APP_NETCDF},
+                    },
+                    {
+                        "href": "https://fake.domain.com/netcdf-2.nc",
+                        "type": ContentType.APP_NETCDF,
+                        "format": {"mediaType": ContentType.APP_NETCDF},
+                    },
+                ]
             }
         ),
         (

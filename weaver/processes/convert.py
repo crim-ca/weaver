@@ -11,7 +11,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -152,6 +152,7 @@ if TYPE_CHECKING:
         ExecutionOutputsList,
         ExecutionOutputsMap,
         JobValueFile,
+        JobValueFormat,
         JobValueItem,
         JSON,
         OpenAPISchema,
@@ -1869,9 +1870,13 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
         cwl_fmt_type = input_data.get("format")
         if isinstance(cwl_fmt_type, str):
             fmt = get_format(cwl_fmt_type)
+            fmt_json = cast("JobValueFormat", {"mediaType": fmt.mime_type})
             if "encoding" in input_data:
-                fmt.encoding = input_data["encoding"]  # type: ignore
-            input_href["format"] = fmt.json
+                fmt_json["encoding"] = input_data["encoding"]  # type: ignore
+            elif fmt.encoding:
+                fmt_json["encoding"] = fmt.encoding
+            input_href["format"] = fmt_json     # old
+            input_href["type"] = fmt.mime_type  # ogc
         if input_data.get("class") == PACKAGE_DIRECTORY_TYPE:
             input_href["type"] = ContentType.APP_DIR
         return input_href
