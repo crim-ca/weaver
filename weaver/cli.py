@@ -87,8 +87,7 @@ if TYPE_CHECKING:
             JobSubscribers,
             JSON,
             Path,
-            SettingsType,
-            URL,
+            SettingsType
         )
     except ImportError:
         # pylint: disable=C0103,invalid-name
