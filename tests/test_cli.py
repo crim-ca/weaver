@@ -310,7 +310,7 @@ def test_parse_inputs_from_file_relative_paths():
             file4 = os.path.abspath(os.path.join(tmp_dir2, path4))
             for file in [file1, file2, file3, file4]:
                 os.makedirs(os.path.dirname(file), exist_ok=True)
-                with open(file, "w") as f:
+                with open(file, mode="w", encoding="utf-8") as f:
                     f.write("test")
 
             cwl_inputs = {
@@ -324,7 +324,7 @@ def test_parse_inputs_from_file_relative_paths():
                 "input5": {"class": "File", "path": path4},  # relative to PWD
             }
             cwl_inputs_path = os.path.join(tmp_dir1, "inputs.json")
-            with open(cwl_inputs_path, "w") as cwl_inputs_file:
+            with open(cwl_inputs_path, mode="w", encoding="utf-8") as cwl_inputs_file:
                 json.dump(cwl_inputs, cwl_inputs_file)
 
             result = WeaverClient().execute("fake_process", inputs=cwl_inputs_path, url="https://fake.domain.com")
