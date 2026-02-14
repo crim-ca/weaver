@@ -16,10 +16,14 @@ Changes:
 
 Fixes:
 ------
+- Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
+  If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
+  If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
+  as previously done by the `CLI`/``WeaverClient`` (fixes `#879 <https://github.com/crim-ca/weaver/issues/879>`_).
 - Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
   correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
   (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
-- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures ``File`` array values.
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
 
 .. _changes_6.8.3:
 

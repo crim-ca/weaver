@@ -1257,8 +1257,12 @@ class WeaverClient(object):
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
 
-    def _upload_files(self, inputs, url=None):
-        # type: (ExecutionInputsMap, Optional[str]) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+    def _upload_files(
+        self,
+        inputs,     # type: ExecutionInputsMap
+        url=None,   # type: Optional[URL]
+        cwd=None,   # type: Optional[Path]
+    ):              # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
 
@@ -1272,6 +1276,10 @@ class WeaverClient(object):
               in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
+        :param url: Instance URL if not already provided during client creation.
+        :param cwd:
+            Alternative working directory to resolve relative file paths if applicable.
+            If provided, it will be considered before the actual current working directory of the invoking process.
         :return: Updated inputs or the result of a failing intermediate request.
         """
         auth_tokens = {}  # type: Dict[str, str]
@@ -1300,6 +1308,10 @@ class WeaverClient(object):
                         title="Directory upload not implemented.",
                         code=HTTPNotImplemented.code,
                     )
+                if cwd and isinstance(cwd, str):
+                    cwd_href = os.path.join(cwd, href)
+                    if os.path.isfile(cwd_href):
+                        href = cwd_href
                 if not os.path.isfile(href):  # Case for remote files (ex. http links)
                     if "://" not in href:
                         LOGGER.warning(
@@ -1308,6 +1320,7 @@ class WeaverClient(object):
                         )
                     continue
 
+                href = os.path.abspath(href)  # ensure dot/relative path are resolved
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
                 if not ctype:
@@ -1360,7 +1373,8 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
-        result = self._upload_files(values, url=base)
+        input_file = os.path.dirname(inputs) if isinstance(inputs, str) else None
+        result = self._upload_files(values, url=base, cwd=input_file)
         return result
 
     def _prepare_outputs(
