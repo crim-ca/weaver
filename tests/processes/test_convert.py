@@ -38,7 +38,9 @@ from weaver.formats import (
     IANA_NAMESPACE_DEFINITION,
     OGC_MAPPING,
     OGC_NAMESPACE_DEFINITION,
-    ContentType
+    ContentEncoding,
+    ContentType,
+    get_cwl_file_format
 )
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
@@ -1780,6 +1782,78 @@ def test_complex2json():
         "maximumMegabytes": 15,
         "default": False,
     }
+
+
+@pytest.mark.parametrize(
+    ["values", "expect"],
+    [
+        (
+            {"test": {"class": "File", "path": "https://example.com/random.txt"}},
+            {"test": {"href": "https://example.com/random.txt"}}
+        ),
+        (
+            {
+                "test": {
+                    "class": "File",
+                    "path": "https://example.com/random.nc",
+                    "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.nc",
+                    "type": ContentType.APP_NETCDF,
+                    "format": {
+                        "mediaType": ContentType.APP_NETCDF,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": "File",
+                    "path": "https://example.com/random.bin",
+                    "format": get_cwl_file_format(ContentType.APP_OCTET_STREAM, make_reference=True),
+                    "encoding": ContentEncoding.BASE64,
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.bin",
+                    "type": ContentType.APP_OCTET_STREAM,
+                    "format": {
+                        "mediaType": ContentType.APP_OCTET_STREAM,
+                        "encoding": ContentEncoding.BASE64,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": "File",
+                    "path": "https://example.com/random.zip",
+                    # ZIP 'Format' object itself defines 'encoding'
+                    "format": get_cwl_file_format(ContentType.APP_ZIP, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.zip",
+                    "type": ContentType.APP_ZIP,
+                    "format": {
+                        "mediaType": ContentType.APP_ZIP,
+                        "encoding": ContentEncoding.BASE64,
+                    }
+                }
+            }
+        ),
+    ],
+)
+def test_cwl2json_input_values_cwl_format(values, expect):
+    result = cwl2json_input_values(values, ProcessSchema.OGC)
+    assert result == expect
 
 
 def test_cwl2json_input_values_ogc_format():

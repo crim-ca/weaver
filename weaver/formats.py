@@ -692,6 +692,12 @@ def get_format(media_type, default=None):
         ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return None
+    # if the input was not a 'basic' media-type, but a CWL-like format URI resolved by cleanup,
+    # reevaluate the potential media-type match prior to further resolution combinations
+    if ctype != media_type:
+        fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(ctype)
+        if fmt is not None:
+            return fmt
     ext = get_extension(ctype)
     if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
         for uri, typ in _CONTENT_TYPE_SCHEMA_OVERRIDES.items():
