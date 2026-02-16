@@ -415,10 +415,9 @@ class WpsConfigBase(GenericUtils):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         if process_id:
-            if "process" in payload["processDescription"]:
-                proc_desc = payload["processDescription"]["process"]
-            else:
-                proc_desc = payload["processDescription"]
+            proc_desc = payload.get("processDescription", payload)
+            if "process" in proc_desc:
+                proc_desc = proc_desc["process"]
             proc_desc["id"] = process_id  # type: ignore
         exec_list = payload.get("executionUnit", [])
         if len(exec_list):

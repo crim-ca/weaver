@@ -1326,8 +1326,9 @@ class WeaverClient(object):
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
+                ctype = fmt.mime_type
                 c_enc = get_field(fmt, "encoding", search_variations=True) or None
-                res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
+                res = self.upload(href, content_type=ctype, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
                 vault_href = res.body["file_href"]
@@ -1337,6 +1338,7 @@ class WeaverClient(object):
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
                 input_vault_href = {
                     "href": vault_href,
+                    "type": ctype,
                     "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
                 }
                 if input_array:
@@ -1798,7 +1800,7 @@ class WeaverClient(object):
                 os.path.basename(file_path),
                 open(file_path, mode=f_mode, encoding=f_enc),  # pylint: disable=R1732
                 file_headers["Content-Type"],
-                {"Content-Encoding": c_enc} if c_enc else {},
+                {"Content-Transfer-Encoding": c_enc} if c_enc else {},
             )
         }
         req_headers = {
