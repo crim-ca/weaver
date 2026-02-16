@@ -16,6 +16,9 @@ Changes:
 
 Fixes:
 ------
+- Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
+  This could occur either when invoking the operation directly, or directly from ``execute`` operation which
+  pre-resolved a local file path subject to the `Vault` upload feature.
 - Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
   If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
   If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
