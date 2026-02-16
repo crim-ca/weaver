@@ -16,6 +16,10 @@ Changes:
 
 Fixes:
 ------
+- Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
+  resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
+  The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension
+  to ensure consistency between the validation methods.
 - Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
   This could occur either when invoking the operation directly, or directly from ``execute`` operation which
   pre-resolved a local file path subject to the `Vault` upload feature.

@@ -27,6 +27,7 @@ from cwltool.errors import WorkflowException
 from cwltool.factory import Factory as CWLFactory
 from pywps.inout.formats import Format
 from pywps.inout.outputs import ComplexOutput
+from pywps.validator import emptyvalidator, get_validator
 from pywps.validator.mode import MODE
 
 from tests.utils import assert_equal_any_order
@@ -857,6 +858,45 @@ def test_mask_process_inputs(inputs, expect):
 def test_format_extension_validator_basic(data_input, mode, expect):
     # type: (Any, int, bool) -> None
     assert format_extension_validator(data_input, mode) == expect
+
+
+@pytest.mark.parametrize(
+    ["content_type", "mode", "ext"],
+    [
+        (ContentType.APP_NETCDF, MODE.NONE, ".nc"),
+        (ContentType.APP_NETCDF, MODE.SIMPLE, ".nc"),
+        (ContentType.APP_X_NETCDF, MODE.NONE, ".nc"),
+        (ContentType.APP_X_NETCDF, MODE.SIMPLE, ".nc"),
+        (ContentType.APP_GEOJSON, MODE.NONE, ".geojson"),
+        (ContentType.APP_GEOJSON, MODE.SIMPLE, ".geojson"),
+        (ContentType.APP_JSON, MODE.NONE, ".json"),
+        (ContentType.APP_JSON, MODE.SIMPLE, ".json"),
+        (ContentType.IMAGE_GEOTIFF, MODE.NONE, ".tif"),
+        (ContentType.IMAGE_GEOTIFF, MODE.SIMPLE, ".tiff"),  # note: pywps distinguishes with extra 'f'
+        (ContentType.IMAGE_OGC_GEOTIFF, MODE.NONE, ".tif"),
+        (ContentType.IMAGE_OGC_GEOTIFF, MODE.SIMPLE, ".tif"),
+    ]
+)
+def test_format_extension_validator_pywps_cases(content_type, mode, ext):
+    # type: (str, int, str) -> None
+    """
+    The :mod:`pywps.validator.complexvalidator` module performs some validations for common climate/geospatial types.
+    Ensure that they do not introduce an ambiguous error when alternative media-types are used by corresponding formats.
+    """
+
+    class MockFileHandler(object):
+        def __init__(self, filename):
+            self._file = filename
+            self.file = filename
+
+    data_out = ComplexOutput("test", "test", [Format(content_type)], mode=mode)
+    data_out._iohandler = MockFileHandler(f"test{ext}")
+    validator = get_validator(content_type)
+    assert (
+        validator is emptyvalidator or  # if empty, weaver bypasses >MODE.NONE to avoid auto-fail validation error
+        validator(data_out, mode)
+    ), "should succeed with the internal validator from pywps"
+    assert format_extension_validator(data_out, mode), "should succeed with format extension validator from weaver"
 
 
 @pytest.mark.parametrize(

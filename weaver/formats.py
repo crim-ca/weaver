@@ -101,7 +101,8 @@ class ContentType(Constants):
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
-    APP_NETCDF = "application/x-netcdf"
+    APP_X_NETCDF = "application/x-netcdf"   # legacy
+    APP_NETCDF = "application/netcdf"       # official (registered IANA)
     APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"

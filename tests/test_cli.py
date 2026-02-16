@@ -833,7 +833,8 @@ def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
         {
             "file": {
                 "format": expect_file_format,
-                "href": fake_href
+                "href": fake_href,
+                "type": expect_file_format["mediaType"]
             }
         },
         {
@@ -865,10 +866,12 @@ def test_file_inputs_array_uploaded_to_vault():
             "file": [
                 {
                     "href": fake_href1,
+                    "type": ContentType.APP_JSON,
                     "format": {"mediaType": ContentType.APP_JSON},
                 },
                 {
                     "href": fake_href2,
+                    "type": ContentType.APP_ZIP,
                     "format": {
                         "mediaType": ContentType.APP_ZIP,
                         "encoding": ContentEncoding.BASE64,
