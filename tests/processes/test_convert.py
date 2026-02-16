@@ -1796,6 +1796,25 @@ def test_complex2json():
                 "test": {
                     "class": "File",
                     "path": "https://example.com/random.nc",
+                    "format": get_cwl_file_format(ContentType.APP_GEOJSON, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.nc",
+                    "type": ContentType.APP_GEOJSON,
+                    "format": {
+                        "mediaType": ContentType.APP_GEOJSON,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": "File",
+                    "path": "https://example.com/random.nc",
+                    # NetCDF 'Format' object itself defines 'encoding'
                     "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
                 }
             },
@@ -1805,6 +1824,7 @@ def test_complex2json():
                     "type": ContentType.APP_NETCDF,
                     "format": {
                         "mediaType": ContentType.APP_NETCDF,
+                        "encoding": ContentEncoding.BASE64,
                     }
                 }
             }
@@ -1815,7 +1835,7 @@ def test_complex2json():
                     "class": "File",
                     "path": "https://example.com/random.bin",
                     "format": get_cwl_file_format(ContentType.APP_OCTET_STREAM, make_reference=True),
-                    "encoding": ContentEncoding.BASE64,
+                    "encoding": ContentEncoding.BASE64,  # explicitly provided
                 }
             },
             {
