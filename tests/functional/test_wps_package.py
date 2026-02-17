@@ -3514,7 +3514,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["minOccurs"] == 1
         assert proc["inputs"][0]["maxOccurs"] == 1000
         assert len(proc["inputs"][0]["formats"]) == 2
-        assert proc["inputs"][0]["formats"][0]["default"] is False  # This is extended as 'prefered' alias
+        assert proc["inputs"][0]["formats"][0]["default"] is False  # This is extended as 'preferred' alias
         assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["inputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
         assert proc["inputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process
@@ -3535,7 +3535,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
         assert len(proc["outputs"][0]["formats"]) == 2
-        assert proc["outputs"][0]["formats"][0]["default"] is False  # This is extended as 'prefered' alias
+        assert proc["outputs"][0]["formats"][0]["default"] is False  # This is extended as 'preferred' alias
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
         assert proc["outputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
         assert proc["outputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process

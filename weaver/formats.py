@@ -632,8 +632,8 @@ OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.IMAGE_COG: "geotiff",
-    ContentType.APP_X_NETCDF: "netcdf",
     ContentType.APP_NETCDF: "netcdf",
+    ContentType.APP_X_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {
     IANA_NAMESPACE: IANA_MAPPING,
