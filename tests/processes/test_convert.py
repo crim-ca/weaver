@@ -1784,6 +1784,7 @@ def test_complex2json():
     }
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["values", "expect"],
     [
@@ -1876,6 +1877,7 @@ def test_cwl2json_input_values_cwl_format(values, expect):
     assert result == expect
 
 
+@pytest.mark.format
 def test_cwl2json_input_values_ogc_format():
     values = {
         "test1": "value",
@@ -1901,6 +1903,7 @@ def test_cwl2json_input_values_ogc_format():
     assert result == expect
 
 
+@pytest.mark.format
 def test_cwl2json_input_values_old_format():
     values = {
         "test1": "value",
@@ -1929,6 +1932,7 @@ def test_cwl2json_input_values_old_format():
     assert result == expect
 
 
+@pytest.mark.format
 def test_convert_input_values_schema_from_old():
     inputs_old = [
         {"id": "test1", "value": "data"},
@@ -1942,22 +1946,22 @@ def test_convert_input_values_schema_from_old():
         {"id": "test9", "value": "short"},
         {"id": "test10", "value": "long"},
         {"id": "test10", "value": "more"},
-        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         {"id": "test13", "value": "short"},
         {"id": "test13", "value": "long"},
         {"id": "test13", "value": "more"},
         {"id": "test14", "value": ["val1", "val2", "val3"]},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         {"id": "test16", "value": 1},
         {"id": "test16", "value": ["val1", "val2", "val3"]},
         {"id": "test16", "value": "short"},
-        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
+        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
     ]
     inputs_ogc = {
         "test1": "data",
@@ -1971,13 +1975,13 @@ def test_convert_input_values_schema_from_old():
         "test9": "short",
         "test10": ["long", "more"],
         "test11": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test12": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test13": [
             "short",
@@ -1990,16 +1994,15 @@ def test_convert_input_values_schema_from_old():
             "val3",
         ],
         "test15": [
-            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         ],
         "test16": [
             1,
             ["val1", "val2", "val3"],
             "short",
-            {"href": "https://www.somewebsite.com/dir1/",
-             "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
         ]
     }
 
@@ -2007,6 +2010,7 @@ def test_convert_input_values_schema_from_old():
     assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
 
+@pytest.mark.format
 def test_convert_input_values_schema_from_ogc():
     inputs_ogc = {
         "test1": "data",
@@ -2020,13 +2024,13 @@ def test_convert_input_values_schema_from_ogc():
         "test9": "short",
         "test10": ["long", "more"],
         "test11": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test12": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test13": [
             "short",
@@ -2034,16 +2038,15 @@ def test_convert_input_values_schema_from_ogc():
             "more"
         ],
         "test14": [
-            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         ],
         "test15": [
             1,
             ["val1", "val2", "val3"],
             "short",
-            {"href": "https://www.somewebsite.com/dir1/",
-             "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
         ]
     }
     inputs_old = [
@@ -2061,26 +2064,27 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test9", "value": "short"},
         {"id": "test10", "value": "long"},
         {"id": "test10", "value": "more"},
-        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         {"id": "test13", "value": "short"},
         {"id": "test13", "value": "long"},
         {"id": "test13", "value": "more"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         {"id": "test15", "value": 1},
         {"id": "test15", "value": ["val1", "val2", "val3"]},
         {"id": "test15", "value": "short"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
     ]
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
 
+@pytest.mark.format
 @pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
 def test_convert_input_values_schema_from_old_xfail():
     inputs_old = [
@@ -2097,20 +2101,21 @@ def test_convert_input_values_schema_from_old_xfail():
         "test1": {"href": ["https://www.somewebsite.com/dir1/",
                            "https://www.somewebsite.com/dir2/",
                            "https://www.somewebsite.com/dir3/"],
-                  "type": "application/directory"}
+                  "type": ContentType.APP_DIR},
     }
 
     assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
     assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
 
+@pytest.mark.format
 @pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
 def test_convert_input_values_schema_from_ogc_xfail():
     inputs_ogc = {
         "test1": {"href": ["https://www.somewebsite.com/dir1/",
                            "https://www.somewebsite.com/dir2/",
                            "https://www.somewebsite.com/dir3/"],
-                  "type": "application/directory"}
+                  "type": ContentType.APP_DIR},
     }
 
     inputs_old = [
@@ -2127,6 +2132,8 @@ def test_convert_input_values_schema_from_ogc_xfail():
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
 
+@pytest.mark.cli
+@pytest.mark.format
 def test_repr2json_input_values():
     values = [
         "test1=value",
@@ -2174,6 +2181,7 @@ def test_repr2json_input_values():
     assert result == expect
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["name", "expect"],
     [

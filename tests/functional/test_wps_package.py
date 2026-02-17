@@ -1094,6 +1094,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
 
+    @pytest.mark.format
     def test_execute_output_file_format_validator(self):
         """
         Test with custom :mod:`pywps` file format extension validator involved in output resolution.

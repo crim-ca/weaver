@@ -838,6 +838,7 @@ def test_mask_process_inputs(inputs, expect):
     assert inputs != expect, "original inputs should not be modified"
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["data_input", "mode", "expect"],
     [
@@ -860,6 +861,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
     assert format_extension_validator(data_input, mode) == expect
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["content_type", "mode", "ext"],
     [

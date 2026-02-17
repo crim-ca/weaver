@@ -93,6 +93,7 @@ class ContentType(Constants):
     APP_CWL_X = "application/x-cwl"  # backward compatible format, others are official
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
+    APP_VDN_GEOJSON = "application/vnd.geo+json"
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
@@ -101,25 +102,27 @@ class ContentType(Constants):
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
+    APP_NETCDF = "application/netcdf"       # official (registered IANA: https://github.com/Unidata/netcdf/issues/42)
     APP_X_NETCDF = "application/x-netcdf"   # legacy
-    APP_NETCDF = "application/netcdf"       # official (registered IANA)
     APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
     APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
-    APP_VDN_GEOJSON = "application/vnd.geo+json"
     APP_XML = "application/xml"
-    APP_YAML = "application/x-yaml"
+    APP_YAML = "application/yaml"       # official (registered IANA)
+    APP_X_YAML = "application/x-yaml"   # legacy
+    TEXT_X_YAML = "text/x-yaml"         # deprecated
+    TEXT_YAML = "text/yaml"             # deprecated
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
+    IMAGE_TIFF = "image/tiff"
     IMAGE_JPEG = "image/jpeg"
     IMAGE_JPEG2000 = "image/jp2"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
-    IMAGE_TIFF = "image/tiff"
     MULTIPART_ANY = "multipart/*"
     MULTIPART_FORM = "multipart/form-data"      # data/file upload
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
@@ -134,9 +137,12 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
+    ANY_NETCDF = {APP_NETCDF, APP_X_NETCDF}
+    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
+    ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
     ANY_JSON = {
-        APP_JSON, APP_YAML,
-        APP_GEOJSON, APP_VDN_GEOJSON,
+        APP_JSON, *ANY_YAML, *ANY_GEOJSON,
         APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
         APP_OAS_JSON,
         APP_OGC_PKG_JSON, APP_OGC_PKG_YAML,
@@ -452,6 +458,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yml",
+    ContentType.APP_X_YAML: ".yaml",
     ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",

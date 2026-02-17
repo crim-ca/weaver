@@ -763,6 +763,7 @@ class TestWeaverClient(TestWeaverClientBase):
     def test_execute_inputs_old_listing_literal_schema_auto_resolve_vault(self):
         self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=True)
 
+    @pytest.mark.format
     @pytest.mark.vault
     def test_execute_inputs_cwi_file_format_forward_media_type_vault(self):
         """

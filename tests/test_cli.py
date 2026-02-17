@@ -336,6 +336,7 @@ def test_parse_inputs_from_file_relative_paths():
 
 
 @pytest.mark.cli
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["data_inputs", "expect_inputs"],
     [
@@ -523,6 +524,7 @@ def test_parse_inputs_unsupported_directory_upload(inputs_value):
 
 
 @pytest.mark.cli
+@pytest.mark.format
 def test_parse_inputs_with_media_type():
     inputs = []
     mock_result = OperationResult(True, code=500)
