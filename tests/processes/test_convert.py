@@ -2869,16 +2869,16 @@ def test_ows_wps_json_default_complex_format():
         "type": WPS_COMPLEX_DATA,
         "data_type": WPS_COMPLEX_DATA,
         "data_format": {
-            "mimeType": ContentType.APP_NETCDF,
-            "encoding": "base64",
+            "mimeType": ContentType.APP_X_NETCDF,
+            "encoding": ContentEncoding.BASE64,
             "maximumMegabytes": 200,
             "schema": None,
             "default": True,
         },
         "formats": [
             {
-                "mimeType": ContentType.APP_NETCDF,
-                "encoding": "base64",
+                "mimeType": ContentType.APP_X_NETCDF,
+                "encoding": ContentEncoding.BASE64,
                 "maximumMegabytes": 200,
                 "schema": None,
                 "default": True,
@@ -2898,11 +2898,11 @@ def test_ows_wps_json_default_complex_format():
     assert wps_io.title == "test"
     assert wps_io.min_occurs == 0
     assert wps_io.max_occurs == 100
-    assert wps_io.data_format == Format(ContentType.APP_NETCDF, encoding="base64")
+    assert wps_io.data_format == Format(ContentType.APP_X_NETCDF, encoding=ContentEncoding.BASE64)
     assert all(wps_fmt == val_fmt for wps_fmt, val_fmt in zip(
         wps_io.supported_formats,
         [
-            Format(ContentType.APP_NETCDF, encoding="base64"),
+            Format(ContentType.APP_X_NETCDF, encoding=ContentEncoding.BASE64),
             Format(ContentType.APP_JSON),
         ],
     ))
@@ -2925,14 +2925,31 @@ def test_ows_wps_json_default_complex_format():
         "maxOccurs": "100",
         "mode": MODE.NONE,
         "type": WPS_COMPLEX,
-        "data_format": {"mime_type": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": ""},
+        "data_format": {
+            "mime_type": ContentType.APP_X_NETCDF,
+            "encoding": ContentEncoding.BASE64,
+            "schema": "",
+            "extension": "",
+        },
         "formats": [
-            {"mediaType": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": "", "default": True},
-            {"mediaType": ContentType.APP_JSON, "encoding": "", "schema": "", "extension": "", "default": False}
+            {
+                "mediaType": ContentType.APP_X_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+                "schema": "",
+                "extension": "",
+                "default": True,
+            },
+            {
+                "mediaType": ContentType.APP_JSON,
+                "encoding": "",
+                "schema": "",
+                "extension": "",
+                "default": False,
+            }
         ],
         # from default data_format
-        "mimetype": ContentType.APP_NETCDF,
-        "encoding": "base64",
+        "mimetype": ContentType.APP_X_NETCDF,
+        "encoding": ContentEncoding.BASE64,
     }
 
 

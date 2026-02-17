@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import difflib
 import inspect
 import itertools
 import os
@@ -229,7 +230,16 @@ def test_content_encoding_open_parameters(encoding, mode):
     ]
 )
 def test_get_format(test_content_type, expected_content_type, expected_content_encoding):
-    assert f.get_format(test_content_type) == Format(expected_content_type, encoding=expected_content_encoding)
+    fmt_src = f.get_format(test_content_type)
+    fmt_exp = Format(expected_content_type, encoding=expected_content_encoding)
+    assert fmt_src == fmt_exp, (
+        "\n".join(
+            difflib.context_diff(
+                f.repr_json(fmt_src.json, indent=2).splitlines(),
+                f.repr_json(fmt_exp.json, indent=2).splitlines(),
+            )
+        )
+    )
 
 
 @pytest.mark.parametrize(

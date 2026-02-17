@@ -137,7 +137,7 @@ class WpsProviderTest(WpsConfigBase):
         assert len(body["inputs"]["dataset"]["formats"]) == 1
         assert body["inputs"]["dataset"]["formats"][0]["default"] is True
         assert "literalDataDomains" not in body["inputs"]["dataset"]
-        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == ContentType.APP_X_NETCDF
         assert body["inputs"]["dataset_opendap"]["minOccurs"] == 0
         assert body["inputs"]["dataset_opendap"]["maxOccurs"] == 100
         assert "formats" not in body["inputs"]["dataset_opendap"]

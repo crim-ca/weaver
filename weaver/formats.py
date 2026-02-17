@@ -116,6 +116,7 @@ class ContentType(Constants):
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
     IMAGE_JPEG = "image/jpeg"
+    IMAGE_JPEG2000 = "image/jp2"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
@@ -451,12 +452,17 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yml",
+    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
+}
+_CONTENT_TYPE_FORMAT_OVERRIDES = {
+    # align encoding with PyWPS variant
+    ContentType.APP_NETCDF: Format(ContentType.APP_NETCDF, extension=".nc", encoding=ContentEncoding.BASE64),
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
@@ -495,9 +501,8 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
-    for name, ctype in locals().items()
-    if name.startswith("ContentType.")
-    and isinstance(ctype, str)
+    for ctype in ContentType.values()
+    if isinstance(ctype, str)
     and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
@@ -530,6 +535,7 @@ _CONTENT_TYPE_FORMAT_MAPPING.update({
     if ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
 })
+_CONTENT_TYPE_FORMAT_MAPPING.update(_CONTENT_TYPE_FORMAT_OVERRIDES)
 _EXTENSION_CONTENT_TYPES_MAPPING = {
     # because the same extension can represent multiple distinct Content-Types,
     # derive the simplest (shortest) one by default for guessing generic Content-Type
@@ -626,6 +632,7 @@ OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.IMAGE_COG: "geotiff",
+    ContentType.APP_X_NETCDF: "netcdf",
     ContentType.APP_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {

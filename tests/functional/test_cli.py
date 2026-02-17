@@ -185,6 +185,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -195,6 +196,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -207,6 +209,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -1557,7 +1560,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                             "type": "string", "format": "binary"}
             out_json_type = {"contentMediaType": ContentType.APP_JSON, "type": "string"}
             out_oas_oneof = {"oneOf": [out_cwl_type, out_json_type, out_oas]}
-            out_cwl_fmt = {"default": False, "mediaType": io_fmt}
+            out_cwl_fmt = {"default": False, "mediaType": io_fmt, "encoding": "base64"}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
             # ignore schema specifications for comparison only of contents

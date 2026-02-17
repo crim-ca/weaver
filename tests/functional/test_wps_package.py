@@ -61,6 +61,7 @@ from weaver.formats import (
     OGC_MAPPING,
     OGC_NAMESPACE,
     AcceptLanguage,
+    ContentEncoding,
     ContentType,
     get_cwl_file_format,
     repr_json
@@ -581,11 +582,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["schema"] = {
             "oneOf": [
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": ContentEncoding.BASE64},
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": ContentEncoding.BASE64},
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": ContentEncoding.BASE64},
             ]
         }
 
@@ -1134,13 +1135,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             results = self.monitor_job(status_url)  # successful (if validator did not apply correctly, execution fails)
 
             assert mock_validator.called
-            validator_call_types = [call.args[0].data_format.mime_type for call in mock_validator.call_args_list]
-            expected_media_types = [
-                "image/jp2",
+            validator_call_types = {call.args[0].data_format.mime_type for call in mock_validator.call_args_list}
+            expected_media_types = {
+                ContentType.IMAGE_JPEG2000,
                 ContentType.IMAGE_TIFF,
                 ContentType.IMAGE_PNG,
                 ContentType.TEXT_XML,
-            ]
+                ContentType.APP_NETCDF,
+            }
             assert validator_call_types == expected_media_types
 
             assert len(results) != len(expected_media_types), (
@@ -3511,10 +3513,13 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["description"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
         assert proc["inputs"][0]["minOccurs"] == 1
         assert proc["inputs"][0]["maxOccurs"] == 1000
-        assert len(proc["inputs"][0]["formats"]) == 1
-        assert proc["inputs"][0]["formats"][0]["default"] is True
+        assert len(proc["inputs"][0]["formats"]) == 2
+        assert proc["inputs"][0]["formats"][0]["default"] is False  # This is extended as 'prefered' alias
         assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert proc["inputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["inputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
+        assert proc["inputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process
+        assert proc["inputs"][0]["formats"][1]["mediaType"] == ContentType.APP_X_NETCDF
+        assert proc["inputs"][0]["formats"][1]["encoding"] == ContentEncoding.BASE64
         assert proc["inputs"][1]["id"] == "freq"
         assert proc["inputs"][1]["title"] == "Frequency"
         assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
@@ -3529,10 +3534,13 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][0]["description"] == "The indicator values computed on the original input grid."
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
-        assert len(proc["outputs"][0]["formats"]) == 1
-        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert len(proc["outputs"][0]["formats"]) == 2
+        assert proc["outputs"][0]["formats"][0]["default"] is False  # This is extended as 'prefered' alias
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert proc["outputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["outputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
+        assert proc["outputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.APP_X_NETCDF
+        assert proc["outputs"][0]["formats"][1]["encoding"] == ContentEncoding.BASE64
         assert proc["outputs"][1]["id"] == "output_log"
         assert proc["outputs"][1]["title"] == "Logging information"
         assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
@@ -3645,7 +3653,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
         assert len(proc["inputs"][2]["formats"]) == 3
         assert proc["inputs"][2]["formats"][0]["default"] is True
-        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_X_NETCDF
         assert "encoding" not in proc["inputs"][2]["formats"][0]  # none specified, so omitted in response
         assert proc["inputs"][2]["formats"][1]["default"] is False
         assert proc["inputs"][2]["formats"][1]["mediaType"] == ContentType.APP_TAR

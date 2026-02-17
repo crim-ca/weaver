@@ -880,6 +880,8 @@ def test_format_extension_validator_basic(data_input, mode, expect):
 def test_format_extension_validator_pywps_cases(content_type, mode, ext):
     # type: (str, int, str) -> None
     """
+    Test format extension validator alignment with :mod:`pywps` validators and formats.
+
     The :mod:`pywps.validator.complexvalidator` module performs some validations for common climate/geospatial types.
     Ensure that they do not introduce an ambiguous error when alternative media-types are used by corresponding formats.
     """
