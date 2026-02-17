@@ -19,7 +19,7 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
@@ -32,7 +32,7 @@ jobs:
   # see: https://github.com/actions/setup-python
   tests:
     needs: skip_duplicate
-    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
