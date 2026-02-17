@@ -454,6 +454,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_YAML: ".yml",
     ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
+    ContentType.IMAGE_OGC_GEOTIFF: ".tif",
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: ".bin",

@@ -384,7 +384,7 @@ def test_parse_inputs_from_file_relative_paths():
                 "in": {
                     "href": "https://fake.domain.com/netcdf.nc",
                     "type": ContentType.APP_NETCDF,
-                    "format": {"mediaType": ContentType.APP_NETCDF},
+                    "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
                 },
             }
         ),
@@ -410,12 +410,12 @@ def test_parse_inputs_from_file_relative_paths():
                     {
                         "href": "https://fake.domain.com/netcdf-1.nc",
                         "type": ContentType.APP_NETCDF,
-                        "format": {"mediaType": ContentType.APP_NETCDF},
+                        "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
                     },
                     {
                         "href": "https://fake.domain.com/netcdf-2.nc",
                         "type": ContentType.APP_NETCDF,
-                        "format": {"mediaType": ContentType.APP_NETCDF},
+                        "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
                     },
                 ]
             }
