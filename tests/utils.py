@@ -16,7 +16,7 @@ import sys
 import tempfile
 import uuid
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
@@ -49,6 +49,7 @@ from weaver.utils import (
     bytes2str,
     fetch_file,
     generate_diff,
+    get_file_header_datetime,
     get_header,
     get_path_kvp,
     get_url_without_query,
@@ -1029,10 +1030,10 @@ def mocked_file_server(directory,                   # type: str
                 mime_type, encoding = mimetypes.guess_type(file_path)
                 headers.update({
                     "Server": "mocked_wps_output",
-                    "Date": str(datetime.utcnow()),
+                    "Date": get_file_header_datetime(datetime.now(timezone.utc)),
                     "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
-                    "Last-Modified": str(datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                    "Last-Modified": get_file_header_datetime(datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })
                 if request.method == "HEAD":
                     headers.pop("Content-Length", None)
