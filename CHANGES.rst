@@ -12,19 +12,6 @@ Changes
 
 Changes:
 --------
-- No change.
-
-Fixes:
-------
-- No change.
-
-.. _changes_6.9.0-dev3:
-
-`6.9.0-dev3 <https://github.com/crim-ca/weaver/tree/6.9.0-dev3>`_ (2026-01-21)
-====================================================================================================================
-
-Changes:
---------
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
 - Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.

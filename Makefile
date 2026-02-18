@@ -6,7 +6,7 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Include custom config if it is available
 -include Makefile.config
 
-override CURRENT_VERSION := 6.9.0-dev3
+override CURRENT_VERSION := 6.8.3
 
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
