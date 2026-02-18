@@ -65,6 +65,12 @@ Glossary
         Please refer to the :term:`OGC` official |ogc-collection|_ for more details
         and complementary terminology.
 
+    CURIE
+    Compact URI
+        A shortened representation of a :term:`URI` that uses a prefix and a reference separated by a colon,
+        such as ``prefix:reference``. In the context of :term:`OGC API`, this is often used to represent a
+        link relation (``rel``) value in HTTP headers or other locations (e.g.: ``[ogc-rel:results]``).
+
     CRS
     Coordinate Reference System
         Geospatial data encoding of the representation parameters, describing the structure to locate entities,
@@ -225,6 +231,10 @@ Glossary
 
         .. seealso::
             |ogc|_
+
+    OGC API
+        Regroups all the :term:`API` standards defined by :term:`OGC`, including :term:`OGC API - Processes`.
+        These are often distinguished from the older :term:`OWS` standards such as :term:`WPS`.
 
     OAP
     OGC API - Processes

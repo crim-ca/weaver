@@ -24,6 +24,7 @@ from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
 
+from weaver import ogc_definitions as ogc_def
 from weaver.database import get_db
 from weaver.datatype import Job, Process
 from weaver.exceptions import (
@@ -86,7 +87,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -271,7 +272,7 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     if not grouped:
         links.append({
-            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URL, "rel": "profile",
+            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URI, "rel": "profile",
             "title": "OGC API - Processes - Job List Profile reference."
         })
 
@@ -357,7 +358,7 @@ def get_job_status_schema(request):
             return {"Content-Type": content_type}
         if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
             content_type = ContentType.APP_JSON
-        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
             content_profile = f"{content_type}; profile=\"{resolved_profile}\""
         else:
             content_profile = f"{content_type}; profile={resolved_schema}"
@@ -372,22 +373,22 @@ def get_job_status_schema(request):
                     }
                 )
             content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
-            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
         else:
             if resolved_schema == JobStatusProfileSchema.OGC:
-                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
-                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, rel="profile")
+                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URI
+                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URI
+                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URI, rel="profile")
             elif resolved_schema == JobStatusProfileSchema.OPENEO:
-                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URI
         return content_headers
 
     profile = get_response_profile(request)
-    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
         schema = sd.JobStatusProfileSchema.OGC
-    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.WPS
-    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.OPENEO
     else:
         params = get_request_args(request)
@@ -423,7 +424,7 @@ def get_job_status_wps_xml_response(job, request):
     If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
     an appropriate HTTP error will be raised.
     """
-    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     headers = {
         "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
         "Content-Schema": schema,
@@ -767,7 +768,10 @@ def get_job_results_response(
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
     profile = get_response_profile(request, request_headers)
-    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
+    is_doc_results = (
+        profile and
+        ogc_def.normalize(profile, version="0") == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+    )
 
     # document/minimal response, unless explicitly requested by profile content negotiation
     if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
@@ -799,9 +803,21 @@ def get_job_results_response(
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
         headers.extend([
-            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URL),
-            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URL, rel="profile")),
+            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI),
+            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
         ])
+        if is_doc_results:
+            # indicate applied preference profile if it was explicitly requested
+            applied = headers.get("Preference-Applied", "")
+            prefer = (
+                get_header("Prefer", request_headers or {}) or
+                get_header("Prefer", request.headers) if request else ""
+            )
+            prefer_profile = get_response_profile(request_headers={"Prefer": prefer})
+            if prefer_profile:
+                applied += "; " if applied else ""
+                applied += f"profile=<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"
+                headers["Preference-Applied"] = applied
 
         # avoid duplicate content-type header due to how pyramid response handles it
         ctype = get_header("Content-Type", headers, pop=True, default=ContentType.APP_JSON)
@@ -909,6 +925,8 @@ def generate_or_resolve_result(
             url = os.path.join(wps_out_url, url[1:])
         if url.startswith(wps_out_url):
             loc = map_wps_output_location(url, settings, exists=True, url=False)
+            if not loc:
+                raise_job_result_gone(job, settings)
             loc = get_secure_path(loc)
         else:
             loc = url  # remote storage, S3, etc.
@@ -1438,7 +1456,7 @@ def raise_job_bad_status_success(job, container=None):
                 }
             )
 
-        # /req/core/job-results-exception/results-not-ready
+        # /req/core/job-results-exception-results-not-ready
         # must use OWS instead of HTTP class to preserve provided JSON body
         # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
         raise OWSNotFound(
@@ -1452,6 +1470,28 @@ def raise_job_bad_status_success(job, container=None):
                 "links": links
             }
         )
+
+
+def raise_job_result_gone(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> NoReturn
+    """
+    Raise a messages indicating that results of an existing and successful :term:`Job` are gone.
+    """
+    settings = get_settings(container)
+    job_links = job.links(settings, self_link="results")
+    job_links = [link for link in job_links if link["rel"] in ["status", "collection", "up", "results"]]
+    headers = [("Link", make_link_header(link)) for link in job_links]
+    raise JobGone(
+        headers=headers,
+        json={
+            "title": "JobResultGone",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+            "status": JobGone.code,
+            "detail": "One or more output data references in Job Results cannot be found.",
+            "value": str(job.id),
+            "links": job_links
+        }
+    )
 
 
 def raise_job_dismissed(job, container=None):

@@ -35,7 +35,7 @@ from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
-from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver import WEAVER_SCHEMA_DIR, __meta__, ogc_definitions as ogc_def
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
@@ -111,6 +111,7 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
+    JobProcessingEntityType,
     JobStatusProfileSchema,
     JobStatusType,
     ProcessSchema
@@ -230,24 +231,33 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 # Because this type has special handling functionalities to distinguish it from any other usual 'complex' I/O
 # or any generic JSON-object data, define common constants that can be reused across the code.
 # If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
-OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
-OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
-OGC_API_BBOX_EPSG = "EPSG:4326"
+OGC_API_PROC_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_PROC_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
+OGC_API_PROC_BBOX_CRS = ogc_def.OGC_DEF_CRS_CRS84_URI
 
-OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
-OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
-OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
-OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
-OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
-OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
-OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
-OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
+OGC_API_PROC_REL_EXCEPTIONS_URI = "http://www.opengis.net/def/rel/ogc/1.0/exceptions"
+OGC_API_PROC_REL_EXECUTE_URI = "http://www.opengis.net/def/rel/ogc/1.0/execute"
+OGC_API_PROC_REL_PROCESSES_URI = "http://www.opengis.net/def/rel/ogc/1.0/processes"
+OGC_API_PROC_REL_PROCESS_DESC_URI = "http://www.opengis.net/def/rel/ogc/1.0/process-desc"
+OGC_API_PROC_REL_JOB_RESULTS_URI = "http://www.opengis.net/def/rel/ogc/1.0/results"
+OGC_API_PROC_REL_JOB_LIST_URI = "http://www.opengis.net/def/rel/ogc/1.0/job-list"
+OGC_API_PROC_REL_JOB_LOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/log"
 
-OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
-OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+OGC_API_PROC_PROFILE_PROC_DESC_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URI = "http://www.opengis.net/def/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_JOB_DESC_URI = "http://www.opengis.net/def/profile/OGC/0/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URI = "http://www.opengis.net/def/profile/OGC/0/jobs-list"
 
-OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
-OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
+OGC_API_PROC_PROFILE_DOCKER_APP_URI = "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+OGC_API_PROC_PROFILE_WPS_APP_URI = "http://www.opengis.net/profiles/eoc/wpsApplication"
+
+OGC_API_SCHEMA_JOB_STATUS_URI = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URI = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+
+OPENEO_API_SCHEMA_URI = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
+OPENEO_API_SCHEMA_JOB_STATUS_URI = f"{OPENEO_API_SCHEMA_URI}#/components/schemas/batch_job"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
@@ -300,13 +310,17 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
-JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
-JOB_STATUS_FIELD_AFTER = [
+JOB_STATUS_FIELD_FIRST = [
+    "id",
     "jobID",
     "processID",
     "providerID",
+    "processingEntityType",
     "type",
     "status",
+]
+JOB_STATUS_FIELD_AFTER = [
+    "title",
     "message",
     "created",
     "started",
@@ -785,14 +799,14 @@ class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
     validator = OneOf([
-        OGC_API_PROC_PROFILE_PROC_DESC_URL,
-        OGC_API_PROC_PROFILE_PROC_LIST_URL,
-        OGC_API_PROC_PROFILE_EXECUTE_URL,
-        OGC_API_PROC_PROFILE_RESULTS_URL,
-        OGC_API_PROC_PROFILE_JOB_DESC_URL,
-        OGC_API_PROC_PROFILE_JOB_LIST_URL,
-        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
-        OPENEO_API_SCHEMA_JOB_STATUS_URL,
+        OGC_API_PROC_PROFILE_PROC_DESC_URI,
+        OGC_API_PROC_PROFILE_PROC_LIST_URI,
+        OGC_API_PROC_PROFILE_EXECUTE_URI,
+        OGC_API_PROC_PROFILE_RESULTS_URI,
+        OGC_API_PROC_PROFILE_JOB_DESC_URI,
+        OGC_API_PROC_PROFILE_JOB_LIST_URI,
+        OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+        OPENEO_API_SCHEMA_JOB_STATUS_URI,
     ])
 
 
@@ -1602,19 +1616,9 @@ class AnyCRS(AnyOfKeywordSchema):
         ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), validator=OneOf([
-            # equivalent forms of EPSG:4326, 2D or 3D
-            "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84",
-            "urn:ogc:def:crs:OGC:2:84",
-            "WGS84",
-        ])),
+        ExtendedSchemaNode(String(), validator=OneOf(ogc_def.OGC_DEF_CRS_ANY_EPSG4326)),
     ]
-    default = OGC_API_BBOX_EPSG
+    default = ogc_def.OGC_DEF_CRS_EPSG4326_SHORT
 
 
 class AnyFilterExpression(AnyOfKeywordSchema):
@@ -2347,6 +2351,14 @@ class JobTypeEnum(ExtendedSchemaNode):
     default = null
     example = "process"
     validator = OneOf(JobStatusType.values())
+
+
+class JobProcessingEntityTypeEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobProcessingEntityType"
+    default = null
+    example = JobProcessingEntityType.OGC_API_PROCESSES
+    validator = OneOf(JobProcessingEntityType.values())
 
 
 class JobTitle(ExtendedSchemaNode):
@@ -3278,7 +3290,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3907,19 +3919,25 @@ class JobProcess(AnyOfKeywordSchema):
     ]
 
 
-class JobStatusInfo(ExtendedMappingSchema):
-    _schema = OGC_API_SCHEMA_JOB_STATUS_URL
-    _sort_first = JOB_STATUS_FIELD_FIRST
-    _sort_after = JOB_STATUS_FIELD_AFTER
-
+class JobSummary(ExtendedMappingSchema):
+    id = JobID()
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
+    processingEntityType = JobProcessingEntityTypeEnum(missing=None,  # allowed omit for backward compatibility
+                                                       description="Represents the entity that executed the job.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
     title = JobTitle(missing=drop)
     status = JobStatusEnum(description="Last updated status.")
+
+
+class JobStatusInfo(JobSummary):
+    _schema = OGC_API_SCHEMA_JOB_STATUS_URI
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
                                  description="Timestamp when the process execution job was created.")
@@ -3942,9 +3960,9 @@ class JobStatusInfo(ExtendedMappingSchema):
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will be prompted for updated status details.")
-    percentCompleted = Number(example=0, validator=Range(min=0, max=100),
+    percentCompleted = Number(example=0, validator=Range(min=0, max=100), missing=drop,
                               description="Completion percentage of the job as indicated by the process.")
-    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
+    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100), missing=drop,
                                   description="Completion progress of the job (alias to 'percentCompleted').")
     process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
@@ -3964,7 +3982,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusSchema(DescriptionSchema):
+class CreatedJobStatusSchema(JobSummary, DescriptionSchema):
     jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
@@ -4287,14 +4305,14 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class BoundingBoxObject(StrictMappingSchema):
-    _schema = OGC_API_BBOX_SCHEMA
+    _schema = OGC_API_PROC_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
-    format = OGC_API_BBOX_FORMAT
+    format = OGC_API_PROC_BBOX_FORMAT
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )
     crs = AnyCRS(
-        default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        default=OGC_API_PROC_BBOX_CRS,
         description="Coordinate Reference System of the Bounding Box points.",
     )
 

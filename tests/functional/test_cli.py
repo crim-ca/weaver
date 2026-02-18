@@ -486,7 +486,7 @@ class TestWeaverClient(TestWeaverClientBase):
         inputs_param,           # type: Union[JSON, str]
         process="Echo",         # type: str
         preload=False,          # type: bool
-        location=False,         # type: Optional[str]
+        location=False,         # type: bool
         expect_success=True,    # type: bool
         expect_status=None,     # type: Optional[AnyStatusType]
         mock_exec=True,         # type: bool
@@ -1728,7 +1728,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:5])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):

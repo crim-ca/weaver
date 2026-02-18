@@ -28,7 +28,7 @@ from pywps.validator.mode import MODE
 
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
-from weaver import xml_util
+from weaver import ogc_definitions as ogc_def, xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.formats import (
     DEFAULT_FORMAT,
@@ -92,7 +92,11 @@ from weaver.processes.convert import (
     xml_wps2cwl
 )
 from weaver.utils import null
-from weaver.wps_restapi.swagger_definitions import OGC_API_BBOX_FORMAT, OGC_API_BBOX_SCHEMA
+from weaver.wps_restapi.swagger_definitions import (
+    OGC_API_PROC_BBOX_CRS,
+    OGC_API_PROC_BBOX_FORMAT,
+    OGC_API_PROC_BBOX_SCHEMA
+)
 
 if TYPE_CHECKING:
     from typing import List
@@ -2853,28 +2857,52 @@ def test_ows_wps_json_default_complex_format():
             {"data": 123456, "dataType": "integer"},
         ),
         (
-            [MockBboxElementXML([1, 2, 3, 4], Crs("EPSG:4326"))],  # auto-resolve axis order YX
+            [MockBboxElementXML([1, 2, 3, 4], Crs(ogc_def.OGC_DEF_CRS_CRS84_URI))],
             WPS_BOUNDINGBOX_DATA,
             None,
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": "urn:ogc:def:crs:EPSG::4326",
-                    "bbox": [2., 1., 4., 3.],
-                    "format": OGC_API_BBOX_FORMAT,
-                    "schema": OGC_API_BBOX_SCHEMA,
+                    "crs": OGC_API_PROC_BBOX_CRS,
+                    "bbox": [1., 2., 3., 4.],            # auto-resolve axis order XY
+                    "format": OGC_API_PROC_BBOX_FORMAT,  # specific case of recognized default format for OAP
+                    "schema": OGC_API_PROC_BBOX_SCHEMA,
                 }
             },
         ),
         (
-            [MockBboxElementXML([1, 2, 3, 4], Crs("CRS:84"))],  # auto-resolve axis order XY
+            [MockBboxElementXML([1, 2, 3, 4], Crs(ogc_def.OGC_DEF_CRS_EPSG4326_SHORT))],
             WPS_BOUNDINGBOX_DATA,
             None,
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": "urn:ogc:def:crs:CRS::84",
-                    "bbox": [1., 2., 3., 4.],
+                    "crs": ogc_def.OGC_DEF_CRS_EPSG4326_URI,
+                    "bbox": [2., 1., 4., 3.],  # auto-resolve axis order YX
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs(ogc_def.OGC_DEF_CRS_CRS84_LEGACY_SHORT))],
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": ogc_def.OGC_DEF_CRS_CRS84_LEGACY_URI,
+                    "bbox": [1., 2., 3., 4.],  # auto-resolve axis order XY
+                }
+            },
+        ),
+        (
+            [MockBboxElementXML([1, 2, 3, 4], Crs(ogc_def.OGC_DEF_CRS_OGC_CRS84_SHORT))],
+            WPS_BOUNDINGBOX_DATA,
+            None,
+            {
+                "dataType": WPS_BOUNDINGBOX_DATA,
+                "data": {
+                    "crs": ogc_def.normalize(ogc_def.OGC_DEF_CRS_CRS84_URI, version="0"),
+                    "bbox": [1., 2., 3., 4.],  # auto-resolve axis order XY
                 }
             },
         ),

@@ -11,7 +11,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -26,7 +26,7 @@ from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, LITERAL_DATA_TYPES, RANGECLOSURETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
 
-from weaver import xml_util
+from weaver import ogc_definitions as ogc_def, xml_util
 from weaver.exceptions import PackageTypeError
 from weaver.execute import ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
@@ -609,17 +609,23 @@ def ows2json_bbox_data(bbox):
     Converts :mod:`owslib` :term:`WPS` Bounding Box data into a :term:`JSON` representation.
     """
     # FIXME: owslib does not actually handle 3D+ coordinates...
-    bbox_crs = str(bbox.crs)
+    if not bbox.crs.authority:
+        bbox_crs = str(bbox.crs)  # URN
+    else:
+        bbox_crs = bbox.crs.getcodeuri1()
     if bbox.crs.axisorder == "yx":
         bbox_val = [bbox.miny, bbox.minx, bbox.maxy, bbox.maxx]
     else:
         bbox_val = [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
     bbox_val = [float(val) for val in bbox_val]
     bbox_data = {"bbox": bbox_val, "crs": bbox_crs}
-    if bbox.crs.id.upper() == sd.OGC_API_BBOX_EPSG:
+    if bbox_crs in [
+        ogc_def.OGC_DEF_CRS_CRS84_URI,
+        ogc_def.OGC_DEF_CRS_CRS84H_URI,
+    ]:
         bbox_data.update({
-            "format": sd.OGC_API_BBOX_FORMAT,
-            "schema": sd.OGC_API_BBOX_SCHEMA,
+            "format": sd.OGC_API_PROC_BBOX_FORMAT,
+            "schema": sd.OGC_API_PROC_BBOX_SCHEMA,
         })
     return bbox_data
 
@@ -2393,13 +2399,16 @@ def json2oas_io_bbox(io_info, io_hint=null):
     """
     # don't add the 'enum' of CRS as defined in the reference schema since this is auto-generated
     # and could mismatch the intended CRS by the user, unless available explicitly
-    crs_schema = {"type": "string", "format": "uri", "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"}
+    crs_schema = cast(
+        "OpenAPISchema",
+        {"type": "string", "format": "uri", "default": ogc_def.OGC_DEF_CRS_CRS84_URI}
+    )
     supported_crs = get_field(io_info, "supported_crs", search_variations=True)
     if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
         crs_schema["enum"] = supported_crs
     bbox_object_schema = {
         "type": "object",
-        "format": sd.OGC_API_BBOX_FORMAT,
+        "format": sd.OGC_API_PROC_BBOX_FORMAT,
         "required": ["bbox"],
         "properties": {
             "crs": crs_schema,
@@ -2412,7 +2421,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
                 ]
             },
         }
-    }  # type: OpenAPISchemaObject
+    }
 
     if isinstance(io_hint, dict):
         if "$ref" in io_hint:
@@ -2426,15 +2435,15 @@ def json2oas_io_bbox(io_info, io_hint=null):
     # add the alternate representation method
     bbox_string_schema = {
         "type": "string",
-        "format": sd.OGC_API_BBOX_FORMAT,
-        "contentSchema": sd.OGC_API_BBOX_SCHEMA,
+        "format": sd.OGC_API_PROC_BBOX_FORMAT,
+        "contentSchema": sd.OGC_API_PROC_BBOX_SCHEMA,
     }
-    bbox_schema = {
+    bbox_schema = cast("OpenAPISchema", {
         "oneOf": [
             bbox_object_schema,
             bbox_string_schema,
         ]
-    }
+    })
     return bbox_schema
 
 
@@ -2738,7 +2747,7 @@ def oas2json_io_object(io_info, io_href=null):
     """
     io_fmt = get_field(io_info, "format", search_variations=False)
     io_props = get_field(io_info, "properties", search_variations=False) or {}
-    if ("bbox" in io_props and "crs" in io_props) or io_fmt == sd.OGC_API_BBOX_FORMAT:
+    if ("bbox" in io_props and "crs" in io_props) or io_fmt == sd.OGC_API_PROC_BBOX_FORMAT:
         io_json = {"type": WPS_BOUNDINGBOX}
         io_crs = get_field(io_props, "crs", search_variations=False)
         if isinstance(io_crs, dict):
@@ -2938,7 +2947,7 @@ def oas2json_io(io_info):
         if any(io_field is not null for io_field in [io_ctype, io_encode]):  # ignore schema since possible in literal
             io_type = WPS_COMPLEX  # set value to avoid null return below, but no parsing after since not OAS type
             io_json = oas2json_io_file(io_info, io_href)
-        if io_schema == sd.OGC_API_BBOX_SCHEMA or io_format == sd.OGC_API_BBOX_FORMAT:
+        if io_schema == sd.OGC_API_PROC_BBOX_SCHEMA or io_format == sd.OGC_API_PROC_BBOX_FORMAT:
             return oas2json_io_object(io_info, io_href)
 
     else:

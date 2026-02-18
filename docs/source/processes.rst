@@ -2600,7 +2600,7 @@ to execute. Content negotiation also happens within the submitted :ref:`proc_exe
 Following is a summary of relevant parameters impacting content negotiation.
 
 .. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
-    :name: table-content-negotiation
+    :name: table-content-negotiation-parameters
     :align: center
     :header-rows: 1
     :widths: 10,10,50,15,15
@@ -2667,7 +2667,7 @@ Following is a summary of relevant parameters impacting content negotiation.
 
 .. rubric:: Notes
 
-.. [#noteEncoding]
+.. [#noteParamEncoding]
     Depending on the location and the specific name of the query parameters or headers, certain encodings are enforced.
     For example, the ``Link`` header is defined by :rfc:`6906`, which **requires** its ``href`` to be an :term:`URI`.
     In such case, shorthand notation like ``rel=profile, href=cloud-optimized`` is **not allowed**.
@@ -2693,7 +2693,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
     However, the corresponding :term:`URI` or :term:`Media-Type` representations must match *exactly*.
 
 .. list-table:: Common Shorthand Notations Identifiers for Content Negotiation
-    :name: table-content-negotiation
+    :name: table-content-negotiation-notations
     :align: center
     :header-rows: 1
     :widths: 10,30,60
