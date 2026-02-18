@@ -142,7 +142,7 @@ class OperationResult(AutoBase):
 
     def __init__(
         self,
-        success=None,   # type: Optional[bool]
+        success=False,  # type: bool
         message=None,   # type: Optional[str]
         body=None,      # type: Optional[Union[str, JSON]]
         headers=None,   # type: Optional[AnyHeadersContainer]
@@ -1331,8 +1331,13 @@ class WeaverClient(object):
                     continue
                 if href.startswith("file://"):
                     href = href[7:]
-                if os.path.isdir(href):
+                if "://" not in href and (
+                    os.path.isdir(href) or
+                    href.endswith("/") or
+                    data.get("type") == ContentType.APP_DIR
+                ):
                     return OperationResult(
+                        success=False,
                         message=f"Cannot upload local directory to vault: [{file}]. Aborting operation.",
                         title="Directory upload not implemented.",
                         code=HTTPNotImplemented.code,
@@ -1842,6 +1847,7 @@ class WeaverClient(object):
         file_path = os.path.abspath(os.path.expanduser(file_path))
         if os.path.isdir(file_path):
             return OperationResult(
+                success=False,
                 message=f"Cannot upload local directory to vault: [{file_path}]. Aborting operation.",
                 title="Directory upload not implemented.",
                 code=HTTPNotImplemented.code,
@@ -3426,25 +3432,23 @@ def make_parser():
         title=docker_auth_title,
         description=docker_auth_desc,
     )
-    op_deploy_token = op_deploy_group.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_creds = op_deploy_token.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_tkt = op_deploy_token.add_argument(
+    op_deploy_tkt = op_deploy_group.add_argument(
         "-T", "--token", dest="token",
         help="Authentication token to retrieve a Docker image reference from a protected registry during execution."
     )
-    op_deploy_usr = op_deploy_creds.add_argument(
+    op_deploy_usr = op_deploy_group.add_argument(
         "-U", "--username", dest="username",
         help="Username to compute the authentication token for Docker image retrieval from a protected registry."
     )
-    op_deploy_pwd = op_deploy_creds.add_argument(
+    op_deploy_pwd = op_deploy_group.add_argument(
         "-P", "--password", dest="password",
         help="Password to compute the authentication token for Docker image retrieval from a protected registry."
     )
-
     # when actions are evaluated for actual executions, conditional 'required' will consider them as options
     # when actions are printed in help, they will be considered required, causing ( ) to be added to form the
     # rendered group of *mutually required* arguments
-    parser.add_help_conditional(op_deploy_creds)
+    parser.add_help_conditional(op_deploy_group)
+
     # following adjust references in order to make arguments appear within sections/groups as intended
     op_deploy_mutex_usr_tkt = op_deploy_group.add_mutually_exclusive_group()
     op_deploy_mutex_usr_tkt._group_actions.append(op_deploy_usr)

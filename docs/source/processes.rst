@@ -415,11 +415,23 @@ The request body requires mainly two components:
 
 - | ``processDescription``:
   | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
-    This mostly corresponds to information that is provided by traditional :term:`WPS`
-    or :term:`OGC API - Processes` definitions.
+    This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
+    following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
+    such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
+
+    .. seealso::
+        Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
+        could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
+
 - | ``executionUnit``:
   | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
     or other :ref:`proc_types` references that indicates how to execute the underlying application.
+
+.. note::
+    If the :term:`Process` can be directly represented and converted from the :term:`CWL` with regard to
+    all :ref:`cwl-wps-mapping` considerations, the :term:`CWL` might be directly deployed with the
+    appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
 
 .. |app_pkg| replace:: Application Package
 .. _app_pkg: docs/source/package.rst
@@ -2073,7 +2085,7 @@ the :ref:`proc_exec_results` options. However, an *additional* ``process`` :term
 to indicate which :term:`Process` should be executed by the :term:`Job`.
 
 The |job-exec-req|_ operation allows interoperability alignement with other execution strategies, such as defined
-by the |openeo-api|_ and the |ogc-tb20-gdc|_ *GDC API Profile*. It also opens the door for advanced :term:`Workflow`
+by the |openeo-api-profile|_ and the |ogc-tb20-gdc-profile|_. It also opens the door for advanced :term:`Workflow`
 definitions from a common :term:`Job` endpoint interface, as described by the |ogc-api-proc-part4|_ extension.
 
 Furthermore, an optional ``"status": "create"`` request body parameter can be supplied to indicate to the :term:`Job`
@@ -2184,7 +2196,7 @@ the |status-req|_ request.
 - Specify a ``profile`` parameter within the ``Accept`` header (e.g.: ``Accept: application/json; profile=openeo``).
 
 Using the |openeo|_ profile for example, will allow returning ``status`` values that are appropriate
-as per the |openeo-api|_ definition.
+as per the |openeo-api-profile|_ definition.
 
 When performing :ref:`Job Status <proc_op_job_status>` requests, the received response should
 contain a ``Content-Schema`` header indicating which of the applied ``profile`` is being represented.

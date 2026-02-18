@@ -35,6 +35,44 @@ Fixes:
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 - Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
 
+.. _changes_6.8.3:
+
+`6.8.3 <https://github.com/crim-ca/weaver/tree/6.8.3>`_ (2026-02-12)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` status endpoint.
+- Pin ``cryptography>=46.0.5`` for security fix.
+
+.. _changes_6.8.2:
+
+`6.8.2 <https://github.com/crim-ca/weaver/tree/6.8.2>`_ (2026-02-11)
+========================================================================
+
+Changes:
+--------
+- Support `CLI` parsing of `CWL` ``Directory`` input value if provided using ``path`` with a remote reference URL.
+  Only remote references are supported since the `Vault` feature cannot be used to upload multiple files in a directory.
+- Emit a ``WeaverConfigurationWarning`` if ``weaver.wps_output_dir`` and ``weaver.wps_output_url`` (or its value
+  resolved from ``weaver.wps_output_path``) are detected to contain unbalanced trailing slashes. If detected, these
+  erroneous values will be automatically adjusted by ``map_wps_output_location`` to avoid invalid reference mapping.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` results leading to errors on certain clients/proxies.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` header in
+  response of `Job` results to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` headers to determine if this profile was applied.
+- Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
+- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid```
+  (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_
+  and `pypa/setuptools#5007 <https://github.com/pypa/setuptools/pull/5007>`_).
+
 .. _changes_6.8.1:
 
 `6.8.1 <https://github.com/crim-ca/weaver/tree/6.8.1>`_ (2026-01-09)

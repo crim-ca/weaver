@@ -1056,7 +1056,14 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"id\": \"Echo\"" in line for line in lines)
         assert all("\"links\":" not in line for line in lines)
 
-    def test_deploy_docker_auth_help(self):
+    @parameterized.expand(
+        # depending on terminal width, the related arguments may be split
+        # over multiple lines differently, which causes groups to be missing
+        # ensures that the definitions handle multi-line help text correction
+        # (however, don't check for too-small terminals, since it won't render nicely anyway)
+        [80, 120, 160]
+    )
+    def test_deploy_docker_auth_help(self, terminal_width):
         """
         Validate some special handling to generate special combinations of help argument details.
         """
@@ -1068,6 +1075,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             ],
             trim=False,
             entrypoint=weaver_cli,
+            env={"COLUMNS": str(terminal_width)},
         )
         args_help = "[-T TOKEN | ( -U USERNAME -P PASSWORD )]"
         err_help = f"Expression '{args_help}' not matched in:\n{repr_json(lines, indent=2)}"

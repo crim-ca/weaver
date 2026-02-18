@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import tempfile
+import warnings
 from configparser import ConfigParser
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -34,6 +35,7 @@ from weaver.utils import (
     retry_on_cache_error,
     validate_s3
 )
+from weaver.warning import WeaverConfigurationWarning
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
@@ -212,6 +214,20 @@ def map_wps_output_location(reference, container, url=False, exists=True, file_s
     wps_out_dir = get_wps_output_dir(settings)
     wps_out_url = get_wps_output_url(settings)
     wps_out_ref = None
+    if (
+        (wps_out_dir.endswith("/") and not wps_out_url.endswith("/")) or
+        (not wps_out_dir.endswith("/") and wps_out_url.endswith("/"))
+    ):
+        warnings.warn(
+            f"WPS output directory [{wps_out_dir}] and URL [{wps_out_url}] should both have balanced slash endings. "
+            "This mismatch can cause mapping issues of WPS output references. "
+            "They will be patched inline for this mapping attempt. "
+            "Consider fixing your configuration.",
+            WeaverConfigurationWarning,
+        )
+        wps_out_dir = wps_out_dir.rstrip("/")
+        wps_out_url = wps_out_url.rstrip("/")
+
     if url and reference.startswith("file://"):
         reference = reference[7:]
     if url and reference.startswith(wps_out_dir):

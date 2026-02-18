@@ -820,7 +820,7 @@ def get_job_results_response(
                 headers["Preference-Applied"] = applied
 
         # avoid duplicate content-type header due to how pyramid response handles it
-        ctype = get_header("Content-Type", headers, pop=True)
+        ctype = get_header("Content-Type", headers, pop=True, default=ContentType.APP_JSON)
         return HTTPOk(json=results_json, headers=headers, content_type=ctype)
 
     if not results:  # avoid schema validation error if all by reference

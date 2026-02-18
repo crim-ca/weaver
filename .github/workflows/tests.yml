@@ -19,9 +19,10 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_duplicate.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
-      - uses: fkirc/skip-duplicate-actions@master
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: "same_content_newer"
           skip_after_successful_duplicate: "true"
@@ -31,13 +32,15 @@ jobs:
   # see: https://github.com/actions/setup-python
   tests:
     needs: skip_duplicate
-    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
+      # globally excluded 'checks', to be re-executed by dedicated job
+      CHECKS_EXCLUDE: "links"
     services:
       # Label used to access the service container
       mongodb:
@@ -62,13 +65,17 @@ jobs:
           #  allow-failure: true
           #  test-case: test-func-only
           # linter tests
-          # limitation with nested f-string quote styles changed in Python 3.12 (https://peps.python.org/pep-0701/)
-          # forces us to pin Python 3.11 during linting checks in order to evaluate backward-compatible code styles
-          # (see https://github.com/edaniszewski/pylint-quotes/issues/32)
+          # performs all 'check' targets except the 'CHECKS_EXCLUDE' ones (that should be defined by dedicated jobs)
           - os: ubuntu-latest
             python-version: "3.12"
             allow-failure: false
             test-case: check-only
+          # check links separately as they tend to sporadically fail from external factors (timeout, ssl, down, etc.)
+          # avoid wasting a lot of CI test time because one of them doesn't respond
+          - os: ubuntu-latest
+            python-version: "3.12"
+            allow-failure: true
+            test-case: check-links-only
           # documentation build
           - os: ubuntu-latest
             python-version: "3.12"
@@ -133,6 +140,10 @@ jobs:
         run: |
           hash -r
           env | sort
+
+      - name: Display Applicable Checks
+        if: ${{ startsWith(matrix.test-case, 'check') }}
+        run: make check-info
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 

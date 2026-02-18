@@ -1,4 +1,4 @@
-RELEASE := master
+VERSION ?= 6.8.3
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
@@ -6,12 +6,10 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Include custom config if it is available
 -include Makefile.config
 
-override CURRENT_VERSION := 6.8.3
-
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= $(if $(VERSION),$(VERSION),$(CURRENT_VERSION))
+APP_VERSION ?= $(VERSION)
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 
 # guess OS (Linux, Darwin,...)
@@ -488,15 +486,22 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 
 ## -- Static code check targets ------------------------------------------------------------------------------------- ##
 ## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
+# note: use multiple 'filter-out' variants to filter transparently with/without 'check-' prefix
+CHECKS_EXCLUDE ?=
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
 CHECKS_PY ?= pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
+CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 CHECKS_PY := $(addprefix check-, $(CHECKS_PY))
+CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
 CHECKS_NO_PY ?= css md
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
+CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
+CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
+
 CHECKS ?= $(CHECKS_PY) $(CHECKS_NO_PY)
 
 $(CHECKS_PY): check-%: install-dev check-%-only
@@ -513,6 +518,11 @@ check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
 check-all: install-dev $(CHECKS) 	## check all code linters
+
+.PHONY: check-info
+check-info:		## display check targets information
+	@echo "Disabled checks [CHECKS_EXCLUDE]: [$(CHECKS_EXCLUDE)]"
+	@echo "Enabled checks  [CHECKS]        : [$(CHECKS)]"
 
 .PHONY: check-pep8-only
 check-pep8-only: | mkdir-reports 		## check for PEP8 code style issues
@@ -783,13 +793,13 @@ dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VER
 	@-echo > /dev/null
 
 .PHONY: bump
-bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.z> bump]
+bump:	## bump version using VERSION specified as user input [make VERSION=<x.y.z> bump]
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) $(BUMP_TOOL) $(BUMP_XARGS) --new-version "${VERSION}";'
 
-.PHONY: dist-pypi	## publish package distribution on PyPI with dependencies preinstall
-dist-pypi: install-sys dist-pypi-only
+.PHONY: dist-pypi
+dist-pypi: install-sys dist-pypi-only	## publish package distribution on PyPI with dependencies preinstall
 
 .PHONY: dist-pypi-only
 dist-pypi-only: clean-dist	## publish package distribution on PyPI
