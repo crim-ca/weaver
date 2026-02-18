@@ -767,7 +767,7 @@ def test_output_format_values(test_format):
         (f.ContentType.TEXT_XML, f.OutputFormat.XML),
         (f.ContentType.TEXT_HTML, f.OutputFormat.HTML),
         (f.ContentType.TEXT_PLAIN, f.OutputFormat.TXT),
-        (f.ContentType.APP_YAML, f.OutputFormat.YML),
+        (f.ContentType.APP_YAML, f.OutputFormat.YAML),
     ]
 )
 def test_output_format_media_type(test_format, expect_type):
