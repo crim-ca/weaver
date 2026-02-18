@@ -59,7 +59,7 @@ def test_valid_media_type_categories(media_type):
 
 
 @pytest.mark.parametrize(
-    ["test_extension", "extra_params", "expected_content_type"],
+    ["test_media_type", "extra_params", "expected_extension"],
     [
         ("", {"dot": False}, ""),
         (f.ContentType.APP_JSON, {}, ".json"),  # basic
@@ -77,10 +77,15 @@ def test_valid_media_type_categories(media_type):
         ("x/y", {"dot": True}, ".y"),
         ("x/.y", {"dot": False}, "y"),
         (f.ContentType.ANY, {}, ".*"),
+        # equivalents YAML extensions/media-types, should all prefer RFC 9512 .yaml, but allows .yml
+        *[
+            (yaml_ctype, {}, ".yaml")
+            for yaml_ctype in f.ContentType.ANY_YAML
+        ],
     ]
 )
-def test_get_extension(test_extension, extra_params, expected_content_type):
-    assert f.get_extension(test_extension, **extra_params) == expected_content_type
+def test_get_extension(test_media_type, extra_params, expected_extension):
+    assert f.get_extension(test_media_type, **extra_params) == expected_extension
 
 
 @pytest.mark.parametrize(

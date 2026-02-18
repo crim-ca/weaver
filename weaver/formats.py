@@ -457,8 +457,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_NETCDF: ".nc",
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
-    ContentType.APP_YAML: ".yml",
-    ContentType.APP_X_YAML: ".yaml",
+    ContentType.APP_YAML: ".yaml",
     ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",
@@ -480,7 +479,8 @@ _CONTENT_TYPE_EXCLUDE = [
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": ContentType.APP_YAML,    # common alternative to .yml
+    ".yml": ContentType.APP_YAML,     # common alternative to .yaml
+    ".yaml": ContentType.APP_YAML,    # official/recommended extension for YAML (RFC 9512)
     ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
     ".xsd": ContentType.APP_XML,
 }
