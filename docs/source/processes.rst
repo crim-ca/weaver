@@ -2731,7 +2731,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
       - :term:`Media-Type` ``application/json``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`JSON` representation.
     * - ``yaml``/``yml``
-      - :term:`Media-Type` ``application/x-yaml``
+      - :term:`Media-Type` ``application/yaml``, ``application/x-yaml``, ``text/yaml`` or ``text/x-yaml``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`YAML` representation.
     * - ``xml``
       - :term:`Media-Type` ``text/xml`` or ``application/xml``
