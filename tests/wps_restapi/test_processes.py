@@ -1009,6 +1009,21 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "cwlVersion: " in resp.text
         assert "class: CommandLineTool" in resp.text
 
+    def test_deploy_process_CWL_media_type_aliases_from_format(self):
+        """
+        Test that media-types with known aliases (ie: NetCDF in this case) are correctly resolved in the process.
+
+        The process description should extract and convert the :term:`CWL` ``format`` keys adequately into their
+        respective :term:`Media-Type` definitions. By default, the preferred mappings should be employed, unless
+        explicitly indicated for alternate variants. Both can be combined to offer flexibility as needed.
+        However, :term:`CWL` outputs do not allow multiple ``format`` (list representation), and should therefore
+        only employ the preferred mapping unless they desire to explicitly defined the alternate :term:`Media-Type`.
+
+        .. seealso::
+            - See :ref:`cwl-file-format-output` regarding the :term:`CWL` output ``format`` limitation.
+        """
+        raise NotImplementedError  # FIXME: WIP!!
+
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
         Test deployment of a process with authentication to access the referenced repository.
