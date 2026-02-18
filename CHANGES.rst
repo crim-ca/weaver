@@ -29,6 +29,9 @@ Changes:
 - Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` response
   of `Job` results requesting this profile to avoid header buffer overflows from server deployments. Instead, clients
   should rely on the ``Link: rel=profile`` or ``Content-Profile`` header to determine if this profile was applied.
+- Return Bounding Box ``crs`` as URI representation when they can be resolved from an URN or short code identifier.
+  This ensures alignment with the default ``format: ogc-bbox`` representation that defines ``crs`` as an enum of URIs
+  for corresponding ``OGC:CRS84`` and ``OGC:CRS84h`` codes.
 
 Fixes:
 ------
@@ -69,7 +72,7 @@ Fixes:
   response of `Job` results to avoid header buffer overflows from server deployments. Instead, clients
   should rely on the ``Link: rel=profile`` or ``Content-Profile`` headers to determine if this profile was applied.
 - Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
-- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid```
+- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid``
   (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_
   and `pypa/setuptools#5007 <https://github.com/pypa/setuptools/pull/5007>`_).
 

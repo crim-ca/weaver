@@ -2366,7 +2366,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             results = self.monitor_job(status_url)
 
         # note: following CRS format is not valid unless nested under 'value' (ie: schema allows it as "object" value)
-        expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
+        expect_bbox = {
+            "bbox": bbox["bbox"],
+            "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
+            "format": sd.OGC_API_PROC_BBOX_FORMAT,
+            "schema": sd.OGC_API_PROC_BBOX_SCHEMA,
+        }
         assert results
         assert "bboxOutput" in results
         assert results["bboxOutput"] == expect_bbox, (
