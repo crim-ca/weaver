@@ -609,14 +609,20 @@ def ows2json_bbox_data(bbox):
     Converts :mod:`owslib` :term:`WPS` Bounding Box data into a :term:`JSON` representation.
     """
     # FIXME: owslib does not actually handle 3D+ coordinates...
-    bbox_crs = str(bbox.crs)
+    if not bbox.crs.authority:
+        bbox_crs = str(bbox.crs)  # URN
+    else:
+        bbox_crs = bbox.crs.getcodeuri1()
     if bbox.crs.axisorder == "yx":
         bbox_val = [bbox.miny, bbox.minx, bbox.maxy, bbox.maxx]
     else:
         bbox_val = [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
     bbox_val = [float(val) for val in bbox_val]
     bbox_data = {"bbox": bbox_val, "crs": bbox_crs}
-    if bbox.crs.id.upper() == sd.OGC_API_PROC_BBOX_CRS:
+    if bbox_crs in [
+        ogc_def.OGC_DEF_CRS_CRS84_URI,
+        ogc_def.OGC_DEF_CRS_CRS84H_URI,
+    ]:
         bbox_data.update({
             "format": sd.OGC_API_PROC_BBOX_FORMAT,
             "schema": sd.OGC_API_PROC_BBOX_SCHEMA,

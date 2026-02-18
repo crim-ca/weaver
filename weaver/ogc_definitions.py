@@ -55,17 +55,25 @@ OGC_DEF_CRS_UNDEFINED_URN = "urn:ogc:def:crs:::-1"
 
 # equivalent forms of EPSG:4326, 2D or 3D
 OGC_DEF_CRS_WSG84_SHORT = "WGS84"
-OGC_DEF_CRS_CRS84_URN_LEGACY = "urn:ogc:def:crs:CRS::84"
+OGC_DEF_CRS_CRS84_LEGACY_SHORT = "CRS:84"
+OGC_DEF_CRS_CRS84_LEGACY_URN = "urn:ogc:def:crs:CRS::84"
+OGC_DEF_CRS_CRS84_LEGACY_URI = "http://www.opengis.net/def/crs/CRS/0/84"
 OGC_DEF_CRS_CRS84_URN = "urn:ogc:def:crs:OGC:2:84"
 OGC_DEF_CRS_CRS84_URI = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 OGC_DEF_CRS_CRS84H_URI = "http://www.opengis.net/def/crs/OGC/0/CRS84h"
+OGC_DEF_CRS_OGC_CRS84_SHORT = "OGC:CRS84"
+OGC_DEF_CRS_OGC_CRS84_URN = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 OGC_DEF_CRS_EPSG4326_URN = "urn:ogc:def:crs:EPSG::4326"
 OGC_DEF_CRS_EPSG4326_SHORT = "EPSG:4326"
 OGC_DEF_CRS_EPSG4326_URI = "http://www.opengis.net/def/crs/EPSG/0/4326"
 OGC_DEF_CRS_ANY_EPSG4326 = [
     OGC_DEF_CRS_WSG84_SHORT,
-    OGC_DEF_CRS_CRS84_URN_LEGACY,
+    OGC_DEF_CRS_CRS84_LEGACY_SHORT,
+    OGC_DEF_CRS_CRS84_LEGACY_URN,
+    OGC_DEF_CRS_CRS84_LEGACY_URI,
     OGC_DEF_CRS_CRS84_URN,
+    OGC_DEF_CRS_OGC_CRS84_SHORT,
+    OGC_DEF_CRS_OGC_CRS84_URN,
     normalize(OGC_DEF_CRS_CRS84_URI, secure=True, version="1.3"),
     normalize(OGC_DEF_CRS_CRS84_URI, secure=False, version="1.3"),
     normalize(OGC_DEF_CRS_CRS84_URI, secure=True, version="0"),
