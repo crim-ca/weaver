@@ -1009,8 +1009,8 @@ docker-test: docker-build stop	## execute smoke test of the built images (valida
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop
 
-.PHONY: docker-stat
-docker-stat:  ## query docker-compose images status (from 'docker-test')
+.PHONY: docker-status
+docker-status:  ## query docker-compose images status (from 'docker-test')
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
@@ -1041,8 +1041,8 @@ start: install-run	## start application instance(s) with gunicorn (pserve)
 stop: 		## kill application instance(s) started with gunicorn (pserve)
 	@(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"
 
-.PHONY: stat
-stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
+.PHONY: status
+status: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
 
 # Reapply config if overrides were defined.

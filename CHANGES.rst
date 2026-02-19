@@ -12,7 +12,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Set up `Weaver Agent Skills <./.agent/skills>`_ based on
+  the `Agent Skill Specification <https://agentskills.io/specification>`_
+  to help AI agents interact with `Weaver` and its API more seamlessly.
+  See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
 
 Fixes:
 ------
