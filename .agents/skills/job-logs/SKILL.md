@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
 ---
+
 # Get Job Logs
 
 Retrieve execution logs for debugging and monitoring.

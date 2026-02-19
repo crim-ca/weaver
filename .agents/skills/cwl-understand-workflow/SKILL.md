@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires understanding of CWL CommandLineTool basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
 ---
+
 # Understand CWL Workflows
 
 Learn to create and understand CWL Workflow class structures for chaining multiple processing steps.
@@ -123,7 +124,7 @@ steps:
 The `run` can also reference an external CWL file.
 
 > ⚠️ WARNING: The referenced `tool.cwl` should be a corresponding pre-existing process (where ID would be `tool`) for
-> this CWL to succeed [Weaver deployment](../process-deploy).
+> this CWL to succeed [Weaver deployment](../process-deploy/).
 
 ```yaml
 steps:

@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires understanding of command-line tools and CWL basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
 ---
+
 # Create CWL CommandLineTool
 
 Learn to create well-structured CWL CommandLineTool packages from scratch.

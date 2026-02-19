@@ -7,6 +7,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
 ---
+
 # Get Job Status
 
 Check current execution status of a job with progress and timestamps.

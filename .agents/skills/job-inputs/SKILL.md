@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
 ---
+
 # Get Job Inputs
 
 Retrieve the input values that were provided when a job was executed.

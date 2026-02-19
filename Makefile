@@ -292,7 +292,7 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 
 .PHONY: install-pip-mdformat
 install-pip-mdformat:	## install mdformat dependencies to fix line wrapping
-	@pip install mdformat mdformat-gfm mdformat-tables
+	@pip install $(cat "$(APP_ROOT)/requirements-dev.txt" | grep mdformat)
 
 .PHONY: install-dev-npm
 install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies

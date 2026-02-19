@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl\_prov=true).
 metadata:
 ---
+
 # Get Job Provenance
 
 Retrieve W3C PROV provenance metadata for tracking execution lineage and data derivation.

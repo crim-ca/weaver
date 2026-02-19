@@ -7,6 +7,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access. Job must have succeeded status.
 metadata:
 ---
+
 # Get Job Results
 
 Retrieve output results from a successfully completed job.

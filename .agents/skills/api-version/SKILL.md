@@ -7,6 +7,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
 ---
+
 # Get Version
 
 Retrieve detailed version information for the Weaver instance.

@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver deployment with builtin processes enabled.
 metadata:
 ---
+
 # Understand Weaver Built-in Processes
 
 Learn to use Weaver's built-in utility processes for common operations without custom Docker containers.

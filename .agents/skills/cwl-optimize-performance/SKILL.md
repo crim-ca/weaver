@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver deployment and CWL v1.0+.
 metadata:
 ---
+
 # Optimize CWL Package Performance
 
 Techniques to improve CWL package execution speed and resource efficiency.

@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with provider registration permissions.
 metadata:
 ---
+
 # Register Provider
 
 Register an external WPS or OGC API - Processes service as a remote provider.

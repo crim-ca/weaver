@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with provider management permissions.
 metadata:
 ---
+
 # Unregister Provider
 
 Remove a registered remote provider from Weaver.

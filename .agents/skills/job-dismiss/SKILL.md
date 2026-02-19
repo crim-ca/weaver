@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with job management permissions.
 metadata:
 ---
+
 # Dismiss Job
 
 Cancel a running or pending job and mark it as dismissed.

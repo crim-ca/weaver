@@ -9,7 +9,7 @@ license: Apache-2.0
 compatibility: Requires Python 3.10+, git, access to weaver repository.
 metadata:
   category: setup-operations
-  version: "1.0.0"
+  version: 1.0.0
   author: CRIM
 allowed-tools: run_command file_read file_write grep_search
 ---

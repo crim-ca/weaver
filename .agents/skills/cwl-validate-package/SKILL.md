@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires cwltool installed locally. Supports CWL v1.0, v1.1, v1.2.
 metadata:
 ---
+
 # Validate CWL Package
 
 Validate CWL package syntax and structure before deploying to Weaver.

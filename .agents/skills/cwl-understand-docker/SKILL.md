@@ -9,6 +9,7 @@ license: Apache-2.0
 compatibility: Requires Docker understanding and CWL v1.0+. Docker must be available for local testing.
 metadata:
 ---
+
 # Understand Docker in CWL
 
 Master Docker requirements and configuration in CWL packages for containerized process execution.

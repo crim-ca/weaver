@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with vault feature enabled.
 metadata:
 ---
+
 # Upload to Vault
 
 Securely store files or credentials in Weaver's encrypted vault.

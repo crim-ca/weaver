@@ -8,6 +8,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access with statistics feature enabled.
 metadata:
 ---
+
 # Get Job Statistics
 
 Retrieve execution statistics and resource usage for a job.

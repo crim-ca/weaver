@@ -7,7 +7,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
   category: system-information
-  version: "1.0.0"
+  version: 1.0.0
   api_endpoint: GET /conformance
   cli_command: weaver conformance
   author: CRIM

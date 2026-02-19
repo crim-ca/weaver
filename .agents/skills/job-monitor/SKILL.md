@@ -7,6 +7,7 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
 ---
+
 # Monitor Job
 
 Continuously monitor a job until completion or timeout with regular status polling.
