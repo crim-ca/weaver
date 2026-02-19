@@ -12,7 +12,10 @@ Changes
 
 Changes:
 --------
-- No change.
+- Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
+  The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
+  that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
+  some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
 
 Fixes:
 ------

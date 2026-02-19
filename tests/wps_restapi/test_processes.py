@@ -1033,6 +1033,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "cwlVersion: " in resp.text
         assert "class: CommandLineTool" in resp.text
 
+    @pytest.mark.format
     def test_deploy_process_CWL_media_type_aliases_from_format(self):
         """
         Test that media-types with known aliases (ie: NetCDF in this case) are correctly resolved in the process.

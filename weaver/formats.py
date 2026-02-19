@@ -91,6 +91,7 @@ class ContentType(Constants):
     APP_CWL_JSON = "application/cwl+json"
     APP_CWL_YAML = "application/cwl+yaml"
     APP_CWL_X = "application/x-cwl"  # backward compatible format, others are official
+    APP_OWL_XML = "application/owl+xml"
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
     APP_VDN_GEOJSON = "application/vnd.geo+json"
@@ -114,6 +115,7 @@ class ContentType(Constants):
     APP_X_YAML = "application/x-yaml"   # legacy
     TEXT_X_YAML = "text/x-yaml"         # deprecated
     TEXT_YAML = "text/yaml"             # deprecated
+    APP_XYZ = "application/x-xyz"       # raw 3D points / LiDAR
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
@@ -615,6 +617,7 @@ EDAM_MAPPING = {
     ContentType.APP_CWL_JSON: "format_3857",
     ContentType.APP_CWL_YAML: "format_3857",
     ContentType.APP_CWL_X: "format_3857",
+    ContentType.APP_OWL_XML: "format_3262",
     ContentType.IMAGE_GIF: "format_3467",
     ContentType.IMAGE_JPEG: "format_3579",
     ContentType.APP_NETCDF: "format_3650",
@@ -622,6 +625,7 @@ EDAM_MAPPING = {
     ContentType.APP_HDF5: "format_3590",
     ContentType.APP_JSON: "format_3464",
     ContentType.APP_YAML: "format_3750",
+    ContentType.APP_XYZ: "format_3877",
     ContentType.TEXT_PLAIN: "format_1964",
 }
 # Official links to be employed in definitions must be formed as:
@@ -655,7 +659,7 @@ FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
     **EDAM_NAMESPACE_DEFINITION,
     **OGC_NAMESPACE_DEFINITION,
-    **OPENGIS_NAMESPACE_DEFINITION
+    **OPENGIS_NAMESPACE_DEFINITION,
 }
 FORMAT_NAMESPACE_PREFIXES = [
     f"{_ns}:" for _ns in FORMAT_NAMESPACE_DEFINITIONS
@@ -804,25 +808,25 @@ def add_content_type_charset(content_type, charset):
 
 @overload
 def get_cwl_file_format(media_type):
-    # type: (str) -> Tuple[Optional[JSON], Optional[str]]
+    # type: (Optional[str]) -> Tuple[Optional[JSON], Optional[str]]
     ...
 
 
 @overload
 def get_cwl_file_format(media_type, make_reference=False, **__):
-    # type: (str, Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
+    # type: (Optional[str], Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
     ...
 
 
 @overload
 def get_cwl_file_format(media_type, make_reference=False, **__):
-    # type: (str, Literal[True], **bool) -> Optional[str]
+    # type: (Optional[str], Literal[True], **bool) -> Optional[str]
     ...
 
 
 @cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
-    # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
+    # type: (Optional[str], bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the extended schema reference from the media-type identifier.
 
@@ -876,12 +880,12 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         if _media_type in IANA_MAPPING:
             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_media_type])
-        if _media_type in EDAM_MAPPING:  # prefer real reference if available
-            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_media_type])
         if _media_type in OGC_MAPPING:  # prefer real reference if available
             return _make_if_ref(OGC_NAMESPACE_DEFINITION, OGC_NAMESPACE, OGC_MAPPING[_media_type])
         if _media_type in OPENGIS_MAPPING:  # prefer real reference if available
             return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_media_type])
+        if _media_type in EDAM_MAPPING:  # prefer real reference if available
+            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_media_type])
         return None
 
     def _request_extra_various(_media_type):

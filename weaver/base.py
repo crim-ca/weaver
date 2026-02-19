@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyKey
 
     ConstantsType: TypeAlias = "Constants"
-    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=ConstantsType)
+    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=Union[ConstantsType, str])
 
 # pylint: disable=E1120,no-value-for-parameter
 
@@ -109,7 +109,7 @@ class Constants(object, metaclass=_Const):
 
 class classproperty(property):  # pylint: disable=C0103,invalid-name
     """
-    Mimics :class:`property` decorator, but applied onto ``classmethod`` in backward compatible way.
+    Mimics :class:`property` decorator, but applied onto :class:`classmethod` in backward compatible way.
 
     .. note::
         This decorator purposely only supports getter attribute to define unmodifiable class properties.

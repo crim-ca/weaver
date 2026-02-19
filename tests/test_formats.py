@@ -396,9 +396,10 @@ def test_get_cwl_file_format_tuple():
         f.ContentType.APP_JSON,
         f.ContentType.APP_NETCDF,
         f.ContentType.APP_HDF5,
+        f.ContentType.APP_OWL_XML,
     ]
     for mime_type in tests:
-        res = f.get_cwl_file_format(mime_type, make_reference=False)
+        res = f.get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=False)
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
         assert isinstance(ns, dict) and len(ns) == 1
@@ -406,7 +407,7 @@ def test_get_cwl_file_format_tuple():
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith(f"{ns_name}:")
-        untested.remove(ns_name)
+        untested -= {ns_name}
     for ns in list(untested):
         ns_map_name = f"{ns.upper()}_MAPPING"
         ns_map = getattr(f, ns_map_name, None)
