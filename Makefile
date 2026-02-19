@@ -797,8 +797,7 @@ dist-pypi: install-sys dist-pypi-only	## publish package distribution on PyPI wi
 .PHONY: dist-pypi-only
 dist-pypi-only: clean-dist	## publish package distribution on PyPI
 	@echo "Build distributions for PyPI ..."
-	@DOC_REMOVE_PYPI=true python setup.py sdist
-	@DOC_REMOVE_PYPI=true python setup.py bdist_wheel
+	@DOC_REMOVE_PYPI=true python -m build
 	@ls -l dist
 
 .PHONY: extract-changes
