@@ -1372,7 +1372,9 @@ def format_extension_validator(data_input, mode):
     if mode == MODE.NONE or data_input.data_format is None:
         return True
     ext = get_extension(data_input.data_format.mime_type, dot=True)
-    return os.path.splitext(data_input._iohandler._file)[-1] == ext
+    ref = getattr(data_input._iohandler, "_file") or getattr(data_input._iohandler, "_url")
+    ref_ext = os.path.splitext(ref)[-1]
+    return not ref_ext or ref_ext == ext  # allow anonymous URL without extension
 
 
 class DirectoryNestedStorage(CachedStorage):

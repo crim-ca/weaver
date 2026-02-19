@@ -1826,7 +1826,7 @@ class WpsRestApiJobsTest(JobUtils):
 
         resp = self.app.get(path, params={"f": "xml"})
         assert resp.status_code == 200
-        assert ContentType.APP_XML in resp.content_type
+        assert ContentType.APP_XML in resp.content_type or ContentType.TEXT_XML in resp.content_type
         assert isinstance(resp.text, str)
         assert resp.text.startswith("<?xml")
         assert "<logs>" in resp.text

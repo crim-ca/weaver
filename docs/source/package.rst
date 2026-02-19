@@ -887,33 +887,33 @@ Following is an example where input definitions are equivalent in both :term:`CW
     :align: center
     :widths: 50,50
 
-    +-----------------------------------------------+-----------------------------------------------------------------+
-    | .. code-block:: json                          | .. code-block:: json                                            |
-    |    :caption: :term:`WPS` Format with MIME-type|    :caption: :term:`CWL` Format with Namespace                  |
-    |    :linenos:                                  |    :linenos:                                                    |
-    |                                               |                                                                 |
-    |    {                                          |    {                                                            |
-    |      "id": "input",                           |      "inputs": [                                                |
-    |      "formats": [                             |        {                                                        |
-    |        {"mimeType": "application/x-netcdf"},  |          "id": "input",                                         |
-    |        {"mimeType": "application/json"}       |          "format": [                                            |
-    |      ]                                        |            "edam:format_3650",                                  |
-    |    }                                          |            "iana:application/json"                              |
-    |                                               |          ]                                                      |
-    |                                               |        }                                                        |
-    |                                               |      ],                                                         |
-    |                                               |      "$namespaces": {                                           |
-    |                                               |        "edam": "http://edamontology.org/",                      |
-    |                                               |        "iana": "https://www.iana.org/assignments/media-types/"  |
-    |                                               |      }                                                          |
-    |                                               |    }                                                            |
-    +-----------------------------------------------+-----------------------------------------------------------------+
+    +-------------------------------------------------+----------------------------------------------------------------+
+    | .. code-block:: json                            | .. code-block:: json                                           |
+    |    :caption: :term:`WPS` Format with Media-Type |    :caption: :term:`CWL` Format with Namespace                 |
+    |    :linenos:                                    |    :linenos:                                                   |
+    |                                                 |                                                                |
+    |    {                                            |    {                                                           |
+    |      "id": "input",                             |      "inputs": [                                               |
+    |      "formats": [                               |        {                                                       |
+    |        {"mediaType": "application/netcdf"},     |          "id": "input",                                        |
+    |        {"mediaType": "application/json"}        |          "format": [                                           |
+    |      ]                                          |            "edam:format_3650",                                 |
+    |    }                                            |            "iana:application/json"                             |
+    |                                                 |          ]                                                     |
+    |                                                 |        }                                                       |
+    |                                                 |      ],                                                        |
+    |                                                 |      "$namespaces": {                                          |
+    |                                                 |        "edam": "http://edamontology.org/",                     |
+    |                                                 |        "iana": "https://www.iana.org/assignments/media-types/" |
+    |                                                 |      }                                                         |
+    |                                                 |    }                                                           |
+    +-------------------------------------------------+----------------------------------------------------------------+
 
 
 As demonstrated, both contexts accept multiple formats for inputs. These effectively represent *supported formats* by
 the underlying application. The two :term:`Media-Types` selected for this example are chosen specifically to demonstrate
 how :term:`CWL` formats must be specified. More precisely, :term:`CWL` requires a real schema definition referencing to
-an existing ontology to validate formats, specified through the ``$namespaces`` section. Each format entry is then
+an existing ontology to validate formats, specified through the ``$namespaces`` section. Each ``format`` entry is then
 defined as a mapping of the appropriate namespace to the identifier of the ontology. Alternatively, you can also provide
 the full URL of the ontology reference in the format string.
 
@@ -924,17 +924,19 @@ in the :term:`WPS` portion during process deployment, and `Weaver` will take car
 definition without any user intervention. This makes it also easier for the user to specify supported formats since it
 is generally easier to remember names of :term:`Media-types` than full ontology references. `Weaver` has a large set of
 commonly employed :term:`Media-Types` that it knows how to convert to corresponding ontologies. Also, `Weaver` will look
-for new :term:`Media-Types` it doesn't explicitly know about onto either the :term:`IANA` or the :term:`EDAM` ontologies
+for new :term:`Media-Types` it doesn't explicitly know about onto its :ref:`table-known-format-ontologies`
 in order to attempt automatically resolving them.
 
 When formats are resolved between the two contexts, `Weaver` applies information in a complimentary fashion. This means
-for example that if the user provided ``application/x-netcdf`` on the :term:`WPS` side and ``iana:application/json`` on
+for example that if the user provided ``application/netcdf`` on the :term:`WPS` side and ``iana:application/json`` on
 the :term:`CWL` side, both resulting contexts will have both of those formats combined. `Weaver` will not favour one
 location over the other, but will rather merge them if they can be resolved into different and valid entities.
+Note that this merging result could differ depending on the performed resolution of :ref:`cwl-file-format-aliases`.
 
 Since ``formats`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`cwl-io-types`) and
 that :term:`Media-Types` are easier to provide in this context, it is *recommended* to provide all of them in the
-:term:`WPS` definition. Alternatively, the :ref:`oas_io_schema` representation also located within the
+:term:`WPS` definition, unless the :term:`Process` is :ref:`Deployed Directly with CWL <proc_op_deploy_cwl>`.
+Alternatively, the :ref:`oas_io_schema` representation also located within the
 :term:`WPS` I/O definitions can be used to provide ``contentMediaType``.
 
 Above examples present the minimal content of ``formats`` :term:`JSON` objects
@@ -942,6 +944,70 @@ Above examples present the minimal content of ``formats`` :term:`JSON` objects
 can be provided as well to further refine the specific format supported by the corresponding :term:`I/O` definition.
 These fields are directly mapped, merged and combined against complementary details provided with ``contentMediaType``,
 and ``contentEncoding`` and ``contentSchema`` within an :term:`OAS` schema (see :ref:`oas_io_schema`).
+
+.. list-table:: Known Format Ontologies
+    :header-rows: 1
+    :widths: 10,20,70
+    :name: table-known-format-ontologies
+
+    * - Ontology Name
+      - Reference
+      - Description
+    * - :term:`IANA`
+      - ``https://www.iana.org/assignments/media-types/``
+      - Common web :term:`Media-Types` defined by :term:`IANA`.
+    * - :term:`EDAM`
+      - ``http://edamontology.org/``
+      - Typically for bioinformatics formats, but also contains mappings for generic and certain geospatial formats.
+    * - :term:`OGC`
+      - ``http://www.opengis.net/def/media-type/ogc/1.0/``
+      - Main ontology for :term:`Media-Types` defined by :term:`OGC`.
+    * - ``opengis``
+      - ``http://www.opengis.net/``
+      - Generic for any :term:`OGC` Naming Authority :term:`URI`.
+
+.. _cwl-file-format-aliases:
+
+File Format Aliases
+~~~~~~~~~~~~~~~~~~~~~~
+
+When resolving formats between :term:`CWL` and :term:`WPS`, `Weaver` also tries to consider aliases for commonly used
+:term:`Media-Types` in order to ensure that the resulting contexts are as complete as possible. When doing so, it might
+also attempt resolving against older or deprecated variants as well to ensure backward compatibility seamlessly.
+It also attempts to resolve :term:`Media-Types` and ontology mappings based on corresponding file extensions if
+they can provide more context for resolution (e.g.: a generic :term:`YAML` vs. a :term:`CWL` encoded as :term:`YAML`).
+However, depending on the employed :ref:`Format Ontologies <table-known-format-ontologies>`, some formats may be
+resolved "*incorrectly*" (not technically invalid references, but as per user expectation).
+
+For example, the following could be considered all equivalent :term:`Media-Types` and :term:`CWL` ``formats``
+for the NetCDF format.
+In the below cases, all formats represent "NetCDF", but some are not yet registered officially (at time of writing),
+or have a long history of older variants employed as workarounds.
+
+- ``application/netcdf``
+- ``application/x-netcdf``
+- ``iana:application/netcdf4``
+- ``edam:format_3650``
+- ``ogc:netcdf``
+
+
+.. seealso::
+    Issue https://github.com/Unidata/netcdf/issues/42 presents the tracking of official :term:`IANA` :term:`Media-Type`
+    registration.
+
+Therefore, if some :term:`Media-Type` and/or ``format`` combinations are not *explicitly* specified in
+a :term:`Process` definition, `Weaver` might fail to "align" :ref:`Execution <proc_op_execute>` inputs/outputs formats
+against the supported ones by the :term:`Process`, and then fail the :term:`Job` execution from input validation.
+`Weaver` might also pick certain preferred mappings (e.g.: ``ogc:netcdf`` over ``edam:format_3650``) when multiple are
+available, which might not be the expected one by the user. For this reason, it is *recommended* to specify additional
+combinations are desired or should be supported by a :term:`Process`. `Weaver` will not automatically include all
+combinations as strict combinations might be desired for better execution replicability.
+
+`Weaver` will respect specified :term:`Process` and :term:`Application Package` format definitions *strictly* to ensure
+operational compatibility, since some variants can embedded incompatible semantics or encoding constraints
+(e.g.: ``application/json`` vs. ``application/geo+json``, NetCDF v3 vs. v4, etc.). Therefore, a :term:`Process` that
+indicates ``application/netcdf`` support would refuse a ``application/x-netcdf`` input, unless it was explicitly mapped
+and resolved when deploying the :term:`CWL` with corresponding ``format`` entries.
 
 .. _cwl-file-format-output:
 
@@ -951,26 +1017,30 @@ Output File Format
 .. warning::
     Format specification differs between :term:`CWL` and :term:`WPS` in the case of outputs.
 
-Although :term:`WPS` definition allows multiple *supported formats* for output that are later resolved to the *applied*
-one onto the produced result of the job, :term:`CWL` only considers the output ``format`` that directly indicates the
-*applied* schema. There is no concept of *supported format* in the :term:`CWL` world. This is simply because :term:`CWL`
+Although :term:`WPS` definition allows multiple *supported formats* for an output that are later resolved to the result
+*applied format* produced by the job, :term:`CWL` only considers the output ``format`` that directly indicates the
+*applied format*. There is no concept of *supported format* in the :term:`CWL` world. This is simply because :term:`CWL`
 cannot predict nor reliably determine which output will be produced by a given application execution without running it,
 and therefore cannot expose consistent output specification before running the process. Because :term:`CWL` requires to
-validate the full process integrity before it can be executed, this means that only a **single** output format is
-permitted in its context (providing many will raise a validation error when parsing the :term:`CWL` definition).
+validate the integrity of the full workflow graph before it can be executed, this means that only a **single** output
+format is permitted in its context (providing many will raise a validation error when parsing the :term:`CWL`
+definition).
 
-To ensure compatibility with multiple *supported formats* outputs of :term:`WPS`, any output that has more that one
+To ensure compatibility with multiple *supported formats* of :term:`WPS` outputs, any output that has more that one
 format will have its ``format`` field dropped in the corresponding :term:`CWL` definition. Without any ``format`` on the
 :term:`CWL` side, the validation process will ignore this specification and will effectively accept any type of file.
 This will not break any execution operation with :term:`CWL`, but it will remove the additional validation layer of the
 format (which especially deteriorates process resolution when chaining processes inside a :ref:`app_pkg_workflow`).
 
-If the :term:`WPS` output only specifies a single MIME-type, then the equivalent format (after being resolved to a valid
-ontology) will be preserved on the :term:`CWL` side since the result is ensured to be the unique one provided. For this
-reason, processes with specific single-format output are be preferred whenever possible. This also removes ambiguity
-in the expected output format, which usually requires a *toggle* input specifying the desired type for processes
-providing a multi-format output. It is instead recommended to produce multiple processes with a fixed output format for
-each case.
+If the :term:`WPS` output only specifies a single :term:`Media-Type`, the equivalent ``format`` (after being resolved to
+a valid ontology) will be preserved on the :term:`CWL` side since the result is ensured to be the unique one provided.
+For this reason, processes with specific single-format outputs are be preferred whenever possible. This also removes
+ambiguity in the expected output format, which usually requires a *toggle* input or other
+:ref:`proc_content_negotiation` strategies to specify the desired type for processes providing a multi-format outputs.
+
+.. seealso::
+    Refer to https://github.com/common-workflow-language/common-workflow-language/issues/901 discussions for more
+    context about the :term:`CWL` output ``format`` limitations and interpretation by the workflow engine.
 
 .. _cwl-allowed-values:
 

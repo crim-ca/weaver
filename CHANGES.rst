@@ -12,11 +12,28 @@ Changes
 
 Changes:
 --------
-- No change.
+- Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
+  The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
+  that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
+  some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
 
 Fixes:
 ------
-- No change.
+- Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
+  resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
+  The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension
+  to ensure consistency between the validation methods.
+- Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
+  This could occur either when invoking the operation directly, or directly from ``execute`` operation which
+  pre-resolved a local file path subject to the `Vault` upload feature.
+- Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
+  If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
+  If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
+  as previously done by the `CLI`/``WeaverClient`` (fixes `#879 <https://github.com/crim-ca/weaver/issues/879>`_).
+- Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
+  correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
+  (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
 
 .. _changes_6.8.3:
 
