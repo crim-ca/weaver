@@ -2596,8 +2596,10 @@ def add_job_ref_param(parser):
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
         "-j", "--job", dest="job_reference", required=True,
-        help=f"Job URL or UUID to run {operation} operation. "
-             "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        help=(
+            f"Job URL or UUID to run {operation} operation. "
+            "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        )
     )
 
 
@@ -2878,6 +2880,7 @@ class ValidateAuthHandlerAction(argparse.Action):
     """
     Action that will validate that the input argument references an authentication handler that can be resolved.
     """
+
     def __call__(self, parser, namespace, auth_handler_ref, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Optional[str], Optional[str]) -> None
         """
@@ -2927,6 +2930,7 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
 
         Header-Name: Header-Value
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """
@@ -2961,6 +2965,7 @@ class ValidateNonZeroPositiveNumberAction(argparse.Action):
     """
     Action that will validate that the input argument is a positive number greater than zero.
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """

@@ -617,6 +617,8 @@ EDAM_MAPPING = {
     ContentType.APP_CWL_X: "format_3857",
     ContentType.IMAGE_GIF: "format_3467",
     ContentType.IMAGE_JPEG: "format_3579",
+    ContentType.APP_NETCDF: "format_3650",
+    ContentType.APP_X_NETCDF: "format_3650",
     ContentType.APP_HDF5: "format_3590",
     ContentType.APP_JSON: "format_3464",
     ContentType.APP_YAML: "format_3750",
