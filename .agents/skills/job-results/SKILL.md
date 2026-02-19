@@ -1,17 +1,12 @@
 ---
 name: job-results
-description: Retrieve output results from a successfully completed job. Downloads output files or retrieves inline values. Use when a job has status 'succeeded' and you need to access the outputs.
+description: |
+  Retrieve output results from a successfully completed job. Downloads output files or retrieves
+  inline values. Use when a job has status 'succeeded' and you need to access the outputs.
 license: Apache-2.0
 compatibility: Requires Weaver API access. Job must have succeeded status.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/results
-  cli_command: weaver results
-  author: CRIM
-allowed-tools: http_request file_write
 ---
-
 # Get Job Results
 
 Retrieve output results from a successfully completed job.

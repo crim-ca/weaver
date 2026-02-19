@@ -1,17 +1,13 @@
 ---
 name: provider-register
-description: Register an external WPS or OGC API - Processes service as a remote provider, making its processes available through Weaver. Enables federation of services and distributed workflow execution. Use when integrating remote processing services.
+description: |
+  Register an external WPS or OGC API - Processes service as a remote provider, making its processes
+  available through Weaver. Enables federation of services and distributed workflow execution. Use
+  when integrating remote processing services.
 license: Apache-2.0
 compatibility: Requires Weaver API access with provider registration permissions.
 metadata:
-  category: provider-management
-  version: "1.0.0"
-  api_endpoint: POST /providers
-  cli_command: weaver register
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Register Provider
 
 Register an external WPS or OGC API - Processes service as a remote provider.
@@ -99,7 +95,8 @@ curl -X POST \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Provider Types
 

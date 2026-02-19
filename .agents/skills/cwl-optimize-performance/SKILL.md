@@ -1,15 +1,13 @@
 ---
 name: cwl-optimize-performance
-description: Optimize CWL package performance including resource allocation, Docker image selection, scatter patterns, and execution strategies. Learn techniques to improve execution speed and resource efficiency. Use when processes are slow, use too many resources, or need optimization.
+description: |
+  Optimize CWL package performance including resource allocation, Docker image selection, scatter
+  patterns, and execution strategies. Learn techniques to improve execution speed and resource
+  efficiency. Use when processes are slow, use too many resources, or need optimization.
 license: Apache-2.0
 compatibility: Requires Weaver deployment and CWL v1.0+.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: http_request file_read
 ---
-
 # Optimize CWL Package Performance
 
 Techniques to improve CWL package execution speed and resource efficiency.

@@ -1,6 +1,8 @@
 ---
 name: api-conformance
-description: Retrieve the OGC API - Processes conformance classes that the Weaver instance implements. Shows which parts of the OGC standard are supported. Use to verify compliance and feature availability.
+description: |
+  Retrieve the OGC API - Processes conformance classes that the Weaver instance implements.
+  Shows which parts of the OGC standard are supported. Use to verify compliance and feature availability.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
@@ -80,7 +82,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Conformance Classes
 

@@ -1,17 +1,13 @@
 ---
 name: job-list
-description: List jobs with optional filtering by process, status, date range, tags, and more. Supports pagination and sorting. Use when you need to find specific jobs, monitor multiple executions, or generate job reports.
+description: |
+  List jobs with optional filtering by process, status, date range, tags, and more. Supports
+  pagination and sorting. Use when you need to find specific jobs, monitor multiple executions, or
+  generate job reports.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-management
-  version: "1.0.0"
-  api_endpoint: GET /jobs
-  cli_command: weaver jobs
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # List Jobs
 
 List jobs with filtering, pagination, and sorting capabilities.
@@ -114,7 +110,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Job Status Values
 

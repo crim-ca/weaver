@@ -1,9 +1,7 @@
 ---
 
-name: Security and Vulnerability Report
-about: Report a problem regarding security or identified vulnerabilities in code or dependencies.
-labels: triage/security
-assignees: fmigneault
+name: Security and Vulnerability Report about: Report a problem regarding security or identified vulnerabilities in code
+or dependencies. labels: triage/security assignees: fmigneault
 
 ---
 

@@ -1,17 +1,13 @@
 ---
 name: job-provenance
-description: Retrieve W3C PROV provenance metadata tracking the complete execution lineage and data derivation. Includes information about inputs, outputs, processes, agents, and temporal relationships for reproducibility and data lineage tracking.
+description: |
+  Retrieve W3C PROV provenance metadata tracking the complete execution lineage and data derivation.
+  Includes information about inputs, outputs, processes, agents, and temporal relationships for
+  reproducibility and data lineage tracking.
 license: Apache-2.0
-compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl_prov=true).
+compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl\_prov=true).
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/prov
-  cli_command: weaver provenance
-  author: CRIM
-allowed-tools: http_request file_write
 ---
-
 # Get Job Provenance
 
 Retrieve W3C PROV provenance metadata for tracking execution lineage and data derivation.
@@ -186,4 +182,5 @@ weaver provenance -u $WEAVER_URL -j $JOB_ID -f xml -o compliance/job-$JOB_ID-pro
 
 ## Note
 
-Provenance tracking must be enabled in Weaver configuration (`weaver.cwl_prov=true`). Jobs executed without this setting will not have provenance data available.
+Provenance tracking must be enabled in Weaver configuration (`weaver.cwl_prov=true`). Jobs executed without this setting
+will not have provenance data available.

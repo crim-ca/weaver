@@ -1,16 +1,12 @@
 ---
 name: job-monitor
-description: Continuously monitor a job until completion or timeout. Polls job status at regular intervals and provides progress updates. Use when you need to wait for a job to complete and get final results.
+description: |
+  Continuously monitor a job until completion or timeout. Polls job status at regular intervals and
+  provides progress updates. Use when you need to wait for a job to complete and get final results.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  cli_command: weaver monitor
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Monitor Job
 
 Continuously monitor a job until completion or timeout with regular status polling.

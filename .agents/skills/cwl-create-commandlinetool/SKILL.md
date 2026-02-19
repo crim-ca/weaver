@@ -1,15 +1,13 @@
 ---
 name: cwl-create-commandlinetool
-description: Create CWL CommandLineTool packages from scratch including proper structure, inputs, outputs, and requirements. Learn best practices for wrapping command-line tools and creating reusable process definitions. Use when creating new CWL packages for Weaver deployment.
+description: |
+  Create CWL CommandLineTool packages from scratch including proper structure, inputs, outputs, and
+  requirements. Learn best practices for wrapping command-line tools and creating reusable process
+  definitions. Use when creating new CWL packages for Weaver deployment.
 license: Apache-2.0
 compatibility: Requires understanding of command-line tools and CWL basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: file_write file_read
 ---
-
 # Create CWL CommandLineTool
 
 Learn to create well-structured CWL CommandLineTool packages from scratch.

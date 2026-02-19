@@ -290,6 +290,10 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 		npm install --save-dev \
 	)
 
+.PHONY: install-pip-mdformat
+install-pip-mdformat:	## install mdformat dependencies to fix line wrapping
+	@pip install mdformat mdformat-gfm mdformat-tables
+
 .PHONY: install-dev-npm
 install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
@@ -744,20 +748,15 @@ fix-css-only: | mkdir-reports 	## fix CSS linting problems automatically
 .PHONY: fix-css
 fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after dependency installation
 
-# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
 .PHONY: fix-md-only
 fix-md-only: | mkdir-reports 	## fix Markdown linting problems automatically
-	@echo "Running Markdown style checks..."
-	@npx --no-install remark \
-		--output --frail \
-		--silently-ignore \
-		--rc-path "$(APP_ROOT)/package.json" \
-		--ignore-path "$(APP_ROOT)/.remarkignore" \
-		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
-		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Wrapping long lines with mdformat..."
+	@mdformat "$(APP_ROOT)" 2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Running remark formatter..."
+	@npm run format-markdown 2>&1 | tee -a "$(REPORTS_DIR)/fixed-md.txt"
 
 .PHONY: fix-md
-fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
+fix-md: install-npm-remarklint install-pip-mdformat fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 

@@ -1,17 +1,13 @@
 ---
 name: job-logs
-description: Retrieve execution logs for debugging and monitoring job execution. Includes process execution steps, standard output/error, and timestamps. Use when debugging failed jobs or tracking execution details.
+description: |
+  Retrieve execution logs for debugging and monitoring job execution. Includes process execution
+  steps, standard output/error, and timestamps. Use when debugging failed jobs or tracking execution
+  details.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/logs
-  cli_command: weaver logs
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Job Logs
 
 Retrieve execution logs for debugging and monitoring.

@@ -1,17 +1,12 @@
 ---
 name: job-status
-description: Check the current execution status of a job including progress, timestamps, and state information. Use when you need to check if a job is still running, has completed, or has failed.
+description: |
+  Check the current execution status of a job including progress, timestamps, and state information.
+  Use when you need to check if a job is still running, has completed, or has failed.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}
-  cli_command: weaver status
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Job Status
 
 Check current execution status of a job with progress and timestamps.
@@ -61,7 +56,8 @@ print(f"Progress: {status.body.get('progress', 0)}%")
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Job Status Values
 

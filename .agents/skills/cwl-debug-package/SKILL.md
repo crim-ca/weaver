@@ -1,15 +1,13 @@
 ---
 name: cwl-debug-package
-description: Debug CWL package issues including deployment failures, execution errors, and validation problems. Learn systematic troubleshooting approaches, common error patterns, and debugging techniques. Use when CWL packages fail to deploy or execute correctly.
+description: |
+  Debug CWL package issues including deployment failures, execution errors, and validation problems.
+  Learn systematic troubleshooting approaches, common error patterns, and debugging techniques. Use
+  when CWL packages fail to deploy or execute correctly.
 license: Apache-2.0
 compatibility: Requires cwltool for local testing. Works with CWL v1.0, v1.1, v1.2.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: file_read run_command http_request
 ---
-
 # Debug CWL Packages
 
 Systematic troubleshooting guide for CWL package deployment and execution issues.

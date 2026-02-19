@@ -1,17 +1,13 @@
 ---
 name: job-dismiss
-description: Cancel a running or pending job. The job status will be updated to "dismissed" and execution will be terminated. Use when you need to stop a job that is taking too long, was submitted with incorrect parameters, or is no longer needed.
+description: |
+  Cancel a running or pending job. The job status will be updated to "dismissed" and execution will
+  be terminated. Use when you need to stop a job that is taking too long, was submitted with
+  incorrect parameters, or is no longer needed.
 license: Apache-2.0
 compatibility: Requires Weaver API access with job management permissions.
 metadata:
-  category: job-management
-  version: "1.0.0"
-  api_endpoint: DELETE /jobs/{job_id}
-  cli_command: weaver dismiss
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Dismiss Job
 
 Cancel a running or pending job and mark it as dismissed.
@@ -75,7 +71,8 @@ curl -X DELETE \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Behavior
 

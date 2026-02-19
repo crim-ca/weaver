@@ -1,17 +1,13 @@
 ---
 name: vault-upload
-description: Securely store files or credentials in Weaver's vault for use in process execution. The vault provides encrypted storage for sensitive data like authentication tokens, private files, or API keys. Use when you need to handle sensitive data securely.
+description: |
+  Securely store files or credentials in Weaver's vault for use in process execution. The vault
+  provides encrypted storage for sensitive data like authentication tokens, private files, or API
+  keys. Use when you need to handle sensitive data securely.
 license: Apache-2.0
 compatibility: Requires Weaver API access with vault feature enabled.
 metadata:
-  category: vault
-  version: "1.0.0"
-  api_endpoint: POST /vault/{file_id}
-  cli_command: weaver upload
-  author: CRIM
-allowed-tools: file_read http_request
 ---
-
 # Upload to Vault
 
 Securely store files or credentials in Weaver's encrypted vault.

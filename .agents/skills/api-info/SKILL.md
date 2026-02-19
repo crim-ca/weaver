@@ -1,17 +1,12 @@
 ---
 name: api-info
-description: Retrieve general API information including server details, supported endpoints, API version, and contact information. Use to verify Weaver instance availability and get basic service metadata.
+description: |
+  Retrieve general API information including server details, supported endpoints, API version, and
+  contact information. Use to verify Weaver instance availability and get basic service metadata.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: system-information
-  version: "1.0.0"
-  api_endpoint: GET /
-  cli_command: weaver info
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get API Information
 
 Retrieve general API information and server metadata.
@@ -106,7 +101,8 @@ Accept: application/json
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Response Fields
 

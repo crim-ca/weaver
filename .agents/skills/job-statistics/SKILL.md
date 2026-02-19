@@ -1,17 +1,13 @@
 ---
 name: job-statistics
-description: Retrieve execution statistics for a job including resource usage (CPU, memory), execution duration, data transfer metrics, and performance indicators. Use for monitoring resource consumption and optimizing process configurations.
+description: |
+  Retrieve execution statistics for a job including resource usage (CPU, memory), execution
+  duration, data transfer metrics, and performance indicators. Use for monitoring resource
+  consumption and optimizing process configurations.
 license: Apache-2.0
 compatibility: Requires Weaver API access with statistics feature enabled.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/statistics
-  cli_command: weaver statistics
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Job Statistics
 
 Retrieve execution statistics and resource usage for a job.
@@ -95,7 +91,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Statistics Fields
 

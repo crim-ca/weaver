@@ -1,17 +1,13 @@
 ---
 name: process-package
-description: Retrieve the CWL application package definition for a deployed process. Returns the complete Common Workflow Language document describing the process implementation. Use when you need to inspect, version control, or replicate process definitions.
+description: |
+  Retrieve the CWL application package definition for a deployed process. Returns the complete
+  Common Workflow Language document describing the process implementation. Use when you need to
+  inspect, version control, or replicate process definitions.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: GET /processes/{process_id}/package
-  cli_command: weaver package
-  author: CRIM
-allowed-tools: http_request file_write
 ---
-
 # Get Process Package
 
 Retrieve the CWL application package definition for a deployed process.

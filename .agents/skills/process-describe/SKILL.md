@@ -1,17 +1,13 @@
 ---
 name: process-describe
-description: Retrieve detailed information about a deployed process including inputs, outputs, metadata, and execution requirements. Use when you need to understand process capabilities or validate before execution.
+description: |
+  Retrieve detailed information about a deployed process including inputs, outputs, metadata, and
+  execution requirements. Use when you need to understand process capabilities or validate before
+  execution.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: GET /processes/{process_id}
-  cli_command: weaver describe
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Describe Process
 
 Retrieve complete process description including inputs, outputs, and metadata.

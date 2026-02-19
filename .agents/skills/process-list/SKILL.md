@@ -1,17 +1,13 @@
 ---
 name: process-list
-description: List all available processes with optional filtering by visibility or provider. Retrieve process summaries for discovery. Use when you need to find available processing capabilities or explore what Weaver can do.
+description: |
+  List all available processes with optional filtering by visibility or provider. Retrieve process
+  summaries for discovery. Use when you need to find available processing capabilities or explore
+  what Weaver can do.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: GET /processes
-  cli_command: weaver capabilities
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # List Processes
 
 List all available processes with optional filtering and pagination.
@@ -79,7 +75,8 @@ for process in result.body.get("processes", []):
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Related Skills
 

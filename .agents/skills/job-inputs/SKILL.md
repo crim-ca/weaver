@@ -1,17 +1,13 @@
 ---
 name: job-inputs
-description: Retrieve the input specifications and values that were provided when a job was executed. Shows what parameters were used to run the process. Use for debugging, reproducing results, or auditing job submissions.
+description: |
+  Retrieve the input specifications and values that were provided when a job was executed. Shows
+  what parameters were used to run the process. Use for debugging, reproducing results, or auditing
+  job submissions.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/inputs
-  cli_command: weaver inputs
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Job Inputs
 
 Retrieve the input values that were provided when a job was executed.
@@ -85,7 +81,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Input Types
 

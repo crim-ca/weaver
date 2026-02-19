@@ -1,17 +1,12 @@
 ---
 name: process-undeploy
-description: Remove a deployed process from Weaver. This action is irreversible and will delete the process definition. Use when you need to clean up unused processes or remove deprecated process versions.
+description: |
+  Remove a deployed process from Weaver. This action is irreversible and will delete the process
+  definition. Use when you need to clean up unused processes or remove deprecated process versions.
 license: Apache-2.0
 compatibility: Requires Weaver API access with process management permissions.
 metadata:
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: DELETE /processes/{process_id}
-  cli_command: weaver undeploy
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Undeploy Process
 
 Remove a deployed process from Weaver permanently.

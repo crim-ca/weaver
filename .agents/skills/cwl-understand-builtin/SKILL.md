@@ -1,15 +1,13 @@
 ---
 name: cwl-understand-builtin
-description: Use Weaver's built-in processes including jsonarray2netcdf, file2string_array, and other utility processes. Learn when to use builtins instead of custom Docker containers for common operations. Use to simplify workflows and avoid unnecessary Docker complexity.
+description: |
+  Use Weaver's built-in processes including jsonarray2netcdf, file2string\_array, and other utility
+  processes. Learn when to use builtins instead of custom Docker containers for common operations.
+  Use to simplify workflows and avoid unnecessary Docker complexity.
 license: Apache-2.0
 compatibility: Requires Weaver deployment with builtin processes enabled.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Understand Weaver Built-in Processes
 
 Learn to use Weaver's built-in utility processes for common operations without custom Docker containers.
@@ -25,7 +23,8 @@ Learn to use Weaver's built-in utility processes for common operations without c
 
 ## What are Built-in Processes?
 
-Built-in processes are pre-deployed utility processes in Weaver that perform common operations without requiring custom Docker images or CWL packages.
+Built-in processes are pre-deployed utility processes in Weaver that perform common operations without requiring custom
+Docker images or CWL packages.
 
 ### Benefits
 

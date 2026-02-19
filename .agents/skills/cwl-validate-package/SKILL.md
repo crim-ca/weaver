@@ -1,16 +1,13 @@
 ---
 name: cwl-validate-package
-description: Validate CWL package syntax and structure before deployment to Weaver. Check for syntax errors, Docker requirements, input/output definitions, and CWL version compatibility. Use to catch errors early and ensure package quality before deployment.
+description: |
+  Validate CWL package syntax and structure before deployment to Weaver. Check for syntax errors,
+  Docker requirements, input/output definitions, and CWL version compatibility. Use to catch errors
+  early and ensure package quality before deployment.
 license: Apache-2.0
 compatibility: Requires cwltool installed locally. Supports CWL v1.0, v1.1, v1.2.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  cli_command: cwltool --validate
-  author: CRIM
-allowed-tools: file_read run_command
 ---
-
 # Validate CWL Package
 
 Validate CWL package syntax and structure before deploying to Weaver.

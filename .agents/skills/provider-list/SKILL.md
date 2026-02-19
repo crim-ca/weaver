@@ -1,17 +1,13 @@
 ---
 name: provider-list
-description: List all registered remote providers including WPS and OGC API - Processes services. Shows provider URLs, types, and availability status. Use to discover available external services integrated with Weaver.
+description: |
+  List all registered remote providers including WPS and OGC API - Processes services. Shows
+  provider URLs, types, and availability status. Use to discover available external services
+  integrated with Weaver.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: provider-management
-  version: "1.0.0"
-  api_endpoint: GET /providers
-  cli_command: weaver capabilities --providers
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # List Providers
 
 List all registered remote providers and their capabilities.
@@ -96,7 +92,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Provider Information
 

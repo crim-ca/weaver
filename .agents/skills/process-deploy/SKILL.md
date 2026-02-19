@@ -1,17 +1,13 @@
 ---
 name: process-deploy
-description: Deploy a new process or application package to Weaver using CWL (Common Workflow Language) definitions. Supports Docker containers, remote WPS references, and workflow definitions. Use when you need to add a new processing capability to Weaver.
+description: |
+  Deploy a new process or application package to Weaver using CWL (Common Workflow Language)
+  definitions. Supports Docker containers, remote WPS references, and workflow definitions. Use when
+  you need to add a new processing capability to Weaver.
 license: Apache-2.0
 compatibility: Requires Weaver API access. Supports CWL v1.0, v1.1, v1.2.
 metadata:
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: POST /processes
-  cli_command: weaver deploy
-  author: CRIM
-allowed-tools: file_read http_request
 ---
-
 # Deploy Process
 
 Deploy a new process or application package to Weaver using CWL (Common Workflow Language) definitions.
@@ -97,7 +93,8 @@ curl -X POST \
 }
 ```
 
-**Note**: Response may include additional fields such as `links`, `keywords`, and extended `process` details. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields such as `links`, `keywords`, and extended `process` details. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Error Handling
 

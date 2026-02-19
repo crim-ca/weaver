@@ -1,15 +1,13 @@
 ---
 name: weaver-install
-description: Install Weaver from Docker or source for local development, testing, or production deployment. Covers Docker deployment and conda environment setup using Makefile targets. Use when setting up a new Weaver instance or development environment.
+description: |
+  Install Weaver from Docker or source for local development, testing, or production deployment.
+  Covers Docker deployment and conda environment setup using Makefile targets. Use when setting up a
+  new Weaver instance or development environment.
 license: Apache-2.0
 compatibility: Requires Python 3.10+, conda (recommended), Docker (for container deployment), Make.
 metadata:
-  category: setup-operations
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: run_command file_read
 ---
-
 # Install Weaver
 
 Install and set up Weaver for development, testing, or production use.
@@ -36,7 +34,9 @@ Install and set up Weaver for development, testing, or production use.
 - **Conda/Miniconda**: For isolated environment management (recommended)
 - **Docker**: For containerized deployment (portable production/testing)
 
-**Note**: If you prefer to install directly in your current Python environment without conda, you can set `CONDA_CMD=""` (empty string) before running make commands. This bypasses conda creation/activation/detection and installs using the detected Python interpreter.
+**Note**: If you prefer to install directly in your current Python environment without conda, you can set `CONDA_CMD=""`
+(empty string) before running make commands. This bypasses conda creation/activation/detection and installs using the
+detected Python interpreter.
 
 ## Installation Methods
 

@@ -1,10 +1,12 @@
 # Weaver Agent Skills
 
-This directory contains [Agent Skills](https://agentskills.io/) - a standardized format for describing capabilities that can be discovered and used by AI agents, IDEs, and automated systems.
+This directory contains [Agent Skills](https://agentskills.io/) - a standardized format for describing capabilities that
+can be discovered and used by AI agents, IDEs, and automated systems.
 
 ## What are Agent Skills?
 
-Agent Skills provide a structured way to document and expose Weaver's capabilities in a format that LLMs and AI agents can easily understand and utilize. Each skill is self-contained with:
+Agent Skills provide a structured way to document and expose Weaver's capabilities in a format that LLMs and AI agents
+can easily understand and utilize. Each skill is self-contained with:
 
 - **Frontmatter metadata** (YAML) describing the skill
 - **Markdown documentation** explaining usage
@@ -36,7 +38,8 @@ All 33 skills are now organized by category for easy discovery:
 
 ### CWL Comprehension (8 skills)
 
-- **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/)** - Create CWL CommandLineTool packages from scratch
+- **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/)** - Create CWL CommandLineTool packages from
+  scratch
 - **[cwl-debug-package](skills/cwl-debug-package/)** - Debug CWL package deployment and execution issues
 - **[cwl-optimize-performance](skills/cwl-optimize-performance/)** - Optimize CWL performance and resource usage
 - **[cwl-understand-builtin](skills/cwl-understand-builtin/)** - Use Weaver's built-in utility processes
@@ -97,8 +100,7 @@ AI agents can read the SKILL.md files to understand:
 
 Configure your IDE to recognize these skills for autocomplete and suggestions:
 
-**PyCharm / JetBrains**:
-Add to `~/.config/github-copilot/intellij/mcp.json`:
+**PyCharm / JetBrains**: Add to `~/.config/github-copilot/intellij/mcp.json`:
 
 ```json
 {
@@ -111,8 +113,7 @@ Add to `~/.config/github-copilot/intellij/mcp.json`:
 }
 ```
 
-**VS Code**:
-Add to `.vscode/settings.json`:
+**VS Code**: Add to `.vscode/settings.json`:
 
 ```json
 {

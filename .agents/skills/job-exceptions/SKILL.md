@@ -1,17 +1,13 @@
 ---
 name: job-exceptions
-description: Retrieve detailed exception and error information for failed jobs including error messages, stack traces, and debugging information. Use when diagnosing job failures or troubleshooting process execution issues.
+description: |
+  Retrieve detailed exception and error information for failed jobs including error messages, stack
+  traces, and debugging information. Use when diagnosing job failures or troubleshooting process
+  execution issues.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: job-monitoring
-  version: "1.0.0"
-  api_endpoint: GET /jobs/{job_id}/exceptions
-  cli_command: weaver exceptions
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Job Exceptions
 
 Retrieve detailed exception and error information for failed jobs.
@@ -77,7 +73,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Exception Information
 

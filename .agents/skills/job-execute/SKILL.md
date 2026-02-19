@@ -1,17 +1,13 @@
 ---
 name: job-execute
-description: Execute a deployed process with specified inputs. Supports synchronous and asynchronous execution modes with various output formats. Use when you need to run a process with specific input data and retrieve results.
+description: |
+  Execute a deployed process with specified inputs. Supports synchronous and asynchronous execution
+  modes with various output formats. Use when you need to run a process with specific input data and
+  retrieve results.
 license: Apache-2.0
 compatibility: Requires Weaver API access. Supports async/sync execution modes.
 metadata:
-  category: job-execution
-  version: "1.0.0"
-  api_endpoint: POST /processes/{process_id}/execution
-  cli_command: weaver execute
-  author: CRIM
-allowed-tools: file_read file_write http_request
 ---
-
 # Execute Process
 
 Execute a deployed process with specified inputs in synchronous or asynchronous mode.
@@ -124,7 +120,8 @@ curl -X POST \
 }
 ```
 
-**Note**: Response may include additional fields such as `links`, `message`, `progress`, and execution details. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields such as `links`, `message`, `progress`, and execution details. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ### For Sync Mode
 
@@ -141,7 +138,8 @@ curl -X POST \
 }
 ```
 
-**Note**: Synchronous responses include complete output data or references. Additional fields may include `logs`, `statistics`, and `provenance`.
+**Note**: Synchronous responses include complete output data or references. Additional fields may include `logs`,
+`statistics`, and `provenance`.
 
 ## Input Format Examples
 

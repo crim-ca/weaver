@@ -1,15 +1,13 @@
 ---
 name: cwl-use-expressions
-description: Use CWL expressions and JavaScript for dynamic behavior including parameter transformation, conditional logic, and computed values. Learn to leverage InlineJavascriptRequirement for powerful CWL packages. Use when you need dynamic, computed, or conditional behavior in CWL processes.
+description: |
+  Use CWL expressions and JavaScript for dynamic behavior including parameter transformation,
+  conditional logic, and computed values. Learn to leverage InlineJavascriptRequirement for powerful
+  CWL packages. Use when you need dynamic, computed, or conditional behavior in CWL processes.
 license: Apache-2.0
 compatibility: Requires CWL v1.0+ with InlineJavascriptRequirement support.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: file_read
 ---
-
 # Use CWL Expressions and JavaScript
 
 Master CWL expressions and JavaScript for dynamic, powerful CWL packages.
@@ -502,8 +500,7 @@ valueFrom: |
 
 ### File Path vs Object
 
-The `inputs.file` is an object with properties.
-The `file` portion is the input ID.
+The `inputs.file` is an object with properties. The `file` portion is the input ID.
 
 ```yaml
 # ✅Use .path for the file path

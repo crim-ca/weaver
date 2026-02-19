@@ -1,17 +1,12 @@
 ---
 name: api-version
-description: Retrieve detailed version information including Weaver version, database schema version, and deployed commit hash. Use for version verification, troubleshooting, and ensuring compatibility.
+description: |
+  Retrieve detailed version information including Weaver version, database schema version, and
+  deployed commit hash. Use for version verification, troubleshooting, and ensuring compatibility.
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
-  category: system-information
-  version: "1.0.0"
-  api_endpoint: GET /versions
-  cli_command: weaver version
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Get Version
 
 Retrieve detailed version information for the Weaver instance.
@@ -76,7 +71,8 @@ curl -X GET \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Version Information
 

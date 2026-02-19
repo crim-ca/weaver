@@ -1,15 +1,14 @@
 ---
 name: cwl-understand-docker
-description: Understand Docker requirements in CWL packages including DockerRequirement configuration, image selection, networking, and volume mounting. Learn best practices for containerized process execution in Weaver. Use when creating Docker-based CWL packages or troubleshooting Docker-related issues.
+description: |
+  Understand Docker requirements in CWL packages including DockerRequirement configuration, image
+  selection, networking, and volume mounting. Learn best practices for containerized process
+  execution in Weaver. Use when creating Docker-based CWL packages or troubleshooting Docker-related
+  issues.
 license: Apache-2.0
 compatibility: Requires Docker understanding and CWL v1.0+. Docker must be available for local testing.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: file_read run_command
 ---
-
 # Understand Docker in CWL
 
 Master Docker requirements and configuration in CWL packages for containerized process execution.

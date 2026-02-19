@@ -1,6 +1,10 @@
 ---
 name: weaver-skills-update
-description: Maintain and update Agent Skills documentation when Weaver codebase changes. Detect code modifications in weaver/cli.py, Makefile, docs/, and configuration files, then systematically update relevant skills to keep documentation synchronized. Use when contributing code changes or maintaining skills framework.
+description: |
+  Maintain and update Agent Skills documentation when Weaver codebase changes.
+  Detect code modifications in weaver/cli.py, Makefile, docs/, and configuration files,
+  then systematically update relevant skills to keep documentation synchronized.
+  Use when contributing code changes or maintaining skills framework.
 license: Apache-2.0
 compatibility: Requires Python 3.10+, git, access to weaver repository.
 metadata:
@@ -26,7 +30,54 @@ Maintain and update Agent Skills documentation when Weaver codebase changes.
 
 ## Overview
 
-Agent Skills must stay synchronized with the Weaver codebase. This skill provides systematic procedures to detect changes and update relevant skills.
+Agent Skills must stay synchronized with the Weaver codebase. This skill provides systematic procedures to detect
+changes and update relevant skills.
+
+## Available Scripts
+
+This skill provides three automation scripts to help maintain Agent Skills:
+
+### 1. detect-skill-updates.sh
+
+**Purpose**: Detect which files have changed and which skills need updating
+
+**Usage**:
+
+```bash
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 week ago"
+```
+
+**Output**: Reports CLI, Makefile, API, and documentation changes with recommendations
+
+**See**: [Automated Detection Script](#automated-detection-script) section for details
+
+### 2. validate-skills.sh
+
+**Purpose**: Validate YAML frontmatter syntax and cross-references
+
+**Usage**:
+
+```bash
+.agents/skills/weaver-skills-update/scripts/validate-skills.sh
+```
+
+**Output**: Checks YAML parsing and skill directory references
+
+**See**: [Automated Validation](#automated-validation) section for details
+
+### 3. check-frontmatter.py
+
+**Purpose**: Verify YAML frontmatter uses proper multiline format
+
+**Usage**:
+
+```bash
+python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
+```
+
+**Output**: Ensures all skills use `description: |` format
+
+**See**: [YAML Frontmatter Format](#yaml-frontmatter-format) section for details
 
 ## Change Detection Strategy
 
@@ -283,47 +334,38 @@ git diff origin/master config/data_sources.yml.example
 # 1. Create update branch
 git checkout -b update-skills-$(date +%Y%m%d)
 
-# 2. Identify all changes since last skill update
+# 2. Identify changes since last update (optional - see what changed)
 git log --since="LAST_UPDATE_DATE" --name-only --pretty=format: | sort -u
 
-# 3. Categorize changes
-echo "Changed files:" > /tmp/skills-update-checklist.txt
-echo "- CLI: $(git diff origin/master --name-only | grep cli.py | wc -l)"
-echo "- Makefile: $(git diff origin/master --name-only | grep Makefile | wc -l)"
-echo "- API: $(git diff origin/master --name-only | grep wps_restapi | wc -l)"
-echo "- Docs: $(git diff origin/master --name-only | grep docs/ | wc -l)"
+# 3. Detect changes and get recommendations
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 week ago"
 
-# 4. For each change category, follow procedure above
+# 4. For each change category reported, follow the corresponding procedure above
+# - CLI changes → Procedure 1
+# - Makefile changes → Procedure 2
+# - API changes → Procedure 3
+# - Documentation changes → Procedure 4
+# - Configuration changes → Procedure 5
 
-# 5. Verify all skills
-for skill in .agents/skills/*/SKILL.md; do
-  echo "Validating $skill"
-  # Check YAML frontmatter
-  # Check markdown formatting
-  # Check code block syntax
-  # Verify cross-references
-done
+# 5. Verify all skills with validation scripts
+.agents/skills/weaver-skills-update/scripts/validate-skills.sh
+python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
 
-# 6. Test examples
-# Randomly test CLI examples from updated skills
-# Verify curl commands work
-# Check Python examples
-
-# 7. Update skill count in README
+# 6. Update skill count in README (if skills added/removed)
 vim .agents/README.md
-# Update total count if new skills added
 
-# 8. Commit changes
+# 7. Commit changes
 git add .agents/
 git commit -m "Update Agent Skills to match code changes"
 
-# 9. Create pull request
+# 8. Create pull request
 git push origin update-skills-$(date +%Y%m%d)
 ```
 
 ## Automated Detection Script
 
-A script is provided to detect which files have changed and need skill updates. The script identifies changes but the actual update procedures are documented in this SKILL.md file (see "Update Procedures" section above).
+A script is provided to detect which files have changed and need skill updates. The script identifies changes but the
+actual update procedures are documented in this SKILL.md file (see "Update Procedures" section above).
 
 **Script**: [`scripts/detect-skill-updates.sh`](scripts/detect-skill-updates.sh)
 
@@ -343,76 +385,116 @@ A script is provided to detect which files have changed and need skill updates. 
 **What it does**:
 
 - Analyzes git history for changes to key files
-- Reports CLI changes (affects job-\*, process-\*, provider-\* skills)
+- Reports CLI changes (affects `job-*`, `process-*`, `provider-*` skills)
 - Reports Makefile changes (affects weaver-install skill)
 - Reports API changes (affects endpoint-related skills)
 - Reports documentation changes (affects documentation links)
 - Provides update recommendations based on detected changes
 
-**Note**: This script only *detects* changes. To perform the actual updates, follow the procedures documented in the sections above (Procedure 1-5 under "Update Procedures").
+**Note**: This script only *detects* changes.
+To perform the actual updates, follow the procedures documented in the
+sections above (Procedure 1-5 under "Update Procedures").
 
 ## Skill Quality Checklist
 
 When updating skills, verify:
 
 - [ ] **YAML frontmatter** is valid
+- [ ] **YAML description** uses multiline format with `description: |` (see YAML Frontmatter Format below)
 - [ ] **Name** matches directory name
 - [ ] **Description** is accurate (1-1024 chars)
-- [ ] **CLI examples** use current syntax
-- [ ] **API requests** use curl with `${WEAVER_URL}`
-- [ ] **Python examples** use correct method signatures
+- [ ] **Scripts** that require large set of commands are placed in dedicated `scripts/` and referenced by the skill
 - [ ] **Returns** section has completeness note
 - [ ] **Job IDs** are UUIDs (not simple strings)
 - [ ] **Documentation links** work (base URLs without anchors)
 - [ ] **Cross-references** point to existing skills
+- [ ] **Steps** that are purely procedural without code use numbered lists instead of code blocks
+- [ ] **Steps** that need code use code blocks only as needed, not for the entire step (avoid embedded comment list)
 - [ ] **Code blocks** have proper syntax highlighting
 - [ ] **Code blocks** do not repeat example keywords making their structure invalid
-- [ ] **Examples** are tested and working
+- [ ] **Python examples** use correct method signatures
+- [ ] **CLI examples** use current syntax
+- [ ] **API requests** use curl with `${WEAVER_URL}`
+- [ ] **Examples** are tested and working if deemed necessary
 - [ ] **Markdown** formatting is valid
+
+### YAML Frontmatter Format
+
+All skills must use proper YAML frontmatter with multiline descriptions to respect the limit of 120 characters per line.
+
+**Required format**:
+
+```yaml
+---
+name: skill-name
+description: |
+  Multi-line description that explains what the skill does.
+  Use the pipe (|) symbol to enable multiline format.
+  This prevents line wrapping issues and maintains readability.
+license: Apache-2.0
+compatibility: Requirements here
+metadata:
+  category: category-name
+  version: "1.0.0"
+  api_endpoint: GET /endpoint
+  cli_command: weaver command
+  author: CRIM
+allowed-tools: tool1 tool2
+---
+```
+
+**Key points**:
+
+- **Always use `description: |`** for multiline format
+- Indent description content with 2 spaces
+- Keep description lines under 100 characters
+- Ensure valid YAML syntax (no trailing commas, proper indentation)
+
+**Validation script**: [`scripts/check-frontmatter.py`](scripts/check-frontmatter.py)
+
+```bash
+# Check YAML frontmatter format in all skills
+python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
+```
 
 ## Version-Specific Updates
 
 ### Major Version Updates (X.0.0)
 
-```bash
-# Comprehensive review required
-# 1. Check all CLI command changes
-# 2. Review API breaking changes
-# 3. Update all version references
-# 4. Review all examples for compatibility
-# 5. Update configuration examples
-# 6. Check for deprecated features
-```
+Comprehensive review required:
+
+1. Check all CLI command changes
+2. Review API breaking changes
+3. Update all version references
+4. Review all examples for compatibility
+5. Update configuration examples
+6. Check for deprecated features
 
 ### Minor Version Updates (X.Y.0)
 
-```bash
-# Focus on new features
-# 1. Check for new CLI commands → create skills
-# 2. Check for new API endpoints → create skills
-# 3. Update affected skills with new options
-# 4. Add examples for new features
-```
+Focus on new features:
+
+1. Check for new CLI commands → create skills
+2. Check for new API endpoints → create skills
+3. Update affected skills with new options
+4. Add examples for new features
 
 ### Patch Version Updates (X.Y.Z)
 
-```bash
-# Minimal updates usually needed
-# 1. Check CLI help text changes
-# 2. Verify examples still work
-# 3. Update error handling if changed
-```
+Minimal updates usually needed:
+
+1. Check CLI help text changes
+2. Verify examples still work
+3. Update error handling if changed
 
 ## Testing Updated Skills
 
 ### Manual Testing (optional)
 
-> ⚠️ WARNING
-> ️Unless a Weaver instance is running locally, the following tests will fail.
-> Running an instance can be a timely process.
-> Therefore, consider whether this is actually needed and there are no simpler workarounds.
-> If required, ensure you have a test instance available before running these commands
-> using [weaver-install](../weaver-install/) skill instructions.
+> ⚠️ WARNING ️Unless a Weaver instance is running locally, the following tests will fail. Running an instance can be a
+> timely process. Therefore, consider whether this is actually needed and there are no simpler workarounds. If required,
+> ensure you have a test instance available before running these commands using [weaver-install](../weaver-install/)
+> skill instructions.
 
 ```bash
 # Test CLI examples
@@ -432,38 +514,44 @@ EOF
 
 ### Automated Validation
 
-```bash
-# Validate YAML frontmatter
-for skill in .agents/skills/*/SKILL.md; do
-  python -c "
-import yaml
-with open('$skill') as f:
-    content = f.read()
-    parts = content.split('---')
-    if len(parts) >= 3:
-        yaml.safe_load(parts[1])
-        print('✓ $skill')
-    else:
-        print('✗ $skill: Invalid frontmatter')
-"
-done
+A script is provided to validate YAML frontmatter and cross-references in all skills.
 
-# Check for broken cross-references
-for skill in .agents/skills/*/SKILL.md; do
-  grep -o '\.\./[^/)]*)' "$skill" | while read ref; do
-    target=$(echo "$ref" | sed 's/\.\.\/\([^/]*\).*/\1/')
-    if [ ! -d ".agents/skills/$target" ]; then
-      echo "✗ Broken reference in $skill: $ref"
-    fi
-  done
-done
+**Script**: [`scripts/validate-skills.sh`](scripts/validate-skills.sh)
+
+**Usage**:
+
+```bash
+# Run from repository root
+.agents/skills/weaver-skills-update/scripts/validate-skills.sh
+```
+
+**What it validates**:
+
+- **YAML frontmatter**: Ensures all skills have valid YAML frontmatter between `---` markers
+- **Cross-references**: Checks that all relative links to other skills (`../skill-name/`) point to existing skill directories
+
+**Example output**:
+
+```text
+Validating Agent Skills...
+==========================
+
+Checking YAML frontmatter...
+✓ .agents/skills/api-conformance/SKILL.md
+✓ .agents/skills/api-info/SKILL.md
+...
+
+Checking cross-references...
+
+==========================
+✅ All validations passed
 ```
 
 ### Format Validation
 
-Employ the `make check-md-only` target or `npm run check-markdown`.
-Similar commands with `make fix-md-only` or `npm run format-markdown` can be used to automatically formatting issues.
-Remove the `-only` suffix if installation/updates of `npm` dependencies are needed.
+Employ the `make check-md-only` target.
+Similar command with `make fix-md-only` can be used to automatically formatting issues.
+Remove the `-only` suffix if installation/updates of dependencies are needed.
 
 ## Best Practices
 

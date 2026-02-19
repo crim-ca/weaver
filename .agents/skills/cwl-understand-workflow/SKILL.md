@@ -1,15 +1,13 @@
 ---
 name: cwl-understand-workflow
-description: Understand CWL Workflow class structures for chaining multiple processing steps. Learn how to connect outputs to inputs, manage data flow between steps, and create complex multi-step workflows. Use when building workflows that chain multiple processes together.
+description: |
+  Understand CWL Workflow class structures for chaining multiple processing steps. Learn how to
+  connect outputs to inputs, manage data flow between steps, and create complex multi-step
+  workflows. Use when building workflows that chain multiple processes together.
 license: Apache-2.0
 compatibility: Requires understanding of CWL CommandLineTool basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
-  category: cwl-comprehension
-  version: "1.0.0"
-  author: CRIM
-allowed-tools: file_read
 ---
-
 # Understand CWL Workflows
 
 Learn to create and understand CWL Workflow class structures for chaining multiple processing steps.
@@ -124,8 +122,7 @@ steps:
 
 The `run` can also reference an external CWL file.
 
-> ⚠️ WARNING:
-> The referenced `tool.cwl` should be a corresponding pre-existing process (where ID would be `tool`) for
+> ⚠️ WARNING: The referenced `tool.cwl` should be a corresponding pre-existing process (where ID would be `tool`) for
 > this CWL to succeed [Weaver deployment](../process-deploy).
 
 ```yaml

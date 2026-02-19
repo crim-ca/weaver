@@ -1,17 +1,13 @@
 ---
 name: provider-unregister
-description: Remove a registered remote provider from Weaver. This disconnects the external service but does not affect the remote service itself. Use when decommissioning integrations or removing outdated provider registrations.
+description: |
+  Remove a registered remote provider from Weaver. This disconnects the external service but does
+  not affect the remote service itself. Use when decommissioning integrations or removing outdated
+  provider registrations.
 license: Apache-2.0
 compatibility: Requires Weaver API access with provider management permissions.
 metadata:
-  category: provider-management
-  version: "1.0.0"
-  api_endpoint: DELETE /providers/{provider_id}
-  cli_command: weaver unregister
-  author: CRIM
-allowed-tools: http_request
 ---
-
 # Unregister Provider
 
 Remove a registered remote provider from Weaver.
@@ -75,7 +71,8 @@ curl -X DELETE \
 }
 ```
 
-**Note**: Response may include additional fields. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields. See
+[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Behavior
 
