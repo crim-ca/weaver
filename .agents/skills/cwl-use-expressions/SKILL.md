@@ -26,6 +26,7 @@ Master CWL expressions and JavaScript for dynamic, powerful CWL packages.
 ## Expression Syntax
 
 ### Parameter References
+
 ```yaml
 $(inputs.parameter_name)       # Reference input
 $(self)                        # Current value
@@ -36,6 +37,7 @@ $(runtime.ram)                 # Available RAM (MB)
 ```
 
 ### Simple Expressions
+
 ```yaml
 inputs:
   value:
@@ -47,6 +49,7 @@ inputs:
 ## Enabling JavaScript
 
 ### InlineJavascriptRequirement
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -57,10 +60,12 @@ requirements:
 ## JavaScript Expressions
 
 ### Basic Syntax
+
 ```yaml
 # Single-line
 valueFrom: $(inputs.x + inputs.y)
 ```
+
 ```yaml
 # Multi-line
 valueFrom: |
@@ -70,6 +75,7 @@ valueFrom: |
 ```
 
 ### String Manipulation
+
 ```yaml
 inputs:
   filename:
@@ -86,6 +92,7 @@ outputs:
 ```
 
 ### File Operations
+
 ```yaml
 inputs:
   input_file:
@@ -111,6 +118,7 @@ arguments:
 ## Common Patterns
 
 ### Conditional Arguments
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -138,6 +146,7 @@ arguments:
 ```
 
 ### Computed Output Names
+
 ```yaml
 inputs:
   input_file:
@@ -159,6 +168,7 @@ outputs:
 ```
 
 ### Array Processing
+
 ```yaml
 inputs:
   files:
@@ -175,6 +185,7 @@ arguments:
 ```
 
 ### Conditional Defaults
+
 ```yaml
 inputs:
   threshold:
@@ -201,6 +212,7 @@ arguments:
 ## Advanced Techniques
 
 ### Complex Validation
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -220,6 +232,7 @@ arguments:
 ```
 
 ### Dynamic Command Building
+
 ```yaml
 baseCommand: [python, -c]
 
@@ -245,6 +258,7 @@ arguments:
 ```
 
 ### Format Conversion
+
 ```yaml
 inputs:
   date_string:
@@ -261,6 +275,7 @@ arguments:
 ```
 
 ### Resource Calculation
+
 ```yaml
 requirements:
   ResourceRequirement:
@@ -273,6 +288,7 @@ requirements:
 ```
 
 ### Array Filtering
+
 ```yaml
 inputs:
   files:
@@ -299,6 +315,7 @@ arguments:
 ## InitialWorkDirRequirement with Expressions
 
 ### Dynamic File Generation
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -316,6 +333,7 @@ requirements:
 ```
 
 ### Conditional File Staging
+
 ```yaml
 requirements:
   InitialWorkDirRequirement:
@@ -332,6 +350,7 @@ requirements:
 ## Runtime Information
 
 ### Available Runtime Properties
+
 ```yaml
 arguments:
   # Output directory
@@ -348,6 +367,7 @@ arguments:
 ```
 
 ### Using Runtime in Paths
+
 ```yaml
 outputs:
   output:
@@ -362,6 +382,7 @@ outputs:
 ## Debugging Expressions
 
 ### Add Logging
+
 ```yaml
 arguments:
   - valueFrom: |
@@ -373,6 +394,7 @@ arguments:
 ```
 
 ### Test Locally
+
 ```bash
 # Run with cwltool to see expression output
 cwltool --debug tool.cwl inputs.json
@@ -381,6 +403,7 @@ cwltool --debug tool.cwl inputs.json
 ## Best Practices
 
 ### 1. Keep Expressions Simple
+
 ```yaml
 # ❌ Too complex
 valueFrom: |
@@ -398,12 +421,14 @@ valueFrom: |
     return result;
   }
 ```
+
 ```yaml
 # ✅ Better - simplify logic
 valueFrom: $(inputs.a + (inputs.b || 0))
 ```
 
 ### 2. Use Null Checks
+
 ```yaml
 valueFrom: |
   ${
@@ -412,6 +437,7 @@ valueFrom: |
 ```
 
 ### 3. Document Complex Expressions
+
 ```yaml
 inputs:
   files:
@@ -429,6 +455,7 @@ arguments:
 ```
 
 ### 4. Avoid Side Effects
+
 ```yaml
 # ❌ Don't modify inputs
 valueFrom: |
@@ -437,12 +464,14 @@ valueFrom: |
     return inputs.value;
   }
 ```
+
 ```yaml
 # ✅ Return new value
 valueFrom: $(inputs.value * 2)
 ```
 
 ### 5. Handle Errors Gracefully
+
 ```yaml
 valueFrom: |
   ${
@@ -458,6 +487,7 @@ valueFrom: |
 ## Common Gotchas
 
 ### Null vs Undefined
+
 ```yaml
 # CWL uses null for missing optional inputs
 valueFrom: |
@@ -479,16 +509,19 @@ The `file` portion is the input ID.
 # ✅Use .path for the file path
 valueFrom: $(inputs.file.path)
 ```
+
 ```yaml
 # ❌ Returns object
 valueFrom: $(inputs.file)
 ```
 
 ### String Concatenation
+
 ```yaml
 # ✅ Use + for concatenation
 valueFrom: $(inputs.prefix + "_" + inputs.suffix)
 ```
+
 ```yaml
 # ❌ Don't rely on automatic coercion
 valueFrom: $(inputs.prefix inputs.suffix)
@@ -511,4 +544,4 @@ valueFrom: $(inputs.prefix inputs.suffix)
 ## Examples Repository
 
 Check the CWL examples repository for more expression patterns:
-https://github.com/common-workflow-language/workflows
+[https://github.com/common-workflow-language/workflows](https://github.com/common-workflow-language/workflows)

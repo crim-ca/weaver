@@ -25,9 +25,11 @@ Continuously monitor a job until completion or timeout with regular status polli
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier to monitor
+
+- **job\_id** (string): Job identifier to monitor
 
 ### Optional
+
 - **timeout** (integer): Maximum time to wait in seconds (default: 60)
 - **interval** (integer): Polling interval in seconds (default: 5)
 

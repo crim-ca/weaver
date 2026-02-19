@@ -25,11 +25,13 @@ Install and set up Weaver for development, testing, or production use.
 ## Prerequisites
 
 ### System Requirements
+
 - **Python**: 3.10 or higher
 - **Operating System**: Linux, macOS, or Windows (with WSL)
 - **Make**: Build tool for using Makefile targets (if using source installation instead of Docker)
 
 ### Required Dependencies
+
 - **Git**: For cloning repository
 - **Conda/Miniconda**: For isolated environment management (recommended)
 - **Docker**: For containerized deployment (portable production/testing)
@@ -78,6 +80,7 @@ docker-compose up -d
 ```
 
 #### Available Docker Tags
+
 - `pavics/weaver:latest` - Latest development version
 - `pavics/weaver:latest-manager` - Manager service (latest)
 - `pavics/weaver:latest-worker` - Worker service (latest)
@@ -110,12 +113,14 @@ make install
 ```
 
 **This is sufficient for**:
+
 - Running Weaver CLI commands (`weaver deploy`, `weaver execute`, etc.)
 - Starting Weaver server locally
 - Deploying and executing processes
 - General usage and testing
 
 This is an alias for `make install-all` and runs:
+
 - `conda-env` - Creates conda environment
 - `conda-install` - Installs conda packages (proj, etc.)
 - `install-sys` - Installs system dependencies
@@ -131,11 +136,13 @@ make install-run
 ```
 
 **Use this if you only need**:
+
 - To run Weaver server in production
 - Minimal installation footprint
 - No testing or development capabilities
 
 This runs:
+
 - `conda-install` - Installs conda packages
 - `install-sys` - Installs system dependencies
 - `install-pkg` - Installs application packages
@@ -263,16 +270,19 @@ celery.result_backend = mongodb://localhost:27017/celery
 ### Configuration Modes
 
 **ADES** (Application Deployment and Execution Service):
+
 - Local process execution
 - Direct access to data
 - Single-node deployment
 
 **EMS** (Execution Management Service):
+
 - Orchestrates remote ADES
 - Distributed workflow execution
 - Multi-node deployment
 
 **HYBRID**:
+
 - Both ADES and EMS capabilities
 - Most flexible configuration
 
@@ -554,6 +564,7 @@ docker-compose down
 ```
 
 ### Services Included
+
 - **weaver-manager**: API and job management
 - **weaver-worker**: Job execution worker
 - **mongodb**: Database
@@ -625,6 +636,7 @@ vim config/request_options.yml
 ## Production Considerations
 
 ### Security
+
 - Use HTTPS in production
 - Configure authentication (if needed)
 - Secure MongoDB connections
@@ -632,6 +644,7 @@ vim config/request_options.yml
 - Restrict Docker socket access
 
 ### Performance
+
 - Use multiple workers for job execution
 - Configure appropriate resource limits
 - Use external MongoDB for persistence
@@ -639,6 +652,7 @@ vim config/request_options.yml
 - Monitor resource usage
 
 ### Monitoring
+
 - Set up log aggregation
 - Configure health checks
 - Monitor job queue

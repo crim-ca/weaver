@@ -27,7 +27,8 @@ Retrieve detailed exception and error information for failed jobs.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ## CLI Usage
 
@@ -81,6 +82,7 @@ curl -X GET \
 ## Exception Information
 
 Typical exception fields:
+
 - **Code**: Error code (e.g., InvalidParameterValue, ProcessFailed)
 - **Text**: Human-readable error message
 - **Locator**: Which parameter or component caused the error

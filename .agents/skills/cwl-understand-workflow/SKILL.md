@@ -27,12 +27,14 @@ Learn to create and understand CWL Workflow class structures for chaining multip
 ### Workflow vs CommandLineTool
 
 **CommandLineTool**: Single process execution
+
 ```yaml
 class: CommandLineTool  # Runs one command
 baseCommand: [process]
 ```
 
 **Workflow**: Chain multiple steps
+
 ```yaml
 class: Workflow  # Chains multiple tools
 steps:
@@ -73,6 +75,7 @@ steps:
 ## Workflow Components
 
 ### 1. Inputs
+
 Workflow-level inputs that can be used by any step:
 
 ```yaml
@@ -87,6 +90,7 @@ inputs:
 ```
 
 ### 2. Outputs
+
 Final outputs from the workflow:
 
 ```yaml
@@ -101,6 +105,7 @@ outputs:
 ```
 
 ### 3. Steps
+
 Individual processing steps:
 
 ```yaml
@@ -132,6 +137,7 @@ steps:
 ## Data Flow Patterns
 
 ### Sequential Processing
+
 ```yaml
 steps:
   download:
@@ -151,6 +157,7 @@ steps:
 ```
 
 ### Parallel Processing
+
 ```yaml
 steps:
   # These can run in parallel (no dependencies)
@@ -174,6 +181,7 @@ steps:
 ```
 
 ### Scatter/Gather Pattern
+
 ```yaml
 steps:
   process_many:
@@ -193,6 +201,7 @@ steps:
 ## Advanced Workflow Features
 
 ### ScatterMethod
+
 ```yaml
 steps:
   process:
@@ -209,6 +218,7 @@ steps:
 ```
 
 ### Conditional Execution (CWL v1.2+)
+
 ```yaml
 steps:
   optional_step:
@@ -221,6 +231,7 @@ steps:
 ```
 
 ### SubWorkflows
+
 ```yaml
 steps:
   sub_workflow:
@@ -233,6 +244,7 @@ steps:
 ## Common Workflow Patterns
 
 ### Preprocessing Pipeline
+
 ```yaml
 steps:
   validate:
@@ -257,6 +269,7 @@ steps:
 ```
 
 ### Map-Reduce Pattern
+
 ```yaml
 steps:
   # Map: process each item
@@ -276,12 +289,14 @@ steps:
 ## Debugging Workflows
 
 ### Visualize Workflow
+
 ```bash
 # Generate workflow diagram
 cwltool --print-dot workflow.cwl | dot -Tpng > workflow.png
 ```
 
 ### Check Step Connections
+
 ```bash
 # Validate connections
 cwltool --validate workflow.cwl
@@ -291,6 +306,7 @@ cwltool --print-deps workflow.cwl inputs.json
 ```
 
 ### Test Individual Steps
+
 ```bash
 # Test each step separately
 cwltool step1.cwl step1-inputs.json
@@ -298,6 +314,7 @@ cwltool step2.cwl step2-inputs.json
 ```
 
 ### Enable Debug Output
+
 ```bash
 # See detailed execution
 cwltool --debug workflow.cwl inputs.json
@@ -306,24 +323,28 @@ cwltool --debug workflow.cwl inputs.json
 ## Requirements for Workflows
 
 ### Subworkflow Feature
+
 ```yaml
 requirements:
   SubworkflowFeatureRequirement: {}
 ```
 
 ### Scatter Feature
+
 ```yaml
 requirements:
   ScatterFeatureRequirement: {}
 ```
 
 ### Multiple Input Feature
+
 ```yaml
 requirements:
   MultipleInputFeatureRequirement: {}
 ```
 
 ### Step Input Expression
+
 ```yaml
 requirements:
   StepInputExpressionRequirement: {}

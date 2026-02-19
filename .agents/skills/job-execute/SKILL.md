@@ -26,13 +26,15 @@ Execute a deployed process with specified inputs in synchronous or asynchronous 
 ## Parameters
 
 ### Required
-- **process_id** (string): Process identifier to execute
+
+- **process\_id** (string): Process identifier to execute
 - **inputs** (object or file): Process input values
   - Can be JSON/YAML file path
   - Can be inline key=value pairs
   - Can be CWL input format
 
 ### Optional
+
 - **mode** (string): Execution mode
   - `async`: Asynchronous execution (default) - returns job ID immediately
   - `sync`: Synchronous execution - waits for completion
@@ -40,7 +42,7 @@ Execute a deployed process with specified inputs in synchronous or asynchronous 
 - **response** (string): Response format
   - `document`: Full job status document (default)
   - `raw`: Direct output results
-- **output_transmission** (string): How outputs are returned
+- **output\_transmission** (string): How outputs are returned
   - `reference`: URLs to output files (default)
   - `value`: Inline output values
 - **subscribers** (object): Notification callbacks for job events
@@ -111,6 +113,7 @@ curl -X POST \
 ## Returns
 
 ### For Async Mode
+
 ```json
 {
   "jobID": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
@@ -124,6 +127,7 @@ curl -X POST \
 **Note**: Response may include additional fields such as `links`, `message`, `progress`, and execution details. See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ### For Sync Mode
+
 ```json
 {
   "outputs": {
@@ -142,6 +146,7 @@ curl -X POST \
 ## Input Format Examples
 
 ### Literal Values
+
 ```json
 {
   "inputs": {
@@ -153,6 +158,7 @@ curl -X POST \
 ```
 
 ### File References
+
 ```json
 {
   "inputs": {
@@ -164,6 +170,7 @@ curl -X POST \
 ```
 
 ### Multiple Files (Array)
+
 ```json
 {
   "inputs": {
@@ -176,6 +183,7 @@ curl -X POST \
 ```
 
 ### Vault References
+
 ```json
 {
   "inputs": {

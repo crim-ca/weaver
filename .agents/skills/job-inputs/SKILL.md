@@ -28,7 +28,8 @@ Retrieve the input values that were provided when a job was executed.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ## CLI Usage
 
@@ -89,6 +90,7 @@ curl -X GET \
 ## Input Types
 
 ### Literal Values
+
 ```json
 {
   "parameter": "string value",
@@ -98,6 +100,7 @@ curl -X GET \
 ```
 
 ### File References
+
 ```json
 {
   "input_file": {
@@ -108,6 +111,7 @@ curl -X GET \
 ```
 
 ### Arrays
+
 ```json
 {
   "files": [
@@ -118,6 +122,7 @@ curl -X GET \
 ```
 
 ### Vault References
+
 ```json
 {
   "credentials": {
@@ -129,6 +134,7 @@ curl -X GET \
 ## Use Cases
 
 ### Reproduce Results
+
 ```bash
 # Get inputs from successful job
 weaver inputs -u $WEAVER_URL -j c3d4e5f6-a7b8-9012-cdef-123456789012 > good-inputs.json
@@ -138,6 +144,7 @@ weaver execute -u $WEAVER_URL -p my-process -I good-inputs.json
 ```
 
 ### Debug Failed Jobs
+
 ```python
 # Compare inputs between successful and failed jobs
 success_inputs = client.inputs(job_id="success-job-id")
@@ -150,6 +157,7 @@ for key in success_inputs.body:
 ```
 
 ### Audit Trail
+
 ```bash
 # Document what inputs were used
 weaver inputs -u $WEAVER_URL -j $JOB_ID | tee audit/job-$JOB_ID-inputs.json

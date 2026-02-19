@@ -28,10 +28,12 @@ Register an external WPS or OGC API - Processes service as a remote provider.
 ## Parameters
 
 ### Required
-- **provider_id** (string): Unique provider identifier
+
+- **provider\_id** (string): Unique provider identifier
 - **url** (string): Provider service URL
 
 ### Optional
+
 - **type** (string): Provider type
   - `wps`: WPS 1.0/2.0 service
   - `ogcapi`: OGC API - Processes
@@ -102,16 +104,19 @@ curl -X POST \
 ## Provider Types
 
 ### WPS (Web Processing Service)
+
 - Supports WPS 1.0.0 and 2.0.0
 - Automatic process discovery via GetCapabilities
 - Execute operations via WPS Execute
 
 ### OGC API - Processes
+
 - Modern RESTful API
 - JSON-based communication
 - Standardized endpoints
 
 ### ESGF
+
 - Earth System Grid Federation services
 - Climate data processing
 - Specialized scientific workflows
@@ -134,6 +139,7 @@ weaver execute -u $WEAVER_URL -P my-provider -p remote-process -I inputs.json
 ## Use Cases
 
 ### Federated Workflows
+
 ```python
 # Register multiple providers
 for provider_name, provider_url in providers.items():
@@ -145,6 +151,7 @@ step2 = client.execute(provider="provider2", process_id="analyze", ...)
 ```
 
 ### Service Integration
+
 ```bash
 # Register institutional services
 weaver register -u $WEAVER_URL -n institution-a -w https://inst-a.org/wps

@@ -26,6 +26,7 @@ List all available processes with optional filtering and pagination.
 ## Parameters
 
 ### Optional
+
 - **provider** (string): Filter by provider ID
 - **visibility** (string): Filter by visibility ("public", "private")
 - **limit** (integer): Maximum number of results

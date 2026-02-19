@@ -26,11 +26,13 @@ Validate CWL package syntax and structure before deploying to Weaver.
 ## Parameters
 
 ### Required
-- **package_file** (path): CWL file to validate (.cwl or .yaml)
+
+- **package\_file** (path): CWL file to validate (.cwl or .yaml)
 
 ### Optional
+
 - **strict** (boolean): Enable strict validation mode
-- **check_docker** (boolean): Verify Docker images are accessible
+- **check\_docker** (boolean): Verify Docker images are accessible
 
 ## CLI Usage
 
@@ -51,23 +53,27 @@ cwltool --validate workflow.cwl
 ## Validation Checks
 
 ### Syntax Validation
+
 - CWL version compatibility
 - YAML/JSON structure
 - Required fields present
 - Type definitions correct
 
 ### Semantic Validation
+
 - Input/output types match
 - Command line bindings valid
 - File paths resolvable
 - Expressions syntax correct
 
 ### Docker Validation
+
 - DockerRequirement properly formatted
 - Image names valid
 - Tags specified (recommended)
 
 ### Workflow Validation
+
 - Step names unique
 - Input/output connections valid
 - No circular dependencies
@@ -76,6 +82,7 @@ cwltool --validate workflow.cwl
 ## Common Issues and Fixes
 
 ### Issue: "Unknown field 'xyz'"
+
 ```yaml
 # ❌ Wrong - typo in field name
 DockerRequirment:  # Missing 'e'
@@ -87,11 +94,13 @@ DockerRequirement:
 ```
 
 ### Issue: "Type mismatch"
+
 ```yaml
 # ❌ Wrong - string where File expected
 inputs:
   input_file: string
 ```
+
 ```yaml
 # ✅ Correct
 inputs:
@@ -99,10 +108,12 @@ inputs:
 ```
 
 ### Issue: "Missing required field"
+
 ```yaml
 # ❌ Wrong - missing class
 cwlVersion: v1.2
 ```
+
 ```yaml
 # ✅ Correct
 cwlVersion: v1.2
@@ -110,10 +121,12 @@ class: CommandLineTool
 ```
 
 ### Issue: "Invalid expression"
+
 ```yaml
 # ❌ Wrong - incorrect JavaScript syntax
 arguments: ["$(runtime.outdir"]  # Missing closing )
 ```
+
 ```yaml
 # ✅ Correct
 arguments: ["$(runtime.outdir)"]
@@ -146,11 +159,13 @@ stdout: output.txt
 ## Validation Output
 
 ### Success
+
 ```
 process.cwl is valid CWL
 ```
 
 ### Errors
+
 ```
 ERROR process.cwl:5:1: Unknown field `DockerRequirment`
   Did you mean `DockerRequirement`?
@@ -159,18 +174,21 @@ ERROR process.cwl:5:1: Unknown field `DockerRequirment`
 ## Advanced Validation
 
 ### Check Docker Images
+
 ```bash
 # Verify Docker image exists
 docker pull $(grep dockerPull process.cwl | cut -d: -f2-)
 ```
 
 ### Test Locally
+
 ```bash
 # Run with sample inputs
 cwltool process.cwl inputs.json
 ```
 
 ### Validate Against Schema
+
 ```bash
 # Use CWL schema validator
 schema-salad-tool --print-jsonld-context process.cwl

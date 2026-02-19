@@ -28,6 +28,7 @@ Learn to use Weaver's built-in utility processes for common operations without c
 Built-in processes are pre-deployed utility processes in Weaver that perform common operations without requiring custom Docker images or CWL packages.
 
 ### Benefits
+
 - ✅ No Docker image required
 - ✅ Faster execution (no image pull)
 - ✅ Always available in Weaver
@@ -41,20 +42,24 @@ Built-in processes are pre-deployed utility processes in Weaver that perform com
 Convert JSON array data to NetCDF format.
 
 **Use Cases**:
+
 - Converting API responses to NetCDF
 - Creating NetCDF from structured data
 - Data format conversion in workflows
 
 **Inputs**:
+
 - `input`: JSON array or file
 - `x_variable`: X-axis variable name
 - `y_variable`: Y-axis variable name
 - `z_variable`: Data variable name
 
 **Outputs**:
+
 - `output`: NetCDF file
 
 **Example**:
+
 ```yaml
 cwlVersion: v1.2
 class: Workflow
@@ -70,22 +75,26 @@ steps:
     out: [output]
 ```
 
-### file2string_array
+### file2string\_array
 
 Convert a file to an array of strings (one per line).
 
 **Use Cases**:
+
 - Reading configuration files
 - Processing line-based data
 - Splitting file content for parallel processing
 
 **Inputs**:
+
 - `file`: Input text file
 
 **Outputs**:
+
 - `output`: Array of strings
 
 **Example**:
+
 ```yaml
 steps:
   read_file:
@@ -258,6 +267,7 @@ steps:
 ## When to Use Built-ins vs Custom
 
 ### Use Built-ins When:
+
 - ✅ Simple format conversion
 - ✅ Basic string/file operations
 - ✅ Quick prototyping
@@ -265,6 +275,7 @@ steps:
 - ✅ Operation matches built-in capability exactly
 
 ### Use Custom CWL When:
+
 - ❌ Complex processing logic
 - ❌ Specific software dependencies
 - ❌ Custom algorithms
@@ -274,9 +285,11 @@ steps:
 ## Built-in Limitations
 
 ### Not Customizable
+
 Built-ins have fixed behavior - you can't modify them.
 
 **Workaround**: Chain built-ins with custom processes
+
 ```yaml
 steps:
   builtin_convert:
@@ -291,9 +304,11 @@ steps:
 ```
 
 ### Limited Operations
+
 Built-ins only cover common operations.
 
 **Workaround**: Use as pre/post-processing steps
+
 ```yaml
 steps:
   preprocess:
@@ -308,9 +323,11 @@ steps:
 ```
 
 ### Version Locked
+
 Built-in behavior tied to Weaver version.
 
 **Workaround**: Document Weaver version requirements
+
 ```yaml
 # In process metadata
 metadata:
@@ -350,12 +367,14 @@ weaver execute -u $WEAVER_URL -p my-workflow -I workflow-inputs.json
 ## Best Practices
 
 ### 1. Check Availability
+
 ```bash
 # Verify built-in exists before using
 weaver describe -u $WEAVER_URL -p jsonarray2netcdf
 ```
 
 ### 2. Document Built-in Usage
+
 ```yaml
 # Add comments in CWL
 steps:
@@ -368,18 +387,21 @@ steps:
 ```
 
 ### 3. Handle Built-in Errors
+
 ```yaml
 # Built-ins can fail like any process
 # Check job status and logs
 ```
 
 ### 4. Version Compatibility
+
 ```yaml
 # Document Weaver version requirements
 # Different Weaver versions may have different built-ins
 ```
 
 ### 5. Combine with Custom Processes
+
 ```yaml
 # Use built-ins for common operations
 # Use custom CWL for specific logic

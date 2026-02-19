@@ -27,6 +27,7 @@ List all registered remote providers and their capabilities.
 ## Parameters
 
 ### Optional
+
 - **detail** (boolean): Include detailed provider information
 - **check** (boolean): Verify provider connectivity
 
@@ -100,6 +101,7 @@ curl -X GET \
 ## Provider Information
 
 Each provider includes:
+
 - **id**: Unique provider identifier
 - **url**: Service endpoint URL
 - **type**: Service type (wps, ogcapi, esgf)
@@ -110,16 +112,19 @@ Each provider includes:
 ## Provider Types
 
 ### WPS
+
 - Web Processing Service 1.0/2.0
 - XML-based protocols
 - GetCapabilities, DescribeProcess, Execute
 
 ### OGC API - Processes
+
 - RESTful JSON API
 - Modern OGC standard
 - /processes, /jobs endpoints
 
 ### ESGF
+
 - Earth System Grid Federation
 - Climate data processing
 - Specialized scientific workflows
@@ -127,6 +132,7 @@ Each provider includes:
 ## Use Cases
 
 ### Service Discovery
+
 ```bash
 # Find all available providers
 weaver capabilities -u $WEAVER_URL --providers
@@ -139,6 +145,7 @@ done
 ```
 
 ### Provider Health Check
+
 ```python
 # Check all providers
 providers = client.capabilities(providers=True)
@@ -152,6 +159,7 @@ for provider in providers.body.get("providers", []):
 ```
 
 ### Federation Management
+
 ```python
 # List providers by type
 providers = client.capabilities(providers=True)

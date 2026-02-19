@@ -26,9 +26,11 @@ Remove a deployed process from Weaver permanently.
 ## Parameters
 
 ### Required
-- **process_id** (string): Process identifier to remove
+
+- **process\_id** (string): Process identifier to remove
 
 ### Optional
+
 - **provider** (string): Provider identifier for remote processes
 
 ## CLI Usage

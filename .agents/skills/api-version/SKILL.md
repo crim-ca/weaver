@@ -81,24 +81,31 @@ curl -X GET \
 ## Version Information
 
 ### version
+
 Weaver application version (e.g., "6.8.3")
+
 - Major version: Breaking changes
 - Minor version: New features
 - Patch version: Bug fixes
 
-### db_version
+### db\_version
+
 Database schema version
+
 - Used for migration compatibility
 - Important for upgrades
 
 ### commit
+
 Git commit hash of deployed version
+
 - Useful for exact version identification
 - Helps with debugging and support
 
 ## Use Cases
 
 ### Version Check
+
 ```bash
 # Check if running latest version
 CURRENT=$(weaver version -u $WEAVER_URL -f json | jq -r '.versions[0].version')
@@ -111,6 +118,7 @@ fi
 ```
 
 ### Compatibility Verification
+
 ```python
 # Check if feature is available
 version_info = client.version()
@@ -126,6 +134,7 @@ else:
 ```
 
 ### Bug Reporting
+
 ```bash
 # Collect version info for bug report
 echo "Weaver Version Information:"
@@ -136,6 +145,7 @@ weaver info -u $WEAVER_URL | jq '.configuration'
 ## Version History
 
 Major versions and key features:
+
 - **6.x**: Enhanced OGC API - Processes Part 4, improved quotation
 - **5.x**: Workflow improvements, vault enhancements
 - **4.x**: W3C PROV provenance tracking

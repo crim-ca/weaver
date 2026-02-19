@@ -111,17 +111,20 @@ Accept: application/json
 ## Response Fields
 
 ### Server Information
+
 - **title**: Service title
 - **description**: Service description
 - **attribution**: Copyright and attribution
 - **configuration**: Weaver mode (EMS, ADES, HYBRID)
 
 ### Contact Information
+
 - **name**: Organization name
 - **url**: Organization website
 - **email**: Contact email (if provided)
 
 ### Links
+
 - **service-desc**: OpenAPI specification
 - **processes**: Process listing endpoint
 - **jobs**: Job listing endpoint
@@ -137,6 +140,7 @@ Accept: application/json
 ## Use Cases
 
 ### Health Check
+
 ```bash
 # Quick availability check
 if weaver info -u $WEAVER_URL > /dev/null 2>&1; then
@@ -147,6 +151,7 @@ fi
 ```
 
 ### Service Discovery
+
 ```python
 # Discover available endpoints
 info = client.info()
@@ -157,6 +162,7 @@ print(f"Jobs endpoint: {endpoints.get('jobs')}")
 ```
 
 ### Configuration Check
+
 ```python
 # Verify Weaver mode
 info = client.info()

@@ -28,7 +28,8 @@ Retrieve execution statistics and resource usage for a job.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ## CLI Usage
 
@@ -99,17 +100,20 @@ curl -X GET \
 ## Statistics Fields
 
 ### Timing
+
 - **duration**: Total time from submission to completion
 - **executionDuration**: Actual processing time
 - **queueDuration**: Time spent waiting in queue
 
 ### Resource Usage
+
 - **cpuUsage**: CPU utilization (average and peak)
 - **memoryUsage**: RAM consumption (average and peak)
 - **diskIO**: Disk read/write operations
 - **networkIO**: Network transfer (if applicable)
 
 ### Data Metrics
+
 - **inputSize**: Total size of input data
 - **outputSize**: Total size of output data
 - **transferredData**: Data transferred between services
@@ -117,6 +121,7 @@ curl -X GET \
 ## Use Cases
 
 ### Resource Optimization
+
 ```python
 # Analyze resource usage patterns
 stats = client.statistics(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
@@ -126,6 +131,7 @@ if stats.body["resource"]["memoryUsage"]["peak"] > "8 GB":
 ```
 
 ### Cost Estimation
+
 ```python
 # Calculate approximate cloud compute costs
 duration_minutes = parse_duration(stats.body["duration"])

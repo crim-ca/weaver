@@ -27,7 +27,8 @@ Remove a registered remote provider from Weaver.
 ## Parameters
 
 ### Required
-- **provider_id** (string): Provider identifier to remove
+
+- **provider\_id** (string): Provider identifier to remove
 
 ## CLI Usage
 
@@ -92,6 +93,7 @@ curl -X DELETE \
 ## Use Cases
 
 ### Provider Update
+
 ```bash
 # Update provider URL or configuration
 weaver unregister -u $WEAVER_URL -n my-provider
@@ -99,6 +101,7 @@ weaver register -u $WEAVER_URL -n my-provider -w https://new-url.example.com/wps
 ```
 
 ### Cleanup
+
 ```python
 # Remove unused providers
 providers = client.capabilities(providers=True)
@@ -114,6 +117,7 @@ for provider in providers.body.get("providers", []):
 ```
 
 ### Service Migration
+
 ```bash
 # Migrate from old to new provider
 weaver register -u $WEAVER_URL -n new-provider -w https://new.example.com/wps

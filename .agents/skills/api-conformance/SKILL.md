@@ -85,21 +85,25 @@ curl -X GET \
 ## Conformance Classes
 
 ### OGC API - Processes Part 1: Core
+
 - **core**: Basic process execution
 - **ogc-process-description**: Standard process descriptions
 - **json**: JSON encoding support
 - **job-list**: Job listing capability
 
 ### OGC API - Processes Part 2: Deploy, Replace, Undeploy (DRU)
+
 - **deploy-replace-undeploy**: Dynamic process deployment
 - **ogcapppkg**: OGC Application Package support
 - **cwl**: Common Workflow Language support
 
 ### OGC API - Processes Part 3: Workflows and Chaining
+
 - **workflows**: Workflow execution support
 - **chaining**: Process chaining capabilities
 
 ### OGC API - Processes Part 4: Job Management
+
 - **job-management**: Enhanced job operations
 - **job-callback**: Notification callbacks
 - **job-dismiss**: Job cancellation
@@ -107,6 +111,7 @@ curl -X GET \
 ## Feature Detection
 
 ### Check Process Deployment Support
+
 ```python
 conformance = client.conformance()
 conforms_to = conformance.body.get("conformsTo", [])
@@ -117,6 +122,7 @@ if has_deployment:
 ```
 
 ### Check Workflow Support
+
 ```bash
 if weaver conformance -u $WEAVER_URL | grep -q "workflows"; then
     echo "Workflow chaining is supported"
@@ -126,6 +132,7 @@ fi
 ```
 
 ### Check Job Management
+
 ```python
 conforms_to = client.conformance().body["conformsTo"]
 
@@ -143,6 +150,7 @@ for feature, supported in features.items():
 ## Use Cases
 
 ### Compatibility Testing
+
 ```python
 # Test if client and server are compatible
 required_features = [
@@ -159,6 +167,7 @@ if compatible:
 ```
 
 ### Feature Documentation
+
 ```bash
 # Generate feature report
 echo "Weaver Capabilities Report"

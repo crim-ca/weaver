@@ -28,6 +28,7 @@ List jobs with filtering, pagination, and sorting capabilities.
 ## Parameters
 
 ### Optional
+
 - **process** (string): Filter by process ID
 - **provider** (string): Filter by provider ID
 - **status** (string): Filter by job status (running, succeeded, failed, etc.)
@@ -126,17 +127,20 @@ curl -X GET \
 ## Filtering Examples
 
 ### By Date Range
+
 ```bash
 weaver jobs -u $WEAVER_URL --date "2026-02-01/2026-02-19"
 ```
 
 ### By Multiple Statuses
+
 ```bash
 # Get all active jobs (accepted or running)
 weaver jobs -u $WEAVER_URL -s accepted,running
 ```
 
 ### By Tags
+
 ```bash
 weaver jobs -u $WEAVER_URL --tags production,validated
 ```

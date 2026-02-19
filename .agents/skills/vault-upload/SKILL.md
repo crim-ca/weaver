@@ -26,10 +26,12 @@ Securely store files or credentials in Weaver's encrypted vault.
 ## Parameters
 
 ### Required
-- **file_id** or **vault_token** (string): Unique vault identifier
-- **file_path** (path): Local file to upload
+
+- **file\_id** or **vault\_token** (string): Unique vault identifier
+- **file\_path** (path): Local file to upload
 
 ### Optional
+
 - **encrypted** (boolean): Whether to encrypt the file
 
 ## CLI Usage
@@ -75,7 +77,7 @@ Once uploaded, reference vault content in job inputs:
 
 ## Returns
 
-- **vault_id**: Vault token for referencing
+- **vault\_id**: Vault token for referencing
 - **status**: Upload confirmation
 - **reference**: `vault://` URL to use in inputs
 

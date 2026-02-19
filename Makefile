@@ -291,7 +291,7 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 	)
 
 .PHONY: install-dev-npm
-install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint	## install all npm development dependencies
+install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 

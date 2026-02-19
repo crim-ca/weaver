@@ -26,6 +26,7 @@ Systematic troubleshooting guide for CWL package deployment and execution issues
 ## Debugging Strategy
 
 ### 1. Validate Locally First
+
 ```bash
 # Always validate before deploying
 cwltool --validate package.cwl
@@ -35,6 +36,7 @@ cwltool package.cwl test-inputs.json
 ```
 
 ### 2. Check Weaver Deployment
+
 ```bash
 # Deploy and capture response
 weaver deploy -u $WEAVER_URL -p my-process -b package.cwl
@@ -47,6 +49,7 @@ weaver describe -u $WEAVER_URL -p my-process
 ```
 
 ### 3. Test Execution
+
 ```bash
 # Execute with test inputs
 JOB_ID=$(weaver execute -u $WEAVER_URL -p my-process -I inputs.json -f json | jq -r .jobID)
@@ -66,6 +69,7 @@ weaver exceptions -u $WEAVER_URL -j $JOB_ID
 ### Validation Errors
 
 #### Unknown Field
+
 ```
 ERROR: Unknown field `DockerRequirment`
 ```
@@ -73,6 +77,7 @@ ERROR: Unknown field `DockerRequirment`
 **Cause**: Typo in field name
 
 **Solution**:
+
 ```yaml
 # Wrong
 DockerRequirment:  # Missing 'e'
@@ -83,11 +88,13 @@ DockerRequirement:
 ```
 
 #### Missing Required Field
+
 ```
 ERROR: Missing required field `class`
 ```
 
 **Solution**:
+
 ```yaml
 cwlVersion: v1.2
 class: CommandLineTool  # Must specify class
@@ -95,16 +102,19 @@ baseCommand: [echo]
 ```
 
 #### Type Mismatch
+
 ```
 ERROR: Expected type File, got string
 ```
 
 **Solution**:
+
 ```yaml
 # Wrong
 inputs:
   input_file: string  # Should be File
 ```
+
 ```yaml
 # ✅ Correct
 inputs:
@@ -114,11 +124,13 @@ inputs:
 ### Deployment Errors
 
 #### Invalid CWL Version
+
 ```text
 ERROR: Unsupported CWL version v2.0
 ```
 
 **Solution**:
+
 ```yaml
 # Use supported version
 cwlVersion: v1.2
@@ -126,11 +138,13 @@ class: CommandLineTool
 ```
 
 #### Docker Image Not Found
+
 ```text
 ERROR: Failed to pull Docker image 'myimage:latest'
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Verify image exists
 docker pull myimage:latest
@@ -143,11 +157,13 @@ docker pull python:3.12-slim
 ```
 
 #### Process ID Conflict
+
 ```
 ERROR: Process 'my-process' already exists
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Use different process ID
 weaver deploy -u $WEAVER_URL -p my-process-v2 -b package.cwl
@@ -160,11 +176,13 @@ weaver deploy -u $WEAVER_URL -p my-process -b package.cwl
 ### Execution Errors
 
 #### Missing Input
+
 ```text
 ERROR: Required input 'input_file' not provided
 ```
 
 **Solution**:
+
 ```json
 {
   "input_file": {
@@ -175,6 +193,7 @@ ERROR: Required input 'input_file' not provided
 ```
 
 #### Input Type Mismatch
+
 ```
 ERROR: Expected File, got string
 ```
@@ -182,12 +201,15 @@ ERROR: Expected File, got string
 **Solution**:
 
 ❌ Incorrect reference for a File (not a string)
+
 ```json
 {
   "input_file": "data.txt"
 }
 ```
+
 ✅ Correct File input reference
+
 ```json
 {
   "input_file": {
@@ -198,21 +220,25 @@ ERROR: Expected File, got string
 ```
 
 #### Command Not Found
+
 ```
 ERROR: /bin/sh: mycommand: command not found
 ```
 
 **Solutions**:
+
 ```yaml
 # 1. Install command in Docker image
 requirements:
   DockerRequirement:
     dockerPull: image-with-mycommand:latest
 ```
+
 ```yaml
 # 2. Use full path
 baseCommand: [/usr/local/bin/mycommand]
 ```
+
 ```yaml
 # 3. Install via InitialWorkDirRequirement
 requirements:
@@ -225,11 +251,13 @@ requirements:
 ```
 
 #### Permission Denied
+
 ```
 ERROR: Permission denied: /output/result.txt
 ```
 
 **Solutions**:
+
 ```yaml
 # 1. Ensure output directory is writable
 outputs:
@@ -245,11 +273,13 @@ arguments:
 ```
 
 #### Output Not Found
+
 ```
 ERROR: Output file 'result.txt' not found
 ```
 
 **Solutions**:
+
 ```yaml
 # 1. Check glob pattern
 outputs:
@@ -258,6 +288,7 @@ outputs:
     outputBinding:
       glob: "result.txt"  # Exact match
 ```
+
 ```yaml
 # 2. Use wildcard
 outputs:
@@ -266,6 +297,7 @@ outputs:
     outputBinding:
       glob: "*.txt"  # Match any .txt file
 ```
+
 ```yaml
 # 3. Verify command produces output
 baseCommand: [echo, "test"]
@@ -294,6 +326,7 @@ baseCommand: [echo, "hello"]
 outputs:
   stdout: stdout
 ```
+
 ```yaml
 # 2. Add inputs
 inputs:
@@ -301,6 +334,7 @@ inputs:
 baseCommand: [echo]
 arguments: [$(inputs.message)]
 ```
+
 ```yaml
 # 3. Add Docker
 requirements:
@@ -359,6 +393,7 @@ Create minimal test inputs
 ## Workflow-Specific Debugging
 
 ### Check Step Connections
+
 ```yaml
 # Verify outputs match inputs
 steps:
@@ -375,12 +410,14 @@ steps:
 ```
 
 ### Visualize Workflow
+
 ```bash
 # Generate workflow diagram
 cwltool --print-dot workflow.cwl | dot -Tpng > workflow.png
 ```
 
 ### Test Steps Individually
+
 ```bash
 # Test each step separately
 cwltool step1.cwl step1-inputs.json
@@ -393,6 +430,7 @@ cwltool workflow.cwl workflow-inputs.json
 ## Docker-Specific Debugging
 
 ### Test Container Locally
+
 ```bash
 # Run container interactively
 docker run -it --rm myimage:latest /bin/bash
@@ -405,6 +443,7 @@ docker run --rm -v $(pwd):/data myimage:latest mycommand /data/test.txt
 ```
 
 ### Check Image Availability
+
 ```bash
 # Pull image
 docker pull myimage:latest
@@ -417,6 +456,7 @@ curl https://hub.docker.com/v2/repositories/myimage/tags/
 ```
 
 ### Debug Network Issues
+
 ```yaml
 # Enable network access
 requirements:
@@ -430,6 +470,7 @@ baseCommand: [curl, -O, https://example.com/data.txt]
 ## Provenance and Statistics
 
 ### Check Execution Details
+
 ```bash
 # Get detailed provenance
 weaver provenance -u $WEAVER_URL -j $JOB_ID
@@ -444,16 +485,19 @@ weaver inputs -u $WEAVER_URL -j $JOB_ID
 ## Common Pitfalls
 
 ### 1. Using `latest` Tags
+
 ```yaml
 # ❌ Avoid
 dockerPull: python:latest  # Unpredictable
 ```
+
 ```yaml
 # ✅ Use specific versions
 dockerPull: python:3.12.16-slim
 ```
 
 ### 2. Missing Output Glob
+
 ```yaml
 # ❌ Output not found
 outputs:
@@ -461,6 +505,7 @@ outputs:
     type: File
     # Missing outputBinding!
 ```
+
 ```yaml
 # ✅ Specify glob
 outputs:
@@ -471,11 +516,13 @@ outputs:
 ```
 
 ### 3. Incorrect Input Types
+
 ```yaml
 # ❌ Type mismatch
 inputs:
   file_input: string  # Should be File
 ```
+
 ```yaml
 # ✅ Correct type
 inputs:
@@ -483,20 +530,24 @@ inputs:
 ```
 
 ### 4. Forgetting Runtime Variables
+
 ```yaml
 # ❌ Hardcoded path
 arguments: ["-o", "/output/result.txt"]
 ```
+
 ```yaml
 # ✅ Use runtime.outdir
 arguments: ["-o", "$(runtime.outdir)/result.txt"]
 ```
 
 ### 5. Missing Requirements
+
 ```yaml
 # ❌ No DockerRequirement
 baseCommand: [python, script.py]  # Where does Python come from?
 ```
+
 ```yaml
 # ✅ Specify Docker image
 requirements:

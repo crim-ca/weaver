@@ -26,7 +26,8 @@ Retrieve execution logs for debugging and monitoring.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ## CLI Usage
 
@@ -49,6 +50,7 @@ for log_entry in logs.body.get("logs", []):
 ## Returns
 
 Execution logs including:
+
 - Process execution steps
 - Standard output/error streams
 - Timestamps for each step

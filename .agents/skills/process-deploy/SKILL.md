@@ -26,13 +26,15 @@ Deploy a new process or application package to Weaver using CWL (Common Workflow
 ## Parameters
 
 ### Required
-- **process_id** (string): Unique identifier for the process (lowercase, hyphens allowed)
+
+- **process\_id** (string): Unique identifier for the process (lowercase, hyphens allowed)
 - **package** (CWL object or file path): Application package definition
   - Can be CWL YAML/JSON file
   - Can be reference URL to remote process
   - Can be inline CWL document
 
 ### Optional
+
 - **visibility** (string): Process visibility ("public" or "private"), default: "public"
 - **auth** (auth handler): Authentication for protected endpoints
 
@@ -106,7 +108,7 @@ curl -X POST \
 ## Related Skills
 
 - [process-describe](../process-describe/) - Get process details
-- [job-execute](../job-execute/) - Run the deployed process  
+- [job-execute](../job-execute/) - Run the deployed process
 - [process-undeploy](../process-undeploy/) - Remove the process
 
 ## Documentation

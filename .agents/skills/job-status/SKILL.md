@@ -26,7 +26,8 @@ Check current execution status of a job with progress and timestamps.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ## CLI Usage
 

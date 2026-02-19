@@ -90,6 +90,7 @@ stderr: error.log
 ## Building Inputs
 
 ### Simple Literal Input
+
 ```yaml
 inputs:
   threshold:
@@ -101,6 +102,7 @@ inputs:
 ```
 
 ### File Input
+
 ```yaml
 inputs:
   input_file:
@@ -116,6 +118,7 @@ inputs:
 ```
 
 ### Array Input
+
 ```yaml
 inputs:
   input_files:
@@ -128,6 +131,7 @@ inputs:
 ```
 
 ### Optional Input
+
 ```yaml
 inputs:
   optional_flag:
@@ -138,6 +142,7 @@ inputs:
 ```
 
 ### Input with Default
+
 ```yaml
 inputs:
   output_format:
@@ -151,6 +156,7 @@ inputs:
 ## InputBinding Configuration
 
 ### Position
+
 ```yaml
 # Command will be: tool input1 input2 output
 inputs:
@@ -171,6 +177,7 @@ inputs:
 ```
 
 ### Prefix
+
 ```yaml
 # Creates: tool --input file.txt --format json
 inputs:
@@ -186,6 +193,7 @@ inputs:
 ```
 
 ### Separate vs Together
+
 ```yaml
 # Separate: --input file.txt
 inputs:
@@ -195,6 +203,7 @@ inputs:
       prefix: --input
       separate: true  # Default
 ```
+
 ```yaml
 # Together: --input=file.txt
 inputs:
@@ -206,6 +215,7 @@ inputs:
 ```
 
 ### Value From Expression
+
 ```yaml
 inputs:
   input_file:
@@ -218,6 +228,7 @@ inputs:
 ## Building Outputs
 
 ### File Output
+
 ```yaml
 outputs:
   output_file:
@@ -227,6 +238,7 @@ outputs:
 ```
 
 ### Multiple Files
+
 ```yaml
 outputs:
   output_files:
@@ -236,6 +248,7 @@ outputs:
 ```
 
 ### Directory Output
+
 ```yaml
 outputs:
   output_dir:
@@ -245,6 +258,7 @@ outputs:
 ```
 
 ### Standard Streams
+
 ```yaml
 outputs:
   stdout_output:
@@ -258,6 +272,7 @@ stderr: error.log
 ```
 
 ### Conditional Output
+
 ```yaml
 outputs:
   optional_output:
@@ -269,6 +284,7 @@ outputs:
 ## Requirements
 
 ### Docker
+
 ```yaml
 requirements:
   DockerRequirement:
@@ -276,6 +292,7 @@ requirements:
 ```
 
 ### Initial Work Directory
+
 ```yaml
 requirements:
   InitialWorkDirRequirement:
@@ -293,6 +310,7 @@ requirements:
 ```
 
 ### Resource Requirements
+
 ```yaml
 requirements:
   ResourceRequirement:
@@ -305,6 +323,7 @@ requirements:
 ```
 
 ### Environment Variables
+
 ```yaml
 requirements:
   EnvVarRequirement:
@@ -314,6 +333,7 @@ requirements:
 ```
 
 ### Inline JavaScript
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -328,6 +348,7 @@ inputs:
 ## Advanced Patterns
 
 ### Conditional Arguments
+
 ```yaml
 inputs:
   verbose:
@@ -346,6 +367,7 @@ arguments:
 ```
 
 ### Dynamic Output Names
+
 ```yaml
 inputs:
   input_file:
@@ -362,6 +384,7 @@ outputs:
 ```
 
 ### Capture Success/Exit Codes
+
 ```yaml
 successCodes: [0]
 temporaryFailCodes: [1, 2]  # Retry these
@@ -378,6 +401,7 @@ outputs:
 ## Complete Examples
 
 ### Simple Python Script
+
 ```yaml
 cwlVersion: v1.2
 class: CommandLineTool
@@ -413,6 +437,7 @@ outputs:
 ```
 
 ### Command with Multiple Options
+
 ```yaml
 cwlVersion: v1.2
 class: CommandLineTool
@@ -465,11 +490,13 @@ outputs:
 ## Testing Your CWL
 
 ### Local Validation
+
 ```bash
 cwltool --validate my-tool.cwl
 ```
 
 ### Local Execution
+
 ```bash
 # Create test inputs
 cat > test-inputs.json << EOF
@@ -487,6 +514,7 @@ cwltool my-tool.cwl test-inputs.json
 ```
 
 ### Deploy to Weaver
+
 ```bash
 weaver deploy -u $WEAVER_URL -p my-tool -b my-tool.cwl
 ```

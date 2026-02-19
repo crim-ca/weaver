@@ -56,6 +56,7 @@ requirements:
 ## Docker Image Selection
 
 ### Official Images (Recommended)
+
 ```yaml
 DockerRequirement:
   dockerPull: python:3.12-slim      # Python
@@ -66,6 +67,7 @@ DockerRequirement:
 ```
 
 ### Scientific Images
+
 ```yaml
 DockerRequirement:
   dockerPull: continuumio/miniconda3:latest  # Conda
@@ -74,6 +76,7 @@ DockerRequirement:
 ```
 
 ### Geospatial Images
+
 ```yaml
 DockerRequirement:
   dockerPull: osgeo/gdal:ubuntu-small-latest  # GDAL
@@ -83,6 +86,7 @@ DockerRequirement:
 ## Docker Image Best Practices
 
 ### Use Specific Tags
+
 ```yaml
 # ❌ Bad - unpredictable
 dockerPull: python:latest
@@ -92,6 +96,7 @@ dockerPull: python:3.12.16-slim
 ```
 
 ### Prefer Slim/Alpine Variants
+
 ```yaml
 # ❌ Large image (~1GB)
 dockerPull: python:3.12
@@ -104,6 +109,7 @@ dockerPull: python:3.12-alpine
 ```
 
 ### Pin Versions for Reproducibility
+
 ```yaml
 # ✅ Exact version
 dockerPull: myorg/myimage:1.2.3
@@ -158,6 +164,7 @@ requirements:
 ## Working with Files in Docker
 
 ### Input Files
+
 ```yaml
 # Files are automatically mounted into container
 inputs:
@@ -169,6 +176,7 @@ inputs:
 ```
 
 ### Output Files
+
 ```yaml
 outputs:
   output_file:
@@ -178,6 +186,7 @@ outputs:
 ```
 
 ### Directory Inputs
+
 ```yaml
 inputs:
   input_dir:
@@ -189,6 +198,7 @@ inputs:
 ## Common Docker Patterns
 
 ### Python Script Execution
+
 ```yaml
 cwlVersion: v1.2
 class: CommandLineTool
@@ -217,6 +227,7 @@ outputs:
 ```
 
 ### Installing Dependencies
+
 ```yaml
 requirements:
   DockerRequirement:
@@ -237,6 +248,7 @@ baseCommand: [bash, install-deps.sh, "&&", python, script.py]
 ```
 
 ### Running Shell Scripts
+
 ```yaml
 requirements:
   DockerRequirement:
@@ -259,11 +271,13 @@ baseCommand: [bash, script.sh]
 ### Image Pull Failures
 
 **Problem**: Cannot pull image
+
 ```
 Error: Failed to pull image 'myimage:latest'
 ```
 
 **Solutions**:
+
 ```yaml
 # 1. Check image exists
 docker pull myimage:latest
@@ -278,11 +292,13 @@ dockerPull: docker.io/library/myimage:latest
 ### Permission Issues
 
 **Problem**: Cannot write files
+
 ```
 Error: Permission denied writing to /output
 ```
 
 **Solution**:
+
 ```yaml
 # Run as specific user
 requirements:
@@ -294,11 +310,13 @@ requirements:
 ### Missing Dependencies
 
 **Problem**: Command not found in container
+
 ```
 Error: bash: mycommand: command not found
 ```
 
 **Solutions**:
+
 ```yaml
 # 1. Use image with command included
 dockerPull: image-with-mycommand:latest
@@ -316,11 +334,13 @@ InitialWorkDirRequirement:
 ### Network Access Issues
 
 **Problem**: Cannot download files
+
 ```
 Error: Unable to connect to remote server
 ```
 
 **Solution**:
+
 ```yaml
 requirements:
   NetworkAccess:
@@ -330,6 +350,7 @@ requirements:
 ## Docker Security Considerations
 
 ### Use Trusted Images
+
 ```yaml
 # ✅ Official images
 dockerPull: python:3.12-slim
@@ -342,6 +363,7 @@ dockerPull: randomuser/unknownimage:latest
 ```
 
 ### Minimize Image Size
+
 ```yaml
 # Use multi-stage builds in your Dockerfile
 FROM python:3.12 AS builder
@@ -352,6 +374,7 @@ FROM python:3.12-slim
 ```
 
 ### Keep Images Updated
+
 ```bash
 # Regularly update pinned versions
 dockerPull: python:3.12.17-slim  # Update from 3.9.16
@@ -360,6 +383,7 @@ dockerPull: python:3.12.17-slim  # Update from 3.9.16
 ## Integration with Weaver
 
 ### Deploy Docker-based Process
+
 ```bash
 # 1. Create CWL with DockerRequirement
 cat > process.cwl << 'EOF'
@@ -383,6 +407,7 @@ weaver deploy -u $WEAVER_URL -p docker-hello -b process.cwl
 ```
 
 ### Monitor Docker Execution
+
 ```bash
 # Execute process
 JOB_ID=$(weaver execute -u $WEAVER_URL -p docker-hello -f json | jq -r .jobID)

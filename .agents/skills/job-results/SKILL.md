@@ -26,10 +26,12 @@ Retrieve output results from a successfully completed job.
 ## Parameters
 
 ### Required
-- **job_id** (string): Job identifier
+
+- **job\_id** (string): Job identifier
 
 ### Optional
-- **output_dir** (path): Directory to download output files
+
+- **output\_dir** (path): Directory to download output files
 - **download** (boolean): Whether to download files locally
 
 ## CLI Usage
@@ -69,6 +71,7 @@ for output_name, output_value in results.body.items():
 Result format depends on output type:
 
 ### File Outputs (Reference Mode)
+
 ```json
 {
   "output1": {
@@ -79,6 +82,7 @@ Result format depends on output type:
 ```
 
 ### Literal Outputs (Value Mode)
+
 ```json
 {
   "count": 42,

@@ -26,16 +26,19 @@ Techniques to improve CWL package execution speed and resource efficiency.
 ## Docker Image Optimization
 
 ### Use Slim/Alpine Variants
+
 ```yaml
 # ❌ Slow - large image (~1GB)
 DockerRequirement:
   dockerPull: python:3.12
 ```
+
 ```yaml
 # ✅ Faster - slim image (~150MB)
 DockerRequirement:
   dockerPull: python:3.12-slim
 ```
+
 ```yaml
 # ✅ Smallest - alpine (~50MB)
 DockerRequirement:
@@ -43,11 +46,13 @@ DockerRequirement:
 ```
 
 ### Pin Specific Versions
+
 ```yaml
 # ❌ Slow - always pulls latest
 DockerRequirement:
   dockerPull: myimage:latest
 ```
+
 ```yaml
 # ✅ Fast - cached after first pull
 DockerRequirement:
@@ -55,6 +60,7 @@ DockerRequirement:
 ```
 
 ### Use Digest for Immutability
+
 ```yaml
 # ✅ Best - never changes, cached forever
 DockerRequirement:
@@ -62,6 +68,7 @@ DockerRequirement:
 ```
 
 ### Pre-pull Images
+
 ```bash
 # Pull images before workflow execution
 docker pull python:3.12-slim
@@ -71,6 +78,7 @@ docker pull gdal:3.6.0-alpine
 ## Resource Requirements
 
 ### Right-size Resources
+
 ```yaml
 requirements:
   ResourceRequirement:
@@ -84,6 +92,7 @@ requirements:
 ```
 
 ### Dynamic Resource Allocation
+
 ```yaml
 requirements:
   InlineJavascriptRequirement: {}
@@ -103,12 +112,14 @@ requirements:
 ```
 
 ### Avoid Over-allocation
+
 ```yaml
 # ❌ Wastes resources
 ResourceRequirement:
   ramMin: 64000  # 64GB for a simple task
   coresMin: 32
 ```
+
 ```yaml
 # ✅ Appropriate allocation
 ResourceRequirement:
@@ -119,6 +130,7 @@ ResourceRequirement:
 ## Parallel Processing with Scatter
 
 ### Basic Scatter
+
 ```yaml
 steps:
   process:
@@ -130,6 +142,7 @@ steps:
 ```
 
 ### Scatter Multiple Inputs
+
 ```yaml
 steps:
   process:
@@ -143,14 +156,17 @@ steps:
 ```
 
 ### Optimal Scatter Size
+
 ```yaml
 # ❌ Too fine-grained - overhead dominates
 scatter: tiny_chunks  # 1000s of 1MB files
 ```
+
 ```yaml
 # ✅ Balanced - good parallelism
 scatter: reasonable_chunks  # Dozens of 100MB files
 ```
+
 ```yaml
 # ❌ Too coarse - underutilizes resources
 scatter: huge_chunks  # 2-3 multi-GB files
@@ -159,12 +175,14 @@ scatter: huge_chunks  # 2-3 multi-GB files
 ## Input/Output Optimization
 
 ### Minimize Data Transfer
+
 ```yaml
 # ❌ Transfers entire large file
 inputs:
   full_dataset:
     type: File  # 10GB file
 ```
+
 ```yaml
 # ✅ Transfer only needed subset
 inputs:
@@ -174,6 +192,7 @@ inputs:
 ```
 
 ### Use File References
+
 ```yaml
 # ✅ Pass by reference when possible
 {
@@ -185,6 +204,7 @@ inputs:
 ```
 
 ### Stream When Possible
+
 ```yaml
 # ✅ Process streams instead of files
 baseCommand: [curl, https://example.com/data.txt]
@@ -194,6 +214,7 @@ stdout: processed.txt
 ```
 
 ### Efficient Output Patterns
+
 ```yaml
 # ❌ Returns many small files
 outputs:
@@ -202,6 +223,7 @@ outputs:
     outputBinding:
       glob: "*.txt"  # 1000s of tiny files
 ```
+
 ```yaml
 # ✅ Returns aggregated results
 outputs:
@@ -214,6 +236,7 @@ outputs:
 ## Workflow Structure Optimization
 
 ### Minimize Steps
+
 ```yaml
 # ❌ Too many small steps
 steps:
@@ -222,6 +245,7 @@ steps:
   step3: validate.cwl
   step4: process.cwl
 ```
+
 ```yaml
 # ✅ Combined operations
 steps:
@@ -230,6 +254,7 @@ steps:
 ```
 
 ### Parallel Independent Steps
+
 ```yaml
 # ✅ Steps that can run in parallel
 steps:
@@ -252,6 +277,7 @@ steps:
 ```
 
 ### Cache Intermediate Results
+
 ```yaml
 # ✅ Expose intermediate results for reuse
 outputs:
@@ -267,12 +293,14 @@ outputs:
 ## Command Optimization
 
 ### Efficient Commands
+
 ```yaml
 # ❌ Inefficient
 baseCommand: [bash, -c]
 arguments:
   - "cat file.txt | grep pattern | sort | uniq > output.txt"
 ```
+
 ```yaml
 # ✅ More efficient
 baseCommand: [grep, pattern]
@@ -281,24 +309,28 @@ stdout: output.txt
 ```
 
 ### Avoid Unnecessary Operations
+
 ```yaml
 # ❌ Reads entire file into memory
 baseCommand: [python, -c]
 arguments:
   - "open('huge.txt').read()"
 ```
+
 ```yaml
 # ✅ Streams data
 baseCommand: [awk, '{print $1}']
 ```
 
 ### Use Native Tools
+
 ```yaml
 # ❌ Python for simple text operations
 DockerRequirement:
   dockerPull: python:3.12-slim
 baseCommand: [python, -c, "print('hello')"]
 ```
+
 ```yaml
 # ✅ Simple shell command
 DockerRequirement:
@@ -309,6 +341,7 @@ baseCommand: [echo, hello]
 ## Monitoring and Profiling
 
 ### Track Resource Usage
+
 ```bash
 # Get job statistics
 weaver statistics -u $WEAVER_URL -j $JOB_ID
@@ -321,6 +354,7 @@ weaver logs -u $WEAVER_URL -j $JOB_ID
 ```
 
 ### Identify Bottlenecks
+
 ```yaml
 # Add timing to steps
 steps:
@@ -334,6 +368,7 @@ steps:
 ```
 
 ### Profile Locally
+
 ```bash
 # Time local execution
 time cwltool process.cwl inputs.json
@@ -345,6 +380,7 @@ docker stats
 ## Caching Strategies
 
 ### Docker Image Caching
+
 ```yaml
 # ✅ Use versioned tags for caching
 DockerRequirement:
@@ -352,6 +388,7 @@ DockerRequirement:
 ```
 
 ### Intermediate File Caching
+
 ```yaml
 # ✅ Reuse expensive preprocessing
 steps:
@@ -369,11 +406,13 @@ steps:
 ## Common Performance Issues
 
 ### Issue: Slow Docker Pull
+
 ```yaml
 # Problem: Large image
 DockerRequirement:
   dockerPull: tensorflow/tensorflow:latest-gpu  # 4GB+
 ```
+
 ```yaml
 # Solutions:
 # 1. Use smaller base image
@@ -387,11 +426,13 @@ DockerRequirement:
 ```
 
 ### Issue: Memory Overflow
+
 ```yaml
 # Problem: Insufficient RAM
 ResourceRequirement:
   ramMin: 2048
 ```
+
 ```yaml
 # Solution: Increase based on data size
 ResourceRequirement:
@@ -403,12 +444,14 @@ ResourceRequirement:
 ```
 
 ### Issue: Slow File I/O
+
 ```yaml
 # Problem: Reading entire file
 baseCommand: [python, -c]
 arguments:
   - "data = open('huge.csv').read()"
 ```
+
 ```yaml
 # Solution: Stream processing
 baseCommand: [python, -c]
@@ -421,6 +464,7 @@ stdin: huge.csv
 ```
 
 ### Issue: Sequential Processing
+
 ```yaml
 # Problem: Processing items one by one
 steps:
@@ -428,6 +472,7 @@ steps:
     run: tool.cwl
     # No scatter - sequential
 ```
+
 ```yaml
 # Solution: Scatter for parallelism
 steps:
@@ -441,6 +486,7 @@ steps:
 ## Benchmarking
 
 ### Compare Approaches
+
 ```bash
 # Approach 1
 time weaver execute -u $WEAVER_URL -p approach1 -I inputs.json
@@ -454,6 +500,7 @@ weaver statistics -u $WEAVER_URL -j $JOB2
 ```
 
 ### A/B Testing
+
 ```yaml
 # Test different resource allocations
 # Version A: Conservative
@@ -461,6 +508,7 @@ ResourceRequirement:
   ramMin: 4096
   coresMin: 2
 ```
+
 ```yaml
 # Version B: Generous
 ResourceRequirement:
@@ -500,6 +548,7 @@ ResourceRequirement:
 ## Measurement
 
 Track these metrics for optimization:
+
 - **Execution time**: Start to finish duration
 - **Docker pull time**: Image download duration
 - **Resource usage**: CPU, RAM, Disk I/O

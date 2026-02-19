@@ -51,12 +51,12 @@ git diff origin/master -- weaver/wps_restapi/
 Based on changed files, determine affected skill categories:
 
 | Changed File              | Affected Skills           | Update Priority |
-|---------------------------|---------------------------|-----------------|
+| ------------------------- | ------------------------- | --------------- |
 | `weaver/cli.py`           | All CLI-referenced skills | **High**        |
 | `weaver/wps_restapi/*.py` | API, job, process skills  | **Medium**      |
 | `docs/source/*.rst`       | Documentation links       | **Medium**      |
 | `config/*.example`        | Configuration examples    | **Medium**      |
-| `weaver/processes/*.py`   | process-* skills          | **Medium**      |
+| `weaver/processes/*.py`   | process-\* skills         | **Medium**      |
 | `Makefile`                | weaver-install            | **Medium**      |
 | `CHANGES.rst`             | All depending on change   | **Low**         |
 
@@ -69,6 +69,7 @@ Based on changed files, determine affected skill categories:
 **Steps**:
 
 #### 1. Extract CLI methods
+
 ```bash
 # List all CLI commands
 grep -E "^def (.*)\(.*\):" weaver/cli.py | grep -v "^def _"
@@ -81,6 +82,7 @@ git diff origin/master weaver/cli.py | grep -A5 "def "
 ```
 
 #### 2. Identify affected skills
+
 ```bash
 # Map CLI commands to skills
 # deploy        → process-deploy
@@ -112,6 +114,7 @@ weaver <command> --help
 ```
 
 #### 4. Check for new CLI commands
+
 ```bash
 # If new command found, create new skill:
 # - Determine category (job-*, process-*, provider-*, etc.)
@@ -128,6 +131,7 @@ weaver <command> --help
 **Steps**:
 
 #### 1. Detect changed targets
+
 ```bash
 # List all make targets
 grep -E "^[a-z-]+:" Makefile | cut -d: -f1
@@ -137,6 +141,7 @@ git diff origin/master Makefile | grep "^+.*:" | grep -v "^+##"
 ```
 
 #### 2. Update weaver-install skill
+
 ```bash
 # Update sections:
 # - "Install with Makefile Targets"
@@ -148,6 +153,7 @@ make help | grep "install"
 ```
 
 #### 3. Test installation procedures
+
 ```bash
 # Verify each documented procedure still works
 cd /tmp && git clone https://github.com/crim-ca/weaver.git test-install
@@ -162,6 +168,7 @@ make install-all  # Test documented procedure
 **Steps**:
 
 #### 1. Identify endpoint changes
+
 ```bash
 # Check route definitions
 git diff origin/master weaver/wps_restapi/api.py | grep "@.*route"
@@ -171,6 +178,7 @@ git diff origin/master weaver/wps_restapi/ | grep -E "@.*\.(get|post|put|delete)
 ```
 
 #### 2. Map endpoints to skills
+
 ```markdown
 GET /processes              → process-list
 GET /processes/{id}         → process-describe
@@ -209,6 +217,7 @@ curl -X GET "${WEAVER_URL}/endpoint" | jq
 **Steps**:
 
 #### 1. Check for restructured docs
+
 ```bash
 # Find moved or renamed files
 git diff origin/master --name-status docs/source/
@@ -218,6 +227,7 @@ git diff origin/master docs/source/*.rst | grep -E "^\+.*\.\. _"
 ```
 
 #### 2. Update documentation links in skills
+
 ```bash
 # Find all documentation links
 grep -r "https://pavics-weaver.readthedocs.io" .agents/skills/*/SKILL.md
@@ -229,6 +239,7 @@ grep -r "https://pavics-weaver.readthedocs.io" .agents/skills/*/SKILL.md
 ```
 
 #### 3. Verify links
+
 ```bash
 # Check each link returns 200
 for skill in .agents/skills/*/SKILL.md; do
@@ -246,6 +257,7 @@ done
 **Steps**:
 
 #### 1. Identify configuration changes
+
 ```bash
 # Check example configs
 git diff origin/master config/weaver.ini.example
@@ -253,6 +265,7 @@ git diff origin/master config/data_sources.yml.example
 ```
 
 #### 2. Update weaver-install skill
+
 ```bash
 # Update "Configuration" section
 # - New configuration options
@@ -310,48 +323,33 @@ git push origin update-skills-$(date +%Y%m%d)
 
 ## Automated Detection Script
 
-Save as `.agents/scripts/detect-skill-updates.sh`:
+A script is provided to detect which files have changed and need skill updates. The script identifies changes but the actual update procedures are documented in this SKILL.md file (see "Update Procedures" section above).
+
+**Script**: [`scripts/detect-skill-updates.sh`](scripts/detect-skill-updates.sh)
+
+**Usage**:
 
 ```bash
-#!/bin/bash
-# Detect files requiring skill updates
+# Run from repository root
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh
 
-SINCE_DATE=${1:-"1 month ago"}
+# Check changes since specific date
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 week ago"
 
-echo "Changes since: $SINCE_DATE"
-echo "================================"
-
-# CLI changes
-CLI_CHANGES=$(git log --since="$SINCE_DATE" --name-only --pretty=format: weaver/cli.py | sort -u | wc -l)
-if [ $CLI_CHANGES -gt 0 ]; then
-  echo "⚠️  CLI changes detected: $CLI_CHANGES"
-  echo "   → Review all job-*, process-*, provider-* skills"
-fi
-
-# Makefile changes
-MK_CHANGES=$(git log --since="$SINCE_DATE" --name-only --pretty=format: Makefile | sort -u | wc -l)
-if [ $MK_CHANGES -gt 0 ]; then
-  echo "⚠️  Makefile changes detected: $MK_CHANGES"
-  echo "   → Update weaver-install skill"
-fi
-
-# API changes
-API_CHANGES=$(git log --since="$SINCE_DATE" --name-only --pretty=format: weaver/wps_restapi/ | sort -u | wc -l)
-if [ $API_CHANGES -gt 0 ]; then
-  echo "⚠️  API changes detected: $API_CHANGES"
-  echo "   → Review affected endpoint skills"
-fi
-
-# Documentation changes
-DOC_CHANGES=$(git log --since="$SINCE_DATE" --name-only --pretty=format: docs/source/ | sort -u | wc -l)
-if [ $DOC_CHANGES -gt 0 ]; then
-  echo "⚠️  Documentation changes detected: $DOC_CHANGES"
-  echo "   → Verify documentation links in skills"
-fi
-
-echo "================================"
-echo "Run: .agents/scripts/update-skills.sh to begin updates"
+# Check changes since last month (default)
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 month ago"
 ```
+
+**What it does**:
+
+- Analyzes git history for changes to key files
+- Reports CLI changes (affects job-\*, process-\*, provider-\* skills)
+- Reports Makefile changes (affects weaver-install skill)
+- Reports API changes (affects endpoint-related skills)
+- Reports documentation changes (affects documentation links)
+- Provides update recommendations based on detected changes
+
+**Note**: This script only *detects* changes. To perform the actual updates, follow the procedures documented in the sections above (Procedure 1-5 under "Update Procedures").
 
 ## Skill Quality Checklist
 
@@ -368,7 +366,9 @@ When updating skills, verify:
 - [ ] **Documentation links** work (base URLs without anchors)
 - [ ] **Cross-references** point to existing skills
 - [ ] **Code blocks** have proper syntax highlighting
+- [ ] **Code blocks** do not repeat example keywords making their structure invalid
 - [ ] **Examples** are tested and working
+- [ ] **Markdown** formatting is valid
 
 ## Version-Specific Updates
 
@@ -405,7 +405,7 @@ When updating skills, verify:
 
 ## Testing Updated Skills
 
-### Manual Testing
+### Manual Testing (optional)
 
 > ⚠️ WARNING
 > ️Unless a Weaver instance is running locally, the following tests will fail.
@@ -459,6 +459,12 @@ for skill in .agents/skills/*/SKILL.md; do
 done
 ```
 
+### Format Validation
+
+Employ the `make check-md-only` target or `npm run check-markdown`.
+Similar commands with `make fix-md-only` or `npm run format-markdown` can be used to automatically formatting issues.
+Remove the `-only` suffix if installation/updates of `npm` dependencies are needed.
+
 ## Best Practices
 
 1. **Update skills immediately** after code changes
@@ -495,8 +501,8 @@ git diff origin/master weaver/cli.py | grep "def "
 # Check API changes
 git diff origin/master weaver/wps_restapi/
 
-# Validate skills
-.agents/scripts/detect-skill-updates.sh "1 week ago"
+# Validate skills (automated detection)
+.agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 week ago"
 
 # Update and test
 # 1. Update affected skills

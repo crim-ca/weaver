@@ -29,11 +29,13 @@ Agent Skills provide a structured way to document and expose Weaver's capabiliti
 All 33 skills are now organized by category for easy discovery:
 
 ### API Information (3 skills)
+
 - **[api-conformance](skills/api-conformance/)** - Check OGC standards conformance
 - **[api-info](skills/api-info/)** - Get API metadata and endpoints
 - **[api-version](skills/api-version/)** - Get Weaver version information
 
 ### CWL Comprehension (8 skills)
+
 - **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/)** - Create CWL CommandLineTool packages from scratch
 - **[cwl-debug-package](skills/cwl-debug-package/)** - Debug CWL package deployment and execution issues
 - **[cwl-optimize-performance](skills/cwl-optimize-performance/)** - Optimize CWL performance and resource usage
@@ -44,6 +46,7 @@ All 33 skills are now organized by category for easy discovery:
 - **[cwl-validate-package](skills/cwl-validate-package/)** - Validate CWL syntax before deployment
 
 ### Job Operations (11 skills)
+
 - **[job-dismiss](skills/job-dismiss/)** - Cancel running or pending jobs
 - **[job-exceptions](skills/job-exceptions/)** - Get detailed error information
 - **[job-execute](skills/job-execute/)** - Run processes with inputs (async/sync)
@@ -57,6 +60,7 @@ All 33 skills are now organized by category for easy discovery:
 - **[job-status](skills/job-status/)** - Check job execution status
 
 ### Process Management (5 skills)
+
 - **[process-deploy](skills/process-deploy/)** - Deploy CWL application packages
 - **[process-describe](skills/process-describe/)** - Get process details and capabilities
 - **[process-get-package](skills/process-get-package/)** - Retrieve CWL package definitions
@@ -64,15 +68,18 @@ All 33 skills are now organized by category for easy discovery:
 - **[process-undeploy](skills/process-undeploy/)** - Remove deployed processes
 
 ### Provider Management (3 skills)
+
 - **[provider-list](skills/provider-list/)** - List all registered providers
 - **[provider-register](skills/provider-register/)** - Register remote WPS/OGC services
 - **[provider-unregister](skills/provider-unregister/)** - Remove provider registrations
 
 ### Setup Operations (2 skills)
+
 - **[weaver-install](skills/weaver-install/)** - Install and configure Weaver (Docker or from source)
 - **[weaver-skills-update](skills/weaver-skills-update/)** - Maintain and update skills documentation
 
 ### Vault Operations (1 skill)
+
 - **[vault-upload](skills/vault-upload/)** - Store sensitive data securely
 
 ## Using These Skills
@@ -80,6 +87,7 @@ All 33 skills are now organized by category for easy discovery:
 ### For AI Agents
 
 AI agents can read the SKILL.md files to understand:
+
 1. When to use each capability
 2. What parameters are required
 3. How to format requests
@@ -91,6 +99,7 @@ Configure your IDE to recognize these skills for autocomplete and suggestions:
 
 **PyCharm / JetBrains**:
 Add to `~/.config/github-copilot/intellij/mcp.json`:
+
 ```json
 {
   "servers": {
@@ -104,6 +113,7 @@ Add to `~/.config/github-copilot/intellij/mcp.json`:
 
 **VS Code**:
 Add to `.vscode/settings.json`:
+
 ```json
 {
   "github.copilot.advanced": {
@@ -177,9 +187,9 @@ These skills follow the [Agent Skills Specification](https://agentskills.io/spec
 ## Additional Resources
 
 - **Main Documentation**: [SKILLS.md](../../SKILLS.md) - Legacy format, comprehensive reference
-- **IDE Integration**: [IDE_INTEGRATION.md](../../IDE_INTEGRATION.md) - Setup instructions
-- **Weaver Docs**: https://pavics-weaver.readthedocs.io/
-- **Agent Skills Spec**: https://agentskills.io/specification
+- **IDE Integration**: [IDE\_INTEGRATION.md](../../IDE_INTEGRATION.md) - Setup instructions
+- **Weaver Docs**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
+- **Agent Skills Spec**: [https://agentskills.io/specification](https://agentskills.io/specification)
 
 ## Validation
 
@@ -192,9 +202,9 @@ agentskills validate .agents/skills/
 
 ## Support
 
-- **Issues**: https://github.com/crim-ca/weaver/issues
-- **Discussions**: https://github.com/crim-ca/weaver/discussions
-- **Documentation**: https://pavics-weaver.readthedocs.io/
+- **Issues**: [https://github.com/crim-ca/weaver/issues](https://github.com/crim-ca/weaver/issues)
+- **Discussions**: [https://github.com/crim-ca/weaver/discussions](https://github.com/crim-ca/weaver/discussions)
+- **Documentation**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
 
 ## License
 
