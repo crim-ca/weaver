@@ -15,7 +15,11 @@ Changes:
 - Set up `Weaver Agent Skills <./.agent/skills>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
-  See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
+
+  - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
+  - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
+  - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
+  - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
 
 Fixes:
 ------
