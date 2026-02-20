@@ -5,6 +5,7 @@ Verifies that descriptions use multiline format with 'description: |'.
 """
 import os
 import sys
+
 import yaml
 
 skills_dir = ".agents/skills"
@@ -16,7 +17,7 @@ for skill_name in sorted(os.listdir(skills_dir)):
     if not os.path.isfile(skill_path):
         continue
 
-    with open(skill_path, 'r') as f:
+    with open(skill_path, mode="r", encoding="utf-8") as f:
         content = f.read()
 
     parts = content.split('---')

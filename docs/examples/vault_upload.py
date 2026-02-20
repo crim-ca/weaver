@@ -10,7 +10,7 @@ with open(PATH, "w", encoding="utf-8") as file:
 files = {
     "file": (
         "desired-name.json",
-        open(PATH, "r", encoding="utf-8"),
+        open(PATH, mode="r", encoding="utf-8"),  # pylint: disable=R1732
         "application/json; charset=UTF-8"
     )
 }

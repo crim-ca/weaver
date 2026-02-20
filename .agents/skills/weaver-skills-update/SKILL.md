@@ -528,7 +528,8 @@ A script is provided to validate YAML frontmatter and cross-references in all sk
 **What it validates**:
 
 - **YAML frontmatter**: Ensures all skills have valid YAML frontmatter between `---` markers
-- **Cross-references**: Checks that all relative links to other skills (`../skill-name/`) point to existing skill directories
+- **Cross-references**: Checks that all relative links to other skills (`../skill-name/`)
+  point to existing skill directories
 
 **Example output**:
 

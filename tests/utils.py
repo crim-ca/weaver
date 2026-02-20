@@ -958,6 +958,7 @@ class FileServer(SimpleHTTPTestServer):
         This server takes more time to start than usual mocks. Use it sparingly, and consider maintaining a single
         instance over multiple tests of a complete test suite rather than recreating a server for each test.
     """
+
     def __init__(self):  # pylint: disable=W0231
         self._port = self.get_port()
         self._uri = f"http://0.0.0.0:{self._port}"

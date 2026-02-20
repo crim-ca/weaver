@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- Set up `Weaver Agent Skills <./.agent/skills>`_ based on
+- Set up `Weaver Agent Skills <./.agents/skills>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
 

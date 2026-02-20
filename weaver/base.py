@@ -117,6 +117,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
+
     def __init__(
         self,
         fget=None,  # type: Optional[Callable[[object], PropertyDataTypeT]]

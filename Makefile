@@ -543,7 +543,8 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 		pylint \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
-			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			"$(APP_ROOT)/" \
+			$(PYLINT_XARGS) \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
@@ -629,7 +630,11 @@ check-docstring-only: | mkdir-reports  ## check code docstring style and linting
 	@echo "Running docstring checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
 	@bash -c '$(CONDA_CMD) \
-		pydocstyle --explain --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		pydocstyle \
+			--explain \
+			--config "$(APP_ROOT)/setup.cfg" \
+			--match-dir "^(node_submodules)" \
+			"$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/check-docstring.txt")'
 
 .PHONY: check-links-only
