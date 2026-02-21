@@ -351,8 +351,11 @@ Installation of `Weaver` from source can be performed instead of using the Docke
 
     pip install https://github.com/crim.ca/weaver
 
-For more details, please refer to the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
-section of the documentation.
+.. seealso::
+
+    For more details, please refer to
+    the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
+    section of the documentation.
 
 ----------------
 Configuration
@@ -362,7 +365,13 @@ All configuration settings can be overridden using a ``weaver.ini`` file that wi
 instantiation of the application. An example of such file is provided here: `weaver.ini.example`_.
 
 Setting the operational mode of `Weaver` (`EMS`/`ADES`/`HYBRID`) is accomplished using the
-``weaver.configuration`` field of ``weaver.ini``. For more configuration details, please refer to Documentation_.
+``weaver.configuration`` field of ``weaver.ini``.
+
+.. seealso::
+
+    For more details, please refer to
+    the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`_
+    section of the documentation.
 
 .. _weaver.ini.example: ./config/weaver.ini.example
 

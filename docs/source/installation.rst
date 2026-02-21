@@ -9,21 +9,70 @@ Installation
     :local:
     :depth: 2
 
+.. _installation-docker:
+
+Docker Installation
+===================
+
+The Docker installation is recommended to ensure reproducibility of the environment and `Weaver` dependencies.
+It is the quickest way to get started with the application.
+
+You can obtain the latest images (or a specific version of you choosing) as follows.
+The base image contains the source code and all dependencies, while the ``manager`` and ``worker``
+images define the commands used to run the :term:`API` and the `Celery`_ workers respectively.
+
+.. code-block:: sh
+
+    docker pull pavics/weaver:latest
+    docker pull pavics/weaver:latest-manager
+    docker pull pavics/weaver:latest-worker
+
+To run :ref:`CLI <cli>` commands, you can run the following.
+
+.. code-block:: sh
+
+    docker run -it --rm pavics/weaver:latest weaver --help
+
+To run the :term:`API` and worker services, it is recommended to use the *Docker Compose*
+configuration because the service must employ a companion `MongoDB`_ container and a ``docker-proxy``
+service to run :ref:`app_pkg_docker` per respective :term:`Process`.
+
+.. seealso::
+    - See :ref:`configuration` to modify application behaviour. A custom INI file should be mounted in the container.
+    - `Example Configuration Files <https://github.com/crim-ca/weaver/tree/master/config>`_
+    - `Example Docker-Compose YAML <https://github.com/crim-ca/weaver/blob/master/docker/docker-compose.yml.example>`_
+
+.. _installation-python:
+
+Python Installation
+===================
+
+Prerequisites
+-------------------
+
 The installation is using the Python distribution system `Miniconda`_ (default installation of no ``conda`` found)
-to maintain software dependencies. Any ``conda`` installation should work the same. To use a pre-installed ``conda``
-distribution, simply make sure that it can be found on the shell path.
+to maintain software dependencies. Any ``conda``-based installation should work the same.
+To use a pre-installed ``conda`` distribution, simply make sure that it can be found on the shell path.
+If not auto-detected, you can hint ``make`` commands about its location using the ``CONDA_HOME`` variable.
 
-Requirements
-============
+You can also employ your own environment management system, by pre-activating it and running ``make`` commands
+with the ``CONDA_CMD=""`` variable.
 
-The installation works on Linux 64 bit distributions (tested on Ubuntu 16.04).
+To avoid repeating variables on each command, you can define them in ``Makefile.config`` at the root of the repository.
+
+.. seealso::
+    Example `Makefile.config.example`_
+
+The installation works on Linux 64 bit distributions (tested on all Ubuntu LTS versions since 16.04).
 
 .. warning::
-    Windows is *not officially supported*, but some patches have been applied to help using it.
+    :ref:`installation-windows` is *not officially supported*, but some patches have been applied to help using it.
     If you find some problems, please |submit-issue|_ or open a pull request with fixes.
 
+.. _installation-github:
+
 From GitHub Sources
-===================
+-------------------
 
 Install Weaver as normal user from GitHub sources:
 
@@ -48,11 +97,29 @@ that environment. You can also enforce a specific environment using:
 
    make CONDA_ENV=<my-env> install
 
+You can then run the :term:`API` and worker services using the corresponding commands with
+your custom `weaver.ini.example`_ configuration file (see :ref:`Configuration` section).
 
-.. _windows_install:
+.. code-block:: sh
+
+    # API service
+    pserve config/weaver.ini
+
+    # Celery worker service
+    celery -A pyramid_celery.celery_app worker -B -E --ini config/weaver.ini
+
+.. warning::
+    `Weaver` typically relies (or expects) some files to be served online for inputs and outputs staging.
+    To run locally, you might want to consider running a file server to make them look like HTTP resources.
+
+    .. code-block:: sh
+
+        python -m http.server 8000 -b 127.0.0.1 --directory <weaver.wps_output_dir>
+
+.. _installation-windows:
 
 Windows Installation
-=====================
+---------------------
 
 *Minimal* support is provided to run the code on Windows. To do so, the ``Makefile`` assumes you are running in a
 ``MINGW`` environment, that ``conda`` is already installed, and that it is available from ``CONDA_HOME`` variable or
@@ -64,8 +131,10 @@ similar. If this is not the case, you will have to adjust the reference variable
     is regularly evaluated on a Linux virtual machine. It is recommended to run it as so or using the existing
     Docker images.
 
-Known issues
-------------
+.. _installation-windows-issues:
+
+Known Issues
+~~~~~~~~~~~~
 
 * Package ``shapely.geos`` has C++ dependency to ``geos`` library. If the package was installed in a ``conda``
   environment, but through ``pip install`` call, the source path will not be found. You have to make sure to install
