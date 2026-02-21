@@ -58,8 +58,10 @@ from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
     OGC_MAPPING,
     OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
     AcceptLanguage,
     ContentEncoding,
     ContentType,
@@ -1094,6 +1096,62 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert resp.status_code in [200, 201], resp.text
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
+
+    @pytest.mark.format
+    def test_execute_file_type_io_format_cwl_iana_yaml_mapping(self):
+        """
+        Test to validate resolution of explicitly provided YAML media-type.
+
+        The plain YAML media-type provided in a :term:`OGC API - Processes` execution should be mapped to the
+        corresponding :term:`CWL` ``format`` reference with IANA namespace mapping according to the package definition.
+        """
+        cwl = self.retrieve_payload("CatFile", "package", ref_name="cat.cwl", local=True)
+        cwl["inputs"]["file"].update({"format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}"})
+        cwl["inputs"]["file2"] = copy.deepcopy(cwl["inputs"]["file"])
+        cwl.update({
+            "$namespaces": {
+                IANA_NAMESPACE: IANA_NAMESPACE_URL,
+                OGC_NAMESPACE: OGC_NAMESPACE_URL,
+            }
+        })
+        self.deploy_process(cwl, process_id=self._testMethodName)
+        data = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            # test with both extensions, to make sure mapping is not based/resolved only on a specific one
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix="test.yaml"))
+            tmp_file2 = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix="test.yml"))
+            yaml.safe_dump({"test": "test1"}, tmp_file)
+            yaml.safe_dump({"test": "test2"}, tmp_file2)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            tmp_file2.flush()
+            tmp_file2.seek(0)
+            tmp_href = tmp_file.name.replace(out_dir, out_url, 1)
+            tmp_href2 = tmp_file2.name.replace(out_dir, out_url, 1)
+            data.update({
+                "inputs": {
+                    "file": {"href": tmp_href, "type": ContentType.APP_YAML},
+                    "file2": {"href": tmp_href2, "type": ContentType.APP_YAML},
+                }
+            })
+
+            proc_url = f"/processes/{self._testMethodName}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 201, resp.text
+            status_url = resp.json.get("location")
+            results = self.monitor_job(status_url)
+            assert "output" in results
+            assert results["output"]["value"] == "testtest2"
 
     @pytest.mark.format
     def test_execute_output_file_format_validator(self):

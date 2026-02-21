@@ -5,7 +5,7 @@ import unittest
 from collections import OrderedDict
 from copy import deepcopy
 from types import MappingProxyType
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import urlparse
 
 import yaml
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
         ExecutionResults,
         JobStatusResponse,
         JSON,
+        Path,
         ProcessDeployment,
         ProcessDescription,
         ProcessDescriptionListing,
@@ -93,79 +94,92 @@ class ResourcesUtil(GenericUtils):
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: Literal["deploy"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessDeployment, Dict[str, JSON]]
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Literal["deploy"]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[False]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Union[ProcessDeployment, Dict[str, JSON]]
         ...
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: Literal["describe"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessDescription, Dict[str, JSON]]
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Literal["describe"]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[False]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Union[ProcessDescription, Dict[str, JSON]]
         ...
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: Literal["execute", "quotation"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Union[ProcessExecution, Dict[str, JSON]]
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Literal["execute", "quotation"]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[False]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Union[ProcessExecution, Dict[str, JSON]]
         ...
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: Literal["package"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> CWL
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Literal["package"]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[False]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> CWL
         ...
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: Literal["estimator"]
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[False]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> Dict[str, JSON]
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Literal["estimator"]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[False]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Dict[str, JSON]
         ...
 
     @classmethod
     @overload
-    def retrieve_payload(cls,
-                         process,           # type: str
-                         ref_type=None,     # type: ReferenceType
-                         ref_name=None,     # type: Optional[str]
-                         ref_found=False,   # type: Literal[True]
-                         location=None,     # type: Optional[str]
-                         local=False,       # type: bool
-                         ):                 # type: (...) -> str
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: ReferenceType
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: Literal[True]
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Path
         ...
 
     @classmethod
-    def retrieve_payload(cls, process, ref_type=None, ref_name=None, ref_found=False, location=None, local=False):
-        # type: (str, Optional[ReferenceType], Optional[str], bool, Optional[str], bool) -> Union[Dict[str, JSON], str]
+    def retrieve_payload(
+        cls,
+        process,            # type: str
+        ref_type=None,      # type: Optional[ReferenceType]
+        ref_name=None,      # type: Optional[str]
+        ref_found=False,    # type: bool
+        location=None,      # type: Optional[str]
+        local=False,        # type: bool
+    ):                      # type: (...) -> Optional[Union[Dict[str, JSON], Path]]
         """
         Retrieve content using known structures and locations.
 
@@ -382,7 +396,7 @@ class WpsConfigBase(GenericUtils):
     @classmethod
     @overload
     def deploy_process(cls,
-                       payload,                             # type: JSON
+                       payload,                             # type: Union[ProcessDeployment, CWL]
                        process_id=None,                     # type: Optional[str]
                        describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOGCType
                        mock_requests_only_local=True,       # type: bool
@@ -393,7 +407,7 @@ class WpsConfigBase(GenericUtils):
     @classmethod
     @overload
     def deploy_process(cls,
-                       payload,                             # type: JSON
+                       payload,                             # type: Union[ProcessDeployment, CWL]
                        process_id=None,                     # type: Optional[str]
                        describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaOLDType
                        mock_requests_only_local=True,       # type: bool
@@ -403,7 +417,7 @@ class WpsConfigBase(GenericUtils):
 
     @classmethod
     def deploy_process(cls,
-                       payload,                             # type: JSON
+                       payload,                             # type: Union[ProcessDeployment, CWL]
                        process_id=None,                     # type: Optional[str]
                        describe_schema=ProcessSchema.OGC,   # type: ProcessSchemaType
                        mock_requests_only_local=True,       # type: bool
@@ -426,7 +440,7 @@ class WpsConfigBase(GenericUtils):
             #   this allows clean separation of deploy payload from CWL to allow reuse and test CWL locally beforehand
             exec_href = exec_list[0].get("href", "")
             if exec_href.startswith("tests/"):
-                exec_unit = load_file(os.path.join(WEAVER_ROOT_DIR, exec_href))
+                exec_unit = cast("CWL", load_file(os.path.join(WEAVER_ROOT_DIR, exec_href)))
                 exec_list[0]["unit"] = exec_unit
                 exec_list[0].pop("href")
             exec_unit = exec_list[0].get("unit")  # type: CWL

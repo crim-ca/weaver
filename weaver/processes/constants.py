@@ -476,7 +476,7 @@ class JobStatusType(Constants):
 
 if TYPE_CHECKING:
     # pylint: disable=invalid-name
-    CWL_RequirementNames = Literal[
+    CWL_RequirementNames = Union[
         CWL_RequirementBuiltinType,
         CWL_RequirementESGFCWTType,
         CWL_RequirementOGCAPIType,
