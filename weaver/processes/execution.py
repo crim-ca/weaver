@@ -989,7 +989,7 @@ def submit_job_dispatch_task(
     .. note::
         Both the :paramref:`container` and :paramref:`request` parameters are provided, although they could contain the
         same nested setting references in certain cases, because other implementations (e.g.: dispatch via :term:`WPS`)
-        might recreate their own :term:`HTTP` request object that doesn't include the application settings.
+        might recreate their own HTTP request object that doesn't include the application settings.
     """
     db = get_db(container)
     store = db.get_store(StoreJobs)

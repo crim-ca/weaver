@@ -30,6 +30,7 @@ services:
       - ./config/wps_processes.yml.example:/opt/local/src/weaver/config/wps_processes.yml
       # WARNING: see detail in 'worker' definition
       - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
+      - /tmp/vault:/tmp/vault
     networks:
       # network 'default' is created by default by docker-compose
       # adjust to whichever service that offers HTTP access if using more advanced networking definitions
@@ -74,6 +75,11 @@ services:
       #   and will expect to find the same directory locations.
       - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
       - /tmp/weaver/wps-workdir:/tmp/weaver/wps-workdir
+      # NOTE:
+      #   The vault is only relevant if 'weaver.vault' is enabled. It should be equal to the 'weaver.vault_dir'.
+      #   The vault path should align with the one used in the Weaver API to ensure correct path resolution between
+      #   the location the uploaded files were saved to, and where the worker should retrieve them from.
+      - /tmp/vault:/tmp/vault
     restart: always
     logging: *default-logging
 
@@ -124,6 +130,22 @@ services:
       - /data/mongodb_persist:/data/db
     networks:
       - mongodb
+    restart: always
+    logging: *default-logging
+
+  file-proxy:
+    # Serves to provide access to the output files from process executions
+    # Jobs will store files in the configured directory location, but will reference them by HTTP URL in metadata
+    # NOTE: This is provided as example, but you could use other file serving like nginx
+    image: httpd:latest
+    container_name: file-proxy
+    ports:
+      - "8000:80"
+    networks:
+      - default
+    volumes:
+      # NOTE: The path should align with 'weaver.wps_output_dir' and will be referenced by 'weaver.wps_output_url'.
+      - /tmp/weaver/wps-outputs:/usr/local/apache2/htdocs:ro
     restart: always
     logging: *default-logging
 

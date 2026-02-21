@@ -20,10 +20,12 @@ Changes:
   - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
   - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
   - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
+- Add documentation to provide better guidance about installation, configuration and example references.
 
 Fixes:
 ------
-- No change.
+- Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
+- Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
 
 .. _changes_6.8.3:
 
