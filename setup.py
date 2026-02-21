@@ -21,7 +21,7 @@ if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ["README.rst", "CHANGES
         DOC_REMOVE_PYPI_START = LONG_DESCRIPTION.find(".. remove-pypi-start")
         DOC_REMOVE_PYPI_END = LONG_DESCRIPTION.find(".. remove-pypi-end")
         if (
-            DOC_REMOVE_PYPI_START > 0 and  # noqa
+            DOC_REMOVE_PYPI_START > 0 and  # noqa  # pylint: disable=R1716
             DOC_REMOVE_PYPI_END > 0 and
             DOC_REMOVE_PYPI_START < DOC_REMOVE_PYPI_END
         ):
@@ -55,7 +55,7 @@ def _parse_requirements(file_path, requirements, links):
     :param requirements: pre-initialized set in which to store extracted package requirements.
     :param links: pre-initialized set in which to store extracted link reference requirements.
     """
-    with open(file_path, "r") as requirements_file:
+    with open(file_path, mode="r", encoding="utf-8") as requirements_file:
         for line in requirements_file:
             # ignore empty line, comment line or reference to other requirements file (-r flag)
             if not line or line.startswith("#") or line.startswith("-"):

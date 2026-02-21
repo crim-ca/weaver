@@ -8,6 +8,7 @@ Weaver
 \| `Installation`_
 \| `Configuration`_
 \| `Documentation`_
+\| `Agent Skills`_
 \| `Extra Details & Sponsors`_
 \|
 
@@ -394,6 +395,34 @@ These are generated from corresponding information provided in `docs`_ source di
 .. _ReadTheDocs: https://pavics-weaver.readthedocs.io
 .. _`OpenAPI Specification`: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
+
+-------------------------
+Agent Skills
+-------------------------
+
+Weaver provides **Agent Skills** (`.agents/skills/`_) - a standardized format following
+the `Agent Skills Specification`_
+for documenting capabilities that can be discovered and used by AI agents, IDEs, and automated systems.
+See `.agents/README.md`_ for usage instructions and skill creation guidelines.
+
+Each skill is self-contained with:
+
+- **YAML frontmatter** describing metadata (name, description, compatibility)
+- **Markdown documentation** with usage examples
+- **Optional supporting files** (scripts, references, assets)
+
+Each skill documents how to interact with Weaver:
+
+- **REST API** endpoints (e.g., ``POST /processes/{id}/execution``)
+- **CLI commands** (e.g., ``weaver execute -u $WEAVER_URL -p process-id``)
+- **Python client** methods (e.g., ``WeaverClient.execute(process_id="...")``)
+
+See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_
+that can be referenced for contextually-indexed documentation from the source code.
+
+.. _.agents/skills/: ./.agents/skills/
+.. _.agents/README.md: ./.agents/README.md
+.. _Agent Skills Specification: https://agentskills.io/specification
 
 -------------------------
 Extra Details & Sponsors

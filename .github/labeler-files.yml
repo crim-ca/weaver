@@ -6,8 +6,12 @@
 ## CI
 # all automation-related steps and files
 
+triage/agents:
+  - ".agents/**"
+
 ci/operations:
   - .*  # all '.<>' files
+  - ".agents/**"
   - ".github/**"
   - MANIFEST.in
   - hooks/**/*

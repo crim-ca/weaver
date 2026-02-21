@@ -9,11 +9,27 @@ extension-pkg-whitelist=lxml.etree,
 
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
-ignore=CVS
+ignore=
+    CVS,
+    env,
+    .venv,
+    .env,
+    .git,
+    .github,
+    .vscode,
+    .idea,
+    .run,
+    .tox,
+    .eggs,
+    build,
+    dist,
+    reports,
+    node_modules,
+
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
-ignore-patterns=
+ignore-patterns=.*\.egg-info,
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
@@ -131,7 +147,8 @@ disable=C0111,missing-docstring,
 # note: (C0412, ungrouped-imports) is managed via isort tool, ignore false positives
 
 per-file-ignores =
-  tests/*:R1729
+    .agents/skills/*/scripts/*:C0103,
+    tests/*:R1729
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

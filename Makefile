@@ -290,8 +290,12 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 		npm install --save-dev \
 	)
 
+.PHONY: install-pip-mdformat
+install-pip-mdformat:	## install mdformat dependencies to fix line wrapping
+	@pip install $(cat "$(APP_ROOT)/requirements-dev.txt" | grep mdformat)
+
 .PHONY: install-dev-npm
-install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint	## install all npm development dependencies
+install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -539,7 +543,8 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 		pylint \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
-			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			"$(APP_ROOT)/" \
+			$(PYLINT_XARGS) \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
@@ -625,7 +630,11 @@ check-docstring-only: | mkdir-reports  ## check code docstring style and linting
 	@echo "Running docstring checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
 	@bash -c '$(CONDA_CMD) \
-		pydocstyle --explain --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		pydocstyle \
+			--explain \
+			--config "$(APP_ROOT)/setup.cfg" \
+			--match-dir "^(node_submodules)" \
+			"$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/check-docstring.txt")'
 
 .PHONY: check-links-only
@@ -744,20 +753,15 @@ fix-css-only: | mkdir-reports 	## fix CSS linting problems automatically
 .PHONY: fix-css
 fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after dependency installation
 
-# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
 .PHONY: fix-md-only
 fix-md-only: | mkdir-reports 	## fix Markdown linting problems automatically
-	@echo "Running Markdown style checks..."
-	@npx --no-install remark \
-		--output --frail \
-		--silently-ignore \
-		--rc-path "$(APP_ROOT)/package.json" \
-		--ignore-path "$(APP_ROOT)/.remarkignore" \
-		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
-		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Wrapping long lines with mdformat..."
+	@mdformat "$(APP_ROOT)" 2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Running remark formatter..."
+	@npm run format-markdown 2>&1 | tee -a "$(REPORTS_DIR)/fixed-md.txt"
 
 .PHONY: fix-md
-fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
+fix-md: install-npm-remarklint install-pip-mdformat fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
@@ -1009,8 +1013,8 @@ docker-test: docker-build stop	## execute smoke test of the built images (valida
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop
 
-.PHONY: docker-stat
-docker-stat:  ## query docker-compose images status (from 'docker-test')
+.PHONY: docker-status
+docker-status:  ## query docker-compose images status (from 'docker-test')
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
@@ -1041,8 +1045,8 @@ start: install-run	## start application instance(s) with gunicorn (pserve)
 stop: 		## kill application instance(s) started with gunicorn (pserve)
 	@(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"
 
-.PHONY: stat
-stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
+.PHONY: status
+status: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"
 
 # Reapply config if overrides were defined.

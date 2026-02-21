@@ -19,6 +19,10 @@ flynt
 isort>=5
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
 marshmallow<4
+mdformat
+mdformat-frontmatter
+mdformat-gfm
+mdformat-tables
 mock<4
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)

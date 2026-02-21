@@ -1,7 +1,6 @@
 ---
 
-name: Pull Request
-about: Create a pull request to resolve issues or add new features.
+name: Pull Request about: Create a pull request to resolve issues or add new features.
 
 ---
 
