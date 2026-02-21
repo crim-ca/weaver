@@ -2602,7 +2602,7 @@ to execute. Content negotiation also happens within the submitted :ref:`proc_exe
 Following is a summary of relevant parameters impacting content negotiation.
 
 .. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
-    :name: table-content-negotiation
+    :name: table-content-negotiation-parameters
     :align: center
     :header-rows: 1
     :widths: 10,10,50,15,15
@@ -2610,7 +2610,7 @@ Following is a summary of relevant parameters impacting content negotiation.
     * - Parameter
       - Location
       - Description
-      - Allowed Encoding [#noteParamEncoding]_
+      - Allowed Encoding [#noteEncoding]_
       - Example
     * - ``f`` / ``format``
       - Query
@@ -2695,7 +2695,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
     However, the corresponding :term:`URI` or :term:`Media-Type` representations must match *exactly*.
 
 .. list-table:: Common Shorthand Notations Identifiers for Content Negotiation
-    :name: table-content-negotiation
+    :name: table-content-negotiation-shorthand
     :align: center
     :header-rows: 1
     :widths: 10,30,60

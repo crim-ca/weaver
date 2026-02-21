@@ -15,7 +15,7 @@ you can customize its behaviour using multiple configuration settings below.
     :local:
     :depth: 2
 
-.. seelalso::
+.. seealso::
     - `Example Configuration Files <https://github.com/crim-ca/weaver/tree/master/config>`_
     - `Example Docker-Compose YAML <https://github.com/crim-ca/weaver/blob/master/docker/docker-compose.yml.example>`_
 

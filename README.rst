@@ -351,7 +351,8 @@ Installation of `Weaver` from source can be performed instead of using the Docke
 
     pip install https://github.com/crim.ca/weaver
 
-.. seealso::
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
 
     For more details, please refer to
     the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
@@ -367,7 +368,8 @@ instantiation of the application. An example of such file is provided here: `wea
 Setting the operational mode of `Weaver` (`EMS`/`ADES`/`HYBRID`) is accomplished using the
 ``weaver.configuration`` field of ``weaver.ini``.
 
-.. seealso::
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
 
     For more details, please refer to
     the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`_
