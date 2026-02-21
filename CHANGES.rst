@@ -12,11 +12,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add documentation to provide better guidance about installation, configuration and example references.
 
 Fixes:
 ------
-- No change.
+- Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
+- Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
 
 .. _changes_6.8.3:
 

@@ -185,6 +185,14 @@ def get_processes(request):
 
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PostProcessesEndpointCWLYAML(),
+    accept=ContentType.APP_JSON,
+    content_type=[ContentType.APP_CWL_YAML, ContentType.APP_CWL, ContentType.APP_CWL_X],
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_processes_responses,
+)
+@sd.processes_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
     schema=sd.PostProcessesEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,

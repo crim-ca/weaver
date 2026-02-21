@@ -253,6 +253,7 @@
 .. |weaver-config| replace:: ``weaver/config``
 .. _weaver-config: ../../../config
 .. _weaver.ini.example: ../../../config/weaver.ini.example
+.. _Makefile.config.example: ../../../Makefile.config.example
 .. _data_sources.yml.example: ../../../config/data_sources.yml.example
 .. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
 .. _request_options.yml.example: ../../../config/request_options.yml.example
@@ -314,8 +315,6 @@
 .. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
 .. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/results`` (Results)
 .. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
-.. |update-token-req| replace:: Update Token
-.. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
 .. |vault-upload-req| replace:: Vault File Upload (POST)
 .. _vault-upload-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault/post
 .. |vault-download-req| replace:: Vault File Download (GET)

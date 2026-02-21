@@ -497,6 +497,7 @@ the |getcap-req|_ request.
 
 
 .. _proc_op_undeploy:
+.. _proc_op_replace:
 .. _proc_op_update:
 
 Modify an Existing Process (Update, Replace, Undeploy)
@@ -539,23 +540,24 @@ to the following table. When a combination of the below items occur, the higher 
     :name: table-process-version
     :align: center
 
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | HTTP Method | Level     | Change                          | Examples                                             |
-    +=============+===========+=================================+======================================================+
-    | ``PATCH``   | ``PATCH`` | Modifications to metadata       | - :term:`Process` ``description``, ``title`` strings |
-    |             |           | not impacting the               | - :term:`Process` ``keywords``, ``metadata`` lists   |
-    |             |           | :term:`Process` execution       | - inputs/outputs ``description``, ``title`` strings  |
-    |             |           | or definition.                  | - inputs/outputs ``keywords``, ``metadata`` lists    |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | ``PATCH``   | ``MINOR`` | Modification that impacts *how* | - :term:`Process` ``jobControlOptions`` (async/sync) |
-    |             |           | the :term:`Process` could be    | - :term:`Process` ``outputTransmission`` (ref/value) |
-    |             |           | executed, but not its           | - :term:`Process` ``visibility``                     |
-    |             |           | definition.                     |                                                      |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | ``PUT``     | ``MAJOR`` | Modification that impacts       | - Any :term:`Application Package` modification       |
-    |             |           | *what* the :term:`Process`      | - Any inputs/outputs change (formats, occurs, type)  |
-    |             |           | executes.                       | - Any inputs/outputs addition or removal             |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | HTTP Method | Level     | Change                     | Examples                                                  |
+    +=============+===========+============================+===========================================================+
+    | ``PATCH``   | ``PATCH`` | Modifications to metadata  | - :term:`Process` ``description``, ``title`` strings      |
+    |             |           | not impacting the          | - :term:`Process` ``keywords``, ``metadata`` lists        |
+    |             |           | :term:`Process` execution  | - inputs/outputs ``description``, ``title`` strings       |
+    |             |           | or definition.             | - inputs/outputs ``keywords``, ``metadata`` lists         |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | ``PATCH``   | ``MINOR`` | Modification that impacts  | - :term:`Process` ``jobControlOptions`` (async/sync)      |
+    |             |           | *how* the :term:`Process`  | - :term:`Process` ``outputTransmission`` (ref/value)      |
+    |             |           | could be executed, but not | - :term:`Process` ``visibility``                          |
+    |             |           | its definition.            |                                                           |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | ``PUT``     | ``MAJOR`` | Modification that impacts  | - Any :term:`Application Package` modification            |
+    |             |           | *what* the :term:`Process` | - Any inputs/outputs change (formats, occurs, type)       |
+    |             |           | executes.                  | - Any inputs/outputs addition or removal                  |
+    |             |           |                            | - Replacing a :ref:`Docker Auth-Token <app_pkg_docker>`   |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
 
 .. note::
     For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
@@ -2600,7 +2602,7 @@ to execute. Content negotiation also happens within the submitted :ref:`proc_exe
 Following is a summary of relevant parameters impacting content negotiation.
 
 .. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
-    :name: table-content-negotiation
+    :name: table-content-negotiation-parameters
     :align: center
     :header-rows: 1
     :widths: 10,10,50,15,15
@@ -2608,7 +2610,7 @@ Following is a summary of relevant parameters impacting content negotiation.
     * - Parameter
       - Location
       - Description
-      - Allowed Encoding [#noteParamEncoding]_
+      - Allowed Encoding [#noteEncoding]_
       - Example
     * - ``f`` / ``format``
       - Query
@@ -2693,7 +2695,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
     However, the corresponding :term:`URI` or :term:`Media-Type` representations must match *exactly*.
 
 .. list-table:: Common Shorthand Notations Identifiers for Content Negotiation
-    :name: table-content-negotiation
+    :name: table-content-negotiation-shorthand
     :align: center
     :header-rows: 1
     :widths: 10,30,60
