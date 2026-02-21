@@ -1038,6 +1038,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "hints" in pkg
         assert pkg["hints"] == {CWL_REQUIREMENT_SECRETS: {"secrets": ["message"]}}
 
+    @pytest.mark.format
     def test_execute_file_type_io_format_references(self):
         """
         Test to validate :term:`OGC` compliant ``type`` directly provided as ``mediaType`` for execution file reference.
@@ -1142,6 +1143,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                 ContentType.IMAGE_TIFF,
                 ContentType.IMAGE_PNG,
                 ContentType.TEXT_XML,
+                ContentType.APP_YAML,
                 ContentType.APP_NETCDF,
             }
             assert validator_call_types == expected_media_types
