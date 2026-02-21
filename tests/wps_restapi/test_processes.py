@@ -36,10 +36,12 @@ from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
 from weaver.formats import (
+    EDAM_MAPPING,
     EDAM_NAMESPACE,
     EDAM_NAMESPACE_URL,
     IANA_NAMESPACE,
     IANA_NAMESPACE_URL,
+    OGC_MAPPING,
     OGC_NAMESPACE,
     OGC_NAMESPACE_URL,
     AcceptLanguage,
@@ -1036,14 +1038,18 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     @pytest.mark.format
     def test_deploy_process_CWL_media_type_aliases_from_format(self):
         """
-        Test that media-types with known aliases (ie: NetCDF in this case) are correctly resolved in the process.
+        Test that media-types with known aliases are correctly resolved in the process.
+        
+        In this case, we evaluate both NetCDF and YAML that have multiple variants across IANA, EDAM and OGC namespaces.
+        These two are interesting cases since they have different combinations of supported ontologies, and different
+        amounts of IANA definitions typically used as preferred mapping.
 
         The process description should extract and convert the :term:`CWL` ``format`` keys adequately into their
         respective :term:`Media-Type` definitions. By default, the preferred mappings should be employed, unless
         explicitly indicated otherwise using alternate variants. Variants can be combined simultaneously to offer
-        flexibility in supported formats by the process, but should do so by providing desired variants to ensure
-        expected validation and expectation by the underlying application that could expect specific formats, or
-        because certain formats imply particular semantics to be respected.
+        flexibility in supported formats by the process, but should do so by providing desired variants explicitly
+        to ensure expected validation and expectation by the underlying application that could expect specific formats
+        are respected, or because certain formats imply particular semantics to be respected.
 
         Because :term:`CWL` outputs do not allow multiple ``format`` (list representation), they should therefore
         only employ the preferred mapping unless they desire to explicitly include additional :term:`Media-Type`.
@@ -1063,25 +1069,45 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "id": pid,
             "requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "alpine:latest"}},
             "inputs": {
-                "input_iana": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}"},
-                "input_iana_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_X_NETCDF}"},
-                "input_edam": {"type": "File", "format": f"{EDAM_NAMESPACE}:format_3650"},
-                "input_ogc": {"type": "File", "format": f"{OGC_NAMESPACE}:netcdf"},
-                "input_all": {
+                "input_nc_iana": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}"},
+                "input_nc_iana_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_X_NETCDF}"},
+                "input_nc_edam": {"type": "File", "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_NETCDF]}"},
+                "input_nc_ogc": {"type": "File", "format": f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}"},
+                "input_nc_all": {
                     "type": "File",
                     "format": [
                         f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
                         f"{IANA_NAMESPACE}:{ContentType.APP_X_NETCDF}",
-                        f"{EDAM_NAMESPACE}:format_3650",
-                        f"{OGC_NAMESPACE}:netcdf",
+                        f"{EDAM_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}",
+                        f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}",
                     ],
                 },
+                "input_yaml_iana": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}"},
+                "input_yaml_iana_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_X_YAML}"},
+                "input_yaml_iana_text": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.TEXT_YAML}"},
+                "input_yaml_iana_text_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.TEXT_X_YAML}"},
+                "input_yaml_edam": {"type": "File", "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_YAML]}"},
+                "input_yaml_all": {
+                    "type": "File",
+                    "format": [
+                        f"{IANA_NAMESPACE}:{ContentType.APP_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.APP_X_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.TEXT_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.TEXT_X_YAML}",
+                        f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_YAML]}",
+                    ],
+                }
             },
             "outputs": {
-                "output": {
+                "output_nc": {
                     "type": "File",
                     "outputBinding": {"glob": "*.nc"},
                     "format": f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
+                },
+                "output_yaml": {
+                    "type": "File",
+                    "outputBinding": {"glob": "*.yaml"},
+                    "format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}",
                 }
             },
             "$namespaces": {
@@ -1102,59 +1128,59 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(proc["inputs"]) == len(cwl["inputs"])
         assert len(proc["outputs"]) == len(cwl["outputs"])
 
-        assert proc["inputs"]["input_iana"]["schema"] == {
+        assert proc["inputs"]["input_nc_iana"]["schema"] == {
             "type": "string",
             "format": ContentEncoding.BINARY,
             "contentMediaType": ContentType.APP_NETCDF,
             "contentEncoding": ContentEncoding.BASE64,
         }
-        assert proc["inputs"]["input_iana"]["formats"] == [
+        assert proc["inputs"]["input_nc_iana"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_NETCDF,
                 "encoding": ContentEncoding.BASE64,
             }
         ]
-        assert proc["inputs"]["input_iana_x"]["schema"] == {
+        assert proc["inputs"]["input_nc_iana_x"]["schema"] == {
             "type": "string",
             "format": ContentEncoding.BINARY,
             "contentMediaType": ContentType.APP_X_NETCDF,  # only unique-format variant that differs
             "contentEncoding": ContentEncoding.BASE64,
         }
-        assert proc["inputs"]["input_iana_x"]["formats"] == [
+        assert proc["inputs"]["input_nc_iana_x"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_X_NETCDF,  # only unique-format variant that differs
                 "encoding": ContentEncoding.BASE64,
             }
         ]
-        assert proc["inputs"]["input_edam"]["schema"] == {
+        assert proc["inputs"]["input_nc_edam"]["schema"] == {
             "type": "string",
             "format": ContentEncoding.BINARY,
             "contentMediaType": ContentType.APP_NETCDF,
             "contentEncoding": ContentEncoding.BASE64,
         }
-        assert proc["inputs"]["input_edam"]["formats"] == [
+        assert proc["inputs"]["input_nc_edam"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_NETCDF,
                 "encoding": ContentEncoding.BASE64,
             }
         ]
-        assert proc["inputs"]["input_ogc"]["schema"] == {
+        assert proc["inputs"]["input_nc_ogc"]["schema"] == {
             "type": "string",
             "format": ContentEncoding.BINARY,
             "contentMediaType": ContentType.APP_NETCDF,
             "contentEncoding": ContentEncoding.BASE64,
         }
-        assert proc["inputs"]["input_ogc"]["formats"] == [
+        assert proc["inputs"]["input_nc_ogc"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_NETCDF,
                 "encoding": ContentEncoding.BASE64,
             }
         ]
-        assert proc["inputs"]["input_all"]["schema"] == {
+        assert proc["inputs"]["input_nc_all"]["schema"] == {
             "oneOf": [
                 {
                     "type": "string",
@@ -1171,17 +1197,99 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             ]
         }, "Duplicates should be removed, but both IANA variants should remain"
 
-        assert proc["outputs"]["output"]["schema"] == {
+        assert proc["inputs"]["input_yaml_iana"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_x"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_X_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_x"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_X_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_text"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.TEXT_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_text"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.TEXT_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_text_x"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.TEXT_X_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_text_x"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.TEXT_X_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_edam"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["inputs"]["input_yaml_edam"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_all"]["schema"] == {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_X_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.TEXT_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.TEXT_X_YAML,
+                },
+            ]
+        }, "Duplicates should be removed, but both IANA variants should remain"
+
+        assert proc["outputs"]["output_nc"]["schema"] == {
             "type": "string",
             "format": ContentEncoding.BINARY,
             "contentMediaType": ContentType.APP_NETCDF,
             "contentEncoding": ContentEncoding.BASE64,
         }
-        assert proc["outputs"]["output"]["formats"] == [
+        assert proc["outputs"]["output_nc"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_NETCDF,
                 "encoding": ContentEncoding.BASE64,
+            }
+        ]
+
+        assert proc["outputs"]["output_yaml"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["outputs"]["output_yaml"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
             }
         ]
 
