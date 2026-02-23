@@ -1118,7 +1118,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         data = {
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
-            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
+            "outputs": {"output": {}}
         }
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_celery():
@@ -1151,7 +1151,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             status_url = resp.json.get("location")
             results = self.monitor_job(status_url)
             assert "output" in results
-            assert results["output"]["value"] == "testtest2"
+            out_ref = map_wps_output_location(results["output"]["href"], self.settings)
+            with open(out_ref, mode="r", encoding="utf-8") as out_fd:
+                out_data = out_fd.read()
+            assert out_data == "test: test1\ntest: test2\n"
 
     @pytest.mark.format
     def test_execute_output_file_format_validator(self):

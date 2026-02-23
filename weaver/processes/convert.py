@@ -1583,6 +1583,15 @@ class CWLIODefinition(object):
     When not overridden by literal values, it uses the default :class:`AnyValue`.
     """
 
+    format: "Optional[List[str]]" = None
+    """
+    Specifies allowed formats for the I/O when :data:`PACKAGE_FILE_TYPE`.
+
+    If an output and specified, it MUST be a single-element array fo consistency with :term:`CWL` behaviour.
+    It will be standardized to a list of string even if a single format was provided for validation convenience.
+    If not applicable, it will be ``None``.
+    """
+
     mode: MODE = MODE.NONE
     """
     Validation mode to be applied if I/O requires it.
@@ -1639,7 +1648,7 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
             for i, typ in enumerate(io_type, start=int(is_null)):
                 typ = resolve_cwl_io_type_schema(typ, cwl_schema_names)
                 io_name = io_info["name"]
-                sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
+                sub_type = cast("CWL_IO_Type", {"type": typ, "name": f"{io_name}[{i}]"})
                 array_io_def = parse_cwl_array_type(sub_type, strict=strict)
                 enum_io_def = parse_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
@@ -1708,8 +1717,16 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
         io_min_occurs = 0
         is_null = True
 
+    # only applies to File and File[]
+    # regardless of single File, shorthand File[] or nested array of File, 'format' is always at the root
+    # it can be either a single one or multiple, so standardize them to list for easier handling later on
+    io_format = io_info.get("format") if io_type == PACKAGE_FILE_TYPE else None
+    if isinstance(io_format, str):
+        io_format = [io_format]
+
     if io_type not in PACKAGE_COMPLEX_TYPES:
         io_type = any2cwl_literal_datatype(io_type)
+
     io_def = CWLIODefinition(
         name=io_name,
         type=io_type,
@@ -1719,6 +1736,7 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
         array=array_io_def.array,
         enum=is_enum,
         symbols=io_allow,
+        format=io_format,
         mode=io_mode,
     )
     return io_def

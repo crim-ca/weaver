@@ -19,6 +19,11 @@ Changes:
 
 Fixes:
 ------
+- Fix `CWL` ``format`` resolution against multiple ontologies (`IANA`, `OGC`, `EDAM`) referring to equivalent
+  media-type definitions to ensure that resolved `Job` input references match the underlying `CWL` package execution.
+- Fix `CWL` ``format`` resolution against media-types that support alternative extensions,
+  such as ``.yaml`` and ``.yml``. These are cross-resolved against their multiple media-type combinations
+  as ``application/yaml`` (official) and legacy ``application/x-yaml``, ``text/yaml`` and ``text/x-yaml``.
 - Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
   resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
   The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension

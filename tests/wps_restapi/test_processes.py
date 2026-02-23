@@ -1039,7 +1039,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_deploy_process_CWL_media_type_aliases_from_format(self):
         """
         Test that media-types with known aliases are correctly resolved in the process.
-        
+
         In this case, we evaluate both NetCDF and YAML that have multiple variants across IANA, EDAM and OGC namespaces.
         These two are interesting cases since they have different combinations of supported ontologies, and different
         amounts of IANA definitions typically used as preferred mapping.

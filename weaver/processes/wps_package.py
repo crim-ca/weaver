@@ -180,7 +180,14 @@ if TYPE_CHECKING:
 
     from weaver.datatype import Authentication, Job
     from weaver.processes.constants import CWL_RequirementCUDANameType, CWL_RequirementDockerGpuType, IO_Select_Type
-    from weaver.processes.convert import ANY_IO_Type, JSON_IO_Type, PKG_IO_Type, WPS_Input_Type, WPS_Output_Type
+    from weaver.processes.convert import (
+        ANY_IO_Type,
+        CWLIODefinition,
+        JSON_IO_Type,
+        PKG_IO_Type,
+        WPS_Input_Type,
+        WPS_Output_Type
+    )
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -1371,10 +1378,10 @@ def format_extension_validator(data_input, mode):
         return False  # validator applied on wrong type
     if mode == MODE.NONE or data_input.data_format is None:
         return True
-    ext = get_extension(data_input.data_format.mime_type, dot=True)
+    extensions = get_extension(data_input.data_format.mime_type, dot=True, variants=True)
     ref = getattr(data_input._iohandler, "_file") or getattr(data_input._iohandler, "_url")
-    ref_ext = os.path.splitext(ref)[-1]
-    return not ref_ext or ref_ext == ext  # allow anonymous URL without extension
+    ref_ext = os.path.splitext(ref)[-1].lower()
+    return not ref_ext or ref_ext in extensions  # allow anonymous URL without extension
 
 
 class DirectoryNestedStorage(CachedStorage):
@@ -2336,10 +2343,10 @@ class WpsPackage(Process):
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
                 if io_def.array:
-                    input_href = [self.make_location_input(io_def.type, input_def) for input_def in input_occurs]
+                    input_href = [self.make_location_input(io_def, input_def) for input_def in input_occurs]
                     input_href = [cwl_input for cwl_input in input_href if cwl_input is not None]
                 else:
-                    input_href = self.make_location_input(io_def.type, input_i)
+                    input_href = self.make_location_input(io_def, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
             elif isinstance(input_i, LiteralInput):
@@ -2439,8 +2446,8 @@ class WpsPackage(Process):
                     input_location = input_local_ref
         return input_location
 
-    def make_location_input(self, input_type, input_definition):
-        # type: (CWL_IO_ComplexType, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
+    def make_location_input(self, cwl_input_def, input_definition):
+        # type: (CWLIODefinition, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
         """
         Generates the JSON content required to specify a `CWL` ``File`` or ``Directory`` input from a location.
 
@@ -2486,7 +2493,7 @@ class WpsPackage(Process):
         if input_definition_file and os.path.isfile(input_definition_file):
             # Because storage handlers assume files, a directory (pseudo-file with trailing '/' unknown to PyWPS)
             # could be mistakenly generated as an empty file. Wipe it in this case to ensure proper resolution.
-            if input_type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
+            if cwl_input_def.type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
                 os.remove(input_definition_file)
             else:
                 input_location = input_definition_file
@@ -2529,25 +2536,25 @@ class WpsPackage(Process):
                 for fmt in input_definition.supported_formats)
         ):
             self.log_message(
-                f"{input_type} input ({input_id}) DROPPED. Detected default format as data.",
+                f"{cwl_input_def.type} input ({input_id}) DROPPED. Detected default format as data.",
                 level=logging.DEBUG,
             )
             return None
 
         input_location = self.make_location_input_security_check(
             input_scheme,
-            input_type,
+            cwl_input_def.type,
             input_id,
             input_location,
             input_definition
         )
 
-        if self.must_fetch(input_location, input_type):
-            self.log_message(f"{input_type} input ({input_id}) ATTEMPT fetch: [{input_location}]")
-            if input_type == PACKAGE_FILE_TYPE:
+        if self.must_fetch(input_location, cwl_input_def.type):
+            self.log_message(f"{cwl_input_def.type} input ({input_id}) ATTEMPT fetch: [{input_location}]")
+            if cwl_input_def.type == PACKAGE_FILE_TYPE:
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
-            elif input_type == PACKAGE_DIRECTORY_TYPE:
+            elif cwl_input_def.type == PACKAGE_DIRECTORY_TYPE:
                 # Because a directory reference can contain multiple sub-dir definitions,
                 # avoid possible conflicts with other inputs by nesting them under the ID.
                 # This also ensures that each directory input can work with a clean staging directory.
@@ -2563,11 +2570,11 @@ class WpsPackage(Process):
                 input_location = os.path.join(out_dir, input_directory_name)
             else:
                 raise PackageExecutionError(
-                    f"Unknown reference staging resolution method for [{input_type}] type "
+                    f"Unknown reference staging resolution method for [{cwl_input_def.type}] type "
                     f"specified for input [{input_id}] from location [{input_location}]."
                 )
         else:
-            self.log_message(f"{input_type} input ({input_id}) SKIPPED fetch: [{input_location}]")
+            self.log_message(f"{cwl_input_def.type} input ({input_id}) SKIPPED fetch: [{input_location}]")
 
         # when the process is passed around between OWSLib and PyWPS, it is very important to provide the scheme
         # otherwise, they will interpret complex data directly instead of by reference
@@ -2576,10 +2583,20 @@ class WpsPackage(Process):
         if "://" not in input_location:
             input_location = f"file://{input_location}"
 
-        location = {"location": input_location, "class": input_type}
+        location = {"location": input_location, "class": cwl_input_def.type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
             if fmt is not None:
+                # in certain cases, the input format might not have been mapped to the exact one in the process
+                # this can happen if different ontologies mapping to equivalent format definitions were resolved
+                # such different resolution can happen because of our intermediate WPS/OAP media-type mapping
+                # in such case, allow the format switch if they resolve to equivalent combinations
+                # however, do NOT automatically resolve/switch them otherwise to preserve strict format checking
+                if cwl_input_def.format and fmt not in cwl_input_def.format:
+                    ctype = map_cwl_media_type(fmt)
+                    alt_ctypes = {map_cwl_media_type(f): f for f in cwl_input_def.format}
+                    if ctype in alt_ctypes:
+                        fmt = alt_ctypes[ctype]
                 location["format"] = fmt
         return location
 

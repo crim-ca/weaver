@@ -606,6 +606,13 @@ IANA_MAPPING = {
     ContentType.APP_CWL_JSON: ContentType.APP_CWL,
     ContentType.APP_CWL_YAML: ContentType.APP_CWL,
     ContentType.APP_CWL_X: ContentType.APP_CWL,
+    # following ensure consistent resolution against EDAM alternative match
+    # however, only define the ones that should explicitly be prioritized by IANA instead of OGC/EDAM/etc.
+    # (eg: 'ogc:netcdf' is common, so it should not be set here to allow it / not enforce the IANA variant)
+    ContentType.APP_YAML: ContentType.APP_YAML,
+    ContentType.APP_X_YAML: ContentType.APP_X_YAML,
+    ContentType.TEXT_YAML: ContentType.TEXT_YAML,
+    ContentType.TEXT_X_YAML: ContentType.TEXT_X_YAML,
 }
 EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_URL = "http://edamontology.org/"
@@ -735,31 +742,62 @@ def get_format(media_type, default=None):
     return fmt
 
 
+@overload
+def get_extension(media_type, **__):
+    # type: (str, Any) -> str
+    ...
+
+
+@overload
+def get_extension(media_type, variants=False):
+    # type: (str, Literal[True]) -> List[str]
+    ...
+
+
+@overload
+def get_extension(media_type, dot=True, variants=False):
+    # type: (str, bool, Literal[True]) -> List[str]
+    ...
+
+
 @cache
-def get_extension(media_type, dot=True):
-    # type: (str, bool) -> str
+def get_extension(media_type, dot=True, variants=False):
+    # type: (str, bool, bool) -> Union[str, List[str]]
     """
     Retrieves the extension corresponding to :paramref:`media_type` if explicitly defined, or by parsing it.
+
+    :param media_type: Media-Type for which to attempt finding a known extension.
+    :param dot: If ``True``, the returned extension will include the leading dot (``.``). Otherwise, it is stripped.
+    :param variants: If ``True``, returns a list of all possible extensions for the media-type. Otherwise, first match.
     """
-    def _handle_dot(_ext):
-        # type: (str) -> str
-        if dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
+    def _handle_dot(_ext, _dot):
+        # type: (str, bool) -> str
+        if _dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
             return f".{_ext}"
-        if not dot and _ext.startswith("."):
+        if not _dot and _ext.startswith("."):
             return _ext[1:]
         return _ext
 
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(media_type)
     if fmt:
-        if not fmt.extension.startswith("."):
-            return fmt.extension
-        return _handle_dot(fmt.extension)
-    ctype = clean_media_type_format(media_type, strip_parameters=True)
-    if not ctype:
-        return ""
-    ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
-    return _handle_dot(ext)
+        ctype = media_type
+        ext = fmt.extension
+    else:
+        ctype = clean_media_type_format(media_type, strip_parameters=True)
+        if not ctype:
+            return "" if not variants else []
+        ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
+        ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
+    if not ext:
+        return "" if not variants else []
+    if not variants:
+        return _handle_dot(ext, dot)
+    ext_var = [
+        _handle_dot(_ext_var, dot)
+        for _ext_var, _ctype in _EXTENSION_CONTENT_TYPES_MAPPING.items()
+        if _ctype == ctype
+    ]
+    return ext_var
 
 
 @cache
