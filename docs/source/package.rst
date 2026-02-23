@@ -117,7 +117,7 @@ provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamica
 
 .. _app_pkg_python:
 
-Python Applications
+Python CLI Applications
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the :term:`Application Package` to be generated consists of a Python script, which happens to make use of
@@ -247,9 +247,12 @@ When advanced processing capabilities and more complicated environment preparati
 to package and push pre-built :term:`Docker` images to a remote registry. In this situation, just like
 for :ref:`app_pkg_script` examples, the |cwl-docker-req|_ is needed. The definitions would also be essentially the
 same as previous examples, but with more complicated operations and possibly larger amount of inputs or outputs.
-
 Whenever a :term:`Docker` image reference is detected, `Weaver` will ensure that the application will be pulled
 using :term:`CWL` capabilities in order to run it.
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/deploy_process_yaml.cwl
+    :caption: Sample CWL definition of a Dockerized Application
+    :language: yaml
 
 Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
 registries, `Weaver` offers the capability to specify an authorization token through HTTP request headers during
@@ -299,8 +302,9 @@ whenever required for launching new :term:`Job` executions.
     any retention time of cached :term:`Docker` images on the server. If the cache is cleaned, and the :term:`Docker`
     image is made unavailable, `Weaver` will attempt to authenticate itself again when receiving the new :term:`Job`.
     It is left up to the developer and :term:`Application Package` provider to manage expired tokens in `Weaver`
-    according to their needs. To resolve such cases, the |update-token-req|_ request or an entire re-deployment
-    of the :term:`Process` could be accomplished, whichever is more convenient for them.
+    according to their needs. To resolve such cases, the :ref:`Replace Process <proc_op_replace>` request or an
+    entire re-deployment of the :term:`Process` (:ref:`Undeploy <proc_op_undeploy>` and :ref:`Deploy <proc_op_deploy>`)
+    including the new ``X-Auth-Docker`` header can be employed to update the token used for authentication.
 
 .. versionadded:: 4.5
     Specification and handling of the ``X-Auth-Docker`` header for providing an authentication token.

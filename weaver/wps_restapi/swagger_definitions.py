@@ -6845,7 +6845,7 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     querystring = FormatQuery()
     body = Deploy(title="Deploy", examples={
         "DeployCWL": {
-            "summary": "Deploy a process from a CWL definition.",
+            "summary": "Deploy a process from a CWL+JSON definition.",
             "value": EXAMPLES["deploy_process_cwl.json"],
         },
         "DeployOGC": {
@@ -6856,6 +6856,15 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
             "summary": "Deploy a process from a remote WPS-1 reference URL.",
             "value": EXAMPLES["deploy_process_wps1.json"],
         }
+    })
+
+
+class PostProcessesEndpointCWLYAML(PostProcessesEndpoint):
+    body = PermissiveMappingSchema(title="DeployCWLYAML", examples={
+        "DeployCWLYAML": {
+            "summary": "Deploy a process from a CWL+YAML definition.",
+            "value": EXAMPLES["deploy_process_yaml.cwl"],
+        },
     })
 
 

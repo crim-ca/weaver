@@ -8,11 +8,16 @@
 Configuration
 ******************
 
+After you have :ref:`Installed Weaver <installation>`,
+you can customize its behaviour using multiple configuration settings below.
+
 .. contents::
     :local:
     :depth: 2
 
-After you have installed `Weaver`, you can customize its behaviour using multiple configuration settings.
+.. seealso::
+    - `Example Configuration Files <https://github.com/crim-ca/weaver/tree/master/config>`_
+    - `Example Docker-Compose YAML <https://github.com/crim-ca/weaver/blob/master/docker/docker-compose.yml.example>`_
 
 .. _conf_settings:
 

@@ -16,6 +16,7 @@ Changes:
   The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
   that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
   some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
+- Add documentation to provide better guidance about installation, configuration and example references.
 
 Fixes:
 ------
@@ -39,6 +40,8 @@ Fixes:
   correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
   (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
 - Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
+- Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
+- Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
 
 .. _changes_6.8.3:
 
