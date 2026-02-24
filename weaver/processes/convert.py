@@ -1191,7 +1191,7 @@ def ogcapi2cwl_process(payload, reference):
     ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
     proc_ref = process_info.get("href")
     cwl_ref = proc_ref or ows_ref  # type: Optional[str]
-    cwl_pkg = {}  # type: CWL
+    cwl_pkg = cast("CWL", {})
     if cwl_ref:
         cwl_pkg = load_package_file(cwl_ref)
     else:
@@ -1233,7 +1233,7 @@ def ogcapi2cwl_process(payload, reference):
 
     # even if the remote process is actually a Workflow on the target server,
     # dispatched execution from Weaver will consider it as a single application
-    cwl_package = {
+    cwl_package = cast("CWL", {
         "cwlVersion": "v1.0",
         "class": "CommandLineTool",
         "hints": {
@@ -1241,7 +1241,7 @@ def ogcapi2cwl_process(payload, reference):
                 "process": reference
             }
         }
-    }
+    })
     cwl_package.update(cwl_pkg)  # type: ignore
     _patch_cwl_enum_js_requirement(cwl_package)
     payload_copy["executionUnit"] = [{"unit": cwl_package}]
@@ -1592,7 +1592,7 @@ class CWLIODefinition(object):
     If not applicable, it will be ``None``.
     """
 
-    mode: MODE = MODE.NONE
+    mode: "Union[MODE, int]" = MODE.NONE
     """
     Validation mode to be applied if I/O requires it.
 
@@ -1722,7 +1722,12 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
     # it can be either a single one or multiple, so standardize them to list for easier handling later on
     io_format = io_info.get("format") if io_type == PACKAGE_FILE_TYPE else None
     if isinstance(io_format, str):
-        io_format = [io_format]
+        # if the specified format is an expression, consider it as not provided since
+        # its value could be resolved to anything and we cannot process it immediately
+        if io_format.strip().startswith("$"):
+            io_format = []
+        else:
+            io_format = [io_format]
 
     if io_type not in PACKAGE_COMPLEX_TYPES:
         io_type = any2cwl_literal_datatype(io_type)
@@ -2420,7 +2425,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
     supported_crs = get_field(io_info, "supported_crs", search_variations=True)
     if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
         crs_schema["enum"] = supported_crs
-    bbox_object_schema = {
+    bbox_object_schema = cast("OpenAPISchemaObject", {
         "type": "object",
         "format": sd.OGC_API_BBOX_FORMAT,
         "required": ["bbox"],
@@ -2435,7 +2440,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
                 ]
             },
         }
-    }  # type: OpenAPISchemaObject
+    })
 
     if isinstance(io_hint, dict):
         if "$ref" in io_hint:
@@ -2452,12 +2457,12 @@ def json2oas_io_bbox(io_info, io_hint=null):
         "format": sd.OGC_API_BBOX_FORMAT,
         "contentSchema": sd.OGC_API_BBOX_SCHEMA,
     }
-    bbox_schema = {
+    bbox_schema = cast("OpenAPISchema", {
         "oneOf": [
             bbox_object_schema,
             bbox_string_schema,
         ]
-    }
+    })
     return bbox_schema
 
 
@@ -2807,7 +2812,7 @@ def oas2json_io_keyword(io_info):
     if keyword == "not":
         keyword_objects = [oas2json_io(keyword_schemas)]  # noqa
     elif keyword == "allOf":
-        merged_schema = {}  # type: OpenAPISchema
+        merged_schema = cast("OpenAPISchema", {})
         for schema in keyword_schemas:
             merged_schema.update(schema)
         keyword_objects = [oas2json_io(merged_schema)]
@@ -2860,7 +2865,7 @@ def oas2json_io_file(io_info, io_href=null):
     :param io_href: Alternate schema reference for the type.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
-    io_json = {"type": WPS_COMPLEX}
+    io_json = cast("JSON_IO_TypedInfo", {"type": WPS_COMPLEX})
     io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
     io_encode = get_field(io_info, "contentEncoding", search_variations=False)
     io_schema = get_field(io_info, "contentSchema", search_variations=False, default=io_href)

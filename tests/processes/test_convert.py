@@ -64,6 +64,7 @@ from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_FILE_TYPE,
     CWLIODefinition,
     any2cwl_io,
     complex2json,
@@ -172,7 +173,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_JSON}",
                 "outputBinding": {
                     "glob": "*.json"
@@ -188,7 +189,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}",
                 "outputBinding": {
                     "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain
@@ -205,7 +206,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "outputBinding": {
                     "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
                 }
@@ -221,7 +222,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_XML}",
                 "outputBinding": {
                     "glob": "*.xml"
@@ -238,7 +239,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 # no "format" since more than one, CWL does not support many
                 "outputBinding": {
                     "glob": ["*.nc", "*.zip"]
@@ -261,7 +262,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_as_json, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -274,7 +275,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -286,7 +287,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -331,7 +332,7 @@ def test_any2cwl_io_from_ows():
     cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -347,7 +348,7 @@ def test_any2cwl_io_from_ows():
     cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -366,7 +367,7 @@ def test_any2cwl_io_from_json():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -377,7 +378,7 @@ def test_any2cwl_io_from_json():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -395,7 +396,7 @@ def test_any2cwl_io_from_oas():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -406,7 +407,7 @@ def test_any2cwl_io_from_oas():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -1104,7 +1105,7 @@ def test_cwl2wps_io_record_format():
     """
     cwl_io_record = {
         "name": "output",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "outputBinding": {"glob": "*.json"},
         "format": f"file:///tmp/tmp-random-dir/package#{ContentType.APP_JSON}",
     }
@@ -1165,7 +1166,7 @@ def test_cwl2wps_io_record_format():
 def test_cwl2wps_io_expression_format(test_formats, expected_types):
     input_def = {
         "name": "data",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": test_formats,
     }
     input_wps = cwl2wps_io(input_def, IO_INPUT)
@@ -1210,6 +1211,8 @@ def test_get_io_type_category(io_type, io_info):
          CWLIODefinition(type="string", null=True, min_occurs=0)),
         ({"type": "string?"},
          CWLIODefinition(type="string", null=True, min_occurs=0)),
+        ({"type": PACKAGE_FILE_TYPE, "format": "${ return \"iana:application/json\"; }"},
+         CWLIODefinition(type=PACKAGE_FILE_TYPE, format=[])),  # format undefined since expression
     ]
 )
 def test_get_cwl_io_type(io_info, io_def):
@@ -1228,7 +1231,11 @@ def test_get_cwl_io_type(io_info, io_def):
                 "format": "https://www.iana.org/assignments/media-types/application/json",
                 "location": "/tmp/random.json",
             },
-            CWLIODefinition(name="test", type="File")
+            CWLIODefinition(
+                name="test",
+                type=PACKAGE_FILE_TYPE,
+                format=["https://www.iana.org/assignments/media-types/application/json"],
+            )
         )
     ]
 )
@@ -1515,7 +1522,7 @@ def test_parse_cwl_enum_type_int():
 def test_is_cwl_complex_type_guaranteed_file():
     io_info = {
         "name": "test",
-        "type": "File"
+        "type": PACKAGE_FILE_TYPE
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1523,7 +1530,7 @@ def test_is_cwl_complex_type_guaranteed_file():
 def test_is_cwl_complex_type_potential_file():
     io_info = {
         "name": "test",
-        "type": ["null", "File"]
+        "type": ["null", PACKAGE_FILE_TYPE]
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1531,7 +1538,7 @@ def test_is_cwl_complex_type_potential_file():
 def test_is_cwl_complex_type_file_array():
     io_info = {
         "name": "test",
-        "type": {"type": "array", "items": "File"}
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE}
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1541,8 +1548,8 @@ def test_is_cwl_complex_type_none_one_or_many_files():
         "name": "test",
         "type": [
             "null",
-            "File",
-            {"type": "array", "items": "File"}
+            PACKAGE_FILE_TYPE,
+            {"type": "array", "items": PACKAGE_FILE_TYPE}
         ]
     }
     assert is_cwl_complex_type(io_info)
@@ -1789,13 +1796,13 @@ def test_complex2json():
     ["values", "expect"],
     [
         (
-            {"test": {"class": "File", "path": "https://example.com/random.txt"}},
+            {"test": {"class": PACKAGE_FILE_TYPE, "path": "https://example.com/random.txt"}},
             {"test": {"href": "https://example.com/random.txt"}}
         ),
         (
             {
                 "test": {
-                    "class": "File",
+                    "class": PACKAGE_FILE_TYPE,
                     "path": "https://example.com/random.nc",
                     "format": get_cwl_file_format(ContentType.APP_GEOJSON, make_reference=True),
                 }
@@ -1813,7 +1820,7 @@ def test_complex2json():
         (
             {
                 "test": {
-                    "class": "File",
+                    "class": PACKAGE_FILE_TYPE,
                     "path": "https://example.com/random.nc",
                     # NetCDF 'Format' object itself defines 'encoding'
                     "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
@@ -1833,7 +1840,7 @@ def test_complex2json():
         (
             {
                 "test": {
-                    "class": "File",
+                    "class": PACKAGE_FILE_TYPE,
                     "path": "https://example.com/random.bin",
                     "format": get_cwl_file_format(ContentType.APP_OCTET_STREAM, make_reference=True),
                     "encoding": ContentEncoding.BASE64,  # explicitly provided
@@ -1853,7 +1860,7 @@ def test_complex2json():
         (
             {
                 "test": {
-                    "class": "File",
+                    "class": PACKAGE_FILE_TYPE,
                     "path": "https://example.com/random.zip",
                     # ZIP 'Format' object itself defines 'encoding'
                     "format": get_cwl_file_format(ContentType.APP_ZIP, make_reference=True),
@@ -1883,11 +1890,11 @@ def test_cwl2json_input_values_ogc_format():
         "test1": "value",
         "test2": 1,
         "test3": 1.23,
-        "test4": {"class": "File", "path": "/tmp/random.txt"},
+        "test4": {"class": PACKAGE_FILE_TYPE, "path": "/tmp/random.txt"},
         "test5": ["val1", "val2"],
         "test6": [1, 2],
         "test7": [1.23, 4.56],
-        "test8": [{"class": "File", "path": "/tmp/other.txt"}]
+        "test8": [{"class": PACKAGE_FILE_TYPE, "path": "/tmp/other.txt"}]
     }
     expect = {
         "test1": {"value": "value"},
@@ -1909,11 +1916,11 @@ def test_cwl2json_input_values_old_format():
         "test1": "value",
         "test2": 1,
         "test3": 1.23,
-        "test4": {"class": "File", "path": "/tmp/random.txt"},
+        "test4": {"class": PACKAGE_FILE_TYPE, "path": "/tmp/random.txt"},
         "test5": ["val1", "val2"],
         "test6": [1, 2],
         "test7": [1.23, 4.56],
-        "test8": [{"class": "File", "path": "/tmp/other.txt"}]
+        "test8": [{"class": PACKAGE_FILE_TYPE, "path": "/tmp/other.txt"}]
     }
     expect = [
         {"id": "test1", "value": "value"},
@@ -2245,11 +2252,11 @@ def test_ogcapi2cwl_process_with_extra_href():
                 "in-str": {"type": "string", "inputBinding": {"position": 1}},
                 "in-int": {"type": "int", "inputBinding": {"position": 2}},
                 "in-float": {"type": "float", "inputBinding": {"position": 3}},
-                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                             "inputBinding": {"prefix": "-f"}},
             },
             "outputs": {
-                "output": {"type": "File", "format": "ogc:geotiff",
+                "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                            "outputBinding": {"glob": "output/*.tiff"}},
             },
             "$namespaces": cwl_ns
@@ -2292,11 +2299,11 @@ def test_ogcapi2cwl_process_with_extra_exec_unit():
             "in-str": {"type": "string", "inputBinding": {"position": 1}},
             "in-int": {"type": "int", "inputBinding": {"position": 2}},
             "in-float": {"type": "float", "inputBinding": {"position": 3}},
-            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+            "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                         "inputBinding": {"prefix": "-f"}},
         },
         "outputs": {
-            "output": {"type": "File", "format": "ogc:geotiff",
+            "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                        "outputBinding": {"glob": "output/*.tiff"}},
         },
         "$namespaces": cwl_ns
@@ -2339,11 +2346,11 @@ def test_ogcapi2cwl_process_with_extra_exec_href():
                 "in-str": {"type": "string", "inputBinding": {"position": 1}},
                 "in-int": {"type": "int", "inputBinding": {"position": 2}},
                 "in-float": {"type": "float", "inputBinding": {"position": 3}},
-                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                             "inputBinding": {"prefix": "-f"}},
             },
             "outputs": {
-                "output": {"type": "File", "format": "ogc:geotiff",
+                "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                            "outputBinding": {"glob": "output/*.tiff"}},
             },
             "$namespaces": cwl_ns
@@ -2405,11 +2412,11 @@ def test_ogcapi2cwl_process_without_extra():
             "in-str": {"type": "string"},
             "in-int": {"type": "int"},
             "in-float": {"type": "float"},
-            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
+            "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}"},
         },
         "outputs": {
             "output": {
-                "type": "File", "format": "ogc:geotiff",
+                "type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                 "outputBinding": {
                     "glob": "*.tiff"  # "output/*.tiff" only during Workflow step execution
                 }

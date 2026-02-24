@@ -897,7 +897,7 @@ def test_format_extension_validator_pywps_cases(content_type, mode, ext):
     data_out._iohandler = MockFileHandler(f"test{ext}")
     validator = get_validator(content_type)
     assert (
-        validator is emptyvalidator or  # if empty, weaver bypasses >MODE.NONE to avoid auto-fail validation error
+        validator is emptyvalidator or  # if empty, weaver bypasses mode>MODE.NONE to avoid auto-fail validation error
         validator(data_out, mode)
     ), "should succeed with the internal validator from pywps"
     assert format_extension_validator(data_out, mode), "should succeed with format extension validator from weaver"

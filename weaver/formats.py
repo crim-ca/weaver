@@ -20,7 +20,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Set, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -762,7 +762,7 @@ def get_extension(media_type, dot=True, variants=False):
 
 @cache
 def get_extension(media_type, dot=True, variants=False):
-    # type: (str, bool, bool) -> Union[str, List[str]]
+    # type: (str, bool, bool) -> Union[str, Set[str]]
     """
     Retrieves the extension corresponding to :paramref:`media_type` if explicitly defined, or by parsing it.
 
@@ -779,6 +779,11 @@ def get_extension(media_type, dot=True, variants=False):
         return _ext
 
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(media_type)
+
+    # special "extensions" or empty-mappings, bypass remaining logic
+    if fmt and not fmt.extension.startswith("."):
+        return fmt.extension
+
     if fmt:
         ctype = media_type
         ext = fmt.extension
@@ -792,11 +797,21 @@ def get_extension(media_type, dot=True, variants=False):
         return "" if not variants else []
     if not variants:
         return _handle_dot(ext, dot)
-    ext_var = [
+
+    # find all extensions variants that are mapped to the requested media-type
+    ext_var = {
         _handle_dot(_ext_var, dot)
         for _ext_var, _ctype in _EXTENSION_CONTENT_TYPES_MAPPING.items()
         if _ctype == ctype
-    ]
+    }
+    # also back-propagate the media-types mapping to get relevant extensions
+    # because multiple media-types might map to the same extension->ctype mapping above,
+    # they might not all be detected by dict keys that would stop at the first match
+    ext_typ = _CONTENT_TYPE_FORMAT_MAPPING.get(ctype)
+    if ext_typ and ext_typ.extension.startswith("."):
+        ext_var |= {_handle_dot(ext_typ.extension, dot)}
+    # also apply the pre-resolved media-type extension itself, in case cleanup resolved another variant
+    ext_var |= {_handle_dot(ext, dot)}
     return ext_var
 
 
