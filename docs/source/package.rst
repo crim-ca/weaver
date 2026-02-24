@@ -928,7 +928,7 @@ in the :term:`WPS` portion during process deployment, and `Weaver` will take car
 definition without any user intervention. This makes it also easier for the user to specify supported formats since it
 is generally easier to remember names of :term:`Media-types` than full ontology references. `Weaver` has a large set of
 commonly employed :term:`Media-Types` that it knows how to convert to corresponding ontologies. Also, `Weaver` will look
-for new :term:`Media-Types` it doesn't explicitly know about onto its :ref:`table-known-format-ontologies`
+for new :term:`Media-Types` it doesn't explicitly know about into its :ref:`table-known-format-ontologies`
 in order to attempt automatically resolving them.
 
 When formats are resolved between the two contexts, `Weaver` applies information in a complimentary fashion. This means
