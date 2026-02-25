@@ -100,12 +100,12 @@ class MockWpsPackage(WpsPackage):
 
     def _handler(
         self,
-        wps_request,    # type: Union[WPSRequest, WorkerRequest]
-        wps_response,   # type: Union[WPSResponse, ExecuteResponse]
-    ):                  # type: (...) -> Union[WPSResponse, ExecuteResponse]
-        self.request = wps_request
-        self.response = wps_response
-        return super(MockWpsPackage, self)._handler(wps_request, wps_response)
+        request,    # type: Union[WPSRequest, WorkerRequest]
+        response,   # type: Union[WPSResponse, ExecuteResponse]
+    ):              # type: (...) -> Union[WPSResponse, ExecuteResponse]
+        self.request = request
+        self.response = response
+        return super(MockWpsPackage, self)._handler(request, response)
 
     @property
     def job(self):
@@ -959,7 +959,7 @@ def test_wps_package_make_outputs_file_array_with_format():
     with contextlib.ExitStack() as stack:
         tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
         cwl_out_test_array = []
-        for file in range(3):
+        for _ in range(3):
             test_file = os.path.join(tmpdir, "test.nc")
             shutil.copyfile(os.path.join(TEST_DATA_ROOT, "test.nc"), test_file)
             cwl_out_file = {
