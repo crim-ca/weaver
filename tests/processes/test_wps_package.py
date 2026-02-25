@@ -97,6 +97,7 @@ class MockWpsPackage(WpsPackage):
         self.mock_status_location = None
         self.request = wps_request or MockWpsRequest(identifier)
         self.response = wps_response or MockWpsResponse(self.request, self)
+        self._logger = logging.getLogger(f"MockWpsPackage.{identifier}")
 
     def _handler(
         self,
@@ -121,9 +122,6 @@ class MockWpsPackage(WpsPackage):
 
     def setup_docker_image(self):
         return None
-
-    def log_message(self, *_, **__):
-        pass  # avoid errors from internal log references and job updates
 
 
 class MockWpsRequest(WorkerRequest):
