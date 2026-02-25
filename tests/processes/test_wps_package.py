@@ -35,7 +35,15 @@ from tests.functional import TEST_DATA_ROOT
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Job, Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
-from weaver.formats import ContentType, get_cwl_file_format
+from weaver.formats import (
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
+    OGC_MAPPING,
+    OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
+    ContentType,
+    get_cwl_file_format
+)
 from weaver.processes.constants import (
     CWL_NAMESPACE_SCHEMA_DEFINITION,
     CWL_NAMESPACE_SCHEMA_URL,
@@ -941,7 +949,22 @@ def test_format_extension_validator_pywps_cases(content_type, mode, ext):
 
 
 @pytest.mark.format
-def test_wps_package_make_outputs_file_array_with_format():
+@pytest.mark.parametrize(
+    ["ctype", "cwl_ns_fmt", "cwl_uri_fmt"],
+    [
+        (
+            ContentType.APP_NETCDF,
+            f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
+            f"{IANA_NAMESPACE_URL}{ContentType.APP_NETCDF}",
+        ),
+        (
+            ContentType.APP_NETCDF,
+            f"{OGC_NAMESPACE}:{ContentType.APP_NETCDF}",
+            f"{OGC_NAMESPACE_URL}{OGC_MAPPING[ContentType.APP_NETCDF]}",
+        ),
+    ]
+)
+def test_wps_package_make_outputs_file_array_with_format(ctype, cwl_ns_fmt, cwl_uri_fmt):
     cwl = cast("CWL", {
         "cwlVersion": "v1.2",
         "class": "CommandLineTool",
@@ -949,7 +972,7 @@ def test_wps_package_make_outputs_file_array_with_format():
         "outputs": {
             "test": {
                 "type": f"{PACKAGE_FILE_TYPE}[]",
-                "format": get_cwl_file_format(ContentType.APP_NETCDF),
+                "format": cwl_ns_fmt,
             }
         }
     })
@@ -963,7 +986,7 @@ def test_wps_package_make_outputs_file_array_with_format():
             cwl_out_file = {
                 "class": PACKAGE_FILE_TYPE,
                 "location": f"file://{test_file}",
-                "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                "format": cwl_uri_fmt,
             }
             cwl_out_test_array.append(cwl_out_file)
         cwl_results = cast("CWL_Results", {"test": cwl_out_test_array})
@@ -975,7 +998,7 @@ def test_wps_package_make_outputs_file_array_with_format():
             "test": ComplexOutput(
                 "test",
                 "test",
-                [Format(ContentType.APP_NETCDF)],
+                [Format(ctype)],
                 mode=MODE.SIMPLE  # note: this is part of the test, ensuring patched weaver validation happens correctly
             )
         }
