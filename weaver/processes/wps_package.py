@@ -1514,7 +1514,7 @@ class WpsPackage(Process):
         identifier,     # type: str
         title=None,     # type: Optional[str]
         package=None,   # type: CWL
-        payload=None,   # type; Optional[JSON]
+        payload=None,   # type: Optional[JSON]
         settings=None,  # type: Optional[AnySettingsContainer]
         **kw,           # type: Any
     ):                  # type: (...) -> None
