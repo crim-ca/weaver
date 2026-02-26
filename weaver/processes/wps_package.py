@@ -1985,14 +1985,31 @@ class WpsPackage(Process):
     def update_effective_user(self):
         # type: () -> None
         """
-        Update effective user/group for the `Application Package` to be executed.
-
-        FIXME: (experimental) update user/group permissions
+        Update effective user/group for the :term:`Application Package` to be executed.
 
         Reducing permissions is safer inside docker application since weaver/cwltool could be running as root
-        but this requires that mounted volumes have the required permissions so euid:egid can use them.
+        but this requires that mounted volumes have the required permissions so ``euid:egid`` can use them.
 
         Overrides :mod:`cwltool`'s function to retrieve user/group id for ones we enforce.
+
+        .. warning::
+            This is an experimental feature.
+            Update of user/group permissions to access inputs/outputs could be required.
+
+        .. note::
+            When invoking a docker application, appropriate user-namespace mapping (if any) should be consistent with
+            the docker daemon configuration. In other words, if the docker daemon is configured to run in rootless mode,
+            mapping of UID/GID might already be applied by the security feature when invoking docker commands, and might
+            therefore not need additional mapping here by Weaver. However, if the docker daemon is configured to run in
+            root mode with added remapping of user-namespaces, setting UID/GID could be required to avoid root-based
+            docker container runs. Developers might also want to override with predefined UID/GID, regardless of
+            user-namespaces mapping depending on their setup. Either way, ensuring that the resulting  UID/GID are
+            consistent between Weaver/cwltool/pywps/docker is left up to developer consideration, since it cannot be
+            entirely automated to handle all possible configurations.
+
+        .. seealso::
+            - https://docs.docker.com/engine/security/rootless/
+            - https://docs.docker.com/engine/security/userns-remap/
         """
         if sys.platform == "win32":
             return
@@ -2000,9 +2017,15 @@ class WpsPackage(Process):
         cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
         app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
-        if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
+        if cfg_euid not in ["", app_euid] or cfg_egid not in ["", app_egid]:
+            cfg_euid = cfg_euid or app_euid
+            cfg_egid = cfg_egid or app_egid
             self.log_message("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
-            cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
+            # NOTE:
+            #   because 'docker_vm_id' expect (int,int), if (0,0) are required,
+            #   the check performed by the code receiving them will do '0 or os.get*id()' and drop them
+            #   therefore, use explicit strings to bypass and enforce the values (they are cast str after anyway)
+            cwltool.docker.docker_vm_id = lambda *_, **__: (str(cfg_euid), str(cfg_egid))
         else:
             self.log_message(
                 "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid,

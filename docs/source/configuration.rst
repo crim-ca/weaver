@@ -88,6 +88,7 @@ they are optional and which default value or operation is applied in each situat
 
   .. versionadded:: 4.0
 
+.. |weaver-cwl-euid| replace:: ``weaver.cwl_euid``
 .. _weaver-cwl-euid:
 
 - | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
@@ -95,8 +96,32 @@ they are optional and which default value or operation is applied in each situat
   |
   | Define the effective machine user ID to be used for running the :term:`Application Package`.
 
-  .. versionadded:: 1.9
+  .. note::
 
+     When a :term:`Docker` container is employed for running the :term:`Application Package`,
+     the effective user ID (and group ID, see |weaver-cwl-egid|_) will also take into consideration any relevant
+     user-namespace mapping, whether using |docker-rootless|_ or |docker-userns-remap|_ security features which
+     will take effect according to existing ``/etc/subuid`` and ``/etc/subgid`` configuration on the host machine.
+     Therefore, the effective user ID and group ID must take into consideration the values with these mappings
+     if applicable to avoid redundant definitions that could work against their features.
+
+     Otherwise (e.g.: when running a root :term:`Docker` daemon and containers), these parameters can be set to
+     indicate explicitly the desired effective user and group IDs to run the :term:`Application Package` with.
+     File system permissions to read and write :term:`I/O` of the :term:`Process` should be adapted accordingly
+     to each situation.
+
+  .. seealso::
+    - `weaver.ini.example`_
+    - :func:`weaver.processes.wps_package.WpsPackage.update_effective_user`
+
+  .. versionadded:: 1.9
+  .. versionchanged:: 6.9
+    Using ``0`` will now be explicitly set to allow |docker-rootless|_ that performs the user/group mapping itself.
+    Also, settings will be applied whether |weaver-cwl-euid|_ or |weaver-cwl-egid|_ are detected to differ from
+    the running process, rather than requiring both to be defined explicitly simultaneously. Missing entries (if any)
+    will use the corresponding value from the running process as default.
+
+.. |weaver-cwl-egid| replace:: ``weaver.cwl_egid``
 .. _weaver-cwl-egid:
 
 - | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
@@ -104,7 +129,12 @@ they are optional and which default value or operation is applied in each situat
   |
   | Define the effective machine group ID to be used for running the :term:`Application Package`.
 
+  .. seealso::
+    Refer to |weaver-cwl-euid|_ about additional details and implications of this setting.
+
   .. versionadded:: 1.9
+  .. versionchanged:: 6.9
+    See |weaver-cwl-euid|_ for details.
 
 .. _weaver-cwl-prov:
 
