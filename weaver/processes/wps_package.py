@@ -2021,11 +2021,11 @@ class WpsPackage(Process):
             cfg_euid = cfg_euid or app_euid
             cfg_egid = cfg_egid or app_egid
             self.log_message("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
-            # NOTE:
+            # FIXME: depend on https://github.com/common-workflow-language/cwltool/pull/2207
             #   because 'docker_vm_id' expect (int,int), if (0,0) are required,
             #   the check performed by the code receiving them will do '0 or os.get*id()' and drop them
-            #   therefore, use explicit strings to bypass and enforce the values (they are cast str after anyway)
-            cwltool.docker.docker_vm_id = lambda *_, **__: (str(cfg_euid), str(cfg_egid))
+            #   cannot bypass by str() casting because of the format string using '%d'
+            cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
         else:
             self.log_message(
                 "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid,
