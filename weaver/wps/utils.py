@@ -559,7 +559,7 @@ def load_pywps_config(container, config=None):
 
     # enforce back resolved values onto PyWPS config
     pywps_config.CONFIG.set("server", "setworkdir", "true")
-    pywps_config.CONFIG.set("server", "sethomedir", "true")
+    pywps_config.CONFIG.set("server", "sethomedir", "false")  # breaks resolution of docker-rootless context
     pywps_config.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
     pywps_config.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
     pywps_config.CONFIG.set("server", "url", get_wps_url(settings, load=False))

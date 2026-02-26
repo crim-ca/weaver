@@ -20,6 +20,9 @@ Changes:
 
 Fixes:
 ------
+- Fix `PyWPS` ``("server", "sethomedir", "false")`` configuration to avoid setting ``HOME`` directory within
+  the `Process` worker instance (``weaver.processes.wps_package.WpsPackage``), which causes *docker rootless mode*
+  to fail its docker-daemon context resolution due to the modified location.
 - Fix `CWL` ``euid``/``geid`` resolution using ``0:0`` which can be desired to let *docker rootless mode* and/or
   *user namespaces* handle the actual user/group ID mapping themselves based on ``/etc/subuid`` and ``/etc/subgid``
   (depends on `common-workflow-language/cwltool#2207 <https://github.com/common-workflow-language/cwltool/pull/2207>`_).
