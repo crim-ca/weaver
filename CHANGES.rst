@@ -20,6 +20,9 @@ Changes:
 
 Fixes:
 ------
+- Fix `CWL` ``euid``/``geid`` resolution using ``0:0`` which can be desired to let *docker rootless mode* and/or
+  *user namespaces* handle the actual user/group ID mapping themselves based on ``/etc/subuid`` and ``/etc/subgid``
+  (depends on `common-workflow-language/cwltool#2207 <https://github.com/common-workflow-language/cwltool/pull/2207>`_).
 - Fix `CWL` ``format`` resolution against multiple ontologies (`IANA`, `OGC`, `EDAM`) referring to equivalent
   media-type definitions to ensure that resolved `Job` input references match the underlying `CWL` package execution.
 - Fix `CWL` ``format`` resolution against media-types that support alternative extensions,
