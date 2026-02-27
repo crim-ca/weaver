@@ -1532,13 +1532,15 @@ def pass_http_error(exception, expected_http_error):
     """
     Silently ignore a raised HTTP error that matches the specified error code of the reference exception class.
 
-    Given an :class:`HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
-    error matches the status code. Other exceptions are re-raised.
-    This is equivalent to capturing a specific ``Exception`` within an ``except`` block and calling ``pass`` to drop it.
+    Given an ``HTTPError`` of any type (i.e.: :class:`PyramidHTTPError` or :class:`RequestsHTTPError` of
+    corresponding :mod:`pyramid` and :mod:`requests` modules), ignores the exception if the
+    actual error matches the status code. Other exceptions are re-raised.
+    This is equivalent to capturing a specific :class:`Exception`` within an ``except`` block
+    and calling ``pass`` to drop it.
 
     :param exception: Any :class:`Exception` instance.
-    :param expected_http_error: Single or list of specific pyramid `HTTPError` to handle and ignore.
-    :raise exception: If it doesn't match the status code or is not an `HTTPError` of any module.
+    :param expected_http_error: Single or list of specific pyramid ``HTTPError`` to handle and ignore.
+    :raise exception: If it doesn't match the status code or is not an ``HTTPError`` of any module.
     """
     if not hasattr(expected_http_error, "__iter__"):
         expected_http_error = [expected_http_error]
@@ -2159,6 +2161,26 @@ def request_extra(method,                           # type: AnyRequestMethod
     """
     Standard library :mod:`requests` with additional functional utilities.
 
+    :param method: HTTP method to set request.
+    :param url: URL of the request to execute.
+    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
+    :param backoff: Factor by which to multiply delays between retries.
+    :param intervals: Explicit intervals in seconds between retries.
+    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
+    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: ``True``).
+    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
+    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
+    :param settings: Additional settings from which to retrieve configuration details for requests.
+    :param only_server_errors:
+        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: ``True``).
+        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
+        This parameter is ignored if allowed codes are explicitly specified.
+    :param request_kwargs: All other keyword arguments are passed down to the request call.
+    :returns: Response object of the request or an appropriate ``HTTPError`` object.
+    :raises requests.ConnectionError: If the connexion as failed and retries are exhausted or not specified.
+    :raises requests.Timeout: If the request timed out and retries are exhausted or not specified.
+
     Retry operation
     ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2199,7 +2221,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     Any other :py:exc:`IOError` types are converted to 400 responses.
 
     .. seealso::
-        - :class:`FileAdapter`
+        - :class:`requests_file.FileAdapter`
 
     SSL Verification
     ~~~~~~~~~~~~~~~~~~~~~~
@@ -2209,8 +2231,8 @@ def request_extra(method,                           # type: AnyRequestMethod
     then application settings are retrieved from ``weaver.ini`` to parse additional SSL options that could disable it.
 
     Following :mod:`weaver` settings are considered :
-        - `weaver.ssl_verify = True|False`
-        - `weaver.request_options = request_options.yml`
+        - ``weaver.ssl_verify = True|False``
+        - ``weaver.request_options = request_options.yml``
 
     .. note::
         Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
@@ -2219,23 +2241,6 @@ def request_extra(method,                           # type: AnyRequestMethod
     .. seealso::
         - :func:`get_request_options`
         - :func:`get_ssl_verify_option`
-
-    :param method: HTTP method to set request.
-    :param url: URL of the request to execute.
-    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
-    :param backoff: Factor by which to multiply delays between retries.
-    :param intervals: Explicit intervals in seconds between retries.
-    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
-    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
-    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
-    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
-    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
-    :param settings: Additional settings from which to retrieve configuration details for requests.
-    :param only_server_errors:
-        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
-        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
-        This parameter is ignored if allowed codes are explicitly specified.
-    :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # obtain file request-options arguments, then override any explicitly provided source-code keywords
     settings = get_settings(settings) or {}
