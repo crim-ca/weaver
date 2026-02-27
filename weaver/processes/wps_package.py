@@ -32,6 +32,7 @@ import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.cwlprov.writablebagfile import close_ro, packed_workflow
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
+from cwltool.pathmapper import PathMapper
 from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
@@ -175,6 +176,7 @@ if TYPE_CHECKING:
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
+    from cwltool.utils import CWLObjectType
     from owslib.wps import WPSExecution
     from pywps.response.execute import ExecuteResponse
 
@@ -1507,6 +1509,106 @@ class DirectoryNestedStorage(CachedStorage):
         return self.storage.location(destination)
 
 
+class WpsPathMapperFactory:
+    """
+    Path mapper factory that preserves the original output directory structure for staging.
+
+    If a :term:`CWL` happens to define multiple ``outputs``, which are collected with ``glob`` patterns pointing to
+    distinct sub-directories under a common directory, and that their respective nested-files also happen to match
+    by name (see below example), the default :class:`PathMapper` that collects the outputs combines them (flat list)
+    under a common output/staging directory with ``.ext_{duplicate}`` to manage conflicts. This is problematic, since
+    the specific extensions are validated to ensure ``format`` integrity between :term:`CWL` and :term:`WPS` operations.
+
+    .. code-block:: yaml
+        :caption: Example structure that causes matching duplicates.
+
+        # input to PathMapper
+        outputs:
+            out1:
+                file1.ext
+                file2.ext
+            out2:
+                file1.ext
+                file2.ext
+
+        # result from *default* PathMapper
+        stagedir:
+            file1.ext       # from out1
+            file1.ext_1     # from out2
+            file2.ext       # from out1
+            file2.ext_1     # from out2
+
+    .. seealso::
+        The :func:`cwltool.executors.JobExecutor.execute` call passes the :class:`PathMapper` type from
+        the :class:`RuntimeContext`, which ends up being used in :func:`cwltool.process.relocateOutputs`.
+        This relocation instantiates the :class:`PathMapper` with a common ``stagedir``
+        (the desired :mod:`pywps` working directory configured by ``"outdir": self.workdir``
+        in :func:`weaver.wps_package.WpsPackage.setup_runtime`), which leads to the removal of the prefix
+        sub-directories (i.e.: above ``out1`` and ``out2``) when moving the files under the staging directory.
+
+    This class provides fixes of above issues using the following procedure.
+
+    1. Use a factory to pass additional arguments that helps resolving the correct source/destination of CWL/PyWPS.
+    2. Let the parent :func:`PathMapper.setup` do its standard resolution to avoid reimplementing it ourselves.
+    3. Detect files from :term:`CWL` temporary output directories (matching ``cwl_outdir_prefix``).
+    4. Extract the relative path from within the original :term:`CWL` output directory.
+    5. Adjust the mapping of the resolved target staging location to inject the relative sub-directory structure.
+
+    .. note::
+        Since :mod:`cwltool` expects to do ``PathMapper(...)`` to instantiate it, using this factory can simulate
+        the :func:`PathMapper.__init__` by copying its arguments in :func:`WpsPathMapperFactory.__call__`
+        and then applying the custom logic with our extra arguments. This is necessary to "hook" into :mod:`cwltool`
+        and its method of creating :class:`PathMapper`.
+    """
+
+    def __init__(self, cwl_outdir_prefix, final_stagedir):
+        # type: (Path, Path) -> None
+        self.cwl_outdir_prefix = cwl_outdir_prefix
+        self.final_stagedir = final_stagedir
+
+    def __call__(self, referenced_files, basedir, stagedir, separateDirs=True):  # noqa  # must match keyword exactly
+        # type: (List[CWLObjectType], Path, Path, bool) -> PathMapper
+        if stagedir != self.final_stagedir:
+            return PathMapper(referenced_files, basedir, stagedir, separateDirs)
+
+        factory = cast("WpsPathMapperFactory", self)
+
+        class SubDirectoryPreservingPathMapper(PathMapper):
+            def setup(self, _referenced_files, _basedir):
+                # type: (List[CWLObjectType], Path) -> None
+                super().setup(_referenced_files, _basedir)
+                self._remap_preserving_structure()
+
+            def _remap_preserving_structure(self):
+                for location, ent in list(self._pathmap.items()):
+                    if ent.type.startswith("Create"):
+                        continue
+
+                    resolved = ent.resolved
+                    if not isinstance(resolved, str) or resolved.startswith("_:"):
+                        continue
+
+                    if not resolved.startswith(factory.cwl_outdir_prefix):
+                        continue
+
+                    remainder = resolved[len(factory.cwl_outdir_prefix):]
+                    parts = remainder.split(os.sep, 1)
+                    if len(parts) < 2:
+                        continue
+
+                    rel_path = parts[1]
+                    new_target = os.path.join(self.stagedir, rel_path)
+
+                    if new_target != ent.target:
+                        target_parent = os.path.dirname(new_target)
+                        if target_parent and target_parent != self.stagedir:
+                            os.makedirs(target_parent, exist_ok=True)
+
+                        self.update(location, ent.resolved, new_target, ent.type, ent.staged)
+
+        return SubDirectoryPreservingPathMapper(referenced_files, basedir, stagedir, separateDirs=separateDirs)
+
+
 class WpsPackage(Process):
     def __init__(
         self,
@@ -2221,6 +2323,10 @@ class WpsPackage(Process):
                 level=logging.DEBUG,
             )
             runtime_context = RuntimeContext(kwargs=runtime_params)
+            runtime_context.path_mapper = WpsPathMapperFactory(
+                cwl_outdir_prefix=runtime_context.tmp_outdir_prefix,
+                final_stagedir=self.workdir
+            )
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
             self.setup_provenance(loading_context, runtime_context)
             try:
@@ -2737,9 +2843,10 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
+        result_workdir = f"{self.workdir}/" if not self.workdir.endswith("/") else self.workdir
         result_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
         result_loc = result_cwl["location"].replace("file://", "").rstrip("/")
-        result_path = os.path.split(result_loc)[-1]
+        result_path = result_loc.split(result_workdir)[-1]
         result_type = result_cwl.get("class", PACKAGE_FILE_TYPE)
         result_cwl_fmt = result_cwl.get("format")
         result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE

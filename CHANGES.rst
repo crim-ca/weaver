@@ -20,6 +20,12 @@ Changes:
 
 Fixes:
 ------
+- Fix ``cwltool`` mapping of output files to staging directory of ``pywps`` when multiple nested output directories
+  contain files of matching names leading to conflicting extension errors from flat-list mapping in staging directory.
+  These conflicts are dealt with by ``cwltool`` using ``_<index>``. However, those led to side-effect errors when
+  `Weaver` attempts to enforce strict extension validation between the `CWL` definition and result ``format`` values.
+  A custom ``PathMapper`` is applied to the ``RuntimeContext`` to preserve the original structure of the `CWL` results
+  and avoid these conflicts entirely.
 - Fix `PyWPS` ``("server", "sethomedir", "false")`` configuration to avoid setting ``HOME`` directory within
   the `Process` worker instance (``weaver.processes.wps_package.WpsPackage``), which causes *docker rootless mode*
   to fail its docker-daemon context resolution due to the modified location.

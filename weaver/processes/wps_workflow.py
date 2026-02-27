@@ -192,7 +192,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
         """
         Collect outputs from the step :term:`Process` following its execution.
 
-        .. note:
+        .. note::
             When :term:`CWL` runner tries to forward ``step(i) outputs -> step(i+1) inputs``
             using :meth:`collect_outputs`, it expects exact ``outputBindings`` locations to be matched.
             In other words, a definition like ``outputBindings: {glob: outputs/*.txt}`` will generate results located
@@ -208,7 +208,7 @@ class WpsWorkflow(command_line_tool.CommandLineTool):
 
         .. note::
             Because the staging operation following remote :term:`Process` execution nests each output under a directory
-            name matching respective output IDs, globs must be update with that modified nested directory as well.
+            name matching respective output IDs, globs must be updated with that modified nested directory as well.
 
         .. seealso::
             :meth:`weaver.processes.wps_process_base.WpsProcessInterface.stage_results`
@@ -323,7 +323,7 @@ class WpsWorkflowJob(CommandLineJob):
         will only return outputs from ``File``/``Directory``, or a *literal* inferred by some JavaScript expression
         or loaded by contents from another source. Because of this, *literal* never needs to be collected in these
         cases. Since a :term:`Process` derived from :class:`WpsProcessInterface` can directly return literal data,
-        their values must be explicit chained for following :term:`Workflow` steps.
+        their values must be explicitly chained for following :term:`Workflow` steps.
 
         :param results: The original :term:`Job` results obtained from the remote :term:`Process`.
         :return: Collected literal outputs.
