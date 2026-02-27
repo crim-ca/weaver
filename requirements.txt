@@ -43,8 +43,9 @@ cryptography>=46.0.5
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
 # FIXME: https://github.com/common-workflow-language/cwltool/pull/2207 to allow rootless execution with user namespaces
+# ~3.1.20260108082145 + PR#2207
+cwltool @ git+https://github.com/crim-ca/cwltool.git@allow-uid-gid-rootless
 # cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-cwltool @ git+https://github.com/crim-ca/cwltool@allow-uid-gid-rootless  # ~3.1.20260108082145 + PR#2207
 cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
