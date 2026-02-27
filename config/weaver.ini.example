@@ -92,6 +92,7 @@ weaver.quotation_currency_converter =
 weaver.quotation_currency_token =
 
 # --- Weaver CWL settings ---
+
 # WARNING: [experimental] - see 'weaver.processes.wps_package.WpsPackage.update_effective_user'
 # enforce provided effective user/group identifiers for Application Package execution
 # values must be resolved as integers
@@ -105,8 +106,15 @@ weaver.quotation_currency_token =
 # See:
 #   - https://docs.docker.com/engine/security/rootless/
 #   - https://docs.docker.com/engine/security/userns-remap/
-weaver.cwl_euid = 0
-weaver.cwl_egid = 0
+# For convenience, environment variables 'WEAVER_CWL_EUID' and 'WEAVER_CWL_EGID' can also be used
+weaver.cwl_euid =
+weaver.cwl_egid =
+# following can be used when employing rootless docker with 'true'
+# to directly employ the effective user/group configured by docker
+# it is NOT recommended to use this setting with root docker-daemon (although it is possible)
+# this will effectively avoid inserting the '--user' option in cwltool docker executions
+# for convenience, environment variable 'WEAVER_CWL_NO_MATCH_USER' can also be used
+weaver.cwl_no_match_user =
 
 # directory where to load predefined process definitions defined with CWL files
 # default configuration directory is used if this entry is removed

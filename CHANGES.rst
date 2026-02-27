@@ -17,6 +17,11 @@ Changes:
   that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
   some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
 - Add documentation to provide better guidance about installation, configuration and example references.
+- Add ``weaver.cwl_no_match_user`` configuration setting to avoid ``--user`` parameter on Docker-based `CWL` execution.
+  This can be desirable when relying on *docker rootless mode* and/or *user namespaces* to handle the actual user/group
+  ID mapping. The parameter can also be configured using the ``WEAVER_CWL_NO_MATCH_USER`` environment variable.
+- Add ``WEAVER_CWL_EUID`` and ``WEAVER_CWL_EGID`` environment variables to control the `CWL` execution user/group ID
+  as alternative to corresponding configuration options.
 
 Fixes:
 ------

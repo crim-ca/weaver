@@ -1927,7 +1927,7 @@ class WpsPackage(Process):
             # protect input paths that can be re-used to avoid potential in-place modifications
             "no_read_only": False,
             # employ enforced user/group from provided config or auto-resolved ones from running user
-            "no_match_user": False,
+            "no_match_user": False,  # default unless overruled by 'update_effective_user'
             # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
             # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
             "tmpdir_prefix": cwl_workdir,
@@ -2090,8 +2090,8 @@ class WpsPackage(Process):
                     if item_enum and array_enum and item_enum == array_enum and "name" not in item_enum:
                         item_enum["name"] = array_enum["name"] = f"{io_name}{uuid.uuid4()}"
 
-    def update_effective_user(self):
-        # type: () -> None
+    def update_effective_user(self, runtime_context):
+        # type: (RuntimeContext) -> None
         """
         Update effective user/group for the :term:`Application Package` to be executed.
 
@@ -2122,9 +2122,19 @@ class WpsPackage(Process):
         if sys.platform == "win32":
             return
 
-        cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
-        cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
+        cfg_user = asbool(self.settings.get("weaver.cwl_no_match_user") or os.getenv("WEAVER_CWL_NO_MATCH_USER") or "")
+        cfg_euid = str(self.settings.get("weaver.cwl_euid") or os.getenv("WEAVER_CWL_EUID") or "")
+        cfg_egid = str(self.settings.get("weaver.cwl_egid") or os.getenv("WEAVER_CWL_EGID") or "")
         app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
+
+        if cfg_user:
+            if app_euid == "0" and app_egid == "0":
+                # not in job log for security reason
+                LOGGER.warning("Running as root user without overriding effective user/group is not recommended.")
+            self.log_message("Using CWL effective user from worker runtime.", level=logging.DEBUG)
+            runtime_context.no_match_user = True
+            return
+
         if cfg_euid not in ["", app_euid] or cfg_egid not in ["", app_egid]:
             cfg_euid = cfg_euid or app_euid
             cfg_egid = cfg_egid or app_egid
@@ -2319,7 +2329,6 @@ class WpsPackage(Process):
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS
                 loading_context.construct_tool_object = self.make_tool
 
-            self.update_effective_user()
             self.update_requirements()
             self.update_cwl_schema_names()
 
@@ -2334,6 +2343,7 @@ class WpsPackage(Process):
                 final_stagedir=self.workdir
             )
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
+            self.update_effective_user(runtime_context)
             self.setup_provenance(loading_context, runtime_context)
             try:
                 self.step_launched = []
