@@ -247,6 +247,12 @@ button.active {
     background-color: #F1F1F1;
 }
 
+.tab-menu-empty {
+    /* Prevent weird text spacing in tab menu when there are no buttons/code. */
+    flex: none;
+    display: revert;
+}
+
 /* Style the buttons inside the tab */
 .tab-menu button {
 }
