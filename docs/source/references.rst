@@ -67,6 +67,10 @@
 .. |cwltool-cwlprov| replace:: CWLProv - Provenance Capture with :mod:`cwltool`
 .. _cwltool-cwlprov: https://cwltool.readthedocs.io/en/latest/CWLProv.html
 .. |docker| replace:: Docker
+.. |docker-rootless| replace:: *docker rootless*
+.. _docker-rootless: https://docs.docker.com/engine/security/rootless/
+.. |docker-userns-remap| replace:: *docker user namespaces*
+.. _docker-userns-remap: https://docs.docker.com/engine/security/userns-remap/
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
 .. _esgf: https://esgf.github.io/

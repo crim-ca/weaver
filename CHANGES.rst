@@ -12,10 +12,51 @@ Changes
 
 Changes:
 --------
+- Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
+  The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
+  that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
+  some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
 - Add documentation to provide better guidance about installation, configuration and example references.
+- Add ``weaver.cwl_no_match_user`` configuration setting to avoid ``--user`` parameter on Docker-based `CWL` execution.
+  This can be desirable when relying on *docker rootless mode* and/or *user namespaces* to handle the actual user/group
+  ID mapping. The parameter can also be configured using the ``WEAVER_CWL_NO_MATCH_USER`` environment variable.
+- Add ``WEAVER_CWL_EUID`` and ``WEAVER_CWL_EGID`` environment variables to control the `CWL` execution user/group ID
+  as alternative to corresponding configuration options.
 
 Fixes:
 ------
+- Fix ``cwltool`` mapping of output files to staging directory of ``pywps`` when multiple nested output directories
+  contain files of matching names leading to conflicting extension errors from flat-list mapping in staging directory.
+  These conflicts are dealt with by ``cwltool`` using ``_<index>``. However, those led to side-effect errors when
+  `Weaver` attempts to enforce strict extension validation between the `CWL` definition and result ``format`` values.
+  A custom ``PathMapper`` is applied to the ``RuntimeContext`` to preserve the original structure of the `CWL` results
+  and avoid these conflicts entirely.
+- Fix `PyWPS` ``("server", "sethomedir", "false")`` configuration to avoid setting ``HOME`` directory within
+  the `Process` worker instance (``weaver.processes.wps_package.WpsPackage``), which causes *docker rootless mode*
+  to fail its docker-daemon context resolution due to the modified location.
+- Fix `CWL` ``euid``/``geid`` resolution using ``0:0`` which can be desired to let *docker rootless mode* and/or
+  *user namespaces* handle the actual user/group ID mapping themselves based on ``/etc/subuid`` and ``/etc/subgid``
+  (depends on `common-workflow-language/cwltool#2207 <https://github.com/common-workflow-language/cwltool/pull/2207>`_).
+- Fix `CWL` ``format`` resolution against multiple ontologies (`IANA`, `OGC`, `EDAM`) referring to equivalent
+  media-type definitions to ensure that resolved `Job` input references match the underlying `CWL` package execution.
+- Fix `CWL` ``format`` resolution against media-types that support alternative extensions,
+  such as ``.yaml`` and ``.yml``. These are cross-resolved against their multiple media-type combinations
+  as ``application/yaml`` (official) and legacy ``application/x-yaml``, ``text/yaml`` and ``text/x-yaml``.
+- Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
+  resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
+  The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension
+  to ensure consistency between the validation methods.
+- Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
+  This could occur either when invoking the operation directly, or directly from ``execute`` operation which
+  pre-resolved a local file path subject to the `Vault` upload feature.
+- Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
+  If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
+  If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
+  as previously done by the `CLI`/``WeaverClient`` (fixes `#879 <https://github.com/crim-ca/weaver/issues/879>`_).
+- Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
+  correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
+  (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
 - Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
 - Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
 

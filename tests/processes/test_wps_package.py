@@ -16,6 +16,7 @@ import re
 import shutil
 import sys
 import tempfile
+import uuid
 import warnings
 from typing import TYPE_CHECKING, cast
 
@@ -27,12 +28,21 @@ from cwltool.errors import WorkflowException
 from cwltool.factory import Factory as CWLFactory
 from pywps.inout.formats import Format
 from pywps.inout.outputs import ComplexOutput
+from pywps.validator import emptyvalidator, get_validator
 from pywps.validator.mode import MODE
 
+from tests.functional import TEST_DATA_ROOT
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Job, Process
 from weaver.exceptions import PackageExecutionError, PackageTypeError
-from weaver.formats import ContentType
+from weaver.formats import (
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
+    OGC_MAPPING,
+    OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
+    ContentType
+)
 from weaver.processes.constants import (
     CWL_NAMESPACE_SCHEMA_DEFINITION,
     CWL_NAMESPACE_SCHEMA_URL,
@@ -45,7 +55,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_PROCESS_GENERATOR,
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SECRETS,
-    CWL_REQUIREMENT_TIME_LIMIT
+    CWL_REQUIREMENT_TIME_LIMIT,
+    PACKAGE_FILE_TYPE
 )
 from weaver.processes.wps_package import (
     WpsPackage,
@@ -57,14 +68,17 @@ from weaver.processes.wps_package import (
     get_application_requirement,
     mask_process_inputs
 )
-from weaver.wps.service import WorkerRequest
+from weaver.wps.service import ExecuteResponse, WorkerRequest
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, TypeVar, Union
+    from typing import Any, Callable, Dict, Optional, TypeVar, Union
     from typing_extensions import Literal
 
-    from weaver.typedefs import CWL, CWL_AnyRequirements, ProcessOfferingMapping
+    from pywps.app import WPSRequest
+    from pywps.response.basic import WPSResponse
+
+    from weaver.typedefs import CWL, CWL_AnyRequirements, CWL_Results, ProcessOfferingMapping, ProcessWPS, SettingsType
 
     KT = TypeVar("KT")
     VT_co = TypeVar("VT_co", covariant=True)
@@ -77,9 +91,29 @@ class MockWpsPackage(WpsPackage):
     Mock of WPS package definition that ignores real status location updates and returns the mock for test validation.
     """
 
-    def __init__(self, *_, **__):
-        super(MockWpsPackage, self).__init__(*_, **__)
+    def __init__(
+        self,
+        identifier,         # type: str
+        wps_request=None,   # type: Optional[Union[WPSRequest, WorkerRequest]]
+        wps_response=None,  # type: Optional[Union[WPSResponse, ExecuteResponse]]
+        settings=None,      # type: Optional[SettingsType]
+        **__,               # type: Any
+    ):                      # type: (...) -> None
+        self.settings = settings or {}
+        super(MockWpsPackage, self).__init__(identifier=identifier, settings=self.settings, **__)
         self.mock_status_location = None
+        self.request = wps_request or MockWpsRequest(identifier)
+        self.response = wps_response or MockWpsResponse(self.request, self)
+        self._logger = logging.getLogger(f"MockWpsPackage.{identifier}")
+
+    def _handler(
+        self,
+        request,    # type: Union[WPSRequest, WorkerRequest]
+        response,   # type: Union[WPSResponse, ExecuteResponse]
+    ):              # type: (...) -> Union[WPSResponse, ExecuteResponse]
+        self.request = request
+        self.response = response
+        return super(MockWpsPackage, self)._handler(request, response)
 
     @property
     def job(self):
@@ -98,7 +132,8 @@ class MockWpsPackage(WpsPackage):
 
 
 class MockWpsRequest(WorkerRequest):
-    def __init__(self, process_id=None, with_message_input=True):
+    def __init__(self, process_id, with_message_input=True, **kwargs):
+        # type: (str, bool, **Any) -> None
         if not process_id:
             raise ValueError("must provide mock process identifier")
         super(MockWpsRequest, self).__init__()
@@ -127,7 +162,20 @@ class MockWpsRequest(WorkerRequest):
                     "allowed_values": [],
                 }
             ]
+        data.update(kwargs)
         self.json = data
+
+
+class MockWpsResponse(ExecuteResponse):
+    def __init__(
+        self,
+        wps_request,    # type: Union[WPSRequest, WorkerRequest]
+        process,        # type: Union[ProcessWPS, WpsPackage]
+        **kwargs,       # type: Any
+    ):                  # type: (...) -> None
+        kwargs.setdefault("uuid", uuid.uuid4())
+        super(MockWpsResponse, self).__init__(wps_request, process=process, **kwargs)
+        self._update_status = lambda *_, **__: None
 
 
 class MockProcess(Process):
@@ -177,7 +225,6 @@ def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
         process = MockProcess(shell_command="echo")
         wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                               payload=process, package=process["package"])
-        wps_package_instance.settings = {}
         wps_package_instance.mock_status_location = xml_file.name
         wps_package_instance.set_workdir(workdir)
         expect_log = f"{os.path.splitext(wps_package_instance.mock_status_location)[0]}.log"
@@ -234,7 +281,6 @@ def test_stdout_stderr_logging_for_commandline_tool_failure(caplog):
         process = MockProcess(shell_command="echo", with_message_input=True)
     wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                           payload=process, package=process["package"])
-    wps_package_instance.settings = {}
     wps_package_instance.mock_status_location = xml_file.name
     wps_package_instance.set_workdir(workdir)
 
@@ -274,7 +320,6 @@ def test_stdout_stderr_logging_for_commandline_tool_exception(caplog):
         process = MockProcess(shell_command="not_existing_command")
     wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                           payload=process, package=process["package"])
-    wps_package_instance.settings = {}
     wps_package_instance.mock_status_location = xml_file.name
     wps_package_instance.set_workdir(workdir)
     expect_log = f"{os.path.splitext(wps_package_instance.mock_status_location)[0]}.log"
@@ -837,6 +882,7 @@ def test_mask_process_inputs(inputs, expect):
     assert inputs != expect, "original inputs should not be modified"
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["data_input", "mode", "expect"],
     [
@@ -857,6 +903,128 @@ def test_mask_process_inputs(inputs, expect):
 def test_format_extension_validator_basic(data_input, mode, expect):
     # type: (Any, int, bool) -> None
     assert format_extension_validator(data_input, mode) == expect
+
+
+@pytest.mark.format
+@pytest.mark.parametrize(
+    ["content_type", "mode", "ext"],
+    [
+        (ContentType.APP_NETCDF, MODE.NONE, ".nc"),
+        (ContentType.APP_NETCDF, MODE.SIMPLE, ".nc"),
+        (ContentType.APP_X_NETCDF, MODE.NONE, ".nc"),
+        (ContentType.APP_X_NETCDF, MODE.SIMPLE, ".nc"),
+        (ContentType.APP_GEOJSON, MODE.NONE, ".geojson"),
+        (ContentType.APP_GEOJSON, MODE.SIMPLE, ".geojson"),
+        (ContentType.APP_JSON, MODE.NONE, ".json"),
+        (ContentType.APP_JSON, MODE.SIMPLE, ".json"),
+        (ContentType.IMAGE_GEOTIFF, MODE.NONE, ".tif"),
+        (ContentType.IMAGE_GEOTIFF, MODE.SIMPLE, ".tiff"),  # note: pywps distinguishes with extra 'f'
+        (ContentType.IMAGE_OGC_GEOTIFF, MODE.NONE, ".tif"),
+        (ContentType.IMAGE_OGC_GEOTIFF, MODE.SIMPLE, ".tif"),
+    ]
+)
+def test_format_extension_validator_pywps_cases(content_type, mode, ext):
+    # type: (str, int, str) -> None
+    """
+    Test format extension validator alignment with :mod:`pywps` validators and formats.
+
+    The :mod:`pywps.validator.complexvalidator` module performs some validations for common climate/geospatial types.
+    Ensure that they do not introduce an ambiguous error when alternative media-types are used by corresponding formats.
+    """
+
+    class MockFileHandler(object):
+        def __init__(self, filename):
+            self._file = filename
+            self.file = filename
+
+    data_out = ComplexOutput("test", "test", [Format(content_type)], mode=mode)
+    data_out._iohandler = MockFileHandler(f"test{ext}")
+    validator = get_validator(content_type)
+    assert (
+        validator is emptyvalidator or  # if empty, weaver bypasses mode>MODE.NONE to avoid auto-fail validation error
+        validator(data_out, mode)
+    ), "should succeed with the internal validator from pywps"
+    assert format_extension_validator(data_out, mode), "should succeed with format extension validator from weaver"
+
+
+@pytest.mark.format
+@pytest.mark.parametrize(
+    ["ctype", "cwl_ns_fmt", "cwl_uri_fmt"],
+    [
+        (
+            ContentType.APP_NETCDF,
+            f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
+            f"{IANA_NAMESPACE_URL}{ContentType.APP_NETCDF}",
+        ),
+        (
+            ContentType.APP_NETCDF,
+            f"{OGC_NAMESPACE}:{ContentType.APP_NETCDF}",
+            f"{OGC_NAMESPACE_URL}{OGC_MAPPING[ContentType.APP_NETCDF]}",
+        ),
+    ]
+)
+def test_wps_package_make_outputs_file_array_with_format(ctype, cwl_ns_fmt, cwl_uri_fmt):
+    cwl = cast("CWL", {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "debian:latest"}},
+        "outputs": {
+            "test": {
+                "type": f"{PACKAGE_FILE_TYPE}[]",
+                "format": cwl_ns_fmt,
+            }
+        }
+    })
+
+    with contextlib.ExitStack() as stack:
+        tmpdir = stack.enter_context(tempfile.TemporaryDirectory())
+        cwl_out_test_array = []
+        for _ in range(3):
+            test_file = os.path.join(tmpdir, "test.nc")
+            shutil.copyfile(os.path.join(TEST_DATA_ROOT, "test.nc"), test_file)
+            cwl_out_file = {
+                "class": PACKAGE_FILE_TYPE,
+                "location": f"file://{test_file}",
+                "format": cwl_uri_fmt,
+            }
+            cwl_out_test_array.append(cwl_out_file)
+        cwl_results = cast("CWL_Results", {"test": cwl_out_test_array})
+
+        wps_package_instance = MockWpsPackage("test", package=cwl)
+        wps_package_instance.workdir = tmpdir  # set up workdir needed by make_location_output
+        wps_package_instance.request.outputs = {"test": []}  # mock to allow outputs collection expecting the IDs
+        wps_package_instance.response.outputs = {
+            "test": ComplexOutput(
+                "test",
+                "test",
+                [Format(ctype)],
+                mode=MODE.SIMPLE  # note: this is part of the test, ensuring patched weaver validation happens correctly
+            )
+        }
+
+        # wrap invocations to ensure they were called as expected
+        mock_array = stack.enter_context(
+            mock.patch.object(
+                wps_package_instance,
+                "make_array_output",
+                wraps=wps_package_instance.make_array_output,
+            )
+        )
+        mock_location = stack.enter_context(
+            mock.patch.object(
+                wps_package_instance,
+                "make_location_output",
+                wraps=wps_package_instance.make_location_output,
+            )
+        )
+        mock_format_validator = stack.enter_context(
+            mock.patch("weaver.processes.wps_package.format_extension_validator", wraps=format_extension_validator)
+        )
+
+        wps_package_instance.make_outputs(cwl_results)
+        assert mock_array.call_count == 1, "should be called once for the output array"
+        assert mock_location.call_count == len(cwl_results["test"]), "should be called for each file in output array"
+        assert mock_format_validator.call_count == len(cwl_results["test"]), "should be called for each file output"
 
 
 @pytest.mark.parametrize(

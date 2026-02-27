@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import difflib
 import inspect
 import itertools
 import os
@@ -34,6 +35,9 @@ _ALLOWED_MEDIA_TYPE_CATEGORIES = [
     "video",
 ]
 
+# all tests in this file
+pytestmark = pytest.mark.format
+
 
 @pytest.mark.parametrize(
     "media_type",
@@ -55,7 +59,7 @@ def test_valid_media_type_categories(media_type):
 
 
 @pytest.mark.parametrize(
-    ["test_extension", "extra_params", "expected_content_type"],
+    ["test_media_type", "extra_params", "expected_extension"],
     [
         ("", {"dot": False}, ""),
         (f.ContentType.APP_JSON, {}, ".json"),  # basic
@@ -73,10 +77,15 @@ def test_valid_media_type_categories(media_type):
         ("x/y", {"dot": True}, ".y"),
         ("x/.y", {"dot": False}, "y"),
         (f.ContentType.ANY, {}, ".*"),
+        # equivalents YAML extensions/media-types, should all prefer RFC 9512 .yaml, but allows .yml
+        *[
+            (yaml_ctype, {}, ".yaml")
+            for yaml_ctype in f.ContentType.ANY_YAML
+        ],
     ]
 )
-def test_get_extension(test_extension, extra_params, expected_content_type):
-    assert f.get_extension(test_extension, **extra_params) == expected_content_type
+def test_get_extension(test_media_type, extra_params, expected_extension):
+    assert f.get_extension(test_media_type, **extra_params) == expected_extension
 
 
 @pytest.mark.parametrize(
@@ -225,11 +234,20 @@ def test_content_encoding_open_parameters(encoding, mode):
         (f.ContentType.APP_JSON, f.ContentType.APP_JSON, ""),  # basic
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", f.ContentType.APP_JSON, ""),  # detailed
         (f.ContentType.APP_GEOJSON, f.ContentType.APP_GEOJSON, ""),  # pywps vendor MIME-type
-        (f.ContentType.APP_NETCDF, f.ContentType.APP_NETCDF, "base64"),  # extra encoding data available
+        (f.ContentType.APP_NETCDF, f.ContentType.APP_NETCDF, f.ContentEncoding.BASE64),  # extra encoding data available
     ]
 )
 def test_get_format(test_content_type, expected_content_type, expected_content_encoding):
-    assert f.get_format(test_content_type) == Format(expected_content_type, encoding=expected_content_encoding)
+    fmt_src = f.get_format(test_content_type)
+    fmt_exp = Format(expected_content_type, encoding=expected_content_encoding)
+    assert fmt_src == fmt_exp, (
+        "\n".join(
+            difflib.context_diff(
+                f.repr_json(fmt_src.json, indent=2).splitlines(),
+                f.repr_json(fmt_exp.json, indent=2).splitlines(),
+            )
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -337,11 +355,39 @@ def test_get_format_binary_extension(test_extension, default_extension):
         ("application/unknown", "application/unknown"),
         ("custom:application/unknown", "application/unknown"),
         ("invalid-unknown", None),
+        # additional alias cases that should resolve to corresponding 'official' variants
+        (f"{f.OGC_NAMESPACE}:netcdf", f.ContentType.APP_NETCDF),
+        (f"{f.OGC_NAMESPACE_URL}netcdf", f.ContentType.APP_NETCDF),
+        (f"{f.IANA_NAMESPACE}:{f.ContentType.APP_NETCDF}", f.ContentType.APP_NETCDF),
+        (f"{f.IANA_NAMESPACE_URL}{f.ContentType.APP_NETCDF}", f.ContentType.APP_NETCDF),
+        (f"{f.IANA_NAMESPACE}:{f.ContentType.APP_YAML}", f.ContentType.APP_YAML),
+        (f"{f.IANA_NAMESPACE_URL}{f.ContentType.APP_YAML}", f.ContentType.APP_YAML),
     ]
 )
 def test_map_cwl_media_type(cwl_format, expect_media_type):
     result_media_type = f.map_cwl_media_type(cwl_format)
     assert result_media_type == expect_media_type
+
+
+def test_get_cwl_file_format_synonym():
+    """
+    Test handling of special non-official MIME-type that have a synonym redirection to an official one.
+    """
+    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=False)
+    assert res == (None, None), "Non-official MIME-type without allowed synonym should resolve as not-found"
+    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=True)
+    assert isinstance(res, tuple)
+    assert res != (None, None), "Synonym type should have been mapped to its base reference"
+    assert res[1].split(":")[1] == f.ContentType.APP_GZIP, "Synonym type should have been mapped to its base reference"
+    assert f.get_extension(f.ContentType.APP_TAR_GZ) == ".tar.gz", "Original extension resolution needed, not synonym"
+    fmt = f.get_format(f.ContentType.APP_TAR_GZ)
+    assert fmt.extension == ".tar.gz"
+    assert fmt.mime_type == f.ContentType.APP_TAR_GZ
+    # above tests validated that synonym is defined and works, so following must not use that synonym
+    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=True, must_exist=False, allow_synonym=True)
+    assert res.endswith(f.ContentType.APP_TAR_GZ), (
+        "Literal MIME-type expected instead of its existing synonym since non-official is allowed (must_exist=False)"
+    )
 
 
 def test_get_cwl_file_format_tuple():
@@ -350,9 +396,10 @@ def test_get_cwl_file_format_tuple():
         f.ContentType.APP_JSON,
         f.ContentType.APP_NETCDF,
         f.ContentType.APP_HDF5,
+        f.ContentType.APP_OWL_XML,
     ]
     for mime_type in tests:
-        res = f.get_cwl_file_format(mime_type, make_reference=False)
+        res = f.get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=False)
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
         assert isinstance(ns, dict) and len(ns) == 1
@@ -360,7 +407,7 @@ def test_get_cwl_file_format_tuple():
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith(f"{ns_name}:")
-        untested.remove(ns_name)
+        untested -= {ns_name}
     for ns in list(untested):
         ns_map_name = f"{ns.upper()}_MAPPING"
         ns_map = getattr(f, ns_map_name, None)
@@ -471,26 +518,6 @@ def test_get_cwl_file_format_retry_fallback_ssl_error():
             assert mocked_request_extra.call_count == 2, "2 calls should occur, 1 for HTTPS, 1 for HTTP fallback"
             assert mocked_request_extra.call_args_list[0].args == ("head", url_ctype)
             assert mocked_request_extra.call_args_list[1].args == ("head", url_ctype.replace("https://", "http://"))
-
-
-def test_get_cwl_file_format_synonym():
-    """
-    Test handling of special non-official MIME-type that have a synonym redirection to an official one.
-    """
-    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=False)
-    assert res == (None, None), "Non-official MIME-type without allowed synonym should resolve as not-found"
-    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=True)
-    assert isinstance(res, tuple)
-    assert res != (None, None), "Synonym type should have been mapped to its base reference"
-    assert res[1].split(":")[1] == f.ContentType.APP_GZIP, "Synonym type should have been mapped to its base reference"
-    assert f.get_extension(f.ContentType.APP_TAR_GZ) == ".tar.gz", "Original extension resolution needed, not synonym"
-    fmt = f.get_format(f.ContentType.APP_TAR_GZ)
-    assert fmt.extension == ".tar.gz"
-    assert fmt.mime_type == f.ContentType.APP_TAR_GZ
-    # above tests validated that synonym is defined and works, so following must not use that synonym
-    res = f.get_cwl_file_format(f.ContentType.APP_TAR_GZ, make_reference=True, must_exist=False, allow_synonym=True)
-    assert res.endswith(f.ContentType.APP_TAR_GZ), \
-        "Literal MIME-type expected instead of its existing synonym since non-official is allowed (must_exist=False)"
 
 
 def test_clean_media_type_format_iana():
@@ -741,7 +768,7 @@ def test_output_format_values(test_format):
         (f.ContentType.TEXT_XML, f.OutputFormat.XML),
         (f.ContentType.TEXT_HTML, f.OutputFormat.HTML),
         (f.ContentType.TEXT_PLAIN, f.OutputFormat.TXT),
-        (f.ContentType.APP_YAML, f.OutputFormat.YML),
+        (f.ContentType.APP_YAML, f.OutputFormat.YAML),
     ]
 )
 def test_output_format_media_type(test_format, expect_type):

@@ -28,7 +28,7 @@ from weaver.cli import (
     main as weaver_cli
 )
 from weaver.exceptions import AuthenticationError
-from weaver.formats import ContentEncoding, ContentType
+from weaver.formats import ContentEncoding, ContentType, get_cwl_file_format
 
 
 @pytest.mark.cli
@@ -266,9 +266,98 @@ def test_parse_inputs_from_file():
 
 
 @pytest.mark.cli
+def test_parse_inputs_from_file_relative_paths():
+    """
+    Validate relative file resolutions from execution input file.
+
+    When a 'inputs' file is provided for execution, and contains relative local paths, they should consider the relative
+    location of the file prior to the :term:`CLI` ``PWD``. This common pattern allows the inputs file definition and all
+    its contained references to remain consistent when moved together between locations without hard-coded paths.
+
+    This handling is performed during the '_upload_files' step since only this operation needs to resolve a local path.
+    Therefore, we mock the actual 'upload' operation to avoid the request and validate the path resolution worked.
+    If it didn't work, an error would have been raised before (file not found), or it would not be mapped to a vault
+    in the case of non-local (file://) reference.
+    """
+    local_inputs = []  # to be filled by mock on vault uploads (therefore local file resolved)
+
+    def mock_describe(*_, **__):
+        return OperationResult(False, code=500)
+
+    def mock_upload(href, *_, **__):
+        local_inputs.append(href)
+        f_id = str(uuid.uuid4())
+        body = {"file_href": f"vault://{f_id}", "file_id": f_id, "access_token": f_id}
+        return OperationResult(True, code=200, body=body)
+
+    cwd = os.getcwd()
+    try:
+        with ExitStack() as stack:
+            # use 'describe' to early-stop the operation, since it is the step right after parsing and upload of inputs
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.describe", side_effect=mock_describe))
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload))
+            tmp_dir1 = stack.enter_context(tempfile.TemporaryDirectory())
+            tmp_dir2 = stack.enter_context(tempfile.TemporaryDirectory())
+            os.chdir(tmp_dir2)  # ensure that PWD-based relative path resolution still works after job-file path
+
+            path1 = "./local-file.txt"
+            file1 = os.path.abspath(os.path.join(tmp_dir1, path1))
+            path2 = "./nested/local-file.txt"
+            file2 = os.path.abspath(os.path.join(tmp_dir1, path2))
+            path3 = "./other-file.txt"
+            file3 = os.path.abspath(os.path.join(tmp_dir1, path3))
+            path4 = "./other-dir-file.txt"
+            file4 = os.path.abspath(os.path.join(tmp_dir2, path4))
+            for file in [file1, file2, file3, file4]:
+                os.makedirs(os.path.dirname(file), exist_ok=True)
+                with open(file, mode="w", encoding="utf-8") as f:
+                    f.write("test")
+
+            cwl_inputs = {
+                "input1": "data",  # not affected since not a file reference
+                "input2": {"class": "File", "path": "https://fake.domain.com/some-file.txt"},  # ignore not local file
+                "input3": {"class": "File", "path": path1},
+                "input4": [
+                    {"class": "File", "path": path2},
+                    {"class": "File", "path": f"file://{file3}"},  # ensure absolute path still resolves
+                ],
+                "input5": {"class": "File", "path": path4},  # relative to PWD
+            }
+            cwl_inputs_path = os.path.join(tmp_dir1, "inputs.json")
+            with open(cwl_inputs_path, mode="w", encoding="utf-8") as cwl_inputs_file:
+                json.dump(cwl_inputs, cwl_inputs_file)
+
+            result = WeaverClient().execute("fake_process", inputs=cwl_inputs_path, url="https://fake.domain.com")
+    finally:
+        os.chdir(cwd)
+    assert result.code == 500, "expected early-stop of execution operation"
+    assert len(local_inputs) == 4
+    assert local_inputs == [file1, file2, file3, file4], "expected local paths to be resolved"
+
+
+@pytest.mark.cli
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["data_inputs", "expect_inputs"],
     [
+        (
+            # CWL definition with an input literal
+            {
+                "in": 1,
+            },
+            {
+                "in": 1,
+            }
+        ),
+        (
+            # CWL definition with an input array of literals
+            {
+                "in": [1, 2, 3],
+            },
+            {
+                "in": [1, 2, 3],
+            }
+        ),
         (
             # CWL definition with an input named 'inputs' not to be confused with OGC execution body
             {
@@ -281,6 +370,55 @@ def test_parse_inputs_from_file():
                 "inputs": {
                     "href": "https://fake.domain.com/some-file.txt",
                 },
+            }
+        ),
+        (
+            # CWL definition with media-type format of the file
+            {
+                "in": {
+                    "class": "File",
+                    "path": "https://fake.domain.com/netcdf.nc",
+                    "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                },
+            },
+            {
+                "in": {
+                    "href": "https://fake.domain.com/netcdf.nc",
+                    "type": ContentType.APP_NETCDF,
+                    "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
+                },
+            }
+        ),
+        (
+            # CWL definition with array of files
+            {
+                "in": [
+                    {
+                        "class": "File",
+                        "path": "https://fake.domain.com/netcdf-1.nc",
+                        "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                    },
+
+                    {
+                        "class": "File",
+                        "path": "https://fake.domain.com/netcdf-2.nc",
+                        "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                    }
+                ],
+            },
+            {
+                "in": [
+                    {
+                        "href": "https://fake.domain.com/netcdf-1.nc",
+                        "type": ContentType.APP_NETCDF,
+                        "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
+                    },
+                    {
+                        "href": "https://fake.domain.com/netcdf-2.nc",
+                        "type": ContentType.APP_NETCDF,
+                        "format": {"mediaType": ContentType.APP_NETCDF, "encoding": ContentEncoding.BASE64},
+                    },
+                ]
             }
         ),
         (
@@ -386,6 +524,7 @@ def test_parse_inputs_unsupported_directory_upload(inputs_value):
 
 
 @pytest.mark.cli
+@pytest.mark.format
 def test_parse_inputs_with_media_type():
     inputs = []
     mock_result = OperationResult(True, code=500)
@@ -696,7 +835,8 @@ def test_file_inputs_uploaded_to_vault(test_file_name, expect_file_format):
         {
             "file": {
                 "format": expect_file_format,
-                "href": fake_href
+                "href": fake_href,
+                "type": expect_file_format["mediaType"]
             }
         },
         {
@@ -728,10 +868,12 @@ def test_file_inputs_array_uploaded_to_vault():
             "file": [
                 {
                     "href": fake_href1,
+                    "type": ContentType.APP_JSON,
                     "format": {"mediaType": ContentType.APP_JSON},
                 },
                 {
                     "href": fake_href2,
+                    "type": ContentType.APP_ZIP,
                     "format": {
                         "mediaType": ContentType.APP_ZIP,
                         "encoding": ContentEncoding.BASE64,

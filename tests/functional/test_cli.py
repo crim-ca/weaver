@@ -44,7 +44,14 @@ from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as wea
 from weaver.config import WeaverConfiguration
 from weaver.datatype import DockerAuthentication, Service
 from weaver.execute import ExecuteReturnPreference
-from weaver.formats import ContentType, OutputFormat, clean_media_type_format, get_cwl_file_format, repr_json
+from weaver.formats import (
+    ContentType,
+    OutputFormat,
+    clean_media_type_format,
+    get_cwl_file_format,
+    get_extension,
+    repr_json
+)
 from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
@@ -102,9 +109,12 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
         # make one process available for testing features
         self.test_process = {}
         self.test_payload = {}
-        for process in ["Echo", "CatFile"]:
+        for process in ["Echo", "CatFile", "FileInfo"]:
             self.test_process[process] = f"{self.test_process_prefix}{process}"
-            self.test_payload[process] = self.retrieve_payload(process, "deploy", local=True)
+            self.test_payload[process] = (
+                 self.retrieve_payload(process, "deploy", local=True) or
+                 self.retrieve_payload(process, "package", local=True)
+            )
             self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
     @classmethod
@@ -175,6 +185,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -185,6 +196,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -197,6 +209,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -486,14 +499,14 @@ class TestWeaverClient(TestWeaverClientBase):
         inputs_param,           # type: Union[JSON, str]
         process="Echo",         # type: str
         preload=False,          # type: bool
-        location=False,         # type: Optional[str]
+        location=False,         # type: bool
         expect_success=True,    # type: bool
         expect_status=None,     # type: Optional[AnyStatusType]
         mock_exec=True,         # type: bool
         **exec_kwargs,          # type: Any
     ):                          # type: (...) -> OperationResult
         if isinstance(inputs_param, str):
-            ref = {"location": inputs_param} if location else {"ref_name": inputs_param}
+            ref = {"location": inputs_param, "ref_found": True} if location else {"ref_name": inputs_param}
             if preload:
                 inputs_param = self.retrieve_payload(process=process, local=True, **ref)
             else:
@@ -749,6 +762,56 @@ class TestWeaverClient(TestWeaverClientBase):
     @pytest.mark.vault
     def test_execute_inputs_old_listing_literal_schema_auto_resolve_vault(self):
         self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.format
+    @pytest.mark.vault
+    def test_execute_inputs_cwi_file_format_forward_media_type_vault(self):
+        """
+        Test that uses the vault feature to upload a local file and validate that its media-type is properly resolved.
+        """
+        content_type = ContentType.APP_JSON
+        ext = get_extension(content_type)
+        fmt = get_cwl_file_format(content_type, make_reference=True)
+        with contextlib.ExitStack() as stack:
+            tmp_input_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=ext))
+            tmp_input_file.write("test")
+            tmp_input_file.flush()
+            tmp_input_file.seek(0)
+            tmp_job_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+            tmp_job_file.write(json.dumps({
+                "file": {
+                    "class": "File",
+                    "path": tmp_input_file.name,
+                    "format": fmt,
+                }
+            }))
+            tmp_job_file.flush()
+            tmp_job_file.seek(0)
+
+            result = self.run_execute_inputs_schema_variant(
+                tmp_job_file.name,  # should be uploaded to vault for resolution
+                location=True,      # above is the file path
+                preload=False,      # pass the file path as is to the CLI
+                process="FileInfo",
+                mock_exec=False,
+            )
+
+        job_id = result.body["jobID"]
+        result = mocked_sub_requests(self.app, self.client.results, job_id)
+        assert result.success, result.message
+        output = result.body["output"]["href"]
+        output = map_wps_output_location(output, self.settings, exists=True)
+        assert os.path.isfile(output)
+        with open(output, mode="r", encoding="utf-8") as out_file:
+            out_data = json.load(out_file)
+
+        # 'FileInfo' simply returns the JSON path/format of the input file
+        # validate that they match expectation (but path can be a random CWL directory)
+        assert out_data["path"] != tmp_input_file.name  # make sure CWL was involved, not just directly the input file
+        assert not out_data["path"].endswith(os.path.basename(tmp_input_file.name))
+        assert out_data["path"].startswith("/var/lib/cwl/")  # default, ensures vault->docker file handling occured
+        assert out_data["path"].endswith(".json")
+        assert out_data["format"] == fmt
 
     @pytest.mark.vault
     def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
@@ -1498,7 +1561,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                             "type": "string", "format": "binary"}
             out_json_type = {"contentMediaType": ContentType.APP_JSON, "type": "string"}
             out_oas_oneof = {"oneOf": [out_cwl_type, out_json_type, out_oas]}
-            out_cwl_fmt = {"default": False, "mediaType": io_fmt}
+            out_cwl_fmt = {"default": False, "mediaType": io_fmt, "encoding": "base64"}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
             # ignore schema specifications for comparison only of contents
