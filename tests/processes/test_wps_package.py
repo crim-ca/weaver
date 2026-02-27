@@ -41,8 +41,7 @@ from weaver.formats import (
     OGC_MAPPING,
     OGC_NAMESPACE,
     OGC_NAMESPACE_URL,
-    ContentType,
-    get_cwl_file_format
+    ContentType
 )
 from weaver.processes.constants import (
     CWL_NAMESPACE_SCHEMA_DEFINITION,

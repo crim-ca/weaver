@@ -1566,7 +1566,13 @@ class WpsPathMapperFactory:
         self.cwl_outdir_prefix = cwl_outdir_prefix
         self.final_stagedir = final_stagedir
 
-    def __call__(self, referenced_files, basedir, stagedir, separateDirs=True):  # noqa  # must match keyword exactly
+    def __call__(
+        self,
+        referenced_files,
+        basedir,
+        stagedir,
+        separateDirs=True,    # noqa  # pylint: disable=C0103  # must match keyword exactly for cwltool invocation
+    ):
         # type: (List[CWLObjectType], Path, Path, bool) -> PathMapper
         if stagedir != self.final_stagedir:
             return PathMapper(referenced_files, basedir, stagedir, separateDirs)
