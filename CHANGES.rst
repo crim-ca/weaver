@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.9.0:
+
+`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-03-02)
+========================================================================
+
+Changes:
+--------
 - Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
   The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
   that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
