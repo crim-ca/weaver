@@ -5896,32 +5896,32 @@ class CWLNamespaces(StrictMappingSchema):
     edam = URI(
         missing=drop,
         name=EDAM_NAMESPACE,
-        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("/")]),
     )
     iana = URI(
         missing=drop,
         name=IANA_NAMESPACE,
-        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("/")]),
     )
     ogc = URI(
         missing=drop,
         name=OGC_NAMESPACE,
-        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("/")]),
     )
     ogc_api_proc_part1 = URI(
         missing=drop,
         name=CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
-        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL])
+        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL, CWL_NAMESPACE_OGC_API_PROC_PART1_URL.rstrip("/")]),
     )
     opengis = URI(
         missing=drop,
         name=OPENGIS_NAMESPACE,
-        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("/")]),
     )
     s = URI(
         missing=drop,
         name=CWL_NAMESPACE_SCHEMA_ID,
-        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("/")]),
     )
     weaver = URI(
         missing=drop,
@@ -6863,7 +6863,7 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     querystring = FormatQuery()
     body = Deploy(title="Deploy", examples={
         "DeployCWL": {
-            "summary": "Deploy a process from a CWL definition.",
+            "summary": "Deploy a process from a CWL+JSON definition.",
             "value": EXAMPLES["deploy_process_cwl.json"],
         },
         "DeployOGC": {
@@ -6874,6 +6874,15 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
             "summary": "Deploy a process from a remote WPS-1 reference URL.",
             "value": EXAMPLES["deploy_process_wps1.json"],
         }
+    })
+
+
+class PostProcessesEndpointCWLYAML(PostProcessesEndpoint):
+    body = PermissiveMappingSchema(title="DeployCWLYAML", examples={
+        "DeployCWLYAML": {
+            "summary": "Deploy a process from a CWL+YAML definition.",
+            "value": EXAMPLES["deploy_process_yaml.cwl"],
+        },
     })
 
 

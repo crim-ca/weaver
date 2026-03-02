@@ -65,13 +65,13 @@ for each process.
     :alt: Requires Python 3.10+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.8.3.svg?logo=github
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.9.0.svg?logo=github
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/6.8.3...master
+    :target: https://github.com/crim-ca/weaver/compare/6.9.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-6.8.3-blue?logo=github
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.9.0-blue?logo=github
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/6.8.3
+    :target: https://github.com/crim-ca/weaver/tree/6.9.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver?logo=librariesdotio&logoColor=white
     :alt: Libraries.io Dependencies Status
@@ -85,9 +85,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.8.3&branch=6.8.3&logo=github
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.9.0&branch=6.9.0&logo=github
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.8.3
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.9.0
 
 .. |readthedocs_build_status| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
@@ -99,7 +99,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.8.3?label=tag&logo=docker
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.9.0?label=tag&logo=docker
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -294,12 +294,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:6.8.3
+    docker pull pavics/weaver:6.9.0
 
 For convenience, following tags are also available:
 
-- ``weaver:6.8.3-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:6.8.3-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:6.9.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:6.9.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
@@ -351,8 +351,12 @@ Installation of `Weaver` from source can be performed instead of using the Docke
 
     pip install https://github.com/crim.ca/weaver
 
-For more details, please refer to the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
-section of the documentation.
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
+
+    For more details, please refer to
+    the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
+    section of the documentation.
 
 ----------------
 Configuration
@@ -362,7 +366,14 @@ All configuration settings can be overridden using a ``weaver.ini`` file that wi
 instantiation of the application. An example of such file is provided here: `weaver.ini.example`_.
 
 Setting the operational mode of `Weaver` (`EMS`/`ADES`/`HYBRID`) is accomplished using the
-``weaver.configuration`` field of ``weaver.ini``. For more configuration details, please refer to Documentation_.
+``weaver.configuration`` field of ``weaver.ini``.
+
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
+
+    For more details, please refer to
+    the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`_
+    section of the documentation.
 
 .. _weaver.ini.example: ./config/weaver.ini.example
 

@@ -93,6 +93,7 @@ if TYPE_CHECKING:
             JobSubscribers,
             JobValueFile,
             JSON,
+            Path,
             SettingsType
         )
     except ImportError:
@@ -268,7 +269,7 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         self,
         identity=None,  # type: Optional[str]
         password=None,  # type: Optional[str]
-        url=None,       # type: Optional[str]
+        url=None,       # type: Optional[URL]
         method="GET",   # type: AnyRequestMethod
         headers=None,   # type: Optional[AnyHeadersContainer]
         token=None,     # type: Optional[str]
@@ -379,7 +380,7 @@ class CookieAuthHandler(RequestAuthHandler):
         self,
         identity=None,  # type: Optional[str]
         password=None,  # type: Optional[str]
-        url=None,       # type: Optional[str]
+        url=None,       # type: Optional[URL]
         method="GET",   # type: AnyRequestMethod
         headers=None,   # type: Optional[AnyHeadersContainer]
         token=None,     # type: Optional[Union[str, CookiesType]]
@@ -416,7 +417,7 @@ class WeaverClient(object):
     auth = None  # type: AuthHandler
 
     def __init__(self, url=None, auth=None, **request_kwargs):
-        # type: (Optional[str], Optional[AuthBase], **Union[AnyValueType, RequestOptions]) -> None
+        # type: (Optional[URL], Optional[AuthBase], **Union[AnyValueType, RequestOptions]) -> None
         """
         Initialize the client with predefined parameters.
 
@@ -484,7 +485,7 @@ class WeaverClient(object):
     def _request(
         self,
         method,                 # type: AnyRequestMethod
-        url,                    # type: str
+        url,                    # type: URL
         headers=None,           # type: Optional[AnyHeadersContainer]
         x_headers=None,         # type: Optional[AnyHeadersContainer]
         request_timeout=None,   # type: Optional[int]
@@ -690,7 +691,7 @@ class WeaverClient(object):
         return OperationResult(True, p_id, body)
 
     def _parse_job_ref(self, job_reference, url=None):
-        # type: (Union[URL, AnyUUID], Optional[str]) -> Tuple[Optional[str], Optional[str]]
+        # type: (Union[URL, AnyUUID], Optional[URL]) -> Tuple[Optional[AnyUUID], Optional[URL]]
         if str(job_reference).startswith("http"):
             job_url = job_reference
             job_parts = [part for part in job_url.split("/") if part.strip()]
@@ -712,7 +713,7 @@ class WeaverClient(object):
 
     def info(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -748,7 +749,7 @@ class WeaverClient(object):
 
     def version(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -793,7 +794,7 @@ class WeaverClient(object):
     def conformance(
         self,
         category=None,          # type: Optional[AnyConformanceCategory]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -835,8 +836,8 @@ class WeaverClient(object):
     def register(
         self,
         provider_id,            # type: str
-        provider_url,           # type: str
-        url=None,               # type: Optional[str]
+        provider_url,           # type: URL
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -878,7 +879,7 @@ class WeaverClient(object):
     def unregister(
         self,
         provider_id,            # type: str
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -926,7 +927,7 @@ class WeaverClient(object):
         username=None,          # type: Optional[str]
         password=None,          # type: Optional[str]
         undeploy=False,         # type: bool
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1016,7 +1017,7 @@ class WeaverClient(object):
     def undeploy(
         self,
         process_id,             # type: str
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1052,7 +1053,7 @@ class WeaverClient(object):
 
     def capabilities(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1129,7 +1130,7 @@ class WeaverClient(object):
         self,
         process_id,                 # type: str
         provider_id=None,           # type: Optional[str]
-        url=None,                   # type: Optional[str]
+        url=None,                   # type: Optional[URL]
         auth=None,                  # type: Optional[AuthBase]
         headers=None,               # type: Optional[AnyHeadersContainer]
         schema=ProcessSchema.OGC,   # type: Optional[ProcessSchemaType]
@@ -1192,7 +1193,7 @@ class WeaverClient(object):
         self,
         process_id,             # type: str
         provider_id=None,       # type: Optional[str]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1233,7 +1234,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
+        # type: (Optional[Union[Path, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
         """
         Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
 
@@ -1269,8 +1270,8 @@ class WeaverClient(object):
                 # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
                 #   unless 'value/href/collection/process' (known OGC structures)
                 #   are present AND their sub-dict don't have CWL 'class'
-                # - if value of 'inputs' is a mapping with nested objects,
-                #   they must be interpreted as the CWL form if a 'class' is found
+                # - if value of 'inputs' is a mapping with nested objects or an array of objects,
+                #   they must be interpreted as the CWL form if a 'class' is found in the object
                 #   (literals would be interpreted the same regardless of OGC or CWL form)
                 # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
                 #   unless 'value/href/collection/process' (and also 'id' technically) are present
@@ -1282,11 +1283,16 @@ class WeaverClient(object):
                         "class" in values
                     ) or
                     (
-                        isinstance(values, (dict, list)) and
+                        isinstance(values, (dict, list)) and  # main container OGC/OLD style
                         any(
-                            isinstance(v, dict) and
-                            get_any_value(v, default=null, extras=["collection", "processes"]) is null
-                            for v in (values if isinstance(values, list) else values.values())
+                            (
+                                isinstance(val, dict) and  # CWL Object
+                                get_any_value(val, default=null, extras=["collection", "processes"]) is null
+                            ) or (
+                                isinstance(val, list) and  # CWL Array
+                                any("class" in (item if isinstance(item, dict) else {}) for item in val)
+                            )
+                            for val in (values if isinstance(values, list) else values.values())
                         )
                     )
                 )
@@ -1299,8 +1305,12 @@ class WeaverClient(object):
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
 
-    def _upload_files(self, inputs, url=None):
-        # type: (ExecutionInputsMap, Optional[str]) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+    def _upload_files(
+        self,
+        inputs,     # type: ExecutionInputsMap
+        url=None,   # type: Optional[URL]
+        cwd=None,   # type: Optional[Path]
+    ):              # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
 
@@ -1314,6 +1324,10 @@ class WeaverClient(object):
               in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
+        :param url: Instance URL if not already provided during client creation.
+        :param cwd:
+            Alternative working directory to resolve relative file paths if applicable.
+            If provided, it will be considered before the actual current working directory of the invoking process.
         :return: Updated inputs or the result of a failing intermediate request.
         """
         auth_tokens = {}  # type: Dict[str, str]
@@ -1342,6 +1356,10 @@ class WeaverClient(object):
                         title="Directory upload not implemented.",
                         code=HTTPNotImplemented.code,
                     )
+                if cwd and isinstance(cwd, str):
+                    cwd_href = os.path.join(cwd, href)
+                    if os.path.isfile(cwd_href):
+                        href = cwd_href
                 if not os.path.isfile(href):  # Case for remote files (ex. http links)
                     if "://" not in href:
                         LOGGER.warning(
@@ -1350,14 +1368,16 @@ class WeaverClient(object):
                         )
                     continue
 
+                href = os.path.abspath(href)  # ensure dot/relative path are resolved
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
                 if not ctype:
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
+                ctype = fmt.mime_type
                 c_enc = get_field(fmt, "encoding", search_variations=True) or None
-                res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
+                res = self.upload(href, content_type=ctype, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
                 vault_href = res.body["file_href"]
@@ -1367,6 +1387,7 @@ class WeaverClient(object):
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
                 input_vault_href = cast("JobValueFile", {
                     "href": vault_href,
+                    "type": ctype,
                     "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
                 })
                 if input_array:
@@ -1386,7 +1407,7 @@ class WeaverClient(object):
     def _prepare_inputs(
         self,
         inputs=None,    # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
-        url=None,       # type: Optional[str]
+        url=None,       # type: Optional[URL]
     ):                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Performs operations needed to prepare inputs, including parsing provided data/reference and upload as needed.
@@ -1402,7 +1423,8 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
-        result = self._upload_files(values, url=base)
+        input_file = os.path.dirname(inputs) if isinstance(inputs, str) else None
+        result = self._upload_files(values, url=base, cwd=input_file)
         return result
 
     def _prepare_outputs(
@@ -1446,7 +1468,7 @@ class WeaverClient(object):
         subscribers=None,       # type: Optional[JobSubscribers]
         execute_mode=None,      # type: Optional[AnyExecuteMode]
         execute_return=None,    # type: Optional[AnyExecuteReturnPreference]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1638,7 +1660,7 @@ class WeaverClient(object):
     def trigger_job(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1685,7 +1707,7 @@ class WeaverClient(object):
         title=null,             # type: Union[Type[null], Optional[str]]
         inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
         subscribers=None,       # type: Optional[JobSubscribers]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1794,7 +1816,7 @@ class WeaverClient(object):
         file_path,              # type: str
         content_type=None,      # type: Optional[str]
         content_encoding=None,  # type: Optional[ContentEncoding]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1872,7 +1894,7 @@ class WeaverClient(object):
                 os.path.basename(file_path),
                 open(file_path, mode=f_mode, encoding=f_enc),  # pylint: disable=R1732
                 file_headers["Content-Type"],
-                {"Content-Encoding": c_enc} if c_enc else {},
+                {"Content-Transfer-Encoding": c_enc} if c_enc else {},
             )
         }
         req_headers = {
@@ -1887,7 +1909,7 @@ class WeaverClient(object):
 
     def jobs(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1970,7 +1992,7 @@ class WeaverClient(object):
     def status(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2011,7 +2033,7 @@ class WeaverClient(object):
         self,
         x_path,                 # type: str
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2078,7 +2100,7 @@ class WeaverClient(object):
         prov_run_id=None,       # type: Optional[AnyUUID]
         prov_format=None,       # type: Optional[ProvenanceFormat]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         **kwargs,               # type: Any
@@ -2152,11 +2174,11 @@ class WeaverClient(object):
 
     def monitor(
         self,
-        job_reference,                      # type: str
+        job_reference,                      # type: Union[URL, AnyUUID]
         timeout=None,                       # type: Optional[int]
         interval=None,                      # type: Optional[int]
         wait_for_status=Status.SUCCESSFUL,  # type: str
-        url=None,                           # type: Optional[str]
+        url=None,                           # type: Optional[URL]
         auth=None,                          # type: Optional[AuthBase]
         headers=None,                       # type: Optional[AnyHeadersContainer]
         with_links=True,                    # type: bool
@@ -2288,10 +2310,10 @@ class WeaverClient(object):
 
     def results(
         self,
-        job_reference,          # type: str
-        out_dir=None,           # type: Optional[str]
+        job_reference,          # type: Union[URL, AnyUUID]
+        out_dir=None,           # type: Optional[Path]
         download=False,         # type: bool
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2375,8 +2397,8 @@ class WeaverClient(object):
 
     def dismiss(
         self,
-        job_reference,          # type: str
-        url=None,               # type: Optional[str]
+        job_reference,          # type: Union[AnyUUID, URL]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2689,8 +2711,10 @@ def add_job_ref_param(parser):
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
         "-j", "--job", dest="job_reference", required=True,
-        help=f"Job URL or UUID to run {operation} operation. "
-             "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        help=(
+            f"Job URL or UUID to run {operation} operation. "
+            "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        )
     )
 
 
@@ -2971,6 +2995,7 @@ class ValidateAuthHandlerAction(argparse.Action):
     """
     Action that will validate that the input argument references an authentication handler that can be resolved.
     """
+
     @staticmethod
     def validate(auth_handler_ref):
         # type: (Optional[str]) -> Optional[Union[Type[AuthHandler], Type[AuthBase]]]
@@ -3070,6 +3095,7 @@ class ValidateHeaderAction(argparse._AppendAction):  # noqa: W0212
 
         Header-Name: Header-Value
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """
@@ -3104,6 +3130,7 @@ class ValidateNonZeroPositiveNumberAction(argparse.Action):
     """
     Action that will validate that the input argument is a positive number greater than zero.
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """

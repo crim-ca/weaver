@@ -38,7 +38,9 @@ from weaver.formats import (
     IANA_NAMESPACE_DEFINITION,
     OGC_MAPPING,
     OGC_NAMESPACE_DEFINITION,
-    ContentType
+    ContentEncoding,
+    ContentType,
+    get_cwl_file_format
 )
 from weaver.processes.constants import (
     CWL_NAMESPACE_CWLTOOL_URL,
@@ -62,6 +64,7 @@ from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_FILE_TYPE,
     CWLIODefinition,
     any2cwl_io,
     complex2json,
@@ -174,7 +177,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_JSON}",
                 "outputBinding": {
                     "glob": "*.json"
@@ -190,7 +193,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}",
                 "outputBinding": {
                     "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain
@@ -207,7 +210,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "outputBinding": {
                     "glob": "*.*"  # *.txt replaced by *.* since anything can be text/plain, including JSON
                 }
@@ -223,7 +226,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 "format": f"{IANA_NAMESPACE}:{ContentType.APP_XML}",
                 "outputBinding": {
                     "glob": "*.xml"
@@ -240,7 +243,7 @@ def test_are_different_and_set_single_null():
             },
             {
                 "id": "output",
-                "type": "File",
+                "type": PACKAGE_FILE_TYPE,
                 # no "format" since more than one, CWL does not support many
                 "outputBinding": {
                     "glob": ["*.nc", "*.zip"]
@@ -263,7 +266,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_as_json, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -276,7 +279,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -288,7 +291,7 @@ def test_any2cwl_io_from_wps():
     cwl_io, cwl_ns = any2cwl_io(wps_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -333,7 +336,7 @@ def test_any2cwl_io_from_ows():
     cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -349,7 +352,7 @@ def test_any2cwl_io_from_ows():
     cwl_io, cwl_ns = any2cwl_io(ows_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
         "default": None,
     }
@@ -368,7 +371,7 @@ def test_any2cwl_io_from_json():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -379,7 +382,7 @@ def test_any2cwl_io_from_json():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -397,7 +400,7 @@ def test_any2cwl_io_from_oas():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}"
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -408,7 +411,7 @@ def test_any2cwl_io_from_oas():
     cwl_io, cwl_ns = any2cwl_io(json_io, "input")
     assert cwl_io == {
         "id": "test",
-        "type": {"type": "array", "items": "File"},
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE},
         "format": f"ogc:{OGC_MAPPING[ContentType.APP_NETCDF]}",
     }
     assert cwl_ns == OGC_NAMESPACE_DEFINITION
@@ -1106,7 +1109,7 @@ def test_cwl2wps_io_record_format():
     """
     cwl_io_record = {
         "name": "output",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "outputBinding": {"glob": "*.json"},
         "format": f"file:///tmp/tmp-random-dir/package#{ContentType.APP_JSON}",
     }
@@ -1167,7 +1170,7 @@ def test_cwl2wps_io_record_format():
 def test_cwl2wps_io_expression_format(test_formats, expected_types):
     input_def = {
         "name": "data",
-        "type": "File",
+        "type": PACKAGE_FILE_TYPE,
         "format": test_formats,
     }
     input_wps = cwl2wps_io(input_def, IO_INPUT)
@@ -1212,6 +1215,8 @@ def test_get_io_type_category(io_type, io_info):
          CWLIODefinition(type="string", null=True, min_occurs=0)),
         ({"type": "string?"},
          CWLIODefinition(type="string", null=True, min_occurs=0)),
+        ({"type": PACKAGE_FILE_TYPE, "format": "${ return \"iana:application/json\"; }"},
+         CWLIODefinition(type=PACKAGE_FILE_TYPE, format=[])),  # format undefined since expression
     ]
 )
 def test_get_cwl_io_type(io_info, io_def):
@@ -1230,7 +1235,11 @@ def test_get_cwl_io_type(io_info, io_def):
                 "format": "https://www.iana.org/assignments/media-types/application/json",
                 "location": "/tmp/random.json",
             },
-            CWLIODefinition(name="test", type="File")
+            CWLIODefinition(
+                name="test",
+                type=PACKAGE_FILE_TYPE,
+                format=["https://www.iana.org/assignments/media-types/application/json"],
+            )
         )
     ]
 )
@@ -1517,7 +1526,7 @@ def test_parse_cwl_enum_type_int():
 def test_is_cwl_complex_type_guaranteed_file():
     io_info = {
         "name": "test",
-        "type": "File"
+        "type": PACKAGE_FILE_TYPE
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1525,7 +1534,7 @@ def test_is_cwl_complex_type_guaranteed_file():
 def test_is_cwl_complex_type_potential_file():
     io_info = {
         "name": "test",
-        "type": ["null", "File"]
+        "type": ["null", PACKAGE_FILE_TYPE]
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1533,7 +1542,7 @@ def test_is_cwl_complex_type_potential_file():
 def test_is_cwl_complex_type_file_array():
     io_info = {
         "name": "test",
-        "type": {"type": "array", "items": "File"}
+        "type": {"type": "array", "items": PACKAGE_FILE_TYPE}
     }
     assert is_cwl_complex_type(io_info)
 
@@ -1543,8 +1552,8 @@ def test_is_cwl_complex_type_none_one_or_many_files():
         "name": "test",
         "type": [
             "null",
-            "File",
-            {"type": "array", "items": "File"}
+            PACKAGE_FILE_TYPE,
+            {"type": "array", "items": PACKAGE_FILE_TYPE}
         ]
     }
     assert is_cwl_complex_type(io_info)
@@ -1786,16 +1795,110 @@ def test_complex2json():
     }
 
 
+@pytest.mark.format
+@pytest.mark.parametrize(
+    ["values", "expect"],
+    [
+        (
+            {"test": {"class": PACKAGE_FILE_TYPE, "path": "https://example.com/random.txt"}},
+            {"test": {"href": "https://example.com/random.txt"}}
+        ),
+        (
+            {
+                "test": {
+                    "class": PACKAGE_FILE_TYPE,
+                    "path": "https://example.com/random.nc",
+                    "format": get_cwl_file_format(ContentType.APP_GEOJSON, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.nc",
+                    "type": ContentType.APP_GEOJSON,
+                    "format": {
+                        "mediaType": ContentType.APP_GEOJSON,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": PACKAGE_FILE_TYPE,
+                    "path": "https://example.com/random.nc",
+                    # NetCDF 'Format' object itself defines 'encoding'
+                    "format": get_cwl_file_format(ContentType.APP_NETCDF, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.nc",
+                    "type": ContentType.APP_NETCDF,
+                    "format": {
+                        "mediaType": ContentType.APP_NETCDF,
+                        "encoding": ContentEncoding.BASE64,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": PACKAGE_FILE_TYPE,
+                    "path": "https://example.com/random.bin",
+                    "format": get_cwl_file_format(ContentType.APP_OCTET_STREAM, make_reference=True),
+                    "encoding": ContentEncoding.BASE64,  # explicitly provided
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.bin",
+                    "type": ContentType.APP_OCTET_STREAM,
+                    "format": {
+                        "mediaType": ContentType.APP_OCTET_STREAM,
+                        "encoding": ContentEncoding.BASE64,
+                    }
+                }
+            }
+        ),
+        (
+            {
+                "test": {
+                    "class": PACKAGE_FILE_TYPE,
+                    "path": "https://example.com/random.zip",
+                    # ZIP 'Format' object itself defines 'encoding'
+                    "format": get_cwl_file_format(ContentType.APP_ZIP, make_reference=True),
+                }
+            },
+            {
+                "test": {
+                    "href": "https://example.com/random.zip",
+                    "type": ContentType.APP_ZIP,
+                    "format": {
+                        "mediaType": ContentType.APP_ZIP,
+                        "encoding": ContentEncoding.BASE64,
+                    }
+                }
+            }
+        ),
+    ],
+)
+def test_cwl2json_input_values_cwl_format(values, expect):
+    result = cwl2json_input_values(values, ProcessSchema.OGC)
+    assert result == expect
+
+
+@pytest.mark.format
 def test_cwl2json_input_values_ogc_format():
     values = {
         "test1": "value",
         "test2": 1,
         "test3": 1.23,
-        "test4": {"class": "File", "path": "/tmp/random.txt"},
+        "test4": {"class": PACKAGE_FILE_TYPE, "path": "/tmp/random.txt"},
         "test5": ["val1", "val2"],
         "test6": [1, 2],
         "test7": [1.23, 4.56],
-        "test8": [{"class": "File", "path": "/tmp/other.txt"}]
+        "test8": [{"class": PACKAGE_FILE_TYPE, "path": "/tmp/other.txt"}]
     }
     expect = {
         "test1": {"value": "value"},
@@ -1811,16 +1914,17 @@ def test_cwl2json_input_values_ogc_format():
     assert result == expect
 
 
+@pytest.mark.format
 def test_cwl2json_input_values_old_format():
     values = {
         "test1": "value",
         "test2": 1,
         "test3": 1.23,
-        "test4": {"class": "File", "path": "/tmp/random.txt"},
+        "test4": {"class": PACKAGE_FILE_TYPE, "path": "/tmp/random.txt"},
         "test5": ["val1", "val2"],
         "test6": [1, 2],
         "test7": [1.23, 4.56],
-        "test8": [{"class": "File", "path": "/tmp/other.txt"}]
+        "test8": [{"class": PACKAGE_FILE_TYPE, "path": "/tmp/other.txt"}]
     }
     expect = [
         {"id": "test1", "value": "value"},
@@ -1839,6 +1943,7 @@ def test_cwl2json_input_values_old_format():
     assert result == expect
 
 
+@pytest.mark.format
 def test_convert_input_values_schema_from_old():
     inputs_old = [
         {"id": "test1", "value": "data"},
@@ -1852,22 +1957,22 @@ def test_convert_input_values_schema_from_old():
         {"id": "test9", "value": "short"},
         {"id": "test10", "value": "long"},
         {"id": "test10", "value": "more"},
-        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         {"id": "test13", "value": "short"},
         {"id": "test13", "value": "long"},
         {"id": "test13", "value": "more"},
         {"id": "test14", "value": ["val1", "val2", "val3"]},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+        {"id": "test15", "href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         {"id": "test16", "value": 1},
         {"id": "test16", "value": ["val1", "val2", "val3"]},
         {"id": "test16", "value": "short"},
-        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
+        {"id": "test16", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
     ]
     inputs_ogc = {
         "test1": "data",
@@ -1881,13 +1986,13 @@ def test_convert_input_values_schema_from_old():
         "test9": "short",
         "test10": ["long", "more"],
         "test11": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test12": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test13": [
             "short",
@@ -1900,16 +2005,15 @@ def test_convert_input_values_schema_from_old():
             "val3",
         ],
         "test15": [
-            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         ],
         "test16": [
             1,
             ["val1", "val2", "val3"],
             "short",
-            {"href": "https://www.somewebsite.com/dir1/",
-             "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
         ]
     }
 
@@ -1917,6 +2021,7 @@ def test_convert_input_values_schema_from_old():
     assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
 
+@pytest.mark.format
 def test_convert_input_values_schema_from_ogc():
     inputs_ogc = {
         "test1": "data",
@@ -1930,13 +2035,13 @@ def test_convert_input_values_schema_from_ogc():
         "test9": "short",
         "test10": ["long", "more"],
         "test11": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test12": [
-            {"href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-            {"href": "/data/file3.txt", "format": {"mediaType": "text/plain"}}
+            {"href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+            {"href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         ],
         "test13": [
             "short",
@@ -1944,16 +2049,15 @@ def test_convert_input_values_schema_from_ogc():
             "more"
         ],
         "test14": [
-            {"href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-            {"href": "https://www.somewebsite.com/dir3/", "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+            {"href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         ],
         "test15": [
             1,
             ["val1", "val2", "val3"],
             "short",
-            {"href": "https://www.somewebsite.com/dir1/",
-             "type": "application/directory"}
+            {"href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
         ]
     }
     inputs_old = [
@@ -1971,26 +2075,27 @@ def test_convert_input_values_schema_from_ogc():
         {"id": "test9", "value": "short"},
         {"id": "test10", "value": "long"},
         {"id": "test10", "value": "more"},
-        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": "text/plain"}},
-        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": "text/plain"}},
+        {"id": "test11", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test11", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file1.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file2.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
+        {"id": "test12", "href": "/data/file3.txt", "format": {"mediaType": ContentType.TEXT_PLAIN}},
         {"id": "test13", "value": "short"},
         {"id": "test13", "value": "long"},
         {"id": "test13", "value": "more"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir2/", "type": "application/directory"},
-        {"id": "test14", "href": "https://www.somewebsite.com/dir3/", "type": "application/directory"},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir2/", "type": ContentType.APP_DIR},
+        {"id": "test14", "href": "https://www.somewebsite.com/dir3/", "type": ContentType.APP_DIR},
         {"id": "test15", "value": 1},
         {"id": "test15", "value": ["val1", "val2", "val3"]},
         {"id": "test15", "value": "short"},
-        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": "application/directory"}
+        {"id": "test15", "href": "https://www.somewebsite.com/dir1/", "type": ContentType.APP_DIR},
     ]
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OGC) == inputs_ogc
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
 
+@pytest.mark.format
 @pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
 def test_convert_input_values_schema_from_old_xfail():
     inputs_old = [
@@ -2007,20 +2112,21 @@ def test_convert_input_values_schema_from_old_xfail():
         "test1": {"href": ["https://www.somewebsite.com/dir1/",
                            "https://www.somewebsite.com/dir2/",
                            "https://www.somewebsite.com/dir3/"],
-                  "type": "application/directory"}
+                  "type": ContentType.APP_DIR},
     }
 
     assert convert_input_values_schema(inputs_old, ProcessSchema.OLD) == inputs_old
     assert convert_input_values_schema(inputs_old, ProcessSchema.OGC) == inputs_ogc
 
 
+@pytest.mark.format
 @pytest.mark.xfail(reason="Expected to fail as conversion is probably not standard compliant")
 def test_convert_input_values_schema_from_ogc_xfail():
     inputs_ogc = {
         "test1": {"href": ["https://www.somewebsite.com/dir1/",
                            "https://www.somewebsite.com/dir2/",
                            "https://www.somewebsite.com/dir3/"],
-                  "type": "application/directory"}
+                  "type": ContentType.APP_DIR},
     }
 
     inputs_old = [
@@ -2037,6 +2143,8 @@ def test_convert_input_values_schema_from_ogc_xfail():
     assert convert_input_values_schema(inputs_ogc, ProcessSchema.OLD) == inputs_old
 
 
+@pytest.mark.cli
+@pytest.mark.format
 def test_repr2json_input_values():
     values = [
         "test1=value",
@@ -2084,6 +2192,7 @@ def test_repr2json_input_values():
     assert result == expect
 
 
+@pytest.mark.format
 @pytest.mark.parametrize(
     ["name", "expect"],
     [
@@ -2147,11 +2256,11 @@ def test_ogcapi2cwl_process_with_extra_href():
                 "in-str": {"type": "string", "inputBinding": {"position": 1}},
                 "in-int": {"type": "int", "inputBinding": {"position": 2}},
                 "in-float": {"type": "float", "inputBinding": {"position": 3}},
-                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                             "inputBinding": {"prefix": "-f"}},
             },
             "outputs": {
-                "output": {"type": "File", "format": "ogc:geotiff",
+                "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                            "outputBinding": {"glob": "output/*.tiff"}},
             },
             "$namespaces": cwl_ns
@@ -2194,11 +2303,11 @@ def test_ogcapi2cwl_process_with_extra_exec_unit():
             "in-str": {"type": "string", "inputBinding": {"position": 1}},
             "in-int": {"type": "int", "inputBinding": {"position": 2}},
             "in-float": {"type": "float", "inputBinding": {"position": 3}},
-            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+            "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                         "inputBinding": {"prefix": "-f"}},
         },
         "outputs": {
-            "output": {"type": "File", "format": "ogc:geotiff",
+            "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                        "outputBinding": {"glob": "output/*.tiff"}},
         },
         "$namespaces": cwl_ns
@@ -2241,11 +2350,11 @@ def test_ogcapi2cwl_process_with_extra_exec_href():
                 "in-str": {"type": "string", "inputBinding": {"position": 1}},
                 "in-int": {"type": "int", "inputBinding": {"position": 2}},
                 "in-float": {"type": "float", "inputBinding": {"position": 3}},
-                "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}",
+                "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}",
                             "inputBinding": {"prefix": "-f"}},
             },
             "outputs": {
-                "output": {"type": "File", "format": "ogc:geotiff",
+                "output": {"type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                            "outputBinding": {"glob": "output/*.tiff"}},
             },
             "$namespaces": cwl_ns
@@ -2307,11 +2416,11 @@ def test_ogcapi2cwl_process_without_extra():
             "in-str": {"type": "string"},
             "in-int": {"type": "int"},
             "in-float": {"type": "float"},
-            "in-file": {"type": "File", "format": f"iana:{ContentType.APP_JSON}"},
+            "in-file": {"type": PACKAGE_FILE_TYPE, "format": f"iana:{ContentType.APP_JSON}"},
         },
         "outputs": {
             "output": {
-                "type": "File", "format": "ogc:geotiff",
+                "type": PACKAGE_FILE_TYPE, "format": "ogc:geotiff",
                 "outputBinding": {
                     "glob": "*.tiff"  # "output/*.tiff" only during Workflow step execution
                 }
@@ -2779,16 +2888,16 @@ def test_ows_wps_json_default_complex_format():
         "type": WPS_COMPLEX_DATA,
         "data_type": WPS_COMPLEX_DATA,
         "data_format": {
-            "mimeType": ContentType.APP_NETCDF,
-            "encoding": "base64",
+            "mimeType": ContentType.APP_X_NETCDF,
+            "encoding": ContentEncoding.BASE64,
             "maximumMegabytes": 200,
             "schema": None,
             "default": True,
         },
         "formats": [
             {
-                "mimeType": ContentType.APP_NETCDF,
-                "encoding": "base64",
+                "mimeType": ContentType.APP_X_NETCDF,
+                "encoding": ContentEncoding.BASE64,
                 "maximumMegabytes": 200,
                 "schema": None,
                 "default": True,
@@ -2808,11 +2917,11 @@ def test_ows_wps_json_default_complex_format():
     assert wps_io.title == "test"
     assert wps_io.min_occurs == 0
     assert wps_io.max_occurs == 100
-    assert wps_io.data_format == Format(ContentType.APP_NETCDF, encoding="base64")
+    assert wps_io.data_format == Format(ContentType.APP_X_NETCDF, encoding=ContentEncoding.BASE64)
     assert all(wps_fmt == val_fmt for wps_fmt, val_fmt in zip(
         wps_io.supported_formats,
         [
-            Format(ContentType.APP_NETCDF, encoding="base64"),
+            Format(ContentType.APP_X_NETCDF, encoding=ContentEncoding.BASE64),
             Format(ContentType.APP_JSON),
         ],
     ))
@@ -2835,14 +2944,31 @@ def test_ows_wps_json_default_complex_format():
         "maxOccurs": "100",
         "mode": MODE.NONE,
         "type": WPS_COMPLEX,
-        "data_format": {"mime_type": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": ""},
+        "data_format": {
+            "mime_type": ContentType.APP_X_NETCDF,
+            "encoding": ContentEncoding.BASE64,
+            "schema": "",
+            "extension": "",
+        },
         "formats": [
-            {"mediaType": ContentType.APP_NETCDF, "encoding": "base64", "schema": "", "extension": "", "default": True},
-            {"mediaType": ContentType.APP_JSON, "encoding": "", "schema": "", "extension": "", "default": False}
+            {
+                "mediaType": ContentType.APP_X_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+                "schema": "",
+                "extension": "",
+                "default": True,
+            },
+            {
+                "mediaType": ContentType.APP_JSON,
+                "encoding": "",
+                "schema": "",
+                "extension": "",
+                "default": False,
+            }
         ],
         # from default data_format
-        "mimetype": ContentType.APP_NETCDF,
-        "encoding": "base64",
+        "mimetype": ContentType.APP_X_NETCDF,
+        "encoding": ContentEncoding.BASE64,
     }
 
 
