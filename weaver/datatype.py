@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobProcessingEntityType,
     JobStatusType,
     ProcessSchema
 )
@@ -100,7 +101,7 @@ if TYPE_CHECKING:
         AnyExecuteTransmissionMode
     )
     from weaver.formats import AnyContentType
-    from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.constants import AnyJobProcessingEntityType, ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
     from weaver.quotation.status import AnyQuoteStatus
@@ -484,7 +485,7 @@ class Service(Base):
                 "type": ContentType.APP_JSON,
             },
             {
-                "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+                "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
                 "title": "Listing of processes provided by this service.",
                 "href": proc_url,
                 "hreflang": AcceptLanguage.EN_CA,
@@ -931,6 +932,11 @@ class Job(Base, LoggerHandler):
         if not isinstance(process, str) or process is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.process'")
         self["process"] = process
+
+    @property
+    def processing_entity_type(self):
+        # type: () -> AnyJobProcessingEntityType
+        return JobProcessingEntityType.OGC_API_PROCESSES
 
     @property
     def type(self):
@@ -1588,9 +1594,9 @@ class Job(Base, LoggerHandler):
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
             {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,
              "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
-            {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
+            {"href": job_list, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,  # OGC
              "title": "List of submitted jobs."},
-            {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+            {"href": job_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
              "title": "New job submission endpoint for the corresponding process."},
             {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
@@ -1605,7 +1611,7 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
-                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, "rel": "profile", "title": "Job response profile."},
+                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URI, "rel": "profile", "title": "Job response profile."},
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -1614,7 +1620,7 @@ class Job(Base, LoggerHandler):
                 job_links.extend([
                     {"href": f"{job_url}/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
-                    {"href": f"{job_url}/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
+                    {"href": f"{job_url}/results", "rel": sd.OGC_API_PROC_REL_JOB_RESULTS_URI,
                      "title": "Job results of successful process execution (direct output values mapping)."},
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
@@ -1625,7 +1631,7 @@ class Job(Base, LoggerHandler):
                 ])
             else:
                 job_links.append({
-                    "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
+                    "href": f"{job_url}/exceptions", "rel": sd.OGC_API_PROC_REL_EXCEPTIONS_URI,
                     "title": "List of job exceptions if applicable in case of failing job."
                 })
         job_links.extend([
@@ -1635,7 +1641,7 @@ class Job(Base, LoggerHandler):
             },
             {
                 # official, same as 'rel="[ogc-rel:log]"'
-                "href": f"{job_url}/logs", "rel": "http://www.opengis.net/def/rel/ogc/1.0/log",
+                "href": f"{job_url}/logs", "rel": sd.OGC_API_PROC_REL_JOB_LOG_URI,
                 "title": "List of collected job logs during process execution."
             }
         ])
@@ -1656,6 +1662,20 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
+    def summary(self, validate=True, **kwargs):
+        # type: (bool, **JSON) -> JSON
+        job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
+            "jobID": self.id,
+            "processID": self.process,
+            "providerID": self.service,  # dropped by validator if not applicable
+            "type": self.type,
+            "status": map_status(self.status),
+            "processingEntityType": self.processing_entity_type,
+        }
+        job_json.update(**kwargs)
+        return sd.JobSummary().deserialize(job_json) if validate else job_json
+
     def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
@@ -1667,9 +1687,11 @@ class Job(Base, LoggerHandler):
         """
         settings = get_settings(container) if container else {}
         job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
             "jobID": self.id,
             "processID": self.process,
             "providerID": self.service,
+            "processingEntityType": self.processing_entity_type,
             "type": self.type,
             "title": self.title,
             "status": map_status(self.status),
@@ -2742,7 +2764,7 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
-            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "rel": "profile", "title": "Process response profile."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "rel": "profile", "title": "Process response profile."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]
@@ -2753,11 +2775,11 @@ class Process(Base):
             )
         links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
-            {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+            {"href": proc_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
              "title": "Process execution endpoint for job submission."},
-            {"href": proc_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+            {"href": proc_list, "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
              "title": "List of registered processes."},
-            {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            {"href": jobs_list, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ])
@@ -2791,7 +2813,7 @@ class Process(Base):
                 {"href": api_base_url, "rel": "service", "title": "Provider service description."},
                 {"href": api_base_url, "rel": "service-meta", "title": "Provider service definition."},
                 {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
-                {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
+                {"href": self.processEndpointWPS1, "rel": sd.OGC_API_PROC_REL_PROCESS_DESC_URI,
                  "title": "Remote process description."},
             ]
             for link in wps_links:

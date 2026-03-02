@@ -1,0 +1,591 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Tests for verifying the functionality of a web server implementing a *OGC API - Processes*.
+
+Definitions are based off the Test Suite Strawman located at:
+https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman
+"""
+
+import glob
+import itertools
+import os
+import uuid
+import warnings
+from functools import cached_property
+from typing import TYPE_CHECKING, cast
+
+import jsonschema
+import pytest
+import requests
+import yaml
+from pyramid.settings import asbool
+from pytest_dependency import depends
+
+from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
+from weaver import ogc_definitions as ogc_defs
+from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
+from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
+from weaver.formats import ContentType, OutputFormat
+from weaver.status import Status
+from weaver.utils import get_any_value
+
+if TYPE_CHECKING:
+    from weaver.typedefs import CWL, JSON, Path
+
+
+TEST_SERVER = os.getenv("TEST_SERVER") or ""
+TEST_SERVER_BASE_URL = os.getenv("TEST_SERVER_BASE_URL", "http://localhost:4002")
+TEST_SERVER_REQUEST_TIMEOUT = int(os.getenv("TEST_SERVER_REQUEST_TIMEOUT", "5"))  # default match internal util timeout
+TEST_SERVER_OAP_CORE_VERSION = os.getenv("TEST_SERVER_OAP_CORE_VERSION", "2.0")  # i.e.: "1.0" or "2.0"
+TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "echo")
+TEST_SERVER_OAP_DRU_PROCESS_ID = os.getenv("TEST_SERVER_OAP_DRU_PROCESS_ID", "test-echo")
+
+# bypass dependencies of certain tests known to fail a certain prerequisite
+TEST_SERVER_OAP_DRU_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_UNSUPPORTED", "false"))
+TEST_SERVER_OAP_OAS_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_OAS_UNSUPPORTED", "false"))
+TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED", "false")
+)
+TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED", "false")
+)
+TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED = asbool(
+    os.getenv("TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED", "false")
+)
+
+
+def setup_client():
+    # fully-qualified name (eg: 'weaver.cli.BasicAuthHandler', 'requests.auth.HTTPBasicAuth')
+    auth_handler_ref = os.getenv("TEST_SERVER_AUTH_HANDLER")
+    auth_handler = ValidateAuthHandlerAction.validate(auth_handler_ref)
+    auth = None if not auth_handler else parse_auth(dict(
+        auth_handler=auth_handler,
+        auth_identity=os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
+        auth_password=os.getenv("TEST_SERVER_AUTH_PASSWORD"),
+        auth_url=os.getenv("TEST_SERVER_AUTH_URL"),
+        auth_method=os.getenv("TEST_SERVER_AUTH_method"),
+        auth_headers=os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
+        auth_token=os.getenv("TEST_SERVER_AUTH_TOKEN"),
+    ))
+    request_options = {
+        # all must be prefixed by 'request_', options as applicable in 'weaver.utils.request_extra'
+        "request_timeout": TEST_SERVER_REQUEST_TIMEOUT,
+    }
+    return WeaverClient(url=TEST_SERVER_BASE_URL, auth=auth, **request_options)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def client():
+    return setup_client()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def check_server():
+    if not TEST_SERVER:
+        pytest.fail("No TEST_SERVER defined. Cannot resolve test resources for specific server tests.")
+
+
+@pytest.fixture(scope="module")
+def process_execute_body() -> "JSON":
+    path = os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER)
+    body = load_resource("process-execute.json", dir=path)
+    return body
+
+
+@pytest.fixture(scope="module", autouse=True)
+def openapi_job_status():
+    schema_url = "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml"
+    response = requests.get(schema_url)
+    response.raise_for_status()
+    schema_yaml = yaml.safe_load(response.text)
+    # The relevant definition is the root schema itself
+    return schema_yaml
+
+
+def depends_or(request, other, scope="module"):
+    item = request.node
+    for o in other:
+        try:
+            depends(request, [o], scope)
+        except pytest.skip.Exception:
+            continue
+        else:
+            return
+    pytest.skip(f"{item.name} depends on any of {', '.join(other)}")
+
+
+class ServerOGCAPIProcessesBase:
+
+    @classmethod
+    def setup_class(cls, check_server=None):
+        cls.client = setup_client()
+
+    @cached_property
+    def conforms_to(self):
+        result = self.client.conformance()
+        assert result.code == 200
+        return result.body.get("conformsTo", [])
+
+    @cached_property
+    def processes(self):
+        result = self.client.processes(detail=True, output_format=OutputFormat.JSON)
+        assert result.code == 200
+        assert result.headers.get("Content-Type", "").startswith("application/json")
+        return result.body.get("processes", [])
+
+
+@pytest.mark.code_sprint
+@pytest.mark.functional
+@pytest.mark.remote
+@pytest.mark.oap_part1
+class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
+
+    @classmethod
+    def setup_class(cls, check_server=None):
+        super().setup_class()
+
+    def test_landing_page_links(self):
+        result = self.client.info()
+        assert result.code == 200
+        links = result.body.get("links", [])
+        rel_by_name = {link.get("rel"): link for link in links}
+        assert "http://www.opengis.net/def/rel/ogc/1.0/conformance" in rel_by_name
+        assert "http://www.opengis.net/def/rel/ogc/1.0/processes" in rel_by_name
+
+    @pytest.mark.dependency(name="test_conformance_classes_core")
+    def test_conformance_classes_core(self):
+        conf_core = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/core"
+        conf_json = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/json"
+        assert conf_core in self.conforms_to
+        assert conf_json in self.conforms_to
+
+    @pytest.mark.dependency(
+        name="test_service_desc_link_and_oas_validation",
+        depends=["test_conformance_classes_core"],
+    )
+    def test_service_desc_link_and_oas_validation(self):
+        conf_oasXX = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
+        conf_oas30 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas30"
+        conf_oas31 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas31"
+        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oasXX, conf_oas30, conf_oas31]]
+        assert conforms_oas, "Server does not declare conformance to OAS"
+
+        result = self.client.info()
+        assert result.code == 200
+        links = result.body.get("links", [])
+        service_desc_links = [link for link in links if link.get("rel") == "service-desc"]
+        assert service_desc_links, "No service-desc link found"
+        # Minimal OAS verification for each service-desc link
+        oas_validated = False
+        service_desc_urls = [link["href"] for link in service_desc_links]
+        for service_desc_url in service_desc_urls:
+            oas_response = self.client._request("GET", service_desc_url, request_timeout=10)
+            assert oas_response.status_code == 200
+            try:
+                oas_json = oas_response.json()
+            except Exception:
+                warnings.warn(f"service-desc href {service_desc_url} did not return valid JSON")
+                continue
+            if isinstance(oas_json, dict) and "openapi" in oas_json and str(oas_json["openapi"]).startswith("3."):
+                oas_validated = True
+                break
+        assert oas_validated, f"none of the service-desc href are valid JSON OpenAPI 3 definitions: {service_desc_urls}"
+
+    @pytest.mark.dependency(
+        name="test_process_list_schema_and_links",
+        depends=(
+            # allow bypass if it is known that the server does not support valid OAS, just to resume the test suite
+            [] if TEST_SERVER_OAP_OAS_UNSUPPORTED else ["test_service_desc_link_and_oas_validation"]
+        ),
+    )
+    def test_process_list_schema_and_links(self):
+        result = self.client.processes(detail=True)
+        assert result.code == 200
+        process_list_data = result.body
+        assert "processes" in process_list_data
+        process_list_links = process_list_data.get("links", [])
+        process_list_rels = [link.get("rel") for link in process_list_links]
+        assert "self" in process_list_rels
+        for process_summary in process_list_data["processes"]:
+            process_summary_links = process_summary.get("links", [])
+            process_summary_rels = [link.get("rel") for link in process_summary_links]
+            assert "self" in process_summary_rels
+        result_paged = self.client.processes(limit=1)
+        assert result_paged.code == 200
+        paged_data = result_paged.body
+        paged_links = paged_data.get("links", [])
+        paged_rels = [link.get("rel") for link in paged_links]
+        assert any(rel in paged_rels for rel in ["next", "prev", "self"])
+
+    @pytest.mark.dependency(
+        name="test_process_description_and_profile_link",
+        depends=["test_process_list_schema_and_links"],
+    )
+    def test_process_description_and_profile_link(self):
+        if not self.processes:
+            pytest.skip("No processes available to test description.")
+        process_id = self.processes[0].get("id")
+        assert process_id
+        desc_result = self.client.describe(process_id, with_headers=True)
+        assert desc_result.code == 200
+        process_description = desc_result.body
+        assert "id" in process_description and process_description["id"] == process_id
+
+        profile_rel = "http://www.opengis.net/def/profile/OGC/0/ogc-process-description"
+        profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
+        assert profile == profile_rel
+
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED,
+        reason="Asynchronous process execution not supported by the test server.",
+    )
+    @pytest.mark.dependency(
+        name="test_sync_execute_all_outputs",
+        depends=(
+            []
+            if TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED
+            else ["test_process_description_and_profile_link"]
+        ),
+    )
+    @pytest.mark.parametrize(
+        "process_execute_json_file",
+        glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json"))
+    )
+    def test_sync_execute_all_outputs(self, process_execute_json_file):
+        """
+        Test synchronous execution for each discovered process execution of the test server.
+        """
+        body = load_resource(process_execute_json_file)
+        process_id = body.get("process") or TEST_SERVER_OAP_CORE_PROCESS_ID
+        process_desc = self.client.describe(process_id).body
+        process_outputs = process_desc.get("outputs", {})
+        assert process_outputs, (
+            f"No outputs defined for process [{process_id}]. "
+            "Cannot test execution result without at least one."
+        )
+        execute_inputs = body.get("inputs", {})
+        execute_result = self.client.execute(
+            process_id,
+            inputs=execute_inputs,
+            execute_mode=ExecuteMode.SYNC,
+            execute_return=ExecuteReturnPreference.MINIMAL,
+            timeout=TEST_SERVER_REQUEST_TIMEOUT,
+        )
+        assert execute_result.code == 200, f"Execution should be successful for {process_execute_json_file}"
+        assert execute_result.headers.get("Content-Type", "").startswith(ContentType.APP_JSON)
+        results = execute_result.body
+        assert set(process_outputs) == set(results)
+        assert all(
+            get_any_value(results[out_id])
+            if isinstance(results[out_id], dict)
+            else isinstance(results[out_id], (bool, int, float, str))
+            for out_id in process_outputs
+        )
+
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED,
+        reason="Asynchronous process execution not supported by the test server.",
+    )
+    @pytest.mark.dependency(
+        name="test_job_results_async",
+        depends=(
+            []
+            if TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED
+            else ["test_process_description_and_profile_link"]
+        ),
+    )
+    @pytest.mark.parametrize(
+        ["process_execute_json_file", "result_profile"],
+        itertools.product(
+            glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json")),
+            [
+                None,
+                "http://www.opengis.net/def/profile/OGC/0/ogc-results",
+            ]
+        ),
+    )
+    def test_job_results_async(self, process_execute_json_file, result_profile):
+        # type: (Path, str) -> None
+        """
+        Test asynchronous execution for each discovered process execution of the test server.
+        """
+        body = load_resource(process_execute_json_file)
+        process_id = body.get("process") or TEST_SERVER_OAP_CORE_PROCESS_ID
+        process_desc = self.client.describe(process_id).body
+        process_outputs = process_desc.get("outputs", {})
+
+        # Async execute (no outputs/prefer args)
+        execute_inputs = body.get("inputs", {})
+        execute_result = self.client.execute(
+            process_id,
+            inputs=execute_inputs,
+            monitor=True,  # automatically start polling the job status until completion
+            timeout=30,
+            interval=2,
+        )
+        assert execute_result.success, f"Job execution failed or monitoring timed out: {execute_result.message}"
+        assert execute_result.code == 200
+
+        # validate job result
+        job_id = execute_result.body.get("id")
+        result = self.client.results(job_id, results_profile=result_profile, with_headers=True, with_links=True)
+        assert result.code == 200
+        if result_profile:
+            job_results_data = result.body
+            assert "outputs" in job_results_data
+
+        # FIXME: no public method to get individual output, use _request
+        results_url = f"{TEST_SERVER_BASE_URL}/jobs/{job_id}/results"
+        output_id = process_outputs[0].get("id")
+        path = f"{results_url}/{output_id}"
+        resp = self.client._request("GET", path)
+        assert resp.status_code == 200
+
+
+@pytest.mark.code_sprint
+@pytest.mark.functional
+@pytest.mark.remote
+@pytest.mark.oap_part2
+class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
+
+    @classmethod
+    def setup_class(cls, check_server=None):
+        super().setup_class()
+        cls.cleanup_processes = set()
+
+    @classmethod
+    def teardown_class(cls):
+        for process_id in cls.cleanup_processes:
+            result = cls.client.undeploy(process_id)
+            if result.code not in (200, 204, 404):
+                warnings.warn(f"Warning: failed to undeploy process [{process_id}] during teardown.")
+
+    @pytest.mark.dependency(name="test_conformance_classes_dru")
+    def test_conformance_classes_dru(self):
+        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy" in self.conforms_to
+
+    @pytest.mark.dependency(
+        name="test_conformance_classes_dru_ogcapppkg",
+        depends=["test_conformance_classes_dru"],
+    )
+    def test_conformance_classes_dru_ogcapppkg(self):
+        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/ogcapppkg" in self.conforms_to
+
+    @pytest.mark.dependency(
+        name="test_conformance_classes_dru_cwl",
+        depends=["test_conformance_classes_dru"],
+    )
+    def test_conformance_classes_dru_cwl(self):
+        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/cwl" in self.conforms_to
+
+    @pytest.mark.dependency(
+        name="test_deploy_process_ogcapppkg",
+        depends=["test_conformance_classes_dru_ogcapppkg"],
+    )
+    def test_deploy_process_ogcapppkg(self):
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(process_id)
+        ogc_app_pkg = {
+            "type": "docker",
+            "image": "hello-world:latest",
+            "deployment": "local",
+            "config": {
+                "cpuMin": 1,
+                "cpuMax": 1,
+            }
+        }
+        body = {
+            "id": process_id,
+            "version": "1.0.0",
+            "inputs": [{"id": "input", "type": "string"}],
+            "outputs": [{"id": "output", "type": "string"}],
+            "jobControlOptions": [ExecuteControlOption.SYNC, ExecuteControlOption.ASYNC],
+            "executionUnit": [
+                {"unit": ogc_app_pkg}
+            ]
+        }
+        headers = {"Content-Type": ContentType.APP_OGC_PKG_JSON}
+        result = self.client.deploy(process_id=process_id, body=body, headers=headers)
+        assert result.code == 200
+        location = result.headers.get("Location")
+        assert location
+        assert location.endswith(f"/processes/{process_id}")
+        result = self.client.describe(process_id)
+        assert result.code == 200
+        desc_json = result.body
+        assert desc_json["id"] == process_id
+        assert desc_json["inputs"][0]["id"] == ogc_app_pkg["inputs"][0]["id"]
+        assert desc_json["outputs"][0]["id"] == ogc_app_pkg["outputs"][0]["id"]
+
+    @pytest.mark.dependency(
+        name="test_deploy_process_cwl",
+        depends=["test_conformance_classes_dru_cwl"],
+    )
+    def test_deploy_process_cwl(self):
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(process_id)
+        cwl_app_pkg = cast(
+            "CWL",
+            {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "id": process_id,
+                "baseCommand": "echo",
+                "inputs": {"input": "string"},
+                "outputs": {"output": {"type": "stdout"}}
+            }
+        )
+        result = self.client.deploy(process_id=process_id, cwl=cwl_app_pkg)
+        assert result.code == 200
+        location = result.headers.get("Location")
+        assert location
+        assert location.endswith(f"/processes/{process_id}")
+        result = self.client.describe(process_id)
+        assert result.code == 200
+        desc_json = result.body
+        assert desc_json["id"] == process_id
+        assert "inputs" in desc_json and "outputs" in desc_json
+
+    @pytest.mark.dependency(
+        name="test_retrieve_application_package_ogcapppkg",
+        depends=["test_deploy_process_ogcapppkg"],
+    )
+    def test_retrieve_application_package_ogcapppkg(self):
+        mutable_proc = (
+            p for p in self.processes
+            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+        )
+        assert mutable_proc, "No mutable process found."
+        process_id = next(mutable_proc)["id"]
+        pkg_response = self.client.package(process_id)
+        assert pkg_response.code == 200
+        content_type = pkg_response.headers.get("Content-Type", "")
+        assert content_type == "application/ogcapppkg+json"
+        pkg_json = pkg_response.body
+        desc_response = self.client.describe(process_id)
+        assert desc_response.code == 200
+        desc_json = desc_response.body
+        assert desc_json["id"] == pkg_json.get("id", process_id)
+        pkg_inputs = pkg_json.get("inputs", [])
+        oap_inputs = desc_json.get("inputs", [])
+        pkg_outputs = pkg_json.get("outputs", [])
+        oap_outputs = desc_json.get("outputs", [])
+        assert set(pkg_inputs) == set(oap_inputs)
+        assert set(pkg_outputs) == set(oap_outputs)
+
+    @pytest.mark.dependency(
+        name="test_retrieve_application_package_cwl",
+        depends=["test_deploy_process_cwl"],
+    )
+    def test_retrieve_application_package_cwl(self):
+        mutable_proc = (
+            p for p in self.processes
+            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+        )
+        assert mutable_proc, "No mutable process found."
+        process_id = next(mutable_proc)["id"]
+        pkg_response = self.client.package(process_id)
+        assert pkg_response.code == 200
+        content_type = pkg_response.headers.get("Content-Type", "")
+        assert content_type in ["application/cwl+json", "application/cwl+yaml", "application/cwl"]
+        pkg_json = pkg_response.body
+        desc_response = self.client.describe(process_id)
+        assert desc_response.code == 200
+        desc_json = desc_response.body
+        assert desc_json["id"] == pkg_json.get("id", process_id)
+        pkg_inputs = pkg_json.get("inputs", [])
+        oap_inputs = desc_json.get("inputs", [])
+        pkg_outputs = pkg_json.get("outputs", [])
+        oap_outputs = desc_json.get("outputs", [])
+        assert set(pkg_inputs) == set(oap_inputs)
+        assert set(pkg_outputs) == set(oap_outputs)
+
+    @pytest.mark.dependency(
+        name="test_replace_process_ogcapppkg",
+        depends=["test_deploy_process_ogcapppkg"],
+    )
+    def test_replace_process_ogcapppkg(self):
+        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
+        assert result.code == 200
+
+        pkg = result.body
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(new_id)
+        result = self.client.deploy(process_id=new_id, cwl=pkg)
+        assert result.code == 200
+
+        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(replace_id)
+        revised_pkg = pkg.copy()
+        revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
+
+        # FIXME: facing method not implemented in client
+        body = {
+            "id": replace_id,
+            "version": "2.0.0",
+            "executionUnit": [{"unit": revised_pkg}]
+        }
+        headers = {"Content-Type": "application/ogcapppkg+json"}
+        replace_path = f"{TEST_SERVER_BASE_URL}/processes/{replace_id}"
+        result = self.client._request("PUT", replace_path, json=body, headers=headers)
+        assert result.status_code in [202, 204]
+
+        result = self.client.describe(replace_id)
+        assert result.code == 200
+        desc_json = result.body
+        assert desc_json["version"] == "2.0.0"
+
+        result = self.client.package(replace_id)
+        assert result.code == 200
+        pkg_replaced = result.body
+        assert pkg_replaced == revised_pkg
+
+    @pytest.mark.dependency(
+        name="test_replace_process_cwl",
+        depends=["test_deploy_process_cwl"],
+    )
+    def test_replace_process_cwl(self):
+        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
+        assert result.code == 200
+
+        pkg = result.body
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(new_id)
+        result = self.client.deploy(process_id=new_id, cwl=pkg)
+        assert result.code == 200
+
+        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        self.cleanup_processes.add(replace_id)
+        revised_pkg = pkg.copy()
+        revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
+
+        # FIXME: facing method not implemented in client
+        headers = {"Content-Type": "application/cwl+json"}
+        replace_path = f"{TEST_SERVER_BASE_URL}/processes/{replace_id}"
+        result = self.client._request("PUT", replace_path, json=revised_pkg, headers=headers)
+        assert result.status_code in [202, 204]
+
+        result = self.client.describe(replace_id)
+        assert result.code == 200
+        desc_json = result.body
+        assert desc_json["version"] == "2.0.0"
+
+        result = self.client.package(replace_id)
+        assert result.code == 200
+        pkg_replaced = result.body
+        assert pkg_replaced == revised_pkg
+
+    @pytest.mark.dependency(name="test_delete_process")
+    def test_delete_process(self, request):
+        depends_or(request, ["test_deploy_process_ogcapppkg", "test_deploy_process_cwl"])
+
+        result = self.client.processes()
+        processes = result.body.get("processes", [])
+        mutable_proc = next((p for p in processes if p.get("id", "").startswith("test-echo")), None)
+        assert mutable_proc, "No mutable process found."
+        process_id = mutable_proc["id"]
+        result = self.client._request("DELETE", f"{TEST_SERVER_BASE_URL}/processes/{process_id}")
+        assert result.status_code == 204
+        result = self.client.describe(process_id)
+        assert result.code == 404

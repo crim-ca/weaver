@@ -2671,7 +2671,7 @@ Following is a summary of relevant parameters impacting content negotiation.
 
 .. rubric:: Notes
 
-.. [#noteEncoding]
+.. [#noteParamEncoding]
     Depending on the location and the specific name of the query parameters or headers, certain encodings are enforced.
     For example, the ``Link`` header is defined by :rfc:`6906`, which **requires** its ``href`` to be an :term:`URI`.
     In such case, shorthand notation like ``rel=profile, href=cloud-optimized`` is **not allowed**.
