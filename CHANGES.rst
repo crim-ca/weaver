@@ -16,7 +16,12 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix multi-token Vault authentication header parsing to support both single and multiple file access tokens.
+  The ``parse_vault_token`` function now handles plain token strings (e.g., from WPS process context) and full
+  header formats (e.g., ``token <value>; id=<uuid>``), and correctly validates token presence for the requested
+  file UUID. The mismatch detection logic was updated to properly check if the requested file ID exists in the
+  parsed tokens rather than only validating against the first token key
+  (fixes `#897 <https://github.com/crim-ca/weaver/issues/897>`_).
 
 .. _changes_6.9.0:
 
