@@ -92,12 +92,30 @@ weaver.quotation_currency_converter =
 weaver.quotation_currency_token =
 
 # --- Weaver CWL settings ---
-# NOTE: [experimental]
+
+# WARNING: [experimental] - see 'weaver.processes.wps_package.WpsPackage.update_effective_user'
 # enforce provided effective user/group identifiers for Application Package execution
 # values must be resolved as integers
-# (default: use cwltool auto-resolution according to running machine and current user/group)
+# (default: [unset/empty] use cwltool auto-resolution according to running machine and current user/group)
+# NOTE:
+#   Using UID/GID 0:0 can be used for either root and rootless mode.
+#   In rootless mode, the considered UID/GID are prior to any /etc/subuid or /etc/subgid mapping by the feature.
+#   Similarly, root docker-daemon combined with additional user-namespace mapping can be used.
+#   It is up to the user to adjust them sensibly according to their needs and security considerations,
+#   and to validate that the corresponding values are mapped/resolved by cwltool and docker commands as expected.
+# See:
+#   - https://docs.docker.com/engine/security/rootless/
+#   - https://docs.docker.com/engine/security/userns-remap/
+# For convenience, environment variables 'WEAVER_CWL_EUID' and 'WEAVER_CWL_EGID' can also be used
 weaver.cwl_euid =
 weaver.cwl_egid =
+# following can be used when employing rootless docker with 'true'
+# to directly employ the effective user/group configured by docker
+# it is NOT recommended to use this setting with root docker-daemon (although it is possible)
+# this will effectively avoid inserting the '--user' option in cwltool docker executions
+# for convenience, environment variable 'WEAVER_CWL_NO_MATCH_USER' can also be used
+weaver.cwl_no_match_user =
+
 # directory where to load predefined process definitions defined with CWL files
 # default configuration directory is used if this entry is removed
 # only CWL files are considered, lookup in directory is recursive

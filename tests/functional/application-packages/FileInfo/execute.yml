@@ -1,0 +1,6 @@
+# This is an example of the expected file.
+# Tests can provide it themselves with temporary files.
+file:
+  class: File
+  format: https://www.iana.org/assignments/media-types/application/json
+  path: test.json

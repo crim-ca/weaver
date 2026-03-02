@@ -406,7 +406,7 @@ Following steps represent the typical steps applied to deploy a process, execute
 Register a New Process (Deploy)
 -----------------------------------------
 
-Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
+Deployment of a new process is accomplished through the |deploy-req|_ request.
 
 .. seealso::
     |ogc-api-proc-part2|_ specification.
@@ -420,18 +420,20 @@ The request body requires mainly two components:
     following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
     such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
 
-    .. seealso::
-        Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
-        could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
-
 - | ``executionUnit``:
   | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
     or other :ref:`proc_types` references that indicates how to execute the underlying application.
 
+.. _proc_op_deploy_cwl:
+
 .. note::
-    If the :term:`Process` can be directly represented and converted from the :term:`CWL` with regard to
-    all :ref:`cwl-wps-mapping` considerations, the :term:`CWL` might be directly deployed with the
-    appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+    If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
+    can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
+    the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+
+.. seealso::
+    Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
+    could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
 
 .. |app_pkg| replace:: Application Package
 .. _app_pkg: docs/source/package.rst
@@ -1112,7 +1114,7 @@ The ``Prefer`` header is also used by |oap| v2.0 to control how the results are 
 separate ``transmissionMode`` parameter. By reducing the amount of parameters involved, v2.0 makes the request easier
 to submit with a single header (also used to indicate the :ref:`proc_exec_mode`), but limits certain representation
 combinations only possible with v1.0. These limited representations can be retrieved by involving more advanced
-:term:`Profile` and :term:`Media-Type` *Content Negotiation* techniques.
+:term:`Profile` and :term:`Media-Type` :ref:`proc_content_negotiation` techniques.
 
 .. seealso::
     Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.
@@ -2733,7 +2735,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
       - :term:`Media-Type` ``application/json``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`JSON` representation.
     * - ``yaml``/``yml``
-      - :term:`Media-Type` ``application/x-yaml``
+      - :term:`Media-Type` ``application/yaml``, ``application/x-yaml``, ``text/yaml`` or ``text/x-yaml``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`YAML` representation.
     * - ``xml``
       - :term:`Media-Type` ``text/xml`` or ``application/xml``

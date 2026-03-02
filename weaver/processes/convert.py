@@ -11,7 +11,7 @@ from collections.abc import Hashable
 from copy import deepcopy
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import unquote, urlparse
 
 import colander
@@ -152,6 +152,7 @@ if TYPE_CHECKING:
         ExecutionOutputsList,
         ExecutionOutputsMap,
         JobValueFile,
+        JobValueFormat,
         JobValueItem,
         JSON,
         OpenAPISchema,
@@ -1190,7 +1191,7 @@ def ogcapi2cwl_process(payload, reference):
     ows_ref = process_info.get("owsContext", {}).get("offering", {}).get("content", {}).get("href")
     proc_ref = process_info.get("href")
     cwl_ref = proc_ref or ows_ref  # type: Optional[str]
-    cwl_pkg = {}  # type: CWL
+    cwl_pkg = cast("CWL", {})
     if cwl_ref:
         cwl_pkg = load_package_file(cwl_ref)
     else:
@@ -1232,7 +1233,7 @@ def ogcapi2cwl_process(payload, reference):
 
     # even if the remote process is actually a Workflow on the target server,
     # dispatched execution from Weaver will consider it as a single application
-    cwl_package = {
+    cwl_package = cast("CWL", {
         "cwlVersion": "v1.0",
         "class": "CommandLineTool",
         "hints": {
@@ -1240,7 +1241,7 @@ def ogcapi2cwl_process(payload, reference):
                 "process": reference
             }
         }
-    }
+    })
     cwl_package.update(cwl_pkg)  # type: ignore
     _patch_cwl_enum_js_requirement(cwl_package)
     payload_copy["executionUnit"] = [{"unit": cwl_package}]
@@ -1582,7 +1583,16 @@ class CWLIODefinition(object):
     When not overridden by literal values, it uses the default :class:`AnyValue`.
     """
 
-    mode: MODE = MODE.NONE
+    format: "Optional[List[str]]" = None
+    """
+    Specifies allowed formats for the I/O when :data:`PACKAGE_FILE_TYPE`.
+
+    If an output and specified, it MUST be a single-element array fo consistency with :term:`CWL` behaviour.
+    It will be standardized to a list of string even if a single format was provided for validation convenience.
+    If not applicable, it will be ``None``.
+    """
+
+    mode: "Union[MODE, int]" = MODE.NONE
     """
     Validation mode to be applied if I/O requires it.
 
@@ -1638,7 +1648,7 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
             for i, typ in enumerate(io_type, start=int(is_null)):
                 typ = resolve_cwl_io_type_schema(typ, cwl_schema_names)
                 io_name = io_info["name"]
-                sub_type = {"type": typ, "name": f"{io_name}[{i}]"}  # type: CWL_IO_Type
+                sub_type = cast("CWL_IO_Type", {"type": typ, "name": f"{io_name}[{i}]"})
                 array_io_def = parse_cwl_array_type(sub_type, strict=strict)
                 enum_io_def = parse_cwl_enum_type(sub_type)
                 # array base type more important than enum because later array conversion also handles allowed values
@@ -1707,8 +1717,21 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
         io_min_occurs = 0
         is_null = True
 
+    # only applies to File and File[]
+    # regardless of single File, shorthand File[] or nested array of File, 'format' is always at the root
+    # it can be either a single one or multiple, so standardize them to list for easier handling later on
+    io_format = io_info.get("format") if io_type == PACKAGE_FILE_TYPE else None
+    if isinstance(io_format, str):
+        # if the specified format is an expression, consider it as not provided since
+        # its value could be resolved to anything and we cannot process it immediately
+        if io_format.strip().startswith("$"):
+            io_format = []
+        else:
+            io_format = [io_format]
+
     if io_type not in PACKAGE_COMPLEX_TYPES:
         io_type = any2cwl_literal_datatype(io_type)
+
     io_def = CWLIODefinition(
         name=io_name,
         type=io_type,
@@ -1718,6 +1741,7 @@ def get_cwl_io_type(io_info, strict=True, cwl_schema_names=None):
         array=array_io_def.array,
         enum=is_enum,
         symbols=io_allow,
+        format=io_format,
         mode=io_mode,
     )
     return io_def
@@ -1869,9 +1893,13 @@ def cwl2json_input_values(data, schema=ProcessSchema.OGC):
         cwl_fmt_type = input_data.get("format")
         if isinstance(cwl_fmt_type, str):
             fmt = get_format(cwl_fmt_type)
+            fmt_json = cast("JobValueFormat", {"mediaType": fmt.mime_type})
             if "encoding" in input_data:
-                fmt.encoding = input_data["encoding"]  # type: ignore
-            input_href["format"] = fmt.json
+                fmt_json["encoding"] = input_data["encoding"]  # type: ignore
+            elif fmt.encoding:
+                fmt_json["encoding"] = fmt.encoding
+            input_href["format"] = fmt_json     # old
+            input_href["type"] = fmt.mime_type  # ogc
         if input_data.get("class") == PACKAGE_DIRECTORY_TYPE:
             input_href["type"] = ContentType.APP_DIR
         return input_href
@@ -2397,7 +2425,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
     supported_crs = get_field(io_info, "supported_crs", search_variations=True)
     if isinstance(supported_crs, list) and all(isinstance(crs, str) for crs in supported_crs):
         crs_schema["enum"] = supported_crs
-    bbox_object_schema = {
+    bbox_object_schema = cast("OpenAPISchemaObject", {
         "type": "object",
         "format": sd.OGC_API_BBOX_FORMAT,
         "required": ["bbox"],
@@ -2412,7 +2440,7 @@ def json2oas_io_bbox(io_info, io_hint=null):
                 ]
             },
         }
-    }  # type: OpenAPISchemaObject
+    })
 
     if isinstance(io_hint, dict):
         if "$ref" in io_hint:
@@ -2429,12 +2457,12 @@ def json2oas_io_bbox(io_info, io_hint=null):
         "format": sd.OGC_API_BBOX_FORMAT,
         "contentSchema": sd.OGC_API_BBOX_SCHEMA,
     }
-    bbox_schema = {
+    bbox_schema = cast("OpenAPISchema", {
         "oneOf": [
             bbox_object_schema,
             bbox_string_schema,
         ]
-    }
+    })
     return bbox_schema
 
 
@@ -2784,7 +2812,7 @@ def oas2json_io_keyword(io_info):
     if keyword == "not":
         keyword_objects = [oas2json_io(keyword_schemas)]  # noqa
     elif keyword == "allOf":
-        merged_schema = {}  # type: OpenAPISchema
+        merged_schema = cast("OpenAPISchema", {})
         for schema in keyword_schemas:
             merged_schema.update(schema)
         keyword_objects = [oas2json_io(merged_schema)]
@@ -2837,7 +2865,7 @@ def oas2json_io_file(io_info, io_href=null):
     :param io_href: Alternate schema reference for the type.
     :return: Converted :term:`JSON` I/O definition, or :data:`null` if definition could not be resolved.
     """
-    io_json = {"type": WPS_COMPLEX}
+    io_json = cast("JSON_IO_TypedInfo", {"type": WPS_COMPLEX})
     io_ctype = get_field(io_info, "contentMediaType", search_variations=False)
     io_encode = get_field(io_info, "contentEncoding", search_variations=False)
     io_schema = get_field(io_info, "contentSchema", search_variations=False, default=io_href)

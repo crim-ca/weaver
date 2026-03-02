@@ -154,7 +154,13 @@ if TYPE_CHECKING:
     CWL_IO_ArrayBaseType = Literal["array"]
     CWL_IO_BaseType = Union[CWL_IO_LiteralType, CWL_IO_ComplexType, CWL_IO_ArrayBaseType, CWL_IO_SpecialType]
     CWL_IO_NullableType = Union[str, List[CWL_IO_BaseType]]  # "<type>?" or ["<type>", "null"]
-    CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
+    CWL_IO_NestedType = TypedDict(
+        "CWL_IO_NestedType", {
+            "type": CWL_IO_NullableType,
+            "format": NotRequired[Optional[Union[str, List[str]]]],
+        },
+        total=True,
+    )
     CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {
         "type": Literal["enum"],

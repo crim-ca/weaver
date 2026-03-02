@@ -88,6 +88,7 @@ they are optional and which default value or operation is applied in each situat
 
   .. versionadded:: 4.0
 
+.. |weaver-cwl-euid| replace:: ``weaver.cwl_euid``
 .. _weaver-cwl-euid:
 
 - | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
@@ -95,8 +96,35 @@ they are optional and which default value or operation is applied in each situat
   |
   | Define the effective machine user ID to be used for running the :term:`Application Package`.
 
-  .. versionadded:: 1.9
+  .. note::
 
+     When a :term:`Docker` container is employed for running the :term:`Application Package`,
+     the effective user ID (and group ID, see |weaver-cwl-egid|_) will also take into consideration any relevant
+     user-namespace mapping, whether using |docker-rootless|_ or |docker-userns-remap|_ security features which
+     will take effect according to existing ``/etc/subuid`` and ``/etc/subgid`` configuration on the host machine.
+     Therefore, the effective user ID and group ID must take into consideration the values with these mappings
+     if applicable to avoid redundant definitions that could work against their features.
+
+     Otherwise (e.g.: when running a root :term:`Docker` daemon and containers), these parameters can be set to
+     indicate explicitly the desired effective user and group IDs to run the :term:`Application Package` with.
+     File system permissions to read and write :term:`I/O` of the :term:`Process` should be adapted accordingly
+     to each situation.
+
+  .. note::
+    Can also be configured using the :envvar:`WEAVER_CWL_EUID` environment variable.
+
+  .. seealso::
+    - `weaver.ini.example`_
+    - :func:`weaver.processes.wps_package.WpsPackage.update_effective_user`
+
+  .. versionadded:: 1.9
+  .. versionchanged:: 6.9
+    Using ``0`` will now be explicitly set to allow |docker-rootless|_ that performs the user/group mapping itself.
+    Also, settings will be applied whether |weaver-cwl-euid|_ or |weaver-cwl-egid|_ are detected to differ from
+    the running process, rather than requiring both to be defined explicitly simultaneously. Missing entries (if any)
+    will use the corresponding value from the running process as default.
+
+.. |weaver-cwl-egid| replace:: ``weaver.cwl_egid``
 .. _weaver-cwl-egid:
 
 - | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
@@ -104,7 +132,36 @@ they are optional and which default value or operation is applied in each situat
   |
   | Define the effective machine group ID to be used for running the :term:`Application Package`.
 
+  .. note::
+    Can also be configured using the :envvar:`WEAVER_CWL_EGID` environment variable.
+
+  .. seealso::
+    Refer to |weaver-cwl-euid|_ about additional details and implications of this setting.
+
   .. versionadded:: 1.9
+  .. versionchanged:: 6.9
+    See |weaver-cwl-euid|_ for details.
+
+.. |weaver-cwl-no-match-user| replace:: ``weaver.cwl_no_match_user``
+.. _weaver-cwl-no-match-user:
+
+- | ``weaver.cwl_no_match_user = true|false`` [:class:`bool`-like, *experimental*]
+  | (default: ``false``)
+  |
+  | If activated, avoids the ``--user`` parameter being passed to Docker-based :term:`Application Package`.
+  |
+  | The containers will be executed using the user resolved by Docker context.
+    Other effective user and group ID settings (|weaver-cwl-euid|_ and |weaver-cwl-egid|_) will be ignored.
+    Can be employed for cases like |docker-rootless|_ or |docker-userns-remap|_ where the user and group mapping
+    is performed by Docker itself, therefore avoiding redundant and potentially conflicting settings.
+
+  .. note::
+    Can also be configured using the :envvar:`WEAVER_CWL_NO_MATCH_USER` environment variable.
+
+  .. seealso::
+    Refer to |weaver-cwl-euid|_ and |weaver-cwl-egid|_.
+
+  .. versionadded:: 6.9
 
 .. _weaver-cwl-prov:
 

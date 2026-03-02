@@ -32,6 +32,7 @@ import yaml
 from cwltool.context import LoadingContext, RuntimeContext
 from cwltool.cwlprov.writablebagfile import close_ro, packed_workflow
 from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
+from cwltool.pathmapper import PathMapper
 from cwltool.process import shortname, use_custom_schema
 from cwltool.secrets import SecretStore
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
@@ -175,12 +176,20 @@ if TYPE_CHECKING:
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
+    from cwltool.utils import CWLObjectType
     from owslib.wps import WPSExecution
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Authentication, Job
     from weaver.processes.constants import CWL_RequirementCUDANameType, CWL_RequirementDockerGpuType, IO_Select_Type
-    from weaver.processes.convert import ANY_IO_Type, JSON_IO_Type, PKG_IO_Type, WPS_Input_Type, WPS_Output_Type
+    from weaver.processes.convert import (
+        ANY_IO_Type,
+        CWLIODefinition,
+        JSON_IO_Type,
+        PKG_IO_Type,
+        WPS_Input_Type,
+        WPS_Output_Type
+    )
     from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyHeadersContainer,
@@ -1371,8 +1380,10 @@ def format_extension_validator(data_input, mode):
         return False  # validator applied on wrong type
     if mode == MODE.NONE or data_input.data_format is None:
         return True
-    ext = get_extension(data_input.data_format.mime_type, dot=True)
-    return os.path.splitext(data_input._iohandler._file)[-1] == ext
+    extensions = get_extension(data_input.data_format.mime_type, dot=True, variants=True)
+    ref = getattr(data_input._iohandler, "_file") or getattr(data_input._iohandler, "_url")
+    ref_ext = os.path.splitext(ref)[-1].lower()
+    return not ref_ext or ref_ext in extensions  # allow anonymous URL without extension
 
 
 class DirectoryNestedStorage(CachedStorage):
@@ -1498,6 +1509,112 @@ class DirectoryNestedStorage(CachedStorage):
         return self.storage.location(destination)
 
 
+class WpsPathMapperFactory:
+    """
+    Path mapper factory that preserves the original output directory structure for staging.
+
+    If a :term:`CWL` happens to define multiple ``outputs``, which are collected with ``glob`` patterns pointing to
+    distinct sub-directories under a common directory, and that their respective nested-files also happen to match
+    by name (see below example), the default :class:`PathMapper` that collects the outputs combines them (flat list)
+    under a common output/staging directory with ``.ext_{duplicate}`` to manage conflicts. This is problematic, since
+    the specific extensions are validated to ensure ``format`` integrity between :term:`CWL` and :term:`WPS` operations.
+
+    .. code-block:: yaml
+        :caption: Example structure that causes matching duplicates.
+
+        # input to PathMapper
+        outputs:
+            out1:
+                file1.ext
+                file2.ext
+            out2:
+                file1.ext
+                file2.ext
+
+        # result from *default* PathMapper
+        stagedir:
+            file1.ext       # from out1
+            file1.ext_1     # from out2
+            file2.ext       # from out1
+            file2.ext_1     # from out2
+
+    .. seealso::
+        The :func:`cwltool.executors.JobExecutor.execute` call passes the :class:`PathMapper` type from
+        the :class:`RuntimeContext`, which ends up being used in :func:`cwltool.process.relocateOutputs`.
+        This relocation instantiates the :class:`PathMapper` with a common ``stagedir``
+        (the desired :mod:`pywps` working directory configured by ``"outdir": self.workdir``
+        in :func:`weaver.wps_package.WpsPackage.setup_runtime`), which leads to the removal of the prefix
+        sub-directories (i.e.: above ``out1`` and ``out2``) when moving the files under the staging directory.
+
+    This class provides fixes of above issues using the following procedure.
+
+    1. Use a factory to pass additional arguments that helps resolving the correct source/destination of CWL/PyWPS.
+    2. Let the parent :func:`PathMapper.setup` do its standard resolution to avoid reimplementing it ourselves.
+    3. Detect files from :term:`CWL` temporary output directories (matching ``cwl_outdir_prefix``).
+    4. Extract the relative path from within the original :term:`CWL` output directory.
+    5. Adjust the mapping of the resolved target staging location to inject the relative sub-directory structure.
+
+    .. note::
+        Since :mod:`cwltool` expects to do ``PathMapper(...)`` to instantiate it, using this factory can simulate
+        the :func:`PathMapper.__init__` by copying its arguments in :func:`WpsPathMapperFactory.__call__`
+        and then applying the custom logic with our extra arguments. This is necessary to "hook" into :mod:`cwltool`
+        and its method of creating :class:`PathMapper`.
+    """
+
+    def __init__(self, cwl_outdir_prefix, final_stagedir):
+        # type: (Path, Path) -> None
+        self.cwl_outdir_prefix = cwl_outdir_prefix
+        self.final_stagedir = final_stagedir
+
+    def __call__(
+        self,
+        referenced_files,
+        basedir,
+        stagedir,
+        separateDirs=True,    # noqa  # pylint: disable=C0103  # must match keyword exactly for cwltool invocation
+    ):
+        # type: (List[CWLObjectType], Path, Path, bool) -> PathMapper
+        if stagedir != self.final_stagedir:
+            return PathMapper(referenced_files, basedir, stagedir, separateDirs)
+
+        factory = cast("WpsPathMapperFactory", self)
+
+        class SubDirectoryPreservingPathMapper(PathMapper):
+            def setup(self, _referenced_files, _basedir):
+                # type: (List[CWLObjectType], Path) -> None
+                super().setup(_referenced_files, _basedir)
+                self._remap_preserving_structure()
+
+            def _remap_preserving_structure(self):
+                for location, ent in list(self._pathmap.items()):
+                    if ent.type.startswith("Create"):
+                        continue
+
+                    resolved = ent.resolved
+                    if not isinstance(resolved, str) or resolved.startswith("_:"):
+                        continue
+
+                    if not resolved.startswith(factory.cwl_outdir_prefix):
+                        continue
+
+                    remainder = resolved[len(factory.cwl_outdir_prefix):]
+                    parts = remainder.split(os.sep, 1)
+                    if len(parts) < 2:
+                        continue
+
+                    rel_path = parts[1]
+                    new_target = os.path.join(self.stagedir, rel_path)
+
+                    if new_target != ent.target:
+                        target_parent = os.path.dirname(new_target)
+                        if target_parent and target_parent != self.stagedir:
+                            os.makedirs(target_parent, exist_ok=True)
+
+                        self.update(location, ent.resolved, new_target, ent.type, ent.staged)
+
+        return SubDirectoryPreservingPathMapper(referenced_files, basedir, stagedir, separateDirs=separateDirs)
+
+
 class WpsPackage(Process):
     def __init__(
         self,
@@ -1505,7 +1622,7 @@ class WpsPackage(Process):
         identifier,     # type: str
         title=None,     # type: Optional[str]
         package=None,   # type: CWL
-        payload=None,   # type; Optional[JSON]
+        payload=None,   # type: Optional[JSON]
         settings=None,  # type: Optional[AnySettingsContainer]
         **kw,           # type: Any
     ):                  # type: (...) -> None
@@ -1810,7 +1927,7 @@ class WpsPackage(Process):
             # protect input paths that can be re-used to avoid potential in-place modifications
             "no_read_only": False,
             # employ enforced user/group from provided config or auto-resolved ones from running user
-            "no_match_user": False,
+            "no_match_user": False,  # default unless overruled by 'update_effective_user'
             # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
             # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
             "tmpdir_prefix": cwl_workdir,
@@ -1973,26 +2090,59 @@ class WpsPackage(Process):
                     if item_enum and array_enum and item_enum == array_enum and "name" not in item_enum:
                         item_enum["name"] = array_enum["name"] = f"{io_name}{uuid.uuid4()}"
 
-    def update_effective_user(self):
-        # type: () -> None
+    def update_effective_user(self, runtime_context):
+        # type: (RuntimeContext) -> None
         """
-        Update effective user/group for the `Application Package` to be executed.
-
-        FIXME: (experimental) update user/group permissions
+        Update effective user/group for the :term:`Application Package` to be executed.
 
         Reducing permissions is safer inside docker application since weaver/cwltool could be running as root
-        but this requires that mounted volumes have the required permissions so euid:egid can use them.
+        but this requires that mounted volumes have the required permissions so ``euid:egid`` can use them.
 
         Overrides :mod:`cwltool`'s function to retrieve user/group id for ones we enforce.
+
+        .. warning::
+            This is an experimental feature.
+            Update of user/group permissions to access inputs/outputs could be required.
+
+        .. note::
+            When invoking a docker application, appropriate user-namespace mapping (if any) should be consistent with
+            the docker daemon configuration. In other words, if the docker daemon is configured to run in rootless mode,
+            mapping of UID/GID might already be applied by the security feature when invoking docker commands, and might
+            therefore not need additional mapping here by Weaver. However, if the docker daemon is configured to run in
+            root mode with added remapping of user-namespaces, setting UID/GID could be required to avoid root-based
+            docker container runs. Developers might also want to override with predefined UID/GID, regardless of
+            user-namespaces mapping depending on their setup. Either way, ensuring that the resulting  UID/GID are
+            consistent between Weaver/cwltool/pywps/docker is left up to developer consideration, since it cannot be
+            entirely automated to handle all possible configurations.
+
+        .. seealso::
+            - https://docs.docker.com/engine/security/rootless/
+            - https://docs.docker.com/engine/security/userns-remap/
         """
         if sys.platform == "win32":
             return
 
-        cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
-        cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
+        cfg_user = asbool(self.settings.get("weaver.cwl_no_match_user") or os.getenv("WEAVER_CWL_NO_MATCH_USER") or "")
+        cfg_euid = str(self.settings.get("weaver.cwl_euid") or os.getenv("WEAVER_CWL_EUID") or "")
+        cfg_egid = str(self.settings.get("weaver.cwl_egid") or os.getenv("WEAVER_CWL_EGID") or "")
         app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
-        if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
+
+        if cfg_user:
+            if app_euid == "0" and app_egid == "0":
+                # not in job log for security reason
+                LOGGER.warning("Running as root user without overriding effective user/group is not recommended.")
+            self.log_message("Using CWL effective user from worker runtime.", level=logging.DEBUG)
+            runtime_context.no_match_user = True
+            return
+
+        if cfg_euid not in ["", app_euid] or cfg_egid not in ["", app_egid]:
+            cfg_euid = cfg_euid or app_euid
+            cfg_egid = cfg_egid or app_egid
             self.log_message("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
+            # FIXME: depend on https://github.com/common-workflow-language/cwltool/pull/2207
+            #   because 'docker_vm_id' expect (int,int), if (0,0) are required,
+            #   the check performed by the code receiving them will do '0 or os.get*id()' and drop them
+            #   cannot bypass by str() casting because of the format string using '%d'
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
         else:
             self.log_message(
@@ -2179,7 +2329,6 @@ class WpsPackage(Process):
                 # EMS/Hybrid dispatch the execution to ADES or remote WPS
                 loading_context.construct_tool_object = self.make_tool
 
-            self.update_effective_user()
             self.update_requirements()
             self.update_cwl_schema_names()
 
@@ -2189,7 +2338,12 @@ class WpsPackage(Process):
                 level=logging.DEBUG,
             )
             runtime_context = RuntimeContext(kwargs=runtime_params)
+            runtime_context.path_mapper = WpsPathMapperFactory(
+                cwl_outdir_prefix=runtime_context.tmp_outdir_prefix,
+                final_stagedir=self.workdir
+            )
             runtime_context.secret_store = SecretStore()  # pre-allocate to reuse the same references as needed
+            self.update_effective_user(runtime_context)
             self.setup_provenance(loading_context, runtime_context)
             try:
                 self.step_launched = []
@@ -2334,10 +2488,10 @@ class WpsPackage(Process):
                 # extend array data that allow max_occur > 1
                 # drop invalid inputs returned as None
                 if io_def.array:
-                    input_href = [self.make_location_input(io_def.type, input_def) for input_def in input_occurs]
+                    input_href = [self.make_location_input(io_def, input_def) for input_def in input_occurs]
                     input_href = [cwl_input for cwl_input in input_href if cwl_input is not None]
                 else:
-                    input_href = self.make_location_input(io_def.type, input_i)
+                    input_href = self.make_location_input(io_def, input_i)
                 if input_href:
                     cwl_inputs[input_id] = input_href
             elif isinstance(input_i, LiteralInput):
@@ -2437,8 +2591,8 @@ class WpsPackage(Process):
                     input_location = input_local_ref
         return input_location
 
-    def make_location_input(self, input_type, input_definition):
-        # type: (CWL_IO_ComplexType, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
+    def make_location_input(self, cwl_input_def, input_definition):
+        # type: (CWLIODefinition, Union[ComplexInput, BoundingBoxInput]) -> Optional[JSON]
         """
         Generates the JSON content required to specify a `CWL` ``File`` or ``Directory`` input from a location.
 
@@ -2484,7 +2638,7 @@ class WpsPackage(Process):
         if input_definition_file and os.path.isfile(input_definition_file):
             # Because storage handlers assume files, a directory (pseudo-file with trailing '/' unknown to PyWPS)
             # could be mistakenly generated as an empty file. Wipe it in this case to ensure proper resolution.
-            if input_type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
+            if cwl_input_def.type == PACKAGE_DIRECTORY_TYPE and os.stat(input_definition_file).st_size == 0:
                 os.remove(input_definition_file)
             else:
                 input_location = input_definition_file
@@ -2527,25 +2681,25 @@ class WpsPackage(Process):
                 for fmt in input_definition.supported_formats)
         ):
             self.log_message(
-                f"{input_type} input ({input_id}) DROPPED. Detected default format as data.",
+                f"{cwl_input_def.type} input ({input_id}) DROPPED. Detected default format as data.",
                 level=logging.DEBUG,
             )
             return None
 
         input_location = self.make_location_input_security_check(
             input_scheme,
-            input_type,
+            cwl_input_def.type,
             input_id,
             input_location,
             input_definition
         )
 
-        if self.must_fetch(input_location, input_type):
-            self.log_message(f"{input_type} input ({input_id}) ATTEMPT fetch: [{input_location}]")
-            if input_type == PACKAGE_FILE_TYPE:
+        if self.must_fetch(input_location, cwl_input_def.type):
+            self.log_message(f"{cwl_input_def.type} input ({input_id}) ATTEMPT fetch: [{input_location}]")
+            if cwl_input_def.type == PACKAGE_FILE_TYPE:
                 input_location = fetch_file(input_location, input_definition.workdir,
                                             settings=self.settings, headers=self.auth)
-            elif input_type == PACKAGE_DIRECTORY_TYPE:
+            elif cwl_input_def.type == PACKAGE_DIRECTORY_TYPE:
                 # Because a directory reference can contain multiple sub-dir definitions,
                 # avoid possible conflicts with other inputs by nesting them under the ID.
                 # This also ensures that each directory input can work with a clean staging directory.
@@ -2561,11 +2715,11 @@ class WpsPackage(Process):
                 input_location = os.path.join(out_dir, input_directory_name)
             else:
                 raise PackageExecutionError(
-                    f"Unknown reference staging resolution method for [{input_type}] type "
+                    f"Unknown reference staging resolution method for [{cwl_input_def.type}] type "
                     f"specified for input [{input_id}] from location [{input_location}]."
                 )
         else:
-            self.log_message(f"{input_type} input ({input_id}) SKIPPED fetch: [{input_location}]")
+            self.log_message(f"{cwl_input_def.type} input ({input_id}) SKIPPED fetch: [{input_location}]")
 
         # when the process is passed around between OWSLib and PyWPS, it is very important to provide the scheme
         # otherwise, they will interpret complex data directly instead of by reference
@@ -2574,10 +2728,20 @@ class WpsPackage(Process):
         if "://" not in input_location:
             input_location = f"file://{input_location}"
 
-        location = {"location": input_location, "class": input_type}
+        location = {"location": input_location, "class": cwl_input_def.type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
             if fmt is not None:
+                # in certain cases, the input format might not have been mapped to the exact one in the process
+                # this can happen if different ontologies mapping to equivalent format definitions were resolved
+                # such different resolution can happen because of our intermediate WPS/OAP media-type mapping
+                # in such case, allow the format switch if they resolve to equivalent combinations
+                # however, do NOT automatically resolve/switch them otherwise to preserve strict format checking
+                if cwl_input_def.format and fmt not in cwl_input_def.format:
+                    ctype = map_cwl_media_type(fmt)
+                    alt_ctypes = {map_cwl_media_type(f): f for f in cwl_input_def.format}
+                    if ctype in alt_ctypes:
+                        fmt = alt_ctypes[ctype]
                 location["format"] = fmt
         return location
 
@@ -2695,9 +2859,10 @@ class WpsPackage(Process):
             - :func:`weaver.wps.load_pywps_config`
         """
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
+        result_workdir = f"{self.workdir}/" if not self.workdir.endswith("/") else self.workdir
         result_cwl = cwl_result[output_id][index] if index is not None else cwl_result[output_id]
         result_loc = result_cwl["location"].replace("file://", "").rstrip("/")
-        result_path = os.path.split(result_loc)[-1]
+        result_path = result_loc.split(result_workdir)[-1]
         result_type = result_cwl.get("class", PACKAGE_FILE_TYPE)
         result_cwl_fmt = result_cwl.get("format")
         result_is_dir = result_type == PACKAGE_DIRECTORY_TYPE
