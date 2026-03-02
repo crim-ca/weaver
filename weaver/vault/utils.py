@@ -132,6 +132,10 @@ def parse_vault_token(header, unique=False):
     """
     if not isinstance(header, str):
         return {}
+    # Check if header is already just a plain token string (no "token " prefix)
+    # This happens when the token is passed directly (e.g., from WPS process)
+    if REGEX_VAULT_TOKEN.match(header):
+        return {None: header}
     header = header.lower()
     if unique and "," in header:
         return {}
@@ -213,15 +217,8 @@ def get_authorized_file(file_id, auth_token, container=None):
     :return: Authorized file.
     :raises: Appropriate HTTP exception according to use case.
     """
-    # Check if auth_token is already just a plain token string (no "token " prefix)
-    # This happens when the worker tries to access the vault file with the token directly,
-    # without the full header format (e.g., from WPS process)
-    vault_token = {}
-    if auth_token and REGEX_VAULT_TOKEN.match(auth_token):
-        token = auth_token
-    else:
-        vault_token = parse_vault_token(auth_token, unique=False)
-        token = vault_token.get(file_id, vault_token.get(None))
+    vault_token = parse_vault_token(auth_token, unique=False)
+    token = vault_token.get(file_id, vault_token.get(None))
 
     if not token:
         # note:
