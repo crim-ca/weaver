@@ -1389,7 +1389,7 @@ class WeaverClient(object):
 
     def _prepare_inputs(
         self,
-        inputs=None,                    # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
         inputs_ignore_errors=False,     # type: bool
         url=None,                       # type: Optional[URL]
     ):                                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
@@ -1412,6 +1412,8 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
+        if isinstance(inputs, list) and len(inputs) == 1:
+            inputs = inputs[0]
         input_file = os.path.dirname(inputs) if isinstance(inputs, str) else None
         result = self._upload_files(values, url=base, cwd=input_file, inputs_ignore_errors=inputs_ignore_errors)
         return result
@@ -1449,7 +1451,7 @@ class WeaverClient(object):
         self,
         process_id,                     # type: str
         provider_id=None,               # type: Optional[str]
-        inputs=None,                    # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
         inputs_ignore_errors=False,     # type: bool
         pending=False,                  # type: bool
         monitor=False,                  # type: bool
@@ -1496,6 +1498,8 @@ class WeaverClient(object):
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
             using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
+            If resolved by the :term:`CLI` invocation, it can also be a single-item list of these types as collected
+            by the input arguments.
         :param inputs_ignore_errors:
             - If ``True``, missing or unresolved local file references will be ignored with a warning.
             - If ``False`` (default), missing files will cause the operation to fail with a detailed error.

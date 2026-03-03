@@ -5,6 +5,7 @@ import argparse
 import base64
 import contextlib
 import inspect
+import itertools
 import json
 import os
 import tempfile
@@ -337,83 +338,50 @@ def test_parse_inputs_from_file_relative_paths():
 
 @pytest.mark.cli
 @pytest.mark.parametrize(
-    ["file_refs", "input_structure"],
-    [
-        # Single file references with simple paths
-        (
+    ["as_cli_list", "input_structure", "file_refs"],
+    itertools.product(
+        # Because the CLI uses 'nargs' to collect potentially multiple '-I' options it can result into a list of path
+        # More than one path is not allowed (see 'test_parse_inputs_multiple_files_rejected'), but the single-item list
+        # must still be handled. These using both invocation cases as the CLI (embedded list) vs WeaverClient (direct).
+        [False, True],
+        # Test both cases where multiple inputs have a single File, or a single input has multiple File[] references
+        ["single", "array"],
+        # Path combinations
+        [
+            # simple relative paths
             [
                 "./file1.txt",
                 "./file2.txt",
                 "./nested/file3.txt",
             ],
-            "single"
-        ),
-        # Array file references with simple paths
-        (
-            [
-                "./file1.txt",
-                "./file2.txt",
-                "./nested/file3.txt",
-            ],
-            "array"
-        ),
-        # Single file references with complex nested navigation
-        (
+            # complex nested navigation
             [
                 "./file1.txt",
                 "./nested/deep/level/../../file3.txt",
                 "./nested/deep/level/file2.txt",
             ],
-            "single"
-        ),
-        # Array file references with complex nested navigation
-        (
-            [
-                "./file1.txt",
-                "./nested/deep/level/../../file3.txt",
-                "./nested/deep/level/file2.txt",
-            ],
-            "array"
-        ),
-        # Single file references starting with "../../" (files outside input file directory)
-        (
+            # file references starting with "../../" (files outside input file directory)
             [
                 "../../outside/file1.txt",
                 "./local.txt",
                 "../../outside/nested/file2.txt",
             ],
-            "single"
-        ),
-        # Array file references starting with "../../" (files outside input file directory)
-        (
-            [
-                "../../outside/file1.txt",
-                "./local.txt",
-                "../../outside/nested/file2.txt",
-            ],
-            "array"
-        ),
-        # Mixed: simple, nested navigation, and parent directory references
-        (
+            # Mixed: simple, nested navigation, and parent directory references
             [
                 "./simple.txt",
                 "../sibling/file.txt",
                 "./nested/../other.txt",
             ],
-            "single"
-        ),
-        # file:// URI references (absolute paths)
-        (
+            # file:// URI references (absolute paths)
             [
                 "file://",  # placeholders, will be replaced with absolute paths
                 "file://",
                 "file://",
             ],
-            "single"
-        ),
-    ]
+        ]
+    )
 )
-def test_parse_inputs_relative_paths_extended_resolutions(file_refs, input_structure):
+def test_parse_inputs_relative_paths_extended_resolutions(as_cli_list, input_structure, file_refs):
     """
     Validate extended scenarios for relative file resolutions from execution input file.
 
@@ -503,6 +471,7 @@ def test_parse_inputs_relative_paths_extended_resolutions(file_refs, input_struc
             inputs_path = os.path.join(inputs_dir, "inputs.json")
             with open(inputs_path, mode="w", encoding="utf-8") as f:
                 json.dump(cwl_inputs, f)
+            inputs_path = [inputs_path] if as_cli_list else inputs_path
 
             result = WeaverClient().execute(
                 "fake_process",
