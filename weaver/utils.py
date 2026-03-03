@@ -765,6 +765,7 @@ def parse_kvp(query,                    # type: str
               unescape_quotes=True,     # type: bool
               strip_spaces=True,        # type: bool
               case_insensitive=True,    # type: bool
+              deep_object=False,        # type: bool
               ):                        # type: (...) -> KVP
     """
     Parse key-value pairs using specified separators.
@@ -782,14 +783,26 @@ def parse_kvp(query,                    # type: str
     the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
     except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
 
-    .. code-blocK:: python
+    When :paramref:`deep_object` is enabled, keys with bracket notation like ``{key}[{qualifier}]={val}`` will be
+    parsed into nested dictionaries. This follows the :term:`OpenAPI` ``deepObject`` style parameter serialization.
+    For example, ``input[href]=url&input[type]=text`` becomes ``{"input": {"href": ["url"], "type": ["text"]}}``.
+
+    .. code-block:: python
 
         >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3", pair_sep="&", nested_pair_sep=";")
         {
-            'format': ['json'],
-            'inputs': {
-                'key1': ['value1'],
-                'key2': ['val2', 'val3']
+            "format": ["json"],
+            "inputs": {
+                "key1": ["value1"],
+                "key2": ["val2", "val3"]
+            }
+        }
+
+        >> parse_kvp("input[href]=url&input[type]=text", pair_sep="&", deep_object=True)
+        {
+            "input": {
+                "href": ["url"],
+                "type": ["text"]
             }
         }
 
@@ -806,7 +819,12 @@ def parse_kvp(query,                    # type: str
     :param case_insensitive:
         Whether to consider keys as case-insensitive.
         If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
-    :return: Parsed KVP.
+    :param deep_object:
+        Whether to parse bracket notation ``key[qualifier]`` as nested objects similar to :term:`OpenAPI` ``deepObject``
+        style serialization. However, it is more a "shallow-object" since nested objects will not be parsed into deeper
+        levels. This is purposely done as such to preserve the original parsing of the sub-values as encoded binary
+        data, array lists, :term:`JSON` structures, etc.
+    :return: Parsed :term:`KVP`.
     :raises HTTPBadRequest: If parsing cannot be accomplished based on parsing conditions.
     """
     if not query:
@@ -857,6 +875,17 @@ def parse_kvp(query,                    # type: str
             kvp[key].extend(val)
         else:
             kvp[key] = val
+
+    if deep_object:
+        deep_kvp = {}
+        for key, val in kvp.items():
+            if "[" in key and key.endswith("]"):
+                base_key, qualifier = key[:-1].split("[", 1)
+                deep_kvp.setdefault(base_key, {})[qualifier] = val
+            else:
+                deep_kvp[key] = val
+        return deep_kvp
+
     return kvp
 
 

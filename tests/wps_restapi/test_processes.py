@@ -2864,6 +2864,76 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert job.task_id == Status.ACCEPTED  # temporary value until processed by celery
                 assert job.process == proc_id
 
+    @pytest.mark.kvp
+    def test_execute_process_kvp_simple_inputs(self):
+        """
+        Test KVP-encoded execution with simple literal inputs.
+        """
+        proc = self.process_public.identifier
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "message": "test message",
+                "count": "42",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert "jobID" in resp.json
+            assert "location" in resp.json
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_with_reference(self):
+        """
+        Test KVP-encoded execution with input by reference.
+        """
+        proc = self.process_public.identifier
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "fileInput[href]": "http://example.com/test.txt",
+                "fileInput[type]": "text/plain",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_with_outputs(self):
+        """
+        Test KVP-encoded execution with output specifications.
+        """
+        proc = self.process_public.identifier
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "message": "test",
+                "output1[include]": "true",
+                "output2[include]": "true",
+                "output2[mediaType]": "application/json",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:
             process = self.process_store.fetch_by_id(wps_process.identifier)

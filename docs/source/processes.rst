@@ -732,6 +732,11 @@ For outputs that correspond to literal data, such as plain strings or numbers, `
 returning the ``value`` directly. However, alternate link representations can also be obtained if specified in the
 execution request, using ``transmissionMode`` overrides for the desired outputs.
 
+.. _proc_exec_body_outputs_filtering:
+
+Execution Body Outputs Filtering
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 When the ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed
 should return *all* outputs it offers in the created :ref:`Job Results <proc_op_result>`.
 If the ``outputs`` section is specified, but that one of the *requested outputs* [#outN]_ defined in
@@ -1118,6 +1123,408 @@ combinations only possible with v1.0. These limited representations can be retri
 
 .. seealso::
     Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.
+
+.. _proc_exec_kvp:
+
+KVP-Encoded Execution
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.10.0
+
+In addition to the :term:`JSON`-based :ref:`POST Process Execution <proc_op_execute>` requests, `Weaver`
+supports :term:`Key-Value Pair (KVP) <KVP>` encoded :term:`Process` execution using HTTP GET requests.
+This execution method is defined by the |ogc-api-proc-part1-kvp|_ definitions, allowing :term:`Process`
+parameters to be specified directly in the :term:`URL` query string.
+
+:term:`KVP` execution provides an alternative approach to submitting :term:`Job` requests that can be more convenient
+for simple executions, URL-based :term:`Workflow` sub-:term:`Process` invocations, or integration with systems that
+prefer GET-based operations.
+All :term:`KVP` requests are converted internally to the equivalent :term:`JSON` execution format, ensuring consistent
+behavior with POST-based executions.
+
+.. seealso::
+    - |ogc-api-proc-part1-kvp|_ for the complete specification
+    - :ref:`proc_op_execute` for the equivalent POST-based execution method
+
+:term:`KVP` execution requests use the following endpoint:
+
+.. code-block:: http
+
+    GET /processes/{processID}/execution?<parameters> HTTP/1.1
+    Host: weaver.example.com
+
+All execution ``<parameters>`` are provided as query string key-value pairs, using either direct values or
+bracket notation for qualifiers.
+
+The following table summarizes all supported KVP parameter qualifiers.
+
+.. table:: KVP Parameter Qualifiers
+    :name: table-kvp-qualifiers
+    :class: table-kvp-qualifiers
+    :align: center
+    :widths: 15 40 45
+
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | Qualifier         | Context                                  | Description                                    |
+    +===================+==========================================+================================================+
+    | ``[href]``        | :ref:`Input <proc_exec_kvp_inputs>`      | Reference :term:`URL` for input data           |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[type]``        | :ref:`Input <proc_exec_kvp_inputs>`      | :term:`Media-Type` for referenced input        |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[value]``       | :ref:`Input <proc_exec_kvp_inputs>`      | Base64-encoded binary value                    |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[mediaType]``   | :ref:`Input <proc_exec_kvp_inputs>`,     | :term:`Media-Type` specification               |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[encoding]``    | :ref:`Input <proc_exec_kvp_inputs>`,     | Encoding (e.g., ``base64``, ``gzip``)          |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[schema]``      | :ref:`Input <proc_exec_kvp_inputs>`,     | Schema :term:`URL` or URL-encoded :term:`JSON` |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`      | Coordinate Reference System for bbox           |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[include]``     | :ref:`Output <proc_exec_kvp_outputs>`    | Set to ``true`` to request output              |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[f]``           | :ref:`Response <proc_exec_kvp_response>` | Format (short, maps to ``Accept`` header)      |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[format]``      | :ref:`Response <proc_exec_kvp_response>` | Format (explicit alias for ``[f]``)            |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[prefer]``      | :ref:`Response <proc_exec_kvp_response>` | Execution preference (maps to ``Prefer``)      |
+    +-------------------+------------------------------------------+------------------------------------------------+
+
+
+.. _proc_exec_kvp_inputs:
+
+KVP Input Parameters
+^^^^^^^^^^^^^^^^^^^^
+
+Input values can be specified using multiple formats depending on their data type and requirements.
+The following table shows :term:`KVP` notation alongside their equivalent :term:`JSON` POST body representations.
+
+.. note::
+    All inputs can be provided using :terM:`URL`-encoded string as long as their decoded value results
+    into a valid :term:`JSON` structure. In other words, an ``array`` of numerics could be provided either
+    as ``arrayOfSimpleValues=[1,2,4,10,7]`` or ``arrayOfSimpleValues=%5B1%2C2%2C4%2C10%2C7%5D`` interchangeably.
+
+.. note::
+    If necessary by the :term:`Process` to interpret a certain input value correctly, a ``string`` may be
+    accompanied by ``contentMediaType``, ``contentEncoding`` and ``contentSchema`` qualifiers to provide
+    additional context about the value's content and structure.
+
+.. note::
+    Binary data (typically a file) can be provided **by-reference**, **by-value** (i.e.: ``{inputID}={binary-data}``),
+    or using **Qualified Value** (using the ``[value]`` and optional ``format`` encoding qualifiers).
+
+.. table:: KVP Input Parameter Examples
+    :name: table-kvp-inputs
+    :class: table-kvp-inputs
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent JSON Body                                  |
+    +=======================================================+=======================================================+
+    | **Simple Literals** (``string``, ``number``, ``boolean``)                                                     |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    message=Hello&count=42&enabled=true                |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "message": "Hello",                            |
+    |                                                       |        "count": 42,                                   |
+    |                                                       |        "enabled": true                                |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Complex Value** (URL-encoded :term:`JSON` object)                                                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    config=%7B%22threshold%22%3A0.5%7D                 |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "config": {                                    |
+    |                                                       |          "threshold": 0.5                             |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Array** (comma-separated values)                                                                            |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    data-values=1.5,2.3,4.7,3.2                        |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "data-values": [1.5, 2.3, 4.7, 3.2]            |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **By Reference** (with ``[href]`` and ``[type]``)                                                             |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    input[href]=http://example.com/data.json&          |    {                                                  |
+    |    input[type]=application/json                       |      "inputs": {                                      |
+    |                                                       |        "input": {                                     |
+    |                                                       |          "href": "http://example.com/data.json",      |
+    |                                                       |          "type": "application/json"                   |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Bounding Box** (with optional ``[crs]``)                                                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    input-geom=5.8,47.2,15.1,55.1&                     |    {                                                  |
+    |    input-geom[crs]=urn:ogc:def:crs:OGC:2:84           |      "inputs": {                                      |
+    |                                                       |        "input-geom": {                                |
+    |                                                       |          "bbox": [5.8, 47.2, 15.1, 55.1],             |
+    |                                                       |          "crs": "urn:ogc:def:crs:OGC:2:84"            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Encoded Value** (``string`` with ``content*`` qualifiers, *note* decoded ``%3D`` to ``=``)                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    data=I1Rlc3Q%3D&                                   |    {                                                  |
+    |    data[contentMediaType]=text/markdown&              |      "inputs": {                                      |
+    |    data[encoding]=base64                              |        "data": {                                      |
+    |                                                       |          "value": "I1Rlc3Q=",                         |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "mediaType": "text/markdown",              |
+    |                                                       |            "encoding": "base64"                       |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Qualified Value** (``value`` with ``format`` qualifiers)                                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    image[value]=SGVsbG8gV29ybGQh&                     |    {                                                  |
+    |    image[mediaType]=image/png&                        |      "inputs": {                                      |
+    |    image[encoding]=binary                             |        "image": {                                     |
+    |                                                       |          "value": "SGVsbG8gV29ybGQh",                 |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "mediaType": "image/png",                  |
+    |                                                       |            "encoding": "binary"                       |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. _proc_exec_kvp_outputs:
+
+KVP Output Parameters
+^^^^^^^^^^^^^^^^^^^^^
+
+Specific outputs can be requested and their format controlled using bracket notation qualifiers.
+
+.. warning::
+    The ``[include]`` qualifier is **required** to request an output. This is to ensure that it can be distinguished
+    from :ref:`proc_exec_kvp_inputs` identifiers. Additional format qualifiers are optional and can be combined as
+    needed.
+
+Similarly to :ref:`proc_exec_body_outputs_filtering` in the :term:`JSON` POST body request case, including
+any ``{outputID}[include]=true`` parameter triggers the filtering behaviour, which means any other outputs will be
+omitted from the response. If other outputs are desired, they must be explicitly included with their
+own ``[include]`` parameter. If no outputs are indicated, the response will **omit** all outputs available from
+the :term:`Process` (i.e.: |res-empty| response [#resNoContent]_). If desired, the request can be explicit by
+indicating ``{outputID}[include]=false`` for outputs that should be omitted, but this is not required since
+it is the default behaviour.
+
+The following table shows :term:`KVP` notation alongside their equivalent :term:`JSON` POST body representations.
+
+.. table:: KVP Output Parameter Examples
+    :name: table-kvp-outputs
+    :class: table-kvp-outputs
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent JSON Body                                  |
+    +=======================================================+=======================================================+
+    | **Basic Output Selection**                                                                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    output1[include]=true&                             |    {                                                  |
+    |    output2[include]=false                             |      "outputs": {                                     |
+    |                                                       |        "output1": {}                                  |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Format Control**                                                                                |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    result[include]=true&                              |    {                                                  |
+    |    result[mediaType]=application/json&                |      "outputs": {                                     |
+    |    result[encoding]=gzip                              |        "result": {                                    |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "mediaType": "application/json",           |
+    |                                                       |            "encoding": "gzip"                         |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Schema**                                                                                        |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    data[include]=true&                                |    {                                                  |
+    |    data[schema]=http://example.com/schema.json        |      "outputs": {                                     |
+    |                                                       |        "data": {                                      |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "schema": "http://example.com/schema.json" |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. _proc_exec_kvp_response:
+
+KVP Response Parameters
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Response format and execution preferences can be controlled using ``response`` bracket notation parameters.
+These map directly to HTTP headers for consistent behavior across GET and POST execution methods:
+
+.. table:: KVP Response Parameter Examples
+    :name: table-kvp-response
+    :class: table-kvp-response
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent HTTP Header                                |
+    +=======================================================+=======================================================+
+    | **Response Format** (short form)                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: http                                  |
+    |                                                       |                                                       |
+    |    response[f]=application/json                       |    Accept: application/json                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Response Format** (explicit alias)                                                                          |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: http                                  |
+    |                                                       |                                                       |
+    |    response[format]=application/json                  |    Accept: application/json                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Execution Preference** (async)                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: http                                  |
+    |                                                       |                                                       |
+    |    response[prefer]=respond-async                     |    Prefer: respond-async                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Execution Preference** (sync with timeout)                                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: http                                  |
+    |                                                       |                                                       |
+    |    response[prefer]=wait=30                           |    Prefer: wait=30                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. note::
+    - Both ``response[f]`` and ``response[format]`` are accepted and equivalent
+    - ``response[format]`` provides a more explicit parameter name for better API clarity
+    - These parameters are optional and can be combined with input/output parameters
+
+.. _proc_exec_kvp_examples:
+
+KVP Execution Examples
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The following table presents complete execution examples combining various :term:`KVP` features:
+
+.. table:: Complete KVP Execution Examples
+    :name: table-kvp-examples
+    :class: table-kvp-examples
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Description                                           |
+    +=======================================================+=======================================================+
+    | .. code-block:: text                                  | Simple literal input with URL-encoded space           |
+    |                                                       |                                                       |
+    |    message=Hello%20World                              |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | Multiple inputs with output format specification      |
+    |                                                       |                                                       |
+    |    values=1.5,2.3,4.7&metric=mean&                    |                                                       |
+    |    result[include]=true&                              |                                                       |
+    |    result[mediaType]=application/json                 |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | By-reference input with output selection              |
+    |                                                       |                                                       |
+    |    input[href]=http://example.com/data.geojson&       |                                                       |
+    |    input[type]=application/geo%2Bjson&                |                                                       |
+    |    output[include]=true                               |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | Complex execution combining multiple features:        |
+    |                                                       |                                                       |
+    |    bbox=5.8,47.2,15.1,55.1&                           | - Bounding box with CRS                               |
+    |    bbox[crs]=http://www.opengis.net/def/             | - By-reference input                                  |
+    |      crs/OGC/1.3/CRS84&                               | - Literal threshold                                   |
+    |    data[href]=http://example.com/input.nc&            | - Output with format & encoding                       |
+    |    data[type]=application/netcdf&                     | - Response format & async preference                  |
+    |    threshold=0.75&                                    |                                                       |
+    |    result[include]=true&                              |                                                       |
+    |    result[mediaType]=application/json&                |                                                       |
+    |    result[encoding]=gzip&                             |                                                       |
+    |    response[format]=application/json&                 |                                                       |
+    |    response[prefer]=respond-async                     |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. seealso::
+    - :ref:`proc_exec_kvp_inputs` for detailed input parameter syntax
+    - :ref:`proc_exec_kvp_outputs` for output parameter options
+    - :ref:`proc_exec_kvp_response` for response control parameters
+
+.. _proc_exec_kvp_notes:
+
+KVP Implementation Notes
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Case-Insensitivity**
+
+All parameter qualifiers (text within brackets) are case-insensitive. Reserved parameters
+(``f``, ``response``, ``prefer``, ``tags``) are also case-insensitive. Input and output identifiers
+preserve their original case to match :term:`Process` descriptions.
+
+**URL Encoding**
+
+Complex values containing special characters must be properly URL-encoded. This includes:
+
+- :term:`JSON` objects and arrays
+- File :term:`URL` containing special characters
+- Any value containing reserved characters (``&``, ``=``, ``[``, ``]``, etc.)
+
+**Equivalence with POST Execution**
+
+KVP requests are converted to the equivalent :term:`JSON` POST execution body internally.
+All validation, execution modes, and result formats work identically between GET and POST methods.
+
+**Reserved Parameters**
+
+The following query parameters are reserved and will not be interpreted as :term:`Process` inputs:
+
+- ``f``: Response format (legacy, prefer ``response[f]`` or ``response[format]``)
+- ``response``: Response parameter container
+- ``prefer``: Execution preference (legacy, prefer ``response[prefer]``)
+- ``tags``: :term:`Job` tags
+
+.. seealso::
+    - :ref:`proc_op_execute` for POST-based execution
+    - :ref:`proc_exec_mode` for execution mode details
+    - :ref:`proc_exec_results` for result format options
 
 .. _proc_exec_steps:
 

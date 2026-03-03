@@ -1,8 +1,11 @@
+import base64
 import copy
+import json
 import logging
 import os
 from time import sleep
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 import colander
 import psutil
@@ -795,6 +798,190 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
+def _extract_kvp_value(values):
+    # type: (Any) -> Any
+    """Extract single value from list or return as-is."""
+    return values[0] if isinstance(values, list) else values
+
+
+def _ensure_format_dict(target_dict, key):
+    # type: (Dict[str, Any], str) -> Dict[str, Any]
+    """Ensure 'format' dict exists in target and return it."""
+    if "format" not in target_dict[key]:
+        target_dict[key]["format"] = {}
+    return target_dict[key]["format"]
+
+
+def parse_kvp_literal_value(value_str):
+    # type: (str) -> Any
+    """Parse a literal value string to appropriate Python type."""
+
+    value_decoded = unquote(value_str)
+
+    # Try JSON object or array
+    if value_decoded.startswith(("{", "[")):
+        try:
+            return json.loads(value_decoded)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Try numeric array (comma-separated)
+    if "," in value_decoded:
+        try:
+            return [float(v.strip()) for v in value_decoded.split(",")]
+        except ValueError:
+            return [v.strip() for v in value_decoded.split(",")]
+
+    # Try number
+    try:
+        return float(value_decoded) if "." in value_decoded else int(value_decoded)
+    except ValueError:
+        return value_decoded
+
+
+def parse_kvp_bbox_value(value_str):
+    # type: (str) -> Dict[str, Any]
+    """Parse a bbox value string to bbox dict."""
+
+    try:
+        coords = [float(c.strip()) for c in unquote(value_str).split(",")]
+        return {"bbox": coords}
+    except (ValueError, AttributeError):
+        return {"bbox": value_str}
+
+
+def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
+    # type: (str, str, str, Dict[str, Any], Dict[str, Any], Dict[str, str]) -> bool
+    """
+    Handle a qualified parameter (key[qualifier]=value).
+
+    Returns True if handled, False if should be skipped.
+    """
+    base_key_lower = base_key.lower()
+
+    # Response parameters (response[f], response[format], response[prefer])
+    if base_key_lower == "response":
+        response_params[qualifier] = value
+        return True
+
+    # Output include
+    if qualifier == "include":
+        if str(value).lower() == "true":
+            if base_key not in outputs_dict:
+                outputs_dict[base_key] = {"id": base_key}
+        return True
+
+    # Determine target (output if already exists there, otherwise input)
+    target_dict = outputs_dict if base_key in outputs_dict else inputs_dict
+
+    if base_key not in target_dict:
+        target_dict[base_key] = {"id": base_key}
+
+    # Format qualifiers (can apply to both inputs and outputs)
+    if qualifier in ("mediatype", "encoding", "schema"):
+        fmt = _ensure_format_dict(target_dict, base_key)
+
+        if qualifier == "mediatype":
+            fmt["mediaType"] = value
+        elif qualifier == "encoding":
+            fmt["encoding"] = value
+        elif qualifier == "schema":
+            decoded = unquote(value)
+            if decoded.startswith("{"):
+                try:
+                    fmt["schema"] = json.loads(decoded)
+                except (json.JSONDecodeError, ValueError):
+                    fmt["schema"] = value
+            else:
+                fmt["schema"] = value
+        return True
+
+    # Input-specific qualifiers
+    if qualifier == "href":
+        inputs_dict.setdefault(base_key, {"id": base_key})["href"] = value
+        return True
+
+    if qualifier == "type":
+        inputs_dict.setdefault(base_key, {"id": base_key})["type"] = value
+        return True
+
+    if qualifier == "value":
+        decoded = unquote(value)
+        # Try to validate as base64, but accept any value
+        try:
+            base64.b64decode(decoded, validate=True)
+        except Exception:
+            pass
+        inputs_dict.setdefault(base_key, {"id": base_key})["value"] = decoded
+        return True
+
+    if qualifier == "crs":
+        inputs_dict.setdefault(base_key, {"id": base_key})["crs"] = value
+        return True
+
+    return False
+
+
+def parse_kvp_inputs_outputs(params):
+    # type: (Dict[str, Any]) -> Tuple[JSON, Dict[str, str]]
+    """
+    Parse KVP query parameters and convert them to JSON execution body format.
+
+    Converts OGC API - Processes KVP-encoded execution parameters to the equivalent JSON structure
+    that would be used in a POST request body. Also extracts response parameters for header mapping.
+
+    :param params: Query parameters from the request.
+    :return: Tuple of (JSON execution body with inputs/outputs, response parameters dict).
+    :raises HTTPBadRequest: If KVP parameters cannot be parsed.
+    """
+    inputs_dict = {}
+    outputs_dict = {}
+    response_params = {}
+
+    # Reserved parameters that should not be treated as inputs
+    reserved_base_params = {"f", "tags", "response"}
+
+    for key, values in params.items():
+        key_lower = key.lower()
+        value = _extract_kvp_value(values)
+
+        # Skip standalone reserved parameters
+        if key_lower in reserved_base_params:
+            continue
+
+        # Standalone prefer (deprecated, prefer response[prefer])
+        if key_lower == "prefer":
+            response_params["prefer"] = value
+            continue
+
+        # Qualified parameter: key[qualifier]=value
+        if "[" in key:
+            base_key, qualifier = key.split("[", 1)
+            qualifier = qualifier.rstrip("]").lower()
+
+            if parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
+                continue
+
+        # Simple input parameter
+        if key not in inputs_dict:
+            # Special handling for bbox
+            if key_lower.endswith("bbox") or key_lower == "bbox":
+                parsed_value = parse_kvp_bbox_value(value) if isinstance(value, str) else value
+            else:
+                parsed_value = parse_kvp_literal_value(value) if isinstance(value, str) else value
+
+            inputs_dict[key] = {"id": key, "value": parsed_value}
+
+    # Build response body
+    body = {}
+    if inputs_dict:
+        body["inputs"] = list(inputs_dict.values())
+    if outputs_dict:
+        body["outputs"] = list(outputs_dict.values())
+
+    return body, response_params
+
+
 def submit_job_dispatch_wps(request, process):
     # type: (Request, Process) -> AnyViewResponse
     """
@@ -816,6 +1003,42 @@ def submit_job_dispatch_wps(request, process):
     http_request = extend_instance(request, WerkzeugRequest)
     http_request.shallow = False
     return service.call(http_request)
+
+
+def submit_job_from_kvp(request, reference, tags=None, process_id=None):
+    # type: (Request, Union[Service, Process], Optional[List[str]], Optional[str]) -> AnyResponseType
+    """
+    Generate job submission from :term:`KVP` query parameters in the request.
+
+    Parses :term:`OGC API - Processes` :term:`KVP`-encoded execution parameters from query string,
+    converts them to :term:`JSON` format, maps response parameters to HTTP headers,
+    and delegates to standard job submission handler.
+
+    .. seealso::
+        :func:`submit_job` for JSON-based execution
+        :func:`parse_kvp_inputs_outputs` for :term:`KVP` to :term:`JSON` conversion
+    """
+    try:
+        json_body_raw, response_params = parse_kvp_inputs_outputs(dict(request.params))
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid KVP parameters",
+            "detail": f"Failed to parse KVP query parameters: {exc}",
+            "status": HTTPBadRequest.code,
+        })
+
+    if response_params:
+        if ("f" in response_params or "format" in response_params) and "Accept" not in request.headers:
+            request.headers["Accept"] = response_params.get("f") or response_params.get("format")
+        if "prefer" in response_params and "Prefer" not in request.headers:
+            request.headers["Prefer"] = response_params["prefer"]
+
+    request.body = json.dumps(json_body_raw).encode("utf-8")
+    if "Content-Type" not in request.headers:
+        request.headers["Content-Type"] = ContentType.APP_JSON
+
+    return submit_job(request, reference, tags=tags, process_id=process_id)
 
 
 def submit_job(request, reference, tags=None, process_id=None):
