@@ -195,7 +195,8 @@ Glossary
         | String representation of a set of key-value pairs, usually but not limited to, ``=`` character
           separating keys from their values, ``,`` for multi-value (array) definitions, and another separator
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
-          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
+          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter,
+          within :ref:`proc_exec_kvp` request parameters, etc.
 
     Media-Type
     Media-Types

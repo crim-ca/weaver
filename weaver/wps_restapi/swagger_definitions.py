@@ -3387,6 +3387,234 @@ class ProcessEndpoint(LocalProcessPath):
     querystring = LocalProcessDescriptionQuery()
 
 
+class KVPInputLiteralValue(ExtendedSchemaNode):
+    """
+    KVP input parameter for literal value.
+
+    Supports simple literals, comma-separated arrays, or URL-encoded JSON values.
+    """
+    schema_type = String
+    name = "{inputID}"
+    variable = "{inputID}"
+    description = (
+        "Input parameter value for process execution using KVP encoding. "
+        "The parameter name corresponds to the input identifier defined in the process description. "
+        "Value can be a simple literal, comma-separated array, or URL-encoded JSON object/array."
+    )
+    example = "value1"
+    missing = drop
+
+
+class KVPInputReference(ExtendedSchemaNode):
+    """
+    KVP input parameter for reference by URL.
+
+    Uses bracket notation: ``{inputID}[href]`` and ``{inputID}[type]``.
+    """
+    schema_type = String
+    name = "{inputID}[href]"
+    variable = "{inputID}[href]"
+    description = (
+        "Input parameter reference URL for process execution using KVP encoding. "
+        "The parameter name uses bracket notation where the input identifier is followed by ``[href]``. "
+        "Use with corresponding ``{inputID}[type]`` to specify the media type."
+    )
+    example = "http://example.com/input.txt"
+    missing = drop
+
+
+class KVPInputReferenceType(ExtendedSchemaNode):
+    """
+    KVP input parameter media type qualifier for reference.
+    """
+    schema_type = String
+    name = "{inputID}[type]"
+    variable = "{inputID}[type]"
+    description = (
+        "Media type for input parameter reference using KVP encoding. "
+        "Used in conjunction with ``{inputID}[href]`` to specify the content type of the referenced input."
+    )
+    example = "text/plain"
+    missing = drop
+
+
+class KVPInputBBoxCRS(ExtendedSchemaNode):
+    """
+    KVP input parameter CRS qualifier for bounding box.
+    """
+    schema_type = String
+    name = "{inputID}[crs]"
+    variable = "{inputID}[crs]"
+    description = (
+        "Coordinate Reference System for bounding box input using KVP encoding. "
+        "Used in conjunction with a bbox input parameter to specify the CRS."
+    )
+    example = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    missing = drop
+
+
+class KVPOutputInclude(ExtendedSchemaNode):
+    """
+    KVP output parameter to request specific outputs.
+    """
+    schema_type = String
+    name = "{outputID}[include]"
+    variable = "{outputID}[include]"
+    description = (
+        "Output parameter selector for process execution using KVP encoding. "
+        "Set to 'true' to request a specific output. "
+        "The parameter name uses bracket notation where the output identifier is followed by ``[include]``."
+    )
+    example = "true"
+    validator = OneOf(["true", "false", "1", "0"])
+    missing = drop
+
+
+class KVPOutputMediaType(ExtendedSchemaNode):
+    """
+    KVP output parameter to request specific output format.
+    """
+    schema_type = String
+    name = "{outputID}[mediaType]"
+    variable = "{outputID}[mediaType]"
+    description = (
+        "Output format specification for process execution using KVP encoding. "
+        "Specifies the desired media type for a specific output. "
+        "Used in conjunction with ``{outputID}[include]=true``."
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPResponseFormat(ExtendedSchemaNode):
+    """
+    KVP response format parameter.
+
+    Behaves like the HTTP ``Accept`` header to specify the desired response format.
+    """
+    schema_type = String
+    name = "response[f]"
+    variable = "response[f]"
+    description = (
+        "Response format specification for process execution using KVP encoding. "
+        "Behaves in the same way as the HTTP ``Accept`` header. "
+        "Specifies the desired media type for the execution response."
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPResponseFormatAlias(ExtendedSchemaNode):
+    """
+    KVP response format parameter (alias).
+
+    Alternative to ``response[f]`` using the more explicit ``format`` qualifier.
+    Behaves like the HTTP ``Accept`` header to specify the desired response format.
+    """
+    schema_type = String
+    name = "response[format]"
+    variable = "response[format]"
+    description = (
+        "Response format specification for process execution using KVP encoding. "
+        "Alias for response[f]. "
+        "Behaves in the same way as the HTTP ``Accept`` header. "
+        "Specifies the desired media type for the execution response."
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPResponsePrefer(ExtendedSchemaNode):
+    """
+    KVP response preference parameter.
+
+    Behaves like the HTTP ``Prefer`` header to specify execution preferences (e.g., async vs sync).
+    """
+    schema_type = String
+    name = "response[prefer]"
+    variable = "response[prefer]"
+    description = (
+        "Response preference specification for process execution using KVP encoding. "
+        "Behaves in the same way as the HTTP ``Prefer`` header. "
+        "Specifies execution preferences such as ``respond-async`` or ``wait=10``."
+    )
+    example = "respond-async"
+    missing = drop
+
+
+class ProcessExecutionKVPQuery(ExtendedMappingSchema):
+    """
+    Query parameters for KVP-encoded process execution.
+
+    Supports OGC API - Processes KVP execution with variable input and output parameters.
+    """
+    description = (
+        "KVP-encoded execution parameters. "
+        "Input parameters use the input ID as parameter name, with optional qualifiers in brackets. "
+        "Output parameters use ``{outputID}[include]=true`` to request specific outputs. "
+        "Response parameters use ``response[f]`` and ``response[prefer]`` for format and execution preferences."
+    )
+    examples = {
+        "KVPSimpleInputs": {
+            "summary": "Simple literal inputs",
+            "value": {"message": "test", "count": "42"}
+        },
+        "KVPByReference": {
+            "summary": "Input by reference",
+            "value": {"fileInput[href]": "http://example.com/file.txt", "fileInput[type]": "text/plain"}
+        },
+        "KVPWithOutputs": {
+            "summary": "With output specifications",
+            "value": {
+                "input1": "value1",
+                "output1[include]": "true",
+                "output2[include]": "true",
+                "output2[mediaType]": "application/json"
+            }
+        },
+        "KVPBoundingBox": {
+            "summary": "Bounding box with CRS",
+            "value": {
+                "bbox": "5.8,47.2,15.1,55.1",
+                "bbox[crs]": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+            }
+        },
+        "KVPWithResponse": {
+            "summary": "With response format and preference",
+            "value": {
+                "input1": "value1",
+                "response[f]": "application/json",
+                "response[prefer]": "respond-async"
+            }
+        },
+        "KVPWithResponseFormatAlias": {
+            "summary": "With response format using 'format' alias",
+            "value": {
+                "input1": "value1",
+                "response[format]": "application/json",
+                "response[prefer]": "respond-async"
+            }
+        }
+    }
+    input_literal = KVPInputLiteralValue()
+    input_ref_href = KVPInputReference()
+    input_ref_type = KVPInputReferenceType()
+    input_bbox_crs = KVPInputBBoxCRS()
+    output_include = KVPOutputInclude()
+    output_mediatype = KVPOutputMediaType()
+    response_format = KVPResponseFormat()
+    response_format_alias = KVPResponseFormatAlias()
+    response_prefer = KVPResponsePrefer()
+
+
+class ProcessExecutionKVPEndpoint(LocalProcessPath):
+    """
+    Endpoint schema for KVP-encoded process execution (GET request).
+    """
+    header = LocalProcessEndpointHeaders()
+    querystring = ProcessExecutionKVPQuery()
+
+
 class ProcessPackageEndpoint(LocalProcessPath):
     header = RequestHeaders()
     querystring = LocalProcessQuery()
@@ -8425,6 +8653,8 @@ post_process_jobs_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_jobs_responses = copy(post_process_jobs_responses)
+get_process_jobs_kvp_responses = copy(post_process_jobs_responses)
+get_process_jobs_kvp_responses.pop("415")  # unsupported media type not applicable for GET with query params
 post_job_results_responses = copy(post_process_jobs_responses)
 post_job_results_responses.pop("201")   # job already created, therefore invalid
 post_job_results_responses.update({

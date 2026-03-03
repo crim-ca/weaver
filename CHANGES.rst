@@ -12,7 +12,29 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support for `Key-Value Pair (KVP)` encoded `Process` execution using
+  HTTP GET requests on ``/processes/{processID}/execution`` endpoint
+  (resolves `#607 <https://github.com/crim-ca/weaver/issues/607>`_
+  and `#445 <https://github.com/crim-ca/weaver/issues/445>`_).
+
+  Supported features include:
+
+  - Simple literal inputs (strings, numbers, booleans) via direct parameter values
+  - Complex inputs via URL-encoded `JSON` objects and arrays
+  - Input arrays using comma-separated values
+  - Input by-reference using ``{inputID}[href]`` and ``{inputID}[type]`` qualifiers
+  - Bounding box inputs with optional ``{inputID}[crs]`` coordinate reference system
+  - Binary inputs with base64 encoding using ``{inputID}[value]`` and format qualifiers
+  - Output selection using ``{outputID}[include]``
+  - Output specification with ``{outputID}[mediaType]``, ``{outputID}[encoding]`` and ``{outputID}[schema]`` qualifiers
+  - Response format control via ``response[f]`` or ``response[format]`` (maps to ``Accept`` header)
+  - Execution preference control via ``response[prefer]`` (maps to ``Prefer`` header)
+  - Case-insensitive parameter qualifiers and reserved parameters
+  - Full `OGC API - Processes` ``kvp-execute`` conformance class support
+
+  The implementation converts `KVP` parameters to equivalent `JSON` execution format internally,
+  ensuring consistent behavior with POST-based executions. All existing validation, execution modes,
+  and result formats are supported identically for both GET and POST methods after query parameter parsing.
 
 Fixes:
 ------
