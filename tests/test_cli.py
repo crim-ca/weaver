@@ -336,6 +336,361 @@ def test_parse_inputs_from_file_relative_paths():
 
 
 @pytest.mark.cli
+@pytest.mark.parametrize(
+    ["file_refs", "input_structure"],
+    [
+        # Single file references with simple paths
+        (
+            [
+                "./file1.txt",
+                "./file2.txt",
+                "./nested/file3.txt",
+            ],
+            "single"
+        ),
+        # Array file references with simple paths
+        (
+            [
+                "./file1.txt",
+                "./file2.txt",
+                "./nested/file3.txt",
+            ],
+            "array"
+        ),
+        # Single file references with complex nested navigation
+        (
+            [
+                "./file1.txt",
+                "./nested/deep/level/../../file3.txt",
+                "./nested/deep/level/file2.txt",
+            ],
+            "single"
+        ),
+        # Array file references with complex nested navigation
+        (
+            [
+                "./file1.txt",
+                "./nested/deep/level/../../file3.txt",
+                "./nested/deep/level/file2.txt",
+            ],
+            "array"
+        ),
+        # Single file references starting with "../../" (files outside input file directory)
+        (
+            [
+                "../../outside/file1.txt",
+                "./local.txt",
+                "../../outside/nested/file2.txt",
+            ],
+            "single"
+        ),
+        # Array file references starting with "../../" (files outside input file directory)
+        (
+            [
+                "../../outside/file1.txt",
+                "./local.txt",
+                "../../outside/nested/file2.txt",
+            ],
+            "array"
+        ),
+        # Mixed: simple, nested navigation, and parent directory references
+        (
+            [
+                "./simple.txt",
+                "../sibling/file.txt",
+                "./nested/../other.txt",
+            ],
+            "single"
+        ),
+        # file:// URI references (absolute paths)
+        (
+            [
+                "file://",  # placeholders, will be replaced with absolute paths
+                "file://",
+                "file://",
+            ],
+            "single"
+        ),
+    ]
+)
+def test_parse_inputs_relative_paths_extended_resolutions(file_refs, input_structure):
+    """
+    Validate extended scenarios for relative file resolutions from execution input file.
+
+    This test extends :func:`test_parse_inputs_from_file_relative_paths` to cover various combinations:
+    - Simple relative paths (e.g., "./file.txt", "./nested/file.txt")
+    - Complex nested navigation (e.g., "./nested/deep/level/../../file.txt")
+    - Parent directory references starting with "../../" to test files outside input file directory
+    - Single file references vs array of file references (i.e.: mapping to ``File`` vs ``File[]`` CWL types)
+    - Explicit URI references ``file://`` with absolute paths
+
+    The test validates that the CLI properly resolves relative paths regardless of these combinations,
+    ensuring that file references embedded within the provided "inputs file" are primarily resolved relative
+    those file's location, rather than the current working directory of the :term:`CLI` command.
+    """
+    local_inputs = []
+
+    def mock_describe(*_, **__):
+        return OperationResult(False, code=500)
+
+    def mock_upload(href, *_, **__):
+        local_inputs.append(href)
+        f_id = str(uuid.uuid4())
+        body = {"file_href": f"vault://{f_id}", "file_id": f_id, "access_token": f_id}
+        return OperationResult(True, code=200, body=body)
+
+    cwd = os.getcwd()
+    try:
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.describe", side_effect=mock_describe))
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload))
+            tmp_base = stack.enter_context(tempfile.TemporaryDirectory())
+            tmp_pwd = stack.enter_context(tempfile.TemporaryDirectory())
+            os.chdir(tmp_pwd)
+
+            # Create inputs file in a nested directory to allow "../../" references
+            inputs_dir = os.path.join(tmp_base, "inputs", "nested")
+            os.makedirs(inputs_dir, exist_ok=True)
+
+            # Create files based on the relative paths specified in file_refs
+            created_files = []
+            resolved_paths = []
+            use_file_uri = all(ref.startswith("file://") for ref in file_refs)
+
+            for idx, rel_path in enumerate(file_refs):
+                if use_file_uri:
+                    # Special case: create simple files and use absolute paths
+                    file_name = f"file{idx + 1}.txt"
+                    file_path = os.path.join(tmp_base, file_name)
+                else:
+                    # Resolve the relative path from the inputs directory
+                    # Use os.path.normpath to resolve all "." and ".." components
+                    file_path = os.path.normpath(os.path.join(inputs_dir, rel_path))
+
+                    # Also ensure all intermediate directories in the non-normalized path exist
+                    # This is needed because os.path.isfile() checks intermediate dirs even when normalizing
+                    non_normalized_path = os.path.join(inputs_dir, rel_path)
+                    intermediate_dir = os.path.dirname(non_normalized_path)
+                    if intermediate_dir:
+                        os.makedirs(intermediate_dir, exist_ok=True)
+
+                # Ensure parent directory of the final normalized file path exists
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, mode="w", encoding="utf-8") as f:
+                    f.write("test")
+
+                created_files.append(file_path)
+                resolved_paths.append(os.path.abspath(file_path))
+
+            # Build CWL inputs structure
+            if use_file_uri:
+                # Use absolute file:// URIs
+                paths_to_use = [f"file://{abs_path}" for abs_path in resolved_paths]
+            else:
+                # Use the relative paths as specified
+                paths_to_use = file_refs
+
+            if input_structure == "array":
+                cwl_inputs = {
+                    "input1": "data",
+                    "input2": [{"class": "File", "path": path} for path in paths_to_use]
+                }
+            else:
+                cwl_inputs = {"input1": "data"}
+                for idx, path in enumerate(paths_to_use, start=2):
+                    cwl_inputs[f"input{idx}"] = {"class": "File", "path": path}
+
+            inputs_path = os.path.join(inputs_dir, "inputs.json")
+            with open(inputs_path, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_inputs, f)
+
+            result = WeaverClient().execute(
+                "fake_process",
+                inputs=inputs_path,
+                url="https://fake.domain.com"
+            )
+    finally:
+        os.chdir(cwd)
+
+    # Verify all files were resolved correctly
+    assert result.code == 500, f"expected early-stop of execution operation, got {result.code}: {result.message}"
+    assert len(local_inputs) == len(file_refs), (
+        f"expected {len(file_refs)} local file uploads, got {len(local_inputs)}"
+    )
+    expected_files = set(resolved_paths)
+    assert set(local_inputs) == expected_files, (
+        f"expected files {expected_files}, got {set(local_inputs)}"
+    )
+
+
+@pytest.mark.cli
+def test_parse_inputs_multiple_files_rejected():
+    """
+    Validate that multiple input files (e.g., multiple ``-I inputs.json``) are properly rejected.
+
+    When multiple input JSON/YAML files are provided via multiple ``-I`` options, the CLI should detect
+    this case and provide a clear error message, rather than treating the file paths as literal input
+    values or causing a confusing error later in the process.
+    """
+    cwd = os.getcwd()
+    try:
+        with ExitStack() as stack:
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            os.chdir(tmp_dir)
+
+            # Create two separate input files
+            inputs1 = {
+                "input1": {"class": "File", "path": "./file1.txt"},
+            }
+            inputs2 = {
+                "input2": {"class": "File", "path": "./file2.txt"},
+            }
+
+            inputs_path1 = os.path.join(tmp_dir, "inputs1.json")
+            inputs_path2 = os.path.join(tmp_dir, "inputs2.json")
+
+            with open(inputs_path1, mode="w", encoding="utf-8") as f:
+                json.dump(inputs1, f)
+            with open(inputs_path2, mode="w", encoding="utf-8") as f:
+                json.dump(inputs2, f)
+
+            # Simulate multiple -I options as they would be processed by argparse
+            # Each -I creates a sublist, resulting in a 2D list that gets flattened
+            multiple_inputs = [[inputs_path1], [inputs_path2]]
+
+            result = WeaverClient().execute(
+                "fake_process",
+                inputs=multiple_inputs,
+                url="https://fake.domain.com"
+            )
+    finally:
+        os.chdir(cwd)
+
+    # Verify that the operation fails with a clear error message
+    assert not result.success, "expected operation to fail when multiple input files are provided"
+    assert result.message is not None, "expected error message to be provided"
+    assert "multiple" in result.message.lower() or "more than one" in result.message.lower(), (
+        f"expected error message to mention 'multiple' or 'more than one' files, got: {result.message}"
+    )
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["missing_files", "ignore_errors", "expect_success"],
+    [
+        # No missing files - should always succeed
+        ([], False, True),
+        ([], True, True),
+        # One missing file without ignore flag - should fail
+        (["./missing.txt"], False, False),
+        # One missing file with ignore flag - should succeed (file skipped with warning)
+        (["./missing.txt"], True, True),
+        # Multiple missing files without ignore flag - should fail with all files listed
+        (["./missing1.txt", "./missing2.txt", "./nested/missing3.txt"], False, False),
+        # Multiple missing files with ignore flag - should succeed (all skipped with warnings)
+        (["./missing1.txt", "./missing2.txt", "./nested/missing3.txt"], True, True),
+        # Mix of existing and missing files without ignore flag - should fail
+        (["./exists.txt", "./missing.txt"], False, False),
+        # Mix of existing and missing files with ignore flag - should succeed (missing skipped)
+        (["./exists.txt", "./missing.txt"], True, True),
+    ]
+)
+def test_parse_inputs_missing_files_handling(missing_files, ignore_errors, expect_success):
+    """
+    Validate that missing local file references are handled correctly based on ``--inputs-ignore-errors`` flag.
+
+    When ``inputs_ignore_errors=False`` (default):
+    - Missing files should cause a failure with a clear error message without moving on to the execution
+    - All missing files should be listed in the error message (not just the first one that fails resolution)
+
+    When ``inputs_ignore_errors=True``:
+    - Missing files should be skipped with a warning
+    - Execution should proceed with the remaining valid inputs
+    """
+    local_inputs = []
+
+    def mock_describe(*_, **__):
+        return OperationResult(False, code=500)
+
+    def mock_upload(href, *_, **__):
+        local_inputs.append(href)
+        f_id = str(uuid.uuid4())
+        body = {"file_href": f"vault://{f_id}", "file_id": f_id, "access_token": f_id}
+        return OperationResult(True, code=200, body=body)
+
+    cwd = os.getcwd()
+    try:
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.describe", side_effect=mock_describe))
+            stack.enter_context(mock.patch("weaver.cli.WeaverClient.upload", side_effect=mock_upload))
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            os.chdir(tmp_dir)
+
+            # Create the inputs file
+            cwl_inputs = {"input1": "data"}
+            existing_files = []
+
+            # Add file references - some will exist, some won't based on the test case
+            input_idx = 2
+            for file_path in missing_files:
+                # Determine if this should be an existing file (for mixed scenarios)
+                is_existing = file_path == "./exists.txt"
+
+                if is_existing:
+                    # Create the file
+                    full_path = os.path.join(tmp_dir, file_path.lstrip("./"))
+                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    with open(full_path, mode="w", encoding="utf-8") as f:
+                        f.write("test")
+                    existing_files.append(os.path.abspath(full_path))
+
+                # Add to inputs (whether file exists or not)
+                cwl_inputs[f"input{input_idx}"] = {"class": "File", "path": file_path}
+                input_idx += 1
+
+            inputs_path = os.path.join(tmp_dir, "inputs.json")
+            with open(inputs_path, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_inputs, f)
+
+            result = WeaverClient().execute(
+                "fake_process",
+                inputs=inputs_path,
+                url="https://fake.domain.com",
+                inputs_ignore_errors=ignore_errors
+            )
+    finally:
+        os.chdir(cwd)
+
+    # Validate results based on expected outcome
+    if expect_success:
+        # When ignore_errors=True or no missing files, operation should succeed (or fail at describe step)
+        # The describe mock returns 500, so we expect that as the error code
+        assert result.code == 500, f"expected early-stop at describe with code 500, got {result.code}: {result.message}"
+
+        # Verify only existing files were uploaded
+        assert len(local_inputs) == len(existing_files), (
+            f"expected {len(existing_files)} file uploads, got {len(local_inputs)}"
+        )
+    else:
+        # When ignore_errors=False and there are missing files, should fail before describe
+        assert not result.success, "expected operation to fail due to missing files"
+        assert result.code == 404, f"expected 404 Not Found error code, got {result.code}"
+
+        # Verify error message mentions missing files
+        msg_lower = result.message.lower()
+        assert (
+            "missing" in msg_lower or "not found" in msg_lower or "not all files could be resolved" in msg_lower
+        ), f"expected error message to mention missing files, got: {result.message}"
+
+        # Verify ALL missing files are listed in the error message
+        actual_missing = [f for f in missing_files if f != "./exists.txt"]
+        for missing_file in actual_missing:
+            assert missing_file in result.message, (
+                f"expected missing file '{missing_file}' to be mentioned in error message, got: {result.message}"
+            )
+
+
+@pytest.mark.cli
 @pytest.mark.format
 @pytest.mark.parametrize(
     ["data_inputs", "expect_inputs"],

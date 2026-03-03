@@ -12,7 +12,13 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``--inputs-ignore-errors`` option to `CLI` ``execute`` operation and corresponding ``inputs_ignore_errors``
+  parameter to ``WeaverClient.execute()`` method. When enabled, missing or unresolved local file references in
+  input definitions will be skipped with warnings rather than causing immediate failure. By default (when disabled),
+  missing files cause the operation to fail with a detailed error message listing all problematic file references.
+- Improve `CLI` ``execute`` operation error handling for multiple input files. When multiple input JSON/YAML files
+  are provided via multiple ``-I`` options, the operation now fails with a clear error message explaining that only
+  a single input file is supported, rather than producing a cryptic attribute error.
 
 Fixes:
 ------
