@@ -3487,10 +3487,12 @@ def make_parser():
     op_deploy_group._group_actions.append(op_deploy_pwd)
     op_deploy_group._group_actions.append(op_deploy_tkt)
     # force a specific representation and validation of arguments to better reflect expected combinations
+    # use regex to handle cases where argparse wraps arguments across multiple lines based on terminal width
     op_deploy.add_formatter(
-        lambda _help: _help.replace(
-            "[-T TOKEN] [-U USERNAME] [-P PASSWORD]",
-            "[-T TOKEN | ( -U USERNAME -P PASSWORD )]"
+        lambda _help: re.sub(
+            r"\[-T TOKEN\]\s+\[-U USERNAME\]\s+\[-P PASSWORD\]",
+            "[-T TOKEN | ( -U USERNAME -P PASSWORD )]",
+            _help
         )
     )
     op_deploy.add_rule(
