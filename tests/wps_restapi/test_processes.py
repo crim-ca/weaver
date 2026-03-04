@@ -6,6 +6,7 @@ import json
 import os
 import re
 import tempfile
+import urllib.parse
 import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
@@ -34,7 +35,13 @@ from tests.utils import (
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -2865,11 +2872,39 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert job.process == proc_id
 
     @pytest.mark.kvp
-    def test_execute_process_kvp_simple_inputs(self):
+    def test_execute_process_kvp_simple_literal_inputs(self):
         """
-        Test KVP-encoded execution with simple literal inputs.
+        Test KVP-encoded execution with simple literal inputs (string, numeric, boolean).
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_string-input-value.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_numeric-input-value.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_boolean-input-value.adoc
         """
-        proc = self.process_public.identifier
+        # Deploy test process with literal inputs
+        body = self.get_process_deploy_template(
+            process_id="kvp-literal-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "stringInput": {"type": "string"},
+                    "intInput": {"type": "int"},
+                    "floatInput": {"type": "float"},
+                    "boolInput": {"type": "boolean"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201], f"Deployment failed: {resp.text}"
+
+        # Execute with KVP
+        proc = "kvp-literal-test"
         task = f"job-{fully_qualified_name(self)}"
         mock_execute = mocked_process_job_runner(task)
 
@@ -2879,8 +2914,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
             path = f"/processes/{proc}/execution"
             params = {
-                "message": "test message",
-                "count": "42",
+                "stringInput": "test message",
+                "intInput": "42",
+                "floatInput": "3.14",
+                "boolInput": "true",
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
             assert resp.status_code == 201, f"Error: {resp.text}"
@@ -2889,11 +2926,80 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "location" in resp.json
 
     @pytest.mark.kvp
-    def test_execute_process_kvp_with_reference(self):
+    def test_execute_process_kvp_array_input(self):
         """
-        Test KVP-encoded execution with input by reference.
+        Test KVP-encoded execution with array inputs using multi-value notation.
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_array-input-value.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_input-cardinality.adoc
         """
-        proc = self.process_public.identifier
+        # Deploy test process with array input
+        body = self.get_process_deploy_template(
+            process_id="kvp-array-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "values": {"type": "string[]"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-array-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            # Multiple values for same key - represents array
+            params = [
+                ("values", "value1"),
+                ("values", "value2"),
+                ("values", "value3"),
+            ]
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_input_by_reference(self):
+        """
+        Test KVP-encoded execution with input by reference using qualifiers.
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_input-by-reference.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_complex-input-value.adoc
+        """
+        # Deploy test process with File input
+        body = self.get_process_deploy_template(
+            process_id="kvp-reference-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "cat",
+                "inputs": {
+                    "fileInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-reference-test"
         task = f"job-{fully_qualified_name(self)}"
         mock_execute = mocked_process_job_runner(task)
 
@@ -2904,18 +3010,140 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             path = f"/processes/{proc}/execution"
             params = {
                 "fileInput[href]": "http://example.com/test.txt",
-                "fileInput[type]": "text/plain",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
             assert resp.status_code == 201, f"Error: {resp.text}"
             assert resp.content_type == ContentType.APP_JSON
 
     @pytest.mark.kvp
-    def test_execute_process_kvp_with_outputs(self):
+    def test_execute_process_kvp_binary_input_value(self):
         """
-        Test KVP-encoded execution with output specifications.
+        Test KVP-encoded execution with binary input value (base64-encoded).
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_binary-input-value.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_binary-input-value-qualified.adoc
         """
-        proc = self.process_public.identifier
+        # Deploy test process with File input
+        body = self.get_process_deploy_template(
+            process_id="kvp-binary-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "cat",
+                "inputs": {
+                    "binaryInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-binary-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            test_data = b"test binary data"
+            encoded = base64.b64encode(test_data).decode("ascii")
+
+            params = {
+                "binaryInput[value]": encoded,
+                "binaryInput[type]": ContentType.APP_OCTET_STREAM,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_bbox_input(self):
+        """
+        Test KVP-encoded execution with bounding box input.
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_bbox-input-value.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_bbox-crs-input-value.adoc
+        """
+        # Deploy test process with bbox input (array of 4 or 6 numbers)
+        body = self.get_process_deploy_template(
+            process_id="kvp-bbox-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "bbox": {
+                        "type": {
+                            "type": "record",
+                            "fields": [
+                                {"name": "bbox", "type": "float[]"},
+                                {"name": "crs", "type": "string?"},
+                            ],
+                        },
+                    },
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-bbox-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "bbox": "5.8,47.2,15.1,55.1",
+                "bbox[crs]": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_output_specifications(self):
+        """
+        Test KVP-encoded execution with output specifications (include, mediaType).
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_output.adoc
+        """
+        # Deploy test process with multiple outputs
+        body = self.get_process_deploy_template(
+            process_id="kvp-output-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "message": {"type": "string"},
+                },
+                "outputs": {
+                    "output1": {"type": "File", "outputBinding": {"glob": "output1.txt"}},
+                    "output2": {"type": "File", "outputBinding": {"glob": "output2.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-output-test"
         task = f"job-{fully_qualified_name(self)}"
         mock_execute = mocked_process_job_runner(task)
 
@@ -2928,11 +3156,199 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "message": "test",
                 "output1[include]": "true",
                 "output2[include]": "true",
-                "output2[mediaType]": "application/json",
+                "output2[mediaType]": ContentType.APP_JSON,
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
             assert resp.status_code == 201, f"Error: {resp.text}"
             assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_response_format(self):
+        """
+        Test KVP-encoded execution with response format control (response[f], response[prefer]).
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_f-definition.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_f-response.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_prefer-definition.adoc
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_prefer-response.adoc
+        """
+        # Deploy simple test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-response-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "input": {"type": "string"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-response-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            # Test with response[f] and response[prefer]
+            path = f"/processes/{proc}/execution"
+            params = {
+                "input": "test",
+                "response[f]": OutputFormat.JSON,
+                "response[prefer]": f"return={ExecuteReturnPreference.MINIMAL}",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+            # Verify response format was applied (should be JSON)
+            assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_mixed_input_types(self):
+        """
+        Test KVP-encoded execution with mix of literal, reference, and qualified inputs.
+
+        Validates combination of multiple OGC requirements in single request.
+        """
+        # Deploy test process with various input types
+        body = self.get_process_deploy_template(
+            process_id="kvp-mixed-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "textInput": {"type": "string"},
+                    "numberInput": {"type": "int"},
+                    "fileInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-mixed-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "textInput": "hello world",
+                "numberInput": "123",
+                "fileInput[href]": "http://example.com/data.txt",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert "jobID" in resp.json
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_schema_qualified_output(self):
+        """
+        Test KVP-encoded execution with output schema qualifier.
+
+        Validates output format specifications with schema.
+        """
+        # Deploy test process with structured output
+        body = self.get_process_deploy_template(
+            process_id="kvp-schema-output-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "input": {"type": "string"},
+                },
+                "outputs": {
+                    "result": {"type": "File", "outputBinding": {"glob": "result.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-schema-output-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            schema = urllib.parse.quote('{"type":"object"}')  # URL-encoded JSON schema
+
+            params = {
+                "input": "test",
+                "result[include]": "true",
+                "result[mediaType]": ContentType.APP_JSON,
+                "result[schema]": schema,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_encoding_qualifier(self):
+        """
+        Test KVP-encoded execution with encoding qualifier for output.
+
+        Validates format specifications with encoding.
+        """
+        # Deploy test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-encoding-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "data": {"type": "string"},
+                },
+                "outputs": {
+                    "compressed": {"type": "File", "outputBinding": {"glob": "output.gz"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-encoding-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "data": "test data",
+                "compressed[include]": "true",
+                "compressed[mediaType]": ContentType.APP_JSON,
+                "compressed[encoding]": "gzip",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
 
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:

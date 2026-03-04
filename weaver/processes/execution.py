@@ -811,7 +811,6 @@ def parse_kvp_literal_value(value_str):
     """
     Parse a literal value string to appropriate Python type.
     """
-
     value_decoded = unquote(value_str)
 
     # Try JSON object or array
@@ -840,7 +839,6 @@ def parse_kvp_bbox_value(value_str):
     """
     Parse a ``bbox`` value string into ``bbox`` object.
     """
-
     try:
         coords = [float(c.strip()) for c in unquote(value_str).split(",")]
         return {"bbox": coords}
@@ -924,14 +922,16 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 def parse_kvp_inputs_outputs(params):
     # type: (Dict[str, Any]) -> Tuple[JSON, Dict[str, str]]
     """
-    Parse KVP query parameters and convert them to JSON execution body format.
+    Parse :term:`KVP` query parameters and convert them to :term:`JSON` execution body format.
 
-    Converts OGC API - Processes KVP-encoded execution parameters to the equivalent JSON structure
-    that would be used in a POST request body. Also extracts response parameters for header mapping.
+    Converts :term:`OGC API - Processes` :term:`KVP`-encoded execution parameters to the equivalent :term:`JSON`
+    structure that would be used in a POST request body. Also, extracts response parameters for header mapping
+    that indicate how the response should be formatted (e.g.: content negotiation, preferred response structure, etc.)
+    and executed (e.g.: asynchronous vs synchronous), as applicable.
 
     :param params: Query parameters from the request.
-    :return: Tuple of (JSON execution body with inputs/outputs, response parameters dict).
-    :raises HTTPBadRequest: If KVP parameters cannot be parsed.
+    :return: Tuple of (:term:`JSON` execution body with ``inputs``/``outputs``, response parameters).
+    :raises HTTPBadRequest: If :term:`KVP` parameters cannot be parsed.
     """
     # Use parse_kvp to handle deep_object transformation with collision handling
     # This transforms key[qualifier] -> nested dict, with None for simple values when both exist
