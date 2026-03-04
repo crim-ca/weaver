@@ -1256,10 +1256,13 @@ def mocked_dismiss_process():
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
     # type: (str) -> Iterable[MockPatch]
     """
-    Provides a mock that will bypass execution of the process when called during job submission.
+    Provides a mock that will bypass execution of the :term:`Process` when called during :term:`Job` submission.
+
+    Th execution request parsing will still occur, but the result will return a fake :term:`Job` task ID.
 
     .. seealso::
-        - :func:`mocked_execute_celery` to still execute the process, but directly instead of within ``Celery`` worker.
+        - :func:`mocked_execute_celery` to still execute the :term:`Process`,
+        but directly instead of within :mod:`celery` worker.
     """
     result = mock.MagicMock()
     result.id = job_task_id
