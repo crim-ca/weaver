@@ -125,7 +125,7 @@ def test_parse_kvp_inputs_outputs_simple_literals():
         "intInput": ["42"],
         "floatInput": ["3.14"],
     }
-    result = parse_kvp_inputs_outputs(params)
+    result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
     assert len(result["inputs"]) == 3
@@ -133,6 +133,7 @@ def test_parse_kvp_inputs_outputs_simple_literals():
     assert inputs["stringInput"] == "test value"
     assert inputs["intInput"] == 42
     assert inputs["floatInput"] == 3.14
+    assert response_params == {}
 
 
 @pytest.mark.kvp

@@ -798,23 +798,19 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
-def _extract_kvp_value(values):
+def parse_kvp_value(values):
     # type: (Any) -> Any
-    """Extract single value from list or return as-is."""
+    """
+    Extract single value from list or return as-is.
+    """
     return values[0] if isinstance(values, list) else values
-
-
-def _ensure_format_dict(target_dict, key):
-    # type: (Dict[str, Any], str) -> Dict[str, Any]
-    """Ensure 'format' dict exists in target and return it."""
-    if "format" not in target_dict[key]:
-        target_dict[key]["format"] = {}
-    return target_dict[key]["format"]
 
 
 def parse_kvp_literal_value(value_str):
     # type: (str) -> Any
-    """Parse a literal value string to appropriate Python type."""
+    """
+    Parse a literal value string to appropriate Python type.
+    """
 
     value_decoded = unquote(value_str)
 
@@ -841,7 +837,9 @@ def parse_kvp_literal_value(value_str):
 
 def parse_kvp_bbox_value(value_str):
     # type: (str) -> Dict[str, Any]
-    """Parse a bbox value string to bbox dict."""
+    """
+    Parse a ``bbox`` value string into ``bbox`` object.
+    """
 
     try:
         coords = [float(c.strip()) for c in unquote(value_str).split(",")]
@@ -879,7 +877,8 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 
     # Format qualifiers (can apply to both inputs and outputs)
     if qualifier in ("mediatype", "encoding", "schema"):
-        fmt = _ensure_format_dict(target_dict, base_key)
+        target_dict[base_key].setdefault("format", {})
+        fmt = target_dict[base_key]["format"]
 
         if qualifier == "mediatype":
             fmt["mediaType"] = value
@@ -934,6 +933,15 @@ def parse_kvp_inputs_outputs(params):
     :return: Tuple of (JSON execution body with inputs/outputs, response parameters dict).
     :raises HTTPBadRequest: If KVP parameters cannot be parsed.
     """
+    # Use parse_kvp to handle deep_object transformation with collision handling
+    # This transforms key[qualifier] -> nested dict, with None for simple values when both exist
+    organized = parse_kvp(
+        params,
+        pair_sep="&",
+        case_insensitive=False,
+        deep_object=True,
+    )
+
     inputs_dict = {}
     outputs_dict = {}
     response_params = {}
@@ -941,28 +949,45 @@ def parse_kvp_inputs_outputs(params):
     # Reserved parameters that should not be treated as inputs
     reserved_base_params = {"f", "tags", "response"}
 
-    for key, values in params.items():
+    for key, values in organized.items():
         key_lower = key.lower()
-        value = _extract_kvp_value(values)
 
         # Skip standalone reserved parameters
         if key_lower in reserved_base_params:
+            # Extract response[...] qualifiers
+            if key_lower == "response" and isinstance(values, dict):
+                for qualifier, qual_vals in values.items():
+                    if qualifier is not None:
+                        response_params[qualifier] = parse_kvp_value(qual_vals)
             continue
 
         # Standalone prefer (deprecated, prefer response[prefer])
         if key_lower == "prefer":
-            response_params["prefer"] = value
+            response_params["prefer"] = parse_kvp_value(values)
             continue
 
-        # Qualified parameter: key[qualifier]=value
-        if "[" in key:
-            base_key, qualifier = key.split("[", 1)
-            qualifier = qualifier.rstrip("]").lower()
+        # Deep object (qualified parameters) - values is a dict
+        if isinstance(values, dict):
+            # Check for simple value under None key (collision case: both key and key[qualifier] exist)
+            if None in values:
+                simple_val = parse_kvp_value(values[None])
+                # Process simple value first
+                if key_lower.endswith("bbox") or key_lower == "bbox":
+                    parsed_value = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
+                else:
+                    parsed_value = parse_kvp_literal_value(simple_val) if isinstance(simple_val, str) else simple_val
+                inputs_dict[key] = {"id": key, "value": parsed_value}
 
-            if parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
-                continue
+            # Process qualifiers
+            for qualifier, qual_values in values.items():
+                if qualifier is None:
+                    continue
+                value = parse_kvp_value(qual_values)
+                parse_kvp_qualified_param(key, qualifier.lower(), value, inputs_dict, outputs_dict, response_params)
+            continue
 
         # Simple input parameter
+        value = parse_kvp_value(values)
         if key not in inputs_dict:
             # Special handling for bbox
             if key_lower.endswith("bbox") or key_lower == "bbox":
