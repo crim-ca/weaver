@@ -139,6 +139,7 @@ from weaver.wps_restapi.colander_extras import (
     NoneType,
     NotKeywordSchema,
     OAS3DefinitionHandler,
+    OAS3Parameter,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
@@ -861,13 +862,20 @@ class PreferHeader(ExtendedSchemaNode):
     schema_type = String
 
 
-class RequestHeaders(ExtendedMappingSchema):
+class RequestHeadersNoBody(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
     """
+    # omits any 'Content-*' headers since no body applicable for OPTIONS,GET,HEAD requests
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
     accept_profile = AcceptProfileHeader(missing=drop)
+
+
+class RequestHeaders(RequestHeadersNoBody):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
     content_type = RequestContentTypeHeader()
 
 
@@ -3370,11 +3378,15 @@ class ProcessDescriptionQuery(ExtendedMappingSchema):
 
 
 class ProviderProcessEndpoint(ProviderProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = ProcessDescriptionQuery()
 
 
 class LocalProcessDescriptionQuery(ProcessDescriptionQuery, LocalProcessQuery, FormatQuery):
+    pass
+
+
+class LocalProcessEndpointHeadersNoBody(AcceptFormatHeaders, RequestHeadersNoBody):
     pass
 
 
@@ -3390,16 +3402,21 @@ class ProcessEndpoint(LocalProcessPath):
 class KVPInputLiteralValue(ExtendedSchemaNode):
     """
     KVP input parameter for literal value.
-
-    Supports simple literals, comma-separated arrays, or URL-encoded JSON values.
     """
     schema_type = String
     name = "{inputID}"
-    variable = "{inputID}"
+    variable = "<inputID>"
+    title = "Input Value"
     description = (
         "Input parameter value for process execution using KVP encoding. "
         "The parameter name corresponds to the input identifier defined in the process description. "
-        "Value can be a simple literal, comma-separated array, or URL-encoded JSON object/array."
+        "Replace ``{inputID}`` with the actual input ID. "
+        "Value can be a simple literal, comma-separated array, or URL-encoded JSON object/array. "
+        "\n\n"
+        "Examples:\n"
+        "- Simple literal: ``message=hello``\n"
+        "- Numeric: ``count=42``\n"
+        "- Array: ``values=a,b,c``"
     )
     example = "value1"
     missing = drop
@@ -3408,16 +3425,18 @@ class KVPInputLiteralValue(ExtendedSchemaNode):
 class KVPInputReference(ExtendedSchemaNode):
     """
     KVP input parameter for reference by URL.
-
-    Uses bracket notation: ``{inputID}[href]`` and ``{inputID}[type]``.
     """
     schema_type = String
     name = "{inputID}[href]"
-    variable = "{inputID}[href]"
+    variable = "<inputID>[href]"
+    title = "Input Reference URL"
     description = (
-        "Input parameter reference URL for process execution using KVP encoding. "
+        "Input parameter reference URL for process execution using KVP encoding with ``deepObject`` style. "
         "The parameter name uses bracket notation where the input identifier is followed by ``[href]``. "
-        "Use with corresponding ``{inputID}[type]`` to specify the media type."
+        "Replace ``{inputID}`` with the actual input ID (e.g., ``fileInput[href]=http://example.com/file.txt``). "
+        "Use with corresponding ``{inputID}[type]`` to specify the media type. "
+        "\n\n"
+        "Example: ``fileInput[href]=http://example.com/data.txt&fileInput[type]=text/plain``"
     )
     example = "http://example.com/input.txt"
     missing = drop
@@ -3429,12 +3448,16 @@ class KVPInputReferenceType(ExtendedSchemaNode):
     """
     schema_type = String
     name = "{inputID}[type]"
-    variable = "{inputID}[type]"
+    variable = "<inputID>[type]"
+    title = "Input Reference Media Type"
     description = (
-        "Media type for input parameter reference using KVP encoding. "
-        "Used in conjunction with ``{inputID}[href]`` to specify the content type of the referenced input."
+        "Media type qualifier for input parameter reference using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[href]`` to specify the content type of the referenced input. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        f"Example: ``fileInput[href]=http://example.com/feature.json&fileInput[type]={ContentType.APP_GEOJSON}``"
     )
-    example = "text/plain"
+    example = ContentType.APP_GEOJSON
     missing = drop
 
 
@@ -3444,10 +3467,14 @@ class KVPInputBBoxCRS(ExtendedSchemaNode):
     """
     schema_type = String
     name = "{inputID}[crs]"
-    variable = "{inputID}[crs]"
+    variable = "<inputID>[crs]"
+    title = "Bounding Box CRS"
     description = (
-        "Coordinate Reference System for bounding box input using KVP encoding. "
-        "Used in conjunction with a bbox input parameter to specify the CRS."
+        "Coordinate Reference System qualifier for bounding box input using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with a bbox input parameter to specify the CRS. "
+        "Replace ``{inputID}`` with the actual bbox input ID. "
+        "\n\n"
+        "Example: ``bbox=5.8,47.2,15.1,55.1&bbox[crs]=http://www.opengis.net/def/crs/OGC/1.3/CRS84``"
     )
     example = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
     missing = drop
@@ -3459,28 +3486,42 @@ class KVPOutputInclude(ExtendedSchemaNode):
     """
     schema_type = String
     name = "{outputID}[include]"
-    variable = "{outputID}[include]"
+    variable = "<outputID>[include]"
+    title = "Output Selection"
     description = (
-        "Output parameter selector for process execution using KVP encoding. "
-        "Set to 'true' to request a specific output. "
-        "The parameter name uses bracket notation where the output identifier is followed by ``[include]``."
+        "Output parameter selector for process execution using KVP encoding with ``deepObject`` style. "
+        "Set to ``true`` to request a specific output. "
+        "The parameter name uses bracket notation where the output identifier is followed by ``[include]``. "
+        "Replace ``{outputID}`` with the actual output ID. "
+        "\n\n"
+        "Example: ``output1[include]=true&output2[include]=true``"
     )
     example = "true"
-    validator = OneOf(["true", "false", "1", "0"])
+    validator = OneOfCaseInsensitive(["true", "false"])
     missing = drop
 
 
 class KVPOutputMediaType(ExtendedSchemaNode):
     """
     KVP output parameter to request specific output format.
+
+    Uses ``deepObject``-style bracket notation to qualify output format preferences.
+
+    .. note::
+        Parameter name is a variable placeholder. Replace ``{outputID}`` with the actual output identifier.
+        Must be combined with ``{outputID}[include]=true`` to be effective.
     """
     schema_type = String
     name = "{outputID}[mediaType]"
-    variable = "{outputID}[mediaType]"
+    variable = "<outputID>[mediaType]"
+    title = "Output Format"
     description = (
-        "Output format specification for process execution using KVP encoding. "
+        "Output format specification for process execution using KVP encoding with ``deepObject`` style. "
         "Specifies the desired media type for a specific output. "
-        "Used in conjunction with ``{outputID}[include]=true``."
+        "Replace ``{outputID}`` with the actual output ID. "
+        "Used in conjunction with ``{outputID}[include]=true``. "
+        "\n\n"
+        f"Example: ``result[include]=true&result[mediaType]={ContentType.APP_JSON}``"
     )
     example = ContentType.APP_JSON
     missing = drop
@@ -3491,14 +3532,21 @@ class KVPResponseFormat(ExtendedSchemaNode):
     KVP response format parameter.
 
     Behaves like the HTTP ``Accept`` header to specify the desired response format.
+    Uses ``deepObject``-style bracket notation with fixed parameter name.
+
+    .. note::
+        This is a fixed parameter name (not a variable placeholder).
+        Use exactly as shown: ``response[f]``.
     """
     schema_type = String
     name = "response[f]"
-    variable = "response[f]"
+    title = "Response Format"
     description = (
-        "Response format specification for process execution using KVP encoding. "
+        "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
         "Behaves in the same way as the HTTP ``Accept`` header. "
-        "Specifies the desired media type for the execution response."
+        "Specifies the desired media type for the execution response. "
+        "\n\n"
+        f"Example: ``response[f]={ContentType.APP_JSON}``"
     )
     example = ContentType.APP_JSON
     missing = drop
@@ -3510,15 +3558,18 @@ class KVPResponseFormatAlias(ExtendedSchemaNode):
 
     Alternative to ``response[f]`` using the more explicit ``format`` qualifier.
     Behaves like the HTTP ``Accept`` header to specify the desired response format.
+    Uses ``deepObject``-style bracket notation with fixed parameter name.
     """
     schema_type = String
     name = "response[format]"
-    variable = "response[format]"
+    title = "Response Format (alias)"
     description = (
-        "Response format specification for process execution using KVP encoding. "
-        "Alias for response[f]. "
+        "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
+        "Alias for ``response[f]``. "
         "Behaves in the same way as the HTTP ``Accept`` header. "
-        "Specifies the desired media type for the execution response."
+        "Specifies the desired media type for the execution response. "
+        "\n\n"
+        f"Example: ``response[format]={ContentType.APP_JSON}``"
     )
     example = ContentType.APP_JSON
     missing = drop
@@ -3528,48 +3579,85 @@ class KVPResponsePrefer(ExtendedSchemaNode):
     """
     KVP response preference parameter.
 
-    Behaves like the HTTP ``Prefer`` header to specify execution preferences (e.g., async vs sync).
+    Behaves like the HTTP ``Prefer`` header to specify execution preferences.
+    Uses ``deepObject``-style bracket notation with fixed parameter name.
     """
     schema_type = String
     name = "response[prefer]"
-    variable = "response[prefer]"
+    title = "Response Preference"
     description = (
-        "Response preference specification for process execution using KVP encoding. "
+        "Response preference specification for process execution using KVP encoding with ``deepObject`` style. "
         "Behaves in the same way as the HTTP ``Prefer`` header. "
-        "Specifies execution preferences such as ``respond-async`` or ``wait=10``."
+        "Specifies execution preferences in terms of "
+        "[Execution Mode](https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode) "
+        "such as ``respond-async`` or ``wait=10`` as well as "
+        "[Execution Results](https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-results) "
+        "control directives. "
+        "\n\n"
+        "Example: ``response[prefer]=respond-async;return=minimal``"
     )
-    example = "respond-async"
+    example = ExecuteControlOption.ASYNC
     missing = drop
 
 
-class ProcessExecutionKVPQuery(ExtendedMappingSchema):
-    """
-    Query parameters for KVP-encoded process execution.
+# class ProcessExecutionKVPInputOutputQuery(AnyOfKeywordSchema, OAS3Parameter):
+#     _any_of = [
+#         PermissiveMappingSchema(),
+#         KVPInputLiteralValue(),
+#         KVPInputReference(),
+#         KVPInputReferenceType(),
+#         KVPInputBBoxCRS(),
+#         KVPOutputInclude(),
+#         KVPOutputMediaType(),
+#     ]
 
-    Supports OGC API - Processes KVP execution with variable input and output parameters.
-    """
+class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
+    _any_of = [
+        KVPInputLiteralValue(),
+        KVPInputBBoxCRS(),
+        KVPInputReference(),
+        KVPInputReferenceType(),
+        KVPOutputInclude(),
+        KVPOutputMediaType(),
+    ]
+
+
+class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter):
+    params = ProcessExecutionKVPInputOutputParameters(variable="<*>")
+
     description = (
-        "KVP-encoded execution parameters. "
-        "Input parameters use the input ID as parameter name, with optional qualifiers in brackets. "
-        "Output parameters use ``{outputID}[include]=true`` to request specific outputs. "
-        "Response parameters use ``response[f]`` and ``response[prefer]`` for format and execution preferences."
+        "KVP-encoded execution parameters using OpenAPI ``deepObject``-style serialization. "
+        "\n\n"
+        "**Variable Parameters** (replace placeholder with actual ID):\n"
+        "- ``<inputID>=value`` - Simple literal value, array, bbox or URL-encoded object\n"
+        "- ``<inputID>[crs]=crs`` - CRS for bounding box input (URI, CURIE, URN or short code)\n"
+        "- ``<inputID>[href]=url`` - Input by reference with URL\n"
+        "- ``<inputID>[type]=mediaType`` - Media type for referenced input\n"
+        "- ``<outputID>[include]=true`` - Request specific output\n"
+        "- ``<outputID>[mediaType]=format`` - Desired output format\n"
     )
     examples = {
         "KVPSimpleInputs": {
             "summary": "Simple literal inputs",
-            "value": {"message": "test", "count": "42"}
+            "value": {
+                "message": "test",
+                "count": "42",
+            }
         },
         "KVPByReference": {
             "summary": "Input by reference",
-            "value": {"fileInput[href]": "http://example.com/file.txt", "fileInput[type]": "text/plain"}
+            "value": {
+                "fileInput[href]": "http://example.com/file.txt",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
+            }
         },
         "KVPWithOutputs": {
-            "summary": "With output specifications",
+            "summary": "With output specifications using ``deepObject`` style",
             "value": {
                 "input1": "value1",
                 "output1[include]": "true",
                 "output2[include]": "true",
-                "output2[mediaType]": "application/json"
+                "output2[mediaType]": ContentType.APP_JSON
             }
         },
         "KVPBoundingBox": {
@@ -3583,25 +3671,33 @@ class ProcessExecutionKVPQuery(ExtendedMappingSchema):
             "summary": "With response format and preference",
             "value": {
                 "input1": "value1",
-                "response[f]": "application/json",
-                "response[prefer]": "respond-async"
+                "response[f]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC
             }
         },
         "KVPWithResponseFormatAlias": {
             "summary": "With response format using 'format' alias",
             "value": {
                 "input1": "value1",
-                "response[format]": "application/json",
-                "response[prefer]": "respond-async"
+                "response[format]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC
             }
         }
     }
-    input_literal = KVPInputLiteralValue()
-    input_ref_href = KVPInputReference()
-    input_ref_type = KVPInputReferenceType()
-    input_bbox_crs = KVPInputBBoxCRS()
-    output_include = KVPOutputInclude()
-    output_mediatype = KVPOutputMediaType()
+    # note:
+    #   the name is arbitrary (https://github.com/OAI/OpenAPI-Specification/issues/2622)
+    #   make it obvious in OpenAPI what its nested definitions refer to
+    name = "Execution Parameters"
+    required = True
+    explode = True
+    style = "form"
+
+
+class ProcessExecutionKVPQuery(ExtendedMappingSchema):
+    """
+    Query parameters for KVP-encoded process execution.
+    """
+    execute_params = ProcessExecutionKVPInputOutputQuery()
     response_format = KVPResponseFormat()
     response_format_alias = KVPResponseFormatAlias()
     response_prefer = KVPResponsePrefer()
@@ -3609,9 +3705,9 @@ class ProcessExecutionKVPQuery(ExtendedMappingSchema):
 
 class ProcessExecutionKVPEndpoint(LocalProcessPath):
     """
-    Endpoint schema for KVP-encoded process execution (GET request).
+    Endpoint schema for KVP-encoded process execution.
     """
-    header = LocalProcessEndpointHeaders()
+    header = LocalProcessEndpointHeadersNoBody()
     querystring = ProcessExecutionKVPQuery()
 
 
@@ -3738,45 +3834,45 @@ class LocalProcessJobResultsQuery(LocalProcessQuery, JobResultsQuery):
 
 
 class JobOutputsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessJobResultsQuery()
 
 
 class ProcessOutputsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessJobResultsQuery()
 
 
 class ProviderOutputsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = JobResultsQuery()
 
 
 class ProcessResultEndpoint(ProcessOutputsEndpoint):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProviderResultEndpoint(ProviderOutputsEndpoint):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobResultEndpoint(JobPath):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessResultsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobResultsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobResultsTriggerExecutionEndpoint(JobResultsEndpoint):
@@ -3789,42 +3885,42 @@ class ProcessJobResultsTriggerExecutionEndpoint(JobResultsTriggerExecutionEndpoi
 
 
 class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobExceptionsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessExceptionsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProviderLogsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobLogsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessLogsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class JobStatisticsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessJobStatisticsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProviderJobStatisticsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 ##################################################################

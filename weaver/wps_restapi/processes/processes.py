@@ -516,9 +516,6 @@ def submit_local_job_kvp(request):
     # type: (PyramidRequest) -> AnyViewResponse
     """
     Execute a process registered locally using KVP-encoded parameters.
-
-    Supports OGC API - Processes KVP execution endpoint with GET request.
-    Query parameters are converted to JSON execution format.
     """
     process = get_process(request=request)
     return submit_job_from_kvp(request, process, tags=["wps-rest", "ogc-api", "kvp"])

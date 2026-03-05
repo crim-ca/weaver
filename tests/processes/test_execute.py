@@ -3,7 +3,9 @@ Unit tests for utility methods of :mod:`weaver.processes.execute`.
 
 For more in-depth execution tests, see ``tests.functional``.
 """
+import base64
 import dataclasses
+import urllib.parse
 import uuid
 from typing import TYPE_CHECKING, List, cast
 
@@ -119,7 +121,9 @@ def test_parse_wps_inputs(input_data, input_definition, expect_input):
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_simple_literals():
-    """Test parsing simple literal values from KVP."""
+    """
+    Test parsing simple literal values from KVP.
+    """
     params = {
         "stringInput": ["test value"],
         "intInput": ["42"],
@@ -138,7 +142,9 @@ def test_parse_kvp_inputs_outputs_simple_literals():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_by_reference():
-    """Test parsing input by reference using href and type qualifiers."""
+    """
+    Test parsing input by reference using ``href`` and ``type`` qualifiers.
+    """
     params = {
         "fileInput[href]": ["http://example.com/file.txt"],
         "fileInput[type]": ["text/plain"],
@@ -154,7 +160,9 @@ def test_parse_kvp_inputs_outputs_by_reference():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_array():
-    """Test parsing array values from KVP."""
+    """
+    Test parsing array values from KVP.
+    """
     params = {
         "arrayInput": ["1,2,3,4,5"],
     }
@@ -168,7 +176,9 @@ def test_parse_kvp_inputs_outputs_array():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_bbox():
-    """Test parsing bounding box from KVP."""
+    """
+    Test parsing bounding box from KVP.
+    """
     params = {
         "bbox": ["5.8,47.2,15.1,55.1"],
         "bbox[crs]": ["http://www.opengis.net/def/crs/OGC/1.3/CRS84"],
@@ -178,14 +188,16 @@ def test_parse_kvp_inputs_outputs_bbox():
     assert "inputs" in result
     assert len(result["inputs"]) == 1
     assert result["inputs"][0]["id"] == "bbox"
-    assert "value" in result["inputs"][0]
-    assert result["inputs"][0]["value"]["bbox"] == [5.8, 47.2, 15.1, 55.1]
+    assert "bbox" in result["inputs"][0]
+    assert result["inputs"][0]["bbox"] == [5.8, 47.2, 15.1, 55.1]
     assert result["inputs"][0]["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_with_outputs():
-    """Test parsing output specifications from KVP."""
+    """
+    Test parsing output specifications from KVP.
+    """
     params = {
         "input1": ["value1"],
         "output1[include]": ["true"],
@@ -208,12 +220,12 @@ def test_parse_kvp_inputs_outputs_with_outputs():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_url_encoded_json():
-    """Test parsing URL-encoded JSON values from KVP."""
-    from urllib.parse import quote
-
+    """
+    Test parsing URL-encoded JSON values from KVP.
+    """
     json_value = '{"key1": "value1", "key2": 123}'
     params = {
-        "complexInput": [quote(json_value)],
+        "complexInput": [urllib.parse.quote(json_value)],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -227,7 +239,9 @@ def test_parse_kvp_inputs_outputs_url_encoded_json():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_reserved_params():
-    """Test that reserved parameters are skipped during KVP parsing."""
+    """
+    Test that reserved parameters are skipped during KVP parsing.
+    """
     params = {
         "input1": ["value1"],
         "f": ["json"],
@@ -251,7 +265,7 @@ def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
         "fileInput[href]": ["http://example.com/file.txt"],
         "output1[include]": ["true"],
         "output2[include]": ["true"],
-        "output2[mediaType]": ["image/tiff"],
+        "output2[mediaType]": [ContentType.IMAGE_GEOTIFF],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -272,9 +286,9 @@ def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
-    """Test parsing base64-encoded binary input with value qualifier."""
-    import base64
-
+    """
+    Test parsing base64-encoded binary input with ``value`` qualifier.
+    """
     binary_data = b"Hello, World!"
     encoded_data = base64.b64encode(binary_data).decode("ascii")
 
@@ -294,16 +308,16 @@ def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_schema_qualifier():
-    """Test parsing schema qualifier for inputs and outputs."""
-    from urllib.parse import quote
-
+    """
+    Test parsing ``schema`` qualifier for inputs and outputs.
+    """
     schema_url = "http://example.com/schema.json"
     schema_obj = '{"type": "object", "properties": {"name": {"type": "string"}}}'
 
     params = {
         "input1[schema]": [schema_url],
         "output1[include]": ["true"],
-        "output1[schema]": [quote(schema_obj)],
+        "output1[schema]": [urllib.parse.quote(schema_obj)],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -316,28 +330,89 @@ def test_parse_kvp_inputs_outputs_schema_qualifier():
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_encoding_qualifier():
-    """Test parsing encoding qualifier for outputs."""
+    """
+    Test parsing ``encoding`` qualifier for outputs.
+    """
     params = {
         "input1": ["test"],
         "output1[include]": ["true"],
-        "output1[mediaType]": ["application/json"],
+        "output1[mediaType]": [ContentType.APP_JSON],
         "output1[encoding]": ["gzip"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "outputs" in result
     assert len(result["outputs"]) == 1
-    assert result["outputs"][0]["format"]["mediaType"] == "application/json"
+    assert result["outputs"][0]["format"]["mediaType"] == ContentType.APP_JSON
     assert result["outputs"][0]["format"]["encoding"] == "gzip"
 
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_response_format_alias():
-    """Test that response[format] is accepted as alias for response[f]."""
+    """
+    Test that ``response[format]`` is accepted as alias for ``response[f]``.
+    """
     params = {
         "input1": ["test"],
-        "response[format]": ["application/json"],
+        "response[format]": [ContentType.APP_JSON],
         "response[prefer]": ["respond-async"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+    assert "format" in response_params or "f" in response_params
+    assert response_params["prefer"] == "respond-async"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals():
+    """
+    Test that ``response[prefer]`` with nested ``=`` characters is parsed correctly.
+
+    The ``Prefer`` header can contain values like ``"respond-async;return=minimal"`` where
+    the nested ``=`` should be preserved as part of the value, not treated as a KVP separator.
+    """
+    # Test case 1: respond-async with return=minimal
+    params = {
+        "input1": ["test value"],
+        "response[prefer]": ["respond-async;return=minimal"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    # Verify input was parsed
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+    assert result["inputs"][0]["id"] == "input1"
+    assert result["inputs"][0]["value"] == "test value"
+
+    # Verify response[prefer] value is preserved with nested '='
+    assert "prefer" in response_params
+    assert response_params["prefer"] == "respond-async;return=minimal"
+    # Ensure the entire string including 'return=minimal' is preserved
+    assert "return=minimal" in response_params["prefer"]
+
+    # Test case 2: wait with nested =
+    params2 = {
+        "input2": ["another value"],
+        "response[prefer]": ["wait=30;handling=lenient"],
+    }
+    result2, response_params2 = parse_kvp_inputs_outputs(params2)
+
+    assert "prefer" in response_params2
+    assert response_params2["prefer"] == "wait=30;handling=lenient"
+    assert "wait=30" in response_params2["prefer"]
+    assert "handling=lenient" in response_params2["prefer"]
+
+    # Test case 3: Multiple nested = signs
+    params3 = {
+        "input3": ["value"],
+        "response[prefer]": ["respond-async;return=representation;wait=10"],
+    }
+    result3, response_params3 = parse_kvp_inputs_outputs(params3)
+
+    assert "prefer" in response_params3
+    assert response_params3["prefer"] == "respond-async;return=representation;wait=10"
+    assert "return=representation" in response_params3["prefer"]
+    assert "wait=10" in response_params3["prefer"]
 

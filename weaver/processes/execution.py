@@ -809,7 +809,7 @@ def parse_kvp_value(values):
 def parse_kvp_literal_value(value_str):
     # type: (str) -> Any
     """
-    Parse a literal value string to appropriate Python type.
+    Parse a literal value string to appropriate type.
     """
     value_decoded = unquote(value_str)
 
@@ -849,9 +849,9 @@ def parse_kvp_bbox_value(value_str):
 def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
     # type: (str, str, str, Dict[str, Any], Dict[str, Any], Dict[str, str]) -> bool
     """
-    Handle a qualified parameter (key[qualifier]=value).
+    Handle a qualified parameter (``key[qualifier]=value``).
 
-    Returns True if handled, False if should be skipped.
+    :returns: ``True`` if handled, ``False`` if should be skipped.
     """
     base_key_lower = base_key.lower()
 
@@ -904,7 +904,6 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 
     if qualifier == "value":
         decoded = unquote(value)
-        # Try to validate as base64, but accept any value
         try:
             base64.b64decode(decoded, validate=True)
         except Exception:
@@ -920,7 +919,7 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 
 
 def parse_kvp_inputs_outputs(params):
-    # type: (Dict[str, Any]) -> Tuple[JSON, Dict[str, str]]
+    # type: (Dict[str, Any]) -> Tuple[ProcessExecution, Dict[str, str]]
     """
     Parse :term:`KVP` query parameters and convert them to :term:`JSON` execution body format.
 
@@ -934,7 +933,7 @@ def parse_kvp_inputs_outputs(params):
     :raises HTTPBadRequest: If :term:`KVP` parameters cannot be parsed.
     """
     # Use parse_kvp to handle deep_object transformation with collision handling
-    # This transforms key[qualifier] -> nested dict, with None for simple values when both exist
+    # This transforms 'key[qualifier]' into a nested dict, with 'None' for simple values when both exist
     organized = parse_kvp(
         params,
         pair_sep="&",
@@ -971,8 +970,7 @@ def parse_kvp_inputs_outputs(params):
             # Check for simple value under None key (collision case: both key and key[qualifier] exist)
             if None in values:
                 simple_val = parse_kvp_value(values[None])
-                # Process simple value first
-                if key_lower.endswith("bbox") or key_lower == "bbox":
+                if key_lower == "bbox":
                     parsed_value = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
                 else:
                     parsed_value = parse_kvp_literal_value(simple_val) if isinstance(simple_val, str) else simple_val
@@ -989,8 +987,7 @@ def parse_kvp_inputs_outputs(params):
         # Simple input parameter
         value = parse_kvp_value(values)
         if key not in inputs_dict:
-            # Special handling for bbox
-            if key_lower.endswith("bbox") or key_lower == "bbox":
+            if key_lower == "bbox":
                 parsed_value = parse_kvp_bbox_value(value) if isinstance(value, str) else value
             else:
                 parsed_value = parse_kvp_literal_value(value) if isinstance(value, str) else value
@@ -1044,7 +1041,7 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
         :func:`parse_kvp_inputs_outputs` for :term:`KVP` to :term:`JSON` conversion
     """
     try:
-        json_body_raw, response_params = parse_kvp_inputs_outputs(dict(request.params))
+        exec_body, response_params = parse_kvp_inputs_outputs(dict(request.params))
     except Exception as exc:
         raise HTTPBadRequest(json={
             "type": "InvalidParameterValue",
@@ -1059,7 +1056,7 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
         if "prefer" in response_params and "Prefer" not in request.headers:
             request.headers["Prefer"] = response_params["prefer"]
 
-    request.body = json.dumps(json_body_raw).encode("utf-8")
+    request.body = json.dumps(exec_body).encode("utf-8")
     if "Content-Type" not in request.headers:
         request.headers["Content-Type"] = ContentType.APP_JSON
 

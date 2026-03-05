@@ -48,7 +48,7 @@ complementary support of one-another features.
     figure out the name of the field automatically. Instead, use the keyword
     or field ``title`` for adjusting the displayed name in the Swagger UI.
     The same value will also be used to generate the ``$ref`` reference names
-    of generated OpenAPI model definitions. If not explicitly provided, the
+    of generated :term:`OpenAPI` model definitions. If not explicitly provided, the
     value of ``title`` **WILL** default to the name of the schema node class.
 """
 
@@ -114,6 +114,16 @@ if TYPE_CHECKING:
     )
 
     DataT = TypeVar("DataT")
+    ParameterStyles = Literal[
+        "form",
+        "matrix",
+        "simple",
+        "label",
+        "cookie",
+        "spaceDelimited",
+        "pipeDelimited",
+        "deepObject",
+    ]
     VariableSchemaNodeMapped = TypedDict("VariableSchemaNodeMapped", {
         "node": str,  # variable schema-node that was mapped
         "name": str,  # property name in cstruct that was mapped
@@ -624,7 +634,7 @@ class ExtendedInteger(ExtendedNumber, colander.Integer):
 
 class ExtendedString(colander.String):
     """
-    String with auto-conversion for known OpenAPI ``format`` field where no direct :mod:`colander` type exist.
+    String with auto-conversion for known :term:`OpenAPI` ``format`` field where no direct :mod:`colander` type exist.
 
     Converts :class:`uuid.UUID` to corresponding string when detected in the node if it defined ``format="uuid"``.
 
@@ -685,11 +695,10 @@ class AnyType(colander.SchemaType):
 
 class XMLObject(object):
     """
-    Object that provides mapping to known XML extensions for OpenAPI schema definition.
+    Object that provides mapping to known XML extensions for :term:`OpenAPI` schema definition.
 
-    Name of the schema definition in the OpenAPI will use :attr:`prefix` and the schema class name.
+    Name of the schema definition in the :term:`OpenAPI` will use :attr:`prefix` and the schema class name.
     Prefix can be omitted from the schema definition name by setting it to :class:`colander.drop`.
-    The value of ``title`` provided as option or
 
     .. seealso::
         - https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#xml-object
@@ -714,6 +723,56 @@ class XMLObject(object):
             spec["prefix"] = self.prefix
         if self.wrapped:  # only add if True to avoid over-populate spec, default is False
             spec["wrapped"] = self.wrapped
+        return spec or None
+
+
+class OAS3Parameter(object):
+    """
+    Object that provides mapping to known :term:`OpenAPI` extensions for parameter definition.
+
+    This is to be used as a schema node for parameters in order to provide support for :term:`OpenAPI` extensions
+    such as ``style``, ``explode`` and ``allowReserved``.
+
+    .. seealso::
+        - https://swagger.io/docs/specification/v3_0/serialization/
+        - https://learn.openapis.org/specification/parameters.html#parameter-serialization-control
+    """
+    style = None  # type: Optional[ParameterStyles]
+    """
+    Serialization style of the parameter.
+    """
+
+    explode = None  # type: Optional[bool]
+    """
+    Whether to explode the parameter into separate parameters (e.g.: for arrays and objects).
+    """
+
+    allow_reserved = None  # type: Optional[bool]
+    """
+    Whether reserved characters are allowed in the parameter value.
+    """
+
+    def __init__(
+        self,
+        style=None,             # type: Optional[ParameterStyles]
+        explode=None,           # type: Optional[bool]
+        allow_reserved=None,    # type: Optional[bool]
+        **kwargs,               # type: **Any
+    ):                          # type: (...) -> None
+        self.style = style
+        self.explode = explode
+        self.allow_reserved = allow_reserved
+        super(OAS3Parameter, self).__init__(**kwargs)
+
+    def convert(self):
+        # type: () -> Optional[Dict[str, Any]]
+        spec = {}
+        if self.style is not None:
+            spec["style"] = self.style
+        if self.explode is not None:
+            spec["explode"] = self.explode
+        if self.allow_reserved is not None:
+            spec["allowReserved"] = self.allow_reserved
         return spec or None
 
 
@@ -743,7 +802,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):  # 
     gets created.
 
     When the schema node is a generic :class:`colander.String` without explicit ``validator``, but that one can be
-    inferred from either ``pattern`` or ``format`` OpenAPI definition, the corresponding ``validator`` gets
+    inferred from either ``pattern`` or ``format`` :term:`OpenAPI` definition, the corresponding ``validator`` gets
     automatically generated.
     """
     @staticmethod
@@ -1382,7 +1441,7 @@ class SortableMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         against different loaded definitions field order from remote servers, local database, pre-defined objects, etc.
 
         This way, any field insertion order from both the input ``cstruct`` following deserialization operation, the
-        internal mechanics that :mod:`colander` (and extended OpenAPI schema definitions) employ to process this
+        internal mechanics that :mod:`colander` (and extended :term:`OpenAPI` schema definitions) employ to process this
         deserialization, and the ``result`` dictionary fields order obtained from it all don't matter.
 
         Using this, the order of inheritance of schema children classes also doesn't matter, removing the need to worry
@@ -1912,7 +1971,7 @@ class KeywordMapper(ExtendedMappingSchema):
     def __init__(self, *args, **kwargs):
         super(KeywordMapper, self).__init__(*args, **kwargs)
         if not hasattr(self, self._keyword):
-            # try retrieving from a kwarg definition (either as literal keyword or OpenAPI name)
+            # try retrieving from a kwarg definition (either as literal keyword or :term:`OpenAPI` name)
             if kwargs:
                 maybe_kwargs = [_kw for _kw in kwargs if _kw in self._keyword_map or _kw in self._keyword_inv]
                 if len(maybe_kwargs) == 1:
@@ -2114,7 +2173,7 @@ class OneOfKeywordSchema(KeywordMapper):
         Class ``OneOfWithRequiredFields`` in the example is a shortcut variant to generate a
         specification that represents the pseudo-code ``oneOf([<list-of-objects-with-same-base>])``.
 
-    The real OpenAPI method to implement the above very commonly occurring situation is as
+    The real :term:`OpenAPI` method to implement the above very commonly occurring situation is as
     presented by the following pseudo-code::
 
         oneOf[allOf[RequiredByBoth, Variant1], allOf[RequiredByBoth, Variant2]]
@@ -2144,7 +2203,7 @@ class OneOfKeywordSchema(KeywordMapper):
     (e.g.: field ``type`` defining the type of object), consider adding a ``validator`` to each sub-node
     with explicit values to solve the discrimination problem.
 
-    As a shortcut, the OpenAPI keyword ``discriminator`` can be provided to try matching as a last resort.
+    As a shortcut, the :term:`OpenAPI` keyword ``discriminator`` can be provided to try matching as a last resort.
 
     For example:
 
@@ -2973,19 +3032,22 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
 
 
 class OAS3ParameterConverter(ParameterConverter):
+    """
+    Converts a :class:`colander.SchemaNode` describing an :term:`OpenAPI` parameter into its appropriate definition.
+
+    If extended by :class:`OASParameter`, the converted node can also include additional :term:`OAS` parameter fields.
+    """
     reserved_params = [
         "name",
         "in",
         "required",
-        "allowReserved",
         "summary",
-        "description",
         "schema",
         "content",
     ]
 
     def convert(self, schema_node, definition_handler):
-        # type: (colander.SchemaNode, DefinitionHandler) -> OpenAPISpecParameter
+        # type: (Union[colander.SchemaNode, OAS3Parameter], DefinitionHandler) -> OpenAPISpecParameter
         param_spec = super(OAS3ParameterConverter, self).convert(schema_node, definition_handler)
         if "schema" not in param_spec:
             param_schema = {}
@@ -2993,6 +3055,8 @@ class OAS3ParameterConverter(ParameterConverter):
                 if param not in self.reserved_params:
                     param_schema[param] = param_spec.pop(param)
             param_spec["schema"] = param_schema
+        if isinstance(schema_node, OAS3Parameter):
+            param_spec.update(schema_node.convert())
         return param_spec
 
 
