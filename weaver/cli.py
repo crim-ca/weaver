@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import yaml
 from colander import EMAIL_RE, URL_REGEX
-from pyramid.httpexceptions import HTTPNotImplemented
+from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 from requests.auth import AuthBase, HTTPBasicAuth
 from requests.sessions import Session
 from requests.structures import CaseInsensitiveDict
@@ -1210,6 +1210,15 @@ class WeaverClient(object):
                     inputs = load_file(inputs[0])
                 elif len(inputs) == 1 and inputs[0] == "":
                     inputs = []
+                # multiple file paths provided - purposely not supported to avoid merging ambiguity
+                elif len(inputs) > 1 and all(isinstance(item, str) and "=" not in item for item in inputs):
+                    return OperationResult(
+                        False,
+                        "Multiple input files are not supported to avoid merging ambiguities. "
+                        "Please provide a single JSON/YAML file containing all input definitions, "
+                        "or use literal input definitions with '-I <id>=<value>' format.",
+                        inputs
+                    )
             if isinstance(inputs, list):
                 inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
 
@@ -1258,10 +1267,11 @@ class WeaverClient(object):
 
     def _upload_files(
         self,
-        inputs,     # type: ExecutionInputsMap
-        url=None,   # type: Optional[URL]
-        cwd=None,   # type: Optional[Path]
-    ):              # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+        inputs,                         # type: ExecutionInputsMap
+        inputs_ignore_errors=False,     # type: bool
+        url=None,                       # type: Optional[URL]
+        cwd=None,                       # type: Optional[Path]
+    ):                                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
 
@@ -1275,6 +1285,9 @@ class WeaverClient(object):
               in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
         :param url: Instance URL if not already provided during client creation.
         :param cwd:
             Alternative working directory to resolve relative file paths if applicable.
@@ -1282,6 +1295,7 @@ class WeaverClient(object):
         :return: Updated inputs or the result of a failing intermediate request.
         """
         auth_tokens = {}  # type: Dict[str, str]
+        missing_files = []  # type: List[Tuple[str, Path]]  # (input_id, file_path)
         update_inputs = dict(inputs)
         for input_id, input_data in dict(inputs).items():
             input_array = True
@@ -1311,13 +1325,16 @@ class WeaverClient(object):
                     cwd_href = os.path.join(cwd, href)
                     if os.path.isfile(cwd_href):
                         href = cwd_href
-                if not os.path.isfile(href):  # Case for remote files (ex. http links)
+                if not os.path.isfile(href):
                     if "://" not in href:
-                        LOGGER.warning(
-                            "Ignoring potential local file reference since it does not exist. "
-                            "Cannot upload to vault: [%s]", file
-                        )
-                    continue
+                        # Local file reference that doesn't exist
+                        missing_files.append((input_id, file))
+                        if inputs_ignore_errors:
+                            LOGGER.warning(
+                                "Ignoring missing local file reference for input '%s': [%s]",
+                                input_id, file
+                            )
+                    continue  # Skip upload for missing local files or remote URLs
 
                 href = os.path.abspath(href)  # ensure dot/relative path are resolved
                 fmt = data.get("format", {})
@@ -1346,6 +1363,21 @@ class WeaverClient(object):
                 else:
                     update_inputs[input_id] = input_vault_href
 
+        # Report all missing files if any were found and errors are not ignored
+        if missing_files and not inputs_ignore_errors:
+            files_list = "\n".join([f"  - Input [{inp_id}]: {fpath}" for inp_id, fpath in missing_files])
+            return OperationResult(
+                success=False,
+                message=(
+                    f"Not all files could be resolved. Missing local file references in inputs:\n{files_list}\n"
+                    "Please verify the files exist relative to the inputs file location, "
+                    "relative to the command's invocation directory, "
+                    "or use '--inputs-ignore-errors' to proceed without the missing files."
+                ),
+                title="Files not found.",
+                code=HTTPNotFound.code,
+            )
+
         auth_headers = {}
         if auth_tokens:
             multi_tokens = ",".join([
@@ -1357,12 +1389,18 @@ class WeaverClient(object):
 
     def _prepare_inputs(
         self,
-        inputs=None,    # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
-        url=None,       # type: Optional[URL]
-    ):                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
+        inputs_ignore_errors=False,     # type: bool
+        url=None,                       # type: Optional[URL]
+    ):                                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Performs operations needed to prepare inputs, including parsing provided data/reference and upload as needed.
 
+        :param inputs: Input values for submission of :term:`Process` execution.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
+        :param url: Instance URL if not already provided during client creation.
         :returns:
             Operation result is returned in case of any failure.
             Otherwise, returns the parsed inputs and upload access tokens (as applicable).
@@ -1374,8 +1412,10 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
+        if isinstance(inputs, list) and len(inputs) == 1:
+            inputs = inputs[0]
         input_file = os.path.dirname(inputs) if isinstance(inputs, str) else None
-        result = self._upload_files(values, url=base, cwd=input_file)
+        result = self._upload_files(values, url=base, cwd=input_file, inputs_ignore_errors=inputs_ignore_errors)
         return result
 
     def _prepare_outputs(
@@ -1409,28 +1449,29 @@ class WeaverClient(object):
 
     def execute(
         self,
-        process_id,             # type: str
-        provider_id=None,       # type: Optional[str]
-        inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
-        pending=False,          # type: bool
-        monitor=False,          # type: bool
-        timeout=None,           # type: Optional[int]
-        interval=None,          # type: Optional[int]
-        subscribers=None,       # type: Optional[JobSubscribers]
-        url=None,               # type: Optional[URL]
-        auth=None,              # type: Optional[AuthBase]
-        headers=None,           # type: Optional[AnyHeadersContainer]
-        with_links=True,        # type: bool
-        with_headers=False,     # type: bool
-        request_type="core",    # type: Literal["core", "jobs"]
-        request_timeout=None,   # type: Optional[int]
-        request_retries=None,   # type: Optional[int]
-        output_format=None,     # type: Optional[AnyOutputFormat]
-        output_refs=None,       # type: Optional[Iterable[str]]
+        process_id,                     # type: str
+        provider_id=None,               # type: Optional[str]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
+        inputs_ignore_errors=False,     # type: bool
+        pending=False,                  # type: bool
+        monitor=False,                  # type: bool
+        timeout=None,                   # type: Optional[int]
+        interval=None,                  # type: Optional[int]
+        subscribers=None,               # type: Optional[JobSubscribers]
+        url=None,                       # type: Optional[URL]
+        auth=None,                      # type: Optional[AuthBase]
+        headers=None,                   # type: Optional[AnyHeadersContainer]
+        with_links=True,                # type: bool
+        with_headers=False,             # type: bool
+        request_type="core",            # type: Literal["core", "jobs"]
+        request_timeout=None,           # type: Optional[int]
+        request_retries=None,           # type: Optional[int]
+        output_format=None,             # type: Optional[AnyOutputFormat]
+        output_refs=None,               # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
-        output_filter=None,     # type: Optional[Sequence[str]]
-        output_context=None,    # type: Optional[str]
-    ):                          # type: (...) -> OperationResult
+        output_filter=None,             # type: Optional[Sequence[str]]
+        output_context=None,            # type: Optional[str]
+    ):                                  # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
@@ -1457,6 +1498,11 @@ class WeaverClient(object):
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
             using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
+            If resolved by the :term:`CLI` invocation, it can also be a single-item list of these types as collected
+            by the input arguments.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
         :param pending:
             If enabled, the :term:`Job` will be created, but will not immediately start execution.
             The :term:`Job` will be pending execution until a following :meth:`trigger_job` is sent.
@@ -1506,7 +1552,7 @@ class WeaverClient(object):
         :returns: Results of the operation.
         """
         base = self._get_url(url)  # raise before inputs parsing if not available
-        result = self._prepare_inputs(inputs, url=base)
+        result = self._prepare_inputs(inputs, url=base, inputs_ignore_errors=inputs_ignore_errors)
         if isinstance(result, OperationResult):
             return result
         values, auth_headers = result
@@ -2653,6 +2699,15 @@ def add_job_exec_param(parser):
 
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
+    )
+    parser.add_argument(
+        "--inputs-ignore-errors", dest="inputs_ignore_errors", action="store_true",
+        help=(
+            "When specified, missing or unresolved local file references in inputs will be ignored with a warning, "
+            "allowing execution to proceed (though the server could refuse the request from empty/missing inputs). "
+            "By default, any missing local file will cause the operation to fail "
+            "with a detailed error message listing all problematic files."
+        )
     )
     parser.add_argument(
         "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", action="append",
