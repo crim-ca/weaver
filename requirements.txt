@@ -36,14 +36,18 @@ colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
-cryptography>=44.0.1
+cryptography>=46.0.5
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
 #   - https://github.com/crim-ca/weaver/issues/138
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-cwltool==3.1.20241217163858
+# FIXME: https://github.com/common-workflow-language/cwltool/pull/2207 to allow rootless execution with user namespaces
+# ~3.1.20260108082145 + PR#2207
+cwltool @ git+https://github.com/crim-ca/cwltool.git@allow-uid-gid-rootless
+# cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
+cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.1.1
@@ -68,6 +72,8 @@ jsonschema>=3.0.1
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
 kombu>=5.3.0b2,<6
+# FIXME: https://github.com/lark-parser/lark/issues/1565
+lark==1.2.2
 lxml
 mako
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
@@ -97,6 +103,11 @@ pygeofilter[fes,backend-native]>=0.3.1
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
 pymongo>=4.6.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
+# FIXME: setuptools/pkg_resources deprecated dependency
+#   (https://github.com/Pylons/pyramid/issues/3731, https://github.com/pypa/setuptools/pull/5007)
+# below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
+# aligned with its upstream 'pyramid' dependency expecting 'pkg_resources' that has official been removed
+setuptools<82
 pyramid>=1.7.3
 pyramid_beaker>=0.8
 # see https://github.com/sontek/pyramid_celery/pull/102 to fix Python 3.12 support and other improvements
@@ -111,11 +122,11 @@ python-box
 python-dateutil
 python-magic
 pytz
-pywps==4.6.0
-pyyaml>=5.2
+pywps==4.7.0
+pyyaml>=5.4
 rasterio
 rdflib>=5  # pyup: ignore
-requests>=2.32.2
+requests>=2.32.5
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
@@ -126,9 +137,9 @@ schema-salad>=8.3.20221209165047,<9
 shapely
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
-urllib3>=2.2.2
+urllib3>=2.6.3
 urlmatch
-xmltodict
+xmltodict>=1.0.2
 webob
-werkzeug>=3.0.3,<3.1
+werkzeug>=3.1.5
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

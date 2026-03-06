@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import yaml
 from colander import EMAIL_RE, URL_REGEX
-from pyramid.httpexceptions import HTTPNotImplemented
+from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
 from requests.auth import AuthBase, HTTPBasicAuth
 from requests.sessions import Session
 from requests.structures import CaseInsensitiveDict
@@ -86,6 +86,7 @@ if TYPE_CHECKING:
             HeadersType,
             JobSubscribers,
             JSON,
+            Path,
             SettingsType
         )
     except ImportError:
@@ -143,7 +144,7 @@ class OperationResult(AutoBase):
 
     def __init__(
         self,
-        success=None,   # type: Optional[bool]
+        success=False,  # type: bool
         message=None,   # type: Optional[str]
         body=None,      # type: Optional[Union[str, JSON]]
         headers=None,   # type: Optional[AnyHeadersContainer]
@@ -269,7 +270,7 @@ class RequestAuthHandler(AuthHandler, HTTPBasicAuth):
         self,
         identity=None,  # type: Optional[str]
         password=None,  # type: Optional[str]
-        url=None,       # type: Optional[str]
+        url=None,       # type: Optional[URL]
         method="GET",   # type: AnyRequestMethod
         headers=None,   # type: Optional[AnyHeadersContainer]
         token=None,     # type: Optional[str]
@@ -380,7 +381,7 @@ class CookieAuthHandler(RequestAuthHandler):
         self,
         identity=None,  # type: Optional[str]
         password=None,  # type: Optional[str]
-        url=None,       # type: Optional[str]
+        url=None,       # type: Optional[URL]
         method="GET",   # type: AnyRequestMethod
         headers=None,   # type: Optional[AnyHeadersContainer]
         token=None,     # type: Optional[Union[str, CookiesType]]
@@ -417,7 +418,7 @@ class WeaverClient(object):
     auth = None  # type: AuthHandler
 
     def __init__(self, url=None, auth=None):
-        # type: (Optional[str], Optional[AuthBase]) -> None
+        # type: (Optional[URL], Optional[AuthBase]) -> None
         """
         Initialize the client with predefined parameters.
 
@@ -443,7 +444,7 @@ class WeaverClient(object):
     def _request(
         self,
         method,                 # type: AnyRequestMethod
-        url,                    # type: str
+        url,                    # type: URL
         headers=None,           # type: Optional[AnyHeadersContainer]
         x_headers=None,         # type: Optional[AnyHeadersContainer]
         request_timeout=None,   # type: Optional[int]
@@ -487,6 +488,8 @@ class WeaverClient(object):
         url = self._parse_url(url) if url else self._url
         if url.endswith("/processes") or url.endswith("/jobs"):
             url = url.rsplit("/", 1)[0]
+        if "/providers" in url:
+            url = url.split("/providers", 1)[0]
         if "/processes/" in url:
             url = url.split("/processes/", 1)[0]
         if "/jobs/" in url:
@@ -495,6 +498,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_url(url):
+        url = url.strip("\"'")
         parsed = urlparse(f"http://{url}" if not url.startswith("http") else url)
         parsed_netloc_path = f"{parsed.netloc}{parsed.path}".replace("//", "/")
         parsed_url = f"{parsed.scheme}://{parsed_netloc_path}"
@@ -642,7 +646,7 @@ class WeaverClient(object):
         return OperationResult(True, p_id, body)
 
     def _parse_job_ref(self, job_reference, url=None):
-        # type: (Union[URL, AnyUUID], Optional[str]) -> Tuple[Optional[str], Optional[str]]
+        # type: (Union[URL, AnyUUID], Optional[URL]) -> Tuple[Optional[AnyUUID], Optional[URL]]
         if str(job_reference).startswith("http"):
             job_url = job_reference
             job_parts = [part for part in job_url.split("/") if part.strip()]
@@ -664,7 +668,7 @@ class WeaverClient(object):
 
     def info(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -685,7 +689,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -700,7 +704,7 @@ class WeaverClient(object):
 
     def version(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -721,7 +725,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -745,7 +749,7 @@ class WeaverClient(object):
     def conformance(
         self,
         category=None,          # type: Optional[AnyConformanceCategory]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -767,7 +771,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -787,8 +791,8 @@ class WeaverClient(object):
     def register(
         self,
         provider_id,            # type: str
-        provider_url,           # type: str
-        url=None,               # type: Optional[str]
+        provider_url,           # type: URL
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -814,7 +818,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -830,7 +834,7 @@ class WeaverClient(object):
     def unregister(
         self,
         provider_id,            # type: str
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -855,7 +859,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -878,7 +882,7 @@ class WeaverClient(object):
         username=None,          # type: Optional[str]
         password=None,          # type: Optional[str]
         undeploy=False,         # type: bool
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -932,7 +936,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -968,7 +972,7 @@ class WeaverClient(object):
     def undeploy(
         self,
         process_id,             # type: str
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -990,7 +994,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1004,7 +1008,7 @@ class WeaverClient(object):
 
     def capabilities(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1034,7 +1038,7 @@ class WeaverClient(object):
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
         :param with_providers: Indicate if remote providers should be listed as well along with local processes.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param sort: Sorting field to list processes. Name must be one of the fields supported by process objects.
@@ -1081,7 +1085,7 @@ class WeaverClient(object):
         self,
         process_id,                 # type: str
         provider_id=None,           # type: Optional[str]
-        url=None,                   # type: Optional[str]
+        url=None,                   # type: Optional[URL]
         auth=None,                  # type: Optional[AuthBase]
         headers=None,               # type: Optional[AnyHeadersContainer]
         schema=ProcessSchema.OGC,   # type: Optional[ProcessSchemaType]
@@ -1109,7 +1113,7 @@ class WeaverClient(object):
         :param schema: Representation schema of the returned process description.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1140,7 +1144,7 @@ class WeaverClient(object):
         self,
         process_id,             # type: str
         provider_id=None,       # type: Optional[str]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1166,7 +1170,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1181,7 +1185,7 @@ class WeaverClient(object):
 
     @staticmethod
     def _parse_inputs(inputs):
-        # type: (Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
+        # type: (Optional[Union[Path, ExecutionInputs, CWL_IO_ValueMap]]) -> Union[OperationResult, ExecutionInputsMap]
         """
         Parse multiple different representation formats and input sources into standard :term:`OGC` inputs.
 
@@ -1206,6 +1210,15 @@ class WeaverClient(object):
                     inputs = load_file(inputs[0])
                 elif len(inputs) == 1 and inputs[0] == "":
                     inputs = []
+                # multiple file paths provided - purposely not supported to avoid merging ambiguity
+                elif len(inputs) > 1 and all(isinstance(item, str) and "=" not in item for item in inputs):
+                    return OperationResult(
+                        False,
+                        "Multiple input files are not supported to avoid merging ambiguities. "
+                        "Please provide a single JSON/YAML file containing all input definitions, "
+                        "or use literal input definitions with '-I <id>=<value>' format.",
+                        inputs
+                    )
             if isinstance(inputs, list):
                 inputs = {"inputs": inputs}  # convert OLD format provided directly into OGC
 
@@ -1217,8 +1230,8 @@ class WeaverClient(object):
                 # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
                 #   unless 'value/href/collection/process' (known OGC structures)
                 #   are present AND their sub-dict don't have CWL 'class'
-                # - if value of 'inputs' is a mapping with nested objects,
-                #   they must be interpreted as the CWL form if a 'class' is found
+                # - if value of 'inputs' is a mapping with nested objects or an array of objects,
+                #   they must be interpreted as the CWL form if a 'class' is found in the object
                 #   (literals would be interpreted the same regardless of OGC or CWL form)
                 # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
                 #   unless 'value/href/collection/process' (and also 'id' technically) are present
@@ -1230,11 +1243,16 @@ class WeaverClient(object):
                         "class" in values
                     ) or
                     (
-                        isinstance(values, (dict, list)) and
+                        isinstance(values, (dict, list)) and  # main container OGC/OLD style
                         any(
-                            isinstance(v, dict) and
-                            get_any_value(v, default=null, extras=["collection", "processes"]) is null
-                            for v in (values if isinstance(values, list) else values.values())
+                            (
+                                isinstance(val, dict) and  # CWL Object
+                                get_any_value(val, default=null, extras=["collection", "processes"]) is null
+                            ) or (
+                                isinstance(val, list) and  # CWL Array
+                                any("class" in (item if isinstance(item, dict) else {}) for item in val)
+                            )
+                            for val in (values if isinstance(values, list) else values.values())
                         )
                     )
                 )
@@ -1247,8 +1265,13 @@ class WeaverClient(object):
             return OperationResult(False, f"Failed inputs parsing with error: [{exc!s}].", inputs)
         return values
 
-    def _upload_files(self, inputs, url=None):
-        # type: (ExecutionInputsMap, Optional[str]) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+    def _upload_files(
+        self,
+        inputs,                         # type: ExecutionInputsMap
+        inputs_ignore_errors=False,     # type: bool
+        url=None,                       # type: Optional[URL]
+        cwd=None,                       # type: Optional[Path]
+    ):                                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Replaces local file paths by references uploaded to the :term:`Vault`.
 
@@ -1262,9 +1285,17 @@ class WeaverClient(object):
               in :ref:`file_vault_token` and :ref:`vault_upload` chapters.
 
         :param inputs: Input values for submission of :term:`Process` execution.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
+        :param url: Instance URL if not already provided during client creation.
+        :param cwd:
+            Alternative working directory to resolve relative file paths if applicable.
+            If provided, it will be considered before the actual current working directory of the invoking process.
         :return: Updated inputs or the result of a failing intermediate request.
         """
         auth_tokens = {}  # type: Dict[str, str]
+        missing_files = []  # type: List[Tuple[str, Path]]  # (input_id, file_path)
         update_inputs = dict(inputs)
         for input_id, input_data in dict(inputs).items():
             input_array = True
@@ -1279,28 +1310,42 @@ class WeaverClient(object):
                     continue
                 if href.startswith("file://"):
                     href = href[7:]
-                if os.path.isdir(href):
+                if "://" not in href and (
+                    os.path.isdir(href) or
+                    href.endswith("/") or
+                    data.get("type") == ContentType.APP_DIR
+                ):
                     return OperationResult(
+                        success=False,
                         message=f"Cannot upload local directory to vault: [{file}]. Aborting operation.",
                         title="Directory upload not implemented.",
                         code=HTTPNotImplemented.code,
                     )
-                if not os.path.isfile(href):  # Case for remote files (ex. http links)
+                if cwd and isinstance(cwd, str):
+                    cwd_href = os.path.join(cwd, href)
+                    if os.path.isfile(cwd_href):
+                        href = cwd_href
+                if not os.path.isfile(href):
                     if "://" not in href:
-                        LOGGER.warning(
-                            "Ignoring potential local file reference since it does not exist. "
-                            "Cannot upload to vault: [%s]", file
-                        )
-                    continue
+                        # Local file reference that doesn't exist
+                        missing_files.append((input_id, file))
+                        if inputs_ignore_errors:
+                            LOGGER.warning(
+                                "Ignoring missing local file reference for input '%s': [%s]",
+                                input_id, file
+                            )
+                    continue  # Skip upload for missing local files or remote URLs
 
+                href = os.path.abspath(href)  # ensure dot/relative path are resolved
                 fmt = data.get("format", {})
                 ctype = get_field(fmt, "mime_type", search_variations=True)
                 if not ctype:
                     ext = os.path.splitext(href)[-1]
                     ctype = get_content_type(ext)
                 fmt = get_format(ctype, default=ContentType.TEXT_PLAIN)
+                ctype = fmt.mime_type
                 c_enc = get_field(fmt, "encoding", search_variations=True) or None
-                res = self.upload(href, content_type=fmt.mime_type, content_encoding=c_enc, url=url)
+                res = self.upload(href, content_type=ctype, content_encoding=c_enc, url=url)
                 if res.code != 200:
                     return res
                 vault_href = res.body["file_href"]
@@ -1310,12 +1355,28 @@ class WeaverClient(object):
                 LOGGER.info("Converted (input: %s) [%s] -> [%s]", input_id, file, vault_href)
                 input_vault_href = {
                     "href": vault_href,
+                    "type": ctype,
                     "format": {"mediaType": ctype, "encoding": c_enc} if c_enc else {"mediaType": ctype}
                 }
                 if input_array:
                     update_inputs[input_id][input_index] = input_vault_href
                 else:
                     update_inputs[input_id] = input_vault_href
+
+        # Report all missing files if any were found and errors are not ignored
+        if missing_files and not inputs_ignore_errors:
+            files_list = "\n".join([f"  - Input [{inp_id}]: {fpath}" for inp_id, fpath in missing_files])
+            return OperationResult(
+                success=False,
+                message=(
+                    f"Not all files could be resolved. Missing local file references in inputs:\n{files_list}\n"
+                    "Please verify the files exist relative to the inputs file location, "
+                    "relative to the command's invocation directory, "
+                    "or use '--inputs-ignore-errors' to proceed without the missing files."
+                ),
+                title="Files not found.",
+                code=HTTPNotFound.code,
+            )
 
         auth_headers = {}
         if auth_tokens:
@@ -1328,12 +1389,18 @@ class WeaverClient(object):
 
     def _prepare_inputs(
         self,
-        inputs=None,    # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
-        url=None,       # type: Optional[str]
-    ):                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
+        inputs_ignore_errors=False,     # type: bool
+        url=None,                       # type: Optional[URL]
+    ):                                  # type: (...) -> Union[Tuple[ExecutionInputsMap, HeadersType], OperationResult]
         """
         Performs operations needed to prepare inputs, including parsing provided data/reference and upload as needed.
 
+        :param inputs: Input values for submission of :term:`Process` execution.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
+        :param url: Instance URL if not already provided during client creation.
         :returns:
             Operation result is returned in case of any failure.
             Otherwise, returns the parsed inputs and upload access tokens (as applicable).
@@ -1345,7 +1412,10 @@ class WeaverClient(object):
         values = self._parse_inputs(inputs)
         if isinstance(values, OperationResult):
             return values
-        result = self._upload_files(values, url=base)
+        if isinstance(inputs, list) and len(inputs) == 1:
+            inputs = inputs[0]
+        input_file = os.path.dirname(inputs) if isinstance(inputs, str) else None
+        result = self._upload_files(values, url=base, cwd=input_file, inputs_ignore_errors=inputs_ignore_errors)
         return result
 
     def _prepare_outputs(
@@ -1379,28 +1449,29 @@ class WeaverClient(object):
 
     def execute(
         self,
-        process_id,             # type: str
-        provider_id=None,       # type: Optional[str]
-        inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
-        pending=False,          # type: bool
-        monitor=False,          # type: bool
-        timeout=None,           # type: Optional[int]
-        interval=None,          # type: Optional[int]
-        subscribers=None,       # type: Optional[JobSubscribers]
-        url=None,               # type: Optional[str]
-        auth=None,              # type: Optional[AuthBase]
-        headers=None,           # type: Optional[AnyHeadersContainer]
-        with_links=True,        # type: bool
-        with_headers=False,     # type: bool
-        request_type="core",    # type: Literal["core", "jobs"]
-        request_timeout=None,   # type: Optional[int]
-        request_retries=None,   # type: Optional[int]
-        output_format=None,     # type: Optional[AnyOutputFormat]
-        output_refs=None,       # type: Optional[Iterable[str]]
+        process_id,                     # type: str
+        provider_id=None,               # type: Optional[str]
+        inputs=None,                    # type: Optional[Union[Path, List[Path], ExecutionInputs, CWL_IO_ValueMap]]
+        inputs_ignore_errors=False,     # type: bool
+        pending=False,                  # type: bool
+        monitor=False,                  # type: bool
+        timeout=None,                   # type: Optional[int]
+        interval=None,                  # type: Optional[int]
+        subscribers=None,               # type: Optional[JobSubscribers]
+        url=None,                       # type: Optional[URL]
+        auth=None,                      # type: Optional[AuthBase]
+        headers=None,                   # type: Optional[AnyHeadersContainer]
+        with_links=True,                # type: bool
+        with_headers=False,             # type: bool
+        request_type="core",            # type: Literal["core", "jobs"]
+        request_timeout=None,           # type: Optional[int]
+        request_retries=None,           # type: Optional[int]
+        output_format=None,             # type: Optional[AnyOutputFormat]
+        output_refs=None,               # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
-        output_filter=None,     # type: Optional[Sequence[str]]
-        output_context=None,    # type: Optional[str]
-    ):                          # type: (...) -> OperationResult
+        output_filter=None,             # type: Optional[Sequence[str]]
+        output_context=None,            # type: Optional[str]
+    ):                                  # type: (...) -> OperationResult
         """
         Execute a :term:`Job` for the specified :term:`Process` with provided inputs.
 
@@ -1427,6 +1498,11 @@ class WeaverClient(object):
         :param inputs:
             Literal :term:`JSON` or :term:`YAML` contents of the inputs submitted and inserted into the execution body,
             using either the :term:`OGC API - Processes` or :term:`CWL` format, or a file path/URL referring to them.
+            If resolved by the :term:`CLI` invocation, it can also be a single-item list of these types as collected
+            by the input arguments.
+        :param inputs_ignore_errors:
+            - If ``True``, missing or unresolved local file references will be ignored with a warning.
+            - If ``False`` (default), missing files will cause the operation to fail with a detailed error.
         :param pending:
             If enabled, the :term:`Job` will be created, but will not immediately start execution.
             The :term:`Job` will be pending execution until a following :meth:`trigger_job` is sent.
@@ -1458,7 +1534,7 @@ class WeaverClient(object):
             The request type behave the same way regardless of the selected endpoint when targeting a `Weaver` instance.
             Selection is provided in case the choice impacts another non-`Weaver` instance for which a specific endpoint
             must be employed by the client. This option is enforced to ``"jobs"`` if :paramref:`pending` is requested.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_refs:
@@ -1476,7 +1552,7 @@ class WeaverClient(object):
         :returns: Results of the operation.
         """
         base = self._get_url(url)  # raise before inputs parsing if not available
-        result = self._prepare_inputs(inputs, url=base)
+        result = self._prepare_inputs(inputs, url=base, inputs_ignore_errors=inputs_ignore_errors)
         if isinstance(result, OperationResult):
             return result
         values, auth_headers = result
@@ -1536,7 +1612,7 @@ class WeaverClient(object):
     def trigger_job(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1564,7 +1640,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :return: Result of the :term:`Job` trigger operation.
@@ -1583,7 +1659,7 @@ class WeaverClient(object):
         title=null,             # type: Union[Type[null], Optional[str]]
         inputs=None,            # type: Optional[Union[str, ExecutionInputs, CWL_IO_ValueMap]]
         subscribers=None,       # type: Optional[JobSubscribers]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1629,7 +1705,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_refs:
@@ -1692,7 +1768,7 @@ class WeaverClient(object):
         file_path,              # type: str
         content_type=None,      # type: Optional[str]
         content_encoding=None,  # type: Optional[ContentEncoding]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1729,7 +1805,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Results of the operation.
@@ -1745,6 +1821,7 @@ class WeaverClient(object):
         file_path = os.path.abspath(os.path.expanduser(file_path))
         if os.path.isdir(file_path):
             return OperationResult(
+                success=False,
                 message=f"Cannot upload local directory to vault: [{file_path}]. Aborting operation.",
                 title="Directory upload not implemented.",
                 code=HTTPNotImplemented.code,
@@ -1769,7 +1846,7 @@ class WeaverClient(object):
                 os.path.basename(file_path),
                 open(file_path, mode=f_mode, encoding=f_enc),  # pylint: disable=R1732
                 file_headers["Content-Type"],
-                {"Content-Encoding": c_enc} if c_enc else {},
+                {"Content-Transfer-Encoding": c_enc} if c_enc else {},
             )
         }
         req_headers = {
@@ -1784,7 +1861,7 @@ class WeaverClient(object):
 
     def jobs(
         self,
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1817,7 +1894,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
@@ -1867,7 +1944,7 @@ class WeaverClient(object):
     def status(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1892,7 +1969,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Retrieved status of the :term:`Job`.
@@ -1908,7 +1985,7 @@ class WeaverClient(object):
         self,
         x_path,                 # type: str
         job_reference,          # type: Union[URL, AnyUUID]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -1935,7 +2012,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Retrieved information from the :term:`Job`.
@@ -1975,7 +2052,7 @@ class WeaverClient(object):
         prov_run_id=None,       # type: Optional[AnyUUID]
         prov_format=None,       # type: Optional[ProvenanceFormat]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         **kwargs,               # type: Any
@@ -2049,11 +2126,11 @@ class WeaverClient(object):
 
     def monitor(
         self,
-        job_reference,                      # type: str
+        job_reference,                      # type: Union[URL, AnyUUID]
         timeout=None,                       # type: Optional[int]
         interval=None,                      # type: Optional[int]
         wait_for_status=Status.SUCCESSFUL,  # type: str
-        url=None,                           # type: Optional[str]
+        url=None,                           # type: Optional[URL]
         auth=None,                          # type: Optional[AuthBase]
         headers=None,                       # type: Optional[AnyHeadersContainer]
         with_links=True,                    # type: bool
@@ -2081,7 +2158,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :return: Result of the successful or failed job, or timeout of monitoring process.
@@ -2189,10 +2266,10 @@ class WeaverClient(object):
 
     def results(
         self,
-        job_reference,          # type: str
-        out_dir=None,           # type: Optional[str]
+        job_reference,          # type: Union[URL, AnyUUID]
+        out_dir=None,           # type: Optional[Path]
         download=False,         # type: bool
-        url=None,               # type: Optional[str]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2217,7 +2294,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :param output_links:
@@ -2267,8 +2344,8 @@ class WeaverClient(object):
 
     def dismiss(
         self,
-        job_reference,          # type: str
-        url=None,               # type: Optional[str]
+        job_reference,          # type: Union[AnyUUID, URL]
+        url=None,               # type: Optional[URL]
         auth=None,              # type: Optional[AuthBase]
         headers=None,           # type: Optional[AnyHeadersContainer]
         with_links=True,        # type: bool
@@ -2290,7 +2367,7 @@ class WeaverClient(object):
             Note that this can break functionalities if expected headers are overridden. Use with care.
         :param with_links: Indicate if ``links`` section should be preserved in returned result body.
         :param with_headers: Indicate if response headers should be returned in result output.
-        :param request_timeout: Maximum timout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
         :returns: Obtained result from the operation.
@@ -2389,7 +2466,7 @@ def add_shared_options(parser):
     req_grp.add_argument(
         "-rT", "--request-timeout", dest="request_timeout", action=ValidateNonZeroPositiveNumberAction, type=int,
         default=5, help=(
-            "Maximum timout duration (seconds) to wait for a response when "
+            "Maximum timeout duration (seconds) to wait for a response when "
             "performing HTTP requests (default: %(default)ss)."
         )
     )
@@ -2569,8 +2646,10 @@ def add_job_ref_param(parser):
     operation = parser.prog.split(" ")[-1]
     parser.add_argument(
         "-j", "--job", dest="job_reference", required=True,
-        help=f"Job URL or UUID to run {operation} operation. "
-             "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        help=(
+            f"Job URL or UUID to run {operation} operation. "
+            "If full Job URL is provided, the instance ``--url`` parameter can be omitted."
+        )
     )
 
 
@@ -2624,6 +2703,15 @@ def add_job_exec_param(parser):
 
             Example: ``-I message='Hello Weaver' -I value:int=1234 -I file:File=data.xml@mediaType=text/xml``
         """)
+    )
+    parser.add_argument(
+        "--inputs-ignore-errors", dest="inputs_ignore_errors", action="store_true",
+        help=(
+            "When specified, missing or unresolved local file references in inputs will be ignored with a warning, "
+            "allowing execution to proceed (though the server could refuse the request from empty/missing inputs). "
+            "By default, any missing local file will cause the operation to fail "
+            "with a detailed error message listing all problematic files."
+        )
     )
     parser.add_argument(
         "-R", "--ref", "--reference", metavar="REFERENCE", dest="output_refs", action="append",
@@ -3265,25 +3353,23 @@ def make_parser():
         title=docker_auth_title,
         description=docker_auth_desc,
     )
-    op_deploy_token = op_deploy_group.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_creds = op_deploy_token.add_argument_group(title=docker_auth_title, description=docker_auth_desc)
-    op_deploy_tkt = op_deploy_token.add_argument(
+    op_deploy_tkt = op_deploy_group.add_argument(
         "-T", "--token", dest="token",
         help="Authentication token to retrieve a Docker image reference from a protected registry during execution."
     )
-    op_deploy_usr = op_deploy_creds.add_argument(
+    op_deploy_usr = op_deploy_group.add_argument(
         "-U", "--username", dest="username",
         help="Username to compute the authentication token for Docker image retrieval from a protected registry."
     )
-    op_deploy_pwd = op_deploy_creds.add_argument(
+    op_deploy_pwd = op_deploy_group.add_argument(
         "-P", "--password", dest="password",
         help="Password to compute the authentication token for Docker image retrieval from a protected registry."
     )
-
     # when actions are evaluated for actual executions, conditional 'required' will consider them as options
     # when actions are printed in help, they will be considered required, causing ( ) to be added to form the
     # rendered group of *mutually required* arguments
-    parser.add_help_conditional(op_deploy_creds)
+    parser.add_help_conditional(op_deploy_group)
+
     # following adjust references in order to make arguments appear within sections/groups as intended
     op_deploy_mutex_usr_tkt = op_deploy_group.add_mutually_exclusive_group()
     op_deploy_mutex_usr_tkt._group_actions.append(op_deploy_usr)

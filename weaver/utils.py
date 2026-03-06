@@ -19,7 +19,6 @@ import warnings
 from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor, as_completed, wait as wait_until
 from copy import deepcopy
 from datetime import datetime
-from pkgutil import get_loader
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
@@ -674,6 +673,60 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
+def get_response_profile(request, request_headers=None):
+    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+    """
+    Obtains the desired response profile based on request parameters.
+
+    Possible locations are, in order of precedence:
+
+        - ``profile`` query parameter.
+        - ``Accept-Profile`` header directly providing the profile :term:`URI`.
+        - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
+        - ``Prefer`` header including a ``profile`` parameter.
+        - ``Link`` header including a ``profile`` parameter.
+
+    .. seealso::
+        - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
+        - `Indicating, Discovering, Negotiating, and Writing Profiled Representations
+          <https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation>`_
+        - :ref:`Weaver Content Negotiation by Profile <content-negotiation-profile>` in the documentation
+          for specific detail about why the below code is implemented in this way.
+
+    :param request: Request to retrieve relevant profile information.
+    :param request_headers: Additional headers to consider for profile extraction.
+    :return: Matched profile value if found.
+    """
+    query_params = get_request_args(request)
+    profile_query = query_params.get("profile")
+    if profile_query:
+        return profile_query or None
+
+    headers = {}
+    if hasattr(request, "headers"):
+        headers.update(request.headers)
+    if request_headers:
+        headers.update(request_headers)
+
+    content_profile = get_header("Accept-Profile", headers)
+    if content_profile:
+        return content_profile.strip("<>").strip() or None
+
+    for header_name in ["Accept", "Prefer", "Link"]:
+        content_accept = get_header(header_name, headers) or ""
+        content_media_type = content_accept.split(",")[0]
+        content_params = parse_kvp(
+            content_media_type,
+            key_value_sep="=",
+            pair_sep=";",
+            nested_pair_sep=None,
+            accumulate_keys=False,
+        )
+        content_profile = content_params.get("profile")
+        if content_profile:
+            return content_profile[0].strip("<>").strip() or None
+
+
 def get_request_args(request):
     # type: (AnyRequestType) -> AnyRequestQueryMultiDict
     """
@@ -1117,7 +1170,11 @@ def open_module_resource_file(module, file_path):
 
     :returns: File stream handler to read contents as needed.
     """
-    loader = get_loader(module)
+    if isinstance(module, str):
+        spec = importlib.util.find_spec(module)
+        loader = spec.loader
+    else:
+        loader = module.__loader__
     # Python <=3.6, no 'get_resource_reader' or 'open_resource' on loader/reader
     # Python >=3.10, no 'open_resource' directly on loader
     # Python 3.7-3.9, both permitted in combination
@@ -1386,14 +1443,14 @@ def make_link_header(
     """
     params = {}
     if isinstance(href, dict):
-        rel = rel or href.pop("rel", None)
-        type = type or href.pop("type", None)  # noqa
-        title = title or href.pop("title", None)
-        charset = charset or href.pop("charset", None)  # noqa
-        hreflang = hreflang or href.pop("hreflang", None)
-        params = {key: val for key, val in href.items() if val and isinstance(val, str)}
-        href = params.pop("href", None)
-    params.update(kwargs)
+        rel = rel or href.get("rel")
+        type = type or href.get("type")  # noqa
+        title = title or href.get("title")
+        charset = charset or href.get("charset")  # noqa
+        hreflang = hreflang or href.get("hreflang")
+        href = href["href"]
+    if not rel:
+        raise ValueError(f"Missing required 'rel' parameter to form a valid 'Link' header for [{href}].")
     link = f"<{href}>; rel=\"{rel}\""
     if type:
         link += f"; type=\"{type}\""
@@ -1490,13 +1547,15 @@ def pass_http_error(exception, expected_http_error):
     """
     Silently ignore a raised HTTP error that matches the specified error code of the reference exception class.
 
-    Given an :class:`HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
-    error matches the status code. Other exceptions are re-raised.
-    This is equivalent to capturing a specific ``Exception`` within an ``except`` block and calling ``pass`` to drop it.
+    Given an ``HTTPError`` of any type (i.e.: :class:`PyramidHTTPError` or :class:`RequestsHTTPError` of
+    corresponding :mod:`pyramid` and :mod:`requests` modules), ignores the exception if the
+    actual error matches the status code. Other exceptions are re-raised.
+    This is equivalent to capturing a specific :class:`Exception`` within an ``except`` block
+    and calling ``pass`` to drop it.
 
     :param exception: Any :class:`Exception` instance.
-    :param expected_http_error: Single or list of specific pyramid `HTTPError` to handle and ignore.
-    :raise exception: If it doesn't match the status code or is not an `HTTPError` of any module.
+    :param expected_http_error: Single or list of specific pyramid ``HTTPError`` to handle and ignore.
+    :raise exception: If it doesn't match the status code or is not an ``HTTPError`` of any module.
     """
     if not hasattr(expected_http_error, "__iter__"):
         expected_http_error = [expected_http_error]
@@ -2117,6 +2176,26 @@ def request_extra(method,                           # type: AnyRequestMethod
     """
     Standard library :mod:`requests` with additional functional utilities.
 
+    :param method: HTTP method to set request.
+    :param url: URL of the request to execute.
+    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
+    :param backoff: Factor by which to multiply delays between retries.
+    :param intervals: Explicit intervals in seconds between retries.
+    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
+    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: ``True``).
+    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
+    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
+    :param settings: Additional settings from which to retrieve configuration details for requests.
+    :param only_server_errors:
+        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: ``True``).
+        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
+        This parameter is ignored if allowed codes are explicitly specified.
+    :param request_kwargs: All other keyword arguments are passed down to the request call.
+    :returns: Response object of the request or an appropriate ``HTTPError`` object.
+    :raises requests.ConnectionError: If the connexion as failed and retries are exhausted or not specified.
+    :raises requests.Timeout: If the request timed out and retries are exhausted or not specified.
+
     Retry operation
     ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2157,7 +2236,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     Any other :py:exc:`IOError` types are converted to 400 responses.
 
     .. seealso::
-        - :class:`FileAdapter`
+        - :class:`requests_file.FileAdapter`
 
     SSL Verification
     ~~~~~~~~~~~~~~~~~~~~~~
@@ -2167,8 +2246,8 @@ def request_extra(method,                           # type: AnyRequestMethod
     then application settings are retrieved from ``weaver.ini`` to parse additional SSL options that could disable it.
 
     Following :mod:`weaver` settings are considered :
-        - `weaver.ssl_verify = True|False`
-        - `weaver.request_options = request_options.yml`
+        - ``weaver.ssl_verify = True|False``
+        - ``weaver.request_options = request_options.yml``
 
     .. note::
         Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
@@ -2177,23 +2256,6 @@ def request_extra(method,                           # type: AnyRequestMethod
     .. seealso::
         - :func:`get_request_options`
         - :func:`get_ssl_verify_option`
-
-    :param method: HTTP method to set request.
-    :param url: URL of the request to execute.
-    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
-    :param backoff: Factor by which to multiply delays between retries.
-    :param intervals: Explicit intervals in seconds between retries.
-    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
-    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
-    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
-    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
-    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
-    :param settings: Additional settings from which to retrieve configuration details for requests.
-    :param only_server_errors:
-        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
-        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
-        This parameter is ignored if allowed codes are explicitly specified.
-    :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # obtain file request-options arguments, then override any explicitly provided source-code keywords
     settings = get_settings(settings) or {}

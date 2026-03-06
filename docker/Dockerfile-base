@@ -1,9 +1,9 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
 LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
 LABEL vendor="CRIM"
-LABEL version="6.4.1"
+LABEL version="6.9.0"
 
 # setup paths
 ENV APP_DIR=/opt/local/src/weaver
@@ -31,11 +31,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc \
         g++ \
         git \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 # install package
 COPY ./ ${APP_DIR}
 # equivalent of `make install` without conda env and pre-installed packages
 RUN pip install --no-dependencies -e ${APP_DIR}
+
+# backward-compatibility mapping for 'importlib.metadata' dist/package name resolution
+# this allows existing 'weaver.ini' to point at 'weaver' rather than 'crim-weaver' for pserve and celery INI
+# start with a 'cd /tmp' to avoid resolution by importlib to return only the current APP_DIR egg-info directory
+RUN cd /tmp && \
+    ln -s $( \
+      python -c 'import importlib.metadata; DIST=importlib.metadata.Distribution.from_name("crim-weaver")._path; \
+        print(DIST); \
+        print(str(DIST).replace("crim_", ""))' \
+    )
 
 CMD ["bash"]

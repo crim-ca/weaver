@@ -13,6 +13,12 @@ feature/CWL:
   - '(CWL|cwl)'
   - 'workflow'
 
+feature/ogc-apppkg:
+  - 'OGC Application Package'
+  - 'OGC AppPkg'
+  - 'ogc-apppkg'
+  - 'ogcapppkg'
+
 feature/oas:
   - '(OpenAPI|openapi)'
   - '(Swagger|swagger)'

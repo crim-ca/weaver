@@ -49,6 +49,11 @@ nosetests.xml
 unit_tests/testdata.json
 result[s].xml
 testdata.json
+output.*
+out.*
+
+# PyPI distributions
+dist/
 
 ## R
 *.Rhistory

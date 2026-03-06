@@ -75,6 +75,9 @@ feature/CWL:
   - weaver/processes/wps_workflow.py
   - tests/processes/test_wps_package.py
 
+feature/HTML:
+  - weaver/wps_restapi/templates/**/*
+
 feature/opensearch:
   - weaver/processes/opensearch.py
   - tests/test_opensearch.py

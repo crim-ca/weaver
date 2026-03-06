@@ -131,6 +131,7 @@ class MetadataTypeConverter(TypeConverter):
     """
     Converter that applies :term:`OpenAPI` schema metadata properties defined in the schema node.
     """
+
     def convert_type(self, schema_node):
         result = super(MetadataTypeConverter, self).convert_type(schema_node)
         deprecated = getattr(schema_node, "deprecated", False)
@@ -2345,7 +2346,10 @@ class OneOfKeywordSchema(KeywordMapper):
             # (e.g.: discriminate between float vs numerical string allowed schema variations)
             if not isinstance(cstruct, (dict, set, list, tuple)):
                 # pylint: disable=C0123
-                valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
+                valid_values = list(filter(
+                    lambda c: c == cstruct and type(c) == type(cstruct),  # noqa: E721
+                    valid_one_of
+                ))
                 if len(valid_values) == 1:
                     return valid_values[0]
                 message = (

@@ -186,6 +186,7 @@ class StoreJobs(StoreInterface):
                  subscribers=None,          # type: Optional[ExecutionSubscribers]
                  accept_type=None,          # type: Optional[str]
                  accept_language=None,      # type: Optional[str]
+                 accept_profile=None,       # type: Optional[str]
                  created=None,              # type: Optional[datetime.datetime]
                  status=None,               # type: Optional[AnyStatusType]
                  ):                         # type: (...) -> Job

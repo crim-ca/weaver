@@ -58,9 +58,12 @@ from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
     IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
     OGC_MAPPING,
     OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
     AcceptLanguage,
+    ContentEncoding,
     ContentType,
     get_cwl_file_format,
     repr_json
@@ -76,7 +79,16 @@ from weaver.processes.constants import (
 )
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import fetch_file, get_any_value, get_header, get_path_kvp, is_uuid, load_file, parse_kvp
+from weaver.utils import (
+    explode_headers,
+    fetch_file,
+    get_any_value,
+    get_header,
+    get_path_kvp,
+    is_uuid,
+    load_file,
+    parse_kvp
+)
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -580,11 +592,11 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         expect_outputs["file"]["schema"] = {
             "oneOf": [
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_PNG, "contentEncoding": ContentEncoding.BASE64},
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_JPEG, "contentEncoding": ContentEncoding.BASE64},
                 {"type": "string", "format": "binary",
-                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": "base64"},
+                 "contentMediaType": ContentType.IMAGE_GEOTIFF, "contentEncoding": ContentEncoding.BASE64},
             ]
         }
 
@@ -1036,6 +1048,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert "hints" in pkg
         assert pkg["hints"] == {CWL_REQUIREMENT_SECRETS: {"secrets": ["message"]}}
 
+    @pytest.mark.format
     def test_execute_file_type_io_format_references(self):
         """
         Test to validate :term:`OGC` compliant ``type`` directly provided as ``mediaType`` for execution file reference.
@@ -1092,6 +1105,66 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
 
+    @pytest.mark.format
+    def test_execute_file_type_io_format_cwl_iana_yaml_mapping(self):
+        """
+        Test to validate resolution of explicitly provided YAML media-type.
+
+        The plain YAML media-type provided in a :term:`OGC API - Processes` execution should be mapped to the
+        corresponding :term:`CWL` ``format`` reference with IANA namespace mapping according to the package definition.
+        """
+        cwl = self.retrieve_payload("CatFile", "package", ref_name="cat.cwl", local=True)
+        cwl["inputs"]["file"].update({"format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}"})
+        cwl["inputs"]["file2"] = copy.deepcopy(cwl["inputs"]["file"])
+        cwl.update({
+            "$namespaces": {
+                IANA_NAMESPACE: IANA_NAMESPACE_URL,
+                OGC_NAMESPACE: OGC_NAMESPACE_URL,
+            }
+        })
+        self.deploy_process(cwl, process_id=self._testMethodName)
+        data = {
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "outputs": {"output": {}}
+        }
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            # test with both extensions, to make sure mapping is not based/resolved only on a specific one
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix="test.yaml"))
+            tmp_file2 = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix="test.yml"))
+            yaml.safe_dump({"test": "test1"}, tmp_file)
+            yaml.safe_dump({"test": "test2"}, tmp_file2)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            tmp_file2.flush()
+            tmp_file2.seek(0)
+            tmp_href = tmp_file.name.replace(out_dir, out_url, 1)
+            tmp_href2 = tmp_file2.name.replace(out_dir, out_url, 1)
+            data.update({
+                "inputs": {
+                    "file": {"href": tmp_href, "type": ContentType.APP_YAML},
+                    "file2": {"href": tmp_href2, "type": ContentType.APP_YAML},
+                }
+            })
+
+            proc_url = f"/processes/{self._testMethodName}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            assert resp.status_code == 201, resp.text
+            status_url = resp.json.get("location")
+            results = self.monitor_job(status_url)
+            assert "output" in results
+            out_ref = map_wps_output_location(results["output"]["href"], self.settings)
+            with open(out_ref, mode="r", encoding="utf-8") as out_fd:
+                out_data = out_fd.read()
+            assert out_data == "test: test1\ntest: test2\n"
+
+    @pytest.mark.format
     def test_execute_output_file_format_validator(self):
         """
         Test with custom :mod:`pywps` file format extension validator involved in output resolution.
@@ -1133,13 +1206,15 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             results = self.monitor_job(status_url)  # successful (if validator did not apply correctly, execution fails)
 
             assert mock_validator.called
-            validator_call_types = [call.args[0].data_format.mime_type for call in mock_validator.call_args_list]
-            expected_media_types = [
-                "image/jp2",
+            validator_call_types = {call.args[0].data_format.mime_type for call in mock_validator.call_args_list}
+            expected_media_types = {
+                ContentType.IMAGE_JPEG2000,
                 ContentType.IMAGE_TIFF,
                 ContentType.IMAGE_PNG,
                 ContentType.TEXT_XML,
-            ]
+                ContentType.APP_YAML,
+                ContentType.APP_NETCDF,
+            }
             assert validator_call_types == expected_media_types
 
             assert len(results) != len(expected_media_types), (
@@ -3062,6 +3137,60 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             output_dir_files = {os.path.join(root, file) for root, _, files in os.walk(out_dir) for file in files}
             assert output_dir_files == expect_out_files
 
+    def test_execute_with_multi_output_subdir_files_matching_names(self):
+        """
+        Test that multi-output subdirectory hierarchies with matching file name/extension are correctly handled.
+
+        If the execution fails, it should be because of the 'fn.ext_{n}' correction of conflicting names automatically
+        applied by :mod:`cwltool`, which leads to failure of :term:`CWL` output ``format`` validation of the extension.
+
+        If the execution succeeds, the path mapper should have collected the results correctly by preserving the
+        original directory structure generated by the :term:`CWL`, which in turn should be re-mapped again to
+        distinct ``outputID`` subdirectories of the :term:`Job`.
+
+        .. seealso::
+            - :class:`weaver.processes.wps_package.WpsPathMapperFactory`
+
+        .. versionadded:: 6.9
+        """
+        proc = "EchoMultiOutputSubDirFiles"
+        pkg = self.retrieve_payload(proc, "package", local=True)
+        assert len(pkg["outputs"]) > 1
+        self.deploy_process(pkg, describe_schema=ProcessSchema.OGC)
+
+        with contextlib.ExitStack() as stack:
+            # tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
+            # tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+            # stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings=self.settings, mock_browse_index=True))
+
+            exec_body = {"inputs": {"message": "test"}}
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            proc_url = f"/processes/{proc}/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], f"Failed with: [{resp.status_code}]\nReason:\n{resp.json}"
+            job_id = str(resp.content_location).rsplit("/", 2)[-2]
+            results = resp.json
+
+            assert all(out_id in results for out_id in pkg["outputs"])
+            wps_dir = get_wps_output_dir(self.settings)
+            wps_url = get_wps_output_url(self.settings)
+            for out_id in pkg["outputs"]:
+                out_dir = os.path.join(wps_dir, job_id, out_id)
+                out_url = os.path.join(wps_url, job_id, out_id)
+                assert isinstance(results[out_id], list)
+                assert len(results[out_id]) > 0
+                for link in results[out_id]:
+                    assert link["type"] == ContentType.APP_JSON
+                    assert link["href"].startswith(out_url)
+                    assert link["href"].endswith(".json")
+                    file = link["href"].replace(out_url, out_dir)
+                    assert os.path.isfile(file)
+                    with open(file, mode="r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    assert data == {"test": exec_body["inputs"]["message"]}
+
     @parameterized.expand([
         # all values in MiB / seconds accordingly
         (False, 48, 96, 16, 3, 0.25, 0.25, {}),
@@ -3533,10 +3662,13 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["inputs"][0]["description"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
         assert proc["inputs"][0]["minOccurs"] == 1
         assert proc["inputs"][0]["maxOccurs"] == 1000
-        assert len(proc["inputs"][0]["formats"]) == 1
-        assert proc["inputs"][0]["formats"][0]["default"] is True
+        assert len(proc["inputs"][0]["formats"]) == 2
+        assert proc["inputs"][0]["formats"][0]["default"] is False  # This is extended as 'preferred' alias
         assert proc["inputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert proc["inputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["inputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
+        assert proc["inputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process
+        assert proc["inputs"][0]["formats"][1]["mediaType"] == ContentType.APP_X_NETCDF
+        assert proc["inputs"][0]["formats"][1]["encoding"] == ContentEncoding.BASE64
         assert proc["inputs"][1]["id"] == "freq"
         assert proc["inputs"][1]["title"] == "Frequency"
         assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
@@ -3551,10 +3683,13 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         assert proc["outputs"][0]["description"] == "The indicator values computed on the original input grid."
         assert "minOccurs" not in proc["outputs"][0]
         assert "maxOccurs" not in proc["outputs"][0]
-        assert len(proc["outputs"][0]["formats"]) == 1
-        assert proc["outputs"][0]["formats"][0]["default"] is True
+        assert len(proc["outputs"][0]["formats"]) == 2
+        assert proc["outputs"][0]["formats"][0]["default"] is False  # This is extended as 'preferred' alias
         assert proc["outputs"][0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
-        assert proc["outputs"][0]["formats"][0]["encoding"] == "base64"
+        assert proc["outputs"][0]["formats"][0]["encoding"] == ContentEncoding.BASE64
+        assert proc["outputs"][0]["formats"][1]["default"] is True  # This is the original from the XML process
+        assert proc["outputs"][0]["formats"][1]["mediaType"] == ContentType.APP_X_NETCDF
+        assert proc["outputs"][0]["formats"][1]["encoding"] == ContentEncoding.BASE64
         assert proc["outputs"][1]["id"] == "output_log"
         assert proc["outputs"][1]["title"] == "Logging information"
         assert "abstract" not in proc["inputs"][1], "Field 'abstract' should be replaced by 'description'."
@@ -3669,7 +3804,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
         assert len(proc["inputs"][2]["formats"]) == 3
         assert proc["inputs"][2]["formats"][0]["default"] is True
-        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert proc["inputs"][2]["formats"][0]["mediaType"] == ContentType.APP_X_NETCDF
         assert "encoding" not in proc["inputs"][2]["formats"][0]  # none specified, so omitted in response
         assert proc["inputs"][2]["formats"][1]["default"] is False
         assert proc["inputs"][2]["formats"][1]["mediaType"] == ContentType.APP_TAR
@@ -4945,6 +5080,68 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                 "href": f"{out_url}/{job_id}/output_json/result.json",
                 "type": ContentType.APP_JSON,
             },
+        }
+
+    @parameterized.expand([
+        (sd.OGC_API_PROC_PROFILE_RESULTS_URL, None),
+        (None, sd.OGC_API_PROC_PROFILE_RESULTS_URL),
+    ])
+    @pytest.mark.oap_part1
+    def test_execute_single_output_response_results_profile_content_negotiation(self, profile_header, profile_query):
+        """
+        Validate that a :term:`JSON` ``document`` response is returned for single output if using the `Results` profile.
+
+        Otherwise, when requesting only a single output, and omitting any other content negotiation method
+        (``Prefer: return=...`` header, ``Accept`` header or ``response`` parameter), the default behavior is to
+        return the single output directly in its ``raw`` content :term:`Media-Type` (see :ref:`proc_exec_results`).
+
+        .. seealso::
+            - :ref:`proc_exec_results`
+            - :func:`test_execute_single_output_prefer_header_return_minimal_complex_accept_default`
+            - :func:`test_execute_single_output_prefer_header_return_representation_complex`
+            - :func:`test_execute_single_output_response_raw_value_literal`
+            - :func:`test_execute_single_output_response_raw_value_complex`
+        """
+        proc = "EchoResultsTester"
+        p_id = self.fully_qualified_test_name(proc)
+        body = self.retrieve_payload(proc, "deploy", local=True)
+        self.deploy_process(body, process_id=p_id)
+
+        exec_headers = {"Accept-Profile": profile_header} if profile_header else {}
+        exec_queries = {"profile": profile_query} if profile_query else {}
+        exec_content = {
+            "mode": ExecuteMode.SYNC,  # force sync to make sure JSON job status is not returned instead
+            "inputs": {
+                "message": "test"
+            },
+            "outputs": {
+                "output_json": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        }
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery():
+                stack.enter_context(mock_exec)
+            path = f"/processes/{p_id}/execution"
+            resp = mocked_sub_requests(self.app, "post_json", path, timeout=5, only_local=True,
+                                       data=exec_content, headers=exec_headers, params=exec_queries)
+            assert resp.status_code == 200, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_RESULTS_URL in profile[0]
+
+        profile = get_header("Content-Profile", resp.headers)
+        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
+
+        # validate the results based on original execution request
+        results = resp.json
+        assert results == {
+            "output_json": {
+                "mediaType": ContentType.APP_JSON,
+                "value": {"data": "test"},
+            }
         }
 
     @parameterized.expand([

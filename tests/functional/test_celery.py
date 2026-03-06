@@ -1,6 +1,9 @@
 """
 Tests to validate that :mod:`celery` execution behaves as intended.
 """
+
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 import contextlib
 import inspect
 import json
@@ -34,6 +37,8 @@ def get_taskmeta_output(taskmeta_collection, output):
     return taskmeta.get("traceback", "") + taskmeta.get("result", "")
 
 
+@pytest.mark.slow
+@pytest.mark.functional
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_celery_registry_resolution():
     python_bin = sys.executable
@@ -63,7 +68,7 @@ def test_celery_registry_resolution():
         cfg_ini.write(
             inspect.cleandoc(f"""
             [app:main]
-            use = egg:weaver
+            use = egg:crim-weaver
             [celery]
             broker_url = {celery_mongo_broker}
             result_backend = {celery_mongo_broker}

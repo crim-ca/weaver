@@ -111,7 +111,8 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
-    JobStatusSchema,
+    JobStatusProfileSchema,
+    JobStatusType,
     ProcessSchema
 )
 from weaver.provenance import ProvenanceFormat
@@ -232,7 +233,17 @@ OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
 OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
 OGC_API_BBOX_EPSG = "EPSG:4326"
 
+OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
+OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
+OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
+OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
+
 OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
 
 OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
 OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
@@ -287,6 +298,30 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
     "metadata",
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
+
+JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
+JOB_STATUS_FIELD_AFTER = [
+    "jobID",
+    "processID",
+    "providerID",
+    "type",
+    "status",
+    "message",
+    "created",
+    "started",
+    "finished",
+    "updated",
+    "duration",
+    "runningDuration",
+    "runningSeconds",
+    "expirationDate",
+    "estimatedCompletion",
+    "nextPoll",
+    "percentCompleted",
+    "progress",
+    "process",
+    "links",
+]
 
 JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
 JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
@@ -742,7 +777,6 @@ class AcceptHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Accept"
     schema_type = String
-    # FIXME: raise HTTPNotAcceptable in not one of those?
     validator = OneOf([
         ContentType.APP_JSON,
         ContentType.APP_YAML,
@@ -769,8 +803,22 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     name = "Accept-Language"
     schema_type = String
     missing = drop
-    default = AcceptLanguage.EN_CA
-    # FIXME: oneOf validator for supported languages (?)
+    default = AcceptLanguage.EN_CA  # FIXME: oneOf validator for supported languages (?)
+
+
+class AcceptProfileHeader(URI):
+    name = "Accept-Profile"
+    default = None
+    validator = OneOf([
+        OGC_API_PROC_PROFILE_PROC_DESC_URL,
+        OGC_API_PROC_PROFILE_PROC_LIST_URL,
+        OGC_API_PROC_PROFILE_EXECUTE_URL,
+        OGC_API_PROC_PROFILE_RESULTS_URL,
+        OGC_API_PROC_PROFILE_JOB_DESC_URL,
+        OGC_API_PROC_PROFILE_JOB_LIST_URL,
+        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+        OPENEO_API_SCHEMA_JOB_STATUS_URL,
+    ])
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -831,6 +879,7 @@ class PreferHeader(ExtendedSchemaNode):
         "Header that describes the desired execution mode of the process job and desired results. "
         "Parameter 'return' indicates the structure and contents how results should be returned. "
         "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
+        "Parameter 'profile' can indicate an alternate results representation than the resolved one by the context. "
         f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
     )
     name = "Prefer"
@@ -843,6 +892,7 @@ class RequestHeaders(ExtendedMappingSchema):
     """
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
+    accept_profile = AcceptProfileHeader(missing=drop)
     content_type = RequestContentTypeHeader()
 
 
@@ -2336,7 +2386,7 @@ class JobTypeEnum(ExtendedSchemaNode):
     title = "JobType"
     default = null
     example = "process"
-    validator = OneOf(["process", "provider", "service"])
+    validator = OneOf(JobStatusType.values())
 
 
 class JobTitle(ExtendedSchemaNode):
@@ -3268,7 +3318,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3423,12 +3473,12 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     description = "Selects the schema employed for representation of returned job status response."
     schema_type = String
     title = "JobStatusQuerySchema"
-    example = JobStatusSchema.OGC
-    default = JobStatusSchema.OGC
-    validator = OneOfCaseInsensitive(JobStatusSchema.values())
+    example = JobStatusProfileSchema.OGC
+    default = JobStatusProfileSchema.OGC
+    validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
 
 
-class GetJobQuery(ExtendedMappingSchema):
+class GetJobQuery(FormatQuery):
     schema = JobStatusQueryProfileSchema(missing=drop)
     profile = JobStatusQueryProfileSchema(missing=drop)
 
@@ -3937,8 +3987,18 @@ class DurationISO(ExtendedSchemaNode):
         return cstruct
 
 
+class JobProcess(AnyOfKeywordSchema):
+    _any_of = [
+        ReferenceURL(),
+        PermissiveMappingSchema(),
+    ]
+
+
 class JobStatusInfo(ExtendedMappingSchema):
     _schema = OGC_API_SCHEMA_JOB_STATUS_URL
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
@@ -3973,6 +4033,7 @@ class JobStatusInfo(ExtendedMappingSchema):
                               description="Completion percentage of the job as indicated by the process.")
     progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
                                   description="Completion progress of the job (alias to 'percentCompleted').")
+    process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
 
 
@@ -3995,7 +4056,7 @@ class CreatedJobStatusSchema(DescriptionSchema):
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
     status = ExtendedSchemaNode(String(), example=Status.ACCEPTED)
-    location = ExtendedSchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
+    location = ExtendedSchemaNode(String(), example="https://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
 
 
 class PagingBodySchema(ExtendedMappingSchema):
@@ -5904,32 +5965,32 @@ class CWLNamespaces(StrictMappingSchema):
     edam = URI(
         missing=drop,
         name=EDAM_NAMESPACE,
-        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("/")]),
     )
     iana = URI(
         missing=drop,
         name=IANA_NAMESPACE,
-        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("/")]),
     )
     ogc = URI(
         missing=drop,
         name=OGC_NAMESPACE,
-        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("/")]),
     )
     ogc_api_proc_part1 = URI(
         missing=drop,
         name=CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
-        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL])
+        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL, CWL_NAMESPACE_OGC_API_PROC_PART1_URL.rstrip("/")]),
     )
     opengis = URI(
         missing=drop,
         name=OPENGIS_NAMESPACE,
-        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("/")]),
     )
     s = URI(
         missing=drop,
         name=CWL_NAMESPACE_SCHEMA_ID,
-        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("/")]),
     )
     weaver = URI(
         missing=drop,
@@ -6487,6 +6548,7 @@ class JobExecuteHeaders(ExtendedMappingSchema):
     description = "Indicates the relevant headers that were supplied for job execution or a null value if omitted."
     accept = AcceptHeader(missing=None)
     accept_language = AcceptLanguageHeader(missing=None)
+    accept_profile = AcceptProfileHeader(missing=None)
     content_type = RequestContentTypeHeader(missing=None, default=None)
     prefer = PreferHeader(missing=None)
     x_wps_output_context = WpsOutputContextHeader(missing=None)
@@ -6870,7 +6932,7 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
     querystring = FormatQuery()
     body = Deploy(title="Deploy", examples={
         "DeployCWL": {
-            "summary": "Deploy a process from a CWL definition.",
+            "summary": "Deploy a process from a CWL+JSON definition.",
             "value": EXAMPLES["deploy_process_cwl.json"],
         },
         "DeployOGC": {
@@ -6881,6 +6943,15 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
             "summary": "Deploy a process from a remote WPS-1 reference URL.",
             "value": EXAMPLES["deploy_process_wps1.json"],
         }
+    })
+
+
+class PostProcessesEndpointCWLYAML(PostProcessesEndpoint):
+    body = PermissiveMappingSchema(title="DeployCWLYAML", examples={
+        "DeployCWLYAML": {
+            "summary": "Deploy a process from a CWL+YAML definition.",
+            "value": EXAMPLES["deploy_process_yaml.cwl"],
+        },
     })
 
 

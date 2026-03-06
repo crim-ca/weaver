@@ -121,7 +121,7 @@ def error_repr(http_err):
         #        specific cleanup in case of string representation of colander.Invalid to help debug logged errors
         err_repr = clean_json_text_body(err_repr, remove_newlines=False, remove_indents=False)
         if "Invalid schema:" in err_repr:
-            err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"
+            err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"  # noqa: flynt
             err_repr = err_repr.replace(". 'Errors for each case:", ".\n Errors for each case:")
     except Exception:  # noqa: W0703 # nosec: B110
         pass

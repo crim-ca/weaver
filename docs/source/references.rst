@@ -19,6 +19,8 @@
 .. _aws_s3_access_points: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-access-points.html
 .. |aws_s3_outposts| replace:: AWS S3 Outposts
 .. _aws_s3_outposts: https://docs.aws.amazon.com/AmazonS3/latest/userguide/S3onOutposts.html
+.. |content_negotiation_profile| replace:: Content Negotiation by Profile
+.. _content_negotiation_profile: https://profilenegotiation.github.io/I-D-Profile-Negotiation/I-D-Profile-Negotiation
 .. |crs| replace:: Coordinate Reference System
 .. _crs: https://www.w3.org/TR/sdw-bp/#CRS-background
 .. |crs-def| replace:: Coordinate Reference System (CRS)
@@ -65,9 +67,13 @@
 .. |cwltool-cwlprov| replace:: CWLProv - Provenance Capture with :mod:`cwltool`
 .. _cwltool-cwlprov: https://cwltool.readthedocs.io/en/latest/CWLProv.html
 .. |docker| replace:: Docker
+.. |docker-rootless| replace:: *docker rootless*
+.. _docker-rootless: https://docs.docker.com/engine/security/rootless/
+.. |docker-userns-remap| replace:: *docker user namespaces*
+.. _docker-userns-remap: https://docs.docker.com/engine/security/userns-remap/
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
-.. _esgf: https://esgf.llnl.gov/
+.. _esgf: https://esgf.github.io/
 .. |esgf-cwt-git| replace:: ESGF Compute API
 .. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
@@ -142,9 +148,11 @@
 .. |ogc-api-proc-exec-outputs| replace:: *OGC API - Processes* - Execution Outputs
 .. _ogc-api-proc-exec-outputs: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs
 .. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
-.. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. _ogc-ets-weaver-impl-ref: https://portal.ogc.org/public_ogc/compliance/product.php?pid=1825
 .. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
 .. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
+.. _ogc-api-proc-profiles: https://docs.ogc.org/DRAFTS/18-062r3.html#profile-uris
+.. |ogc-api-proc-profiles| replace:: *OGC API - Processes* - Profile Identifiers
 .. |ogc-api-proc-part2| replace:: *OGC API - Processes* - Part 2: Deploy, Replace, Undeploy
 .. _ogc-api-proc-part2: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/deploy_replace_undeploy
 .. |ogc-api-proc-part3| replace:: *OGC API - Processes* - Part 3: Workflows
@@ -153,8 +161,10 @@
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
-.. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
+.. |ogc-tb20-gdc| replace:: *OGC Testbed-20* - GeoDataCubes
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-tb20-gdc-profile| replace:: *OGC Testbed-20* - GeoDataCubes (GDC) API Profile
+.. _ogc-tb20-gdc-profile: https://docs.ogc.org/per/24-035.html
 .. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
 .. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
@@ -172,6 +182,8 @@
 .. _openeo: https://openeo.org/
 .. |openeo-api| replace:: openEO API
 .. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
+.. |openeo-api-profile| replace:: openEO API Profiles
+.. _openeo-api-profile: https://openeo.org/documentation/1.0/developers/profiles/api.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |JSON-LD| replace:: JSON Linked Data
@@ -237,7 +249,7 @@
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _MongoDB: https://www.mongodb.com/
 .. |mongodb-docs| replace:: MongoDB official documentation
-.. _mongodb-docs: https://docs.mongodb.com/manual
+.. _mongodb-docs: https://www.mongodb.com/docs/manual/
 .. |media-types| replace:: Media-Types
 .. _media-types: https://www.iana.org/assignments/media-types/media-types.xhtml
 
@@ -245,6 +257,7 @@
 .. |weaver-config| replace:: ``weaver/config``
 .. _weaver-config: ../../../config
 .. _weaver.ini.example: ../../../config/weaver.ini.example
+.. _Makefile.config.example: ../../../Makefile.config.example
 .. _data_sources.yml.example: ../../../config/data_sources.yml.example
 .. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
 .. _request_options.yml.example: ../../../config/request_options.yml.example
@@ -306,8 +319,6 @@
 .. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
 .. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/results`` (Results)
 .. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
-.. |update-token-req| replace:: Update Token
-.. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
 .. |vault-upload-req| replace:: Vault File Upload (POST)
 .. _vault-upload-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault/post
 .. |vault-download-req| replace:: Vault File Download (GET)

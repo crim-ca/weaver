@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
+from urllib.parse import unquote_plus
 
 import colander
 from celery.utils.log import get_task_logger
@@ -18,6 +19,7 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPOk
 )
+from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
@@ -50,8 +52,9 @@ from weaver.formats import (
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
-from weaver.processes.constants import JobInputsOutputsSchema, JobStatusSchema
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.transform import transform
@@ -65,26 +68,31 @@ from weaver.utils import (
     get_href_headers,
     get_path_kvp,
     get_request_args,
+    get_response_profile,
     get_sane_name,
     get_secure_path,
     get_settings,
-    get_weaver_url,
     is_uuid,
-    make_link_header,
-    parse_kvp
+    make_link_header
 )
 from weaver.visibility import Visibility
-from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps.utils import (
+    get_wps_local_status_location,
+    get_wps_output_dir,
+    get_wps_output_url,
+    map_wps_output_location
+)
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
-    from weaver.formats import AnyContentEncoding
-    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusSchemaType
+    from weaver.formats import AnyContentEncoding, AnyContentType
+    from weaver.processes.constants import JobInputsOutputsSchemaType, JobStatusProfileSchemaType
     from weaver.typedefs import (
         AnyDataStream,
         AnyHeadersContainer,
@@ -101,6 +109,8 @@ if TYPE_CHECKING:
         HTTPValid,
         JobValueFormat,
         JSON,
+        Link,
+        ProcessExecution,
         PyramidRequest,
         SettingsType
     )
@@ -204,14 +214,14 @@ def get_job(request):
     return job
 
 
-def get_job_list_links(job_total, filters, request):
-    # type: (int, Dict[str, AnyValueType], AnyRequestType) -> List[JSON]
+def get_job_list_links(job_total, filters, grouped, request):
+    # type: (int, Dict[str, AnyValueType], Any, AnyRequestType) -> List[Link]
     """
     Obtains a list of all relevant links for the corresponding job listing defined by query parameter filters.
 
     :raises IndexError: if the paging values are out of bounds compared to available total :term:`Job` matching search.
     """
-    base_url = get_weaver_url(request)
+    base_url = get_wps_restapi_base_url(request)
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
     kvp_params = {param: value for param, value in request.params.items() if param != "page"}
@@ -239,7 +249,9 @@ def get_job_list_links(job_total, filters, request):
     # path is whichever specific service/process endpoint, jobs are pre-filtered by them
     # transform sub-endpoints into matching query parameters and use generic path as alternate location
     else:
-        job_path = base_url + request.path
+        # remove query and ensure API prefix is preserved if any, but not duplicated either
+        req_path = request.route_url(request.matched_route.name, _app_url="", **request.matchdict)
+        job_path = base_url + req_path
         alt_path = base_url + sd.jobs_service.path
         alt_kvp["process"] = filters["process"]
         if filters["service"]:
@@ -252,14 +264,20 @@ def get_job_list_links(job_total, filters, request):
     if cur_page < 0 or cur_page > max_page:
         raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
 
-    alt_links = []
+    links = []
     if alt_path:
-        alt_links = [{
+        links.append({
             "href": get_path_kvp(alt_path, page=cur_page, **alt_kvp), "rel": "alternate",
             "type": ContentType.APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
-        }]
+        })
 
-    links = alt_links + [
+    if not grouped:
+        links.append({
+            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URL, "rel": "profile",
+            "title": "OGC API - Processes - Job List Profile reference."
+        })
+
+    links.extend([
         {"href": job_path, "rel": "collection",
          "type": ContentType.APP_JSON, "title": "Complete job listing (no filtering queries applied)."},
         {"href": base_url + sd.jobs_service.path, "rel": "search",
@@ -274,7 +292,7 @@ def get_job_list_links(job_total, filters, request):
          "type": ContentType.APP_JSON, "title": "First page of job query listing."},
         {"href": get_path_kvp(job_path, page=max_page, **kvp_params), "rel": "last",
          "type": ContentType.APP_JSON, "title": "Last page of job query listing."},
-    ]
+    ])
     if cur_page > 0:
         links.append({
             "href": get_path_kvp(job_path, page=cur_page - 1, **kvp_params), "rel": "prev",
@@ -329,50 +347,115 @@ def get_job_io_schema_query(
 
 
 def get_job_status_schema(request):
-    # type: (AnyRequestType) -> Tuple[JobStatusSchemaType, HeadersType]
+    # type: (AnyRequestType) -> Tuple[JobStatusProfileSchemaType, HeadersType]
     """
-    Identifies if a :term:`Job` status response schema applies for the request.
+    Identifies if a :term:`Job` status response schema :term:`Profile` applies for the request.
+
+    :raises HTTPBadRequest: If an invalid combination :term:`Profile` and :term:`Media-Type` is requested.
     """
 
-    def make_headers(resolved_schema):
-        # type: (JobStatusSchemaType) -> HeadersType
-        content_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
-        # FIXME: support HTML or XML
-        #  (allow transparently for browsers types since Accept did not raise earlier, and no other supported yet)
-        if content_type in ContentType.ANY_XML | {ContentType.TEXT_HTML}:
+    def make_headers(resolved_schema, resolved_profile, content_type):
+        # type: (JobStatusProfileSchemaType, Optional[str], AnyContentType) -> HeadersType
+        if content_type == ContentType.TEXT_HTML:
+            return {"Content-Type": content_type}
+        if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
             content_type = ContentType.APP_JSON
-        content_profile = f"{content_type}; profile={resolved_schema}"
+        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+            content_profile = f"{content_type}; profile=\"{resolved_profile}\""
+        else:
+            content_profile = f"{content_type}; profile={resolved_schema}"
         content_headers = {"Content-Type": content_profile}
-        if resolved_schema == JobStatusSchema.OGC:
-            content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-        elif resolved_schema == JobStatusSchema.OPENEO:
-            content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        if content_type in ContentType.ANY_XML:
+            if resolved_schema not in [JobStatusProfileSchema.WPS, None]:
+                raise HTTPBadRequest(
+                    json={
+                        "code": "InvalidParameterValue",
+                        "description": "Requested job schema profile cannot be combined with XML representation.",
+                        "cause": {"profile" if "profile" in request.params else "schema": schema},
+                    }
+                )
+            content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+        else:
+            if resolved_schema == JobStatusProfileSchema.OGC:
+                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
+                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
+                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, rel="profile")
+            elif resolved_schema == JobStatusProfileSchema.OPENEO:
+                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
         return content_headers
 
-    content_accept = request.accept.header_value or ContentType.APP_JSON
-    if content_accept == ContentType.ANY:
-        content_accept = ContentType.APP_JSON
+    profile = get_response_profile(request)
+    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+        schema = sd.JobStatusProfileSchema.OGC
+    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL:
+        schema = sd.JobStatusProfileSchema.WPS
+    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL:
+        schema = sd.JobStatusProfileSchema.OPENEO
+    else:
+        params = get_request_args(request)
+        schema = JobStatusProfileSchema.get(profile or params.get("schema"))
 
-    params = get_request_args(request)
-    schema = JobStatusSchema.get(params.get("profile") or params.get("schema"))
+    content_accept = get_header("Accept", request.headers) or ContentType.APP_JSON
+    content_media_type = clean_media_type_format(content_accept.split(",")[0], strip_parameters=True)
     if schema:
-        headers = make_headers(schema)
+        headers = make_headers(schema, profile, content_media_type)
         return schema, headers
-    ctype = get_header("Accept", request.headers)
-    if not ctype:
-        return JobStatusSchema.OGC, {}
-    params = parse_kvp(ctype)
-    profile = params.get("profile")
+
     if not profile:
-        schema = JobStatusSchema.OGC
-        headers = make_headers(schema)
+        if content_media_type in ContentType.ANY_XML:
+            schema = JobStatusProfileSchema.WPS
+        else:
+            schema = JobStatusProfileSchema.OGC
+        headers = make_headers(schema, profile, content_media_type)
         return schema, headers
-    schema = cast(
-        "JobStatusSchemaType",
-        JobStatusSchema.get(profile[0], default=JobStatusSchema.OGC)
-    )
-    headers = make_headers(schema)
+
+    schema = JobStatusProfileSchema.get(profile, default=JobStatusProfileSchema.OGC)
+    headers = make_headers(schema, profile, content_media_type)
     return schema, headers
+
+
+def get_job_status_wps_xml_response(job, request):
+    # type: (Job, AnyRequestType) -> AnyResponseType
+    """
+    Retrieve the :term:`WPS` :term:`XML` status file and return it as response.
+
+    Assumes that :func:`get_job_status_schema` was invoked to resolve any relevant schema :term:`Profile` and
+    content :term:`Media-Type` that is enforced by handling of the response representation from this function.
+
+    If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
+    an appropriate HTTP error will be raised.
+    """
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    headers = {
+        "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
+        "Content-Schema": schema,
+    }
+    wps_status_file = get_wps_local_status_location(
+        job.status_location or job.status_url(request),
+        container=request,
+        must_exist=True,
+    )
+    if not wps_status_file:
+        accept_header = get_header("Accept", request.headers)
+        format_query = "f" if "f" in request.params else "format"
+        raise JobGone(
+            json={
+                "title": "JobStatusGone",
+                "type": "JobStatusGone",
+                "status": JobGone.code,
+                "detail": "Job status artifact in XML representation cannot be resolved.",
+                "cause": (
+                    {"in": "headers", "name": "Accept", "value": accept_header}
+                    if accept_header else
+                    {"in": "query", "name": format_query, "value": "xml"}
+                ),
+                "value": {"jobID": str(job.id), "status": job.status},
+            }
+        )
+    resp = FileResponse(wps_status_file, request=request)
+    resp.headers.update(headers)
+    return resp
 
 
 def make_result_link(
@@ -433,14 +516,14 @@ def get_results(  # pylint: disable=R1260
     wps_url = get_wps_output_url(settings)
     if not wps_url.endswith("/"):
         wps_url = f"{wps_url}/"
-    schema = JobInputsOutputsSchema.get(str(schema).lower(), default=JobInputsOutputsSchema.OLD)
+    schema = str(JobInputsOutputsSchema.get(str(schema).lower(), default=JobInputsOutputsSchema.OLD))
     strict = schema.endswith("+strict")
-    schema = schema.split("+")[0]
+    schema = schema.split("+", 1)[0]
     ogc_api = schema == JobInputsOutputsSchema.OGC
     outputs = {} if ogc_api else []
     fmt_key = "mediaType" if ogc_api else "mimeType"
     references = {}
-    for result in job.results:
+    for result in job.results:  # type: Union[JSON, JobValueItem]
         # Filter outputs not requested, unless 'all' requested by omitting
         out_id = get_any_id(result)
         if (
@@ -494,7 +577,7 @@ def get_results(  # pylint: disable=R1260
             elif value_key:
                 out_key = value_key
 
-            output = {out_key: val_data}
+            output = cast("ExecutionResultObject", {out_key: val_data})
 
             # required for the rest to be there, other fields optional
             if is_ref:
@@ -569,7 +652,7 @@ def get_job_output_transmission(job, output_id, is_reference):
 
 def get_job_return(
     job=None,       # type: Optional[Job]
-    body=None,      # type: Optional[JSON]
+    body=None,      # type: Optional[ProcessExecution]
     headers=None,   # type: Optional[AnyHeadersContainer]
 ):                  # type: (...) -> Tuple[AnyExecuteResponse, AnyExecuteReturnPreference]
     """
@@ -599,6 +682,7 @@ def get_job_results_response(
     job,                        # type: Job
     *,                          # force named keyword arguments after
     container,                  # type: AnySettingsContainer
+    request=None,               # type: Optional[AnyRequestType]
     request_headers=None,       # type: Optional[AnyHeadersContainer]
     response_headers=None,      # type: Optional[AnyHeadersContainer]
     results_headers=None,       # type: Optional[AnyHeadersContainer]
@@ -636,7 +720,11 @@ def get_job_results_response(
         - :ref:`proc_exec_results`
 
     :param job: Job for which to generate the results response, which contains the originally submitted parameters.
-    :param container: Application settings.
+    :param container:
+        Request that was submitted for this response generation or an application settings container.
+        If the object cannot be the request directly, additional parameters must be provided to resolve relevant
+        properties defined in the request, such as control headers that can affect the response format.
+    :param request: Request object to look for more parameters that could affect the generation of this response.
     :param request_headers: Original headers submitted to the request that leads to this response.
     :param response_headers: Additional headers to provide in the response.
     :param results_headers: Headers that override originally submitted job parameters when requesting results.
@@ -645,9 +733,12 @@ def get_job_results_response(
     raise_job_dismissed(job, container)
     raise_job_bad_status_success(job, container)
     settings = get_settings(container)
+    request = request or container
+    request = None if isinstance(request, dict) else request
 
     results, _ = get_results(
-        job, container,
+        job,
+        container,
         value_key="value",
         schema=JobInputsOutputsSchema.OGC,  # not strict to provide more format details
         # no link headers since they are represented differently based on request parameters
@@ -679,9 +770,11 @@ def get_job_results_response(
     )
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
+    profile = get_response_profile(request, request_headers)
+    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
 
-    # document/minimal response
-    if not is_raw and not is_accept_multipart and not is_single_output_minimal:
+    # document/minimal response, unless explicitly requested by profile content negotiation
+    if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
         try:
             results_schema = sd.ResultsDocument()
             results_json = results_schema.deserialize(results)
@@ -709,13 +802,21 @@ def get_job_results_response(
         # use deserialized contents such that only the applicable fields remain
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
-        return HTTPOk(json=results_json, headers=headers)
+        headers.extend([
+            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URL),
+            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URL, rel="profile")),
+        ])
+
+        # avoid duplicate content-type header due to how pyramid response handles it
+        ctype = get_header("Content-Type", headers, pop=True, default=ContentType.APP_JSON)
+        return HTTPOk(json=results_json, headers=headers, content_type=ctype)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
         # see:
         #   - https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-ref
         #   - https://docs.ogc.org/DRAFTS/18-062.html#req_core_job-results-param-outputs-empty
+        #   - /req/core/process-execute-success-sync-empty-outputs
         return HTTPNoContent(headers=headers)
 
     # raw response can be data-only value, link-only or a mix of them
@@ -1308,7 +1409,7 @@ def raise_job_bad_status_success(job, container=None):
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if job.status not in JOB_STATUS_CATEGORIES[StatusCategory.SUCCESS]:
+    if not job.success:
         links = job.links(container=container)
         headers = [("Link", make_link_header(link)) for link in links]
         if job.status == Status.FAILED:
@@ -1342,9 +1443,10 @@ def raise_job_bad_status_success(job, container=None):
                 headers=headers,
                 json={
                     "title": "JobResultsFailed",
-                    "type": err_code,
+                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
                     "detail": "Job results not available because execution failed.",
                     "status": HTTPBadRequest.code,
+                    "error": err_code,
                     "cause": err_info,
                     "links": links
                 }
@@ -1381,7 +1483,7 @@ def raise_job_dismissed(job, container=None):
             headers=headers,
             json={
                 "title": "JobDismissed",
-                "type": "JobDismissed",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
                 "status": JobGone.code,
                 "detail": "Job was dismissed and artifacts have been removed.",
                 "cause": {"status": job.status},
@@ -1417,7 +1519,7 @@ def dismiss_job_task(job, container):
     job_out_xml = os.path.join(wps_out_dir, f"{str(job.id)}.xml")
     if os.path.isdir(job_out_dir):
         LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
-        shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(
+        shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(  # pylint: disable=W4903
             "Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_dir, _exc
         ))
     if os.path.isfile(job_out_log):
@@ -1453,9 +1555,33 @@ def get_job_prov_response(request):
     raise_job_dismissed(job, request)
     raise_job_bad_status_success(job, request)
 
-    prov_type = guess_target_format(request, override_user_agent=True, default=ContentType.APP_JSON)
     prov_path = request.path.rsplit("/prov", 1)[-1]
     prov_path = f"/prov{prov_path}"
+
+    def prov_format_handler(fmt):
+        if isinstance(fmt, str):
+            # special case of 'application/ld+json'
+            # if passed by query parameter, the '+' is escaped to a space
+            # also, consider if the %-escape was done explicitly for it
+            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+                fmt = ProvenanceFormat.PROV_JSONLD
+            if "/" not in fmt and not fmt.lower().startswith("prov-"):
+                fmt = f"prov-{fmt}"
+            # special case of YAML that is obtained from PROV-JSON
+            # early fix its media-type to resolve it correctly without ambiguity
+            if fmt.lower() == "prov-yaml":
+                return ContentType.APP_YAML
+        prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
+        if prov_fmt:
+            return ProvenanceFormat.as_media_type(prov_fmt)
+        return prov_fmt
+
+    prov_type = guess_target_format(
+        request,
+        override_user_agent=True,
+        default=ContentType.APP_JSON,
+        format_handler=prov_format_handler,
+    )
     prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
     if not prov_data:
         prov_dir = job.prov_path(request)

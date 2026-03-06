@@ -1,15 +1,15 @@
 import itertools
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, cast
 from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Dict, Set, TypeAlias
 
-    from weaver.typedefs import CWL_NamespaceDefinition
+    from weaver.typedefs import CWL_IO_LiteralType, CWL_NamespaceDefinition
 
 IO_SelectInput_Type = Literal["input"]
 IO_SelectOutput_Type = Literal["output"]
@@ -337,13 +337,13 @@ PACKAGE_INTEGER_TYPES = frozenset(["int", "integer", "long"])
 PACKAGE_FLOATING_TYPES = frozenset(["float", "double"])
 PACKAGE_NUMERIC_TYPES = frozenset(PACKAGE_INTEGER_TYPES | PACKAGE_FLOATING_TYPES)
 PACKAGE_BASIC_TYPES = frozenset({"string", "boolean"} | PACKAGE_NUMERIC_TYPES)
-PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_BASIC_TYPES | {"null", "Any"})
-PACKAGE_FILE_TYPE = "File"
-PACKAGE_DIRECTORY_TYPE = "Directory"
+PACKAGE_LITERAL_TYPES = cast("Set[CWL_IO_LiteralType]", frozenset(PACKAGE_BASIC_TYPES | {"null", "Any"}))
+PACKAGE_FILE_TYPE = "File"  # type: Literal["File"]
+PACKAGE_DIRECTORY_TYPE = "Directory"  # type: Literal["Directory"]
 PACKAGE_COMPLEX_TYPES = frozenset([PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE])
-PACKAGE_ENUM_BASE = "enum"
+PACKAGE_ENUM_BASE = "enum"  # type: Literal["enum"]
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
-PACKAGE_ARRAY_BASE = "array"
+PACKAGE_ARRAY_BASE = "array"  # type: Literal["array"]
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
 PACKAGE_ARRAY_ITEMS = frozenset(PACKAGE_BASIC_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
 PACKAGE_ARRAY_TYPES = frozenset([f"{item}[]" for item in PACKAGE_ARRAY_ITEMS])
@@ -386,17 +386,45 @@ OAS_DATA_TYPES = frozenset(
 ProcessSchemaOGCType = Literal["OGC", "ogc"]
 ProcessSchemaOLDType = Literal["OLD", "old"]
 ProcessSchemaWPSType = Literal["WPS", "wps"]
-ProcessSchemaType = Union[ProcessSchemaOGCType, ProcessSchemaOLDType, ProcessSchemaWPSType]
+ProcessSchemaConstType = "ProcessSchema"  # type: TypeAlias
+ProcessSchemaType = Union[
+    ProcessSchemaOGCType,
+    ProcessSchemaOLDType,
+    ProcessSchemaWPSType,
+    ProcessSchemaConstType,
+]
+JobStatusTypeProcess = Literal["process"]
+JobStatusTypeService = Literal["service"]
+JobStatusTypeProvider = Literal["provider"]
+JobStatusConstType = "JobStatusType"  # type: TypeAlias
+JobStatusPropertyType = Union[
+    JobStatusTypeProcess,
+    JobStatusTypeService,
+    JobStatusTypeProvider,
+    JobStatusConstType,
+]
 JobInputsOutputsSchemaType_OGC = Literal["OGC", "ogc"]
 JobInputsOutputsSchemaType_OLD = Literal["OLD", "old"]
 JobInputsOutputsSchemaType_OGC_STRICT = Literal["OGC+STRICT", "ogc+strict"]
 JobInputsOutputsSchemaType_OLD_STRICT = Literal["OLD+STRICT", "old+strict"]
 JobInputsOutputsSchemaAnyOGCType = Union[JobInputsOutputsSchemaType_OGC, JobInputsOutputsSchemaType_OGC_STRICT]
 JobInputsOutputsSchemaAnyOLDType = Union[JobInputsOutputsSchemaType_OLD, JobInputsOutputsSchemaType_OLD_STRICT]
-JobInputsOutputsSchemaType = Union[JobInputsOutputsSchemaAnyOGCType, JobInputsOutputsSchemaAnyOLDType]
-JobStatusSchemaType_OGC = Literal["OGC", "ogc"]
-JobStatusSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
-JobStatusSchemaType = Union[JobStatusSchemaType_OGC, JobStatusSchemaType_OpenEO]
+JobInputsOutputsSchemaConstType = "JobInputsOutputsSchema"  # type: TypeAlias
+JobInputsOutputsSchemaType = Union[
+    JobInputsOutputsSchemaAnyOGCType,
+    JobInputsOutputsSchemaAnyOLDType,
+    JobInputsOutputsSchemaConstType,
+]
+JobStatusProfileSchemaType_OGC = Literal["OGC", "ogc"]
+JobStatusProfileSchemaType_OpenEO = Literal["OPENEO", "openeo", "openEO", "OpenEO"]
+JobStatusProfileSchemaType_WPS = Literal["WPS", "wps"]
+JobStatusProfileSchemaConstType = "JobStatusProfileSchema"  # type: TypeAlias
+JobStatusProfileSchemaType = Union[
+    JobStatusProfileSchemaType_OGC,
+    JobStatusProfileSchemaType_OpenEO,
+    JobStatusProfileSchemaType_WPS,
+    JobStatusProfileSchemaConstType,
+]
 
 
 class ProcessSchema(Constants):
@@ -418,17 +446,37 @@ class JobInputsOutputsSchema(Constants):
     OLD = "old"                 # type: JobInputsOutputsSchemaType_OLD
 
 
-class JobStatusSchema(Constants):
+class JobStatusProfileSchema(Constants):
     """
-    Schema selector to represent a :term:`Job` status response.
+    Schema :term:`Profile` selector to represent a :term:`Job` status response.
     """
-    OGC = "ogc"         # type: JobStatusSchemaType_OGC
-    OPENEO = "openeo"   # type: JobStatusSchemaType_OpenEO
+    OGC = "ogc"         # type: JobStatusProfileSchemaType_OGC
+    OPENEO = "openeo"   # type: JobStatusProfileSchemaType_OpenEO
+    WPS = "wps"         # type: JobStatusProfileSchemaType_WPS
+
+
+class JobStatusType(Constants):
+    """
+    Type of :term:`Job` status response being represented.
+
+    The values consider teh originally submitted :term:`Process`, :term:`Provider` or :term:`Profile` representations.
+
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+    """
+    # backward compatibility
+    PROCESS = "process"     # type: JobStatusTypeProcess  # happens to be the same as newer 'OGC API - Processes' type
+    PROVIDER = "provider"   # type: JobStatusTypeProvider
+    # previous name used instead of 'provider', reflecting 'weaver.datatype.Service' explicitly
+    SERVICE = "service"     # type: JobStatusTypeService
+    # additional values as more specific variants of 'provider' or alternate 'profile' representations
+    WPS = "wps"             # type: ProcessSchemaWPSType
+    OPENEO = "openeo"       # type: JobStatusProfileSchemaType_OpenEO
 
 
 if TYPE_CHECKING:
     # pylint: disable=invalid-name
-    CWL_RequirementNames = Literal[
+    CWL_RequirementNames = Union[
         CWL_RequirementBuiltinType,
         CWL_RequirementESGFCWTType,
         CWL_RequirementOGCAPIType,

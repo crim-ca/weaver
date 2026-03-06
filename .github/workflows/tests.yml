@@ -19,69 +19,81 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_duplicate.outputs.should_skip && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
-      - uses: fkirc/skip-duplicate-actions@master
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: "same_content_newer"
           skip_after_successful_duplicate: "true"
+          cancel_others: "true"
           do_not_skip: '["workflow_dispatch", "schedule", "release"]'
 
   # see: https://github.com/actions/setup-python
   tests:
     needs: skip_duplicate
-    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' && ! contains(github.ref, 'refs/tags') && ! contains(github.ref, 'refs/heads/master') }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
       # override make command to install directly in active python
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
+      # globally excluded 'checks', to be re-executed by dedicated job
+      CHECKS_EXCLUDE: "links"
     services:
       # Label used to access the service container
       mongodb:
-        image: mongo:5.0  # DockerHub
+        image: mongo:7.0  # DockerHub
         ports:
           - "27017:27017"
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         allow-failure: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
-          - os: ubuntu-latest
-            python-version: "3.13"
-            allow-failure: true
-            test-case: test-unit-only
-          - os: ubuntu-latest
-            python-version: "3.13"
-            allow-failure: true
-            test-case: test-func-only
+          # not yet ready due to pywps->fiona dependency missing (https://github.com/Toblerity/Fiona/issues/1504)
+          #- os: ubuntu-latest
+          #  python-version: "3.14"
+          #  allow-failure: true
+          #  test-case: test-unit-only
+          #- os: ubuntu-latest
+          #  python-version: "3.14"
+          #  allow-failure: true
+          #  test-case: test-func-only
           # linter tests
+          # performs all 'check' targets except the 'CHECKS_EXCLUDE' ones (that should be defined by dedicated jobs)
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
-            test-case: check-all
+            test-case: check-only
+          # check links separately as they tend to sporadically fail from external factors (timeout, ssl, down, etc.)
+          # avoid wasting a lot of CI test time because one of them doesn't respond
+          - os: ubuntu-latest
+            python-version: "3.12"
+            allow-failure: true
+            test-case: check-links-only
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.10"  # doesn't matter which one (in docker), but match default of repo
+            python-version: "3.12"  # doesn't matter which one (defined in docker), use only to report matching version
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             allow-failure: true
             test-case: test-workflow-only
     steps:
@@ -128,6 +140,10 @@ jobs:
         run: |
           hash -r
           env | sort
+
+      - name: Display Applicable Checks
+        if: ${{ startsWith(matrix.test-case, 'check') }}
+        run: make check-info
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 
@@ -154,10 +170,43 @@ jobs:
           fail_ci_if_error: true
           verbose: true
 
+  # PyPI requires that all packages are distributed in PyPI.
+  # Because we have multiple patched/forked dependencies, we cannot use them directly for PyPI releases.
+  # (i.e.: all packages referenced as '<pacakge> @ git+https://github.com/projects/<package>.git@<ref>)
+  # pypi-publish:
+  #   name: Upload release to PyPI
+  #   runs-on: ubuntu-latest
+  #   needs: tests
+  #   if: ${{ success() && (contains(github.ref, 'refs/tags') || github.ref == 'refs/heads/master') }}
+  #   environment:
+  #     name: pypi
+  #     url: https://pypi.org/p/crim-weaver
+  #   permissions:
+  #     id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: "0"
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.12"
+  #     - name: Build Distribution Package
+  #       run: make dist-pypi
+  #     - name: Publish package distributions to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         user: __token__
+  #         password: ${{ secrets.PYPI_API_TOKEN }}
+  #         verbose: true
+
   deploy-docker:
     needs: tests
     if: ${{ success() && (contains(github.ref, 'refs/tags') || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-latest
+    env:
+      # enabled provenance attestation during build/push (see Makefile for details)
+      DOCKER_PROV: "true"
     steps:
       - uses: actions/checkout@v2
         with:
@@ -171,14 +220,17 @@ jobs:
           else
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
-      - name: Build Docker
-        run: |
-          make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-info docker-build
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build Docker
+        run: |
+          make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-info docker-build
       - name: Push to DockerHub
+        # push does not apply if built with provenance since the build itself already pushes the layers
+        # the referenced repository and tagged version will not be available locally for push
+        if: ${{ env.DOCKER_PROV != 'true' }}
         run: |
           make DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} docker-push

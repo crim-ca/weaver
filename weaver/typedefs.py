@@ -154,7 +154,13 @@ if TYPE_CHECKING:
     CWL_IO_ArrayBaseType = Literal["array"]
     CWL_IO_BaseType = Union[CWL_IO_LiteralType, CWL_IO_ComplexType, CWL_IO_ArrayBaseType, CWL_IO_SpecialType]
     CWL_IO_NullableType = Union[str, List[CWL_IO_BaseType]]  # "<type>?" or ["<type>", "null"]
-    CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
+    CWL_IO_NestedType = TypedDict(
+        "CWL_IO_NestedType", {
+            "type": CWL_IO_NullableType,
+            "format": NotRequired[Optional[Union[str, List[str]]]],
+        },
+        total=True,
+    )
     CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {
         "type": Literal["enum"],
@@ -357,6 +363,7 @@ if TYPE_CHECKING:
     KVP = Dict[str, List[KVP_Item]]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
+    EnvContainer = Dict[str, AnyValueType]
     SettingValue = Optional[Union[JSON, AnyValueType]]
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
@@ -390,10 +397,14 @@ if TYPE_CHECKING:
     ]
     AnyRequestMethod = Union[RequestMethod, str]
     AnyRequestQueryMultiDict = Union[PyramidMultiDict, WerkzeugMultiDict, MutableMapping[str, str]]
+    AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
+
+    # type that can be used to indicate that any container of headers is supported, but
+    # whichever type that is employed will persist (e.g.: function does not convert it
+    PreservedHeadersType = TypeVar("PreservedHeadersType", bound=AnyHeadersContainer)
+
     ViewHandler = Callable[[PyramidRequest], AnyViewResponse]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
-
-    AnyAcceptLanguageHeader = Union[AcceptLanguageNoHeader, AcceptLanguageValidHeader, AcceptLanguageInvalidHeader]
 
     AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessRef = Union[Process, str]

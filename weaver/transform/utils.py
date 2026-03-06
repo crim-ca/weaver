@@ -8,6 +8,7 @@ from typing import List, Union
 from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
+
 from weaver.formats import ContentType, get_content_type
 
 LOGGER = get_task_logger(__name__)

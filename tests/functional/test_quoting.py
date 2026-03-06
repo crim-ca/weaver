@@ -35,6 +35,12 @@ if TYPE_CHECKING:
     ]
 
 
+pytestmark = [
+    pytest.mark.functional,
+    pytest.mark.quotation,
+]
+
+
 def mocked_estimate_process_quote(quote, process, settings, mock_step_outputs=None):  # noqa
     # type: (Quote, Process, Optional[AnySettingsContainer], Optional[MockStepOutputs]) -> Quote
     """

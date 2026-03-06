@@ -8,7 +8,7 @@ import re
 import tempfile
 import uuid
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import colander
 import mock
@@ -35,7 +35,21 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
-from weaver.formats import AcceptLanguage, ContentType, OutputFormat, get_cwl_file_format
+from weaver.formats import (
+    EDAM_MAPPING,
+    EDAM_NAMESPACE,
+    EDAM_NAMESPACE_URL,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_URL,
+    OGC_MAPPING,
+    OGC_NAMESPACE,
+    OGC_NAMESPACE_URL,
+    AcceptLanguage,
+    ContentEncoding,
+    ContentType,
+    OutputFormat,
+    get_cwl_file_format
+)
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
@@ -49,28 +63,40 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
-from weaver.utils import fully_qualified_name, get_path_kvp, load_file, ows_context_href
+from weaver.utils import explode_headers, fully_qualified_name, get_path_kvp, load_file, ows_context_href, repr_json
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple, TypeAlias
+    from typing import Any, Generator, List, Optional, Tuple, TypeAlias, Union
     from typing_extensions import Literal
 
     import _pytest  # noqa: W0212
 
+    from weaver.formats import AnyContentType
     from weaver.processes.constants import ProcessSchemaType
-    from weaver.typedefs import AnyHeadersContainer, AnyVersion, CWL, JSON, ProcessExecution, SettingsType
+    from weaver.typedefs import (
+        AnyHeadersContainer,
+        AnyVersion,
+        CWL,
+        CWL_Inputs,
+        JSON,
+        ProcessDescription,
+        ProcessExecution,
+        SettingsType
+    )
 
     Marker: TypeAlias = "_pytest.mark.structures.Mark"  # noqa
 
 
 # noinspection PyTypeHints
 @pytest.fixture(name="assert_cwl_no_warn_unknown_hint")
-def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
-    # type: (pytest.LogCaptureFixture, pytest.FixtureRequest) -> None
+def fixture_cwl_no_warn_unknown_hint(
+    caplog,     # type: pytest.LogCaptureFixture
+    request,    # type: pytest.FixtureRequest
+):              # type: (...) -> Generator[pytest.LogCaptureFixture, Any, None]
     """
     Looks for a warning related to unknown :term:`CWL` requirement thrown by :mod:`cwltool`.
 
@@ -100,11 +126,23 @@ def fixture_cwl_no_warn_unknown_hint(caplog, request) -> None:
     """
     yield caplog  # run the test and collect logs from it
 
+    def is_cwl_fixture(marker, fixture):  # pragma: no cover
+        mark = marker.name
+        if mark != "parametrize":
+            return False
+        name = getattr(fixture, "name", None)
+        func = None
+        if not name:
+            func = getattr(fixture, "_fixture_function_marker", None)
+        if not func:
+            func = getattr(fixture, "_pytestfixturefunction", None)
+        if func:
+            name = func.name
+        return name == marker.args[0]
+
     markers = list(
         filter(
-            lambda _marker:
-                _marker.name == "parametrize"
-                and _marker.args[0] == fixture_cwl_no_warn_unknown_hint._pytestfixturefunction.name,  # noqa
+            lambda _marker: is_cwl_fixture(_marker, fixture_cwl_no_warn_unknown_hint),
             request.keywords.get("pytestmark", [])
         )
     )  # type: List[Marker]
@@ -150,6 +188,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             processDescriptionURL=f"{weaver_api_url}/processes/{self.process_public.identifier}",
             processEndpointWPS1=weaver_wps_url,
             jobControlOptions=ExecuteControlOption.values(),
+            package={"cwlVersion": "v1.2", "class": "CommandLineTool"},  # to test requesting it, but not executable
         )
         self.process_store.save_process(public_process)
         self.process_store.save_process(self.process_private)
@@ -198,7 +237,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         Contents correspond to required I/O for WPS process :class:`weaver.processes.wps_testing.WpsTestProcess`.
         """
-        return {
+        return cast("ProcessExecution", {
             "inputs": [
                 {"id": "test_input",
                  "data": test_input},
@@ -209,7 +248,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             ],
             "mode": ExecuteMode.ASYNC,
             "response": ExecuteResponse.DOCUMENT,
-        }
+        })
 
     def test_get_processes(self):
         path = "/processes"
@@ -258,6 +297,22 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(resp.json["processes"])
         for process in resp.json["processes"]:
             assert "links" not in process
+
+    def test_get_processes_link_profile_ogc_process_listing(self):
+        path = "/processes"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URL
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URL in profile[0]
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -670,6 +725,24 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.content_type == ContentType.APP_JSON
         assert "processes" in resp.json
 
+    def test_describe_process_yaml_accept_header(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.yaml_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
+    def test_describe_process_yaml_format_query(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, params={"f": OutputFormat.YAML})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_YAML
+        assert f"$schema: {sd.OGC_API_PROC_PART1_SCHEMAS}/process.yaml" in resp.text
+        assert f"id: {self.process_public.identifier}" in resp.text
+        assert f"processDescriptionURL: {self.url}{path}" in resp.text
+
     def test_describe_process_visibility_public(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.get(path, headers=self.json_headers)
@@ -681,6 +754,22 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
         assert resp.content_type == ContentType.APP_JSON
+
+    def test_describe_process_link_profile_ogc_process_description(self):
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+
+        assert "links" in resp.json
+        profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
+        assert len(profile) == 1
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URL
+
+        headers = explode_headers(resp.headers)
+        profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
+        assert len(profile) == 1, "Expected exactly one profile link in the response headers."
+        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URL in profile[0]
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_name()
@@ -819,7 +908,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @staticmethod
     def assert_deployed_wps3(response_json, expected_process_id, assert_io=True):
-        proc = response_json["process"]
+        proc = response_json["process"] if "process" in response_json else response_json
         assert expected_process_id in proc["id"]
         if assert_io:
             assert len(proc["inputs"]) == 1
@@ -841,12 +930,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert proc["outputs"][0]["formats"][2]["mediaType"] == ContentType.APP_XML
             assert proc["outputs"][0]["formats"][3]["mediaType"] == ContentType.APP_YAML
 
-    def deploy_process_make_visible_and_fetch_deployed(self,
-                                                       deploy_payload,          # type: JSON
-                                                       expected_process_id,     # type: str
-                                                       headers=None,            # type: Optional[AnyHeadersContainer]
-                                                       assert_io=True,          # type: bool
-                                                       ):                       # type: (...) -> JSON
+    def deploy_process_make_visible_and_fetch_deployed(
+        self,
+        deploy_payload,                     # type: Union[JSON, CWL]
+        expected_process_id,                # type: str
+        headers=None,                       # type: Optional[AnyHeadersContainer]
+        describe_schema=ProcessSchema.OLD,  # type: Optional[ProcessSchemaType]
+        assert_io=True,                     # type: bool
+    ):                                      # type: (...) -> ProcessDescription
         """
         Deploy, make visible and obtain process description.
 
@@ -861,7 +952,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         deploy_headers.update(headers or {})
         resp = mocked_sub_requests(self.app, "post", "/processes",  # mock in case of TestApp self-reference URLs
                                    data=deploy_payload, headers=deploy_headers, only_local=True)
-        assert resp.status_code == 201, f"{resp!s}\n{resp.text}"
+        assert resp.status_code == 201, f"{resp!s}\n{repr_json(resp.text)}"
         assert resp.content_type == ContentType.APP_JSON
 
         # apply visibility to allow retrieval
@@ -872,13 +963,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.put_json(vis_url, params=body, headers=self.json_headers)
         assert resp.status_code == 200
 
-        body = self.get_process_description(proc_id)
+        body = self.get_process_description(proc_id, schema=describe_schema)
         self.assert_deployed_wps3(body, expected_process_id, assert_io=assert_io)
         return body
 
     def get_process_description(self, process_id, schema=ProcessSchema.OLD):
-        # type: (str, ProcessSchema) -> JSON
-        proc_query = {"schema": schema}
+        # type: (str, Optional[ProcessSchema]) -> JSON
+        proc_query = {"schema": schema} if schema else {}
         proc_url = f"/processes/{process_id}"
         resp = self.app.get(proc_url, params=proc_query, headers=self.json_headers)
         assert resp.status_code == 200
@@ -912,6 +1003,299 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             valid_urls = [provider_url, f"{provider_url}/"]
         assert req_hint["provider"] in valid_urls
 
+    @parameterized.expand([
+        (ContentType.ANY, None),  # endpoint's default if none explicit
+        (ContentType.APP_CWL, None),  # interchangeable catch-all YAML/JSON CWL, resolve to endpoint's default JSON
+        (ContentType.APP_JSON, None),
+        (ContentType.APP_CWL_JSON, None),
+        (None, OutputFormat.JSON),
+    ])
+    def test_get_process_package_cwl_json(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_JSON)
+        content = json.loads(resp.text)  # avoid 'resp.json' since not handled by non-explicitly JSON types
+        assert "cwlVersion" in content
+        assert "class" in content
+        assert content["class"] == "CommandLineTool"
+
+    @parameterized.expand([
+        (ContentType.APP_YAML, None),
+        (ContentType.APP_CWL_YAML, None),
+        (None, OutputFormat.YAML),
+        (None, OutputFormat.YML),
+    ])
+    def test_get_process_package_cwl_yaml(self, accept_header, format_query):
+        headers = {"Accept": accept_header} if accept_header else {}
+        query = {"f": format_query} if format_query else {}
+        path = f"/processes/{self.process_public.identifier}/package"
+        resp = self.app.get(path, params=query, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == (accept_header or ContentType.APP_YAML)
+        assert "cwlVersion: " in resp.text
+        assert "class: CommandLineTool" in resp.text
+
+    @pytest.mark.format
+    def test_deploy_process_CWL_media_type_aliases_from_format(self):
+        """
+        Test that media-types with known aliases are correctly resolved in the process.
+
+        In this case, we evaluate both NetCDF and YAML that have multiple variants across IANA, EDAM and OGC namespaces.
+        These two are interesting cases since they have different combinations of supported ontologies, and different
+        amounts of IANA definitions typically used as preferred mapping.
+
+        The process description should extract and convert the :term:`CWL` ``format`` keys adequately into their
+        respective :term:`Media-Type` definitions. By default, the preferred mappings should be employed, unless
+        explicitly indicated otherwise using alternate variants. Variants can be combined simultaneously to offer
+        flexibility in supported formats by the process, but should do so by providing desired variants explicitly
+        to ensure expected validation and expectation by the underlying application that could expect specific formats
+        are respected, or because certain formats imply particular semantics to be respected.
+
+        Because :term:`CWL` outputs do not allow multiple ``format`` (list representation), they should therefore
+        only employ the preferred mapping unless they desire to explicitly include additional :term:`Media-Type`.
+        If desired, those alternate output formats must be provided by process description to work around the
+        :term:`CWL` limitation.
+
+        .. seealso::
+            - See :ref:`cwl-file-format-aliases` regarding the tested :term:`CWL` ``format`` resolutions.
+            - See :ref:`cwl-file-format-output` regarding the :term:`CWL` output ``format`` limitation.
+
+        .. versionadded:: 6.9
+        """
+        pid = "test-netcdf-aliases"
+        cwl = cast("CWL", {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": pid,
+            "requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "alpine:latest"}},
+            "inputs": {
+                "input_nc_iana": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}"},
+                "input_nc_iana_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_X_NETCDF}"},
+                "input_nc_edam": {"type": "File", "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_NETCDF]}"},
+                "input_nc_ogc": {"type": "File", "format": f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}"},
+                "input_nc_all": {
+                    "type": "File",
+                    "format": [
+                        f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
+                        f"{IANA_NAMESPACE}:{ContentType.APP_X_NETCDF}",
+                        f"{EDAM_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}",
+                        f"{OGC_NAMESPACE}:{OGC_MAPPING[ContentType.APP_NETCDF]}",
+                    ],
+                },
+                "input_yaml_iana": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}"},
+                "input_yaml_iana_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.APP_X_YAML}"},
+                "input_yaml_iana_text": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.TEXT_YAML}"},
+                "input_yaml_iana_text_x": {"type": "File", "format": f"{IANA_NAMESPACE}:{ContentType.TEXT_X_YAML}"},
+                "input_yaml_edam": {"type": "File", "format": f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_YAML]}"},
+                "input_yaml_all": {
+                    "type": "File",
+                    "format": [
+                        f"{IANA_NAMESPACE}:{ContentType.APP_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.APP_X_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.TEXT_YAML}",
+                        f"{IANA_NAMESPACE}:{ContentType.TEXT_X_YAML}",
+                        f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.APP_YAML]}",
+                    ],
+                }
+            },
+            "outputs": {
+                "output_nc": {
+                    "type": "File",
+                    "outputBinding": {"glob": "*.nc"},
+                    "format": f"{IANA_NAMESPACE}:{ContentType.APP_NETCDF}",
+                },
+                "output_yaml": {
+                    "type": "File",
+                    "outputBinding": {"glob": "*.yaml"},
+                    "format": f"{IANA_NAMESPACE}:{ContentType.APP_YAML}",
+                }
+            },
+            "$namespaces": {
+                IANA_NAMESPACE: IANA_NAMESPACE_URL,
+                EDAM_NAMESPACE: EDAM_NAMESPACE_URL,
+                OGC_NAMESPACE: OGC_NAMESPACE_URL,
+            }
+        })
+        headers = {
+            "Content-Type": ContentType.APP_CWL_JSON,
+            "Accept": ContentType.APP_JSON,
+        }
+        proc = self.deploy_process_make_visible_and_fetch_deployed(
+            cwl, pid,
+            headers=headers, assert_io=False, describe_schema=ProcessSchema.OGC,
+        )
+
+        assert len(proc["inputs"]) == len(cwl["inputs"])
+        assert len(proc["outputs"]) == len(cwl["outputs"])
+
+        assert proc["inputs"]["input_nc_iana"]["schema"] == {
+            "type": "string",
+            "format": ContentEncoding.BINARY,
+            "contentMediaType": ContentType.APP_NETCDF,
+            "contentEncoding": ContentEncoding.BASE64,
+        }
+        assert proc["inputs"]["input_nc_iana"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+            }
+        ]
+        assert proc["inputs"]["input_nc_iana_x"]["schema"] == {
+            "type": "string",
+            "format": ContentEncoding.BINARY,
+            "contentMediaType": ContentType.APP_X_NETCDF,  # only unique-format variant that differs
+            "contentEncoding": ContentEncoding.BASE64,
+        }
+        assert proc["inputs"]["input_nc_iana_x"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_X_NETCDF,  # only unique-format variant that differs
+                "encoding": ContentEncoding.BASE64,
+            }
+        ]
+        assert proc["inputs"]["input_nc_edam"]["schema"] == {
+            "type": "string",
+            "format": ContentEncoding.BINARY,
+            "contentMediaType": ContentType.APP_NETCDF,
+            "contentEncoding": ContentEncoding.BASE64,
+        }
+        assert proc["inputs"]["input_nc_edam"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+            }
+        ]
+        assert proc["inputs"]["input_nc_ogc"]["schema"] == {
+            "type": "string",
+            "format": ContentEncoding.BINARY,
+            "contentMediaType": ContentType.APP_NETCDF,
+            "contentEncoding": ContentEncoding.BASE64,
+        }
+        assert proc["inputs"]["input_nc_ogc"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+            }
+        ]
+        assert proc["inputs"]["input_nc_all"]["schema"] == {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "format": ContentEncoding.BINARY,
+                    "contentMediaType": ContentType.APP_NETCDF,
+                    "contentEncoding": ContentEncoding.BASE64,
+                },
+                {
+                    "type": "string",
+                    "format": ContentEncoding.BINARY,
+                    "contentMediaType": ContentType.APP_X_NETCDF,
+                    "contentEncoding": ContentEncoding.BASE64,
+                },
+            ]
+        }, "Duplicates should be removed, but both IANA variants should remain"
+
+        assert proc["inputs"]["input_yaml_iana"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_x"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_X_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_x"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_X_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_text"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.TEXT_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_text"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.TEXT_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_iana_text_x"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.TEXT_X_YAML,
+        }
+        assert proc["inputs"]["input_yaml_iana_text_x"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.TEXT_X_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_edam"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["inputs"]["input_yaml_edam"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
+            }
+        ]
+        assert proc["inputs"]["input_yaml_all"]["schema"] == {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_X_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.TEXT_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.TEXT_X_YAML,
+                },
+            ]
+        }, "Duplicates should be removed, but both IANA variants should remain"
+
+        assert proc["outputs"]["output_nc"]["schema"] == {
+            "type": "string",
+            "format": ContentEncoding.BINARY,
+            "contentMediaType": ContentType.APP_NETCDF,
+            "contentEncoding": ContentEncoding.BASE64,
+        }
+        assert proc["outputs"]["output_nc"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_NETCDF,
+                "encoding": ContentEncoding.BASE64,
+            }
+        ]
+
+        assert proc["outputs"]["output_yaml"]["schema"] == {
+            "type": "string",
+            "contentMediaType": ContentType.APP_YAML,
+        }
+        assert proc["outputs"]["output_yaml"]["formats"] == [
+            {
+                "default": True,
+                "mediaType": ContentType.APP_YAML,
+            }
+        ]
+
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
         """
         Test deployment of a process with authentication to access the referenced repository.
@@ -919,7 +1303,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         .. note::
             Use same definition as the one provided in :ref:`app_pkg_script` documentation.
         """
-        cwl = load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl"))  # type: CWL
+        cwl = cast("CWL", load_file(os.path.join(WEAVER_ROOT_DIR, "docs/examples/docker-shell-script-cat.cwl")))
         docker = "fake.repo/org/private-image:latest"
         cwl["requirements"][CWL_REQUIREMENT_APP_DOCKER]["dockerPull"] = docker
         body = self.get_process_deploy_template(cwl=cwl)
@@ -966,7 +1350,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Missing required field." in resp.json["cause"]["DeployCWL.id"]
 
     def deploy_process_CWL_direct(self,
-                                  content_type,                         # type: ContentType
+                                  content_type,                         # type: AnyContentType
                                   graph_count=0,                        # type: int
                                   process_id="test-direct-cwl-json",    # type: str
                                   version=None,                         # type: Optional[AnyVersion]
@@ -990,7 +1374,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
-        expect_cwl = copy.deepcopy(cwl_base)  # type: CWL
+        expect_cwl = cast("CWL", copy.deepcopy(cwl_base))
         expect_cwl.update(cwl_core)
         expect_cwl["inputs"] = []
         cwl_out = cwl_core["outputs"]["output"]
@@ -1075,7 +1459,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 }
             },
         })
-        return cwl
+        return cast("CWL", cwl)
 
     @parameterized.expand([
         ("mapping", ),
@@ -1377,7 +1761,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_CUDA_NAME], indirect=True)
-    def test_deploy_process_CWL_CudaRequirement_executionUnit(self):
+    def test_deploy_process_CWL_CudaRequirement_executionUnit(self):  # noqa
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             cuda_requirements = {
@@ -1465,7 +1849,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_executionUnit_requirements(self):
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit_requirements(self):  # noqa
         """
         Ensures that :term:`CWL` ``requirements`` directly resolves with a namespaced ``weaver`` requirement schema.
         """
@@ -1521,7 +1905,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_href(self):
+    def test_deploy_process_CWL_WPS1Requirement_href(self):  # noqa
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -1582,7 +1966,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
+    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):  # noqa
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -1647,7 +2031,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):  # noqa
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -1699,7 +2083,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_href(self):
+    def test_deploy_process_WPS1_DescribeProcess_href(self):  # noqa
         body = {
             "processDescription": {
                 "href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL  # this one should be used
@@ -1719,7 +2103,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
+    def test_deploy_process_WPS1_DescribeProcess_owsContext(self):  # noqa
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -1735,7 +2119,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
+    def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):  # noqa
         """
         Test process deployment using a WPS-1 DescribeProcess URL specified as an execution unit reference.
         """
@@ -1757,7 +2141,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_href(self):
+    def test_deploy_process_WPS1_GetCapabilities_href(self):  # noqa
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference.
         """
@@ -1777,7 +2161,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
+    def test_deploy_process_WPS1_GetCapabilities_owsContext(self):  # noqa
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition.
         """
@@ -1795,7 +2179,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
+    def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):  # noqa
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter.
         """
@@ -1808,7 +2192,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def validate_ogcapi_process_description(
             self,
-            process_description,            # type: JSON
+            process_description,            # type: Union[ProcessDescription, JSON]
             process_id,                     # type: str
             remote_process,                 # type: str
             requirement_location="hints",   # type: Literal["hints", "requirements"]
@@ -1841,7 +2225,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_href(self):
+    def test_deploy_process_OGC_API_DescribeProcess_href(self):  # noqa
         """
         Use the basic :term:`Process` URL format for referencing remote OGC API definition.
 
@@ -1869,7 +2253,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):
+    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):  # noqa
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
@@ -1884,7 +2268,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):
+    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):  # noqa
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
@@ -2102,7 +2486,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = resp.json
         assert body["outputs"]["output"]["title"] == data["outputs"]["output"]["title"]
 
-        cwl["inputs"] = {"message": {"type": "string"}}
+        cwl["inputs"] = cast("CWL_Inputs", {"message": {"type": "string"}})
         cwl.pop("version", None)  # make sure none specified, let MAJOR auto-revision with latest
         data = {
             "processDescription": {"process": {"id": p_id, "visibility": Visibility.PUBLIC}},

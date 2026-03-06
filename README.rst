@@ -5,6 +5,7 @@ Weaver
 \| `Summary`_
 \| `Features`_
 \| `Links`_
+\| `Installation`_
 \| `Configuration`_
 \| `Documentation`_
 \| `Extra Details & Sponsors`_
@@ -13,10 +14,16 @@ Weaver
 **Implementations**
 
 * |ogc-api-proc-long|
+    - |ogc-api-proc-part1-v1|_
+    - |ogc-api-proc-part1-v2|_
+    - |ogc-api-proc-part2|_
+    - |ogc-api-proc-part3|_
+    - |ogc-api-proc-part4|_ (including Provenance)
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
-* |jupyter-nb-app|_ as |ogc-apppkg|_
+* |w3c-prov|_ for provenance metadata tracking through |ogc-api-proc| and |cwl|
+* |jupyter-nb-app|_ deployment as |ogc-apppkg|_
 * |ems-long| for dispatching distributed workflow processing
 * |ades-long| for processing close to the data
 
@@ -48,7 +55,7 @@ for each process.
     * - citation
       - | |citation-zenodo| |citation-cff|
     * - build status
-      - | |readthedocs| |docker_build_mode| |docker_build_status|
+      - | |readthedocs_build_status| |docker_build_mode| |docker_build_status|
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
@@ -58,13 +65,13 @@ for each process.
     :alt: Requires Python 3.10+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.4.1.svg?logo=github
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.9.0.svg?logo=github
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/6.4.1...master
+    :target: https://github.com/crim-ca/weaver/compare/6.9.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-6.4.1-blue?logo=github
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.9.0-blue?logo=github
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/6.4.1
+    :target: https://github.com/crim-ca/weaver/tree/6.9.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver?logo=librariesdotio&logoColor=white
     :alt: Libraries.io Dependencies Status
@@ -78,11 +85,11 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.4.1&branch=6.4.1&logo=github
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.9.0&branch=6.9.0&logo=github
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.4.1
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.9.0
 
-.. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
+.. |readthedocs_build_status| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
     :target: `ReadTheDocs`_
 
@@ -92,7 +99,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.4.1?label=tag&logo=docker
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.9.0?label=tag&logo=docker
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -189,6 +196,8 @@ offered by |ades| and |ems| instances like `Weaver`.
 .. |kw12| image:: https://img.shields.io/badge/Open%20Science-blue
    :alt: Open Science
 
+.. remove-pypi-start
+
 Applications
 ~~~~~~~~~~~~~~~~
 
@@ -220,6 +229,13 @@ Observation data processing can evolve, and illustrates the advantages with appl
     </div>
     <br>
 
+.. note::
+    See section `Extra Details & Sponsors`_ for further application examples and concrete demonstrations.
+
+.. remove-pypi-end
+
+.. remove-pypi-start
+
 Platform
 ~~~~~~~~~~~~~~~~
 
@@ -246,6 +262,8 @@ application stores, and shows the potential for multidisciplinary workflows in t
         </div>
     </div>
     <br>
+
+.. remove-pypi-end
 
 ----------------
 Links
@@ -276,12 +294,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:6.4.1
+    docker pull pavics/weaver:6.9.0
 
 For convenience, following tags are also available:
 
-- ``weaver:6.4.1-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:6.4.1-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:6.9.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:6.9.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
@@ -324,6 +342,23 @@ Following links correspond to existing servers with `Weaver` configured as *EMS*
     The test servers will **not** necessarily be up-to-date with the *latest* version.
 
 ----------------
+Installation
+----------------
+
+Installation of `Weaver` from source can be performed instead of using the Docker containers.
+
+.. code-block:: sh
+
+    pip install https://github.com/crim.ca/weaver
+
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
+
+    For more details, please refer to
+    the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
+    section of the documentation.
+
+----------------
 Configuration
 ----------------
 
@@ -331,7 +366,14 @@ All configuration settings can be overridden using a ``weaver.ini`` file that wi
 instantiation of the application. An example of such file is provided here: `weaver.ini.example`_.
 
 Setting the operational mode of `Weaver` (`EMS`/`ADES`/`HYBRID`) is accomplished using the
-``weaver.configuration`` field of ``weaver.ini``. For more configuration details, please refer to Documentation_.
+``weaver.configuration`` field of ``weaver.ini``.
+
+.. using 'note' instead of 'seealso' because non-sphinx RST required by setup distribution
+.. note::
+
+    For more details, please refer to
+    the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`_
+    section of the documentation.
 
 .. _weaver.ini.example: ./config/weaver.ini.example
 
@@ -342,6 +384,9 @@ Documentation
 The REST API documentation is auto-generated and served under any running `Weaver` application on route
 ``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
 For the latest documentation, you can refer to the `OpenAPI Specification`_ served directly on `ReadTheDocs`_.
+
+For the |ogc-api-proc|_ compliant Python and Shell clients, please refer to
+the `Weaver CLI and Client <https://pavics-weaver.readthedocs.io/en/latest/cli.html>`_ documentation.
 
 More ample details about installation, configuration and usage are also provided on `ReadTheDocs`_.
 These are generated from corresponding information provided in `docs`_ source directory.
@@ -362,6 +407,11 @@ explicitly in the |ogc-tb14-platform-er|_.
 
 The project has been employed for |ogc-tb15-ml|_ to demonstrate the use of Machine Learning interactions with OGC web
 standards in the context of natural resources applications. The advancements are reported through the |ogc-tb15-ml-er|_.
+The combination of |cwl-long| with the |ogc-api-proc|_ standard in the context of Machine Learning and Geomatics
+applications deployment was also presented at the |cwl-2021-conf|_ conference, with multiple example use case
+demonstrating pretrained model inference for lake and river feature classification over satellite imagery,
+land-cover mapping of raster imagery, and climate analysis leveraging preexisting |wps-long| servers.
+The video recording of these demonstrations is available under the blog post |cwl-2021-video|_.
 
 Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
@@ -378,11 +428,28 @@ close to the data.
 `Weaver` is employed in the |ogc-ospd|_ initiative to demonstrate reusability, portability, and transparency
 in the context of open science in Earth Observation, using |ogc-apppkg|_ encoded as |cwl|_ for interoperability
 and distributed processing workflows. Its related developments and demonstrations were presented at
-the |ogc-129th|_ (2024, Montréal) and the |ESIP-2024|_.
+the |ogc-129th-mm|_ (2024, Montréal) and the |ESIP-2024|_ during the |ESIP-2024-panel|_.
+Video recordings and related outcomes are available under the following links:
 
-`Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the alignment of multiple
-community standards involved in workflow design, such as |cwl|_, `openEO`_ and |ogc-api-proc-part3|_, for
-processing of multidimensional data involved through GeoDataCube interactions.
+- **Report**: |ogc-ospd-er|_
+- **Video**: |ogc-ospd-demo-video|_
+- **Video**: |ogc-ospd-crim-video|_
+- **Video**: ESIP presentation |ESIP-2024-presentation|_
+
+`Weaver` is employed in |ogc-tb20-gdc|_ to improve and work on the integration of multiple
+community standards involved in workflow design, such as |cwl|_, `openEO`_, |ogc-api-proc-part3|_
+and |ogc-api-proc-part4|_, for processing of multidimensional data involved through *GeoDataCube* interactions.
+Support of extended traceability and provenance metadata using |w3c-prov|_ over executed processing jobs has also
+been implemented during this effort to provide data lineage and better integrity, provenance and trust (IPT)
+of derived products resulting from processing workflows.
+Outcomes were presented during the |ogc-tb20-demo-days|_ and the |ogc-131st-mm|_ events.
+Corresponding reports are available online at the following locations:
+
+- |ogc-tb20-gdc-api-file-report|_
+- |ogc-tb20-gdc-prov-demo-report|_
+- |ogc-tb20-gdc-usage-test-report|_
+
+.. fixme: Add the OGC Testbed-20 report references when published (https://github.com/crim-ca/weaver/issues/812).
 
 The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
 initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
@@ -396,6 +463,10 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _`Common Workflow Language`: https://www.commonwl.org/
 .. |cwl| replace:: CWL
 .. _cwl: https://www.commonwl.org/
+.. |cwl-2021-conf| replace:: CWLcon 2021
+.. _cwl-2021-conf: https://cwl.discourse.group/c/cwlcon-2021/
+.. |cwl-2021-video| replace:: ML Processing Pipelines using CWL, Deployment in Context of Research Teams and OGC-API Integration
+.. _cwl-2021-video: https://cwl.discourse.group/t/ml-processing-pipelines-using-cwl-deployment-in-context-of-research-teams-and-ogc-api-integration/269
 .. _openEO: https://openeo.org/
 .. |jupyter-nb-app| replace:: Jupyter Notebook Applications
 .. _jupyter-nb-app: https://pavics-weaver.readthedocs.io/en/latest/package.html#jupyter-notebook-applications
@@ -416,11 +487,17 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-long: https://www.ogc.org/
 .. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
-.. |ogc-api-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)
+.. |ogc-api-proc-long| replace:: |ogc-api-proc|_
+.. |ogc-api-proc-part1-v1| replace:: *OGC API - Processes - Part 1: Core (v1.0)*
+.. _ogc-api-proc-part1-v1: https://docs.ogc.org/is/18-062r2/18-062r2.html
+.. |ogc-api-proc-part1-v2| replace:: *OGC API - Processes - Part 1: Core (v2.0)*
+.. _ogc-api-proc-part1-v2: https://docs.ogc.org/DRAFTS/18-062r3.html
 .. |ogc-api-proc-part2| replace:: *OGC API - Processes - Part 2: Deploy, Replace, Undeploy (DRU)*
 .. _ogc-api-proc-part2: https://docs.ogc.org/DRAFTS/20-044.html
 .. |ogc-api-proc-part3| replace:: *OGC API - Processes - Part 3: Workflows and Chaining*
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
+.. |ogc-api-proc-part4| replace:: *OGC API - Processes - Part 4: Job Management*
+.. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
 .. |ogc-tb13-cloud-er| replace:: *OGC Testbed-13 - Cloud Engineering Report*
 .. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
 .. |ogc-tb14| replace:: *OGC Testbed-14*
@@ -439,22 +516,42 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-tb16-ipynb-er: http://docs.opengeospatial.org/per/20-035.html
 .. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-tb20-demo-days| replace:: OGC Testbed-20 Demonstration Days
+.. _ogc-tb20-demo-days: https://www.ogc.org/event/t20-demo-days/
+.. |ogc-tb20-gdc-api-file-report| replace:: OGC Testbed 20 GeoDataCube (GDC) API Profile Report
+.. _ogc-tb20-gdc-api-file-report: https://docs.ogc.org/per/24-035.html
+.. |ogc-tb20-gdc-prov-demo-report| replace:: OGC Testbed 20 GDC Provenance Demonstration Report
+.. _ogc-tb20-gdc-prov-demo-report: https://docs.ogc.org/per/24-036.html
+.. |ogc-tb20-gdc-usage-test-report| replace:: OGC Testbed 20 GDC Usability Testing Report
+.. _ogc-tb20-gdc-usage-test-report: https://docs.ogc.org/per/24-037.html
 .. |ogc-ospd| replace:: *OGC Open Science Persistent Demonstrator*
 .. _ogc-ospd: https://www.ogc.org/initiatives/open-science/
+.. |ogc-ospd-demo-video| replace:: OGC Open Science Demonstrations - Part 1
+.. _ogc-ospd-demo-video: https://www.youtube.com/watch?v=CB_-Gn3eruM
+.. |ogc-ospd-crim-video| replace:: OGC OSPD CRIM Workflow Demonstration in Galaxy
+.. _ogc-ospd-crim-video: https://www.youtube.com/watch?v=68glSbzRIQI
+.. |ogc-ospd-er| replace:: OGC Open Science Persistent Demonstrator (OSPD) Report
+.. _ogc-ospd-er: http://docs.opengeospatial.org/per/24-022.html
 .. |ogc-eo-apps-pilot| replace:: *OGC Earth Observation Applications Pilot*
 .. _ogc-eo-apps-pilot: https://www.ogc.org/initiatives/eoa-pilot/
 .. |ogc-eo-apps-pilot-er| replace:: *OGC Earth Observation Applications Pilot: CRIM Engineering Report*
 .. _ogc-eo-apps-pilot-er: http://docs.opengeospatial.org/per/20-045.html
 .. |ogc-best-practices-eo-apppkg| replace:: *OGC Best Practice for Earth Observation Application Package*
 .. _ogc-best-practices-eo-apppkg: https://docs.ogc.org/bp/20-089r1.html
-.. |ogc-129th| replace:: *OGC 129th Member's Meeting*
-.. _ogc-129th: https://www.ogc.org/ogc-events/129th-ogc-member-meeting-montreal/
+.. |ogc-129th-mm| replace:: *OGC 129th Member's Meeting*
+.. _ogc-129th-mm: https://portal.ogc.org/meet/?p=default&mid=95
+.. |ogc-131st-mm| replace:: *OGC 131st Member's Meeting*
+.. _ogc-131st-mm: https://events.ogc.org/131MM#/agenda?day=3&lang=en&sessionId=126498000002166220
 .. |ogc-apppkg| replace:: *OGC Application Package*
 .. _ogc-apppkg: https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-dru/ogcapppkg.yaml
 .. |ESIP| replace:: *Earth Science Information Partners*
 .. _ESIP: https://www.esipfed.org/
 .. |ESIP-2024| replace:: *Earth Science Information Partners* (ESIP) 2024 Meeting
 .. _ESIP-2024: https://2024julyesipmeeting.sched.com/
+.. |ESIP-2024-panel| replace:: *Cross-Platform Interoperability for Scalable Computing in Open Science Analysis and Algorithm Development*
+.. _ESIP-2024-panel: https://2024julyesipmeeting.sched.com/
+.. |ESIP-2024-presentation| replace:: *Perspectives on the integration of OGC standards to improve interoperability of open science data processing workflows*
+.. _ESIP-2024-presentation: https://www.youtube.com/watch?v=7gqkdRuy2AE&list=PL8X9E6I5_i8iIFrualb2PriPQoF52aIPh&index=36
 .. _CRIM: https://crim.ca/
 .. _Ouranos: https://www.ouranos.ca/
 .. _PAVICS: https://pavics.ouranos.ca/index.html
@@ -480,3 +577,5 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. |PCC| replace:: Prairie Climate Centre (PCC)
 .. _PCC: https://prairieclimatecentre.ca/
 .. _Pyramid: http://www.pylonsproject.org
+.. |w3c-prov| replace:: W3C PROV
+.. _w3c-prov: https://www.w3.org/TR/prov-overview

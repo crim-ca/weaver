@@ -7,11 +7,12 @@ import inspect
 from typing import TYPE_CHECKING, NewType
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+    from typing import Any, Callable, Dict, List, Optional, Type, TypeAlias, TypeVar, Union
 
     from weaver.typedefs import AnyKey
 
-    PropertyDataTypeT = TypeVar("PropertyDataTypeT")
+    ConstantsType: TypeAlias = "Constants"
+    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=Union[ConstantsType, str])
 
 # pylint: disable=E1120,no-value-for-parameter
 
@@ -47,8 +48,11 @@ class Constants(object, metaclass=_Const):
         return [member for member in members if not isinstance(member, str) or not member.startswith("_")]
 
     @classmethod
-    def get(cls, key_or_value, default=None):
-        # type: (Union[AnyKey, EnumType, PropertyDataTypeT], Optional[Any]) -> PropertyDataTypeT
+    def get(
+        cls,            # type: Type[PropertyDataTypeT]
+        key_or_value,   # type: Union[AnyKey, EnumType, PropertyDataTypeT, None]
+        default=None,   # type: Optional[Any]
+    ):                  # type: (...) -> PropertyDataTypeT
         if isinstance(key_or_value, str):
             upper_key = key_or_value.upper()
             lower_key = key_or_value.lower()
@@ -105,7 +109,7 @@ class Constants(object, metaclass=_Const):
 
 class classproperty(property):  # pylint: disable=C0103,invalid-name
     """
-    Mimics :class:`property` decorator, but applied onto ``classmethod`` in backward compatible way.
+    Mimics :class:`property` decorator, but applied onto :class:`classmethod` in backward compatible way.
 
     .. note::
         This decorator purposely only supports getter attribute to define unmodifiable class properties.
@@ -113,6 +117,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
+
     def __init__(
         self,
         fget=None,  # type: Optional[Callable[[object], PropertyDataTypeT]]

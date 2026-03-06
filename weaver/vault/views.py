@@ -29,12 +29,12 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import HTTPHeadFileResponse
 
 if TYPE_CHECKING:
-    import cgi
+    import cgi  # pylint: disable=deprecated-module  # still used under the hood by webob, use for annotation only
     from typing import Optional
 
     from pyramid.config import Configurator
     from pyramid.httpexceptions import HTTPException
-    from pyramid.request import Request
+    from webob.request import Request
 
 LOGGER = logging.getLogger(__name__)
 

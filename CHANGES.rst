@@ -19,10 +19,302 @@ Changes:
   If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
 - Return ``Link`` headers containing all possible output formats, allowing retrieval via query parameters
   (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Add ``--inputs-ignore-errors`` option to `CLI` ``execute`` operation and corresponding ``inputs_ignore_errors``
+  parameter to ``WeaverClient.execute()`` method. When enabled, missing or unresolved local file references in
+  input definitions will be skipped with warnings rather than causing immediate failure. By default (when disabled),
+  missing files cause the operation to fail with a detailed error message listing all problematic file references.
+- Improve `CLI` ``execute`` operation error handling for multiple input files. When multiple input JSON/YAML files
+  are provided via multiple ``-I`` options, the operation now fails with a clear error message explaining that only
+  a single input file is supported, rather than producing a cryptic attribute error.
 
 Fixes:
 ------
-- Add a fix entry for the multiple duplicate links not re-downloaded in the CLI.
+- Fix multi-token Vault authentication header parsing to support both single and multiple file access tokens.
+  The ``parse_vault_token`` function now handles plain token strings (e.g., from WPS process context) and full
+  header formats (e.g., ``token <value>; id=<uuid>``), and correctly validates token presence for the requested
+  file UUID. The mismatch detection logic was updated to properly check if the requested file ID exists in the
+  parsed tokens rather than only validating against the first token key
+  (fixes `#897 <https://github.com/crim-ca/weaver/issues/897>`_).
+
+.. _changes_6.9.0:
+
+`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-03-02)
+========================================================================
+
+Changes:
+--------
+- Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
+  The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
+  that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
+  some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
+- Add documentation to provide better guidance about installation, configuration and example references.
+- Add ``weaver.cwl_no_match_user`` configuration setting to avoid ``--user`` parameter on Docker-based `CWL` execution.
+  This can be desirable when relying on *docker rootless mode* and/or *user namespaces* to handle the actual user/group
+  ID mapping. The parameter can also be configured using the ``WEAVER_CWL_NO_MATCH_USER`` environment variable.
+- Add ``WEAVER_CWL_EUID`` and ``WEAVER_CWL_EGID`` environment variables to control the `CWL` execution user/group ID
+  as alternative to corresponding configuration options.
+
+Fixes:
+------
+- Fix ``cwltool`` mapping of output files to staging directory of ``pywps`` when multiple nested output directories
+  contain files of matching names leading to conflicting extension errors from flat-list mapping in staging directory.
+  These conflicts are dealt with by ``cwltool`` using ``_<index>``. However, those led to side-effect errors when
+  `Weaver` attempts to enforce strict extension validation between the `CWL` definition and result ``format`` values.
+  A custom ``PathMapper`` is applied to the ``RuntimeContext`` to preserve the original structure of the `CWL` results
+  and avoid these conflicts entirely.
+- Fix `PyWPS` ``("server", "sethomedir", "false")`` configuration to avoid setting ``HOME`` directory within
+  the `Process` worker instance (``weaver.processes.wps_package.WpsPackage``), which causes *docker rootless mode*
+  to fail its docker-daemon context resolution due to the modified location.
+- Fix `CWL` ``euid``/``geid`` resolution using ``0:0`` which can be desired to let *docker rootless mode* and/or
+  *user namespaces* handle the actual user/group ID mapping themselves based on ``/etc/subuid`` and ``/etc/subgid``
+  (depends on `common-workflow-language/cwltool#2207 <https://github.com/common-workflow-language/cwltool/pull/2207>`_).
+- Fix `CWL` ``format`` resolution against multiple ontologies (`IANA`, `OGC`, `EDAM`) referring to equivalent
+  media-type definitions to ensure that resolved `Job` input references match the underlying `CWL` package execution.
+- Fix `CWL` ``format`` resolution against media-types that support alternative extensions,
+  such as ``.yaml`` and ``.yml``. These are cross-resolved against their multiple media-type combinations
+  as ``application/yaml`` (official) and legacy ``application/x-yaml``, ``text/yaml`` and ``text/x-yaml``.
+- Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
+  resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
+  The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension
+  to ensure consistency between the validation methods.
+- Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
+  This could occur either when invoking the operation directly, or directly from ``execute`` operation which
+  pre-resolved a local file path subject to the `Vault` upload feature.
+- Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
+  If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
+  If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
+  as previously done by the `CLI`/``WeaverClient`` (fixes `#879 <https://github.com/crim-ca/weaver/issues/879>`_).
+- Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
+  correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
+  (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
+- Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
+- Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
+
+.. _changes_6.8.3:
+
+`6.8.3 <https://github.com/crim-ca/weaver/tree/6.8.3>`_ (2026-02-12)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` status endpoint.
+- Pin ``cryptography>=46.0.5`` for security fix.
+
+.. _changes_6.8.2:
+
+`6.8.2 <https://github.com/crim-ca/weaver/tree/6.8.2>`_ (2026-02-11)
+========================================================================
+
+Changes:
+--------
+- Support `CLI` parsing of `CWL` ``Directory`` input value if provided using ``path`` with a remote reference URL.
+  Only remote references are supported since the `Vault` feature cannot be used to upload multiple files in a directory.
+- Emit a ``WeaverConfigurationWarning`` if ``weaver.wps_output_dir`` and ``weaver.wps_output_url`` (or its value
+  resolved from ``weaver.wps_output_path``) are detected to contain unbalanced trailing slashes. If detected, these
+  erroneous values will be automatically adjusted by ``map_wps_output_location`` to avoid invalid reference mapping.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` results leading to errors on certain clients/proxies.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` header in
+  response of `Job` results to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` headers to determine if this profile was applied.
+- Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
+- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid```
+  (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_
+  and `pypa/setuptools#5007 <https://github.com/pypa/setuptools/pull/5007>`_).
+
+.. _changes_6.8.1:
+
+`6.8.1 <https://github.com/crim-ca/weaver/tree/6.8.1>`_ (2026-01-09)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Pin ``urllib3>=2.6.3`` for security fix.
+- Pin ``werkzeug>=3.1.5`` for security fix.
+- Pin ``xmltodict>=1.0.2`` for security fix.
+
+.. _changes_6.8.0:
+
+`6.8.0 <https://github.com/crim-ca/weaver/tree/6.8.0>`_ (2025-12-18)
+========================================================================
+
+Changes:
+--------
+- Update docker with Python 3.13.
+- Add Python 3.13 to CI and project setup. Python 3.14 tentatively added to CI but unsupported from by dependencies.
+- Unpin ``cwltool==3.1.20241217163858`` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
+- Pin ``pywps==4.7.0``.
+- Use Mongo v7 in CI and tests.
+- Update security dependencies for ``pip``, ``pyyaml``, ``requests``, ``urllib`` and ``werkzeug``.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.7.0:
+
+`6.7.0 <https://github.com/crim-ca/weaver/tree/6.7.0>`_ (2025-12-12)
+========================================================================
+
+Changes:
+--------
+- Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
+  if referenced by the request.
+- Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
+  using ``profile`` or ``schema`` query parameter for values ``ogc``, ``openeo``, and ``wps``.
+- Add additional ``rel="http://www.opengis.net/def/rel/ogc/1.0/log"`` (i.e.: ``rel="[ogc-rel:log]"``)
+  to `Job` status response links to respect ``http://www.opengis.net/spec/ogcapi-processes-1/2.0/rec/core/job-links``.
+- Add `Profile` details in headers of ``/processes/{processID}/package`` response describing `CWL` contents.
+- Add `YAML` support for `ProcessDescription` ``/processes/{processID}`` endpoint with ``Accept: application/x-yaml``,
+  header and any query parameter combination ``?f=yaml``, ``?f=yml``, ``?format=yaml`` and ``?format=yml``
+  (fixes `#456 <https://github.com/crim-ca/weaver/issues/456>`_).
+- Add `YAML` support for `CWL` ``/processes/{processID}/package`` endpoint with multiple `Media-Type` variations
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_).
+- Changed `CWL` ``/processes/{processID}/package`` response to be ``application/cwl+json`` by default
+  (previously plain ``application/json``) to better represent the returned contents with registered `IANA Media-Type`.
+  Other variants (`CWL+YAML` or plain `JSON`) can be requested using the ``Accept`` header or ``f``/``format`` query.
+- Update new requirement definitions to align with `OGC API - Processes: Core v2.0` integrating
+  the `Collection Inputs/Outputs` originally from `Part 3: Workflows and Chaining`
+  (fixes `#841 <https://github.com/crim-ca/weaver/issues/841>`_).
+- Allow ``profile`` content negotiation for single result `Job` to be represented
+  using the multi-output `JSON` results representation instead of the default raw/direct value representation
+  (relates to `#754 <https://github.com/crim-ca/weaver/issues/754>`_,
+  fixes `#815 <https://github.com/crim-ca/weaver/issues/815>`_).
+- Return ``Link`` header with ``rel: profile`` and a corresponding definition in `JSON` ``links`` for responses
+  of `Job` status, `Job` listing, `Process` description and `Process` listing endpoints when applicable.
+- Return `Content-Profile` header for responses with corresponding ``Link: rel="profile"``.
+- Validate that, if provided during `Job` creation for `Process` execution, a ``Content-Schema`` header different than
+  supported representations will return *HTTP 422 Unprocessable Content*. At this point, only the `OGC API - Processes`
+  ``https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/execute.yaml`` is allowed for `JSON` content.
+  If other representations are needed and supported at a later point, ``Content-Schema`` can be omitted to avoid this
+  additional verification.
+
+Fixes:
+------
+- Fix `HTML` links when requesting `Process` listing that could fail schema validation due to additional media-types
+  injected by the web browser.
+- Fix `HTML` pages main header link referring to the current page instead of the intended landing page
+  (fixes `#855 <https://github.com/crim-ca/weaver/issues/855>`_).
+- Fix `Job` listing not returning adequate paging links when `Weaver` is running behind a proxied URL prefix
+  (fixes `#854 <https://github.com/crim-ca/weaver/issues/854>`_).
+- Fix missing `HTML` CSS styles for `Job` status responses using `openEO` profile.
+- Fix `Process` deployment using an ``href`` assuming response contents to be one of the supported formats.
+  For example, ``/processes/{processID}`` was assumed to return `JSON` by default, but it is often `HTML`
+  if no format specifier or acceptable media-type is specified.
+- Fix setup of ``pywps`` potentially failing due to empty ``weaver.wps_workdir`` configuration setting.
+
+.. _changes_6.6.2:
+
+`6.6.2 <https://github.com/crim-ca/weaver/tree/6.6.2>`_ (2025-06-27)
+========================================================================
+
+Changes:
+--------
+- Add ``mongodb.`` prefix parsing of configuration settings defined in Weaver INI file to provide additional
+  parameters that could be required to setup the MongoDB connection.
+
+Fixes:
+------
+- Fix automatic ``paste-deploy`` resolution from legacy INI configuration using ``egg:weaver`` package name
+  instead of the new ``crim-weaver`` distribution name to ensure ``pserve`` and ``celery`` applications always
+  resolve within Docker runtime regardless of the variant employed
+  (fixes `#847 <https://github.com/crim-ca/weaver/issues/847>`_).
+
+.. _changes_6.6.1:
+
+`6.6.1 <https://github.com/crim-ca/weaver/tree/6.6.1>`_ (2025-06-24)
+========================================================================
+
+Changes:
+--------
+- Update ``urllib3>=2.5.0`` and ``requests>=2.32.4`` to address security vulnerabilities.
+- Update package distribution name to ``crim-weaver`` for (eventual) release on PyPI.
+  The Python package is still imported as ``weaver``, but ``pserve`` and ``celery`` looking for the package egg
+  need to point at ``egg:crim-weaver``. For backward compatibility, provided Docker images create a system link
+  that make this change transparent, but users need to update the INI configuration if running *Weaver* locally.
+  Note that given the explicit GitHub URI dependencies defined for certain packages with fixes not yet released
+  on PyPI, and for which direct dependency link are forbidden,  ``crim-weaver`` cannot be released at this time
+  (see `#838 <https://github.com/crim-ca/weaver/pull/838>`_).
+
+Fixes:
+------
+- Fix misconfigured ``/providers/{providerID}/processes/{processID}/jobs/{jobID}`` endpoint for the `HTML` response
+  (fixes `#840 <https://github.com/crim-ca/weaver/issues/840>`_).
+- Fix `CLI` bug where overly quoted URL from input arguments would not be handled correctly.
+- Fix `CLI` bug where ``/providers`` URL from input arguments would not be handled correctly.
+- Fix missing link in `Job` status `HTML` page for ``inputs`` and ``links`` references.
+- Fix invalid link in `Job` status `HTML` page for ``logs`` reference.
+- Fix consistency between link names between `Job` status and `Process` description `HTML` pages.
+- Remove additional software dependency in worker Docker image leading to outdated Python 3.11 and
+  its insecure dependencies to be installed along updated Python 3.12 with specific `Weaver` requirements.
+- Reduce all Docker image sizes by approximately 1/3 with post-install removal of build dependencies.
+- Fix build of `Worker` image missing ``-y`` flags to upgrade relevant packages non-interactively.
+
+.. _changes_6.6.0:
+
+`6.6.0 <https://github.com/crim-ca/weaver/tree/6.6.0>`_ (2025-05-08)
+========================================================================
+
+Changes:
+--------
+- Update Docker builds and CI tests to use Python 3.12 by default.
+- Add ``f=xml`` support for `Job` status endpoints to directly retrieve the corresponding `WPS` `XML` status content.
+- Add ``schema=wps`` and ``profile=wps`` query parameter support for `Job` status endpoints.
+  If used by themselves, these query parameter values will return the same `WPS` `XML` content as when using ``f=xml``.
+  If combined with `JSON` format (i.e.: ``?f=json&profile=wps``), the `OGC API - Processes` `Job` status information
+  will be returned instead, but using the corresponding `WPS` ``status`` values. Specifically, this allows returning
+  the previous `WPS`  ``succeeded`` and ``started`` status values instead of the `OGC API - Processes` ``successful``
+  and ``running`` values respectively. This is provided to help clients that have to deal with the mixture of
+  properties until the standard is properly stabilized and released. However, the default status values returned
+  by ``profile=ogc`` should be preferred and employed whenever possible.
+- Enable Docker `Provenance <https://docs.docker.com/build/metadata/attestations/slsa-provenance>`_
+  and `Software Bill of Materials (SBOM) <https://docs.docker.com/build/metadata/attestations/sbom>`_
+  within the CI to release |pavics_weaver|_ images including this tracking information by default for
+  improved security and trust toward the software runtime, as observed through
+  the `Docker Scout Health Score <https://docs.docker.com/scout/policy/>`_.
+  Running ``make docker-build`` without arguments will build the images without these features by default.
+  They can be enabled using ``DOCKER_PROV=true make docker-build``. Building the images with these features
+  requires an intermediate step to setup a `builder` with
+  the `docker-container <https://docs.docker.com/build/builders/drivers/docker-container>`_ driver.
+
+Fixes:
+------
+- Add missing ``f`` and ``format`` query parameters for `Job` status endpoints in `OpenAPI` schema.
+
+.. _changes_6.5.0:
+
+`6.5.0 <https://github.com/crim-ca/weaver/tree/6.5.0>`_ (2025-05-02)
+========================================================================
+
+Changes:
+--------
+- Add `Job` status `HTML` response (resolves `#779 <https://github.com/crim-ca/weaver/issues/779>`_).
+- Add the ``process`` property to `Job` status response when requesting ``profile=openEO``,
+  with a direct reference to the underlying `CWL` `Application Package` of the main `Process` ran by the `Job`.
+
+Fixes:
+------
+- Fix `W3C PROV` endpoints not returning contents in appropriate type when using ``f`` or ``format`` query parameter.
+  On top of the supported explicit ``Accept`` header, the endpoints will now also allow either explicit ``Content-Type``
+  passed by ``f`` / ``format`` query parameter, their shorthand representations (e.g.: ``json`` for ``application/json``
+  and their more verbose ``PROV``-specific representation (e.g.: ``f=prov-n``), all case-insensitive.
+- Fix ``/prov`` endpoint not correctly allowing the `YAML` equivalent representation of ``PROV-JSON`` contents.
+- Fix reported ``$schema`` to point at the `openEO` *Batch Job* `OenAPI` definition when requesting ``profile=openEO``.
+- Fix reported ``type`` of the `openEO` *Batch Job* `OenAPI` definition as alternate to `OGC API - Processes` `Job`
+  status using new ``weaver.processes.constants.JobStatusType`` definition that includes previous
+  the ``process`` and ``provider`` values applied by ``weaver.datatype.Job.type``.
+- Fix `Job` statistics not reported by the API in case of execution failure, although they might be partially available.
 
 .. _changes_6.4.1:
 
@@ -1834,7 +2126,7 @@ Changes:
 - Require minimally ``pymongo==3.12.0`` and corresponding `MongoDB` ``5.0`` instance to process new filtering queries
   of ``minDuration`` and ``maxDuration``. Please refer
   to `Database Migration <https://pavics-weaver.readthedocs.io/en/latest/installation.html#database-migration>`_
-  and `MongoDB official documentation <https://docs.mongodb.com/manual>`_ for migration methods.
+  and `MongoDB official documentation <https://www.mongodb.com/docs/manual/>`_ for migration methods.
 - Refactor ``Job`` search method to facilitate its extension in the event of future filter parameters.
 - Support contextual WPS output location using ``X-WPS-Output-Context`` header to store ``Job`` results.
   When a ``Job`` is executed by providing this header with a sub-directory, the resulting outputs of the ``Job``
@@ -2186,7 +2478,7 @@ Fixes:
 
 Changes:
 --------
-- Add reference link to ReadTheDocs URL of `Weaver` in API landing page.
+- Add reference link to `ReadTheDocs` URL of `Weaver` in API landing page.
 - Add references to `OGC-API Processes` requirements and recommendations for eventual conformance listing
   (relates to `#231 <https://github.com/crim-ca/weaver/issues/231>`_).
 - Add ``datetime`` query parameter for job searches queries
@@ -2455,11 +2747,11 @@ Fixes:
 
 Changes:
 --------
-- Generate Weaver OpenAPI specification for readthedocs publication.
+- Generate Weaver OpenAPI specification for `ReadTheDocs` publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
-  and Readthedocs served pages.
-- Improve documentation links, ReadTheDocs format and TOC references.
+  and `ReadTheDocs` served pages.
+- Improve documentation links, `ReadTheDocs` format and TOC references.
 - Avoid logging ``stdout/stderr`` in workflows.
 - Add tests to make sure processes ``stdout/stderr`` are logged.
 - Remove Python 2.7 version as not *officially* supported.
@@ -2746,14 +3038,14 @@ Changes:
   (`#74 <https://github.com/crim-ca/weaver/issues/74>`_).
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
-- Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
+- Change doc to point to DockerHub |pavics_weaver|_ images.
 - Adjust CI rule long-lasting failures until it gets patched by original reference
   (`gitleaks-actions#3 <https://github.com/eshork/gitleaks-action/issues/3>`_).
 
 Fixes:
 -------------
 
-- Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
+- Fix `ReadTheDocs` documentation generation.
 - Fix ``.travis`` docker image build condition.
 - Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support
   (`#62 <https://github.com/crim-ca/weaver/issues/62>`_).
@@ -2899,3 +3191,6 @@ Fixes:
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 
 .. _Twitcher: https://github.com/Ouranosinc/Twitcher
+
+.. |pavics_weaver| replace:: pavics/weaver
+.. _pavics_weaver: https://hub.docker.com/r/pavics/weaver/tags

@@ -15,6 +15,7 @@ from weaver import xml_util
 from weaver.formats import AcceptLanguage, ContentType
 from weaver.owsexceptions import OWSAccessForbidden, OWSException, OWSMissingParameterValue, OWSNoApplicableCode
 from weaver.utils import null
+from weaver.warning import WeaverConfigurationWarning
 from weaver.wps.utils import (
     get_exception_from_xml_status,
     get_wps_client,
@@ -316,3 +317,18 @@ def test_map_wps_output_location_exists():
         pytest.fail(f"Failed due to unexpected exception: [{exc}]")
     finally:
         shutil.rmtree(wps_dir, ignore_errors=True)
+
+
+def test_map_wps_output_location_unbalanced_trailing_slash():
+    wps_url = "http:///localhost/wps-output"
+    wps_dir = "/tmp/weaver-test/test-outputs"  # nosec: B108 # don't care hardcoded for test
+    settings = {
+        "weaver.wps_output_dir": wps_dir,
+        "weaver.wps_output_url": f"{wps_url}/",  # extra trailing slash should be auto-removed and not cause issues
+    }
+    with pytest.warns(WeaverConfigurationWarning):
+        wps_out = map_wps_output_location(f"{wps_url}/some-file.txt", settings, exists=False)
+    assert wps_out == f"{wps_dir}/some-file.txt"
+    with pytest.warns(WeaverConfigurationWarning):
+        wps_out = map_wps_output_location(f"{wps_dir}/some-file.txt", settings, exists=False, url=True)
+    assert wps_out == f"{wps_url}/some-file.txt"

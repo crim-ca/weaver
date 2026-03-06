@@ -53,6 +53,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobStatusType,
     ProcessSchema
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
@@ -76,6 +77,7 @@ from weaver.utils import (
     get_log_fmt,
     get_path_kvp,
     get_settings,
+    is_valid_url,
     now,
     request_extra
 )
@@ -943,8 +945,8 @@ class Job(Base, LoggerHandler):
             - Queried with https://docs.ogc.org/is/18-062r2/18-062r2.html#toc49 (Parameter Type section).
         """
         if self.service is None:
-            return "process"
-        return "provider"
+            return JobStatusType.PROCESS
+        return JobStatusType.PROVIDER
 
     @property
     def title(self):
@@ -1000,6 +1002,11 @@ class Job(Base, LoggerHandler):
         if not isinstance(user_id, (int, str, uuid.UUID)) or user_id is None:
             raise TypeError(f"Type 'int', 'str' or a UUID is required for '{self.__name__}.user_id'")
         self["user_id"] = user_id
+
+    @property
+    def success(self):
+        # type: () -> bool
+        return map_status(self.status, category=True) == StatusCategory.SUCCESS
 
     @property
     def status(self):
@@ -1075,10 +1082,10 @@ class Job(Base, LoggerHandler):
 
     @accept_type.setter
     def accept_type(self, content_type):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(content_type, str):
+        # type: (Optional[str]) -> None
+        if not (isinstance(content_type, str) or content_type is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_type'")
-        self["accept_type"] = content_type
+        self["accept_type"] = content_type or None
 
     @property
     def accept_language(self):
@@ -1087,10 +1094,24 @@ class Job(Base, LoggerHandler):
 
     @accept_language.setter
     def accept_language(self, language):
-        # type: (Optional[Union[str]]) -> None
-        if not isinstance(language, str):
+        # type: (Optional[str]) -> None
+        if not (isinstance(language, str) or language is None):
             raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_language'")
-        self["accept_language"] = language
+        self["accept_language"] = language or None
+
+    @property
+    def accept_profile(self):
+        # type: () -> Optional[str]
+        return self.get("accept_profile")
+
+    @accept_profile.setter
+    def accept_profile(self, profile):
+        # type: (Optional[str]) -> None
+        if not (isinstance(profile, str) or profile is None):
+            raise TypeError(f"Type 'str' is required for '{self.__name__}.accept_profile'")
+        if profile and not is_valid_url(profile):
+            raise ValueError(f"Valid URI is required for '{self.__name__}.accept_profile'")
+        self["accept_profile"] = profile or None
 
     @property
     def execute_async(self):
@@ -1573,6 +1594,9 @@ class Job(Base, LoggerHandler):
             tool.output.seek(0)
             data = tool.output.read()
             fmt = ContentType.TEXT_PLAIN
+        if fmt == ContentType.APP_YAML:
+            data = json.loads(data)
+            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         return data, fmt
 
     def links(self, container=None, self_link=None):
@@ -1615,6 +1639,7 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
+                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, "rel": "profile", "title": "Job response profile."},
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -1640,10 +1665,17 @@ class Job(Base, LoggerHandler):
                     "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
                     "title": "List of job exceptions if applicable in case of failing job."
                 })
-        job_links.append({
-            "href": f"{job_url}/logs", "rel": "logs",  # unofficial
-            "title": "List of collected job logs during process execution."
-        })
+        job_links.extend([
+            {
+                "href": f"{job_url}/logs", "rel": "logs",  # unofficial
+                "title": "List of collected job logs during process execution."
+            },
+            {
+                # official, same as 'rel="[ogc-rel:log]"'
+                "href": f"{job_url}/logs", "rel": "http://www.opengis.net/def/rel/ogc/1.0/log",
+                "title": "List of collected job logs during process execution."
+            }
+        ])
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions", "provenance"]:
             self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
@@ -1661,8 +1693,8 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
-    def json(self, container=None):  # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
+    def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
         Obtains the :term:`JSON` data representation for :term:`Job` response body.
 
@@ -1696,6 +1728,7 @@ class Job(Base, LoggerHandler):
             "progress": int(self.progress),
             "links": self.links(settings, self_link="status")
         }
+        job_json.update(**kwargs)
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):
@@ -1736,6 +1769,7 @@ class Job(Base, LoggerHandler):
             "subscribers": self.subscribers,
             "accept_type": self.accept_type,
             "accept_language": self.accept_language,
+            "accept_profile": self.accept_profile,
         }
 
 
@@ -2745,6 +2779,7 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "rel": "profile", "title": "Process response profile."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]

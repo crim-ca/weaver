@@ -138,7 +138,7 @@ LOGGER = logging.getLogger(__name__)
     tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE],
     schema=sd.JobProvMetadataEndpoint(),
     accept=ContentType.TEXT_PLAIN,
-    response_schemas=sd.get_job_prov_responses,  # FIXME
+    response_schemas=sd.get_job_prov_responses,
 )
 @sd.provider_prov_run_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_PROVENANCE, sd.TAG_PROVIDERS],

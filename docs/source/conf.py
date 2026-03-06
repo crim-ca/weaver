@@ -123,7 +123,7 @@ redoc = [{
     }
 }]
 # must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
-redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"
+redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
@@ -454,6 +454,22 @@ linkcheck_ignore = [
     # ignore links using archived web pages, which sometimes become unavailable briefly
     # since using an archive, they are already using "last resort" references
     "http[s]*://web.archive.org/.*",
+    # sporadic timeouts
+    "https://2024julyesipmeeting.sched.com/",
+    # FIXME: OGC Drafts broken (https://github.com/opengeospatial/ogcapi-processes/issues/490)
+    "https://docs.ogc.org/DRAFTS/.*",
+    # URLs causing 403 (USer-Agent blocked or bot protection)
+    "https://www.iso.org/iso-4217-currency-codes.html",
+    "https://www.mongodb.com/.*",
+    # ignore the various weaver instances that could be down temporarily from the hosting server
+    # their corresponding version checks in the readme's shields will indicate if such an error occurs
+    "https://hirondelle.crim.ca/weaver",
+    "https://services.crim.ca/weaver",
+    "https://pavics.ouranos.ca/weaver/",
+    "https://redoak.cs.toronto.edu/weaver/",
+    "https://pavics.climatedata.ca/",
+    # FIXME: openEO API direct link access error (https://github.com/Open-EO/openeo.org/issues/101)
+    "https://openeo.org/documentation/1.0/developers/api/reference.html",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
@@ -461,6 +477,7 @@ linkcheck_anchors_ignore = [
     "defusedxmllxml",  # https://github.com/tiran/defusedxml/tree/main
     "ncml-to-stac",  # https://github.com/crim-ca/ncml2stac/tree/main#ncml-to-stac
     "issuecomment-[0-9]+",  # links to specific GitHub comments
+    "/agenda.*",   # OGC Members meeting - specific agenda event
 ]
 linkcheck_request_headers = {
     "https://github.com/": {

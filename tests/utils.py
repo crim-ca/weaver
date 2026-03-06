@@ -16,7 +16,7 @@ import sys
 import tempfile
 import uuid
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
@@ -49,6 +49,7 @@ from weaver.utils import (
     bytes2str,
     fetch_file,
     generate_diff,
+    get_file_header_datetime,
     get_header,
     get_path_kvp,
     get_url_without_query,
@@ -85,6 +86,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        EnvContainer,
         HeadersType,
         JSON,
         Path,
@@ -327,8 +329,8 @@ def get_links(resp_links):
     return link_dict
 
 
-def run_command(command, trim=True, expect_error=False, entrypoint=None):
-    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType]) -> List[str]
+def run_command(command, trim=True, expect_error=False, entrypoint=None, env=None):
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType], Optional[EnvContainer]) -> List[str]
     """
     Run a CLI operation and retrieve the produced output.
 
@@ -347,6 +349,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
         Python context to preserve any active mocks.
+    :param env:
+        Environment variables to override for the command execution.
     :return: retrieved command standard output or error as applicable.
     """
     # pylint: disable=R1732
@@ -361,7 +365,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
             out = sys.executable  # fallback for some systems that fail above call
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
-        env = {"PATH": f"{python_path}:{debug_path}"}
+        env = env or {}
+        env.update({"PATH": f"{python_path}:{debug_path}"})
         std = {"stderr": subprocess.PIPE, "stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
@@ -370,7 +375,11 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
-            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+            with (
+                contextlib.redirect_stderr(stderr),
+                contextlib.redirect_stdout(stdout),
+                mock.patch.dict(os.environ, env or {}),
+            ):
                 ret = entrypoint(*tuple(command))
         except SystemExit as exc:
             ret = exc.code
@@ -556,9 +565,9 @@ def mocked_sub_requests(app,                # type: TestApp
         if (
             (get_header("Content-Type", headers) == ContentType.APP_JSON or isinstance(content, (dict, list)))
             and allow_json
-            and hasattr(app, method + "_json")
+            and hasattr(app, f"{method}_json")
         ):
-            method = method + "_json"
+            method = f"{method}_json"
             if isinstance(content, str):
                 req_kwargs["params"] = json.loads(req_kwargs["params"])
         req = getattr(app, method)
@@ -904,7 +913,7 @@ def mocked_dir_listing(local_directory,             # type: str
         ("</td></tr>" if include_table_format else "")
         for href in dir_files
     ]
-    dir_refs = "\n" + "\n".join(ref_files)
+    dir_refs = "\n" + "\n".join(ref_files)  # noqa: flynt
     dir_base = directory_path if directory_path.startswith("/") else f"/{directory_path}"
     dir_base = dir_base if dir_base.endswith("/") else f"{dir_base}/"
     dir_title = f"<h1>Index of {dir_base}</h1>" if include_dir_heading else ""
@@ -1012,7 +1021,8 @@ def mocked_file_server(directory,                   # type: str
         Operation called when the file-server URL is matched against incoming requests that have been mocked.
         """
         if (mock_head and request.method == "HEAD") or (mock_get and request.method == "GET"):
-            file_url = "file://" + request.url.replace(url, directory, 1)
+            dir_path = request.url.replace(url, directory, 1)
+            file_url = f"file://{dir_path}"
             resp = request_extra(request.method, file_url, settings=settings)
             if resp.status_code == 200:
                 headers = resp.headers
@@ -1021,10 +1031,10 @@ def mocked_file_server(directory,                   # type: str
                 mime_type, encoding = mimetypes.guess_type(file_path)
                 headers.update({
                     "Server": "mocked_wps_output",
-                    "Date": str(datetime.utcnow()),
+                    "Date": get_file_header_datetime(datetime.now(timezone.utc)),
                     "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
-                    "Last-Modified": str(datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                    "Last-Modified": get_file_header_datetime(datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })
                 if request.method == "HEAD":
                     headers.pop("Content-Length", None)
@@ -1540,7 +1550,7 @@ def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
             os.makedirs(dir_path, exist_ok=True)
     listing = []
     for path, dirs, files in os.walk(test_root_dir):
-        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))
+        listing.extend((os.path.join(path, dir_path) + "/" for dir_path in dirs))  # noqa: flynt
         listing.extend((os.path.join(path, file_name) for file_name in files))
     return sorted(listing)
 
@@ -1555,7 +1565,9 @@ def assert_equal_any_order(result,          # type: Iterable[Any]
         def comparer(_res, _exp):  # pylint: disable=E0102
             return _res == _exp
 
-    assert type(result) == type(expect), "Expected types mismatch between iterable containers."  # pylint: disable=C0123
+    assert type(result) == type(expect), (  # pylint: disable=C0123  # noqa: E721
+        "Expected types mismatch between iterable containers."
+    )
     # in case of exhaustible iterators, compute them to get a copy once
     # also use the copy to remove items such that all must be matched
     result = list(result)
