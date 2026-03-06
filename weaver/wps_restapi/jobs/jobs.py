@@ -40,7 +40,7 @@ from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.transform import transform
-from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import get_any_value, get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
