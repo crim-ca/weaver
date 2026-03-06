@@ -1249,6 +1249,16 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def create_content_id(first_id, second_id):
+    # type: (AnyUUID, AnyUUID) -> str
+    """
+    Generate a unique content id from passed ids.
+
+    Both ids can be strings or UUIDs.
+    """
+    return f"<{first_id}@{second_id}>"
+
+
 def get_href_headers(
     path,                                   # type: str
     download_headers=False,                 # type: bool
@@ -1376,9 +1386,8 @@ def get_href_headers(
 
     headers = {}
     if content_headers:
-        content_id = content_id.strip("<>") if isinstance(content_id, str) else ""
         if content_id:
-            headers["Content-ID"] = f"<{content_id}>"
+            headers["Content-ID"] = content_id
         if location_headers:
             headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
@@ -1419,6 +1428,7 @@ def make_link_header(
     type=None,      # type: Optional[str]  # noqa
     title=None,     # type: Optional[str]
     charset=None,   # type: Optional[str]
+    **kwargs,       # type: Optional[str]
 ):                  # type: (...) -> str
     """
     Creates the HTTP Link (:rfc:`8288`) header value from input parameters or a dictionary representation.
@@ -1431,6 +1441,7 @@ def make_link_header(
         Parameter :paramref:`rel` is optional to allow unpacking with a single parameter,
         but its value is required to form a valid ``Link`` header.
     """
+    params = {}
     if isinstance(href, dict):
         rel = rel or href.get("rel")
         type = type or href.get("type")  # noqa
@@ -1449,6 +1460,9 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
+    if params:
+        for key, val in params.items():
+            link += f"; {key}={val}"
     return link
 
 
