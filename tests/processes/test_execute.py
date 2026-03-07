@@ -500,3 +500,84 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
     assert "value" not in result_output
 
 
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_with_profile():
+    """
+    Test parsing input and output with profile qualifier.
+    """
+    params = {
+        "features[value]": ['{"type": "FeatureCollection"}'],
+        "features[mediaType]": [ContentType.APP_GEOJSON],
+        "features[profile]": ["http://www.opengis.net/spec/ogcapi-features-1/1.0"],
+        "output[include]": ["true"],
+        "output[mediaType]": [ContentType.APP_JSON],
+        "output[profile]": ["http://www.opengis.net/spec/ogcapi-processes-1/1.0"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    # Check input with profile
+    assert "inputs" in result
+    features_input = next((i for i in result["inputs"] if i["id"] == "features"), None)
+    assert features_input is not None
+    assert "format" in features_input
+    assert features_input["format"]["mediaType"] == ContentType.APP_GEOJSON
+    assert features_input["format"]["profile"] == "http://www.opengis.net/spec/ogcapi-features-1/1.0"
+
+    # Check output with profile
+    assert "outputs" in result
+    output_result = next((o for o in result["outputs"] if o["id"] == "output"), None)
+    assert output_result is not None
+    assert "format" in output_result
+    assert output_result["format"]["mediaType"] == ContentType.APP_JSON
+    assert output_result["format"]["profile"] == "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_response_profile():
+    """
+    Test parsing response[profile] parameter.
+    """
+    params = {
+        "input1": ["value1"],
+        "response[profile]": ["http://www.opengis.net/spec/ogcapi-processes-1/1.0"],
+        "response[f]": [ContentType.APP_JSON],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+
+    # Check response parameters
+    assert "profile" in response_params
+    assert response_params["profile"] == "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
+    assert "f" in response_params
+    assert response_params["f"] == ContentType.APP_JSON
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_response_format_short_names():
+    """
+    Test parsing response[f] with short format names (json, xml, etc.).
+
+    Validates that short names are properly preserved for conversion by default_format_handler.
+    """
+    params = {
+        "input1": ["value1"],
+        "response[f]": ["json"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert "f" in response_params
+    assert response_params["f"] == "json"
+
+    # Test with xml
+    params["response[f]"] = ["xml"]
+    result, response_params = parse_kvp_inputs_outputs(params)
+    assert response_params["f"] == "xml"
+
+    # Test with full media-type
+    params["response[f]"] = [ContentType.APP_JSON]
+    result, response_params = parse_kvp_inputs_outputs(params)
+    assert response_params["f"] == ContentType.APP_JSON
+

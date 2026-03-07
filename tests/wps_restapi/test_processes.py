@@ -1431,7 +1431,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "class": "CommandLineTool",
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
-                    "dockerPull": "python:3.7-alpine"
+                    "dockerPull": "python:3.12-alpine"
                 }
             },
             "baseCommand": ["python3", "-V"],
@@ -1661,7 +1661,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cudaDeviceCountMin": 1,
                 "cudaDeviceCountMax": 8
             }
-            docker_requirement = {"dockerPull": "python:3.7-alpine"}
+            docker_requirement = {"dockerPull": "python:3.12-alpine"}
             cwl = {
                 "class": "CommandLineTool",
                 "cwlVersion": "v1.2",
@@ -1700,7 +1700,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             network_access_requirement = {"networkAccess": True}
-            docker_requirement = {"dockerPull": "python:3.7-alpine"}
+            docker_requirement = {"dockerPull": "python:3.12-alpine"}
             for req_type in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
                 cwl = {
                     "class": "CommandLineTool",
@@ -2888,6 +2888,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "stringInput": {"type": "string"},
                     "intInput": {"type": "int"},
@@ -2941,6 +2946,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "values": {"type": "string[]"},
                 },
@@ -2987,6 +2997,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "cat",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "fileInput": {"type": "File"},
                 },
@@ -3032,6 +3047,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "cat",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "binaryInput": {"type": "File"},
                 },
@@ -3079,6 +3099,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "bbox": {
                         "type": {
@@ -3130,6 +3155,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "message": {"type": "string"},
                 },
@@ -3180,6 +3210,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "input": {"type": "string"},
                 },
@@ -3227,6 +3262,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "textInput": {"type": "string"},
                     "numberInput": {"type": "int"},
@@ -3274,6 +3314,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
                 "inputs": {
                     "input": {"type": "string"},
                 },
@@ -3346,6 +3391,58 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "compressed[include]": "true",
                 "compressed[mediaType]": ContentType.APP_JSON,
                 "compressed[encoding]": "gzip",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_profile_qualifier(self):
+        """
+        Test KVP-encoded execution with profile qualifier for input and output.
+
+        Validates that profile specifications are correctly parsed and applied.
+        """
+        # Deploy test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-profile-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "features": {"type": "File"},
+                },
+                "outputs": {
+                    "result": {"type": "File", "outputBinding": {"glob": "result.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-profile-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "features[href]": "http://example.com/features.json",
+                "features[mediaType]": ContentType.APP_GEOJSON,
+                "features[profile]": "http://www.opengis.net/spec/ogcapi-features-1/1.0",
+                "result[include]": "true",
+                "result[mediaType]": ContentType.APP_JSON,
+                "result[profile]": "http://www.opengis.net/spec/ogcapi-processes-1/1.0",
+                "response[prefer]": ExecuteControlOption.ASYNC,
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
             assert resp.status_code == 201, f"Error: {resp.text}"

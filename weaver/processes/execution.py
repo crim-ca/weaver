@@ -37,7 +37,14 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
+from weaver.formats import (
+    AcceptLanguage,
+    ContentType,
+    clean_media_type_format,
+    default_format_handler,
+    map_cwl_media_type,
+    repr_json
+)
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -874,7 +881,7 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
         target_dict[base_key] = {"id": base_key}
 
     # Format qualifiers (can apply to both inputs and outputs)
-    if qualifier in ("mediatype", "encoding", "schema"):
+    if qualifier in ("mediatype", "encoding", "schema", "profile"):
         target_dict[base_key].setdefault("format", {})
         fmt = target_dict[base_key]["format"]
 
@@ -882,6 +889,8 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
             fmt["mediaType"] = value
         elif qualifier == "encoding":
             fmt["encoding"] = value
+        elif qualifier == "profile":
+            fmt["profile"] = value
         elif qualifier == "schema":
             decoded = unquote(value)
             if decoded.startswith("{"):
@@ -1057,10 +1066,34 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
         })
 
     if response_params:
-        if ("f" in response_params or "format" in response_params) and "Accept" not in request.headers:
-            request.headers["Accept"] = response_params.get("f") or response_params.get("format")
-        if "prefer" in response_params and "Prefer" not in request.headers:
+        # Convert 'f' or 'format' query parameter to Accept header
+        if "f" in response_params or "format" in response_params:
+            fmt_value = response_params.get("f") or response_params.get("format")
+            media_type = default_format_handler(fmt_value)  # convert short form aliases
+            request.headers["Accept"] = media_type or fmt_value
+
+        # Convert 'prefer' query parameter to Prefer header
+        if "prefer" in response_params:
             request.headers["Prefer"] = response_params["prefer"]
+
+        # Convert 'profile' query parameter to Accept-Profile header
+        # Note:
+        #   For sync execution, 'profile' and 'response[profile]' are equivalent (same immediate response).
+        #   For async execution, 'profile' applies to job status response,
+        #   while 'response[profile]' applies to final results (handled separately).
+        if "profile" in response_params:
+            request.headers["Accept-Profile"] = response_params["profile"]
+
+        # FIXME: Add support for 'response=collection' to control job status collection representation
+        #        See: https://github.com/opengeospatial/ogcapi-processes/issues/557
+        #             https://github.com/crim-ca/weaver/issues/683
+        # if "collection" in response_params:
+        #     # Handle collection response format when implemented
+        #     pass
+
+    # FIXME: clear query parameters from request (except 'response=collection' to be compliant?)
+    # FIXME: forward '?f/format' for 'prefer' sync (override 'response[profile]') - otherwise (async) 'response' in body
+    # FIXME: convert '?f/format' to 'Accept' for async case?
 
     request.body = json.dumps(exec_body).encode("utf-8")
     if "Content-Type" not in request.headers:

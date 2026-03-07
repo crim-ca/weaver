@@ -690,7 +690,7 @@ better illustrate where each of the mentioned parameters in following sections a
       applicable to `Weaver`, which align with :term:`OGC API - Processes`, but that can also support additional
       capabilities.
     - |ogc-api-proc-exec-outputs|_ offers general details on ``transmissionMode`` parameter of requested outputs.
-    - |ogc-api-proc-exec-mode|_ describes general details about the execution negotiation (`sync`/`async`),
+    - |ogc-api-proc-exec-mode|_ describes general details about the execution negotiation (``sync``/``async``),
       formerly with ``mode`` parameter, and more recently with ``Prefer`` header.
     - |ogc-api-proc-exec-responses-sync|_ and |ogc-api-proc-exec-responses-async|_ provide
       a complete listing of available ``response`` formats considering all other parameters.
@@ -1182,6 +1182,9 @@ The following table summarizes all supported KVP parameter qualifiers.
     | ``[schema]``      | :ref:`Input <proc_exec_kvp_inputs>`,     | Schema :term:`URL` or URL-encoded :term:`JSON` |
     |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
     +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[profile]``     | :ref:`Input <proc_exec_kvp_inputs>`,     | Content :term:`Profile` :term:`URI`            |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
+    +-------------------+------------------------------------------+------------------------------------------------+
     | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`      | Coordinate Reference System for bbox           |
     +-------------------+------------------------------------------+------------------------------------------------+
     | ``[include]``     | :ref:`Output <proc_exec_kvp_outputs>`    | Set to ``true`` to request output              |
@@ -1191,6 +1194,8 @@ The following table summarizes all supported KVP parameter qualifiers.
     | ``[format]``      | :ref:`Response <proc_exec_kvp_response>` | Format (explicit alias for ``[f]``)            |
     +-------------------+------------------------------------------+------------------------------------------------+
     | ``[prefer]``      | :ref:`Response <proc_exec_kvp_response>` | Execution preference (maps to ``Prefer``)      |
+    +-------------------+------------------------------------------+------------------------------------------------+
+    | ``[profile]``     | :ref:`Response <proc_exec_kvp_response>` | Response :term:`Profile` (see warning below)   |
     +-------------------+------------------------------------------+------------------------------------------------+
 
 
@@ -1317,6 +1322,23 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
+    | **Qualified Value with Profile**                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    features[value]=%7B%22type%22%3A%22Feature         |    {                                                  |
+    |      Collection%22%7D&                                |      "inputs": {                                      |
+    |    features[mediaType]=application/geo%2Bjson&        |        "features": {                                  |
+    |    features[profile]=http://www.opengis.net/spec/     |          "value": "{\"type\":\"FeatureCollection\"}",  |
+    |      ogcapi-features-1/1.0                            |          "format": {                                  |
+    |                                                       |            "mediaType": "application/geo+json",       |
+    |                                                       |            "profile": "http://www.opengis.net/spec/   |
+    |                                                       |              ogcapi-features-1/1.0"                   |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
 
 .. _proc_exec_kvp_outputs:
 
@@ -1388,6 +1410,22 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Profile**                                                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    result[include]=true&                              |    {                                                  |
+    |    result[mediaType]=application/geo%2Bjson&          |      "outputs": {                                     |
+    |    result[profile]=http://www.opengis.net/spec/       |        "result": {                                    |
+    |      ogcapi-features-1/1.0                            |          "format": {                                  |
+    |                                                       |            "mediaType": "application/geo+json",       |
+    |                                                       |            "profile": "http://www.opengis.net/spec/   |
+    |                                                       |              ogcapi-features-1/1.0"                   |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
 
 .. _proc_exec_kvp_response:
 
@@ -1395,7 +1433,7 @@ KVP Response Parameters
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 Response format and execution preferences can be controlled using ``response`` bracket notation parameters.
-These map directly to HTTP headers for consistent behavior across GET and POST execution methods:
+These map directly to HTTP headers for consistent behavior across GET and POST execution methods.
 
 .. table:: KVP Response Parameter Examples
     :name: table-kvp-response
@@ -1418,6 +1456,12 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
     |                                                       |                                                       |
     |    response[format]=application/json                  |    Accept: application/json                           |
     +-------------------------------------------------------+-------------------------------------------------------+
+    | **Response Profile** (for :ref:`proc_exec_results`) [#kvpProfile]_                                            |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: http                                  |
+    |                                                       |                                                       |
+    |    response[profile]=[ogc-rel:results]                |    Accept-Profile: [ogc-rel:results]                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
     | **Execution Preference** (async)                                                                              |
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: http                                  |
@@ -1430,6 +1474,72 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
     |                                                       |                                                       |
     |    response[prefer]=wait=30                           |    Prefer: wait=30                                    |
     +-------------------------------------------------------+-------------------------------------------------------+
+
+.. [#kvpProfile]
+.. warning::
+    **Profile Parameter Behavior with Execution Mode**
+
+    The ``profile`` and ``response[profile]`` parameters have different meanings depending on the
+    :ref:`Execution Mode <proc_exec_mode>`. Other precaution must also be taken to avoid confusion
+    between these parameters and the other ``[profile]`` qualifiers used for inputs and outputs.
+
+    **Synchronous Execution** (``Prefer: wait``):
+        Both ``profile`` and ``response[profile]`` are **equivalent** and apply to the same immediate response
+        containing the :ref:`proc_exec_results`. They can be used interchangeably because the response return
+        directly from the execution request.
+
+    **Asynchronous Execution** (``Prefer: respond-async``):
+        - ``profile`` applies to the :ref:`Job Status <proc_op_status>` response
+          (the immediate *HTTP 201 Created* response)
+        - ``response[profile]`` applies to the **final** :ref:`proc_exec_results`
+          (retrieved by subsequent :ref:`Job Result <proc_op_result>` request)
+          This can be relevant the profile of the results as a whole is relevant (e.g.: ``response[profile]=stac``),
+          such as when combined with the ``response=collection`` parameter.
+
+    **Input/Output Profile Qualifiers** (``{inputID}[profile]``, ``{outputID}[profile]``):
+        These format qualifiers are **independent** of :ref:`Execution Mode <proc_exec_mode>` and always specify
+        the content :term:`Profile` for those specific inputs or outputs, regardless of whether execution is
+        |synchronous|_ or |asynchronous|_.
+
+    **Example for Asynchronous Execution:**
+
+    .. code-block:: text
+
+        # Request async execution with different profiles
+        ?...&
+        input[href]=http://example.com/data.json&
+        input[type]=application/geo+json&
+        input[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry&
+        output[include]=true&
+        output[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection&
+        response=collection&
+        response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac&
+        response[prefer]=respond-async&
+        profile=ogc&
+        f=json
+
+    In this example, the immediate :ref:`Job Status <proc_op_status>` is obtained |asynchronously|_, and explicitly
+    requests its :term:`OGC` representation (rather than :term:`openEO` for example), and requests it to be returned
+    in :term:`JSON` (rather than :term:`YAML` for example).
+    It requests that the :ref:`Job Result <proc_op_result>` from that execution to be represented as a :term:`STAC`
+    collection (e.g.: to include relevant metadata and ``assets`` specific to it), although the :term:`Process` itself
+    is expected to produce a :term:`GeoJSON` ``FeatureCollection`` as output (rather than a ``Polygon`` for example),
+    generated from an input :term:`GeoJSON` ``Geometry``.
+    It desires the response to be provided as :ref:`Collection Output <proc_col_outputs>`, compatible with :term:`STAC`.
+
+    In this case, the input/output profiles are handled by the underlying :term:`Process` execution,
+    while the response profiles (:ref:`Job Status <proc_op_status>` / :ref:`Job Result <proc_op_result>`) are
+    specifically for `Weaver` as :term:`OGC API - Processes` request interactions.
+
+    .. note::
+        In most situations, this level of granular control over profiles is not necessary since sensible results
+        are applied based on common patterns. However, they might be necessary in situations of highly overloaded
+        :term:`Media-Types` such as :term:`GeoJSON` and :term:`JSON`, or for partially compatible :term:`API` or
+        responses between :term:`STAC`, :term:`OGC` and :term:`openEO` specifications. In certain cases, only a few
+        of them might be necessary, but it is important to reflect precisely where the :term:`Profile` applies.
+
+    .. seealso::
+        - :ref:`Response Content Negotiation <proc_content_negotiation>`
 
 .. note::
     - Both ``response[f]`` and ``response[format]`` are accepted and equivalent

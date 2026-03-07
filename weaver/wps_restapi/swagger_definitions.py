@@ -3422,7 +3422,7 @@ class KVPInputLiteralValue(ExtendedSchemaNode):
     missing = drop
 
 
-class KVPInputReference(ExtendedSchemaNode):
+class KVPInputReferenceURI(ExtendedSchemaNode):
     """
     KVP input parameter for reference by URL.
     """
@@ -3442,7 +3442,115 @@ class KVPInputReference(ExtendedSchemaNode):
     missing = drop
 
 
-class KVPInputReferenceType(ExtendedSchemaNode):
+class KVPInputQualifiedValue(ExtendedSchemaNode):
+    """
+    KVP input parameter for qualified value with format specifications.
+
+    Allows providing an input value along with format qualifiers (mediaType, encoding, schema, profile).
+    """
+    schema_type = String
+    name = "{inputID}[value]"
+    variable = "<inputID>[value]"
+    title = "Input Qualified Value"
+    description = (
+        "Input parameter qualified value for process execution using KVP encoding with ``deepObject`` style. "
+        "The parameter name uses bracket notation where the input identifier is followed by ``[value]``. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "This allows specifying format qualifiers alongside the value. "
+        "\n\n"
+        "**Combinable with:**\n"
+        "- ``{inputID}[mediaType]`` - Media type of the value\n"
+        "- ``{inputID}[encoding]`` - Encoding (e.g., base64, gzip)\n"
+        "- ``{inputID}[schema]`` - Schema or profile URI\n"
+        "- ``{inputID}[profile]`` - Content profile URI\n"
+        "\n\n"
+        "Examples:\n"
+        "- Binary data: ``data[value]=SGVsbG8=&data[mediaType]=text/plain&data[encoding]=base64``\n"
+        "- Structured data: ``geojson[value]={...}&geojson[mediaType]=application/geo+json"
+        "&geojson[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
+    )
+    example = "data_value"
+    missing = drop
+
+
+class KVPInputQualifiedMediaType(ExtendedSchemaNode):
+    """
+    KVP input parameter media type qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[mediaType]"
+    variable = "<inputID>[mediaType]"
+    title = "Input Value Media Type"
+    description = (
+        "Media type qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify the content type. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        f"Example: ``data[value]={{...}}&data[mediaType]={ContentType.APP_JSON}``"
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPInputQualifiedEncoding(ExtendedSchemaNode):
+    """
+    KVP input parameter encoding qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[encoding]"
+    variable = "<inputID>[encoding]"
+    title = "Input Value Encoding"
+    description = (
+        "Encoding qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify the encoding (e.g., base64, gzip). "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]=SGVsbG8=&data[encoding]=base64``"
+    )
+    example = "base64"
+    missing = drop
+
+
+class KVPInputQualifiedSchema(ExtendedSchemaNode):
+    """
+    KVP input parameter schema qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[schema]"
+    variable = "<inputID>[schema]"
+    title = "Input Value Schema"
+    description = (
+        "Schema qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify a schema URI or definition. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]={{...}}&data[schema]=http://example.com/schema.json``"
+    )
+    example = "http://example.com/schema.json"
+    missing = drop
+
+
+class KVPInputQualifiedProfile(ExtendedSchemaNode):
+    """
+    KVP input parameter profile qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[profile]"
+    variable = "<inputID>[profile]"
+    title = "Input Value Profile"
+    description = (
+        "Profile qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify a content profile URI. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]={{...}}&data[mediaType]=application/geo+json"
+        "&data[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
+    )
+    example = "http://www.opengis.net/spec/ogcapi-features-1/1.0"
+    missing = drop
+
+
+class KVPInputReferenceMediaType(ExtendedSchemaNode):
     """
     KVP input parameter media type qualifier for reference.
     """
@@ -3527,6 +3635,31 @@ class KVPOutputMediaType(ExtendedSchemaNode):
     missing = drop
 
 
+class KVPInputOutputProfile(ExtendedSchemaNode):
+    """
+    KVP input/output parameter to specify content profile.
+
+    Uses ``deepObject``-style bracket notation to qualify format profile.
+
+    .. note::
+        Parameter name is a variable placeholder. Replace ``{inputID}`` or ``{outputID}`` accordingly.
+        For outputs in asynchronous execution, this specifies the profile for the final result data.
+    """
+    schema_type = String
+    name = "{inputID}[profile]"
+    variable = "<inputID>[profile]"
+    title = "Input/Output Profile"
+    description = (
+        "Content profile negotiation for input or output using KVP encoding with ``deepObject`` style. "
+        "Specifies a profile URI or well-known identifier for the format. "
+        "Replace ``{inputID}`` or ``{outputID}`` with the actual identifier. "
+        "\n\n"
+        "Example: ``data[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
+    )
+    example = "http://www.opengis.net/spec/ogcapi-features-1/1.0"
+    missing = drop
+
+
 class KVPResponseFormat(ExtendedSchemaNode):
     """
     KVP response format parameter.
@@ -3600,26 +3733,47 @@ class KVPResponsePrefer(ExtendedSchemaNode):
     missing = drop
 
 
-# class ProcessExecutionKVPInputOutputQuery(AnyOfKeywordSchema, OAS3Parameter):
-#     _any_of = [
-#         PermissiveMappingSchema(),
-#         KVPInputLiteralValue(),
-#         KVPInputReference(),
-#         KVPInputReferenceType(),
-#         KVPInputBBoxCRS(),
-#         KVPOutputInclude(),
-#         KVPOutputMediaType(),
-#     ]
+class KVPResponseProfile(ExtendedSchemaNode):
+    """
+    KVP response profile parameter.
+
+    Behaves like the HTTP ``Accept-Profile`` header to specify desired response profile.
+    Uses ``deepObject``-style bracket notation with fixed parameter name.
+    """
+    schema_type = String
+    name = "response[profile]"
+    title = "Response Profile"
+    description = (
+        "Response profile negotiation for process execution using KVP encoding with ``deepObject`` style. "
+        "Specifies the desired profile URI or well-known identifier for the response. "
+        "\n\n"
+        "**Execution Mode Behavior:**\n"
+        "- **Synchronous**: The ``response[profile]`` applies to the immediate response "
+        "(same as``Accept-Profile`` header or ``profile`` query)\n"
+        "- **Asynchronous**: The ``response[profile]`` applies to the final *Job Results* profile, "
+        "whereas the ``profile`` query applies to the *Job Status* response\n"
+        "\n\n"
+        "Example: ``response[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
+    )
+    example = "http://www.opengis.net/spec/ogcapi-features-1/1.0"
+    missing = drop
+
 
 class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
     description = "KVP-encoded inputs and outputs parameters for execution of the process."
     _any_of = [
         KVPInputLiteralValue(),
         KVPInputBBoxCRS(),
-        KVPInputReference(),
-        KVPInputReferenceType(),
+        KVPInputReferenceURI(),
+        KVPInputReferenceMediaType(),
+        KVPInputQualifiedValue(),
+        KVPInputQualifiedMediaType(),
+        KVPInputQualifiedEncoding(),
+        KVPInputQualifiedSchema(),
+        KVPInputQualifiedProfile(),
         KVPOutputInclude(),
         KVPOutputMediaType(),
+        KVPInputOutputProfile(),
     ]
 
 
@@ -3643,12 +3797,14 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
         "- ``<inputID>[mediaType]=type`` - Qualified value desired media-type for the input\n"
         "- ``<inputID>[encoding]=encode`` - Qualified value encoding to consider (eg: bas64, binary, gzip)\n"
         "- ``<inputID>[schema]=schema`` - Qualified value schema indication (URL or well-known OGC profile)\n"
+        "- ``<inputID>[profile]=profile`` - Qualified value content profile (URI or well-known identifier)\n"
         "- ``<inputID>[href]=url`` - Input by reference with URL\n"
         "- ``<inputID>[type]=mediaType`` - Media type for referenced input\n"
         "- ``<outputID>[include]=true`` - Request specific output\n"
         "- ``<outputID>[mediaType]=format`` - Desired output format media-type\n"
         "- ``<outputID>[encoding]=encode`` - Desired output format encoding\n"
         "- ``<outputID>[schema]=schema`` - Desired output format schema or profile\n"
+        "- ``<outputID>[profile]=profile`` - Desired output format content profile\n"
     )
     examples = {
         "KVPSimpleInput": {
@@ -3659,10 +3815,11 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
             }
         },
         "KVPQualifiedInput": {
-            "summary": "Simple literal inputs",
+            "summary": "Qualified value with format specifications",
             "value": {
                 "data[value]": "{\"test\":123}",
                 "data[mediaType]": ContentType.APP_JSON,
+                "data[profile]": "http://www.opengis.net/spec/ogcapi-features-1/1.0",
             }
         },
         "KVPByReference": {
@@ -3703,6 +3860,15 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
                 "response[format]": ContentType.APP_JSON,
                 "response[prefer]": ExecuteControlOption.ASYNC,
             }
+        },
+        "KVPWithResponseProfile": {
+            "summary": "With response format and profile",
+            "value": {
+                "input1": "value1",
+                "response[f]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC,
+                "response[profile]": "http://www.opengis.net/spec/ogcapi-processes-1/1.0",
+            }
         }
     }
 
@@ -3715,6 +3881,7 @@ class ProcessExecutionKVPQuery(ExtendedMappingSchema):
     response_format = KVPResponseFormat()
     response_format_alias = KVPResponseFormatAlias()
     response_prefer = KVPResponsePrefer()
+    response_profile = KVPResponseProfile()
 
 
 class ProcessExecutionKVPEndpoint(LocalProcessPath):
