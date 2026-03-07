@@ -147,7 +147,7 @@ def test_parse_kvp_inputs_outputs_by_reference():
     """
     params = {
         "fileInput[href]": ["http://example.com/file.txt"],
-        "fileInput[type]": ["text/plain"],
+        "fileInput[type]": [ContentType.TEXT_PLAIN],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -155,7 +155,7 @@ def test_parse_kvp_inputs_outputs_by_reference():
     assert len(result["inputs"]) == 1
     assert result["inputs"][0]["id"] == "fileInput"
     assert result["inputs"][0]["href"] == "http://example.com/file.txt"
-    assert result["inputs"][0]["type"] == "text/plain"
+    assert result["inputs"][0]["type"] == ContentType.TEXT_PLAIN
 
 
 @pytest.mark.kvp
@@ -202,7 +202,7 @@ def test_parse_kvp_inputs_outputs_with_outputs():
         "input1": ["value1"],
         "output1[include]": ["true"],
         "output2[include]": ["true"],
-        "output2[mediaType]": ["application/json"],
+        "output2[mediaType]": [ContentType.APP_JSON],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -215,7 +215,7 @@ def test_parse_kvp_inputs_outputs_with_outputs():
     assert "output1" in outputs
     assert "output2" in outputs
     assert "format" in outputs["output2"]
-    assert outputs["output2"]["format"]["mediaType"] == "application/json"
+    assert outputs["output2"]["format"]["mediaType"] == ContentType.APP_JSON
 
 
 @pytest.mark.kvp
@@ -288,13 +288,15 @@ def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
 def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
     """
     Test parsing base64-encoded binary input with ``value`` qualifier.
+
+    Format qualifiers for inputs should be at top level, not nested under ``format``.
     """
     binary_data = b"Hello, World!"
     encoded_data = base64.b64encode(binary_data).decode("ascii")
 
     params = {
         "binaryInput[value]": [encoded_data],
-        "binaryInput[mediaType]": ["text/plain"],
+        "binaryInput[mediaType]": [ContentType.TEXT_PLAIN],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -302,14 +304,17 @@ def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
     assert len(result["inputs"]) == 1
     assert result["inputs"][0]["id"] == "binaryInput"
     assert result["inputs"][0]["value"] == encoded_data
-    assert "format" in result["inputs"][0]
-    assert result["inputs"][0]["format"]["mediaType"] == "text/plain"
+    assert "format" not in result["inputs"][0]
+    assert result["inputs"][0]["mediaType"] == ContentType.TEXT_PLAIN
 
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_schema_qualifier():
     """
     Test parsing ``schema`` qualifier for inputs and outputs.
+
+    For inputs, format qualifiers should be at top level.
+    For outputs, format qualifiers should be nested under ``format``.
     """
     schema_url = "http://example.com/schema.json"
     schema_obj = '{"type": "object", "properties": {"name": {"type": "string"}}}'
@@ -323,7 +328,9 @@ def test_parse_kvp_inputs_outputs_schema_qualifier():
 
     assert "inputs" in result
     assert "outputs" in result
-    assert result["inputs"][0]["format"]["schema"] == schema_url
+    assert "format" not in result["inputs"][0]
+    assert result["inputs"][0]["schema"] == schema_url
+    assert "format" in result["outputs"][0]
     assert isinstance(result["outputs"][0]["format"]["schema"], dict)
     assert result["outputs"][0]["format"]["schema"]["type"] == "object"
 
@@ -366,55 +373,36 @@ def test_parse_kvp_inputs_outputs_response_format_alias():
 
 
 @pytest.mark.kvp
-def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals():
+@pytest.mark.parametrize(
+    ["prefer_value", "expected_contains"],
+    [
+        ("respond-async;return=minimal", ["return=minimal"]),
+        ("wait=30;handling=lenient", ["wait=30", "handling=lenient"]),
+        ("respond-async;return=representation;wait=10", ["return=representation", "wait=10"]),
+    ]
+)
+def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals(prefer_value, expected_contains):
     """
     Test that ``response[prefer]`` with nested ``=`` characters is parsed correctly.
 
     The ``Prefer`` header can contain values like ``"respond-async;return=minimal"`` where
     the nested ``=`` should be preserved as part of the value, not treated as a KVP separator.
     """
-    # Test case 1: respond-async with return=minimal
     params = {
         "input1": ["test value"],
-        "response[prefer]": ["respond-async;return=minimal"],
+        "response[prefer]": [prefer_value],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
-    # Verify input was parsed
     assert "inputs" in result
     assert len(result["inputs"]) == 1
     assert result["inputs"][0]["id"] == "input1"
     assert result["inputs"][0]["value"] == "test value"
 
-    # Verify response[prefer] value is preserved with nested '='
     assert "prefer" in response_params
-    assert response_params["prefer"] == "respond-async;return=minimal"
-    # Ensure the entire string including 'return=minimal' is preserved
-    assert "return=minimal" in response_params["prefer"]
-
-    # Test case 2: wait with nested =
-    params2 = {
-        "input2": ["another value"],
-        "response[prefer]": ["wait=30;handling=lenient"],
-    }
-    result2, response_params2 = parse_kvp_inputs_outputs(params2)
-
-    assert "prefer" in response_params2
-    assert response_params2["prefer"] == "wait=30;handling=lenient"
-    assert "wait=30" in response_params2["prefer"]
-    assert "handling=lenient" in response_params2["prefer"]
-
-    # Test case 3: Multiple nested = signs
-    params3 = {
-        "input3": ["value"],
-        "response[prefer]": ["respond-async;return=representation;wait=10"],
-    }
-    result3, response_params3 = parse_kvp_inputs_outputs(params3)
-
-    assert "prefer" in response_params3
-    assert response_params3["prefer"] == "respond-async;return=representation;wait=10"
-    assert "return=representation" in response_params3["prefer"]
-    assert "wait=10" in response_params3["prefer"]
+    assert response_params["prefer"] == prefer_value
+    for expected in expected_contains:
+        assert expected in response_params["prefer"]
 
 
 @pytest.mark.kvp
@@ -423,12 +411,12 @@ def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     Test parsing input with ``value`` qualifier and format qualifiers.
 
     Validates that ``input[value]=data&input[mediaType]=text/plain`` produces
-    an input with both value and format.
+    an input with both value and format qualifiers at top level (not under ``format``).
     """
     params = {
         "my_input[value]": ["test data"],
-        "my_input[mediaType]": ["text/plain"],
-        "my_input[encoding]": ["base64"],
+        "my_input[mediaType]": [ContentType.TEXT_PLAIN],
+        "my_input[encoding]": [ContentEncoding.BASE64],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
@@ -438,9 +426,9 @@ def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     input_data = result["inputs"][0]
     assert input_data["id"] == "my_input"
     assert input_data["value"] == "test data"
-    assert "format" in input_data
-    assert input_data["format"]["mediaType"] == "text/plain"
-    assert input_data["format"]["encoding"] == "base64"
+    assert "format" not in input_data
+    assert input_data["mediaType"] == ContentType.TEXT_PLAIN
+    assert input_data["encoding"] == ContentEncoding.BASE64
 
 
 @pytest.mark.kvp
@@ -476,6 +464,8 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
     Test that ``include`` qualifier determines input vs output classification.
 
     Parameters with ``include=true`` become outputs, others become inputs.
+    For inputs, format qualifiers are at top level.
+    For outputs, format qualifiers are nested under 'format'.
     """
     params = {
         # Input - has format but no include
@@ -486,17 +476,19 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
-    # data should be input (no include)
+    # data should be input (no include) - format at top level
     assert "inputs" in result
     assert any(i["id"] == "data" for i in result["inputs"])
     data_input = next(i for i in result["inputs"] if i["id"] == "data")
-    assert "format" in data_input
+    assert "format" not in data_input
+    assert data_input["mediaType"] == "text/csv"
 
-    # result should be output (has include=true)
+    # result should be output (has include=true) - format nested under 'format'
     assert "outputs" in result
     assert any(o["id"] == "result" for o in result["outputs"])
     result_output = next(o for o in result["outputs"] if o["id"] == "result")
     assert "format" in result_output
+    assert result_output["format"]["mediaType"] == ContentType.APP_JSON
     assert "value" not in result_output
 
 
@@ -504,32 +496,35 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
 def test_parse_kvp_inputs_outputs_with_profile():
     """
     Test parsing input and output with profile qualifier.
+
+    For inputs, format qualifiers should be at top level.
+    For outputs, format qualifiers should be nested under 'format'.
     """
     params = {
         "features[value]": ['{"type": "FeatureCollection"}'],
         "features[mediaType]": [ContentType.APP_GEOJSON],
-        "features[profile]": ["http://www.opengis.net/spec/ogcapi-features-1/1.0"],
+        "features[profile]": ["http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"],
         "output[include]": ["true"],
         "output[mediaType]": [ContentType.APP_JSON],
-        "output[profile]": ["http://www.opengis.net/spec/ogcapi-processes-1/1.0"],
+        "output[profile]": ["http://www.opengis.net/def/format/ogcapi-processes/0/stac-collection"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
-    # Check input with profile
+    # Check input with profile - format qualifiers at top level
     assert "inputs" in result
     features_input = next((i for i in result["inputs"] if i["id"] == "features"), None)
     assert features_input is not None
-    assert "format" in features_input
-    assert features_input["format"]["mediaType"] == ContentType.APP_GEOJSON
-    assert features_input["format"]["profile"] == "http://www.opengis.net/spec/ogcapi-features-1/1.0"
+    assert "format" not in features_input
+    assert features_input["mediaType"] == ContentType.APP_GEOJSON
+    assert features_input["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
 
-    # Check output with profile
+    # Check output with profile - format qualifiers nested under 'format'
     assert "outputs" in result
     output_result = next((o for o in result["outputs"] if o["id"] == "output"), None)
     assert output_result is not None
     assert "format" in output_result
     assert output_result["format"]["mediaType"] == ContentType.APP_JSON
-    assert output_result["format"]["profile"] == "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
+    assert output_result["format"]["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac-collection"
 
 
 @pytest.mark.kvp
@@ -539,7 +534,7 @@ def test_parse_kvp_inputs_outputs_response_profile():
     """
     params = {
         "input1": ["value1"],
-        "response[profile]": ["http://www.opengis.net/spec/ogcapi-processes-1/1.0"],
+        "response[profile]": ["http://www.opengis.net/def/format/ogcapi-processes/0/stac"],
         "response[f]": [ContentType.APP_JSON],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
@@ -549,35 +544,31 @@ def test_parse_kvp_inputs_outputs_response_profile():
 
     # Check response parameters
     assert "profile" in response_params
-    assert response_params["profile"] == "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
+    assert response_params["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
     assert "f" in response_params
     assert response_params["f"] == ContentType.APP_JSON
 
 
 @pytest.mark.kvp
-def test_parse_kvp_inputs_outputs_response_format_short_names():
+@pytest.mark.parametrize(
+    "format_value",
+    [
+        "json",
+        "xml",
+        ContentType.APP_JSON,
+    ]
+)
+def test_parse_kvp_inputs_outputs_response_format_short_names(format_value):
     """
-    Test parsing response[f] with short format names (json, xml, etc.).
-
-    Validates that short names are properly preserved for conversion by default_format_handler.
+    Test parsing ``response[f]`` with short format names.
     """
     params = {
         "input1": ["value1"],
-        "response[f]": ["json"],
+        "response[f]": [format_value],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
     assert "f" in response_params
-    assert response_params["f"] == "json"
-
-    # Test with xml
-    params["response[f]"] = ["xml"]
-    result, response_params = parse_kvp_inputs_outputs(params)
-    assert response_params["f"] == "xml"
-
-    # Test with full media-type
-    params["response[f]"] = [ContentType.APP_JSON]
-    result, response_params = parse_kvp_inputs_outputs(params)
-    assert response_params["f"] == ContentType.APP_JSON
+    assert response_params["f"] == format_value
 

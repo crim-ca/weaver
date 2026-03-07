@@ -1183,7 +1183,7 @@ For advanced examples, see their corresponding sections.
     |                   | :ref:`Output <proc_exec_kvp_outputs>`    | (:term:`URI` or short name)                      |
     +-------------------+------------------------------------------+--------------------------------------------------+
     | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`,     | Coordinate Reference System (:term:`CRS`) for    |
-    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | the bounding box                                 |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | the bounding box [#kvpBboxNote]_                 |
     +-------------------+------------------------------------------+--------------------------------------------------+
     | ``[href]``        | :ref:`Input <proc_exec_kvp_inputs>`      | Reference :term:`URL` for input data             |
     +-------------------+------------------------------------------+--------------------------------------------------+
@@ -1200,6 +1200,11 @@ For advanced examples, see their corresponding sections.
     | ``[profile]``     | :ref:`Response <proc_exec_kvp_response>` | Response :term:`Profile` [#kvpProfile]_          |
     +-------------------+------------------------------------------+--------------------------------------------------+
 
+.. [#kvpBboxNote]
+    Although the |ogc-api-proc-part1-kvp|_ requirements considers the ``[crs]`` qualifier as optional for bounding box,
+    it is recommended to always include it to avoid ambiguity and ensure correct interpretation of the coordinates.
+    Furthermore, it helps parameter parsing disambiguate between bounding box coordinates and array values that employ
+    similar comma-separated array representations.
 
 .. _proc_exec_kvp_inputs:
 
@@ -1266,7 +1271,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | **By Reference** (with ``[href]`` and ``[type]``)                                                             |
+    | **URL Reference**                                                                                             |
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
@@ -1279,7 +1284,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | **Bounding Box** (with optional ``[crs]``)                                                                    |
+    | **Bounding Box** [#kvpBboxNote]_                                                                              |
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
@@ -1306,7 +1311,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | **Qualified Value** (``value`` with ``format`` qualifiers)                                                    |
+    | **Qualified Value** (``value`` with format qualifiers)                                                        |
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
@@ -3134,7 +3139,7 @@ Following is a summary of relevant parameters impacting content negotiation.
       - Requested content :term:`Media-Type` (explicitly or implicitly using a shorthand notation).
         Equivalent to the ``Accept`` header, but with a higher precedence if both are provided.
         This precedence allows ignoring automatically injected :term:`HTML`-like ``Accept`` headers
-        by some :term:`Web` browsers, in order to provide alternate response representations.
+        by some web browsers, in order to provide alternate response representations.
       - |shorthand| or :term:`URI`
       - ``/jobs/{jobID}?f=json``
     * - ``profile``
@@ -3282,7 +3287,7 @@ Possible locations where :term:`Profile` can be specified are, in order of prece
 .. note::
     The precedence requirement is mostly predominant regarding the use of a ``profile`` query parameter in contrast
     to any other header variant. This is simply due to the fact that inserting a query parameter is the simplest
-    method to provide a :term:`Profile`, especially in the case of :term:`Web` browsers where headers are more
+    method to provide a :term:`Profile`, especially in the case of web browsers where headers are more
     complicated to include in the request. Therefore, combining multiple headers approaches simultaneously with
     distinct :term:`Profile` values is considered *undefined or random behavior* by referenced standards.
 
@@ -3295,7 +3300,7 @@ header is more relaxed and fulfillment is optional (the server is allowed to ign
 The ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
 respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
 submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
-clients and servers supporting different :term:`Profiles` interoperability. In this case, the ``Link`` header can be
+clients and servers supporting different :term:`Profile` interoperability. In this case, the ``Link`` header can be
 used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
 for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
 scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.

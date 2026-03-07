@@ -882,8 +882,14 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 
     # Format qualifiers (can apply to both inputs and outputs)
     if qualifier in ("mediatype", "encoding", "schema", "profile"):
-        target_dict[base_key].setdefault("format", {})
-        fmt = target_dict[base_key]["format"]
+        # for output, they are nested under 'format' because they are *requested*
+        # for inputs, they are directly with the qualified 'value' provided
+        is_output = base_key in outputs_dict
+        if is_output:
+            target_dict[base_key].setdefault("format", {})
+            fmt = target_dict[base_key]["format"]
+        else:
+            fmt = target_dict[base_key]
 
         if qualifier == "mediatype":
             fmt["mediaType"] = value
