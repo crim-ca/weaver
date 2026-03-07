@@ -416,3 +416,87 @@ def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals():
     assert "return=representation" in response_params3["prefer"]
     assert "wait=10" in response_params3["prefer"]
 
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_qualified_value_with_format():
+    """
+    Test parsing input with ``value`` qualifier and format qualifiers.
+
+    Validates that ``input[value]=data&input[mediaType]=text/plain`` produces
+    an input with both value and format.
+    """
+    params = {
+        "my_input[value]": ["test data"],
+        "my_input[mediaType]": ["text/plain"],
+        "my_input[encoding]": ["base64"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+
+    input_data = result["inputs"][0]
+    assert input_data["id"] == "my_input"
+    assert input_data["value"] == "test data"
+    assert "format" in input_data
+    assert input_data["format"]["mediaType"] == "text/plain"
+    assert input_data["format"]["encoding"] == "base64"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_output_with_include_and_format():
+    """
+    Test that outputs require ``include=true`` and get format structure.
+
+    Validates that ``output[include]=true&output[mediaType]=...`` produces
+    an output with format but no value.
+    """
+    params = {
+        "result[include]": ["true"],
+        "result[mediaType]": [ContentType.APP_JSON],
+        "result[encoding]": ["gzip"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "outputs" in result
+    assert len(result["outputs"]) == 1
+
+    output_data = result["outputs"][0]
+    assert output_data["id"] == "result"
+    # Outputs should NOT have value
+    assert "value" not in output_data
+    assert "format" in output_data
+    assert output_data["format"]["mediaType"] == ContentType.APP_JSON
+    assert output_data["format"]["encoding"] == "gzip"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_include_determines_classification():
+    """
+    Test that ``include`` qualifier determines input vs output classification.
+
+    Parameters with ``include=true`` become outputs, others become inputs.
+    """
+    params = {
+        # Input - has format but no include
+        "data[mediaType]": ["text/csv"],
+        # Output - has include=true
+        "result[include]": ["true"],
+        "result[mediaType]": [ContentType.APP_JSON],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    # data should be input (no include)
+    assert "inputs" in result
+    assert any(i["id"] == "data" for i in result["inputs"])
+    data_input = next(i for i in result["inputs"] if i["id"] == "data")
+    assert "format" in data_input
+
+    # result should be output (has include=true)
+    assert "outputs" in result
+    assert any(o["id"] == "result" for o in result["outputs"])
+    result_output = next(o for o in result["outputs"] if o["id"] == "result")
+    assert "format" in result_output
+    assert "value" not in result_output
+
+

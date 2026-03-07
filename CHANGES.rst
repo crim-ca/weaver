@@ -36,8 +36,16 @@ Changes:
   ensuring consistent behavior with POST-based executions. All existing validation, execution modes,
   and result formats are supported identically for both GET and POST methods after query parameter parsing.
 
+- Add documentation for new KVP execution parameters and functionalities.
+- Add conformance classes for KVP execution support.
+- Update ``weaver/wps_restapi/colander_extras.py`` to allow additional parameter options (``style``, ``explode``, etc.)
+  defined by `OpenAPI`. These are employed in this context to support the representation of KVP query parameters.
+- Update ``weaver.utils.parse_kvp`` with additional ``deep_object`` capability required by KVP execution parameters.
+- Update ``swagger-ui@5.32.0`` scripts to handle rendering of advanced KVP query parameter definitions.
+
 Fixes:
 ------
+- Fix `GET` endpoints documenting a ``Content-Type`` header although no content body applies to them.
 - Fix multi-token Vault authentication header parsing to support both single and multiple file access tokens.
   The ``parse_vault_token`` function now handles plain token strings (e.g., from WPS process context) and full
   header formats (e.g., ``token <value>; id=<uuid>``), and correctly validates token presence for the requested

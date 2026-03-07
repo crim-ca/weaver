@@ -3612,6 +3612,7 @@ class KVPResponsePrefer(ExtendedSchemaNode):
 #     ]
 
 class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
+    description = "KVP-encoded inputs and outputs parameters for execution of the process."
     _any_of = [
         KVPInputLiteralValue(),
         KVPInputBBoxCRS(),
@@ -3624,24 +3625,44 @@ class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
 
 class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter):
     params = ProcessExecutionKVPInputOutputParameters(variable="<*>")
+    # note:
+    #   the name is arbitrary (https://github.com/OAI/OpenAPI-Specification/issues/2622)
+    #   make it obvious in OpenAPI what its nested 'params' definitions refer to
+    name = "Execution Parameters"
+    required = True
+    explode = True
+    style = "form"
 
     description = (
-        "KVP-encoded execution parameters using OpenAPI ``deepObject``-style serialization. "
+        "KVP-encoded inputs and outputs parameters for execution of the process. "
         "\n\n"
         "**Variable Parameters** (replace placeholder with actual ID):\n"
         "- ``<inputID>=value`` - Simple literal value, array, bbox or URL-encoded object\n"
         "- ``<inputID>[crs]=crs`` - CRS for bounding box input (URI, CURIE, URN or short code)\n"
+        "- ``<inputID>[value]=value`` - Qualified value representation to allow format specification\n"
+        "- ``<inputID>[mediaType]=type`` - Qualified value desired media-type for the input\n"
+        "- ``<inputID>[encoding]=encode`` - Qualified value encoding to consider (eg: bas64, binary, gzip)\n"
+        "- ``<inputID>[schema]=schema`` - Qualified value schema indication (URL or well-known OGC profile)\n"
         "- ``<inputID>[href]=url`` - Input by reference with URL\n"
         "- ``<inputID>[type]=mediaType`` - Media type for referenced input\n"
         "- ``<outputID>[include]=true`` - Request specific output\n"
-        "- ``<outputID>[mediaType]=format`` - Desired output format\n"
+        "- ``<outputID>[mediaType]=format`` - Desired output format media-type\n"
+        "- ``<outputID>[encoding]=encode`` - Desired output format encoding\n"
+        "- ``<outputID>[schema]=schema`` - Desired output format schema or profile\n"
     )
     examples = {
-        "KVPSimpleInputs": {
+        "KVPSimpleInput": {
             "summary": "Simple literal inputs",
             "value": {
                 "message": "test",
                 "count": "42",
+            }
+        },
+        "KVPQualifiedInput": {
+            "summary": "Simple literal inputs",
+            "value": {
+                "data[value]": "{\"test\":123}",
+                "data[mediaType]": ContentType.APP_JSON,
             }
         },
         "KVPByReference": {
@@ -3651,20 +3672,20 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
                 "fileInput[type]": ContentType.TEXT_PLAIN,
             }
         },
+        "KVPBoundingBoxInput": {
+            "summary": "Bounding box with CRS",
+            "value": {
+                "bbox": "5.8,47.2,15.1,55.1",
+                "bbox[crs]": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+            }
+        },
         "KVPWithOutputs": {
             "summary": "With output specifications using ``deepObject`` style",
             "value": {
                 "input1": "value1",
                 "output1[include]": "true",
                 "output2[include]": "true",
-                "output2[mediaType]": ContentType.APP_JSON
-            }
-        },
-        "KVPBoundingBox": {
-            "summary": "Bounding box with CRS",
-            "value": {
-                "bbox": "5.8,47.2,15.1,55.1",
-                "bbox[crs]": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                "output2[mediaType]": ContentType.APP_JSON,
             }
         },
         "KVPWithResponse": {
@@ -3672,7 +3693,7 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
             "value": {
                 "input1": "value1",
                 "response[f]": ContentType.APP_JSON,
-                "response[prefer]": ExecuteControlOption.ASYNC
+                "response[prefer]": ExecuteControlOption.ASYNC,
             }
         },
         "KVPWithResponseFormatAlias": {
@@ -3680,17 +3701,10 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
             "value": {
                 "input1": "value1",
                 "response[format]": ContentType.APP_JSON,
-                "response[prefer]": ExecuteControlOption.ASYNC
+                "response[prefer]": ExecuteControlOption.ASYNC,
             }
         }
     }
-    # note:
-    #   the name is arbitrary (https://github.com/OAI/OpenAPI-Specification/issues/2622)
-    #   make it obvious in OpenAPI what its nested definitions refer to
-    name = "Execution Parameters"
-    required = True
-    explode = True
-    style = "form"
 
 
 class ProcessExecutionKVPQuery(ExtendedMappingSchema):

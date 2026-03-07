@@ -970,11 +970,16 @@ def parse_kvp_inputs_outputs(params):
             # Check for simple value under None key (collision case: both key and key[qualifier] exist)
             if None in values:
                 simple_val = parse_kvp_value(values[None])
-                if key_lower == "bbox":
-                    parsed_value = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
+                has_crs_qualifier = "crs" in values
+                if key_lower == "bbox" or has_crs_qualifier:
+                    parsed_bbox = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
+                    inputs_dict[key] = {"id": key}
+                    inputs_dict[key].update(parsed_bbox)
                 else:
-                    parsed_value = parse_kvp_literal_value(simple_val) if isinstance(simple_val, str) else simple_val
-                inputs_dict[key] = {"id": key, "value": parsed_value}
+                    # Outputs detected using required 'include' qualifier
+                    if "include" not in values:
+                        parsed_value = parse_kvp_literal_value(simple_val) if isinstance(simple_val, str) else simple_val
+                        inputs_dict[key] = {"id": key, "value": parsed_value}
 
             # Process qualifiers
             for qualifier, qual_values in values.items():
@@ -982,6 +987,7 @@ def parse_kvp_inputs_outputs(params):
                     continue
                 value = parse_kvp_value(qual_values)
                 parse_kvp_qualified_param(key, qualifier.lower(), value, inputs_dict, outputs_dict, response_params)
+
             continue
 
         # Simple input parameter

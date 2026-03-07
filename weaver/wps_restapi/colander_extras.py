@@ -114,6 +114,10 @@ if TYPE_CHECKING:
     )
 
     DataT = TypeVar("DataT")
+    ParameterExample = TypedDict("ParameterExample", {
+        "summary": str,
+        "value": JSON,
+    }, total=True)
     ParameterStyles = Literal[
         "form",
         "matrix",
@@ -730,10 +734,14 @@ class OAS3Parameter(object):
     """
     Object that provides mapping to known :term:`OpenAPI` extensions for parameter definition.
 
-    This is to be used as a schema node for parameters in order to provide support for :term:`OpenAPI` extensions
-    such as ``style``, ``explode`` and ``allowReserved``.
+    .. note::
+        These extensions are mostly for documentation properties not already handled by a
+        specific :class:`cornice_swagger.converters.parameters.ParameterConverter` implementation,
+        but that can be used in combination with any of them when applicable.
 
     .. seealso::
+        - https://swagger.io/docs/specification/v3_0/describing-parameters/#parameter-examples
+        - https://swagger.io/docs/specification/v3_0/describing-parameters/#deprecated-parameters
         - https://swagger.io/docs/specification/v3_0/serialization/
         - https://learn.openapis.org/specification/parameters.html#parameter-serialization-control
     """
@@ -752,28 +760,62 @@ class OAS3Parameter(object):
     Whether reserved characters are allowed in the parameter value.
     """
 
+    summary = None  # type: Optional[str]
+    """
+    Small description of the parameter.
+    """
+
+    description = None  # type: Optional[str]
+    """
+    Longer description of the parameter.
+    """
+
+    example = None  # type: Optional[JSON]
+    """
+    Single example of the parameter value.
+    """
+
+    examples = None  # type: Optional[Dict[str, ParameterExample]]
+    """
+    Single example of the parameter value.
+    """
+
     def __init__(
         self,
         style=None,             # type: Optional[ParameterStyles]
         explode=None,           # type: Optional[bool]
         allow_reserved=None,    # type: Optional[bool]
-        **kwargs,               # type: **Any
+        summary=None,           # type: Optional[str]
+        description=None,       # type: Optional[str]
+        example=None,           # type: Optional[JSON]
+        examples=None,          # type: Optional[Dict[str, ParameterExample]]
+        **kwargs,               # type: Any
     ):                          # type: (...) -> None
         self.style = style
         self.explode = explode
         self.allow_reserved = allow_reserved
+        self.summary = summary
+        self.description = description
+        self.example = example
+        self.examples = examples
         super(OAS3Parameter, self).__init__(**kwargs)
 
     def convert(self):
-        # type: () -> Optional[Dict[str, Any]]
+        # type: () -> Dict[str, Any]
         spec = {}
-        if self.style is not None:
-            spec["style"] = self.style
-        if self.explode is not None:
-            spec["explode"] = self.explode
-        if self.allow_reserved is not None:
-            spec["allowReserved"] = self.allow_reserved
-        return spec or None
+        for name, attr in [
+            ("style", "style"),
+            ("explode", "explode"),
+            ("allowReserved", "allow_reserved"),
+            ("summary", "summary"),
+            ("description", "description"),
+            ("example", "example"),
+            ("examples", "examples"),
+        ]:
+            value = getattr(self, attr)
+            if value is not None:
+                spec[attr] = value
+        return spec
 
 
 class ExtendedNodeInterface(object):
@@ -3041,7 +3083,6 @@ class OAS3ParameterConverter(ParameterConverter):
         "name",
         "in",
         "required",
-        "summary",
         "schema",
         "content",
     ]
