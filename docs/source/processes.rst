@@ -1126,7 +1126,7 @@ combinations only possible with v1.0. These limited representations can be retri
 
 .. _proc_exec_kvp:
 
-KVP-Encoded Execution
+Execution KVP-Encoded
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. versionadded:: 6.10.0
@@ -1156,47 +1156,49 @@ behavior with POST-based executions.
 All execution ``<parameters>`` are provided as query string key-value pairs, using either direct values or
 bracket notation for qualifiers.
 
-The following table summarizes all supported KVP parameter qualifiers.
+The following table summarizes all supported :term:`KVP` parameter qualifiers,
+each of them prefixed by the applicable ``{parameterID}`` or ``response``.
+For advanced examples, see their corresponding sections.
 
 .. table:: KVP Parameter Qualifiers
     :name: table-kvp-qualifiers
-    :class: table-kvp-qualifiers
     :align: center
     :widths: 15 40 45
 
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | Qualifier         | Context                                  | Description                                    |
-    +===================+==========================================+================================================+
-    | ``[href]``        | :ref:`Input <proc_exec_kvp_inputs>`      | Reference :term:`URL` for input data           |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[type]``        | :ref:`Input <proc_exec_kvp_inputs>`      | :term:`Media-Type` for referenced input        |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[value]``       | :ref:`Input <proc_exec_kvp_inputs>`      | Base64-encoded binary value                    |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[mediaType]``   | :ref:`Input <proc_exec_kvp_inputs>`,     | :term:`Media-Type` specification               |
-    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[encoding]``    | :ref:`Input <proc_exec_kvp_inputs>`,     | Encoding (e.g., ``base64``, ``gzip``)          |
-    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[schema]``      | :ref:`Input <proc_exec_kvp_inputs>`,     | Schema :term:`URL` or URL-encoded :term:`JSON` |
-    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[profile]``     | :ref:`Input <proc_exec_kvp_inputs>`,     | Content :term:`Profile` :term:`URI`            |
-    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`      | Coordinate Reference System for bbox           |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[include]``     | :ref:`Output <proc_exec_kvp_outputs>`    | Set to ``true`` to request output              |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[f]``           | :ref:`Response <proc_exec_kvp_response>` | Format (short, maps to ``Accept`` header)      |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[format]``      | :ref:`Response <proc_exec_kvp_response>` | Format (explicit alias for ``[f]``)            |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[prefer]``      | :ref:`Response <proc_exec_kvp_response>` | Execution preference (maps to ``Prefer``)      |
-    +-------------------+------------------------------------------+------------------------------------------------+
-    | ``[profile]``     | :ref:`Response <proc_exec_kvp_response>` | Response :term:`Profile` (see warning below)   |
-    +-------------------+------------------------------------------+------------------------------------------------+
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | Qualifier         | Context                                  | Description                                      |
+    +===================+==========================================+==================================================+
+    | ``[value]``       | :ref:`Input <proc_exec_kvp_inputs>`      | Qualified value for the input                    |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[mediaType]``   | :ref:`Input <proc_exec_kvp_inputs>`,     | :term:`Media-Type` specification                 |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[encoding]``    | :ref:`Input <proc_exec_kvp_inputs>`,     | Encoding (e.g., ``base64``, ``gzip``)            |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[schema]``      | :ref:`Input <proc_exec_kvp_inputs>`,     | Schema :term:`URL` or URL-encoded :term:`JSON`   |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[profile]``     | :ref:`Input <proc_exec_kvp_inputs>`,     | Content :term:`Profile`                          |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | (:term:`URI` or short name)                      |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`,     | Coordinate Reference System (:term:`CRS`) for    |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | the bounding box                                 |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[href]``        | :ref:`Input <proc_exec_kvp_inputs>`      | Reference :term:`URL` for input data             |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[type]``        | :ref:`Input <proc_exec_kvp_inputs>`      | :term:`Media-Type` for referenced input          |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[include]``     | :ref:`Output <proc_exec_kvp_outputs>`    | Request output with ``true`` (otherwise omit)    |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[f]``           | :ref:`Response <proc_exec_kvp_response>` | Format (short, maps to ``Accept`` header)        |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[format]``      | :ref:`Response <proc_exec_kvp_response>` | Format (explicit alias for ``[f]``)              |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[prefer]``      | :ref:`Response <proc_exec_kvp_response>` | Execution preference (maps to ``Prefer`` header) |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[profile]``     | :ref:`Response <proc_exec_kvp_response>` | Response :term:`Profile` [#kvpProfile]_          |
+    +-------------------+------------------------------------------+--------------------------------------------------+
 
 
 .. _proc_exec_kvp_inputs:
@@ -1219,11 +1221,11 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
 
 .. note::
     Binary data (typically a file) can be provided **by-reference**, **by-value** (i.e.: ``{inputID}={binary-data}``),
-    or using **Qualified Value** (using the ``[value]`` and optional ``format`` encoding qualifiers).
+    or using **Qualified Value** (using the ``[value]`` and other optional format encoding qualifiers).
 
 .. table:: KVP Input Parameter Examples
     :name: table-kvp-inputs
-    :class: table-kvp-inputs
+    :class: table-code
     :align: center
     :widths: 50 50
 
@@ -1234,7 +1236,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    message=Hello&count=42&enabled=true                |    {                                                  |
+    |    ?message=Hello&count=42&enabled=true               |    {                                                  |
     |                                                       |      "inputs": {                                      |
     |                                                       |        "message": "Hello",                            |
     |                                                       |        "count": 42,                                   |
@@ -1246,7 +1248,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    config=%7B%22threshold%22%3A0.5%7D                 |    {                                                  |
+    |    ?config=%7B%22threshold%22%3A0.5%7D                |    {                                                  |
     |                                                       |      "inputs": {                                      |
     |                                                       |        "config": {                                    |
     |                                                       |          "threshold": 0.5                             |
@@ -1258,7 +1260,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    data-values=1.5,2.3,4.7,3.2                        |    {                                                  |
+    |    ?data-values=1.5,2.3,4.7,3.2                       |    {                                                  |
     |                                                       |      "inputs": {                                      |
     |                                                       |        "data-values": [1.5, 2.3, 4.7, 3.2]            |
     |                                                       |      }                                                |
@@ -1268,8 +1270,8 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    input[href]=http://example.com/data.json&          |    {                                                  |
-    |    input[type]=application/json                       |      "inputs": {                                      |
+    |    ?input[href]=http://example.com/data.json          |    {                                                  |
+    |    &input[type]=application/json                      |      "inputs": {                                      |
     |                                                       |        "input": {                                     |
     |                                                       |          "href": "http://example.com/data.json",      |
     |                                                       |          "type": "application/json"                   |
@@ -1281,8 +1283,8 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    input-geom=5.8,47.2,15.1,55.1&                     |    {                                                  |
-    |    input-geom[crs]=urn:ogc:def:crs:OGC:2:84           |      "inputs": {                                      |
+    |    ?input-geom=5.8,47.2,15.1,55.1                     |    {                                                  |
+    |    &input-geom[crs]=urn:ogc:def:crs:OGC:2:84          |      "inputs": {                                      |
     |                                                       |        "input-geom": {                                |
     |                                                       |          "bbox": [5.8, 47.2, 15.1, 55.1],             |
     |                                                       |          "crs": "urn:ogc:def:crs:OGC:2:84"            |
@@ -1294,14 +1296,12 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    data=I1Rlc3Q%3D&                                   |    {                                                  |
-    |    data[contentMediaType]=text/markdown&              |      "inputs": {                                      |
-    |    data[encoding]=base64                              |        "data": {                                      |
+    |    ?data=I1Rlc3Q%3D                                   |    {                                                  |
+    |    &data[contentMediaType]=text/markdown              |      "inputs": {                                      |
+    |    &data[encoding]=base64                             |        "data": {                                      |
     |                                                       |          "value": "I1Rlc3Q=",                         |
-    |                                                       |          "format": {                                  |
-    |                                                       |            "mediaType": "text/markdown",              |
-    |                                                       |            "encoding": "base64"                       |
-    |                                                       |          }                                            |
+    |                                                       |          "mediaType": "text/markdown",                |
+    |                                                       |          "encoding": "base64"                         |
     |                                                       |        }                                              |
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
@@ -1310,14 +1310,12 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    image[value]=SGVsbG8gV29ybGQh&                     |    {                                                  |
-    |    image[mediaType]=image/png&                        |      "inputs": {                                      |
-    |    image[encoding]=binary                             |        "image": {                                     |
+    |    ?image[value]=SGVsbG8gV29ybGQh                     |    {                                                  |
+    |    &image[mediaType]=image/png                        |      "inputs": {                                      |
+    |    &image[encoding]=binary                            |        "image": {                                     |
     |                                                       |          "value": "SGVsbG8gV29ybGQh",                 |
-    |                                                       |          "format": {                                  |
-    |                                                       |            "mediaType": "image/png",                  |
-    |                                                       |            "encoding": "binary"                       |
-    |                                                       |          }                                            |
+    |                                                       |          "mediaType": "image/png",                    |
+    |                                                       |          "encoding": "binary"                         |
     |                                                       |        }                                              |
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
@@ -1326,15 +1324,15 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    features[value]=%7B%22type%22%3A%22Feature         |    {                                                  |
-    |      Collection%22%7D&                                |      "inputs": {                                      |
-    |    features[mediaType]=application/geo%2Bjson&        |        "features": {                                  |
-    |    features[profile]=http://www.opengis.net/spec/     |          "value": "{\"type\":\"FeatureCollection\"}",  |
-    |      ogcapi-features-1/1.0                            |          "format": {                                  |
-    |                                                       |            "mediaType": "application/geo+json",       |
-    |                                                       |            "profile": "http://www.opengis.net/spec/   |
-    |                                                       |              ogcapi-features-1/1.0"                   |
-    |                                                       |          }                                            |
+    |    ?features[value]=                                  |    {                                                  |
+    |       %7B%22type%22%3A%22Point%22%2C                  |      "inputs": {                                      |
+    |       %22coordinates%22%3A%5B-90.0%2C50.0%5D%7D       |        "features": {                                  |
+    |    &features[mediaType]=application/geo%2Bjson        |          "value": {                                   |
+    |    &features[profile]=geojson-geometry                |            "type": "Point",                           |
+    |                                                       |            "coordinates": [-90.0, 50.0],              |
+    |                                                       |          },                                           |
+    |                                                       |          "mediaType": "application/geo+json",         |
+    |                                                       |          "profile": "geojson-geometry"                |
     |                                                       |        }                                              |
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
@@ -1364,7 +1362,7 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
 
 .. table:: KVP Output Parameter Examples
     :name: table-kvp-outputs
-    :class: table-kvp-outputs
+    :class: table-code
     :align: center
     :widths: 50 50
 
@@ -1375,8 +1373,8 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    output1[include]=true&                             |    {                                                  |
-    |    output2[include]=false                             |      "outputs": {                                     |
+    |    ?output1[include]=true                             |    {                                                  |
+    |    &output2[include]=false                            |      "outputs": {                                     |
     |                                                       |        "output1": {}                                  |
     |                                                       |      }                                                |
     |                                                       |    }                                                  |
@@ -1385,9 +1383,9 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    result[include]=true&                              |    {                                                  |
-    |    result[mediaType]=application/json&                |      "outputs": {                                     |
-    |    result[encoding]=gzip                              |        "result": {                                    |
+    |    ?result[include]=true                              |    {                                                  |
+    |    &result[mediaType]=application/json                |      "outputs": {                                     |
+    |    &result[encoding]=gzip                             |        "result": {                                    |
     |                                                       |          "format": {                                  |
     |                                                       |            "mediaType": "application/json",           |
     |                                                       |            "encoding": "gzip"                         |
@@ -1400,8 +1398,8 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    data[include]=true&                                |    {                                                  |
-    |    data[schema]=http://example.com/schema.json        |      "outputs": {                                     |
+    |    ?data[include]=true                                |    {                                                  |
+    |    &data[schema]=http://example.com/schema.json       |      "outputs": {                                     |
     |                                                       |        "data": {                                      |
     |                                                       |          "format": {                                  |
     |                                                       |            "schema": "http://example.com/schema.json" |
@@ -1414,13 +1412,12 @@ The following table shows :term:`KVP` notation alongside their equivalent :term:
     +-------------------------------------------------------+-------------------------------------------------------+
     | .. code-block:: text                                  | .. code-block:: json                                  |
     |                                                       |                                                       |
-    |    result[include]=true&                              |    {                                                  |
-    |    result[mediaType]=application/geo%2Bjson&          |      "outputs": {                                     |
-    |    result[profile]=http://www.opengis.net/spec/       |        "result": {                                    |
-    |      ogcapi-features-1/1.0                            |          "format": {                                  |
+    |    ?result[include]=true                              |    {                                                  |
+    |    &result[mediaType]=application/geo%2Bjson          |      "outputs": {                                     |
+    |    &result[profile]=geojson-feature                   |        "result": {                                    |
+    |                                                       |          "format": {                                  |
     |                                                       |            "mediaType": "application/geo+json",       |
-    |                                                       |            "profile": "http://www.opengis.net/spec/   |
-    |                                                       |              ogcapi-features-1/1.0"                   |
+    |                                                       |            "profile": "geojson-feature"               |
     |                                                       |          }                                            |
     |                                                       |        }                                              |
     |                                                       |      }                                                |
@@ -1437,7 +1434,7 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
 
 .. table:: KVP Response Parameter Examples
     :name: table-kvp-response
-    :class: table-kvp-response
+    :class: table-code
     :align: center
     :widths: 50 50
 
@@ -1446,40 +1443,41 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
     +=======================================================+=======================================================+
     | **Response Format** (short form)                                                                              |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | .. code-block:: text                                  | .. code-block:: http                                  |
+    | .. code-block:: text                                  | .. code-block:: text                                  |
     |                                                       |                                                       |
-    |    response[f]=application/json                       |    Accept: application/json                           |
+    |    ?response[f]=application/json                      |    Accept: application/json                           |
     +-------------------------------------------------------+-------------------------------------------------------+
     | **Response Format** (explicit alias)                                                                          |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | .. code-block:: text                                  | .. code-block:: http                                  |
+    | .. code-block:: text                                  | .. code-block:: text                                  |
     |                                                       |                                                       |
-    |    response[format]=application/json                  |    Accept: application/json                           |
+    |    ?response[format]=application/json                 |    Accept: application/json                           |
     +-------------------------------------------------------+-------------------------------------------------------+
     | **Response Profile** (for :ref:`proc_exec_results`) [#kvpProfile]_                                            |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | .. code-block:: text                                  | .. code-block:: http                                  |
+    | .. code-block:: text                                  | .. code-block:: text                                  |
     |                                                       |                                                       |
-    |    response[profile]=[ogc-rel:results]                |    Accept-Profile: [ogc-rel:results]                  |
+    |    ?response[profile]=[ogc-rel:results]               |    Accept-Profile: [ogc-rel:results]                  |
     +-------------------------------------------------------+-------------------------------------------------------+
     | **Execution Preference** (async)                                                                              |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | .. code-block:: text                                  | .. code-block:: http                                  |
+    | .. code-block:: text                                  | .. code-block:: text                                  |
     |                                                       |                                                       |
-    |    response[prefer]=respond-async                     |    Prefer: respond-async                              |
+    |    ?response[prefer]=respond-async                    |    Prefer: respond-async                              |
     +-------------------------------------------------------+-------------------------------------------------------+
     | **Execution Preference** (sync with timeout)                                                                  |
     +-------------------------------------------------------+-------------------------------------------------------+
-    | .. code-block:: text                                  | .. code-block:: http                                  |
+    | .. code-block:: text                                  | .. code-block:: text                                  |
     |                                                       |                                                       |
-    |    response[prefer]=wait=30                           |    Prefer: wait=30                                    |
+    |    ?response[prefer]=wait=30                          |    Prefer: wait=30                                    |
     +-------------------------------------------------------+-------------------------------------------------------+
 
 .. [#kvpProfile]
-.. warning::
-    **Profile Parameter Behavior with Execution Mode**
+    The behavior of :term:`Profile` parameters vary depending on :ref:`Execution Mode <proc_exec_mode>`.
 
-    The ``profile`` and ``response[profile]`` parameters have different meanings depending on the
+.. warning::
+
+    The ``profile`` and ``response[profile]`` parameters have different implications depending on the
     :ref:`Execution Mode <proc_exec_mode>`. Other precaution must also be taken to avoid confusion
     between these parameters and the other ``[profile]`` qualifiers used for inputs and outputs.
 
@@ -1504,19 +1502,19 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
     **Example for Asynchronous Execution:**
 
     .. code-block:: text
+        :caption:  Request asynchronous execution profiles applicable to different concepts
 
-        # Request async execution with different profiles
-        ?...&
-        input[href]=http://example.com/data.json&
-        input[type]=application/geo+json&
-        input[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry&
-        output[include]=true&
-        output[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection&
-        response=collection&
-        response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac&
-        response[prefer]=respond-async&
-        profile=ogc&
-        f=json
+        ?...
+        &input[href]=http://example.com/data.json
+        &input[type]=application/geo%2Bjson
+        &input[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry
+        &output[include]=true
+        &output[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection
+        &response=collection
+        &response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac
+        &response[prefer]=respond-async
+        &profile=ogc
+        &f=json
 
     In this example, the immediate :ref:`Job Status <proc_op_status>` is obtained |asynchronously|_, and explicitly
     requests its :term:`OGC` representation (rather than :term:`openEO` for example), and requests it to be returned
@@ -1555,7 +1553,7 @@ The following table presents complete execution examples combining various :term
 
 .. table:: Complete KVP Execution Examples
     :name: table-kvp-examples
-    :class: table-kvp-examples
+    :class: table-code
     :align: center
     :widths: 50 50
 
