@@ -1153,8 +1153,29 @@ behavior with POST-based executions.
     GET /processes/{processID}/execution?<parameters> HTTP/1.1
     Host: weaver.example.com
 
-All execution ``<parameters>`` are provided as query string key-value pairs, using either direct values or
-bracket notation for qualifiers.
+All execution ``<parameters>`` are provided as query string key-value pairs, using either direct values
+and using extended bracket notation for additional qualifiers in the style of :term:`OpenAPI` ``deepObject`` queries.
+
+.. code-block:: text
+
+    ?parameter[qualifier]=value
+
+All parameter *qualifiers* are case-insensitive. The casing of the primary *parameters* depend of their context.
+Certain parameters (notably ``response``) are reserved for alignment with other |ogc-api-proc|_ requirements and
+extensions, which therefore allow case-insensitive names. However, input and output identifiers directly mapped to the
+:term:`Process` description parameters preserve their original case to ensure adequate resolution and avoid ambiguities.
+
+.. warning::
+    This casing management is a non-standard |ogc-api-proc-part1-kvp|_ behavior enforced by `Weaver`
+    to ensure data integrity.
+
+The values of the parameters are also case-sensitive as to not alter the intended meaning of the submitted values
+for execution of the :term:`Process`. However, adequate :term:`URL` encoding and escape mechanisms apply to ensure
+that special characters are properly transmitted and parsed. Following should be considered for :term:`URL` encoding:
+
+- Embedded :term:`JSON` arrays (``[`` and ``]``) conflicting with ``[qualifier]`` notation
+- Reserved characters in :term:`URL` query strings (``&``, ``=``) conflicting with :term:`KVP` separation
+- Special :term:`URL` characters such as ``+``, ``%``, and ``#`` that require encoding to avoid misinterpretation
 
 The following table summarizes all supported :term:`KVP` parameter qualifiers,
 each of them prefixed by the applicable ``{parameterID}`` or ``response``.
@@ -1600,44 +1621,6 @@ The following table presents complete execution examples combining various :term
     - :ref:`proc_exec_kvp_inputs` for detailed input parameter syntax
     - :ref:`proc_exec_kvp_outputs` for output parameter options
     - :ref:`proc_exec_kvp_response` for response control parameters
-
-.. _proc_exec_kvp_notes:
-
-KVP Implementation Notes
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Case-Insensitivity**
-
-All parameter qualifiers (text within brackets) are case-insensitive. Reserved parameters
-(``f``, ``response``, ``prefer``, ``tags``) are also case-insensitive. Input and output identifiers
-preserve their original case to match :term:`Process` descriptions.
-
-**URL Encoding**
-
-Complex values containing special characters must be properly URL-encoded. This includes:
-
-- :term:`JSON` objects and arrays
-- File :term:`URL` containing special characters
-- Any value containing reserved characters (``&``, ``=``, ``[``, ``]``, etc.)
-
-**Equivalence with POST Execution**
-
-KVP requests are converted to the equivalent :term:`JSON` POST execution body internally.
-All validation, execution modes, and result formats work identically between GET and POST methods.
-
-**Reserved Parameters**
-
-The following query parameters are reserved and will not be interpreted as :term:`Process` inputs:
-
-- ``f``: Response format (legacy, prefer ``response[f]`` or ``response[format]``)
-- ``response``: Response parameter container
-- ``prefer``: Execution preference (legacy, prefer ``response[prefer]``)
-- ``tags``: :term:`Job` tags
-
-.. seealso::
-    - :ref:`proc_op_execute` for POST-based execution
-    - :ref:`proc_exec_mode` for execution mode details
-    - :ref:`proc_exec_results` for result format options
 
 .. _proc_exec_steps:
 
