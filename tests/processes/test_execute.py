@@ -5,6 +5,7 @@ For more in-depth execution tests, see ``tests.functional``.
 """
 import base64
 import dataclasses
+import json
 import urllib.parse
 import uuid
 from typing import TYPE_CHECKING, List, cast
@@ -12,11 +13,13 @@ from typing import TYPE_CHECKING, List, cast
 import mock
 import pytest
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
+from pyramid.httpexceptions import HTTPNotImplemented
 
+from tests.utils import MockedRequest
 from weaver.datatype import Job
 from weaver.formats import ContentEncoding, ContentType
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, WPS_LITERAL, WPS_CategoryType
-from weaver.processes.execution import parse_kvp_inputs_outputs, parse_wps_inputs
+from weaver.processes.execution import parse_kvp_inputs_outputs, parse_wps_inputs, submit_job, submit_job_from_kvp
 
 if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type
@@ -247,13 +250,15 @@ def test_parse_kvp_inputs_outputs_reserved_params():
         "f": ["json"],
         "response": ["document"],
         "prefer": ["respond-async"],
-        "tags": ["test"],
+        "data": ["test"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
-    assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "input1"
+    assert len(result["inputs"]) == 2
+    input_ids = {inp["id"]: inp for inp in result["inputs"]}
+    assert "input1" in input_ids
+    assert "data" in input_ids
 
 
 @pytest.mark.kvp
@@ -368,8 +373,9 @@ def test_parse_kvp_inputs_outputs_response_format_alias():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert "format" in response_params or "f" in response_params
-    assert response_params["prefer"] == "respond-async"
+    response_dict = response_params.get("response", {})
+    assert "format" in response_dict or "f" in response_dict
+    assert response_dict.get("prefer") == "respond-async"
 
 
 @pytest.mark.kvp
@@ -399,10 +405,11 @@ def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals(prefer_valu
     assert result["inputs"][0]["id"] == "input1"
     assert result["inputs"][0]["value"] == "test value"
 
-    assert "prefer" in response_params
-    assert response_params["prefer"] == prefer_value
+    response_dict = response_params.get("response", {})
+    assert "prefer" in response_dict
+    assert response_dict["prefer"] == prefer_value
     for expected in expected_contains:
-        assert expected in response_params["prefer"]
+        assert expected in response_dict["prefer"]
 
 
 @pytest.mark.kvp
@@ -542,11 +549,12 @@ def test_parse_kvp_inputs_outputs_response_profile():
     assert "inputs" in result
     assert len(result["inputs"]) == 1
 
-    # Check response parameters
-    assert "profile" in response_params
-    assert response_params["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
-    assert "f" in response_params
-    assert response_params["f"] == ContentType.APP_JSON
+    # Check response parameters from nested dict
+    response_dict = response_params.get("response", {})
+    assert "profile" in response_dict
+    assert response_dict["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
+    assert "f" in response_dict
+    assert response_dict["f"] == ContentType.APP_JSON
 
 
 @pytest.mark.kvp
@@ -569,6 +577,646 @@ def test_parse_kvp_inputs_outputs_response_format_short_names(format_value):
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
-    assert "f" in response_params
-    assert response_params["f"] == format_value
+    response_dict = response_params.get("response", {})
+    assert "f" in response_dict
+    assert response_dict["f"] == format_value
 
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_standalone_profile():
+    """
+    Test parsing standalone 'profile' parameter (without response qualifier).
+    """
+    params = {
+        "input1": ["value1"],
+        "profile": ["ogc"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+    assert "profile" in response_params
+    assert response_params["profile"] == "ogc"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_response_collection():
+    """
+    Test parsing 'response=collection' parameter.
+    """
+    params = {
+        "input1": ["value1"],
+        "response": ["collection"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+    assert "response" in response_params
+    response_dict = response_params["response"]
+    assert isinstance(response_dict, dict)
+    assert None in response_dict
+    assert response_dict[None] == "collection"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_both_f_and_format():
+    """
+    Test that 'response[f]' takes precedence over 'response[format]' when both are provided.
+    """
+    params = {
+        "input1": ["value1"],
+        "response[f]": ["json"],
+        "response[format]": ["xml"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    response_dict = response_params.get("response", {})
+    assert "f" in response_dict
+    assert "format" in response_dict
+    assert response_dict["f"] == "json"
+    assert response_dict["format"] == "xml"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_profile_vs_response_profile():
+    """
+    Test that standalone 'profile' parameter is parsed.
+    Note: response[profile] is not a standard OGC parameter but profile=value is.
+    """
+    params = {
+        "input1": ["value1"],
+        "profile": ["ogc"],
+        "response[f]": ["json"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert "profile" in response_params
+    assert response_params["profile"] == "ogc"
+    response_dict = response_params.get("response", {})
+    assert "f" in response_dict
+    assert response_dict["f"] == "json"
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_case_sensitivity():
+    """
+    Test that parameter names are case-sensitive (not lowercased for input/output IDs).
+    """
+    params = {
+        "MyInput": ["value1"],
+        "myInput": ["value2"],
+        "MYINPUT": ["value3"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 3
+
+    input_ids = {inp["id"] for inp in result["inputs"]}
+    assert "MyInput" in input_ids
+    assert "myInput" in input_ids
+    assert "MYINPUT" in input_ids
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_reserved_params_case_insensitive():
+    """
+    Test that reserved parameters (f, response, prefer, profile) are case-insensitive.
+    """
+    params = {
+        "input1": ["value1"],
+        "F": ["json"],
+        "RESPONSE[prefer]": ["respond-async"],
+        "PROFILE": ["ogc"],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+
+
+@pytest.mark.kvp
+def test_submit_job_from_kvp():
+    """
+    Tests all variants of :term:`KVP` inputs/outputs/response parameters and qualifiers into expected POST request.
+    """
+    req = MockedRequest()
+    req.params = {
+        # Simple literal input
+        "input1": "value1",
+        # Numeric literal input
+        "input2": "42",
+        # Complex input with qualifiers
+        "input3[href]": "http://example.com/data.json",
+        "input3[type]": "application/json",
+        # Output with qualifiers
+        "output1[include]": "true",
+        "output1[mediaType]": "application/json",
+        # Response parameters
+        "response": "collection",
+        "response[f]": "json",
+        "response[format]": "xml",
+        "response[prefer]": "respond-async",
+    }
+    # Headers that should be overridden by KVP parameters
+    req.headers = {
+        "Accept": "application/xml",
+        "Prefer": "wait=30",
+    }
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+    data = cast(bytes, req.body).decode("utf-8")
+    body = json.loads(data)
+
+    # Check inputs
+    assert "inputs" in body
+    assert len(body["inputs"]) == 3
+    input_ids = {inp["id"]: inp for inp in body["inputs"]}
+    assert "input1" in input_ids
+    assert input_ids["input1"]["value"] == "value1"
+    assert "input2" in input_ids
+    assert input_ids["input2"]["value"] == 42
+    assert "input3" in input_ids
+    assert input_ids["input3"]["href"] == "http://example.com/data.json"
+    assert input_ids["input3"]["type"] == "application/json"
+
+    # Check outputs
+    assert "outputs" in body
+    assert len(body["outputs"]) == 1
+    output_obj = body["outputs"][0]
+    assert output_obj["id"] == "output1"
+    assert "format" in output_obj
+    assert output_obj["format"]["mediaType"] == "application/json"
+    assert "format" in output_obj
+    assert output_obj["format"]["mediaType"] == "application/json"
+
+    # Check response parameter in body
+    assert "response" in body
+    assert body["response"] == "collection"
+
+    # Validate headers (KVP overrides original headers)
+    # response[f] takes precedence over response[format]
+    assert ContentType.APP_JSON in req.headers["Accept"]
+    assert req.headers["Prefer"] == "respond-async", "response[prefer] overrides original Prefer header"
+    assert req.headers["Content-Type"] == ContentType.APP_JSON
+
+
+@pytest.mark.kvp
+def test_kvp_complex_profile_combinations():
+    """
+    Test async execution with ``profile`` and ``response[profile]`` handling.
+
+    Profile parameters behaviour:
+    - Async execution: ``profile`` applies to Job Status response (immediate HTTP 201)
+    - Async execution: ``response[profile]`` applies to Job Result response (final results)
+    - Input/output profiles are independent of execution mode
+    """
+    req = MockedRequest()
+    req.params = {
+        # Input with profile qualifier
+        "input[href]": "http://example.com/data.json",
+        "input[type]": "application/geo+json",
+        "input[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry",
+        # Output with profile qualifier
+        "output[include]": "true",
+        "output[mediaType]": "application/geo+json",
+        "output[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection",
+        # Response parameters
+        "response": "collection",
+        "response[prefer]": "respond-async",
+        "response[f]": "json",
+        # Job Status profile (immediate response)
+        "profile": "ogc",
+        # Job Result profile (final results)
+        "response[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/stac",
+    }
+    req.headers = {}
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+    data = cast(bytes, req.body).decode("utf-8")
+    body = json.loads(data)
+
+    # Validate input profile (content profile for the input data)
+    input_obj = next(i for i in body["inputs"] if i["id"] == "input")
+    assert input_obj["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
+
+    # Validate output profile (content profile for the output data)
+    output_obj = next(o for o in body["outputs"] if o["id"] == "output")
+    assert "format" in output_obj
+    assert output_obj["format"]["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
+
+    # Validate response=collection in body
+    assert "response" in body
+    assert body["response"] == "collection"
+
+    # Validate response[profile] in body (applies to final Job Result)
+    assert "profile" in body
+    assert body["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
+
+    # Validate Accept-Profile header (applies to immediate Job Status)
+    assert "Accept-Profile" in req.headers
+    assert req.headers["Accept-Profile"] == "ogc"
+
+    # Validate Accept header from response[f]
+    assert "Accept" in req.headers
+    assert ContentType.APP_JSON in req.headers["Accept"]
+
+    # Validate Prefer header
+    assert "Prefer" in req.headers
+    assert req.headers["Prefer"] == "respond-async"
+
+
+@pytest.mark.parametrize(
+    ["prefer_mode", "top_profile", "response_profile", "expected_header_profile", "expected_body_profile"],
+    [
+        # Synchronous execution: both profile and response[profile] are equivalent, apply to Accept-Profile header
+        ("wait", "ogc", None, "ogc", None),
+        ("wait", None, "stac", "stac", None),
+        ("wait", "ogc", "stac", "stac", None),  # response[profile] takes precedence in sync
+        # Asynchronous execution: profile -> Accept-Profile, response[profile] -> body
+        ("respond-async", "ogc", None, "ogc", None),
+        ("respond-async", None, "stac", None, "stac"),
+        ("respond-async", "ogc", "stac", "ogc", "stac"),  # both used independently
+    ]
+)
+def test_kvp_profile_resolution_sync_async(
+    prefer_mode,
+    top_profile,
+    response_profile,
+    expected_header_profile,
+    expected_body_profile
+):
+    """
+    Validate profile and response[profile] resolution based on execution mode (sync vs async).
+
+    Per OGC API - Processes spec and [#kvpProfile] warning in docs:
+    - Synchronous (Prefer: wait): profile and response[profile] are equivalent, both apply to Accept-Profile header
+    - Asynchronous (Prefer: respond-async):
+      - profile applies to Job Status response (Accept-Profile header for immediate 201)
+      - response[profile] applies to Job Result response (stored in body for final results)
+    """
+    req = MockedRequest()
+    req.params = {"prefer": prefer_mode}
+    if top_profile:
+        req.params["profile"] = top_profile
+    if response_profile:
+        req.params["response[profile]"] = response_profile
+    req.headers = {}
+
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+
+    data = cast(bytes, req.body).decode("utf-8")
+    body = json.loads(data)
+
+    if expected_header_profile:
+        assert "Accept-Profile" in req.headers, \
+            f"Expected Accept-Profile header for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert req.headers["Accept-Profile"] == expected_header_profile
+    else:
+        assert "Accept-Profile" not in req.headers, \
+            f"Unexpected Accept-Profile header for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+
+    if expected_body_profile:
+        assert "profile" in body, \
+            f"Expected profile in body for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert body["profile"] == expected_body_profile
+    else:
+        assert "profile" not in body, \
+            f"Unexpected profile in body for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+
+
+@pytest.mark.parametrize(
+    ["param_name", "qualifier_name", "expected_profile"],
+    [
+        # Case-insensitive reserved parameters
+        ("profile", None, "test-profile"),
+        ("Profile", None, "test-profile"),
+        ("PROFILE", None, "test-profile"),
+        # Case-insensitive qualifiers
+        ("response[profile]", None, "test-profile"),
+        ("response[Profile]", None, "test-profile"),
+        ("response[PROFILE]", None, "test-profile"),
+        ("Response[profile]", None, "test-profile"),
+        ("RESPONSE[PROFILE]", None, "test-profile"),
+    ]
+)
+def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profile):
+    """
+    Validate case-insensitive handling of profile parameters.
+
+    Per processes.rst documentation:
+    - Reserved parameters (profile, response, etc.) are case-insensitive
+    - Qualifiers ([profile], [f], etc.) are case-insensitive
+    """
+    req = MockedRequest()
+    req.params = {
+        "prefer": "wait",
+        param_name: expected_profile,
+    }
+    req.headers = {}
+
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+
+    assert "Accept-Profile" in req.headers
+    assert req.headers["Accept-Profile"] == expected_profile
+
+
+@pytest.mark.parametrize(
+    ["kvp_params", "expected_body", "expected_headers", "expected_queries"],
+    [
+        # Simple input parameter
+        (
+            {"input1": "value1"},
+            {"inputs": [{"id": "input1", "value": "value1"}]},
+            {},
+            {},
+        ),
+        # Input with href
+        (
+            {"input1[href]": "http://example.com/data.json"},
+            {"inputs": [{"id": "input1", "href": "http://example.com/data.json"}]},
+            {},
+            {},
+        ),
+        # Response parameter goes to body
+        (
+            {"response": "document"},
+            {"response": "document"},
+            {},
+            {},
+        ),
+        # Format parameter (f) goes to Accept header
+        (
+            {"f": "json"},
+            {},
+            {"Accept": ContentType.APP_JSON},
+            {},
+        ),
+        # Prefer parameter goes to Prefer header
+        (
+            {"prefer": "respond-async"},
+            {},
+            {"Prefer": "respond-async"},
+            {},
+        ),
+        # Profile parameter goes to Accept-Profile header (sync mode with explicit wait)
+        (
+            {"prefer": "wait", "profile": "ogc"},
+            {},
+            {"Prefer": "wait", "Accept-Profile": "ogc"},
+            {},
+        ),
+        # Multiple inputs
+        (
+            {"input1": "value1", "input2": "value2"},
+            {"inputs": [{"id": "input1", "value": "value1"}, {"id": "input2", "value": "value2"}]},
+            {},
+            {},
+        ),
+        # Input with format qualifiers
+        (
+            {
+                "input1[href]": "http://example.com/data.json",
+                "input1[mediaType]": "application/geo+json",
+                "input1[schema]": "http://example.com/schema.json",
+            },
+            {
+                "inputs": [{
+                    "id": "input1",
+                    "href": "http://example.com/data.json",
+                    "mediaType": "application/geo+json",
+                    "schema": "http://example.com/schema.json",
+                }]
+            },
+            {},
+            {},
+        ),
+        # Output with format qualifiers
+        (
+            {
+                "output1[include]": "true",
+                "output1[mediaType]": "application/json",
+                "output1[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson",
+            },
+            {
+                "outputs": [{
+                    "id": "output1",
+                    "format": {
+                        "mediaType": "application/json",
+                        "profile": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson",
+                    }
+                }]
+            },
+            {},
+            {},
+        ),
+        # Response with qualifiers
+        (
+            {"response[f]": "json", "response[prefer]": "wait"},
+            {},
+            {"Accept": ContentType.APP_JSON, "Prefer": "wait"},
+            {},
+        ),
+    ]
+)
+def test_kvp_parameter_resolution(kvp_params, expected_body, expected_headers, expected_queries):
+    """
+    Validate KVP parameters are correctly resolved to JSON body, headers, and queries.
+
+    Tests the conversion of KVP query parameters to their corresponding request elements:
+    - Input/output parameters -> JSON body
+    - Format (f), prefer, profile -> HTTP headers
+    - Response parameter -> JSON body
+    """
+    req = MockedRequest()
+    req.params = kvp_params
+    req.headers = {}
+
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+
+    data = cast(bytes, req.body).decode("utf-8")
+    body = json.loads(data)
+
+    for key, value in expected_body.items():
+        assert key in body, f"Expected '{key}' in body"
+        if isinstance(value, list):
+            assert len(body[key]) == len(value), f"Expected {len(value)} items in '{key}', got {len(body[key])}"
+            for item in value:
+                matching = [b for b in body[key] if b.get("id") == item.get("id")]
+                assert len(matching) == 1, f"Expected exactly one item with id '{item.get('id')}' in '{key}'"
+                for k, v in item.items():
+                    assert matching[0].get(k) == v, f"Expected '{k}' to be '{v}' in item '{item.get('id')}'"
+        else:
+            assert body[key] == value, f"Expected '{key}' to be '{value}', got '{body[key]}'"
+
+    for header, value in expected_headers.items():
+        assert header in req.headers, f"Expected '{header}' in headers"
+        if header == "Accept":
+            assert value in req.headers[header], f"Expected '{value}' in '{header}' header"
+        else:
+            assert req.headers[header] == value, f"Expected '{header}' to be '{value}', got '{req.headers[header]}'"
+
+
+@pytest.mark.parametrize(
+    ["kvp_params", "initial_headers", "expected_header", "expected_value"],
+    [
+        # KVP f overrides Accept header
+        (
+            {"f": "json"},
+            {"Accept": "text/html"},
+            "Accept",
+            ContentType.APP_JSON,
+        ),
+        # KVP prefer overrides Prefer header
+        (
+            {"prefer": "respond-async"},
+            {"Prefer": "wait"},
+            "Prefer",
+            "respond-async",
+        ),
+        # KVP profile overrides Accept-Profile header
+        (
+            {"prefer": "wait", "profile": "ogc"},
+            {"Accept-Profile": "stac"},
+            "Accept-Profile",
+            "ogc",
+        ),
+        # KVP response[f] overrides Accept header
+        (
+            {"response[f]": "json"},
+            {"Accept": "text/html"},
+            "Accept",
+            ContentType.APP_JSON,
+        ),
+        # KVP response[prefer] overrides Prefer header
+        (
+            {"response[prefer]": "wait"},
+            {"Prefer": "respond-async"},
+            "Prefer",
+            "wait",
+        ),
+    ]
+)
+def test_kvp_overrides_headers(kvp_params, initial_headers, expected_header, expected_value):
+    """
+    Validate that KVP parameters override existing headers.
+
+    Per submit_job_from_kvp documentation:
+    Any time a KVP parameter is detected and matches an existing header,
+    it will override that header and takes precedence to obtain the original
+    intent of the user request.
+    """
+    req = MockedRequest()
+    req.params = kvp_params
+    req.headers = dict(initial_headers)
+
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+
+    assert expected_header in req.headers
+    if expected_header == "Accept":
+        assert expected_value in req.headers[expected_header]
+    else:
+        assert req.headers[expected_header] == expected_value
+
+
+@pytest.mark.parametrize(
+    ["f_param", "format_param", "expected_accept"],
+    [
+        # Only f parameter
+        ("json", None, ContentType.APP_JSON),
+        # Only format parameter
+        (None, "json", ContentType.APP_JSON),
+        # Both provided: f takes precedence
+        ("json", "xml", ContentType.APP_JSON),
+        ("xml", "json", "text/xml"),  # xml maps to text/xml, not application/xml
+    ]
+)
+def test_kvp_format_precedence(f_param, format_param, expected_accept):
+    """
+    Validate that 'response[f]' parameter takes precedence over 'response[format]' parameter.
+
+    When both are provided, 'f' is prioritized and 'format' is ignored.
+    """
+    req = MockedRequest()
+    req.params = {}
+    if f_param:
+        req.params["response[f]"] = f_param
+    if format_param:
+        req.params["response[format]"] = format_param
+    req.headers = {}
+
+    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
+        mock_submit.return_value = None
+        submit_job_from_kvp(req, None)  # type: ignore
+
+    assert "Accept" in req.headers
+    assert expected_accept in req.headers["Accept"]
+
+
+# FIXME: remove when collection output supported (https://github.com/crim-ca/weaver/issues/683)
+def test_kvp_response_collection_validation():
+    """
+    Validate that 'response=collection' raises HTTPNotImplemented.
+
+    The parameter is properly transferred to the body, but submit_job validates
+    it and raises an error since this feature is not yet implemented.
+    Related: https://github.com/crim-ca/weaver/issues/683
+    """
+    req = MockedRequest()
+    req.params = {"response": "collection"}
+    req.headers = {}
+
+    # Mock the body validation to return a simple body
+    with mock.patch("weaver.processes.execution.validate_job_json") as mock_validate:
+        mock_validate.return_value = {"response": "collection"}
+        with mock.patch("weaver.processes.execution.get_wps_output_context"):
+            with pytest.raises(HTTPNotImplemented) as exc_info:
+                submit_job(req, None)  # type: ignore
+
+    error_json = exc_info.value.json
+    assert "response=collection" in error_json.get("detail", "").lower()
+    assert "not yet supported" in error_json.get("detail", "").lower()
+
+
+# FIXME: remove when collection output supported (https://github.com/crim-ca/weaver/issues/683)
+def test_kvp_response_collection_in_submission():
+    """
+    Validate that response=collection from KVP is transferred to body and validated.
+
+    Ensures the complete flow: KVP -> body conversion -> validation -> error
+    """
+    req = MockedRequest()
+    req.params = {
+        "response": "collection",
+        "input1": "test-value",
+    }
+    req.headers = {}
+
+    # The KVP submission should convert params to body, then submit_job should validate
+    with mock.patch("weaver.processes.execution.validate_job_json") as mock_validate_json:
+        with mock.patch("weaver.processes.execution.get_wps_output_context"):
+            # Capture what body is generated
+            def capture_body(request):
+                data = cast("bytes", request.body).decode("utf-8")
+                return json.loads(data)
+
+            mock_validate_json.side_effect = capture_body
+
+            with pytest.raises(HTTPNotImplemented) as exc_info:
+                submit_job_from_kvp(req, None)  # type: ignore
+
+    error_json = exc_info.value.json
+    assert "response=collection" in error_json.get("detail", "").lower()

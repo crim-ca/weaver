@@ -3101,7 +3101,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "baseCommand": "echo",
                 "requirements": {
                     "DockerRequirement": {
-                        "dockerPull": "alpine:latest"
+                        "dockerPull": "python:3.12-alpine"
                     }
                 },
                 "inputs": {
@@ -3365,6 +3365,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "python:3.12-alpine"
+                    }
+                },
                 "inputs": {
                     "data": {"type": "string"},
                 },

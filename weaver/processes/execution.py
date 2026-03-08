@@ -19,6 +19,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
     HTTPNotAcceptable,
+    HTTPNotImplemented,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
@@ -959,30 +960,37 @@ def parse_kvp_inputs_outputs(params):
     inputs_dict = {}
     outputs_dict = {}
     response_params = {}
-
-    # Reserved parameters that should not be treated as inputs
-    reserved_base_params = {"f", "tags", "response"}
+    # Reserved parameters that should not be treated as inputs/outputs
+    reserved_base_params = {"f", "response", "profile", "prefer"}
 
     for key, values in organized.items():
         key_lower = key.lower()
-
-        # Skip standalone reserved parameters
         if key_lower in reserved_base_params:
-            # Extract response[...] qualifiers
-            if key_lower == "response" and isinstance(values, dict):
-                for qualifier, qual_vals in values.items():
-                    if qualifier is not None:
-                        response_params[qualifier] = parse_kvp_value(qual_vals)
-            continue
+            if key_lower == "response":
+                # response can have both simple value (response=collection) and qualifiers (response[f]=json)
+                if isinstance(values, dict):
+                    if "response" not in response_params:
+                        response_params["response"] = {}
+                    if None in values:
+                        response_params["response"][None] = parse_kvp_value(values[None])
+                    for qualifier, qual_vals in values.items():
+                        if qualifier is not None:
+                            qualifier_lower = qualifier.lower()
+                            response_params["response"][qualifier_lower] = parse_kvp_value(qual_vals)
+                else:
+                    response_params["response"] = {None: parse_kvp_value(values)}
+            elif key_lower == "profile":
+                response_params["profile"] = parse_kvp_value(values)
+            elif key_lower == "prefer":
+                response_params["prefer"] = parse_kvp_value(values)
+            elif key_lower == "f":
+                response_params["f"] = parse_kvp_value(values)
 
-        # Standalone prefer (deprecated, prefer response[prefer])
-        if key_lower == "prefer":
-            response_params["prefer"] = parse_kvp_value(values)
             continue
 
         # Deep object (qualified parameters) - values is a dict
         if isinstance(values, dict):
-            # Check for simple value under None key (collision case: both key and key[qualifier] exist)
+            # Check for simple value under None key (collision case: both 'key' and 'key[qualifier]' exist)
             if None in values:
                 simple_val = parse_kvp_value(values[None])
                 has_crs_qualifier = "crs" in values
@@ -1057,6 +1065,12 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
     converts them to :term:`JSON` format, maps response parameters to HTTP headers,
     and delegates to standard job submission handler.
 
+    .. note::
+        Any time a :term:`KVP` parameter is detected and matches an existing header,
+        it will override that header and takes precedence to obtain the original intent of the user request.
+        Notably, this can be relevant for cases where web browsers automatically inject additional headers
+        that the user is not aware or cares about.
+
     .. seealso::
         :func:`submit_job` for JSON-based execution
         :func:`parse_kvp_inputs_outputs` for :term:`KVP` to :term:`JSON` conversion
@@ -1072,34 +1086,48 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
         })
 
     if response_params:
-        # Convert 'f' or 'format' query parameter to Accept header
+        # Handle response qualifiers (response[f], response[format], response[prefer], response[profile])
+        response_dict = response_params.get("response", {})
+        if isinstance(response_dict, dict):
+            # Extract format parameters from response[f] or response[format]
+            fmt_value = response_dict.get("f") or response_dict.get("format")
+            if fmt_value:
+                media_type = default_format_handler(fmt_value)
+                request.headers["Accept"] = media_type or fmt_value
+
+            # Extract prefer from response[prefer]
+            if "prefer" in response_dict:
+                request.headers["Prefer"] = response_dict["prefer"]
+
+        # Also check for standalone f and format parameters
         if "f" in response_params or "format" in response_params:
             fmt_value = response_params.get("f") or response_params.get("format")
-            media_type = default_format_handler(fmt_value)  # convert short form aliases
+            media_type = default_format_handler(fmt_value)
             request.headers["Accept"] = media_type or fmt_value
 
-        # Convert 'prefer' query parameter to Prefer header
         if "prefer" in response_params:
             request.headers["Prefer"] = response_params["prefer"]
 
-        # Convert 'profile' query parameter to Accept-Profile header
-        # Note:
-        #   For sync execution, 'profile' and 'response[profile]' are equivalent (same immediate response).
-        #   For async execution, 'profile' applies to job status response,
-        #   while 'response[profile]' applies to final results (handled separately).
-        if "profile" in response_params:
-            request.headers["Accept-Profile"] = response_params["profile"]
+        # Per OGC API - Processes spec [#kvpProfile] warning (see processes.rst):
+        # - Synchronous: profile and response[profile] are equivalent, both apply to Accept-Profile header
+        # - Asynchronous: profile -> Accept-Profile (Job Status), response[profile] -> body (Job Result)
+        prefer_header = request.headers.get("Prefer", "")
+        is_sync = "wait" in prefer_header.lower() and "respond-async" not in prefer_header.lower()
+        top_profile = response_params.get("profile")
+        resp_profile = response_dict.get("profile") if isinstance(response_dict, dict) else None
+        if is_sync:
+            profile_value = resp_profile or top_profile
+            if profile_value:
+                request.headers["Accept-Profile"] = profile_value
+        else:
+            if top_profile:
+                request.headers["Accept-Profile"] = top_profile
+            if resp_profile:
+                exec_body["profile"] = resp_profile
 
-        # FIXME: Add support for 'response=collection' to control job status collection representation
-        #        See: https://github.com/opengeospatial/ogcapi-processes/issues/557
-        #             https://github.com/crim-ca/weaver/issues/683
-        # if "collection" in response_params:
-        #     # Handle collection response format when implemented
-        #     pass
-
-    # FIXME: clear query parameters from request (except 'response=collection' to be compliant?)
-    # FIXME: forward '?f/format' for 'prefer' sync (override 'response[profile]') - otherwise (async) 'response' in body
-    # FIXME: convert '?f/format' to 'Accept' for async case?
+        # Extract simple response value (e.g., response=collection or response=document)
+        if isinstance(response_dict, dict) and None in response_dict:
+            exec_body["response"] = response_dict[None]
 
     request.body = json.dumps(exec_body).encode("utf-8")
     if "Content-Type" not in request.headers:
@@ -1120,6 +1148,9 @@ def submit_job(request, reference, tags=None, process_id=None):
     json_body = validate_job_json(request)
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
+
+    # FIXME: to remove once implemented (https://github.com/crim-ca/weaver/issues/683)
+    validate_response_collection_unsupported(request, json_body)
 
     prov_id = None  # None OK if local
     proc_id = None  # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
@@ -1830,3 +1861,22 @@ def validate_process_io(process, payload):
                             "occurrences": io_len,
                         }
                     })
+
+
+def validate_response_collection_unsupported(request, json_body):
+    # FIXME: Add support for 'response=collection' to control job status collection representation
+    #        See: https://github.com/opengeospatial/ogcapi-processes/issues/557
+    #             https://github.com/crim-ca/weaver/issues/683
+    response_value = None
+    if "response" in json_body:
+        response_value = json_body.get("response")
+    if not response_value and hasattr(request, "params"):
+        response_value = request.params.get("response")
+    if response_value and isinstance(response_value, str):
+        if response_value.lower() == "collection":
+            raise HTTPNotImplemented(json={
+                "type": "NotImplemented",
+                "title": "Response collection format not implemented",
+                "detail": "The 'response=collection' parameter is not yet supported.",
+                "status": HTTPNotImplemented.code,
+            })
