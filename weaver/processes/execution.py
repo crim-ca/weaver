@@ -126,6 +126,7 @@ if TYPE_CHECKING:
         HeadersType,
         JobValueBbox,
         JSON,
+        KVP,
         Number,
         ProcessExecution,
         SettingsType,
@@ -873,14 +874,14 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
     if qualifier == "include":
         if str(value).lower() == "true":
             if base_key not in outputs_dict:
-                outputs_dict[base_key] = {"id": base_key}
+                outputs_dict[base_key] = {}
         return True
 
     # Determine target (output if already exists there, otherwise input)
     target_dict = outputs_dict if base_key in outputs_dict else inputs_dict
 
     if base_key not in target_dict:
-        target_dict[base_key] = {"id": base_key}
+        target_dict[base_key] = {}
 
     # Format qualifiers (can apply to both inputs and outputs)
     if qualifier in ("mediatype", "encoding", "schema", "profile"):
@@ -912,11 +913,11 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
 
     # Input-specific qualifiers
     if qualifier == "href":
-        inputs_dict.setdefault(base_key, {"id": base_key})["href"] = value
+        inputs_dict.setdefault(base_key, {})["href"] = value
         return True
 
     if qualifier == "type":
-        inputs_dict.setdefault(base_key, {"id": base_key})["type"] = value
+        inputs_dict.setdefault(base_key, {})["type"] = value
         return True
 
     if qualifier == "value":
@@ -925,18 +926,18 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
             base64.b64decode(decoded, validate=True)
         except (binascii.Error, ValueError):
             pass
-        inputs_dict.setdefault(base_key, {"id": base_key})["value"] = decoded
+        inputs_dict.setdefault(base_key, {})["value"] = decoded
         return True
 
     if qualifier == "crs":
-        inputs_dict.setdefault(base_key, {"id": base_key})["crs"] = value
+        inputs_dict.setdefault(base_key, {})["crs"] = value
         return True
 
     return False
 
 
 def parse_kvp_inputs_outputs(params):
-    # type: (Dict[str, Any]) -> Tuple[ProcessExecution, Dict[str, str]]
+    # type: (Dict[str, Any]) -> Tuple[ProcessExecution, KVP]
     """
     Parse :term:`KVP` query parameters and convert them to :term:`JSON` execution body format.
 
@@ -949,7 +950,7 @@ def parse_kvp_inputs_outputs(params):
     :return: Tuple of (:term:`JSON` execution body with ``inputs``/``outputs``, response parameters).
     :raises HTTPBadRequest: If :term:`KVP` parameters cannot be parsed.
     """
-    # Use parse_kvp to handle deep_object transformation with collision handling
+    # Use 'parse_kvp' to handle 'deep_object' transformation with collision handling
     # This transforms 'key[qualifier]' into a nested dict, with 'None' for simple values when both exist
     organized = parse_kvp(
         params,
@@ -961,32 +962,31 @@ def parse_kvp_inputs_outputs(params):
     inputs_dict = {}
     outputs_dict = {}
     response_params = {}
-    # Reserved parameters that should not be treated as inputs/outputs
-    reserved_base_params = {"f", "response", "profile", "prefer"}
 
     for key, values in organized.items():
         key_lower = key.lower()
-        if key_lower in reserved_base_params:
-            if key_lower == "response":
-                # response can have both simple value (response=collection) and qualifiers (response[f]=json)
-                if isinstance(values, dict):
-                    if "response" not in response_params:
-                        response_params["response"] = {}
-                    if None in values:
-                        response_params["response"][None] = parse_kvp_value(values[None])
-                    for qualifier, qual_vals in values.items():
-                        if qualifier is not None:
-                            qualifier_lower = qualifier.lower()
-                            response_params["response"][qualifier_lower] = parse_kvp_value(qual_vals)
-                else:
-                    response_params["response"] = {None: parse_kvp_value(values)}
-            elif key_lower == "profile":
-                response_params["profile"] = parse_kvp_value(values)
-            elif key_lower == "prefer":
-                response_params["prefer"] = parse_kvp_value(values)
-            elif key_lower == "f":
-                response_params["f"] = parse_kvp_value(values)
-
+        if key_lower == "response":
+            # response can have both simple value (response=collection) and qualifiers (response[f]=json)
+            if isinstance(values, dict):
+                if "response" not in response_params:
+                    response_params["response"] = {}
+                if None in values:
+                    response_params["response"][None] = parse_kvp_value(values[None])
+                for qualifier, qual_vals in values.items():
+                    if qualifier is not None:
+                        qualifier_lower = qualifier.lower()
+                        response_params["response"][qualifier_lower] = parse_kvp_value(qual_vals)
+            else:
+                response_params["response"] = {None: parse_kvp_value(values)}
+            continue
+        if key_lower == "profile":
+            response_params["profile"] = parse_kvp_value(values)
+            continue
+        if key_lower == "f":
+            response_params["f"] = parse_kvp_value(values)
+            continue
+        if key_lower == "prefer":
+            response_params["prefer"] = parse_kvp_value(values)
             continue
 
         # Deep object (qualified parameters) - values is a dict
@@ -997,8 +997,7 @@ def parse_kvp_inputs_outputs(params):
                 has_crs_qualifier = "crs" in values
                 if key_lower == "bbox" or has_crs_qualifier:
                     parsed_bbox = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
-                    inputs_dict[key] = {"id": key}
-                    inputs_dict[key].update(parsed_bbox)
+                    inputs_dict[key] = parsed_bbox
                 else:
                     # Outputs detected using required 'include' qualifier
                     if "include" not in values:
@@ -1006,7 +1005,7 @@ def parse_kvp_inputs_outputs(params):
                             parsed_value = parse_kvp_literal_value(simple_val)
                         else:
                             parsed_value = simple_val
-                        inputs_dict[key] = {"id": key, "value": parsed_value}
+                        inputs_dict[key] = {"value": parsed_value}
 
             # Process qualifiers
             for qualifier, qual_values in values.items():
@@ -1025,14 +1024,14 @@ def parse_kvp_inputs_outputs(params):
             else:
                 parsed_value = parse_kvp_literal_value(value) if isinstance(value, str) else value
 
-            inputs_dict[key] = {"id": key, "value": parsed_value}
+            inputs_dict[key] = {"value": parsed_value}
 
     # Build response body
     body = {}
     if inputs_dict:
-        body["inputs"] = list(inputs_dict.values())
+        body["inputs"] = inputs_dict
     if outputs_dict:
-        body["outputs"] = list(outputs_dict.values())
+        body["outputs"] = outputs_dict
 
     return body, response_params
 
@@ -1114,16 +1113,19 @@ def submit_job_from_kvp(request, reference, tags=None, process_id=None):
 
         # Per OGC API - Processes spec [#kvpProfile] warning (see processes.rst):
         # - Synchronous: profile and response[profile] are equivalent, both apply to Accept-Profile header
+        #   (if both provided, response[profile] takes precedence)
         # - Asynchronous: profile -> Accept-Profile (Job Status), response[profile] -> body (Job Result)
         prefer_header = request.headers.get("Prefer", "")
         is_sync = "wait" in prefer_header.lower() and "respond-async" not in prefer_header.lower()
         top_profile = response_params.get("profile")
         resp_profile = response_dict.get("profile") if isinstance(response_dict, dict) else None
         if is_sync:
+            # In sync mode, response[profile] takes precedence if both are provided
             profile_value = resp_profile or top_profile
             if profile_value:
                 request.headers["Accept-Profile"] = profile_value
         else:
+            # In async mode, they are used independently
             if top_profile:
                 request.headers["Accept-Profile"] = top_profile
             if resp_profile:

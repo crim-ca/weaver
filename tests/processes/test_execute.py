@@ -136,10 +136,9 @@ def test_parse_kvp_inputs_outputs_simple_literals():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 3
-    inputs = {inp["id"]: inp["value"] for inp in result["inputs"]}
-    assert inputs["stringInput"] == "test value"
-    assert inputs["intInput"] == 42
-    assert inputs["floatInput"] == 3.14
+    assert result["inputs"]["stringInput"] == {"value": "test value"}
+    assert result["inputs"]["intInput"] == {"value": 42}
+    assert result["inputs"]["floatInput"] == {"value": 3.14}
     assert not response_params
 
 
@@ -156,9 +155,9 @@ def test_parse_kvp_inputs_outputs_by_reference():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "fileInput"
-    assert result["inputs"][0]["href"] == "http://example.com/file.txt"
-    assert result["inputs"][0]["type"] == ContentType.TEXT_PLAIN
+    assert "fileInput" in result["inputs"]
+    assert result["inputs"]["fileInput"]["href"] == "http://example.com/file.txt"
+    assert result["inputs"]["fileInput"]["type"] == ContentType.TEXT_PLAIN
     assert not response_params
 
 
@@ -174,8 +173,8 @@ def test_parse_kvp_inputs_outputs_array():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "arrayInput"
-    assert result["inputs"][0]["value"] == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert "arrayInput" in result["inputs"]
+    assert result["inputs"]["arrayInput"]["value"] == [1.0, 2.0, 3.0, 4.0, 5.0]
     assert not response_params
 
 
@@ -185,17 +184,16 @@ def test_parse_kvp_inputs_outputs_bbox():
     Test parsing bounding box from KVP.
     """
     params = {
-        "bbox": ["5.8,47.2,15.1,55.1"],
-        "bbox[crs]": ["http://www.opengis.net/def/crs/OGC/1.3/CRS84"],
+        "area": ["5.8,47.2,15.1,55.1"],
+        "area[crs]": ["http://www.opengis.net/def/crs/OGC/1.3/CRS84"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "bbox"
-    assert "bbox" in result["inputs"][0]
-    assert result["inputs"][0]["bbox"] == [5.8, 47.2, 15.1, 55.1]
-    assert result["inputs"][0]["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    assert "area" in result["inputs"]
+    assert result["inputs"]["area"]["bbox"] == [5.8, 47.2, 15.1, 55.1]
+    assert result["inputs"]["area"]["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
     assert not response_params
 
 
@@ -217,11 +215,10 @@ def test_parse_kvp_inputs_outputs_with_outputs():
     assert len(result["inputs"]) == 1
     assert len(result["outputs"]) == 2
 
-    outputs = {out["id"]: out for out in result["outputs"]}
-    assert "output1" in outputs
-    assert "output2" in outputs
-    assert "format" in outputs["output2"]
-    assert outputs["output2"]["format"]["mediaType"] == ContentType.APP_JSON
+    assert "output1" in result["outputs"]
+    assert "output2" in result["outputs"]
+    assert "format" in result["outputs"]["output2"]
+    assert result["outputs"]["output2"]["format"]["mediaType"] == ContentType.APP_JSON
     assert not response_params
 
 
@@ -238,10 +235,10 @@ def test_parse_kvp_inputs_outputs_url_encoded_json():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "complexInput"
-    assert isinstance(result["inputs"][0]["value"], dict)
-    assert result["inputs"][0]["value"]["key1"] == "value1"
-    assert result["inputs"][0]["value"]["key2"] == 123
+    assert "complexInput" in result["inputs"]
+    assert isinstance(result["inputs"]["complexInput"]["value"], dict)
+    assert result["inputs"]["complexInput"]["value"]["key1"] == "value1"
+    assert result["inputs"]["complexInput"]["value"]["key2"] == 123
     assert not response_params
 
 
@@ -254,27 +251,29 @@ def test_parse_kvp_inputs_outputs_reserved_params():
         "input1": ["value1"],
         "f": ["json"],
         "response": ["document"],
-        "prefer": ["respond-async"],
+        "response[prefer]": ["respond-async"],
         "data": ["test"],
     }
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
     assert len(result["inputs"]) == 2
-    input_ids = {inp["id"]: inp for inp in result["inputs"]}
-    assert "input1" in input_ids
-    assert "data" in input_ids
+    assert "input1" in result["inputs"]
+    assert "data" in result["inputs"]
 
     # Validate reserved parameters are in response_params
     assert "response" in response_params
     assert response_params["response"][None] == "document"
+    assert response_params["response"]["prefer"] == "respond-async"
     assert "f" in response_params
-    assert "prefer" in response_params
+    assert "prefer" not in response_params
 
 
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
-    """Test parsing a mix of inputs and outputs."""
+    """
+    Test parsing a mix of inputs and outputs.
+    """
     params = {
         "stringInput": ["test"],
         "numberInput": ["42"],
@@ -290,14 +289,12 @@ def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
     assert len(result["inputs"]) == 3
     assert len(result["outputs"]) == 2
 
-    input_ids = {inp["id"] for inp in result["inputs"]}
-    assert "stringInput" in input_ids
-    assert "numberInput" in input_ids
-    assert "fileInput" in input_ids
+    assert "stringInput" in result["inputs"]
+    assert "numberInput" in result["inputs"]
+    assert "fileInput" in result["inputs"]
 
-    output_ids = {out["id"] for out in result["outputs"]}
-    assert "output1" in output_ids
-    assert "output2" in output_ids
+    assert "output1" in result["outputs"]
+    assert "output2" in result["outputs"]
     assert not response_params
 
 
@@ -319,10 +316,10 @@ def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "binaryInput"
-    assert result["inputs"][0]["value"] == encoded_data
-    assert "format" not in result["inputs"][0]
-    assert result["inputs"][0]["mediaType"] == ContentType.TEXT_PLAIN
+    assert "binaryInput" in result["inputs"]
+    assert result["inputs"]["binaryInput"]["value"] == encoded_data
+    assert "format" not in result["inputs"]["binaryInput"]
+    assert result["inputs"]["binaryInput"]["mediaType"] == ContentType.TEXT_PLAIN
     assert not response_params
 
 
@@ -346,11 +343,13 @@ def test_parse_kvp_inputs_outputs_schema_qualifier():
 
     assert "inputs" in result
     assert "outputs" in result
-    assert "format" not in result["inputs"][0]
-    assert result["inputs"][0]["schema"] == schema_url
-    assert "format" in result["outputs"][0]
-    assert isinstance(result["outputs"][0]["format"]["schema"], dict)
-    assert result["outputs"][0]["format"]["schema"]["type"] == "object"
+    assert "input1" in result["inputs"]
+    assert "format" not in result["inputs"]["input1"]
+    assert result["inputs"]["input1"]["schema"] == schema_url
+    assert "output1" in result["outputs"]
+    assert "format" in result["outputs"]["output1"]
+    assert isinstance(result["outputs"]["output1"]["format"]["schema"], dict)
+    assert result["outputs"]["output1"]["format"]["schema"]["type"] == "object"
     assert not response_params
 
 
@@ -369,8 +368,9 @@ def test_parse_kvp_inputs_outputs_encoding_qualifier():
 
     assert "outputs" in result
     assert len(result["outputs"]) == 1
-    assert result["outputs"][0]["format"]["mediaType"] == ContentType.APP_JSON
-    assert result["outputs"][0]["format"]["encoding"] == "gzip"
+    assert "output1" in result["outputs"]
+    assert result["outputs"]["output1"]["format"]["mediaType"] == ContentType.APP_JSON
+    assert result["outputs"]["output1"]["format"]["encoding"] == "gzip"
     assert not response_params
 
 
@@ -417,8 +417,8 @@ def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals(prefer_valu
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
-    assert result["inputs"][0]["id"] == "input1"
-    assert result["inputs"][0]["value"] == "test value"
+    assert "input1" in result["inputs"]
+    assert result["inputs"]["input1"]["value"] == "test value"
 
     response_dict = response_params.get("response", {})
     assert "prefer" in response_dict
@@ -445,8 +445,8 @@ def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     assert "inputs" in result
     assert len(result["inputs"]) == 1
 
-    input_data = result["inputs"][0]
-    assert input_data["id"] == "my_input"
+    assert "my_input" in result["inputs"]
+    input_data = result["inputs"]["my_input"]
     assert input_data["value"] == "test data"
     assert "format" not in input_data
     assert input_data["mediaType"] == ContentType.TEXT_PLAIN
@@ -472,8 +472,8 @@ def test_parse_kvp_inputs_outputs_output_with_include_and_format():
     assert "outputs" in result
     assert len(result["outputs"]) == 1
 
-    output_data = result["outputs"][0]
-    assert output_data["id"] == "result"
+    assert "result" in result["outputs"]
+    output_data = result["outputs"]["result"]
     # Outputs should NOT have value
     assert "value" not in output_data
     assert "format" in output_data
@@ -489,7 +489,7 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
 
     Parameters with ``include=true`` become outputs, others become inputs.
     For inputs, format qualifiers are at top level.
-    For outputs, format qualifiers are nested under 'format'.
+    For outputs, format qualifiers are nested under ``format``.
     """
     params = {
         # Input - has format but no include
@@ -502,15 +502,15 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
 
     # data should be input (no include) - format at top level
     assert "inputs" in result
-    assert any(i["id"] == "data" for i in result["inputs"])
-    data_input = next(i for i in result["inputs"] if i["id"] == "data")
+    assert "data" in result["inputs"]
+    data_input = result["inputs"]["data"]
     assert "format" not in data_input
     assert data_input["mediaType"] == "text/csv"
 
     # result should be output (has include=true) - format nested under 'format'
     assert "outputs" in result
-    assert any(o["id"] == "result" for o in result["outputs"])
-    result_output = next(o for o in result["outputs"] if o["id"] == "result")
+    assert "result" in result["outputs"]
+    result_output = result["outputs"]["result"]
     assert "format" in result_output
     assert result_output["format"]["mediaType"] == ContentType.APP_JSON
     assert "value" not in result_output
@@ -523,7 +523,7 @@ def test_parse_kvp_inputs_outputs_with_profile():
     Test parsing input and output with profile qualifier.
 
     For inputs, format qualifiers should be at top level.
-    For outputs, format qualifiers should be nested under 'format'.
+    For outputs, format qualifiers should be nested under ``format``.
     """
     params = {
         "features[value]": ['{"type": "FeatureCollection"}'],
@@ -537,16 +537,16 @@ def test_parse_kvp_inputs_outputs_with_profile():
 
     # Check input with profile - format qualifiers at top level
     assert "inputs" in result
-    features_input = next((i for i in result["inputs"] if i["id"] == "features"), None)
-    assert features_input is not None
+    assert "features" in result["inputs"]
+    features_input = result["inputs"]["features"]
     assert "format" not in features_input
     assert features_input["mediaType"] == ContentType.APP_GEOJSON
     assert features_input["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
 
     # Check output with profile - format qualifiers nested under 'format'
     assert "outputs" in result
-    output_result = next((o for o in result["outputs"] if o["id"] == "output"), None)
-    assert output_result is not None
+    assert "output" in result["outputs"]
+    output_result = result["outputs"]["output"]
     assert "format" in output_result
     assert output_result["format"]["mediaType"] == ContentType.APP_JSON
     assert output_result["format"]["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac-collection"
@@ -556,7 +556,7 @@ def test_parse_kvp_inputs_outputs_with_profile():
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_response_profile():
     """
-    Test parsing response[profile] parameter.
+    Test parsing ``response[profile]`` parameter.
     """
     params = {
         "input1": ["value1"],
@@ -604,7 +604,7 @@ def test_parse_kvp_inputs_outputs_response_format_short_names(format_value):
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_standalone_profile():
     """
-    Test parsing standalone 'profile' parameter (without response qualifier).
+    Test parsing standalone ``profile`` parameter (without response qualifier).
     """
     params = {
         "input1": ["value1"],
@@ -621,7 +621,7 @@ def test_parse_kvp_inputs_outputs_standalone_profile():
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_response_collection():
     """
-    Test parsing 'response=collection' parameter.
+    Test parsing ``response=collection`` parameter.
     """
     params = {
         "input1": ["value1"],
@@ -641,7 +641,7 @@ def test_parse_kvp_inputs_outputs_response_collection():
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_both_f_and_format():
     """
-    Test that 'response[f]' takes precedence over 'response[format]' when both are provided.
+    Test that ``response[f]`` takes precedence over ``response[format]`` when both are provided.
     """
     params = {
         "input1": ["value1"],
@@ -661,8 +661,7 @@ def test_parse_kvp_inputs_outputs_both_f_and_format():
 @pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_profile_vs_response_profile():
     """
-    Test that standalone 'profile' parameter is parsed.
-    Note: response[profile] is not a standard OGC parameter but profile=value is.
+    Test that standalone ``profile`` parameter is parsed.
     """
     params = {
         "input1": ["value1"],
@@ -693,11 +692,9 @@ def test_parse_kvp_inputs_outputs_case_sensitivity():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 3
-
-    input_ids = {inp["id"] for inp in result["inputs"]}
-    assert "MyInput" in input_ids
-    assert "myInput" in input_ids
-    assert "MYINPUT" in input_ids
+    assert "MyInput" in result["inputs"]
+    assert "myInput" in result["inputs"]
+    assert "MYINPUT" in result["inputs"]
     assert not response_params
 
 
@@ -759,24 +756,20 @@ def test_submit_job_from_kvp():
     # Check inputs
     assert "inputs" in body
     assert len(body["inputs"]) == 3
-    input_ids = {inp["id"]: inp for inp in body["inputs"]}
-    assert "input1" in input_ids
-    assert input_ids["input1"]["value"] == "value1"
-    assert "input2" in input_ids
-    assert input_ids["input2"]["value"] == 42
-    assert "input3" in input_ids
-    assert input_ids["input3"]["href"] == "http://example.com/data.json"
-    assert input_ids["input3"]["type"] == "application/json"
+    assert "input1" in body["inputs"]
+    assert body["inputs"]["input1"]["value"] == "value1"
+    assert "input2" in body["inputs"]
+    assert body["inputs"]["input2"]["value"] == 42
+    assert "input3" in body["inputs"]
+    assert body["inputs"]["input3"]["href"] == "http://example.com/data.json"
+    assert body["inputs"]["input3"]["type"] == "application/json"
 
     # Check outputs
     assert "outputs" in body
     assert len(body["outputs"]) == 1
-    output_obj = body["outputs"][0]
-    assert output_obj["id"] == "output1"
-    assert "format" in output_obj
-    assert output_obj["format"]["mediaType"] == "application/json"
-    assert "format" in output_obj
-    assert output_obj["format"]["mediaType"] == "application/json"
+    assert "output1" in body["outputs"]
+    assert "format" in body["outputs"]["output1"]
+    assert body["outputs"]["output1"]["format"] == {"mediaType": "application/json"}
 
     # Check response parameter in body
     assert "response" in body
@@ -825,11 +818,15 @@ def test_kvp_complex_profile_combinations():
     body = json.loads(data)
 
     # Validate input profile (content profile for the input data)
-    input_obj = next(i for i in body["inputs"] if i["id"] == "input")
+    assert "inputs" in body
+    assert "input" in body["inputs"]
+    input_obj = body["inputs"]["input"]
     assert input_obj["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
 
     # Validate output profile (content profile for the output data)
-    output_obj = next(o for o in body["outputs"] if o["id"] == "output")
+    assert "outputs" in body
+    assert "output" in body["outputs"]
+    output_obj = body["outputs"]["output"]
     assert "format" in output_obj
     expected_profile = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
     assert output_obj["format"]["profile"] == expected_profile
@@ -966,13 +963,13 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
         # Simple input parameter
         (
             {"input1": "value1"},
-            {"inputs": [{"id": "input1", "value": "value1"}]},
+            {"inputs": {"input1": {"value": "value1"}}},
             {},
         ),
         # Input with href
         (
             {"input1[href]": "http://example.com/data.json"},
-            {"inputs": [{"id": "input1", "href": "http://example.com/data.json"}]},
+            {"inputs": {"input1": {"href": "http://example.com/data.json"}}},
             {},
         ),
         # Response parameter goes to body
@@ -1002,7 +999,7 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
         # Multiple inputs
         (
             {"input1": "value1", "input2": "value2"},
-            {"inputs": [{"id": "input1", "value": "value1"}, {"id": "input2", "value": "value2"}]},
+            {"inputs": {"input1": {"value": "value1"}, "input2": {"value": "value2"}}},
             {},
         ),
         # Input with format qualifiers
@@ -1013,12 +1010,13 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
                 "input1[schema]": "http://example.com/schema.json",
             },
             {
-                "inputs": [{
-                    "id": "input1",
-                    "href": "http://example.com/data.json",
-                    "mediaType": "application/geo+json",
-                    "schema": "http://example.com/schema.json",
-                }]
+                "inputs": {
+                    "input1": {
+                        "href": "http://example.com/data.json",
+                        "mediaType": "application/geo+json",
+                        "schema": "http://example.com/schema.json",
+                    }
+                }
             },
             {},
         ),
@@ -1030,13 +1028,14 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
                 "output1[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson",
             },
             {
-                "outputs": [{
-                    "id": "output1",
-                    "format": {
-                        "mediaType": "application/json",
-                        "profile": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson",
+                "outputs": {
+                    "output1": {
+                        "format": {
+                            "mediaType": "application/json",
+                            "profile": "http://www.opengis.net/def/format/ogcapi-processes/0/geojson",
+                        }
                     }
-                }]
+                }
             },
             {},
         ),
@@ -1069,13 +1068,16 @@ def test_kvp_parameter_resolution(kvp_params, expected_body, expected_headers):
 
     for key, value in expected_body.items():
         assert key in body, f"Expected '{key}' in body"
-        if isinstance(value, list):
+        if isinstance(value, dict) and key in ("inputs", "outputs"):
+            # Handle mapping form: {"inputs": {"id": {...}}}
+            assert isinstance(body[key], dict), f"Expected '{key}' to be a dict"
             assert len(body[key]) == len(value), f"Expected {len(value)} items in '{key}', got {len(body[key])}"
-            for item in value:
-                matching = [b for b in body[key] if b.get("id") == item.get("id")]
-                assert len(matching) == 1, f"Expected exactly one item with id '{item.get('id')}' in '{key}'"
-                for k, v in item.items():
-                    assert matching[0].get(k) == v, f"Expected '{k}' to be '{v}' in item '{item.get('id')}'"
+            for item_id, item_value in value.items():
+                assert item_id in body[key], f"Expected '{item_id}' in '{key}'"
+                for k, v in item_value.items():
+                    assert body[key][item_id].get(k) == v, (
+                        f"Expected '{k}' to be '{v}' in '{key}[{item_id}]', got '{body[key][item_id].get(k)}'"
+                    )
         else:
             assert body[key] == value, f"Expected '{key}' to be '{value}', got '{body[key]}'"
 
