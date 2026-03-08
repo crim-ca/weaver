@@ -3091,8 +3091,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Validates:
         - REQ_bbox-input-value.adoc
         - REQ_bbox-crs-input-value.adoc
+
+        .. note::
+            Bounding box inputs are converted to File type in CWL (not record type).
+            The bbox data with coordinates and CRS is stored as JSON file content.
         """
-        # Deploy test process with bbox input (array of 4 or 6 numbers)
+        # Deploy test process with bbox input as File (bbox is converted to JSON file)
         body = self.get_process_deploy_template(
             process_id="kvp-bbox-test",
             cwl=cast("CWL", {
@@ -3106,13 +3110,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 },
                 "inputs": {
                     "bbox": {
-                        "type": {
-                            "type": "record",
-                            "fields": [
-                                {"name": "bbox", "type": "float[]"},
-                                {"name": "crs", "type": "string?"},
-                            ],
-                        },
+                        "type": "File",
+                        "format": "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml",
                     },
                 },
                 "outputs": {
