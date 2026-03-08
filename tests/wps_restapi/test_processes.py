@@ -2877,9 +2877,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with simple literal inputs (string, numeric, boolean).
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_string-input-value.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_numeric-input-value.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_boolean-input-value.adoc
+        - REQ_string-input-value.adoc
+        - REQ_numeric-input-value.adoc
+        - REQ_boolean-input-value.adoc
         """
         # Deploy test process with literal inputs
         body = self.get_process_deploy_template(
@@ -2936,8 +2936,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with array inputs using multi-value notation.
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_array-input-value.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_input-cardinality.adoc
+        - REQ_array-input-value.adoc
+        - REQ_input-cardinality.adoc
         """
         # Deploy test process with array input
         body = self.get_process_deploy_template(
@@ -2987,8 +2987,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with input by reference using qualifiers.
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_input-by-reference.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_complex-input-value.adoc
+        - REQ_input-by-reference.adoc
+        - REQ_complex-input-value.adoc
         """
         # Deploy test process with File input
         body = self.get_process_deploy_template(
@@ -3037,8 +3037,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with binary input value (base64-encoded).
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_binary-input-value.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_binary-input-value-qualified.adoc
+        - REQ_binary-input-value.adoc
+        - REQ_binary-input-value-qualified.adoc
         """
         # Deploy test process with File input
         body = self.get_process_deploy_template(
@@ -3089,8 +3089,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with bounding box input.
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_bbox-input-value.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_bbox-crs-input-value.adoc
+        - REQ_bbox-input-value.adoc
+        - REQ_bbox-crs-input-value.adoc
         """
         # Deploy test process with bbox input (array of 4 or 6 numbers)
         body = self.get_process_deploy_template(
@@ -3198,10 +3198,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         Test KVP-encoded execution with response format control (response[f], response[prefer]).
 
         Validates:
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_f-definition.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_f-response.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_prefer-definition.adoc
-        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_prefer-response.adoc
+        - REQ_f-definition.adoc
+        - REQ_f-response.adoc
+        - REQ_prefer-definition.adoc
+        - REQ_prefer-response.adoc
         """
         # Deploy simple test process
         body = self.get_process_deploy_template(

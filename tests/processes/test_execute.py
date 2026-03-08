@@ -140,7 +140,7 @@ def test_parse_kvp_inputs_outputs_simple_literals():
     assert inputs["stringInput"] == "test value"
     assert inputs["intInput"] == 42
     assert inputs["floatInput"] == 3.14
-    assert response_params == {}
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -159,6 +159,7 @@ def test_parse_kvp_inputs_outputs_by_reference():
     assert result["inputs"][0]["id"] == "fileInput"
     assert result["inputs"][0]["href"] == "http://example.com/file.txt"
     assert result["inputs"][0]["type"] == ContentType.TEXT_PLAIN
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -175,6 +176,7 @@ def test_parse_kvp_inputs_outputs_array():
     assert len(result["inputs"]) == 1
     assert result["inputs"][0]["id"] == "arrayInput"
     assert result["inputs"][0]["value"] == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -194,6 +196,7 @@ def test_parse_kvp_inputs_outputs_bbox():
     assert "bbox" in result["inputs"][0]
     assert result["inputs"][0]["bbox"] == [5.8, 47.2, 15.1, 55.1]
     assert result["inputs"][0]["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -219,6 +222,7 @@ def test_parse_kvp_inputs_outputs_with_outputs():
     assert "output2" in outputs
     assert "format" in outputs["output2"]
     assert outputs["output2"]["format"]["mediaType"] == ContentType.APP_JSON
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -238,6 +242,7 @@ def test_parse_kvp_inputs_outputs_url_encoded_json():
     assert isinstance(result["inputs"][0]["value"], dict)
     assert result["inputs"][0]["value"]["key1"] == "value1"
     assert result["inputs"][0]["value"]["key2"] == 123
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -259,6 +264,12 @@ def test_parse_kvp_inputs_outputs_reserved_params():
     input_ids = {inp["id"]: inp for inp in result["inputs"]}
     assert "input1" in input_ids
     assert "data" in input_ids
+
+    # Validate reserved parameters are in response_params
+    assert "response" in response_params
+    assert response_params["response"][None] == "document"
+    assert "f" in response_params
+    assert "prefer" in response_params
 
 
 @pytest.mark.kvp
@@ -287,6 +298,7 @@ def test_parse_kvp_inputs_outputs_mixed_inputs_outputs():
     output_ids = {out["id"] for out in result["outputs"]}
     assert "output1" in output_ids
     assert "output2" in output_ids
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -311,6 +323,7 @@ def test_parse_kvp_inputs_outputs_binary_with_value_qualifier():
     assert result["inputs"][0]["value"] == encoded_data
     assert "format" not in result["inputs"][0]
     assert result["inputs"][0]["mediaType"] == ContentType.TEXT_PLAIN
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -338,6 +351,7 @@ def test_parse_kvp_inputs_outputs_schema_qualifier():
     assert "format" in result["outputs"][0]
     assert isinstance(result["outputs"][0]["format"]["schema"], dict)
     assert result["outputs"][0]["format"]["schema"]["type"] == "object"
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -357,6 +371,7 @@ def test_parse_kvp_inputs_outputs_encoding_qualifier():
     assert len(result["outputs"]) == 1
     assert result["outputs"][0]["format"]["mediaType"] == ContentType.APP_JSON
     assert result["outputs"][0]["format"]["encoding"] == "gzip"
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -436,6 +451,7 @@ def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     assert "format" not in input_data
     assert input_data["mediaType"] == ContentType.TEXT_PLAIN
     assert input_data["encoding"] == ContentEncoding.BASE64
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -463,6 +479,7 @@ def test_parse_kvp_inputs_outputs_output_with_include_and_format():
     assert "format" in output_data
     assert output_data["format"]["mediaType"] == ContentType.APP_JSON
     assert output_data["format"]["encoding"] == "gzip"
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -497,6 +514,7 @@ def test_parse_kvp_inputs_outputs_include_determines_classification():
     assert "format" in result_output
     assert result_output["format"]["mediaType"] == ContentType.APP_JSON
     assert "value" not in result_output
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -532,6 +550,7 @@ def test_parse_kvp_inputs_outputs_with_profile():
     assert "format" in output_result
     assert output_result["format"]["mediaType"] == ContentType.APP_JSON
     assert output_result["format"]["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/stac-collection"
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -679,6 +698,7 @@ def test_parse_kvp_inputs_outputs_case_sensitivity():
     assert "MyInput" in input_ids
     assert "myInput" in input_ids
     assert "MYINPUT" in input_ids
+    assert not response_params
 
 
 @pytest.mark.kvp
@@ -696,6 +716,11 @@ def test_parse_kvp_inputs_outputs_reserved_params_case_insensitive():
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
+
+    # Validate reserved parameters are case-insensitive
+    assert "f" in response_params
+    assert "response" in response_params
+    assert "profile" in response_params
 
 
 @pytest.mark.kvp
@@ -726,8 +751,7 @@ def test_submit_job_from_kvp():
         "Accept": "application/xml",
         "Prefer": "wait=30",
     }
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
     data = cast(bytes, req.body).decode("utf-8")
     body = json.loads(data)
@@ -795,8 +819,7 @@ def test_kvp_complex_profile_combinations():
         "response[profile]": "http://www.opengis.net/def/format/ogcapi-processes/0/stac",
     }
     req.headers = {}
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
     data = cast(bytes, req.body).decode("utf-8")
     body = json.loads(data)
@@ -808,7 +831,8 @@ def test_kvp_complex_profile_combinations():
     # Validate output profile (content profile for the output data)
     output_obj = next(o for o in body["outputs"] if o["id"] == "output")
     assert "format" in output_obj
-    assert output_obj["format"]["profile"] == "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
+    expected_profile = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
+    assert output_obj["format"]["profile"] == expected_profile
 
     # Validate response=collection in body
     assert "response" in body
@@ -868,28 +892,35 @@ def test_kvp_profile_resolution_sync_async(
         req.params["response[profile]"] = response_profile
     req.headers = {}
 
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
 
     data = cast(bytes, req.body).decode("utf-8")
     body = json.loads(data)
 
     if expected_header_profile:
-        assert "Accept-Profile" in req.headers, \
-            f"Expected Accept-Profile header for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert "Accept-Profile" in req.headers, (
+            f"Expected Accept-Profile header for mode={prefer_mode}, "
+            f"profile={top_profile}, response[profile]={response_profile}"
+        )
         assert req.headers["Accept-Profile"] == expected_header_profile
     else:
-        assert "Accept-Profile" not in req.headers, \
-            f"Unexpected Accept-Profile header for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert "Accept-Profile" not in req.headers, (
+            f"Unexpected Accept-Profile header for mode={prefer_mode}, "
+            f"profile={top_profile}, response[profile]={response_profile}"
+        )
 
     if expected_body_profile:
-        assert "profile" in body, \
-            f"Expected profile in body for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert "profile" in body, (
+            f"Expected profile in body for mode={prefer_mode}, "
+            f"profile={top_profile}, response[profile]={response_profile}"
+        )
         assert body["profile"] == expected_body_profile
     else:
-        assert "profile" not in body, \
-            f"Unexpected profile in body for mode={prefer_mode}, profile={top_profile}, response[profile]={response_profile}"
+        assert "profile" not in body, (
+            f"Unexpected profile in body for mode={prefer_mode}, "
+            f"profile={top_profile}, response[profile]={response_profile}"
+        )
 
 
 @pytest.mark.parametrize(
@@ -922,8 +953,7 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
     }
     req.headers = {}
 
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
 
     assert "Accept-Profile" in req.headers
@@ -931,13 +961,12 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
 
 
 @pytest.mark.parametrize(
-    ["kvp_params", "expected_body", "expected_headers", "expected_queries"],
+    ["kvp_params", "expected_body", "expected_headers"],
     [
         # Simple input parameter
         (
             {"input1": "value1"},
             {"inputs": [{"id": "input1", "value": "value1"}]},
-            {},
             {},
         ),
         # Input with href
@@ -945,13 +974,11 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
             {"input1[href]": "http://example.com/data.json"},
             {"inputs": [{"id": "input1", "href": "http://example.com/data.json"}]},
             {},
-            {},
         ),
         # Response parameter goes to body
         (
             {"response": "document"},
             {"response": "document"},
-            {},
             {},
         ),
         # Format parameter (f) goes to Accept header
@@ -959,27 +986,23 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
             {"f": "json"},
             {},
             {"Accept": ContentType.APP_JSON},
-            {},
         ),
         # Prefer parameter goes to Prefer header
         (
             {"prefer": "respond-async"},
             {},
             {"Prefer": "respond-async"},
-            {},
         ),
         # Profile parameter goes to Accept-Profile header (sync mode with explicit wait)
         (
             {"prefer": "wait", "profile": "ogc"},
             {},
             {"Prefer": "wait", "Accept-Profile": "ogc"},
-            {},
         ),
         # Multiple inputs
         (
             {"input1": "value1", "input2": "value2"},
             {"inputs": [{"id": "input1", "value": "value1"}, {"id": "input2", "value": "value2"}]},
-            {},
             {},
         ),
         # Input with format qualifiers
@@ -997,7 +1020,6 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
                     "schema": "http://example.com/schema.json",
                 }]
             },
-            {},
             {},
         ),
         # Output with format qualifiers
@@ -1017,18 +1039,16 @@ def test_kvp_profile_case_insensitive(param_name, qualifier_name, expected_profi
                 }]
             },
             {},
-            {},
         ),
         # Response with qualifiers
         (
             {"response[f]": "json", "response[prefer]": "wait"},
             {},
             {"Accept": ContentType.APP_JSON, "Prefer": "wait"},
-            {},
         ),
     ]
 )
-def test_kvp_parameter_resolution(kvp_params, expected_body, expected_headers, expected_queries):
+def test_kvp_parameter_resolution(kvp_params, expected_body, expected_headers):
     """
     Validate KVP parameters are correctly resolved to JSON body, headers, and queries.
 
@@ -1041,8 +1061,7 @@ def test_kvp_parameter_resolution(kvp_params, expected_body, expected_headers, e
     req.params = kvp_params
     req.headers = {}
 
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
 
     data = cast(bytes, req.body).decode("utf-8")
@@ -1121,8 +1140,7 @@ def test_kvp_overrides_headers(kvp_params, initial_headers, expected_header, exp
     req.params = kvp_params
     req.headers = dict(initial_headers)
 
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
 
     assert expected_header in req.headers
@@ -1158,8 +1176,7 @@ def test_kvp_format_precedence(f_param, format_param, expected_accept):
         req.params["response[format]"] = format_param
     req.headers = {}
 
-    with mock.patch("weaver.processes.execution.submit_job") as mock_submit:
-        mock_submit.return_value = None
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
         submit_job_from_kvp(req, None)  # type: ignore
 
     assert "Accept" in req.headers
@@ -1180,8 +1197,7 @@ def test_kvp_response_collection_validation():
     req.headers = {}
 
     # Mock the body validation to return a simple body
-    with mock.patch("weaver.processes.execution.validate_job_json") as mock_validate:
-        mock_validate.return_value = {"response": "collection"}
+    with mock.patch("weaver.processes.execution.validate_job_json", return_value={"response": "collection"}):
         with mock.patch("weaver.processes.execution.get_wps_output_context"):
             with pytest.raises(HTTPNotImplemented) as exc_info:
                 submit_job(req, None)  # type: ignore

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import copy
 import json
 import logging
@@ -922,7 +923,7 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
         decoded = unquote(value)
         try:
             base64.b64decode(decoded, validate=True)
-        except Exception:
+        except (binascii.Error, ValueError):
             pass
         inputs_dict.setdefault(base_key, {"id": base_key})["value"] = decoded
         return True
@@ -1001,7 +1002,10 @@ def parse_kvp_inputs_outputs(params):
                 else:
                     # Outputs detected using required 'include' qualifier
                     if "include" not in values:
-                        parsed_value = parse_kvp_literal_value(simple_val) if isinstance(simple_val, str) else simple_val
+                        if isinstance(simple_val, str):
+                            parsed_value = parse_kvp_literal_value(simple_val)
+                        else:
+                            parsed_value = simple_val
                         inputs_dict[key] = {"id": key, "value": parsed_value}
 
             # Process qualifiers

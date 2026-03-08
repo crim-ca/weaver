@@ -814,7 +814,7 @@ class OAS3Parameter(object):
         ]:
             value = getattr(self, attr)
             if value is not None:
-                spec[attr] = value
+                spec[name] = value
         return spec
 
 
