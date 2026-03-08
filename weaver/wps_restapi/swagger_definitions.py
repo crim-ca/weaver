@@ -3612,12 +3612,6 @@ class KVPOutputInclude(ExtendedSchemaNode):
 class KVPOutputMediaType(ExtendedSchemaNode):
     """
     KVP output parameter to request specific output format.
-
-    Uses ``deepObject``-style bracket notation to qualify output format preferences.
-
-    .. note::
-        Parameter name is a variable placeholder. Replace ``{outputID}`` with the actual output identifier.
-        Must be combined with ``{outputID}[include]=true`` to be effective.
     """
     schema_type = String
     name = "{outputID}[mediaType]"
@@ -3635,20 +3629,14 @@ class KVPOutputMediaType(ExtendedSchemaNode):
     missing = drop
 
 
-class KVPInputOutputProfile(ExtendedSchemaNode):
+class KVPOutputProfile(ExtendedSchemaNode):
     """
     KVP input/output parameter to specify content profile.
-
-    Uses ``deepObject``-style bracket notation to qualify format profile.
-
-    .. note::
-        Parameter name is a variable placeholder. Replace ``{inputID}`` or ``{outputID}`` accordingly.
-        For outputs in asynchronous execution, this specifies the profile for the final result data.
     """
     schema_type = String
-    name = "{inputID}[profile]"
-    variable = "<inputID>[profile]"
-    title = "Input/Output Profile"
+    name = "{outputID}[profile]"
+    variable = "<outputID>[profile]"
+    title = "Output Profile"
     description = (
         "Content profile negotiation for input or output using KVP encoding with ``deepObject`` style. "
         "Specifies a profile URI or well-known identifier for the format. "
@@ -3656,42 +3644,29 @@ class KVPInputOutputProfile(ExtendedSchemaNode):
         "\n\n"
         "Example: ``data[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
     )
-    example = "http://www.opengis.net/spec/ogcapi-features-1/1.0"
     missing = drop
 
 
-class KVPResponseFormat(ExtendedSchemaNode):
+class KVPResponseFormat(ExtendedSchemaNode, OAS3Parameter):
     """
     KVP response format parameter.
-
-    Behaves like the HTTP ``Accept`` header to specify the desired response format.
-    Uses ``deepObject``-style bracket notation with fixed parameter name.
-
-    .. note::
-        This is a fixed parameter name (not a variable placeholder).
-        Use exactly as shown: ``response[f]``.
     """
     schema_type = String
     name = "response[f]"
     title = "Response Format"
     description = (
         "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
-        "Behaves in the same way as the HTTP ``Accept`` header. "
+        "Behaves in the same way as the HTTP ``Accept`` header and allows certain short name format indicators. "
         "Specifies the desired media type for the execution response. "
         "\n\n"
         f"Example: ``response[f]={ContentType.APP_JSON}``"
     )
-    example = ContentType.APP_JSON
     missing = drop
 
 
-class KVPResponseFormatAlias(ExtendedSchemaNode):
+class KVPResponseFormatAlias(ExtendedSchemaNode, OAS3Parameter):
     """
     KVP response format parameter (alias).
-
-    Alternative to ``response[f]`` using the more explicit ``format`` qualifier.
-    Behaves like the HTTP ``Accept`` header to specify the desired response format.
-    Uses ``deepObject``-style bracket notation with fixed parameter name.
     """
     schema_type = String
     name = "response[format]"
@@ -3699,21 +3674,17 @@ class KVPResponseFormatAlias(ExtendedSchemaNode):
     description = (
         "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
         "Alias for ``response[f]``. "
-        "Behaves in the same way as the HTTP ``Accept`` header. "
+        "Behaves in the same way as the HTTP ``Accept`` header and allows certain short name format indicators. "
         "Specifies the desired media type for the execution response. "
         "\n\n"
         f"Example: ``response[format]={ContentType.APP_JSON}``"
     )
-    example = ContentType.APP_JSON
     missing = drop
 
 
-class KVPResponsePrefer(ExtendedSchemaNode):
+class KVPResponsePrefer(ExtendedSchemaNode, OAS3Parameter):
     """
     KVP response preference parameter.
-
-    Behaves like the HTTP ``Prefer`` header to specify execution preferences.
-    Uses ``deepObject``-style bracket notation with fixed parameter name.
     """
     schema_type = String
     name = "response[prefer]"
@@ -3729,16 +3700,12 @@ class KVPResponsePrefer(ExtendedSchemaNode):
         "\n\n"
         "Example: ``response[prefer]=respond-async;return=minimal``"
     )
-    example = ExecuteControlOption.ASYNC
     missing = drop
 
 
-class KVPResponseProfile(ExtendedSchemaNode):
+class KVPResponseProfile(ExtendedSchemaNode, OAS3Parameter):
     """
     KVP response profile parameter.
-
-    Behaves like the HTTP ``Accept-Profile`` header to specify desired response profile.
-    Uses ``deepObject``-style bracket notation with fixed parameter name.
     """
     schema_type = String
     name = "response[profile]"
@@ -3746,21 +3713,26 @@ class KVPResponseProfile(ExtendedSchemaNode):
     description = (
         "Response profile negotiation for process execution using KVP encoding with ``deepObject`` style. "
         "Specifies the desired profile URI or well-known identifier for the response. "
+        "Behaves like the HTTP ``Accept-Profile`` header or ``profile`` query parameter *depending on context*. "
         "\n\n"
         "**Execution Mode Behavior:**\n"
-        "- **Synchronous**: The ``response[profile]`` applies to the immediate response "
-        "(same as``Accept-Profile`` header or ``profile`` query)\n"
-        "- **Asynchronous**: The ``response[profile]`` applies to the final *Job Results* profile, "
-        "whereas the ``profile`` query applies to the *Job Status* response\n"
+        "- **Synchronous**: The ``response[profile]`` applies to the immediate"
+        "[*Execution Results*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#proc-exec-results) "
+        "response (same as``Accept-Profile`` header or ``profile`` query)\n"
+        "- **Asynchronous**: The ``response[profile]`` applies to the final "
+        "[*Job Results*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#job-results) profile, "
+        "whereas the ``profile`` query applies to the "
+        "[*Job Status*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#alternate-job-status) response\n"
         "\n\n"
         "Example: ``response[profile]=http://www.opengis.net/spec/ogcapi-features-1/1.0``"
     )
-    example = "http://www.opengis.net/spec/ogcapi-features-1/1.0"
     missing = drop
 
 
 class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
-    description = "KVP-encoded inputs and outputs parameters for execution of the process."
+    """
+    KVP-encoded inputs and outputs parameters for execution of the process.
+    """
     _any_of = [
         KVPInputLiteralValue(),
         KVPInputBBoxCRS(),
@@ -3773,7 +3745,7 @@ class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
         KVPInputQualifiedProfile(),
         KVPOutputInclude(),
         KVPOutputMediaType(),
-        KVPInputOutputProfile(),
+        KVPOutputProfile(),
     ]
 
 
@@ -3800,7 +3772,7 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
         "- ``<inputID>[profile]=profile`` - Qualified value content profile (URI or well-known identifier)\n"
         "- ``<inputID>[href]=url`` - Input by reference with URL\n"
         "- ``<inputID>[type]=mediaType`` - Media type for referenced input\n"
-        "- ``<outputID>[include]=true`` - Request specific output\n"
+        "- ``<outputID>[include]=true`` - Request specific output (required)\n"
         "- ``<outputID>[mediaType]=format`` - Desired output format media-type\n"
         "- ``<outputID>[encoding]=encode`` - Desired output format encoding\n"
         "- ``<outputID>[schema]=schema`` - Desired output format schema or profile\n"
@@ -3837,7 +3809,7 @@ class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter
             }
         },
         "KVPWithOutputs": {
-            "summary": "With output specifications using ``deepObject`` style",
+            "summary": "With output selection and format",
             "value": {
                 "input1": "value1",
                 "output1[include]": "true",
