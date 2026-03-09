@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.9.1:
+
+`6.9.1 <https://github.com/crim-ca/weaver/tree/6.9.1>`_ (2026-03-09)
+========================================================================
+
+Changes:
+--------
 - Add ``--inputs-ignore-errors`` option to `CLI` ``execute`` operation and corresponding ``inputs_ignore_errors``
   parameter to ``WeaverClient.execute()`` method. When enabled, missing or unresolved local file references in
   input definitions will be skipped with warnings rather than causing immediate failure. By default (when disabled),
