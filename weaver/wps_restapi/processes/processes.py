@@ -504,13 +504,6 @@ def delete_local_process(request):
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_process_jobs_kvp_responses,
 )
-@sd.process_jobs_service.get(
-    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-    schema=sd.ProcessExecutionKVPEndpoint(),
-    accept=ContentType.APP_JSON,
-    renderer=OutputFormat.JSON,
-    response_schemas=sd.get_process_jobs_kvp_responses,
-)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def submit_local_job_kvp(request):
     # type: (PyramidRequest) -> AnyViewResponse
