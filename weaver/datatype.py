@@ -62,7 +62,7 @@ from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
-from weaver.transform import transform
+from weaver.transform.const import EXCLUDED_TYPES
 from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
@@ -1512,10 +1512,10 @@ class Job(Base, LoggerHandler):
         links = []
         for result in results:
             media_type = get_field(result, "mimeType", search_variations=True)
-            if media_type and media_type not in transform.EXCLUDED_TYPES:
+            if media_type and media_type not in EXCLUDED_TYPES:
                 id = get_field(result, "identifier", search_variations=True)
                 formats = [{"mediaType": media_type}]
-                extended_formats = extend_alternate_formats(formats, transform.CONVERSION_DICT)
+                extended_formats = extend_alternate_formats(formats)
                 links.extend([
                     {
                         "href": f"{url}/{id}?f={fmt['mediaType']}",
@@ -2921,7 +2921,7 @@ class Process(Base):
                 if io_type == "outputs":
                     formats = io_def.get("formats", [])
                     if formats:
-                        io_def["formats"] = extend_alternate_formats(formats, transform.CONVERSION_DICT)
+                        io_def["formats"] = extend_alternate_formats(formats)
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)

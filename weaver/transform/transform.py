@@ -21,7 +21,7 @@ from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
-from weaver.formats import ContentType, get_extension
+from weaver.formats import get_extension
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
 from weaver.transform.utils import get_content, is_gif, is_image, is_png, is_svg, is_tiff, write_content
@@ -32,26 +32,6 @@ HTML_CONTENT = """<html>
     <head></head>
     <body><p>%CONTENT%</p></body>
     </html>"""
-
-CONVERSION_DICT = {
-    ContentType.TEXT_PLAIN: [ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ContentType.APP_PDF],
-    ContentType.TEXT_HTML: [ContentType.TEXT_PLAIN, ContentType.APP_PDF],
-    ContentType.IMAGE_PNG: [ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
-                            ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
-    ContentType.IMAGE_GIF: [ContentType.IMAGE_PNG, ContentType.IMAGE_JPEG, ContentType.IMAGE_TIFF,
-                            ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
-    ContentType.IMAGE_JPEG: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_TIFF,
-                             ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
-    ContentType.IMAGE_TIFF: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG,
-                             ContentType.IMAGE_SVG_XML, ContentType.APP_PDF],
-    ContentType.IMAGE_SVG_XML: [ContentType.IMAGE_PNG, ContentType.IMAGE_GIF, ContentType.IMAGE_JPEG,
-                                ContentType.IMAGE_TIFF, ContentType.APP_PDF],
-    ContentType.TEXT_CSV: [ContentType.APP_XML, ContentType.APP_YAML, ContentType.APP_JSON],
-    ContentType.APP_XML: [ContentType.APP_YAML, ContentType.APP_JSON],
-    ContentType.APP_YAML: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_JSON],
-    ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML]
-}
-EXCLUDED_TYPES = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
 
 
 def exception_handler(func):

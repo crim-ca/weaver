@@ -57,7 +57,8 @@ from weaver.processes.convert import any2wps_literal_datatype, convert_output_pa
 from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.transform import transform
+from weaver.transform.const import EXCLUDED_TYPES
+from weaver.transform.transform import Transform
 from weaver.utils import (
     create_content_id,
     data2str,
@@ -922,8 +923,8 @@ def generate_or_resolve_result(
     out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
     # Apply transform if type is different from desired output and desired output is different from plain
-    if out and out not in transform.EXCLUDED_TYPES and out != typ:
-        file_transform = transform.Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+    if out and out not in EXCLUDED_TYPES and out != typ:
+        file_transform = Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
         typ = out
         file_transform.get()
         loc = file_transform.output_path

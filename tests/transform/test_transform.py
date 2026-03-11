@@ -7,7 +7,8 @@ import pytest
 from pyramid.response import FileResponse
 
 from tests.resources import TRANSFORM_PATH
-from weaver.transform.transform import CONVERSION_DICT, Transform
+from weaver.transform.const import CONVERSION_DICT
+from weaver.transform.transform import Transform
 
 # Register the MIME type for .yaml files
 mimetypes.add_type("application/x-yaml", ".yaml")

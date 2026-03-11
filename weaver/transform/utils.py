@@ -10,6 +10,7 @@ from PIL import Image
 from processes.convert import get_field
 
 from weaver.formats import ContentType, get_content_type
+from weaver.transform.const import CONVERSION_DICT
 
 LOGGER = get_task_logger(__name__)
 
@@ -125,14 +126,18 @@ def write_images(images: List[Image.Image], output_file: str, ext: str = "png") 
             shutil.copy(img_paths[0], output_file)
 
 
-def extend_alternate_formats(formats, conversion_dict):
+def extend_alternate_formats(formats, conversion_dict=None):
     """
     Extend a list of formats with missing alternate formats while preserving the original order.
 
     :param formats: A list of format dictionaries containing the "mediaType" key.
     :param conversion_dict: A dictionary mapping media types to their alternate formats.
+                           If None, uses the default CONVERSION_DICT.
     :return: The extended list of formats with alternate formats added in a consistent order.
     """
+    if conversion_dict is None:
+        conversion_dict = CONVERSION_DICT
+
     if not formats or not all(isinstance(fmt, dict) for fmt in formats):
         return formats  # No formats or invalid structure, return as-is
 
