@@ -1407,8 +1407,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                     }
                 ]
             },
-            "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN}, {"mediaType": ContentType.TEXT_HTML},
-                        {"mediaType": ContentType.APP_PDF}]
+            "formats": [
+                {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                {"mediaType": ContentType.TEXT_HTML},
+                {"mediaType": ContentType.APP_PDF}
+            ]
         }]
         return cwl, desc  # type: ignore
 
@@ -1524,9 +1527,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         }
                     ]
                 },
-                "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                            {"mediaType": ContentType.TEXT_HTML},
-                            {"mediaType": ContentType.APP_PDF}]
+                "formats": [
+                    {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                    {"mediaType": ContentType.TEXT_HTML},
+                    {"mediaType": ContentType.APP_PDF}
+                ]
             }]
 
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
@@ -1583,9 +1588,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         }
                     ]
                 },
-                "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                            {"mediaType": ContentType.TEXT_HTML},
-                            {"mediaType": ContentType.APP_PDF}]
+                "formats": [
+                    {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                    {"mediaType": ContentType.TEXT_HTML},
+                    {"mediaType": ContentType.APP_PDF}
+                ]
             }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
@@ -1640,9 +1647,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         }
                     ]
                 },
-                "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                            {"mediaType": ContentType.TEXT_HTML},
-                            {"mediaType": ContentType.APP_PDF}]
+                "formats": [
+                    {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                    {"mediaType": ContentType.TEXT_HTML},
+                    {"mediaType": ContentType.APP_PDF}
+                ]
             }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit_DirectUnit(self):
@@ -1697,9 +1706,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         }
                     ]
                 },
-                "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                            {"mediaType": ContentType.TEXT_HTML},
-                            {"mediaType": ContentType.APP_PDF}]
+                "formats": [
+                    {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                    {"mediaType": ContentType.TEXT_HTML},
+                    {"mediaType": ContentType.APP_PDF}
+                ]
             }]
 
     def test_deploy_process_CWL_DockerRequirement_executionUnit_UnitWithMediaType(self):
@@ -1754,9 +1765,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         }
                     ]
                 },
-                "formats": [{"default": True, "mediaType": ContentType.TEXT_PLAIN},
-                            {"mediaType": ContentType.TEXT_HTML},
-                            {"mediaType": ContentType.APP_PDF}]
+                "formats": [
+                    {"default": True, "mediaType": ContentType.TEXT_PLAIN},
+                    {"mediaType": ContentType.TEXT_HTML},
+                    {"mediaType": ContentType.APP_PDF}
+                ]
             }]
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
