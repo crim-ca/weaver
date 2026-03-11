@@ -4828,9 +4828,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
-            Content-Disposition: attachment; name="output_json"; filename="result.yml"
+            Content-Disposition: attachment; name="output_json"; filename="result.yaml"
             Content-Type: {ContentType.APP_YAML}
-            Content-Location: {out_url}/{job_id}/output_json/result.yml
+            Content-Location: {out_url}/{job_id}/output_json/result.yaml
             Content-ID: <output_json@{job_id}>
             Content-Length: 11
 
@@ -4905,9 +4905,9 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         output_json_as_yaml = yaml.safe_dump({"data": "test"})
         results_body = self.fix_result_multipart_indent(f"""
             --{boundary}
-            Content-Disposition: attachment; name="output_json"; filename="result.yml"
+            Content-Disposition: attachment; name="output_json"; filename="result.yaml"
             Content-Type: {ContentType.APP_YAML}
-            Content-Location: {out_url}/{job_id}/output_json/result.yml
+            Content-Location: {out_url}/{job_id}/output_json/result.yaml
             Content-ID: <output_json@{job_id}>
             Content-Length: 11
 
