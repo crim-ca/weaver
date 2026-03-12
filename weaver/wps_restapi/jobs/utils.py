@@ -58,7 +58,7 @@ from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.transform.const import EXCLUDED_TYPES
-from weaver.transform.transform import Transform
+from weaver.transform.handlers import Transform
 from weaver.utils import (
     create_content_id,
     data2str,
