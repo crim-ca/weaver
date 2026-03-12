@@ -2561,6 +2561,12 @@ Following is a table of available formats and corresponding endpoints offered by
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
     can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
 
+.. note::
+    Although not directly encoded within the above :ref:`Provenance Representations <table-job-prov>`, entities
+    that desire to offer additional information and traceability about the underlying :term:`Process` execution
+    should consider including their respective :ref:`Metadata <app_pkg_metadata>`.
+
+
 Resulting metadata that is collected from :term:`Job` :term:`Provenance` will be stored under a similar endpoint
 as the :ref:`exec_output_location`, except with an additional ``-prov`` suffix applied after the :term:`Job` UUID,
 as shown below.

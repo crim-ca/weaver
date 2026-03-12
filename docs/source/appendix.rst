@@ -229,7 +229,12 @@ Glossary
     OAP
     OGC API - Processes
         The new :term:`API` that defines :term:`JSON` REST-binding representation
-        of :term:`WPS` :term:`Process` collection.
+        of the older :term:`WPS` representation of :term:`Process` descriptions.
+
+        This is the **main** interface that `Weaver` employs.
+
+        .. seealso::
+            :ref:`proc_ogc_api`
 
     ONNX
         The |ONNX-long|_ standard is an open format employed for sharing machine learning model representations
