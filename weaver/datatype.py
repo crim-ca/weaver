@@ -2918,15 +2918,13 @@ class Process(Base):
             # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
-                # Generate schema BEFORE extending formats, so the schema reflects only the explicitly specified formats
-                io_schema = get_field(io_def, "schema", search_variations=False)
-                if not isinstance(io_schema, dict):
-                    io_def["schema"] = json2oas_io(io_def)
-                # For outputs only, extend formats with alternate representations for transformation support
                 if io_type == "outputs":
                     formats = io_def.get("formats", [])
                     if formats:
                         io_def["formats"] = extend_alternate_formats(formats)
+                io_schema = get_field(io_def, "schema", search_variations=False)
+                if not isinstance(io_schema, dict):
+                    io_def["schema"] = json2oas_io(io_def)
 
         # force selection of schema to avoid ambiguity
         if str(schema or ProcessSchema.OGC).upper() == ProcessSchema.OLD:

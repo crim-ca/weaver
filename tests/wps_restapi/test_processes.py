@@ -1286,14 +1286,45 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ]
 
         assert proc["outputs"]["output_yaml"]["schema"] == {
-            "type": "string",
-            "contentMediaType": ContentType.APP_YAML,
+            "oneOf": [
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_YAML,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.TEXT_CSV,
+                },
+                {
+                    "type": "string",
+                    "format": ContentEncoding.BINARY,
+                    "contentMediaType": ContentType.APP_XML,
+                    "contentEncoding": ContentEncoding.BASE64,
+                },
+                {
+                    "type": "string",
+                    "contentMediaType": ContentType.APP_JSON,
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                },
+            ]
         }
         assert proc["outputs"]["output_yaml"]["formats"] == [
             {
                 "default": True,
                 "mediaType": ContentType.APP_YAML,
-            }
+            },
+            {
+                "mediaType": "text/csv",
+            },
+            {
+                "mediaType": "application/xml",
+            },
+            {
+                "mediaType": "application/json",
+            },
         ]
 
     def test_deploy_process_CWL_DockerRequirement_auth_header_format(self):
