@@ -48,7 +48,10 @@ def svg_header(width: int, height: int) -> str:
 """
 
 
-def joined_edges(assorted_edges: List[Tuple[Tuple[int, int], Tuple[int, int]]], keep_every_point: bool = False) -> List[List[Tuple[Tuple[int, int], Tuple[int, int]]]]:
+def joined_edges(
+    assorted_edges: List[Tuple[Tuple[int, int], Tuple[int, int]]],
+    keep_every_point: bool = False,
+) -> List[List[Tuple[Tuple[int, int], Tuple[int, int]]]]:
     pieces = []
     piece = []
     directions = deque([
@@ -85,7 +88,11 @@ def joined_edges(assorted_edges: List[Tuple[Tuple[int, int], Tuple[int, int]]], 
     return pieces
 
 
-def rgba_image_to_svg_contiguous(img: Image.Image, opaque: Optional[bool] = None, keep_every_point: bool = False) -> str:
+def rgba_image_to_svg_contiguous(
+    img: Image.Image,
+    opaque: Optional[bool] = None,
+    keep_every_point: bool = False,
+) -> str:
     # collect contiguous pixel groups
 
     adjacent = ((1, 0), (0, 1), (-1, 0), (0, -1))

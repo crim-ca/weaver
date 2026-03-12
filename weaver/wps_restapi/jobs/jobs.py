@@ -40,22 +40,21 @@ from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.transform.const import CONVERSION_DICT
-from weaver.utils import get_any_value, get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     dismiss_job_task,
     get_job,
     get_job_io_schema_query,
     get_job_list_links,
-    get_job_output_transmission,
     get_job_results_response,
-    get_job_results_single,
     get_job_status_schema,
     get_job_status_wps_xml_response,
     get_results,
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
     raise_job_dismissed,
+    resolve_result_single,
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
@@ -769,17 +768,7 @@ def get_job_output(request):
             "value": result_media_type
         })
 
-    is_reference = bool(get_any_value(result, key=True, file=True))
-    _, output_format = get_job_output_transmission(job, output_id, is_reference)
-    output_format = accept or output_format or result_media_type
-
-    # To ensure consistency and avoid type mismatches, all output formats are converted to a dictionary.
-    # This standardization prevents errors when handling cases in `get_job_results_single`
-    # where some formats are dictionaries and others are different types (e.g., strings or ContentType).
-    if not isinstance(output_format, dict):
-        output_format = {"mime_type": output_format}
-
-    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
+    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
 
 
 @sd.provider_results_service.get(

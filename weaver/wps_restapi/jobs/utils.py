@@ -679,6 +679,45 @@ def get_job_return(
     return job.execution_response, job.execution_return
 
 
+def resolve_result_single(
+    job,                # type: Job
+    result,             # type: ExecutionResultObject
+    output_id,          # type: str
+    accept_header,      # type: Optional[str]
+    headers,            # type: AnyHeadersContainer
+    *,                  # force named keyword arguments after
+    settings,           # type: AnySettingsContainer
+):                      # type: (...) -> Union[HTTPOk, HTTPNoContent]
+    """
+    Resolves and returns a single job result with appropriate format negotiation.
+
+    This function consolidates the logic for determining the output format based on priority:
+    1. Accept header from request
+    2. Job output transmission format
+    3. Result media type
+
+    :param job: Job definition to obtain relevant path resolution.
+    :param result: Result to be represented.
+    :param output_id: Identifier of the corresponding result output.
+    :param accept_header: Accept header value from request, if any.
+    :param headers: Additional headers to include in the response.
+    :param settings: Application settings to resolve locations.
+    :return: Response with the single result.
+    """
+    is_reference = bool(get_any_value(result, key=True, file=True))
+    _, output_format = get_job_output_transmission(job, output_id, is_reference)
+    result_media_type = get_field(result, "mime_type", search_variations=True, default=None)
+
+    # Resolve format priority: accept header > job transmission > result media type
+    output_format = accept_header or output_format or result_media_type
+
+    # Normalize format to dictionary for consistency
+    if not isinstance(output_format, dict):
+        output_format = {"mime_type": output_format}
+
+    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
+
+
 def get_job_results_response(
     job,                        # type: Job
     *,                          # force named keyword arguments after
@@ -858,13 +897,8 @@ def get_job_results_response(
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
     res_id = out_vals[0][0]
-    # check accept header
     req_fmt = (request_headers or {}).get("accept")
-    out_fmt = out_transmissions[res_id][1]
-    out_type = get_field(results[res_id], "mime_type", search_variations=True, default=None)  # a voir en debuggant
-    out_select = req_fmt or out_fmt or out_type  # (resolution order/precedence)
-    out_fmt = out_select
-    return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+    return resolve_result_single(job, out_info, res_id, req_fmt, headers=headers, settings=settings)
 
 
 def generate_or_resolve_result(
