@@ -8,48 +8,38 @@ https://github.com/ianmackinnon/png2svg/blob/master/png2svg.py
 import operator
 from collections import deque
 from io import StringIO
-from typing import TYPE_CHECKING
+from typing import List, Optional, Tuple
 
 from PIL import Image
 
-if TYPE_CHECKING:
-    from typing import List, Optional, Tuple
 
-
-def add_tuple(first_tuple, second_tuple):
-    # type: (Tuple[int, int], Tuple[int, int]) -> Tuple[int, int]
+def add_tuple(first_tuple: Tuple[int, int], second_tuple: Tuple[int, int]) -> Tuple[int, int]:
     return tuple(map(operator.add, first_tuple, second_tuple))
 
 
-def sub_tuple(first_tuple, second_tuple):
-    # type: (Tuple[int, int], Tuple[int, int]) -> Tuple[int, int]
+def sub_tuple(first_tuple: Tuple[int, int], second_tuple: Tuple[int, int]) -> Tuple[int, int]:
     return tuple(map(operator.sub, first_tuple, second_tuple))
 
 
-def neg_tuple(first_tuple):
-    # type: (Tuple[int, int]) -> Tuple[int, int]
+def neg_tuple(first_tuple: Tuple[int, int]) -> Tuple[int, int]:
     return tuple(map(operator.neg, first_tuple))
 
 
-def direction(edge):
-    # type: (Tuple[Tuple[int, int], Tuple[int, int]]) -> Tuple[int, int]
+def direction(edge: Tuple[Tuple[int, int], Tuple[int, int]]) -> Tuple[int, int]:
     return sub_tuple(edge[1], edge[0])
 
 
-def magnitude(tpl):
-    # type: (Tuple[int, int]) -> int
+def magnitude(tpl: Tuple[int, int]) -> int:
     return int(pow(pow(tpl[0], 2) + pow(tpl[1], 2), .5))
 
 
-def normalize(tpl):
-    # type: (Tuple[int, int]) -> Tuple[int, int]
+def normalize(tpl: Tuple[int, int]) -> Tuple[int, int]:
     mag = magnitude(tpl)
     assert mag > 0, "Cannot normalize a zero-length vector"
     return tuple(map(operator.truediv, tpl, [mag] * len(tpl)))
 
 
-def svg_header(width, height):
-    # type: (int, int) -> str
+def svg_header(width: int, height: int) -> str:
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
@@ -58,8 +48,7 @@ def svg_header(width, height):
 """
 
 
-def joined_edges(assorted_edges, keep_every_point=False):
-    # type: (List[Tuple[Tuple[int, int], Tuple[int, int]]], bool) -> List[List[Tuple[Tuple[int, int], Tuple[int, int]]]]
+def joined_edges(assorted_edges: List[Tuple[Tuple[int, int], Tuple[int, int]]], keep_every_point: bool = False) -> List[List[Tuple[Tuple[int, int], Tuple[int, int]]]]:
     pieces = []
     piece = []
     directions = deque([
@@ -96,8 +85,7 @@ def joined_edges(assorted_edges, keep_every_point=False):
     return pieces
 
 
-def rgba_image_to_svg_contiguous(img, opaque=None, keep_every_point=False):
-    # type: (Image.Image, Optional[bool], bool) -> str
+def rgba_image_to_svg_contiguous(img: Image.Image, opaque: Optional[bool] = None, keep_every_point: bool = False) -> str:
     # collect contiguous pixel groups
 
     adjacent = ((1, 0), (0, 1), (-1, 0), (0, -1))
