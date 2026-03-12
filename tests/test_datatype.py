@@ -220,45 +220,39 @@ def test_process_split_version(process_id, result):
 
 def test_process_outputs_alt():
 
-    from weaver.processes.utils import get_settings as real_get_settings
-    setup_mongodb_processstore()
-
-    def _get_mocked(req=None):
-        return req.registry.settings if req else real_get_settings(None)
-
-    # mock db functions called by offering
+    # mock functions called by offering
     with contextlib.ExitStack() as stack:
+        mock_settings = {"weaver.wps_restapi_url": "http://test-weaver.com"}
+        stack.enter_context(mock.patch("weaver.datatype.get_settings", return_value=mock_settings))
 
-        stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
+        process = Process(id=f"test-{uuid.uuid4()!s}", package={},
+                          outputs=[{"identifier": "output1", "formats": [{"mediaType": ContentType.IMAGE_TIFF}]}],
+                          inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
+        offer = process.offering()
 
-    process = Process(id=f"test-{uuid.uuid4()!s}", package={},
-                      outputs=[{"identifier": "output1", "formats": [{"mediaType": ContentType.IMAGE_TIFF}]}],
-                      inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
-    offer = process.offering()
+        # Assert that process outputs in offering contains alternate representation
+        assert offer["outputs"]["output1"]["formats"] == [
+            {
+                "mediaType": ContentType.IMAGE_TIFF
+            },
+            {
+                "mediaType": ContentType.IMAGE_PNG
+            },
+            {
+                "mediaType": ContentType.IMAGE_GIF
+            },
+            {
+                "mediaType": ContentType.IMAGE_JPEG
+            },
+            {
+                "mediaType": ContentType.IMAGE_SVG_XML
+            },
+            {
+                "mediaType": ContentType.APP_PDF
+            }]
 
-    # Assert that process outputs in offering contains alternate representation
-    assert offer["outputs"]["output1"]["formats"] == [
-        {
-            "mediaType": ContentType.IMAGE_TIFF
-        },
-        {
-            "mediaType": ContentType.IMAGE_PNG
-        },
-        {
-            "mediaType": ContentType.IMAGE_GIF
-        },
-        {
-            "mediaType": ContentType.IMAGE_JPEG
-        },
-        {
-            "mediaType": ContentType.IMAGE_SVG_XML
-        },
-        {
-            "mediaType": ContentType.APP_PDF
-        }]
-
-    # Assert that process outputs are unchanged
-    assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
+        # Assert that process outputs are unchanged
+        assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
 
 
 @pytest.mark.parametrize(
