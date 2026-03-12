@@ -228,10 +228,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw install-dev install-transform ## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev install-transform ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip install-dev ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -240,7 +240,7 @@ install-doc: install-pip	## install documentation dependencies
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-pip	## install development and test dependencies
+install-dev: install-pip install-transform 	## install development and test dependencies
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
@@ -293,6 +293,9 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 
 .PHONY: install-transform
 install-transform: install-cairo-dependencies       # install-transform dependencies
+	@echo "Installing transformation dependencies..."
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-transform.txt" --no-cache-dir'
+	@echo "Install with pip complete."
 
 .PHONY: install-cairo-dependencies
 install-cairo-dependencies:   ## install required dependencies for Transformer
