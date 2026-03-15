@@ -181,7 +181,7 @@
 .. |openeo| replace:: openEO
 .. _openeo: https://openeo.org/
 .. |openeo-api| replace:: openEO API
-.. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
+.. _openeo-api: https://api.openeo.org
 .. |openeo-api-profile| replace:: openEO API Profiles
 .. _openeo-api-profile: https://openeo.org/documentation/1.0/developers/profiles/api.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
