@@ -1229,7 +1229,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
-                    "dockerPull": "python:3.7-alpine"
+                    "dockerPull": "python:3.12-alpine"
                 },
             },
             "outputs": [],
@@ -1264,7 +1264,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
     @parameterized.expand([
         # not allowed even if combined with another known and valid definition
-        ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.7-alpine"}}, ),
+        ({"UnknownRequirement": {}, CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "python:3.12-alpine"}}, ),
         ({"UnknownRequirement": {}}, ),
         ({}, ),  # no requirement (i.e.: simple shell script) also invalid
     ])
@@ -2118,7 +2118,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
-                    "dockerPull": "python:3.7-alpine"
+                    "dockerPull": "python:3.12-alpine"
                 },
                 CWL_REQUIREMENT_INIT_WORKDIR: {
                     "listing": [
@@ -2290,7 +2290,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
-                    "dockerPull": "python:3.7-alpine"
+                    "dockerPull": "python:3.12-alpine"
                 },
                 CWL_REQUIREMENT_INIT_WORKDIR: {
                     "listing": [

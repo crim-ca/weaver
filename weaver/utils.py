@@ -756,16 +756,18 @@ def get_request_args(request):
     return dict(params)
 
 
-def parse_kvp(query,                    # type: str
-              key_value_sep="=",        # type: str
-              pair_sep=";",             # type: str
-              nested_pair_sep="",       # type: Optional[str]
-              multi_value_sep=",",      # type: Optional[str]
-              accumulate_keys=True,     # type: bool
-              unescape_quotes=True,     # type: bool
-              strip_spaces=True,        # type: bool
-              case_insensitive=True,    # type: bool
-              ):                        # type: (...) -> KVP
+def parse_kvp(
+    query,                  # type: Union[str, Dict[str, Any]]
+    key_value_sep="=",      # type: str
+    pair_sep=";",           # type: str
+    nested_pair_sep="",     # type: Optional[str]
+    multi_value_sep=",",    # type: Optional[str]
+    accumulate_keys=True,   # type: bool
+    unescape_quotes=True,   # type: bool
+    strip_spaces=True,      # type: bool
+    case_insensitive=True,  # type: bool
+    deep_object=False,      # type: bool
+):                          # type: (...) -> KVP
     """
     Parse key-value pairs using specified separators.
 
@@ -782,18 +784,44 @@ def parse_kvp(query,                    # type: str
     the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
     except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
 
-    .. code-blocK:: python
+    .. code-block:: python
 
         >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3", pair_sep="&", nested_pair_sep=";")
         {
-            'format': ['json'],
-            'inputs': {
-                'key1': ['value1'],
-                'key2': ['val2', 'val3']
+            "format": ["json"],
+            "inputs": {
+                "key1": ["value1"],
+                "key2": ["val2", "val3"]
             }
         }
 
-    :param query: Definition to be parsed as :term:`KVP`.
+    When :paramref:`deep_object` is enabled, keys with bracket notation like ``{key}[{qualifier}]={val}`` will be
+    parsed into nested dictionaries. This follows the :term:`OpenAPI` ``deepObject`` style parameter serialization.
+
+    .. code-block:: python
+
+        >> parse_kvp("input[href]=url&input[type]=text", pair_sep="&", deep_object=True)
+        {
+            "input": {
+                "href": ["url"],
+                "type": ["text"]
+            }
+        }
+
+    With :paramref:`deep_object` enabled, if the case where both ``{key}`` and ``{key}[{qualifier}]`` is encountered,
+    the simple value (without qualifier) will be stored under ``None`` key within the nested dictionary.
+
+    .. code-block:: python
+
+        >> parse_kvp("bbox=1,2,3,4&bbox[crs]=EPSG:4326", pair_sep="&", deep_object=True)
+        {
+            "bbox": {
+                None: ["1,2,3,4"],
+                "crs": ["EPSG:4326"]
+            }
+        }
+
+    :param query: Definition to be parsed as :term:`KVP`. Can be a query string or an already-parsed dict.
     :param key_value_sep: Separator that delimits the keys from their values.
     :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
     :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
@@ -806,57 +834,87 @@ def parse_kvp(query,                    # type: str
     :param case_insensitive:
         Whether to consider keys as case-insensitive.
         If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
-    :return: Parsed KVP.
+    :param deep_object:
+        Whether to parse bracket notation ``key[qualifier]`` as nested objects similar to :term:`OpenAPI` ``deepObject``
+        style serialization. When collisions occur (both ``key`` and ``key[qualifier]`` exist), the simple value
+        is stored under ``None`` key. Parsing is performed more like a "shallow-object" since nested objects will not
+        be parsed into deeper levels to preserve the original parsing of sub-values as encoded binary data,
+        array lists, :term:`JSON` structures, etc.
+    :return: Parsed :term:`KVP`.
     :raises HTTPBadRequest: If parsing cannot be accomplished based on parsing conditions.
     """
     if not query:
         return {}
-    kvp_items = query.split(pair_sep)
-    kvp = {}
-    for item in kvp_items:
-        k_v = item.split(key_value_sep, 1)
-        if len(k_v) < 2:
-            key = k_v[0]
-            val = []
-        else:
-            key, val = k_v
-            if key_value_sep in val and nested_pair_sep:
-                val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
-                                pair_sep=nested_pair_sep, nested_pair_sep=None,
-                                accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
-                                strip_spaces=strip_spaces, case_insensitive=case_insensitive)
-        if isinstance(val, str):  # in case nested KVP already processed
-            arr = val.split(multi_value_sep) if multi_value_sep else [val]
-            for i, val_item in enumerate(list(arr)):
-                if strip_spaces:
-                    val_item = val_item.strip()
-                if unescape_quotes and (
-                    (val_item.startswith("'") and val_item.endswith("'")) or
-                    (val_item.startswith("\"") and val_item.endswith("\""))
-                ):
-                    val_item = val_item[1:-1]
-                arr[i] = val_item
-            val = arr
-        if case_insensitive:
-            key = key.lower()
-        if strip_spaces:
-            key = key.strip()
-        if key in kvp:
-            if not accumulate_keys:
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for this query.",
-                    "value": str(query),
-                })
-            if isinstance(val, dict) or isinstance(kvp[key], dict):
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
-                    "value": str(query),
-                })
-            kvp[key].extend(val)
-        else:
-            kvp[key] = val
+
+    # If query is already a dict, skip string parsing and
+    # use it directly as KVP base for further processing
+    if isinstance(query, dict):
+        kvp = query
+    else:
+        # Parse query string into KVP dict
+        kvp_items = query.split(pair_sep)
+        kvp = {}
+        for item in kvp_items:
+            k_v = item.split(key_value_sep, 1)
+            if len(k_v) < 2:
+                key = k_v[0]
+                val = []
+            else:
+                key, val = k_v
+                if key_value_sep in val and nested_pair_sep:
+                    val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
+                                    pair_sep=nested_pair_sep, nested_pair_sep=None,
+                                    accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
+                                    strip_spaces=strip_spaces, case_insensitive=case_insensitive)
+            if isinstance(val, str):  # in case nested KVP already processed
+                arr = val.split(multi_value_sep) if multi_value_sep else [val]
+                for i, val_item in enumerate(list(arr)):
+                    if strip_spaces:
+                        val_item = val_item.strip()
+                    if unescape_quotes and (
+                        (val_item.startswith("'") and val_item.endswith("'")) or
+                        (val_item.startswith("\"") and val_item.endswith("\""))
+                    ):
+                        val_item = val_item[1:-1]
+                    arr[i] = val_item
+                val = arr
+            if case_insensitive:
+                key = key.lower()
+            if strip_spaces:
+                key = key.strip()
+            if key in kvp:
+                if not accumulate_keys:
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for this query.",
+                        "value": str(query),
+                    })
+                if isinstance(val, dict) or isinstance(kvp[key], dict):
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
+                        "value": str(query),
+                    })
+                kvp[key].extend(val)
+            else:
+                kvp[key] = val
+
+    if deep_object:
+        deep_kvp = {}
+        for key, val in kvp.items():
+            if "[" in key and key.endswith("]"):
+                base_key, qualifier = key[:-1].split("[", 1)
+                # Handle collision: both 'key' and 'key[qualifier]' exist
+                if base_key in deep_kvp and not isinstance(deep_kvp[base_key], dict):
+                    deep_kvp[base_key] = {None: deep_kvp[base_key]}
+                deep_kvp.setdefault(base_key, {})[qualifier] = val
+            else:
+                if key in deep_kvp and isinstance(deep_kvp[key], dict):
+                    deep_kvp[key][None] = val
+                else:
+                    deep_kvp[key] = val
+        return deep_kvp
+
     return kvp
 
 

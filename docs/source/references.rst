@@ -139,6 +139,8 @@
 .. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
 .. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
 .. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
+.. |ogc-api-proc-part1-kvp| replace:: *OGC API - Processes* - Part 1: Core KVP-Encoded Execute
+.. _ogc-api-proc-part1-kvp: https://docs.ogc.org/DRAFTS/18-062r3.html#rc_kvp-execute
 .. |ogc-api-proc-exec-mode| replace:: *OGC API - Processes* - Execution Mode
 .. _ogc-api-proc-exec-mode: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode
 .. |ogc-api-proc-exec-responses-sync| replace:: *OGC API - Processes* - Execution Responses (sync)

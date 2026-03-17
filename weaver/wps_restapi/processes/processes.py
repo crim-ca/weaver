@@ -27,7 +27,7 @@ from weaver.formats import (
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import ProcessSchema
-from weaver.processes.execution import submit_job, submit_job_dispatch_wps
+from weaver.processes.execution import submit_job, submit_job_dispatch_wps, submit_job_from_kvp
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
@@ -495,6 +495,23 @@ def delete_local_process(request):
         })
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
+
+
+@sd.process_execution_service.get(
+    tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
+    schema=sd.ProcessExecutionKVPEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_process_jobs_kvp_responses,
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def submit_local_job_kvp(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Execute a process registered locally using KVP-encoded parameters.
+    """
+    process = get_process(request=request)
+    return submit_job_from_kvp(request, process, tags=["wps-rest", "ogc-api", "kvp"])
 
 
 @sd.process_execution_service.post(

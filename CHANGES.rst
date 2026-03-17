@@ -12,11 +12,41 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support for `Key-Value Pair (KVP)` encoded `Process` execution using
+  HTTP GET requests on ``/processes/{processID}/execution`` endpoint
+  (resolves `#607 <https://github.com/crim-ca/weaver/issues/607>`_
+  and `#445 <https://github.com/crim-ca/weaver/issues/445>`_).
+
+  Supported features include:
+
+  - Simple literal inputs (strings, numbers, booleans) via direct parameter values
+  - Complex inputs via URL-encoded `JSON` objects and arrays
+  - Input arrays using comma-separated values
+  - Input by-reference using ``{inputID}[href]`` and ``{inputID}[type]`` qualifiers
+  - Bounding box inputs with optional ``{inputID}[crs]`` coordinate reference system
+  - Binary inputs with base64 encoding using ``{inputID}[value]`` and format qualifiers
+  - Output selection using ``{outputID}[include]``
+  - Output specification with ``{outputID}[mediaType]``, ``{outputID}[encoding]`` and ``{outputID}[schema]`` qualifiers
+  - Response format control via ``response[f]`` or ``response[format]`` (maps to ``Accept`` header)
+  - Execution preference control via ``response[prefer]`` (maps to ``Prefer`` header)
+  - Case-insensitive parameter qualifiers and reserved parameters
+  - Full `OGC API - Processes` ``kvp-execute`` conformance class support
+
+  The implementation converts `KVP` parameters to equivalent `JSON` execution format internally,
+  ensuring consistent behavior with POST-based executions. All existing validation, execution modes,
+  and result formats are supported identically for both GET and POST methods after query parameter parsing.
+
+- Add documentation for new KVP execution parameters and functionalities.
+- Add conformance classes for KVP execution support.
+- Update ``weaver/wps_restapi/colander_extras.py`` to allow additional parameter options (``style``, ``explode``, etc.)
+  defined by `OpenAPI`. These are employed in this context to support the representation of KVP query parameters.
+- Update ``weaver.utils.parse_kvp`` with additional ``deep_object`` capability required by KVP execution parameters.
+- Update ``swagger-ui@5.32.0`` scripts to handle rendering of advanced KVP query parameter definitions.
+- Replace generic ``PermissiveMappingSchema`` employed under I/O ``schema`` by the more explicit ``OAS`` definition.
 
 Fixes:
 ------
-- No change.
+- Fix `GET` endpoints documenting a ``Content-Type`` header although no content body applies to them.
 
 .. _changes_6.9.1:
 

@@ -2121,6 +2121,7 @@ def test_localize_datetime():
     assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)
 
 
+@pytest.mark.kvp
 @pytest.mark.parametrize(["query", "params", "expected"], [
     ("key1=val1;key2=val21,val22;key3=val3;key4", {},
      {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
