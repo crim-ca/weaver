@@ -808,7 +808,7 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
-def parse_kvp_value(values):
+def parse_kvp_single_value(values):
     # type: (Any) -> Any
     """
     Extract single value from list or return as-is.
@@ -816,26 +816,33 @@ def parse_kvp_value(values):
     return values[0] if isinstance(values, list) else values
 
 
-def parse_kvp_literal_value(value_str):
+def parse_kvp_encoded_value(value_str):
     # type: (str) -> Any
     """
-    Parse a literal value string to appropriate type.
+    Parse a possibly encoded value string to appropriate type.
     """
     value_decoded = unquote(value_str)
+    value_stripped = value_decoded.strip()
 
     # Try JSON object or array
-    if value_decoded.startswith(("{", "[")):
-        try:
-            return json.loads(value_decoded)
-        except (json.JSONDecodeError, ValueError):
-            pass
+    if value_stripped.startswith(("{", "[")) or value_stripped.endswith(("}", "]")):
+        return json.loads(value_decoded)
 
     # Try numeric array (comma-separated)
-    if "," in value_decoded:
+    # attempt to convert numerics if possible, otherwise return as strings (after stripping)
+    # if the input allows only numeric, they should all be converted or will fail later during its input validation
+    # if the input allows either numeric/string, the failed conversion should allow the only-string variant anyway
+    # don't enforce all-int/float alignment in case the input supports both and want to maintain the distinction
+    # note: commas must be split before decoding since they could embedded nested encoded commas to preserve
+    if "," in value_str:
         try:
-            return [float(v.strip()) for v in value_decoded.split(",")]
+            # perform strip after decoding to attempt numeric interpretation with superfluous spaces
+            values = [unquote(v).strip() for v in value_str.split(",")]
+            values = [float(v) if "." in v else int(v) for v in values]
+            return values
         except ValueError:
-            return [v.strip() for v in value_decoded.split(",")]
+            # perform the strip before such that escaped spaces are preserved by decoding
+            return [unquote(v.strip()) for v in value_str.split(",")]
 
     # Try number
     try:
@@ -851,9 +858,11 @@ def parse_kvp_bbox_value(value_str):
     """
     try:
         coords = [float(c.strip()) for c in unquote(value_str).split(",")]
-        return {"bbox": coords}
-    except (ValueError, AttributeError):
-        return {"bbox": value_str}
+    except Exception:
+        raise ValueError(f"Invalid bbox value: [{value_str}]. Expected 4 or 6 comma-separated numeric coordinates.")
+    if len(coords) not in [4, 6]:
+        raise ValueError(f"Invalid bbox value: [{value_str}]. Expected 4 or 6 comma-separated numeric coordinates.")
+    return {"bbox": coords}
 
 
 def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
@@ -971,58 +980,57 @@ def parse_kvp_inputs_outputs(params):
                 if "response" not in response_params:
                     response_params["response"] = {}
                 if None in values:
-                    response_params["response"][None] = parse_kvp_value(values[None])
+                    response_params["response"][None] = parse_kvp_single_value(values[None])
                 for qualifier, qual_vals in values.items():
                     if qualifier is not None:
                         qualifier_lower = qualifier.lower()
-                        response_params["response"][qualifier_lower] = parse_kvp_value(qual_vals)
+                        response_params["response"][qualifier_lower] = parse_kvp_single_value(qual_vals)
             else:
-                response_params["response"] = {None: parse_kvp_value(values)}
+                response_params["response"] = {None: parse_kvp_single_value(values)}
             continue
         if key_lower == "profile":
-            response_params["profile"] = parse_kvp_value(values)
+            response_params["profile"] = parse_kvp_single_value(values)
             continue
         if key_lower == "f":
-            response_params["f"] = parse_kvp_value(values)
+            response_params["f"] = parse_kvp_single_value(values)
             continue
         if key_lower == "prefer":
-            response_params["prefer"] = parse_kvp_value(values)
+            response_params["prefer"] = parse_kvp_single_value(values)
             continue
 
         # Deep object (qualified parameters) - values is a dict
         if isinstance(values, dict):
             # Check for simple value under None key (collision case: both 'key' and 'key[qualifier]' exist)
             if None in values:
-                simple_val = parse_kvp_value(values[None])
-                has_crs_qualifier = "crs" in values
-                if key_lower == "bbox" or has_crs_qualifier:
-                    parsed_bbox = parse_kvp_bbox_value(simple_val) if isinstance(simple_val, str) else simple_val
+                value = parse_kvp_single_value(values[None])
+                if key_lower == "bbox" or "crs" in values:
+                    parsed_bbox = parse_kvp_bbox_value(value) if isinstance(value, str) else value
                     inputs_dict[key] = parsed_bbox
                 else:
                     # Outputs detected using required 'include' qualifier
                     if "include" not in values:
-                        if isinstance(simple_val, str):
-                            parsed_value = parse_kvp_literal_value(simple_val)
+                        if isinstance(value, str):
+                            parsed_value = parse_kvp_encoded_value(value)
                         else:
-                            parsed_value = simple_val
+                            parsed_value = value
                         inputs_dict[key] = {"value": parsed_value}
 
             # Process qualifiers
             for qualifier, qual_values in values.items():
                 if qualifier is None:
                     continue
-                value = parse_kvp_value(qual_values)
+                value = parse_kvp_single_value(qual_values)
                 parse_kvp_qualified_param(key, qualifier.lower(), value, inputs_dict, outputs_dict, response_params)
 
             continue
 
         # Simple input parameter
-        value = parse_kvp_value(values)
+        value = parse_kvp_single_value(values)
         if key not in inputs_dict:
             if key_lower == "bbox":
                 parsed_value = parse_kvp_bbox_value(value) if isinstance(value, str) else value
             else:
-                parsed_value = parse_kvp_literal_value(value) if isinstance(value, str) else value
+                parsed_value = parse_kvp_encoded_value(value) if isinstance(value, str) else value
 
             inputs_dict[key] = {"value": parsed_value}
 

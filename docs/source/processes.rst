@@ -1222,10 +1222,10 @@ For advanced examples, see their corresponding sections.
     +-------------------+------------------------------------------+--------------------------------------------------+
 
 .. [#kvpBboxNote]
-    Although the |ogc-api-proc-part1-kvp|_ requirements considers the ``[crs]`` qualifier as optional for bounding box,
-    it is recommended to always include it to avoid ambiguity and ensure correct interpretation of the coordinates.
-    Furthermore, it helps parameter parsing disambiguate between bounding box coordinates and array values that employ
-    similar comma-separated array representations.
+    Although the |ogc-api-proc-part1-kvp|_ requirements considers the ``[crs]`` qualifier as optional for a bounding
+    box, it is **STRONGLY RECOMMENDED** to always include it to avoid ambiguity and ensure correct interpretation of
+    the coordinates. Providing the ``[crs]`` helps parameter parsing disambiguate between bounding box coordinates and
+    a generic array of numeric values that employ similar comma-separated array representations.
 
 .. _proc_exec_kvp_inputs:
 
@@ -1236,9 +1236,26 @@ Input values can be specified using multiple formats depending on their data typ
 The following table shows :term:`KVP` notation alongside their equivalent :term:`JSON` POST body representations.
 
 .. note::
-    All inputs can be provided using :terM:`URL`-encoded string as long as their decoded value results
-    into a valid :term:`JSON` structure. In other words, an ``array`` of numerics could be provided either
-    as ``arrayOfSimpleValues=[1,2,4,10,7]`` or ``arrayOfSimpleValues=%5B1%2C2%2C4%2C10%2C7%5D`` interchangeably.
+    All inputs can be provided using :term:`URL`-encoded string as long as their decoded value results
+    into a valid :term:`JSON` structure. The values can be provided directly if there is no ambiguity between their
+    values and reserved :term:`URL` characters, including the explicit ``,`` comma separator representation below.
+    In other words, an ``array`` of numerics could be provided either
+    as ``arrayOfValues=[1,2,4,10,7]`` or ``arrayOfValues=%5B1%2C2%2C4%2C10%2C7%5D`` interchangeably.
+
+    For convenience, a comma-separated list of values (e.g.: ``arrayOfValues=1,2,4,10,7``) is supported.
+    To avoid misinterpretation with the :term:`URL`-encoded :term:`JSON` structure, the commas must **NOT** be
+    :term:`URL`-encoded (i.e.: not ``%2C``), but their nested values can employ escaped characters as needed.
+    For example, the value ``arrayOfSimpleValues=1,2%2C5,4,10%2C7`` would be interpreted as an array of
+    values: ``[1, "2,5", 4, "10,7"]``. Inputs will be converted to ``float`` or ``integer`` values when possible,
+    but will be kept as strings otherwise. If the :term:`Process` requires ``float``, explicit ``.`` could be
+    needed with the numeric values to ensure proper conversion.
+
+.. note::
+    Bounding box coordinates are handled like the comma-separated array value above, but with additional
+    requirement of 2D or 3D coordinates (i.e.: 4 or 6 float values required). The order of these values depend entirely
+    on the relevant ``[crs]`` and defaults to the ``OGC:CRS84`` (or ``OGC:CRS84h`` for 3D) in long :term:`URI` format,
+    with the expected ``WGS:84`` ellipsoid using longitude-latitude coordinates ``lon1,lat1[,alt1],lon2,lat2[,alt2]``.
+    The ``[crs]`` qualifier should be provided to ensure correct interpretation of the coordinates [#kvpBboxNote]_.
 
 .. note::
     If necessary by the :term:`Process` to interpret a certain input value correctly, a ``string`` may be

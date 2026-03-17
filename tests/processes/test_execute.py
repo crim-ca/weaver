@@ -162,19 +162,27 @@ def test_parse_kvp_inputs_outputs_by_reference():
 
 
 @pytest.mark.kvp
-def test_parse_kvp_inputs_outputs_array():
+@pytest.mark.parametrize(
+    ["value", "expect"],
+    [
+        (["1,2,3,4,5"], [1, 2, 3, 4, 5]),
+        (["1.23,3.45"], [1.23, 3.45]),
+        (["1,2,3,4,5."], [1.0, 2.0, 3.0, 4.0, 5.0]),  # auto convert all if any is float
+        (["%201,2%20"], [1, 2]),
+        (["%20abc,def%20"], [" abc", "def "]),
+    ]
+)
+def test_parse_kvp_inputs_outputs_array_encoding_preserved(value, expect):
     """
     Test parsing array values from KVP.
     """
-    params = {
-        "arrayInput": ["1,2,3,4,5"],
-    }
+    params = {"arrayInput": value}
     result, response_params = parse_kvp_inputs_outputs(params)
 
     assert "inputs" in result
     assert len(result["inputs"]) == 1
     assert "arrayInput" in result["inputs"]
-    assert result["inputs"]["arrayInput"]["value"] == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert result["inputs"]["arrayInput"]["value"] == expect
     assert not response_params
 
 
@@ -718,6 +726,34 @@ def test_parse_kvp_inputs_outputs_reserved_params_case_insensitive():
     assert "f" in response_params
     assert "response" in response_params
     assert "profile" in response_params
+
+
+@pytest.mark.kvp
+@pytest.mark.parametrize(
+    "invalid_params",
+    [
+        {"input1": "[value1,value2"},   # missing ]
+        {"input1": "{value1,1,2,3,4"},  # missing }
+        {"input1": "value1,value2]"},   # missing {
+        {"input1": "value1,1,2,3,4}"},  # missing [
+        {"input1": "{value1,value2}"},  # not JSON object
+        {
+            "input1": "1,2,3,a",        # not bbox coordinates
+            "input1[crs]": "OGC:CRS84",
+        },
+        {
+            "input1": "1,2,3",          # missing bbox coordinate
+            "input1[crs]": "OGC:CRS84",
+        },
+        {
+            "input1": "[1,2,3,4]",      # invalid array coordinates
+            "input1[crs]": "OGC:CRS84",
+        },
+    ]
+)
+def test_parse_kvp_inputs_outputs_invalid_raised(invalid_params):
+    with pytest.raises((json.JSONDecodeError, ValueError)):
+        parse_kvp_inputs_outputs(invalid_params)
 
 
 @pytest.mark.kvp
