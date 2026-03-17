@@ -13,13 +13,19 @@ from typing import TYPE_CHECKING, List, cast
 import mock
 import pytest
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
-from pyramid.httpexceptions import HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
 
 from tests.utils import MockedRequest
 from weaver.datatype import Job
 from weaver.formats import ContentEncoding, ContentType
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, WPS_LITERAL, WPS_CategoryType
-from weaver.processes.execution import parse_kvp_inputs_outputs, parse_wps_inputs, submit_job, submit_job_from_kvp
+from weaver.processes.execution import (
+    parse_kvp_inputs_outputs,
+    parse_wps_inputs,
+    parse_kvp_qualified_param,
+    submit_job,
+    submit_job_from_kvp
+)
 
 if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type
@@ -436,6 +442,67 @@ def test_parse_kvp_inputs_outputs_response_prefer_with_nested_equals(prefer_valu
 
 
 @pytest.mark.kvp
+@pytest.mark.parametrize(
+    ["schema", "expect"],
+    [
+        (
+            "https://example.com/test.json",
+            "https://example.com/test.json",
+        ),
+        (
+            """{"$ref": "https://example.com/test.json"}""",
+            {"$ref": "https://example.com/test.json"},
+        ),
+        (
+            """
+            {
+                "type": "object",
+                "properties": {"test": {"type": "string"}}
+            }
+            """,
+            {
+                "type": "object",
+                "properties": {"test": {"type": "string"}}
+            },
+        ),
+        (
+            urllib.parse.quote(json.dumps({
+                "type": "object",
+                "properties": {"test": {"type": "string"}}
+            })),
+            {
+                "type": "object",
+                "properties": {"test": {"type": "string"}}
+            },
+        )
+    ]
+)
+def test_parse_kvp_inputs_outputs_qualified_value_with_schema(schema, expect):
+    """
+    Test parsing input with ``value`` qualifier and format qualifiers.
+
+    Validates that ``input[value]=data&input[mediaType]=text/plain`` produces
+    an input with both value and format qualifiers at top level (not under ``format``).
+    """
+    value = """{"test": "data"}"""
+    params = {
+        "my_input[value]": [value],
+        "my_input[schema]": [schema],
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+
+    assert "inputs" in result
+    assert len(result["inputs"]) == 1
+    assert "my_input" in result["inputs"]
+    input_data = result["inputs"]["my_input"]
+    assert input_data["value"] == value
+    for qual in ["format", "mediaType", "encoding"]:
+        assert qual not in input_data
+    assert input_data["schema"] == expect
+    assert not response_params
+
+
+@pytest.mark.kvp
 def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     """
     Test parsing input with ``value`` qualifier and format qualifiers.
@@ -459,6 +526,21 @@ def test_parse_kvp_inputs_outputs_qualified_value_with_format():
     assert "format" not in input_data
     assert input_data["mediaType"] == ContentType.TEXT_PLAIN
     assert input_data["encoding"] == ContentEncoding.BASE64
+    assert not response_params
+
+
+@pytest.mark.kvp
+def test_parse_kvp_inputs_outputs_qualified_param_unknown_ignored():
+    params = {
+        "input1": "test",
+        "input1[unknown]": "whatever",
+    }
+    result, response_params = parse_kvp_inputs_outputs(params)
+    assert result == {
+        "inputs": {
+            "input1": {"value": "test"}
+        }
+    }
     assert not response_params
 
 
@@ -749,11 +831,36 @@ def test_parse_kvp_inputs_outputs_reserved_params_case_insensitive():
             "input1": "[1,2,3,4]",      # invalid array coordinates
             "input1[crs]": "OGC:CRS84",
         },
+        {
+            "input1[value]": """{"test":"value"}""",
+            "input1[schema]": """{"invalid-json"}""",
+        },
+        {
+            "input1[value]": """{"test":"value"}""",
+            "input1[schema]": "[1,2,3,4]",  # valid JSON, but not object
+        }
     ]
 )
 def test_parse_kvp_inputs_outputs_invalid_raised(invalid_params):
-    with pytest.raises((json.JSONDecodeError, ValueError)):
+    with pytest.raises(ValueError):
         parse_kvp_inputs_outputs(invalid_params)
+
+
+@pytest.mark.kvp
+def test_submit_job_from_kvp_invalid():
+    """
+    Raised :class:`ValueError` should be caught and result in :class:`pyramid.httpexceptions.HTTPBadRequest`.
+
+    .. seealso::
+        :func:`test_parse_kvp_inputs_outputs_invalid_raised`
+    """
+    req = MockedRequest()
+    req.params = {"input1": "{value1,value2}"}
+    with pytest.raises(HTTPBadRequest) as exc:
+        submit_job_from_kvp(req, None)  # type: ignore
+    body = exc.value.json
+    assert body["type"] == "InvalidParameterValue"
+    assert body["title"] == "Invalid KVP parameters"
 
 
 @pytest.mark.kvp

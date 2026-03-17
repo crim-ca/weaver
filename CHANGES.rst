@@ -42,6 +42,7 @@ Changes:
   defined by `OpenAPI`. These are employed in this context to support the representation of KVP query parameters.
 - Update ``weaver.utils.parse_kvp`` with additional ``deep_object`` capability required by KVP execution parameters.
 - Update ``swagger-ui@5.32.0`` scripts to handle rendering of advanced KVP query parameter definitions.
+- Replace generic ``PermissiveMappingSchema`` employed under I/O ``schema`` by the more explicit ``OAS`` definition.
 
 Fixes:
 ------

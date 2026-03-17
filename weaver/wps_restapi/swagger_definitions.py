@@ -1091,6 +1091,167 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
+class ReferenceOAS(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/reference.yaml"
+    _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
+
+
+class TypeOAS(ExtendedSchemaNode):
+    name = "type"
+    schema_type = String
+    validator = OneOf(OAS_DATA_TYPES)
+
+
+class EnumItemOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+class EnumOAS(ExtendedSequenceSchema):
+    enum = EnumItemOAS()
+
+
+class RequiredOAS(ExtendedSequenceSchema):
+    required_field = ExtendedSchemaNode(String(), description="Name of the field that is required under the object.")
+
+
+class MultipleOfOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+    ]
+
+
+class PermissiveDefinitionOAS(NotKeywordSchema, PermissiveMappingSchema):
+    _not = [
+        ReferenceOAS
+    ]
+
+
+# cannot make recursive declarative schemas
+# simulate it and assume it is sufficient for validation purposes
+class PseudoObjectOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveDefinitionOAS(),
+    ]
+
+
+class KeywordObjectOAS(ExtendedSequenceSchema):
+    item = PseudoObjectOAS()
+
+
+class AdditionalPropertiesOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveDefinitionOAS(),
+        ExtendedSchemaNode(Boolean())
+    ]
+
+
+class AnyValueOAS(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(),
+        PermissiveSequenceSchema(),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+# reference:
+#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/schema.yaml
+# note:
+#   although reference definition provides multiple 'default: 0|false' entries, we omit them since the behaviour
+#   of colander with extended schema nodes is to set this value by default in deserialize result if they were missing,
+#   but reference 'default' correspond more to the default *interpretation* value if none was provided.
+#   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
+#   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
+# WARNING:
+#   cannot use any KeywordMapper derived instance here, otherwise conflicts with same OpenAPI keywords as children nodes
+class PropertyOAS(PermissiveMappingSchema):
+    _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
+    _format = ExtendedSchemaNode(String(), name="format", missing=drop)
+    default = AnyValueOAS(unknown="preserve", missing=drop)
+    example = AnyValueOAS(unknown="preserve", missing=drop)
+    title = ExtendedSchemaNode(String(), missing=drop)
+    description = ExtendedSchemaNode(String(), missing=drop)
+    enum = EnumOAS(missing=drop)
+    items = PseudoObjectOAS(name="items", missing=drop)
+    required = RequiredOAS(missing=drop)
+    nullable = ExtendedSchemaNode(Boolean(), missing=drop)
+    deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
+    read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
+    write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
+    multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
+    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
+    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
+    exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
+    exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
+    min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
+    max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    pattern = ExtendedSchemaNode(Integer(), missing=drop)
+    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  # default=0
+    max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
+    unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
+    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, validator=Range(min=0))  # default=0
+    max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
+    content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
+    content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
+    content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
+    _not_key = PseudoObjectOAS(name="not", title="not", missing=drop)
+    _all_of = KeywordObjectOAS(name="allOf", missing=drop)
+    _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
+    _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
+    x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
+    properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
+
+
+# this class is only to avoid conflicting names with keyword mappers
+class AnyPropertyOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PropertyOAS(),
+    ]
+
+
+class ObjectPropertiesOAS(ExtendedMappingSchema):
+    property_name = AnyPropertyOAS(
+        variable="{property-name}",
+        description="Named of the property being defined under the OpenAPI object.",
+    )
+
+
+# would not need this if we could do explicit recursive definitions but at the very least, validate that when an
+# object type is specified, its properties are as well and are slightly more specific than permissive mapping
+class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
+    _not = [ReferenceOAS]
+    _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
+    properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
+
+
+# since we redefine 'properties', do not cause validation error for 'oneOf'
+class DefinitionOAS(AnyOfKeywordSchema):
+    _any_of = [
+        ObjectOAS(),
+        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
+    ]
+
+
+class OAS(OneOfKeywordSchema):
+    description = "OpenAPI schema definition."
+    # _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
+    _schema = "http://json-schema.org/draft-07/schema#"
+    _one_of = [
+        ReferenceOAS(),
+        DefinitionOAS(),
+    ]
+
+
 # sub-schema within:
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/format.yaml
 class FormatSchema(OneOfKeywordSchema):
@@ -1098,7 +1259,7 @@ class FormatSchema(OneOfKeywordSchema):
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
         ReferenceURL(description="Reference where the schema definition can be retrieved to describe referenced data."),
         # literal JSON schema, permissive since it can be anything
-        PermissiveMappingSchema(description="Explicit schema definition of the formatted reference data.")
+        OAS(description="Explicit schema definition of the formatted reference data.")
     ]
 
     # because some pre-existing processes + pywps default schema is ""
@@ -1356,167 +1517,6 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
                 child.missing = drop
-
-
-class ReferenceOAS(ExtendedMappingSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/reference.yaml"
-    _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
-
-
-class TypeOAS(ExtendedSchemaNode):
-    name = "type"
-    schema_type = String
-    validator = OneOf(OAS_DATA_TYPES)
-
-
-class EnumItemOAS(OneOfKeywordSchema):
-    _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(String()),
-    ]
-
-
-class EnumOAS(ExtendedSequenceSchema):
-    enum = EnumItemOAS()
-
-
-class RequiredOAS(ExtendedSequenceSchema):
-    required_field = ExtendedSchemaNode(String(), description="Name of the field that is required under the object.")
-
-
-class MultipleOfOAS(OneOfKeywordSchema):
-    _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-    ]
-
-
-class PermissiveDefinitionOAS(NotKeywordSchema, PermissiveMappingSchema):
-    _not = [
-        ReferenceOAS
-    ]
-
-
-# cannot make recursive declarative schemas
-# simulate it and assume it is sufficient for validation purposes
-class PseudoObjectOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PermissiveDefinitionOAS(),
-    ]
-
-
-class KeywordObjectOAS(ExtendedSequenceSchema):
-    item = PseudoObjectOAS()
-
-
-class AdditionalPropertiesOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PermissiveDefinitionOAS(),
-        ExtendedSchemaNode(Boolean())
-    ]
-
-
-class AnyValueOAS(AnyOfKeywordSchema):
-    _any_of = [
-        PermissiveMappingSchema(),
-        PermissiveSequenceSchema(),
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String()),
-    ]
-
-
-# reference:
-#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/schema.yaml
-# note:
-#   although reference definition provides multiple 'default: 0|false' entries, we omit them since the behaviour
-#   of colander with extended schema nodes is to set this value by default in deserialize result if they were missing,
-#   but reference 'default' correspond more to the default *interpretation* value if none was provided.
-#   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
-#   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
-# WARNING:
-#   cannot use any KeywordMapper derived instance here, otherwise conflicts with same OpenAPI keywords as children nodes
-class PropertyOAS(PermissiveMappingSchema):
-    _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
-    _format = ExtendedSchemaNode(String(), name="format", missing=drop)
-    default = AnyValueOAS(unknown="preserve", missing=drop)
-    example = AnyValueOAS(unknown="preserve", missing=drop)
-    title = ExtendedSchemaNode(String(), missing=drop)
-    description = ExtendedSchemaNode(String(), missing=drop)
-    enum = EnumOAS(missing=drop)
-    items = PseudoObjectOAS(name="items", missing=drop)
-    required = RequiredOAS(missing=drop)
-    nullable = ExtendedSchemaNode(Boolean(), missing=drop)
-    deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
-    read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
-    write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
-    multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
-    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
-    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
-    exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
-    exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
-    min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
-    max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
-    pattern = ExtendedSchemaNode(Integer(), missing=drop)
-    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  # default=0
-    max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
-    unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
-    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, validator=Range(min=0))  # default=0
-    max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
-    content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
-    content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
-    content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
-    _not_key = PseudoObjectOAS(name="not", title="not", missing=drop)
-    _all_of = KeywordObjectOAS(name="allOf", missing=drop)
-    _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
-    _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
-    x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
-    properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
-
-
-# this class is only to avoid conflicting names with keyword mappers
-class AnyPropertyOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PropertyOAS(),
-    ]
-
-
-class ObjectPropertiesOAS(ExtendedMappingSchema):
-    property_name = AnyPropertyOAS(
-        variable="{property-name}",
-        description="Named of the property being defined under the OpenAPI object.",
-    )
-
-
-# would not need this if we could do explicit recursive definitions but at the very least, validate that when an
-# object type is specified, its properties are as well and are slightly more specific than permissive mapping
-class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
-    _not = [ReferenceOAS]
-    _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
-    properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
-
-
-# since we redefine 'properties', do not cause validation error for 'oneOf'
-class DefinitionOAS(AnyOfKeywordSchema):
-    _any_of = [
-        ObjectOAS(),
-        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
-    ]
-
-
-class OAS(OneOfKeywordSchema):
-    description = "OpenAPI schema definition."
-    # _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
-    _schema = "http://json-schema.org/draft-07/schema#"
-    _one_of = [
-        ReferenceOAS(),
-        DefinitionOAS(),
-    ]
 
 
 class InputOutputDescriptionSchema(ExtendedMappingSchema):

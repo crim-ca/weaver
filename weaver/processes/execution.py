@@ -866,25 +866,26 @@ def parse_kvp_bbox_value(value_str):
 
 
 def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
-    # type: (str, str, str, Dict[str, Any], Dict[str, Any], Dict[str, str]) -> bool
+    # type: (str, str, str, Dict[str, Any], Dict[str, Any], Dict[str, str]) -> None
     """
     Handle a qualified parameter (``key[qualifier]=value``).
 
-    :returns: ``True`` if handled, ``False`` if should be skipped.
+    Parameters are updated in-place within provided dictionaries as applicable.
+    Unknown qualifiers are simply ignored.
     """
     base_key_lower = base_key.lower()
 
     # Response parameters (response[f], response[format], response[prefer])
     if base_key_lower == "response":
         response_params[qualifier] = value
-        return True
+        return
 
     # Output include
     if qualifier == "include":
         if str(value).lower() == "true":
             if base_key not in outputs_dict:
                 outputs_dict[base_key] = {}
-        return True
+        return
 
     # Determine target (output if already exists there, otherwise input)
     target_dict = outputs_dict if base_key in outputs_dict else inputs_dict
@@ -910,39 +911,38 @@ def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_d
         elif qualifier == "profile":
             fmt["profile"] = value
         elif qualifier == "schema":
-            decoded = unquote(value)
-            if decoded.startswith("{"):
-                try:
+            try:
+                decoded = unquote(value).strip()
+                if decoded.startswith("{"):
                     fmt["schema"] = json.loads(decoded)
-                except (json.JSONDecodeError, ValueError):
-                    fmt["schema"] = value
-            else:
-                fmt["schema"] = value
-        return True
+                elif decoded.startswith("http"):
+                    fmt["schema"] = decoded
+                else:
+                    raise ValueError
+            except Exception:
+                raise ValueError(
+                    f"Invalid 'schema' value for [{base_key}]. "
+                    "Expected JSON object or URI could not be parsed."
+                )
+        return
 
     # Input-specific qualifiers
     if qualifier == "href":
         inputs_dict.setdefault(base_key, {})["href"] = value
-        return True
 
-    if qualifier == "type":
+    elif qualifier == "type":
         inputs_dict.setdefault(base_key, {})["type"] = value
-        return True
 
-    if qualifier == "value":
+    elif qualifier == "value":
         decoded = unquote(value)
         try:
             base64.b64decode(decoded, validate=True)
         except (binascii.Error, ValueError):
             pass
         inputs_dict.setdefault(base_key, {})["value"] = decoded
-        return True
 
-    if qualifier == "crs":
+    elif qualifier == "crs":
         inputs_dict.setdefault(base_key, {})["crs"] = value
-        return True
-
-    return False
 
 
 def parse_kvp_inputs_outputs(params):
