@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.10.0:
+
+`6.10.0 <https://github.com/crim-ca/weaver/tree/6.10.0>`_ (2026-03-17)
+========================================================================
+
+Changes:
+--------
 - Add support for `Key-Value Pair (KVP)` encoded `Process` execution using
   HTTP GET requests on ``/processes/{processID}/execution`` endpoint
   (resolves `#607 <https://github.com/crim-ca/weaver/issues/607>`_
