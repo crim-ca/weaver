@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         "TEXT", "text",
         "YML", "yml",
         "YAML", "yaml",
+        "CSV", "csv",
     ]
 
 LOGGER = logging.getLogger(__name__)
@@ -378,6 +379,10 @@ class OutputFormat(Constants):
     Representation as HTML content formatted as raw string without indentation or newlines.
     """)  # type: Literal["HTML+RAW", "html+raw"]
 
+    CSV = classproperty(fget=lambda self: "csv", doc="""
+    Representation as :term:`CSV` content formatted as string.
+    """)  # type: Literal["CSV", "csv"]
+
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
@@ -423,6 +428,8 @@ class OutputFormat(Constants):
             Unused for other representations.
         :return: Formatted output.
         """
+        from io import StringIO
+
         from weaver.utils import bytes2str
 
         fmt = cls.get(to)
@@ -438,8 +445,7 @@ class OutputFormat(Constants):
         ]:
             pretty = fmt in [OutputFormat.XML_STR, OutputFormat.HTML_STR]
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
-            if fmt in [OutputFormat.XML_RAW, OutputFormat.HTML_RAW]:
-                xml = bytes2str(xml)
+            xml = bytes2str(xml)
             if isinstance(xml, str):
                 xml = xml.strip()
             return xml
@@ -448,6 +454,13 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
+        if fmt == OutputFormat.CSV:
+            import pandas as pd
+
+            df = pd.json_normalize(data) if isinstance(data, dict) else pd.DataFrame(data)
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index=False)
+            return csv_buffer.getvalue()
         return data  # pragma: no cover  # last resort if new output format unhandled
 
 

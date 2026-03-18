@@ -65,7 +65,11 @@ def test_unsupported_image_conversion():
         img = Image.new('RGB', (100, 100), color='red')
         img.save(png_file)
 
-        trans = Transform(file_path=png_file, current_media_type=ContentType.IMAGE_PNG, wanted_media_type=ContentType.TEXT_CSV)
+        trans = Transform(
+            file_path=png_file,
+            current_media_type=ContentType.IMAGE_PNG,
+            wanted_media_type=ContentType.TEXT_CSV
+        )
         with pytest.raises(HTTPUnprocessableEntity):
             trans.get()
 
@@ -76,7 +80,11 @@ def test_transform_same_media_type():
         with open(txt_file, "w", encoding="utf-8") as f:
             f.write("test content")
 
-        trans = Transform(file_path=txt_file, current_media_type=ContentType.TEXT_PLAIN, wanted_media_type=ContentType.TEXT_PLAIN)
+        trans = Transform(
+            file_path=txt_file,
+            current_media_type=ContentType.TEXT_PLAIN,
+            wanted_media_type=ContentType.TEXT_PLAIN
+        )
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert trans.output_path == txt_file
@@ -125,7 +133,11 @@ def test_csv_with_empty_headers():
         with open(csv_file, "w", encoding="utf-8") as f:
             f.write(",col2,\nval1,val2,val3\n")
 
-        trans = Transform(file_path=csv_file, current_media_type=ContentType.TEXT_CSV, wanted_media_type=ContentType.APP_JSON)
+        trans = Transform(
+            file_path=csv_file,
+            current_media_type=ContentType.TEXT_CSV,
+            wanted_media_type=ContentType.APP_JSON
+        )
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert os.path.exists(trans.output_path)

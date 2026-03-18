@@ -1,27 +1,24 @@
 import base64
 import csv
-import json
 import os.path
 import shutil
 import tarfile
 import tempfile
 from typing import List
 
-import pandas as pd
 import xmltodict
 import yaml
 from bs4 import BeautifulSoup
 from cairosvg import svg2png
 from celery.utils.log import get_task_logger
 from fpdf import FPDF
-from json2xml import json2xml
 from json2xml.utils import readfromjson
 from markupsafe import escape
 from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
-from weaver.formats import get_extension
+from weaver.formats import OutputFormat, get_extension
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
 from weaver.transform.utils import get_content, is_gif, is_image, is_png, is_svg, is_tiff, write_content
@@ -54,48 +51,48 @@ def exception_handler(func):
 
 
 @exception_handler
-def image_to_any(i: str, out: str) -> None:
+def image_to_any(image: str, out: str) -> None:
     """
     Converts image files to a specified output format. If no conversion is needed, it copies the file.
 
-    :param i: Input image file path.
+    :param image: Input image file path.
     :param out: Output file path.
     """
     # exit if no transformation needed
-    if os.path.splitext(i)[1] == os.path.splitext(out)[1]:
+    if os.path.splitext(image)[1] == os.path.splitext(out)[1]:
         if not os.path.exists(out):
-            shutil.copy(i, out)
+            shutil.copy(image, out)
         return
 
-    if is_tiff(i):
-        tif = Tiff(i)
+    if is_tiff(image):
+        tif = Tiff(image)
         return images_to_any(tif.get_images(), out)
 
-    if is_gif(i):
-        return images_to_any([Image.open(i).convert("RGB")], out)
+    if is_gif(image):
+        return images_to_any([Image.open(image).convert("RGB")], out)
 
-    if is_svg(i):
-        png = f"{i}.png"
-        with open(i, "rb") as svg_file:
+    if is_svg(image):
+        png = f"{image}.png"
+        with open(image, "rb") as svg_file:
             svg_data = svg_file.read()
         with open(png, "wb") as png_file:
             svg2png(svg_data, write_to=png_file)
-        i = png
+        image = png
 
-    return images_to_any([Image.open(i)], out)
+    return images_to_any([Image.open(image)], out)
 
 
-def images_to_any(ims: List[Image.Image], out: str) -> None:
+def images_to_any(images: List[Image.Image], out: str) -> None:
     """
     Processes a list of images and converts them to the desired format, saving them in the specified output path.
 
-    :param ims: List of Image objects to process.
+    :param images: List of Image objects to process.
     :param out: Output file path.
     """
     ret = []
     with tempfile.TemporaryDirectory() as tmp_path:
         _o = os.path.join(tmp_path, str(len(ret)).zfill(4) + get_extension(out))
-        for img in ims:
+        for img in images:
             clrs = img.getpixel((0, 0))
             if not isinstance(clrs, tuple):
                 img = img.convert("RGB")
@@ -183,16 +180,16 @@ def any_to_pdf(i: str, out: str) -> None:
     else:
         if is_tiff(i):
             tiff = Tiff(i)
-            ims = tiff.get_images()  # For TIFF files with multiple pages
+            images = tiff.get_images()  # For TIFF files with multiple pages
         else:
-            ims = [image.convert("RGB")]
+            images = [image.convert("RGB")]
 
         new_pdf.set_margins(10, 10)
 
         pdf_width = new_pdf.w - 20
         pdf_height = new_pdf.h - 20
 
-        for img in ims:
+        for img in images:
             image_w, image_h = img.size
 
             if image_w > image_h:
@@ -254,7 +251,8 @@ def csv_to_xml(i: str, out: str) -> None:
     file = f"{i}.json"
     csv_to_json(i, file)
     data = readfromjson(file)
-    write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
+    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    write_content(out, xml_content)
 
 
 @exception_handler
@@ -266,7 +264,8 @@ def json_to_xml(i: str, out: str) -> None:
     :param out: Path to the output XML file.
     """
     data = readfromjson(i)
-    write_content(out, json2xml.Json2xml(data, item_wrap=False).to_xml())
+    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    write_content(out, xml_content)
 
 
 @exception_handler
@@ -277,10 +276,9 @@ def json_to_txt(i: str, out: str) -> None:
     :param i: Path to the input JSON file.
     :param out: Path to the output text file.
     """
-    with open(i, "r", encoding="utf-8") as file:
-        data = json.load(file)
-    with open(out, "w", encoding="utf-8") as txt_file:
-        json.dump(data, txt_file, indent=4)
+    data = readfromjson(i)
+    txt_content = OutputFormat.convert(data, OutputFormat.JSON_STR)
+    write_content(out, txt_content)
 
 
 @exception_handler
@@ -291,10 +289,9 @@ def json_to_yaml(i: str, out: str) -> None:
     :param i: Path to the input JSON file.
     :param out: Path to the output YAML file.
     """
-    with open(i, "r", encoding="utf-8") as file:
-        configuration = json.load(file)
-    with open(out, "w", encoding="utf-8") as yaml_file:
-        yaml.dump(configuration, yaml_file)
+    data = readfromjson(i)
+    yaml_content = OutputFormat.convert(data, OutputFormat.YAML)
+    write_content(out, yaml_content)
 
 
 @exception_handler
@@ -306,9 +303,8 @@ def yaml_to_json(i: str, out: str) -> None:
     :param out: Path to the output JSON file.
     """
     with open(i, "r", encoding="utf-8") as file:
-        configuration = yaml.safe_load(file)
-    with open(out, "w", encoding="utf-8") as json_file:
-        json.dump(configuration, json_file)
+        data = yaml.safe_load(file)
+    write_content(out, data)
 
 
 @exception_handler
@@ -319,9 +315,9 @@ def json_to_csv(i: str, out: str) -> None:
     :param i: Path to the input JSON file.
     :param out: Path to the output CSV file.
     """
-    with open(i, encoding="utf-8") as file:
-        data_file = pd.read_json(file, encoding="utf-8")
-        data_file.to_csv(out, encoding="utf-8", index=False)
+    data = readfromjson(i)
+    csv_content = OutputFormat.convert(data, OutputFormat.CSV)
+    write_content(out, csv_content)
 
 
 @exception_handler
@@ -361,25 +357,28 @@ def yaml_to_csv(i: str, out: str) -> None:
 @exception_handler
 def yaml_to_xml(i: str, out: str) -> None:
     """
-    Converts a YAML file to an XML file by first converting it to JSON.
+    Converts a YAML file to an XML file.
 
     :param i: Path to the input YAML file.
     :param out: Path to the output XML file.
     """
-    yaml_to_json(i, f"{i}.json")
-    json_to_xml(f"{i}.json", out)
+    with open(i, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    write_content(out, xml_content)
 
 
 @exception_handler
 def xml_to_yaml(i: str, out: str) -> None:
     """
-    Converts an XML file to a YAML file by first converting it to JSON.
+    Converts an XML file to a YAML file.
 
     :param i: Path to the input XML file.
     :param out: Path to the output YAML file.
     """
-    xml_to_json(i, f"{i}.json")
-    json_to_yaml(f"{i}.json", out)
+    data = xmltodict.parse(get_content(i))
+    yaml_content = OutputFormat.convert(data, OutputFormat.YAML)
+    write_content(out, yaml_content)
 
 
 @exception_handler

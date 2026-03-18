@@ -17,13 +17,15 @@ Changes:
 - Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
   individual `Job` result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
   If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
-- Return ``Link`` headers containing all possible output formats, allowing retrieval via query parameters
+- Return ``Link`` headers with ``rel="alternate"`` containing all possible output formats, allowing retrieval via query parameters
   (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
-- No change.
+- Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
+  from JSON data structures.
 
 Fixes:
 ------
-- No change.
+- Fix ``OutputFormat.convert()`` returning ``bytes`` instead of ``str`` for XML/HTML conversions, causing write errors when
+  saving transformation results to files.
 
 .. _changes_6.9.1:
 

@@ -218,7 +218,12 @@ def test_process_split_version(process_id, result):
 
 
 def test_process_outputs_alt():
+    """
+    Validates handling of additional formats for output transform.
 
+    The output formats provided by transforms are dynamically extended from the original database process to provide
+    alternate results. These should not modify the process definition originally deployed.
+    """
     # mock functions called by offering
     with contextlib.ExitStack() as stack:
         mock_settings = {"weaver.wps_restapi_url": "http://test-weaver.com"}
@@ -229,7 +234,7 @@ def test_process_outputs_alt():
                           inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
         offer = process.offering()
 
-        # Assert that process outputs in offering contains alternate representation
+        # Assert that process outputs in offering contains alternate representation dynamically generated
         assert offer["outputs"]["output1"]["formats"] == [
             {
                 "mediaType": ContentType.IMAGE_TIFF
@@ -250,7 +255,7 @@ def test_process_outputs_alt():
                 "mediaType": ContentType.APP_PDF
             }]
 
-        # Assert that process outputs are unchanged
+        # Assert that process outputs are unchanged from the original database definition
         assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
 
 

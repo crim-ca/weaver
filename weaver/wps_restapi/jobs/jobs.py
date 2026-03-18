@@ -767,7 +767,10 @@ def get_job_output(request):
             "type": "http://www.opengis.net/def/exceptions/ogcapi-common-1/1.0/not-acceptable",
             "detail": "The requested output format cannot be generated for this output.",
             "status": HTTPNotAcceptable.code,
-            "cause": f"Requested format '{result_media_type}' is not compatible with available formats: {possible_media_types}",
+            "cause": (
+                f"Requested format '{result_media_type}' is not compatible "
+                f"with available formats: {possible_media_types}"
+            ),
             "value": result_media_type
         })
 
