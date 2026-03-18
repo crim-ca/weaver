@@ -1622,6 +1622,9 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
     |                                           |    }                                                  |
     +-------------------------------------------+-------------------------------------------------------+
 
+
+.. _app_pkg_metadata:
+
 Metadata
 -----------------------
 

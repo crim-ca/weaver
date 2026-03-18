@@ -1,4 +1,4 @@
-VERSION ?= 6.9.0
+VERSION ?= 6.10.0
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
@@ -538,7 +538,6 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 	@bash -c '$(CONDA_CMD) \
 		pylint \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
-			--reports y \
 			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 

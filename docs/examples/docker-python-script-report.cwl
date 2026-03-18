@@ -16,7 +16,7 @@ outputs:
       glob: report.txt
 requirements:
   DockerRequirement:
-    dockerPull: "python:3.7-alpine"
+    dockerPull: "python:3.12-alpine"
   InitialWorkDirRequirement:
     listing:
       # below script is generated dynamically in the working directory, and then called by the base command

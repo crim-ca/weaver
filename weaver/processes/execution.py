@@ -1,8 +1,12 @@
+import base64
+import binascii
 import copy
+import json
 import logging
 import os
 from time import sleep
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 import colander
 import psutil
@@ -16,6 +20,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
     HTTPNotAcceptable,
+    HTTPNotImplemented,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
 )
@@ -35,7 +40,14 @@ from weaver.execute import (
     parse_prefer_header_return,
     update_preference_applied_return_header
 )
-from weaver.formats import AcceptLanguage, ContentType, clean_media_type_format, map_cwl_media_type, repr_json
+from weaver.formats import (
+    AcceptLanguage,
+    ContentType,
+    clean_media_type_format,
+    default_format_handler,
+    map_cwl_media_type,
+    repr_json
+)
 from weaver.notify import map_job_subscribers, notify_job_subscribers
 from weaver.owsexceptions import OWSInvalidParameterValue, OWSNoApplicableCode
 from weaver.processes import wps_package
@@ -115,6 +127,7 @@ if TYPE_CHECKING:
         HeadersType,
         JobValueBbox,
         JSON,
+        KVP,
         Number,
         ProcessExecution,
         SettingsType,
@@ -796,6 +809,242 @@ def map_locations(job, settings):
             os.symlink(wps_ref, job_ref)
 
 
+def parse_kvp_single_value(values):
+    # type: (Any) -> Any
+    """
+    Extract single value from list or return as-is.
+    """
+    return values[0] if isinstance(values, list) else values
+
+
+def parse_kvp_encoded_value(value_str):
+    # type: (str) -> Any
+    """
+    Parse a possibly encoded value string to appropriate type.
+    """
+    value_decoded = unquote(value_str)
+    value_stripped = value_decoded.strip()
+
+    # Try JSON object or array
+    if value_stripped.startswith(("{", "[")) or value_stripped.endswith(("}", "]")):
+        return json.loads(value_decoded)
+
+    # Try numeric array (comma-separated)
+    # attempt to convert numerics if possible, otherwise return as strings (after stripping)
+    # if the input allows only numeric, they should all be converted or will fail later during its input validation
+    # if the input allows either numeric/string, the failed conversion should allow the only-string variant anyway
+    # don't enforce all-int/float alignment in case the input supports both and want to maintain the distinction
+    # note: commas must be split before decoding since they could embedded nested encoded commas to preserve
+    if "," in value_str:
+        try:
+            # perform strip after decoding to attempt numeric interpretation with superfluous spaces
+            values = [unquote(v).strip() for v in value_str.split(",")]
+            values = [float(v) if "." in v else int(v) for v in values]
+            return values
+        except ValueError:
+            # perform the strip before such that escaped spaces are preserved by decoding
+            return [unquote(v.strip()) for v in value_str.split(",")]
+
+    # Try number
+    try:
+        return float(value_decoded) if "." in value_decoded else int(value_decoded)
+    except ValueError:
+        return value_decoded
+
+
+def parse_kvp_bbox_value(value_str):
+    # type: (str) -> Dict[str, Any]
+    """
+    Parse a ``bbox`` value string into ``bbox`` object.
+    """
+    try:
+        coords = [float(c.strip()) for c in unquote(value_str).split(",")]
+    except Exception:
+        raise ValueError(f"Invalid bbox value: [{value_str}]. Expected 4 or 6 comma-separated numeric coordinates.")
+    if len(coords) not in [4, 6]:
+        raise ValueError(f"Invalid bbox value: [{value_str}]. Expected 4 or 6 comma-separated numeric coordinates.")
+    return {"bbox": coords}
+
+
+def parse_kvp_qualified_param(base_key, qualifier, value, inputs_dict, outputs_dict, response_params):
+    # type: (str, str, str, Dict[str, Any], Dict[str, Any], Dict[str, str]) -> None
+    """
+    Handle a qualified parameter (``key[qualifier]=value``).
+
+    Parameters are updated in-place within provided dictionaries as applicable.
+    Unknown qualifiers are simply ignored.
+    """
+    base_key_lower = base_key.lower()
+
+    # Response parameters (response[f], response[format], response[prefer])
+    if base_key_lower == "response":
+        response_params[qualifier] = value
+        return
+
+    # Output include
+    if qualifier == "include":
+        if str(value).lower() == "true":
+            if base_key not in outputs_dict:
+                outputs_dict[base_key] = {}
+        return
+
+    # Determine target (output if already exists there, otherwise input)
+    target_dict = outputs_dict if base_key in outputs_dict else inputs_dict
+
+    if base_key not in target_dict:
+        target_dict[base_key] = {}
+
+    # Format qualifiers (can apply to both inputs and outputs)
+    if qualifier in ("mediatype", "encoding", "schema", "profile"):
+        # for output, they are nested under 'format' because they are *requested*
+        # for inputs, they are directly with the qualified 'value' provided
+        is_output = base_key in outputs_dict
+        if is_output:
+            target_dict[base_key].setdefault("format", {})
+            fmt = target_dict[base_key]["format"]
+        else:
+            fmt = target_dict[base_key]
+
+        if qualifier == "mediatype":
+            fmt["mediaType"] = value
+        elif qualifier == "encoding":
+            fmt["encoding"] = value
+        elif qualifier == "profile":
+            fmt["profile"] = value
+        elif qualifier == "schema":
+            try:
+                decoded = unquote(value).strip()
+                if decoded.startswith("{"):
+                    fmt["schema"] = json.loads(decoded)
+                elif decoded.startswith("http"):
+                    fmt["schema"] = decoded
+                else:
+                    raise ValueError
+            except Exception:
+                raise ValueError(
+                    f"Invalid 'schema' value for [{base_key}]. "
+                    "Expected JSON object or URI could not be parsed."
+                )
+        return
+
+    # Input-specific qualifiers
+    if qualifier == "href":
+        inputs_dict.setdefault(base_key, {})["href"] = value
+
+    elif qualifier == "type":
+        inputs_dict.setdefault(base_key, {})["type"] = value
+
+    elif qualifier == "value":
+        decoded = unquote(value)
+        try:
+            base64.b64decode(decoded, validate=True)
+        except (binascii.Error, ValueError):
+            pass
+        inputs_dict.setdefault(base_key, {})["value"] = decoded
+
+    elif qualifier == "crs":
+        inputs_dict.setdefault(base_key, {})["crs"] = value
+
+
+def parse_kvp_inputs_outputs(params):
+    # type: (Dict[str, Any]) -> Tuple[ProcessExecution, KVP]
+    """
+    Parse :term:`KVP` query parameters and convert them to :term:`JSON` execution body format.
+
+    Converts :term:`OGC API - Processes` :term:`KVP`-encoded execution parameters to the equivalent :term:`JSON`
+    structure that would be used in a POST request body. Also, extracts response parameters for header mapping
+    that indicate how the response should be formatted (e.g.: content negotiation, preferred response structure, etc.)
+    and executed (e.g.: asynchronous vs synchronous), as applicable.
+
+    :param params: Query parameters from the request.
+    :return: Tuple of (:term:`JSON` execution body with ``inputs``/``outputs``, response parameters).
+    :raises HTTPBadRequest: If :term:`KVP` parameters cannot be parsed.
+    """
+    # Use 'parse_kvp' to handle 'deep_object' transformation with collision handling
+    # This transforms 'key[qualifier]' into a nested dict, with 'None' for simple values when both exist
+    organized = parse_kvp(
+        params,
+        pair_sep="&",
+        case_insensitive=False,
+        deep_object=True,
+    )
+
+    inputs_dict = {}
+    outputs_dict = {}
+    response_params = {}
+
+    for key, values in organized.items():
+        key_lower = key.lower()
+        if key_lower == "response":
+            # response can have both simple value (response=collection) and qualifiers (response[f]=json)
+            if isinstance(values, dict):
+                if "response" not in response_params:
+                    response_params["response"] = {}
+                if None in values:
+                    response_params["response"][None] = parse_kvp_single_value(values[None])
+                for qualifier, qual_vals in values.items():
+                    if qualifier is not None:
+                        qualifier_lower = qualifier.lower()
+                        response_params["response"][qualifier_lower] = parse_kvp_single_value(qual_vals)
+            else:
+                response_params["response"] = {None: parse_kvp_single_value(values)}
+            continue
+        if key_lower == "profile":
+            response_params["profile"] = parse_kvp_single_value(values)
+            continue
+        if key_lower == "f":
+            response_params["f"] = parse_kvp_single_value(values)
+            continue
+        if key_lower == "prefer":
+            response_params["prefer"] = parse_kvp_single_value(values)
+            continue
+
+        # Deep object (qualified parameters) - values is a dict
+        if isinstance(values, dict):
+            # Check for simple value under None key (collision case: both 'key' and 'key[qualifier]' exist)
+            if None in values:
+                value = parse_kvp_single_value(values[None])
+                if key_lower == "bbox" or "crs" in values:
+                    parsed_bbox = parse_kvp_bbox_value(value) if isinstance(value, str) else value
+                    inputs_dict[key] = parsed_bbox
+                else:
+                    # Outputs detected using required 'include' qualifier
+                    if "include" not in values:
+                        if isinstance(value, str):
+                            parsed_value = parse_kvp_encoded_value(value)
+                        else:
+                            parsed_value = value
+                        inputs_dict[key] = {"value": parsed_value}
+
+            # Process qualifiers
+            for qualifier, qual_values in values.items():
+                if qualifier is None:
+                    continue
+                value = parse_kvp_single_value(qual_values)
+                parse_kvp_qualified_param(key, qualifier.lower(), value, inputs_dict, outputs_dict, response_params)
+
+            continue
+
+        # Simple input parameter
+        value = parse_kvp_single_value(values)
+        if key not in inputs_dict:
+            if key_lower == "bbox":
+                parsed_value = parse_kvp_bbox_value(value) if isinstance(value, str) else value
+            else:
+                parsed_value = parse_kvp_encoded_value(value) if isinstance(value, str) else value
+
+            inputs_dict[key] = {"value": parsed_value}
+
+    # Build response body
+    body = {}
+    if inputs_dict:
+        body["inputs"] = inputs_dict
+    if outputs_dict:
+        body["outputs"] = outputs_dict
+
+    return body, response_params
+
+
 def submit_job_dispatch_wps(request, process):
     # type: (Request, Process) -> AnyViewResponse
     """
@@ -819,6 +1068,89 @@ def submit_job_dispatch_wps(request, process):
     return service.call(http_request)
 
 
+def submit_job_from_kvp(request, reference, tags=None, process_id=None):
+    # type: (Request, Union[Service, Process], Optional[List[str]], Optional[str]) -> AnyResponseType
+    """
+    Generate job submission from :term:`KVP` query parameters in the request.
+
+    Parses :term:`OGC API - Processes` :term:`KVP`-encoded execution parameters from query string,
+    converts them to :term:`JSON` format, maps response parameters to HTTP headers,
+    and delegates to standard job submission handler.
+
+    .. note::
+        Any time a :term:`KVP` parameter is detected and matches an existing header,
+        it will override that header and takes precedence to obtain the original intent of the user request.
+        Notably, this can be relevant for cases where web browsers automatically inject additional headers
+        that the user is not aware or cares about.
+
+    .. seealso::
+        :func:`submit_job` for JSON-based execution
+        :func:`parse_kvp_inputs_outputs` for :term:`KVP` to :term:`JSON` conversion
+    """
+    try:
+        exec_body, response_params = parse_kvp_inputs_outputs(dict(request.params))
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid KVP parameters",
+            "detail": f"Failed to parse KVP query parameters: {exc}",
+            "status": HTTPBadRequest.code,
+        })
+
+    if response_params:
+        # Handle response qualifiers (response[f], response[format], response[prefer], response[profile])
+        response_dict = response_params.get("response", {})
+        if isinstance(response_dict, dict):
+            # Extract format parameters from response[f] or response[format]
+            fmt_value = response_dict.get("f") or response_dict.get("format")
+            if fmt_value:
+                media_type = default_format_handler(fmt_value)
+                request.headers["Accept"] = media_type or fmt_value
+
+            # Extract prefer from response[prefer]
+            if "prefer" in response_dict:
+                request.headers["Prefer"] = response_dict["prefer"]
+
+        # Also check for standalone f and format parameters
+        if "f" in response_params or "format" in response_params:
+            fmt_value = response_params.get("f") or response_params.get("format")
+            media_type = default_format_handler(fmt_value)
+            request.headers["Accept"] = media_type or fmt_value
+
+        if "prefer" in response_params:
+            request.headers["Prefer"] = response_params["prefer"]
+
+        # Per OGC API - Processes spec [#kvpProfile] warning (see processes.rst):
+        # - Synchronous: profile and response[profile] are equivalent, both apply to Accept-Profile header
+        #   (if both provided, response[profile] takes precedence)
+        # - Asynchronous: profile -> Accept-Profile (Job Status), response[profile] -> body (Job Result)
+        prefer_header = request.headers.get("Prefer", "")
+        is_sync = "wait" in prefer_header.lower() and "respond-async" not in prefer_header.lower()
+        top_profile = response_params.get("profile")
+        resp_profile = response_dict.get("profile") if isinstance(response_dict, dict) else None
+        if is_sync:
+            # In sync mode, response[profile] takes precedence if both are provided
+            profile_value = resp_profile or top_profile
+            if profile_value:
+                request.headers["Accept-Profile"] = profile_value
+        else:
+            # In async mode, they are used independently
+            if top_profile:
+                request.headers["Accept-Profile"] = top_profile
+            if resp_profile:
+                exec_body["profile"] = resp_profile
+
+        # Extract simple response value (e.g., response=collection or response=document)
+        if isinstance(response_dict, dict) and None in response_dict:
+            exec_body["response"] = response_dict[None]
+
+    request.body = json.dumps(exec_body).encode("utf-8")
+    if "Content-Type" not in request.headers:
+        request.headers["Content-Type"] = ContentType.APP_JSON
+
+    return submit_job(request, reference, tags=tags, process_id=process_id)
+
+
 def submit_job(request, reference, tags=None, process_id=None):
     # type: (Request, Union[Service, Process], Optional[List[str]], Optional[str]) -> AnyResponseType
     """
@@ -831,6 +1163,9 @@ def submit_job(request, reference, tags=None, process_id=None):
     json_body = validate_job_json(request)
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
+
+    # FIXME: to remove once implemented (https://github.com/crim-ca/weaver/issues/683)
+    validate_response_collection_unsupported(request, json_body)
 
     prov_id = None  # None OK if local
     proc_id = None  # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
@@ -1537,3 +1872,22 @@ def validate_process_io(process, payload):
                             "occurrences": io_len,
                         }
                     })
+
+
+def validate_response_collection_unsupported(request, json_body):
+    # FIXME: Add support for 'response=collection' to control job status collection representation
+    #        See: https://github.com/opengeospatial/ogcapi-processes/issues/557
+    #             https://github.com/crim-ca/weaver/issues/683
+    response_value = None
+    if "response" in json_body:
+        response_value = json_body.get("response")
+    if not response_value and hasattr(request, "params"):
+        response_value = request.params.get("response")
+    if response_value and isinstance(response_value, str):
+        if response_value.lower() == "collection":
+            raise HTTPNotImplemented(json={
+                "type": "NotImplemented",
+                "title": "Response collection format not implemented",
+                "detail": "The 'response=collection' parameter is not yet supported.",
+                "status": HTTPNotImplemented.code,
+            })

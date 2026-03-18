@@ -201,7 +201,8 @@ Glossary
         | String representation of a set of key-value pairs, usually but not limited to, ``=`` character
           separating keys from their values, ``,`` for multi-value (array) definitions, and another separator
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
-          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
+          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter,
+          within :ref:`proc_exec_kvp` request parameters, etc.
 
     Media-Type
     Media-Types
@@ -239,7 +240,12 @@ Glossary
     OAP
     OGC API - Processes
         The new :term:`API` that defines :term:`JSON` REST-binding representation
-        of :term:`WPS` :term:`Process` collection.
+        of the older :term:`WPS` representation of :term:`Process` descriptions.
+
+        This is the **main** interface that `Weaver` employs.
+
+        .. seealso::
+            :ref:`proc_ogc_api`
 
     ONNX
         The |ONNX-long|_ standard is an open format employed for sharing machine learning model representations

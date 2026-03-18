@@ -38,6 +38,73 @@ Fixes:
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 - Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
 
+.. _changes_6.10.0:
+
+`6.10.0 <https://github.com/crim-ca/weaver/tree/6.10.0>`_ (2026-03-17)
+========================================================================
+
+Changes:
+--------
+- Add support for `Key-Value Pair (KVP)` encoded `Process` execution using
+  HTTP GET requests on ``/processes/{processID}/execution`` endpoint
+  (resolves `#607 <https://github.com/crim-ca/weaver/issues/607>`_
+  and `#445 <https://github.com/crim-ca/weaver/issues/445>`_).
+
+  Supported features include:
+
+  - Simple literal inputs (strings, numbers, booleans) via direct parameter values
+  - Complex inputs via URL-encoded `JSON` objects and arrays
+  - Input arrays using comma-separated values
+  - Input by-reference using ``{inputID}[href]`` and ``{inputID}[type]`` qualifiers
+  - Bounding box inputs with optional ``{inputID}[crs]`` coordinate reference system
+  - Binary inputs with base64 encoding using ``{inputID}[value]`` and format qualifiers
+  - Output selection using ``{outputID}[include]``
+  - Output specification with ``{outputID}[mediaType]``, ``{outputID}[encoding]`` and ``{outputID}[schema]`` qualifiers
+  - Response format control via ``response[f]`` or ``response[format]`` (maps to ``Accept`` header)
+  - Execution preference control via ``response[prefer]`` (maps to ``Prefer`` header)
+  - Case-insensitive parameter qualifiers and reserved parameters
+  - Full `OGC API - Processes` ``kvp-execute`` conformance class support
+
+  The implementation converts `KVP` parameters to equivalent `JSON` execution format internally,
+  ensuring consistent behavior with POST-based executions. All existing validation, execution modes,
+  and result formats are supported identically for both GET and POST methods after query parameter parsing.
+
+- Add documentation for new KVP execution parameters and functionalities.
+- Add conformance classes for KVP execution support.
+- Update ``weaver/wps_restapi/colander_extras.py`` to allow additional parameter options (``style``, ``explode``, etc.)
+  defined by `OpenAPI`. These are employed in this context to support the representation of KVP query parameters.
+- Update ``weaver.utils.parse_kvp`` with additional ``deep_object`` capability required by KVP execution parameters.
+- Update ``swagger-ui@5.32.0`` scripts to handle rendering of advanced KVP query parameter definitions.
+- Replace generic ``PermissiveMappingSchema`` employed under I/O ``schema`` by the more explicit ``OAS`` definition.
+
+Fixes:
+------
+- Fix `GET` endpoints documenting a ``Content-Type`` header although no content body applies to them.
+
+.. _changes_6.9.1:
+
+`6.9.1 <https://github.com/crim-ca/weaver/tree/6.9.1>`_ (2026-03-09)
+========================================================================
+
+Changes:
+--------
+- Add ``--inputs-ignore-errors`` option to `CLI` ``execute`` operation and corresponding ``inputs_ignore_errors``
+  parameter to ``WeaverClient.execute()`` method. When enabled, missing or unresolved local file references in
+  input definitions will be skipped with warnings rather than causing immediate failure. By default (when disabled),
+  missing files cause the operation to fail with a detailed error message listing all problematic file references.
+- Improve `CLI` ``execute`` operation error handling for multiple input files. When multiple input JSON/YAML files
+  are provided via multiple ``-I`` options, the operation now fails with a clear error message explaining that only
+  a single input file is supported, rather than producing a cryptic attribute error.
+
+Fixes:
+------
+- Fix multi-token Vault authentication header parsing to support both single and multiple file access tokens.
+  The ``parse_vault_token`` function now handles plain token strings (e.g., from WPS process context) and full
+  header formats (e.g., ``token <value>; id=<uuid>``), and correctly validates token presence for the requested
+  file UUID. The mismatch detection logic was updated to properly check if the requested file ID exists in the
+  parsed tokens rather than only validating against the first token key
+  (fixes `#897 <https://github.com/crim-ca/weaver/issues/897>`_).
+
 .. _changes_6.9.0:
 
 `6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-03-02)
