@@ -1500,14 +1500,9 @@ class Job(Base, LoggerHandler):
         """
         Get direct links to all outputs in any possible format.
 
-        Args:
-            url (str): The base URL for constructing links.
-            results (List[Dict[str, Any]]): A list of result dictionaries containing
-                "mimeType" and "identifier".
-
-        Returns:
-            List[Dict[str, str]]: A list of dictionaries representing the links to
-                all possible output formats.
+        :param url: The base URL for constructing links.
+        :param results: A list of result dictionaries containing "mimeType" and "identifier".
+        :returns: A list of dictionaries representing the links to all possible output formats.
         """
         links = []
         for result in results:

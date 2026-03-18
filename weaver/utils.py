@@ -1249,14 +1249,18 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def create_content_id(first_id, second_id):
+def create_content_id(resource_id, context_id):
     # type: (AnyUUID, AnyUUID) -> str
     """
-    Generate a unique content id from passed ids.
-
-    Both ids can be strings or UUIDs.
+    Generates a unique ``Content-ID`` from provided IDs.
+    .. seealso::
+        - Format of ``Content-ID`` header is defined under :rfc:`2392`.
+        - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.
+    :param resource_id: Identifier of the resource unique within the context.
+    :param context_id: Identifier that provides a unique reference across contexts.
+    :returns: The ``Content-ID`` representation that can be directly employed as header.
     """
-    return f"<{first_id}@{second_id}>"
+    return f"<{resource_id}@{context_id}>"
 
 
 def get_href_headers(

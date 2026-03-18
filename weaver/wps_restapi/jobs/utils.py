@@ -598,7 +598,7 @@ def get_results(  # pylint: disable=R1260
                 else:
                     output["dataType"] = dtype
 
-            if strict:
+            if ogc_api and strict:
                 out_fmt = output.pop("format", {})
                 for fmt_key, fmt_val in out_fmt.items():
                     output.setdefault(fmt_key, fmt_val)

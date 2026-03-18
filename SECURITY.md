@@ -10,7 +10,7 @@ Patches for security vulnerabilities will be released for the following versions
 
 | Version | Supported            |
 | ------- | -------------------- |
-| 4.x     | :white\_check\_mark: |
-| < 4.x   | :x:                  |
+| 4.x     | ✅                   |
+| < 4.x   | ❌                   |
 
 [svr]: https://github.com/crim-ca/weaver/issues/new?assignees=fmigneault&labels=triage%2Fsecurity&template=security.md
