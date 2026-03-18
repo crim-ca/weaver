@@ -21,6 +21,9 @@ Changes:
   (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
 - Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
   from JSON data structures.
+- Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
+  extended from the original `Process` definition to provide alternate result representations without modifying the deployed
+  `Process` metadata.
 
 Fixes:
 ------
