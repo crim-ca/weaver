@@ -11,9 +11,7 @@ def normalize_band(image_band: np.ndarray) -> np.ndarray:
     Normalize a single band of an image to the range [0, 1].
 
     :param image_band: The image band to normalize.
-    :type image_band: np.ndarray
     :return: The normalized image band.
-    :rtype: np.ndarray
     """
     band_min, band_max = image_band.min(), image_band.max()  # type: ignore  # IDE type stub error
     return (image_band - band_min) / (band_max - band_min)
@@ -52,7 +50,6 @@ class Tiff:
         Initialize the Tiff object with the given file path.
 
         :param file_path: The file path to the TIFF image.
-        :type file_path: str
         """
         self.file_path = file_path
         self.dataset = rasterio.open(self.file_path)
@@ -85,7 +82,6 @@ class Tiff:
         Get the range of valid band indexes for the TIFF file.
 
         :return: A range object representing valid band indexes.
-        :rtype: range
         """
         return range(1, self.nb_bands + 1)
 
@@ -94,9 +90,7 @@ class Tiff:
         Retrieve a specific band of the image by index.
 
         :param index: The band index to retrieve.
-        :type index: int
         :return: The band as a NumPy array, or None if not found.
-        :rtype: Optional[np.ndarray]
         :raises RuntimeError: If the band index is invalid or data cannot be read.
         """
         if index in self.range:
@@ -108,13 +102,9 @@ class Tiff:
         Retrieve RGB images by combining bands from a GeoTIFF or multi-page TIFF.
 
         :param red_band: The band index for the red channel.
-        :type red_band: int
         :param green_band: The band index for the green channel.
-        :type green_band: int
         :param blue_band: The band index for the blue channel.
-        :type blue_band: int
         :return: A list of PIL Image objects representing the RGB image(s).
-        :rtype: List[Image.Image]
         """
         if self.is_geotiff:
             indexes = [i for i in [red_band, green_band, blue_band] if i in self.range]
