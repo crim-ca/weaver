@@ -821,7 +821,7 @@ def test_output_format_version(test_format, allow_version, expect_type):
             <item type="int">123</item>
             </data>
             </item>
-            """).replace("\n", "")
+            """).replace("\n", "").encode()
         ),
         (
             f.OutputFormat.XML_STR,

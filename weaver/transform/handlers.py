@@ -251,7 +251,7 @@ def csv_to_xml(i: str, out: str) -> None:
     file = f"{i}.json"
     csv_to_json(i, file)
     data = readfromjson(file)
-    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    xml_content = OutputFormat.convert(data, OutputFormat.XML_RAW)
     write_content(out, xml_content)
 
 
@@ -264,7 +264,7 @@ def json_to_xml(i: str, out: str) -> None:
     :param out: Path to the output XML file.
     """
     data = readfromjson(i)
-    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    xml_content = OutputFormat.convert(data, OutputFormat.XML_RAW)
     write_content(out, xml_content)
 
 
@@ -364,7 +364,7 @@ def yaml_to_xml(i: str, out: str) -> None:
     """
     with open(i, "r", encoding="utf-8") as file:
         data = yaml.safe_load(file)
-    xml_content = OutputFormat.convert(data, OutputFormat.XML)
+    xml_content = OutputFormat.convert(data, OutputFormat.XML_RAW)
     write_content(out, xml_content)
 
 

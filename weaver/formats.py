@@ -445,7 +445,8 @@ class OutputFormat(Constants):
         ]:
             pretty = fmt in [OutputFormat.XML_STR, OutputFormat.HTML_STR]
             xml = Json2xml(data, item_wrap=True, pretty=pretty, wrapper=item_root).to_xml()
-            xml = bytes2str(xml)
+            if fmt in [OutputFormat.XML_RAW, OutputFormat.HTML_RAW]:
+                xml = bytes2str(xml)
             if isinstance(xml, str):
                 xml = xml.strip()
             return xml
