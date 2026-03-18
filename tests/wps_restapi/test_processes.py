@@ -1317,13 +1317,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "mediaType": ContentType.APP_YAML,
             },
             {
-                "mediaType": "text/csv",
+                "mediaType": ContentType.TEXT_CSV,
             },
             {
-                "mediaType": "application/xml",
+                "mediaType": ContentType.APP_XML,
             },
             {
-                "mediaType": "application/json",
+                "mediaType": ContentType.APP_JSON,
             },
         ]
 
@@ -1432,9 +1432,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                     },
                     {
                         "type": "string",
-                        "format": "binary",
+                        "format": ContentEncoding.BINARY,
                         "contentMediaType": ContentType.APP_PDF,
-                        "contentEncoding": "base64"
+                        "contentEncoding": ContentEncoding.BASE64
                     }
                 ]
             },
@@ -1552,9 +1552,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         },
                         {
                             "type": "string",
-                            "format": "binary",
+                            "format": ContentEncoding.BINARY,
                             "contentMediaType": ContentType.APP_PDF,
-                            "contentEncoding": "base64"
+                            "contentEncoding": ContentEncoding.BASE64
                         }
                     ]
                 },
@@ -1613,9 +1613,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         },
                         {
                             "type": "string",
-                            "format": "binary",
+                            "format": ContentEncoding.BINARY,
                             "contentMediaType": ContentType.APP_PDF,
-                            "contentEncoding": "base64"
+                            "contentEncoding": ContentEncoding.BASE64
                         }
                     ]
                 },
@@ -1672,9 +1672,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         },
                         {
                             "type": "string",
-                            "format": "binary",
+                            "format": ContentEncoding.BINARY,
                             "contentMediaType": ContentType.APP_PDF,
-                            "contentEncoding": "base64"
+                            "contentEncoding": ContentEncoding.BASE64
                         }
                     ]
                 },
@@ -1731,9 +1731,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         },
                         {
                             "type": "string",
-                            "format": "binary",
+                            "format": ContentEncoding.BINARY,
                             "contentMediaType": ContentType.APP_PDF,
-                            "contentEncoding": "base64"
+                            "contentEncoding": ContentEncoding.BASE64
                         }
                     ]
                 },
@@ -1790,9 +1790,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         },
                         {
                             "type": "string",
-                            "format": "binary",
+                            "format": ContentEncoding.BINARY,
                             "contentMediaType": ContentType.APP_PDF,
-                            "contentEncoding": "base64"
+                            "contentEncoding": ContentEncoding.BASE64
                         }
                     ]
                 },

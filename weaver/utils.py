@@ -1253,6 +1253,7 @@ def create_content_id(resource_id, context_id):
     # type: (AnyUUID, AnyUUID) -> str
     """
     Generates a unique ``Content-ID`` from provided IDs.
+
     .. seealso::
         - Format of ``Content-ID`` header is defined under :rfc:`2392`.
         - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.

@@ -6,6 +6,7 @@ from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPNoContent,
+    HTTPNotAcceptable,
     HTTPNotFound,
     HTTPOk,
     HTTPPermanentRedirect,
@@ -740,10 +741,11 @@ def get_job_output(request):
         available_ids = [str(o["identifier"]) for o in job.results]
         raise HTTPNotFound(
             json={
-                "code": "InvalidIdentifierValue",
-                "description": "The requested output ID is not available in the job results.",
-                "cause": f"The output ID must be one of: {available_ids}",
-                "error": HTTPNotFound.__name__,
+                "title": "NoSuchOutput",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+                "detail": "The requested output ID is not available in the job results.",
+                "status": HTTPNotFound.code,
+                "cause": f"Available outputs: {available_ids}" if available_ids else output_id,
                 "value": output_id
             }
         )
@@ -760,11 +762,12 @@ def get_job_output(request):
     result_media_type = guess_target_format(request, default=result_media_type)
 
     if result_media_type not in possible_media_types:
-        raise HTTPUnprocessableEntity(json={
-            "code": "InvalidMediaTypesRequested",
-            "description": "The requested output format is not in the possible output formats.",
-            "cause": "Incompatible Media-Types",
-            "error": "InvalidMediaTypesRequested",
+        raise HTTPNotAcceptable(json={
+            "title": "NotAcceptable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-common-1/1.0/not-acceptable",
+            "detail": "The requested output format cannot be generated for this output.",
+            "status": HTTPNotAcceptable.code,
+            "cause": f"Requested format '{result_media_type}' is not compatible with available formats: {possible_media_types}",
             "value": result_media_type
         })
 

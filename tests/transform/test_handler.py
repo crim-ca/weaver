@@ -1,4 +1,3 @@
-import mimetypes
 import os
 import shutil
 import tempfile
@@ -8,17 +7,16 @@ from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
 from tests.resources import TRANSFORM_PATH
+from weaver.formats import ContentType, get_content_type
 from weaver.transform.const import CONVERSION_DICT
 from weaver.transform.handlers import Transform
-
-# Register the MIME type for .yaml files
-mimetypes.add_type("application/x-yaml", ".yaml")
 
 
 def using_mimes(func):
     def wrapper(*args, **kwargs):
-        cmt = mimetypes.guess_type(args[0])[0]
-        if cmt in CONVERSION_DICT:
+        ext = os.path.splitext(args[0])[1]
+        cmt = get_content_type(ext)
+        if cmt and cmt in CONVERSION_DICT:
             for wmt in CONVERSION_DICT[cmt]:
                 func(args[0], cmt, wmt)
 
@@ -44,10 +42,10 @@ def test_transformations(file_name):
 
 
 @pytest.mark.parametrize("file_ext,content,current_type,wanted_type", [
-    ("csv", "col1,col2\nval1,val2\n", "text/csv", "application/pdf"),
-    ("json", '{"key": "value"}', "application/json", "image/png"),
-    ("yaml", "key: value\n", "application/x-yaml", "image/png"),
-    ("xml", "<root><item>value</item></root>", "application/xml", "text/csv"),
+    ("csv", "col1,col2\nval1,val2\n", ContentType.TEXT_CSV, ContentType.APP_PDF),
+    ("json", '{"key": "value"}', ContentType.APP_JSON, ContentType.IMAGE_PNG),
+    ("yaml", "key: value\n", ContentType.APP_X_YAML, ContentType.IMAGE_PNG),
+    ("xml", "<root><item>value</item></root>", ContentType.APP_XML, ContentType.TEXT_CSV),
 ])
 def test_unsupported_conversions(file_ext, content, current_type, wanted_type):
     with tempfile.TemporaryDirectory() as tmp_path:
@@ -67,7 +65,7 @@ def test_unsupported_image_conversion():
         img = Image.new('RGB', (100, 100), color='red')
         img.save(png_file)
 
-        trans = Transform(file_path=png_file, current_media_type="image/png", wanted_media_type="text/csv")
+        trans = Transform(file_path=png_file, current_media_type=ContentType.IMAGE_PNG, wanted_media_type=ContentType.TEXT_CSV)
         with pytest.raises(HTTPUnprocessableEntity):
             trans.get()
 
@@ -78,17 +76,17 @@ def test_transform_same_media_type():
         with open(txt_file, "w", encoding="utf-8") as f:
             f.write("test content")
 
-        trans = Transform(file_path=txt_file, current_media_type="text/plain", wanted_media_type="text/plain")
+        trans = Transform(file_path=txt_file, current_media_type=ContentType.TEXT_PLAIN, wanted_media_type=ContentType.TEXT_PLAIN)
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert trans.output_path == txt_file
 
 
 @pytest.mark.parametrize("file_ext,content,current_type,wanted_type,expected_ext", [
-    ("txt", "test content", "text/plain", "text/html", ".html"),
-    ("txt", "test content for PDF", "text/plain", "application/pdf", ".pdf"),
-    ("html", "<html><body><p>test content</p></body></html>", "text/html", "text/plain", ".txt"),
-    ("json", '{"key": "value", "number": 123}', "application/json", "text/plain", ".txt"),
+    ("txt", "test content", ContentType.TEXT_PLAIN, ContentType.TEXT_HTML, ".html"),
+    ("txt", "test content for PDF", ContentType.TEXT_PLAIN, ContentType.APP_PDF, ".pdf"),
+    ("html", "<html><body><p>test content</p></body></html>", ContentType.TEXT_HTML, ContentType.TEXT_PLAIN, ".txt"),
+    ("json", '{"key": "value", "number": 123}', ContentType.APP_JSON, ContentType.TEXT_PLAIN, ".txt"),
 ])
 def test_successful_conversions(file_ext, content, current_type, wanted_type, expected_ext):
     with tempfile.TemporaryDirectory() as tmp_path:
@@ -114,8 +112,8 @@ def test_output_file_already_exists():
         with open(xml_file, "w", encoding="utf-8") as f:
             f.write("<old>content</old>")
 
-        trans = Transform(file_path=json_file, current_media_type="application/json",
-                          wanted_media_type="application/xml")
+        trans = Transform(file_path=json_file, current_media_type=ContentType.APP_JSON,
+                          wanted_media_type=ContentType.APP_XML)
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert os.path.exists(trans.output_path)
@@ -127,7 +125,7 @@ def test_csv_with_empty_headers():
         with open(csv_file, "w", encoding="utf-8") as f:
             f.write(",col2,\nval1,val2,val3\n")
 
-        trans = Transform(file_path=csv_file, current_media_type="text/csv", wanted_media_type="application/json")
+        trans = Transform(file_path=csv_file, current_media_type=ContentType.TEXT_CSV, wanted_media_type=ContentType.APP_JSON)
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert os.path.exists(trans.output_path)

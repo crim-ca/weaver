@@ -189,8 +189,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/conf/core/job-result",
         f"{ogcapi_proc_core1}/conf/core/job-results",
         f"{ogcapi_proc_core1}/conf/core/job-results-async-many",
-        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
-        # f"{ogcapi_proc_core1}/conf/core/job-results-async-one",
+        f"{ogcapi_proc_core1}/conf/core/job-results-async-one",
         f"{ogcapi_proc_core1}/conf/core/job-results-exception-no-such-job",
         f"{ogcapi_proc_core1}/conf/core/job-results-exception-results-not-ready",
         f"{ogcapi_proc_core1}/conf/core/job-results-failed",
@@ -223,8 +222,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/conf/core/process-execute-op",
         f"{ogcapi_proc_core1}/conf/core/process-execute-request",
         f"{ogcapi_proc_core1}/conf/core/process-execute-success-async",
-        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
-        # f"{ogcapi_proc_core1}/conf/core/process-execute-sync-one",
+        f"{ogcapi_proc_core1}/conf/core/process-execute-sync-one",
         f"{ogcapi_proc_core1}/conf/core/process-execute-sync-default-content",
         f"{ogcapi_proc_core1}/conf/core/process-execute-sync-many-json",
         f"{ogcapi_proc_core1}/conf/core/process-list",
@@ -313,8 +311,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/core/job-results",
         f"{ogcapi_proc_core1}/req/core/job-results-async-document",
         f"{ogcapi_proc_core1}/req/core/job-results-async-many",
-        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
-        # f"{ogcapi_proc_core1}/req/core/job-results-async-one",
+        f"{ogcapi_proc_core1}/req/core/job-results-async-one",
         f"{ogcapi_proc_core1}/req/core/job-results-async-raw-mixed-multi",
         f"{ogcapi_proc_core1}/req/core/job-results-async-raw-ref",
         f"{ogcapi_proc_core1}/req/core/job-results-async-raw-value-multi",
@@ -350,9 +347,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/core/process-execute-success-async",
         f"{ogcapi_proc_core2}/req/core/process-execute-success-async-outputs"
         f"{ogcapi_proc_core2}/req/core/process-execute-success-async-outputs-omitted"
-        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
-        # (currently we "succeed" the 404 requirement in this case, but because endpoint is missing, not output omitted)
-        # f"{ogcapi_proc_core2}/req/core/process-execute-success-async-outputs-empty"
+        f"{ogcapi_proc_core2}/req/core/process-execute-success-async-outputs-empty"
         f"{ogcapi_proc_core2}/req/core/process-execute-success-sync-empty-outputs"
         f"{ogcapi_proc_core1}/req/core/process-execute-sync-document",
         f"{ogcapi_proc_core1}/req/core/process-execute-sync-raw-mixed-multi",
