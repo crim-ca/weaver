@@ -696,7 +696,7 @@ class BuiltinAppTest(WpsConfigBase):
                 "boundingBoxOutput",
                 [
                     (["bbox"], ["bbox"]),
-                    (Crs(inputs["boundingBoxInput"]["crs"]).getcodeurn(), ["crs"]),
+                    (Crs(inputs["boundingBoxInput"]["crs"]).getcodeuri1(), ["crs"]),
                 ]
             ),
         ]:

@@ -422,7 +422,7 @@ test-unit-only: | mkdir-reports 		## run unit tests (skip long running and onlin
 .PHONY: test-func-only
 test-func-only: | mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
-	@$(call run_test,-m "functional")
+	@$(call run_test,-m "functional and not code_sprint")
 
 .PHONY: test-cli-only
 test-cli-only: | mkdir-reports   		## run WeaverClient and CLI tests
@@ -448,6 +448,12 @@ test-offline-only: | mkdir-reports  	## run offline tests (not marked as online)
 test-no-tb14-only: | mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
 	@$(call run_test,-m "not testbed14")
+
+.PHONY: test-code-sprint-only
+test-code-sprint-only: | mkdir-reports   	## run OGC Code Sprint tests (test against server specified by environment)
+	@echo "Running functional tests..."
+	@[ "${TEST_SERVER}" ] || ( echo ">> 'TEST_SERVER' is not set. Tests code-sprint requires a server to run."; exit 1 )
+	@$(call run_test,-m "code_sprint")
 
 .PHONY: test-spec-only
 test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
@@ -1039,17 +1045,73 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 ## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
 .PHONY: start
-start: install-run	## start application instance(s) with gunicorn (pserve)
-	@echo "Starting $(APP_NAME)..."
-	@bash -c '$(CONDA_CMD) exec pserve "$(APP_INI)" &'
+start: install-run start-only	## start application instance(s) after dependencies installation
+
+.PHONY: start-only
+start-only: start-manager-only start-worker-only	## start both manager and worker instances
+
+# Minimal pidfile-based start/stop for the two known services (manager, worker).
+# allow overrides via Makefile.config or environment
+MANAGER_PIDFILE ?= /tmp/$(APP_NAME)-manager.pid
+MANAGER_LOG ?= /tmp/$(APP_NAME)-manager.log
+WORKER_PIDFILE ?= /tmp/$(APP_NAME)-worker.pid
+WORKER_LOG ?= /tmp/$(APP_NAME)-worker.log
+
+.PHONY: start-manager-only
+start-manager-only:   	## start application instance(s) with pserve (manager)
+	@echo "Starting $(APP_NAME) [manager]..."
+	@bash -c 'mkdir -p $$(dirname "$(MANAGER_LOG)"); nohup bash -lc "$(CONDA_CMD) exec pserve \"$(APP_INI)\"" >>"$(MANAGER_LOG)" 2>&1 & echo $$! > "$(MANAGER_PIDFILE)"; echo "Started manager -> $(MANAGER_PIDFILE)"'
+
+.PHONY: start-worker-only
+start-worker-only: 	## start worker instance(s) with celery
+	@echo "Starting $(APP_NAME) [worker]..."
+	@bash -c 'mkdir -p $$(dirname "$(WORKER_LOG)"); nohup bash -lc "$(CONDA_CMD) exec celery -A pyramid_celery.celery_app worker -B -E --ini \"$(APP_INI)\"" >>"$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PIDFILE)"; echo "Started worker -> $(WORKER_PIDFILE)"'
 
 .PHONY: stop
-stop: 		## kill application instance(s) started with gunicorn (pserve)
-	@(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"
+stop: stop-manager stop-worker		## stop application instance(s) as needed
+
+.PHONY: stop-manager
+stop-manager: 		## stop application instance(s) started with pserve (manager)
+	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
+		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ]; then \
+			kill $$pid 2>/dev/null || true; sleep 1; \
+			if kill -0 $$pid 2>/dev/null; then kill -9 $$pid 2>/dev/null || true; fi; \
+			rm -f "$(MANAGER_PIDFILE)"; echo "Stopped manager (PID $$pid)"; \
+		else \
+			echo "Invalid pidfile; removing"; rm -f "$(MANAGER_PIDFILE)"; \
+		fi; \
+	else \
+		(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"; \
+	fi'
+
+.PHONY: stop-worker
+stop-worker: 		## stop worker instance(s) started with celery
+	@bash -c 'if [ -f "$(WORKER_PIDFILE)" ]; then \
+		pid=$$(cat "$(WORKER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ]; then \
+			kill $$pid 2>/dev/null || true; sleep 1; \
+			if kill -0 $$pid 2>/dev/null; then kill -9 $$pid 2>/dev/null || true; fi; \
+			rm -f "$(WORKER_PIDFILE)"; echo "Stopped worker (PID $$pid)"; \
+		else \
+			echo "Invalid pidfile; removing"; rm -f "$(WORKER_PIDFILE)"; \
+		fi; \
+	else \
+		echo "No worker pidfile ($(WORKER_PIDFILE)) - nothing to stop"; \
+	fi'
 
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
-	@lsof -i :4001 || echo "No instance running"
+	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
+		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ] && kill -0 $$pid 2>/dev/null; then \
+			ps -p $$pid -o pid,cmd; \
+		else \
+			echo "No manager instance running"; \
+		fi; \
+	else \
+		lsof -i :4001 || echo "No instance running"; \
+	fi'
 
 # Reapply config if overrides were defined.
 # Ensure overrides take precedence over targets and auto-resolution logic of variables.

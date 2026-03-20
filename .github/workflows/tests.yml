@@ -94,8 +94,13 @@ jobs:
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
             python-version: "3.12"
-            allow-failure: true
+            allow-failure: false
             test-case: test-workflow-only
+          # OGC Code-Sprint tests
+          - os: ubuntu-latest
+            python-version: "3.12"
+            allow-failure: false
+            test-case: start-only test-code-sprint-only
     steps:
       - uses: actions/checkout@v2
         with:
@@ -144,6 +149,11 @@ jobs:
       - name: Display Applicable Checks
         if: ${{ startsWith(matrix.test-case, 'check') }}
         run: make check-info
+      - name: Env Test Setup
+        if: ${{ contains(matrix.test-case, 'code-sprint') }}
+        uses: xom9ikk/dotenv@v2
+        with:
+          path: ./tests/functionals/code-sprint/weaver-localhost/test.env
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 

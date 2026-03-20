@@ -27,6 +27,7 @@ from weaver import ogc_definitions as ogc_defs
 from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER
 from weaver.status import Status
 from weaver.utils import get_any_value
 
@@ -52,6 +53,9 @@ TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED = asbool(
 )
 TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED = asbool(
     os.getenv("TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED", "false")
+)
+TEST_SERVER_RESULTS_SINGLE_OUTPUT = asbool(
+    os.getenv("TEST_SERVER_RESULTS_SINGLE_OUTPUT", "true")
 )
 
 
@@ -333,14 +337,22 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert result.code == 200
         if result_profile:
             job_results_data = result.body
-            assert "outputs" in job_results_data
+            assert all(out_id in job_results_data for out_id in process_outputs), (
+                "All process outputs expected in results."
+            )
+            assert all(
+                get_any_value(out) if isinstance(out, dict) else bool(out)
+                for out in job_results_data.values()
+            ), "Output result should be provided by value or reference, directly or qualified, for all process outputs."
 
         # FIXME: no public method to get individual output, use _request
-        results_url = f"{TEST_SERVER_BASE_URL}/jobs/{job_id}/results"
-        output_id = process_outputs[0].get("id")
-        path = f"{results_url}/{output_id}"
-        resp = self.client._request("GET", path)
-        assert resp.status_code == 200
+        # FIXME: to enable with https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548
+        if TEST_SERVER_RESULTS_SINGLE_OUTPUT:
+            results_url = f"{TEST_SERVER_BASE_URL}/jobs/{job_id}/results"
+            output_id = process_outputs[0].get("id")
+            path = f"{results_url}/{output_id}"
+            resp = self.client._request("GET", path)
+            assert resp.status_code == 200
 
 
 @pytest.mark.code_sprint
@@ -432,12 +444,14 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
                 "class": "CommandLineTool",
                 "id": process_id,
                 "baseCommand": "echo",
+                "requirements": {CWL_REQUIREMENT_APP_DOCKER: {"dockerPull": "alpine:latest"}},
                 "inputs": {"input": "string"},
-                "outputs": {"output": {"type": "stdout"}}
+                "outputs": {"output": {"type": "File"}},
+                "stdout": "output.txt",
             }
         )
         result = self.client.deploy(process_id=process_id, cwl=cwl_app_pkg)
-        assert result.code == 200
+        assert result.code == 201
         location = result.headers.get("Location")
         assert location
         assert location.endswith(f"/processes/{process_id}")

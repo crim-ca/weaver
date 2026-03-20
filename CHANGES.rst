@@ -14,8 +14,10 @@ Changes:
 --------
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
+  and run their tests with ``tests/functional/code-sprint/test-servers/weaver-localhost`` definitions in the CI.
 - Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.
-- Allow ``WeaverClient`` and the `CLI` to accept `Process` and `Provider` IDs as their full URI.
+- Add support of ``WeaverClient`` and the `CLI` with `Process` and `Provider` IDs provided directly as their full URI.
+- Add support of ``WeaverClient`` and the `CLI` to ``deploy`` a `CWL` definition directly as ``application/cwl+json``.
 - Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions`` module.
   This module also provides utilities to allow conversion between various equivalent representations of the definitions.
 - Add ``processingEntityType`` (always ``ogc-api-processes`` in this case) and ``id`` to `Job` response for conformance.
@@ -37,6 +39,7 @@ Fixes:
 ------
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 - Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
+- Fix missing ``Location`` header in ``HTTP 201 Created`` response of `Process` deployment.
 
 .. _changes_6.10.0:
 
@@ -79,7 +82,7 @@ Changes:
 
 Fixes:
 ------
-- Fix `GET` endpoints documenting a ``Content-Type`` header although no content body applies to them.
+- Fix ``GET`` endpoints documenting a ``Content-Type`` header although no content body applies to them.
 
 .. _changes_6.9.1:
 
