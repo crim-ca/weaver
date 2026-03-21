@@ -153,7 +153,7 @@ jobs:
         if: ${{ contains(matrix.test-case, 'code-sprint') }}
         uses: xom9ikk/dotenv@v2
         with:
-          path: ./tests/functionals/code-sprint/weaver-localhost/test.env
+          path: ./tests/functionals/code_sprint/test-servers/weaver-localhost/test.env
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 
