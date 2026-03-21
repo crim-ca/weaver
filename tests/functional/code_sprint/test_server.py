@@ -48,8 +48,10 @@ TEST_SERVER_OAP_CORE_PROCESS_ID = os.getenv("TEST_SERVER_OAP_CORE_PROCESS_ID", "
 TEST_SERVER_OAP_DRU_PROCESS_ID = os.getenv("TEST_SERVER_OAP_DRU_PROCESS_ID", "test-echo")
 
 # bypass dependencies of certain tests known to fail a certain prerequisite
-TEST_SERVER_OAP_DRU_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_UNSUPPORTED", "false"))
 TEST_SERVER_OAP_OAS_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_OAS_UNSUPPORTED", "false"))
+TEST_SERVER_OAP_DRU_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_UNSUPPORTED", "false"))
+TEST_SERVER_OAP_DRU_CWL_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_CWL_UNSUPPORTED", "false"))
+TEST_SERVER_OAP_DRU_OGCAPPPKG_UNSUPPORTED = asbool(os.getenv("TEST_SERVER_OAP_DRU_OGCAPPPKG_UNSUPPORTED", "false"))
 TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED = asbool(
     os.getenv("TEST_SERVER_OAP_PROC_DESC_PROFILE_UNSUPPORTED", "false")
 )
@@ -388,6 +390,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
     def test_conformance_classes_dru(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy" in self.conforms_to
 
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_DRU_OGCAPPPKG_UNSUPPORTED,
+        reason="OGC API Application Package process deployment not supported by the test server.",
+    )
     @pytest.mark.dependency(
         name="test_conformance_classes_dru_ogcapppkg",
         depends=["test_conformance_classes_dru"],
@@ -395,6 +401,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
     def test_conformance_classes_dru_ogcapppkg(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/ogcapppkg" in self.conforms_to
 
+    @pytest.mark.skipif(
+        TEST_SERVER_OAP_DRU_CWL_UNSUPPORTED,
+        reason="CWL Application Package process deployment not supported by the test server.",
+    )
     @pytest.mark.dependency(
         name="test_conformance_classes_dru_cwl",
         depends=["test_conformance_classes_dru"],
@@ -648,14 +658,21 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
         result = self.client.processes(detail=True)
         processes = result.body.get("processes", [])
-        mutable_proc = next((p for p in processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
-        assert mutable_proc, "No mutable process found."
-        process_id = mutable_proc["id"]
-        result = self.client.undeploy(process_id)
-        assert result.code == 204, (
-            "Undeploy should respond with 204 if successful "
-            "(/req/deploy-replace-undeploy/undeploy-response)."
-        )
-        assert not result.body
-        result = self.client.describe(process_id)
+        mutable_proc = None
+        deployed_proc = [p for p in processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)]
+        for mutable_proc in deployed_proc:
+            assert mutable_proc, "No mutable process found."
+            process_id = mutable_proc["id"]
+            result = self.client.undeploy(process_id)
+            assert result.code == 204, (
+                "Undeploy should respond with 204 if successful "
+                "(/req/deploy-replace-undeploy/undeploy-response)."
+            )
+            assert not result.body
+
+        # note: particularity of Weaver
+        #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
+        #   therefore, requesting the description of the non-versioned processID *might* cause a 200 finding it
+        #   this is why we iteratively undeploy all expected ones above, so there is no revision left either
+        result = self.client.describe(mutable_proc)
         assert result.code == 404
