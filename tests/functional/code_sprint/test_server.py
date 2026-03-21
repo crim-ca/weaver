@@ -350,7 +350,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             assert all(
                 get_any_value(out) if isinstance(out, dict) else bool(out)
                 for out in job_results_data.values()
-            ), "Output result should respond with provided by value or reference, directly or qualified, for all process outputs."
+            ), (
+                "Output result should respond with provided by value or reference, "
+                "directly or qualified, for all process outputs."
+            )
 
         # FIXME: no public method to get individual output, use _request
         # FIXME: to enable with https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548

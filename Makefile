@@ -643,7 +643,7 @@ check-imports-only: | mkdir-reports 	## check imports ordering and styles
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
-		isort --check-only --diff --recursive $(APP_ROOT) \
+		isort --check-only --diff $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: check-css-only
@@ -698,7 +698,7 @@ fix-imports-only: mkdir-reports	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-imports.txt"
 	@bash -c '$(CONDA_CMD) \
-		isort --recursive $(APP_ROOT) \
+		isort $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
 # FIXME: https://github.com/PyCQA/pycodestyle/issues/996

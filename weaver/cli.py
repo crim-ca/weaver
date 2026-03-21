@@ -31,8 +31,13 @@ from weaver.execute import (
     resolve_execution_parameters
 )
 from weaver.formats import (
-    ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json,
-    clean_media_type_format
+    ContentEncoding,
+    ContentType,
+    OutputFormat,
+    clean_media_type_format,
+    get_content_type,
+    get_format,
+    repr_json
 )
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (

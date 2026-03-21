@@ -450,9 +450,9 @@ Corresponding reports are available online at the following locations:
 - |ogc-tb20-gdc-usage-test-report|_
 
 `Weaver` has been employed in the context of the |ogc-api-proc-code-sprint-2026-event|_, where it was used
-to validate its conformance implementation and test interoperability capabilities of the |ogc-api-proc-part1-v2|_
+to validate its conformance implementation and to test interoperability capabilities of the |ogc-api-proc-part1-v2|_
 and |ogc-api-proc-part2|_ standards. Feedback was provided, allowing improvements related to advanced
-content negotiation capabilities with to complex `Results Profile` representations in `Job` management.
+content negotiation capabilities to enable support of `Results Profile` representations in `Job` management.
 Amongst evaluated server implementations over the |ogc-api-proc-code-sprint-2026-test-suite|_, `Weaver` was able
 to strongly align with other participant and demonstrated the standard's capabilities. The ``WeaverClient`` was
 also employed to communicate with the participant's implementations, demonstrating its capacity to interoperate
