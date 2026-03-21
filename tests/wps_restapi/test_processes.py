@@ -2621,10 +2621,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_delete_process_success(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200, f"Error: {resp.text}"
-        assert resp.content_type == ContentType.APP_JSON
-        assert resp.json["identifier"] == self.process_public.identifier
-        assert isinstance(resp.json["undeploymentDone"], bool) and resp.json["undeploymentDone"]
+        assert resp.status_code == 204, f"Error: {resp.text}"
+        assert "Content-Type" not in resp.headers
         with pytest.raises(ProcessNotFound):
             self.process_store.fetch_by_id(self.process_public.identifier)
 

@@ -27,9 +27,14 @@ from weaver import ogc_definitions as ogc_defs
 from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
-from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER
+from weaver.processes.constants import (
+    CWL_NAMESPACE_SCHEMA_DEFINITION,
+    CWL_NAMESPACE_SCHEMA_ID,
+    CWL_REQUIREMENT_APP_DOCKER
+)
+from weaver.processes.convert import normalize_ordered_io
 from weaver.status import Status
-from weaver.utils import get_any_value
+from weaver.utils import get_any_id, get_any_value
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON, Path
@@ -276,7 +281,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             execute_return=ExecuteReturnPreference.MINIMAL,
             timeout=TEST_SERVER_REQUEST_TIMEOUT,
         )
-        assert execute_result.code == 200, f"Execution should be successful for {process_execute_json_file}"
+        assert execute_result.code == 200, f"Execution should respond with successful for {process_execute_json_file}"
         assert execute_result.headers.get("Content-Type", "").startswith(ContentType.APP_JSON)
         results = execute_result.body
         assert set(process_outputs) == set(results)
@@ -343,7 +348,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             assert all(
                 get_any_value(out) if isinstance(out, dict) else bool(out)
                 for out in job_results_data.values()
-            ), "Output result should be provided by value or reference, directly or qualified, for all process outputs."
+            ), "Output result should respond with provided by value or reference, directly or qualified, for all process outputs."
 
         # FIXME: no public method to get individual output, use _request
         # FIXME: to enable with https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548
@@ -373,6 +378,12 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
             if result.code not in (200, 204, 404):
                 warnings.warn(f"Warning: failed to undeploy process [{process_id}] during teardown.")
 
+    @classmethod
+    def get_cleanup_process(cls, prefix_process_id):
+        for p_id in cls.cleanup_processes:
+            if p_id.startswith(prefix_process_id):
+                return p_id
+
     @pytest.mark.dependency(name="test_conformance_classes_dru")
     def test_conformance_classes_dru(self):
         assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy" in self.conforms_to
@@ -396,7 +407,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_conformance_classes_dru_ogcapppkg"],
     )
     def test_deploy_process_ogcapppkg(self):
-        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-ogcapppkg-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
         ogc_app_pkg = {
             "type": "docker",
@@ -435,7 +446,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_conformance_classes_dru_cwl"],
     )
     def test_deploy_process_cwl(self):
-        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        process_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-cwl-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(process_id)
         cwl_app_pkg = cast(
             "CWL",
@@ -451,12 +462,18 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
             }
         )
         result = self.client.deploy(process_id=process_id, cwl=cwl_app_pkg)
-        assert result.code == 201
+        assert result.code == 201, (
+            "Deploy should respond with 201 if immediate or 202 if accepted "
+            "(/req/deploy-replace-undeploy/deploy-response-success)."
+        )
         location = result.headers.get("Location")
         assert location
         assert location.endswith(f"/processes/{process_id}")
         result = self.client.describe(process_id)
-        assert result.code == 200
+        assert result.code == 200, (
+            "Process description should respond with 200 "
+            "(/req/core/process-description-success)."
+        )
         desc_json = result.body
         assert desc_json["id"] == process_id
         assert "inputs" in desc_json and "outputs" in desc_json
@@ -466,9 +483,12 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_ogcapppkg"],
     )
     def test_retrieve_application_package_ogcapppkg(self):
+        partial_proc = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-ogcapppkg-"
         mutable_proc = (
             p for p in self.processes
-            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+            if p.get("mutable")
+            and str(p.get("id")).startswith(partial_proc)
+            and p.get("id") in self.cleanup_processes
         )
         assert mutable_proc, "No mutable process found."
         process_id = next(mutable_proc)["id"]
@@ -485,6 +505,8 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         oap_inputs = desc_json.get("inputs", [])
         pkg_outputs = pkg_json.get("outputs", [])
         oap_outputs = desc_json.get("outputs", [])
+        pkg_inputs = [get_any_id(param) for param in normalize_ordered_io(pkg_inputs)]
+        pkg_outputs = [get_any_id(param) for param in normalize_ordered_io(pkg_outputs)]
         assert set(pkg_inputs) == set(oap_inputs)
         assert set(pkg_outputs) == set(oap_outputs)
 
@@ -493,16 +515,21 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_cwl"],
     )
     def test_retrieve_application_package_cwl(self):
+        partial_proc = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-cwl-"
         mutable_proc = (
             p for p in self.processes
-            if p.get("id") == TEST_SERVER_OAP_DRU_PROCESS_ID and p.get("mutable") is True
+            if p.get("mutable")
+            and str(p.get("id")).startswith(partial_proc)
+            and p.get("id") in self.cleanup_processes
         )
         assert mutable_proc, "No mutable process found."
         process_id = next(mutable_proc)["id"]
-        pkg_response = self.client.package(process_id)
+        # by default, package response returns "plain" JSON Content-Type since added by default in 'Accept'
+        # request it explicitly to ensure the corresponding content and media-type are obtained
+        pkg_response = self.client.package(process_id, headers={"Accept": ContentType.APP_CWL_JSON})
         assert pkg_response.code == 200
         content_type = pkg_response.headers.get("Content-Type", "")
-        assert content_type in ["application/cwl+json", "application/cwl+yaml", "application/cwl"]
+        assert content_type in ContentType.ANY_CWL
         pkg_json = pkg_response.body
         desc_response = self.client.describe(process_id)
         assert desc_response.code == 200
@@ -512,6 +539,8 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         oap_inputs = desc_json.get("inputs", [])
         pkg_outputs = pkg_json.get("outputs", [])
         oap_outputs = desc_json.get("outputs", [])
+        pkg_inputs = [get_any_id(param) for param in normalize_ordered_io(pkg_inputs)]
+        pkg_outputs = [get_any_id(param) for param in normalize_ordered_io(pkg_outputs)]
         assert set(pkg_inputs) == set(oap_inputs)
         assert set(pkg_outputs) == set(oap_outputs)
 
@@ -520,33 +549,46 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_ogcapppkg"],
     )
     def test_replace_process_ogcapppkg(self):
-        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
-        assert result.code == 200
+        p_id = self.get_cleanup_process(f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-ogcapppkg-")
+        result = self.client.package(p_id, headers={"Content-Type": ContentType.APP_OGC_PKG_JSON})
+        assert result.code == 200, (
+            "Package should respond with 200 for request of supported type "
+            "(/req/deploy-replace-undeploy/package-response-success)."
+        )
 
         pkg = result.body
-        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-ogcapppkg-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(new_id)
         result = self.client.deploy(process_id=new_id, cwl=pkg)
-        assert result.code == 200
+        assert result.code == 201, (
+            "Deploy should respond with 201 if immediate or 202 if accepted "
+            "(/req/deploy-replace-undeploy/deploy-response-success)."
+        )
 
-        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-ogcapppkg-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(replace_id)
         revised_pkg = pkg.copy()
         revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
 
-        # FIXME: facing method not implemented in client
+        # FIXME: replace method not implemented in client (https://github.com/crim-ca/weaver/issues/906)
         body = {
             "id": replace_id,
             "version": "2.0.0",
             "executionUnit": [{"unit": revised_pkg}]
         }
-        headers = {"Content-Type": "application/ogcapppkg+json"}
+        headers = {"Content-Type": ContentType.APP_OGC_PKG_JSON}
         replace_path = f"{TEST_SERVER_BASE_URL}/processes/{replace_id}"
         result = self.client._request("PUT", replace_path, json=body, headers=headers)
-        assert result.status_code in [202, 204]
+        assert result.status_code in [200, 202, 204], (
+            "Replace should respond with 200/204 if immediate or 202 if accepted "
+            "(/req/deploy-replace-undeploy/replace-response)."
+        )
 
         result = self.client.describe(replace_id)
-        assert result.code == 200
+        assert result.code == 200, (
+            "Process description should respond with 200 "
+            "(/req/core/process-description-success)."
+        )
         desc_json = result.body
         assert desc_json["version"] == "2.0.0"
 
@@ -560,32 +602,42 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_deploy_process_cwl"],
     )
     def test_replace_process_cwl(self):
-        result = self.client.package(TEST_SERVER_OAP_DRU_PROCESS_ID)
-        assert result.code == 200
+        p_id = self.get_cleanup_process(f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-cwl-")
+        result = self.client.package(p_id, headers={"Content-Type": ContentType.APP_CWL_JSON})
+        assert result.code == 200, (
+            "Package should respond with 200 for request of supported type "
+            "(/req/deploy-replace-undeploy/package-response-success)."
+        )
 
         pkg = result.body
-        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
+        new_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-cwl-{uuid.uuid4().hex[:8]}"
         self.cleanup_processes.add(new_id)
         result = self.client.deploy(process_id=new_id, cwl=pkg)
-        assert result.code == 200
+        assert result.code == 201, (
+            "Deploy should respond with 201 if immediate or 202 if accepted "
+            "(/req/deploy-replace-undeploy/deploy-response-success)."
+        )
 
-        replace_id = f"{TEST_SERVER_OAP_DRU_PROCESS_ID}-{uuid.uuid4().hex[:8]}"
-        self.cleanup_processes.add(replace_id)
+        # FIXME: replace method not implemented in client (https://github.com/crim-ca/weaver/issues/906)
         revised_pkg = pkg.copy()
         revised_pkg["inputs"].append({"id": "additional_input", "type": "string"})
-
-        # FIXME: facing method not implemented in client
-        headers = {"Content-Type": "application/cwl+json"}
-        replace_path = f"{TEST_SERVER_BASE_URL}/processes/{replace_id}"
+        revised_pkg[f"{CWL_NAMESPACE_SCHEMA_ID}:version"] = "2.0.0"
+        revised_pkg.setdefault("$namespaces", {})
+        revised_pkg["$namespaces"].update(dict(CWL_NAMESPACE_SCHEMA_DEFINITION))
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        replace_path = f"{TEST_SERVER_BASE_URL}/processes/{new_id}"
         result = self.client._request("PUT", replace_path, json=revised_pkg, headers=headers)
-        assert result.status_code in [202, 204]
+        assert result.status_code in [200, 202, 204], (
+            "Replace should respond with 200/204 if immediate or 202 if accepted "
+            "(/req/deploy-replace-undeploy/replace-response)."
+        )
 
-        result = self.client.describe(replace_id)
+        result = self.client.describe(new_id)
         assert result.code == 200
         desc_json = result.body
         assert desc_json["version"] == "2.0.0"
 
-        result = self.client.package(replace_id)
+        result = self.client.package(new_id)
         assert result.code == 200
         pkg_replaced = result.body
         assert pkg_replaced == revised_pkg
@@ -594,12 +646,16 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
     def test_delete_process(self, request):
         depends_or(request, ["test_deploy_process_ogcapppkg", "test_deploy_process_cwl"])
 
-        result = self.client.processes()
+        result = self.client.processes(detail=True)
         processes = result.body.get("processes", [])
-        mutable_proc = next((p for p in processes if p.get("id", "").startswith("test-echo")), None)
+        mutable_proc = next((p for p in processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)), None)
         assert mutable_proc, "No mutable process found."
         process_id = mutable_proc["id"]
-        result = self.client._request("DELETE", f"{TEST_SERVER_BASE_URL}/processes/{process_id}")
-        assert result.status_code == 204
+        result = self.client.undeploy(process_id)
+        assert result.code == 204, (
+            "Undeploy should respond with 204 if successful "
+            "(/req/deploy-replace-undeploy/undeploy-response)."
+        )
+        assert not result.body
         result = self.client.describe(process_id)
         assert result.code == 404

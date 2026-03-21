@@ -40,6 +40,9 @@ Fixes:
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 - Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
 - Fix missing ``Location`` header in ``HTTP 201 Created`` response of `Process` deployment.
+- Fix ``HTTP 200 OK`` not employed on a `Process` update operation (``PUT``/``PATCH`` replace).
+  An ``HTTP 201 Created`` was used instead since update functionality is implemented with the same code as deployment.
+- Fix ``HTTP 204 No Content`` not employed on a ``DELETE`` `Process` operation. An ``HTTP 200 OK`` was returned instead.
 
 .. _changes_6.10.0:
 

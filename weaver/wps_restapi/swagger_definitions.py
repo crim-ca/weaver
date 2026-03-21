@@ -8195,18 +8195,10 @@ class ForbiddenVisibilityUpdateResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
-    deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
-                                        description="Indicates if the process was successfully undeployed.")
-    identifier = ExtendedSchemaNode(String(), example="workflow")
-    failureReason = ExtendedSchemaNode(String(), missing=drop,
-                                       description="Description of undeploy failure if applicable.")
-
-
-class OkDeleteProcessResponse(ExtendedMappingSchema):
+class NoContentDeleteProcessResponse(ExtendedMappingSchema):
     description = "Process successfully undeployed."
     header = ResponseHeaders()
-    body = OkDeleteProcessUndeployBodySchema()
+    body = NoContent()
 
 
 class OkGetProviderProcessDescriptionResponse(ExtendedMappingSchema):
@@ -8815,10 +8807,10 @@ put_process_visibility_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessResponse(examples={
+    "204": NoContentDeleteProcessResponse(examples={
         "ProcessUndeployed": {
             "summary": "Process successfully undeployed.",
-            "value": EXAMPLES["local_process_undeploy_success.json"],
+            "value": None,
         }
     }),
     "403": ForbiddenProcessAccessResponseSchema(),

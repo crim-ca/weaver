@@ -7,6 +7,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
     HTTPForbidden,
+    HTTPNoContent,
     HTTPNotFound,
     HTTPOk,
     HTTPServiceUnavailable,
@@ -489,11 +490,7 @@ def delete_local_process(request):
             "cause": {"jobs": [str(job.id) for job in jobs]}
         })
     if proc_store.delete_process(process_id, visibility=Visibility.PUBLIC):
-        return HTTPOk(json={
-            "description": sd.OkDeleteProcessResponse.description,
-            "identifier": process_id,
-            "undeploymentDone": True,
-        })
+        return HTTPNoContent()
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 

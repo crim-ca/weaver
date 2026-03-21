@@ -562,7 +562,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         "Content-Location": loc_url,
         "Location": loc_url,
     }
-    return HTTPCreated(json=data, headers=headers)
+    http_cls = HTTPOk if overwrite else HTTPCreated
+    return http_cls(json=data, headers=headers)
 
 
 def _save_deploy_process(process, override, container):

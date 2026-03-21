@@ -30,7 +30,10 @@ from weaver.execute import (
     ExecuteTransmissionMode,
     resolve_execution_parameters
 )
-from weaver.formats import ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json
+from weaver.formats import (
+    ContentEncoding, ContentType, OutputFormat, get_content_type, get_format, repr_json,
+    clean_media_type_format
+)
 from weaver.processes.constants import ProcessSchema
 from weaver.processes.convert import (
     convert_input_values_schema,
@@ -571,7 +574,11 @@ class WeaverClient(object):
             ctype = headers.get("Content-Type", content_type)
             content = getattr(response, "content", None) or getattr(response, "body", None)
             text = None
-            if not body and content and ctype and ContentType.APP_JSON in ctype and hasattr(response, "json"):
+            if (
+                not body and content and ctype
+                and "json" in clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
+                and hasattr(response, "json")
+            ):
                 body = response.json()
             elif isinstance(response, OperationResult):
                 body = response.body
@@ -666,7 +673,8 @@ class WeaverClient(object):
     ):                  # type: (...) -> OperationResult
         try:
             if not body and cwl and isinstance(cwl, dict):
-                p_id = cwl.get("id")
+                p_id = process_id or cwl.get("id")
+                cwl["id"] = p_id  # override if provided by processID
             else:
                 p_desc = get_process_information(body)
                 p_id = get_any_id(p_desc, default=process_id)
