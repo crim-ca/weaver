@@ -156,6 +156,8 @@ jobs:
           path: ./tests/functional/code_sprint/test-servers/weaver-localhost/test.env
           ensure-exists: true
           export-variables: true
+          log-variables: true
+          keys-case: bypass
       - name: Run Tests
         run: make stop ${{ matrix.test-case }}
 
