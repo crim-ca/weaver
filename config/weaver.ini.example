@@ -19,7 +19,12 @@ pyramid.debug_routematch = false
 pyramid.default_locale_name = en
 
 # mongodb
-mongodb.host = mongodb
+# NOTE:
+#   using docker-compose with mongo service, direct access to the container is configured with its name as "hostname"
+#   otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
+#   see also the "celery" worker configuration for the broker and result backend settings related to DB connexion
+mongodb.host = localhost
+# mongodb.host = mongodb
 mongodb.port = 27017
 mongodb.db_name = weaver
 
@@ -211,7 +216,12 @@ weaver.vault_dir = /tmp/vault
 ###
 [celery]
 #USE_CELERYCONFIG = True
-BROKER_URL = mongodb://mongodb:27017/celery
+# NOTE:
+#   using docker-compose with mongo service, direct access to the container is configured with its name as "hostname"
+#   otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
+#   this broker can be the same or a distinct one from the one used by weaver for process and job management
+# BROKER_URL = mongodb://mongodb:27017/celery
+BROKER_URL = mongodb://localhost:27017/celery
 # Result backend is required for SYNC execution.
 #   Using only the backend type matching the broker URL will automatically resolve to use it database location.
 #   For an alternative result location, provide the full backend directly rather than using "mongodb_backend_settings".

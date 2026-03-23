@@ -11,6 +11,7 @@ APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
 APP_VERSION ?= $(VERSION)
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
+override APP_INI_DEFAULT := $(APP_ROOT)/config/$(APP_NAME).ini.example
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -1057,15 +1058,37 @@ MANAGER_LOG ?= /tmp/$(APP_NAME)-manager.log
 WORKER_PIDFILE ?= /tmp/$(APP_NAME)-worker.pid
 WORKER_LOG ?= /tmp/$(APP_NAME)-worker.log
 
+.PHONY: setup-ini
+setup-ini:		## setup configuration INI file for application instances
+	@-echo "Setting up configuration file for application instances..."
+	@-mkdir -p "$(shell dirname $$(realpath "$(APP_INI)"))"
+	@[ -f "$(APP_INI)" ] && echo "Using configuration INI: [$(APP_INI)]" || true
+	@[ -f "$(APP_INI)" ] || ( \
+		echo "Creating configuration INI: [$(APP_INI)] from [$(APP_INI_DEFAULT)]" && \
+		cp "$(APP_INI_DEFAULT)" "$(APP_INI)" \
+	)
+
 .PHONY: start-manager-only
-start-manager-only:   	## start application instance(s) with pserve (manager)
+start-manager-only: setup-ini	## start application instance(s) with pserve (manager)
 	@echo "Starting $(APP_NAME) [manager]..."
-	@bash -c 'mkdir -p $$(dirname "$(MANAGER_LOG)"); nohup bash -lc "$(CONDA_CMD) exec pserve \"$(APP_INI)\"" >>"$(MANAGER_LOG)" 2>&1 & echo $$! > "$(MANAGER_PIDFILE)"; echo "Started manager -> $(MANAGER_PIDFILE)"'
+	@bash -c '\
+		mkdir -p $$(dirname "$(MANAGER_LOG)"); \
+ 		nohup bash -lc "\
+ 			$(CONDA_CMD) exec \
+ 			pserve \"$(APP_INI)\"" >>"$(MANAGER_LOG)" 2>&1 & \
+ 			echo $$! > "$(MANAGER_PIDFILE)"; \
+ 		echo "Started manager -> $(MANAGER_PIDFILE)"'
 
 .PHONY: start-worker-only
-start-worker-only: 	## start worker instance(s) with celery
+start-worker-only: setup-ini	## start worker instance(s) with celery
 	@echo "Starting $(APP_NAME) [worker]..."
-	@bash -c 'mkdir -p $$(dirname "$(WORKER_LOG)"); nohup bash -lc "$(CONDA_CMD) exec celery -A pyramid_celery.celery_app worker -B -E --ini \"$(APP_INI)\"" >>"$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PIDFILE)"; echo "Started worker -> $(WORKER_PIDFILE)"'
+	@bash -c '\
+		mkdir -p $$(dirname "$(WORKER_LOG)"); \
+		nohup bash -lc "\
+			$(CONDA_CMD) exec \
+			celery -A pyramid_celery.celery_app worker -B -E --ini \"$(APP_INI)\"" >>"$(WORKER_LOG)" 2>&1 & \
+			echo $$! > "$(WORKER_PIDFILE)"; \
+		echo "Started worker -> $(WORKER_PIDFILE)"'
 
 .PHONY: stop
 stop: stop-manager stop-worker		## stop application instance(s) as needed
