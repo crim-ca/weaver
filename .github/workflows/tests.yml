@@ -152,7 +152,7 @@ jobs:
         if: ${{ startsWith(matrix.test-case, 'check') }}
         run: make check-info
       - name: Env Test Setup
-        if: ${{ matrix.test-server == 'true' }}
+        if: ${{ matrix.test-server == true }}
         uses: falti/dotenv-action@v1.2.0
         with:
           path: ./tests/functional/code_sprint/test-servers/weaver-localhost/test.env
@@ -161,14 +161,14 @@ jobs:
           log-variables: true
           keys-case: bypass
       - name: Start Test Instance
-        if: ${{ matrix.test-server == 'true' }}
+        if: ${{ matrix.test-server == true }}
         run: |
           make stop start-only
           sleep 10
       - name: Run Tests
         run: make ${{ matrix.test-case }}
       - name: Display Test Logs (failure)
-        if: ${{ failure() && matrix.test-server == 'true' }}
+        if: ${{ failure() && matrix.test-server == true }}
         run: |
           echo "=== Weaver Manager Logs ==="
           cat /tmp/weaver-manager.log
