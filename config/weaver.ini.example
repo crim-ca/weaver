@@ -21,6 +21,7 @@ pyramid.default_locale_name = en
 # mongodb
 # NOTE:
 #   using docker-compose with mongo service, direct access to the container is configured with its name as "hostname"
+#   for an example, see the 'tests/smoke/' definitions (it uses the "mongodb" hostname from 'make test-smore' call)
 #   otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
 #   see also the "celery" worker configuration for the broker and result backend settings related to DB connexion
 mongodb.host = localhost
@@ -218,6 +219,7 @@ weaver.vault_dir = /tmp/vault
 #USE_CELERYCONFIG = True
 # NOTE:
 #   using docker-compose with mongo service, direct access to the container is configured with its name as "hostname"
+#   for an example, see the 'tests/smoke/' definitions (it uses the "mongodb" hostname from 'make test-smore' call)
 #   otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
 #   this broker can be the same or a distinct one from the one used by weaver for process and job management
 # BROKER_URL = mongodb://mongodb:27017/celery

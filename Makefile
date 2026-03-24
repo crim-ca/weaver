@@ -1006,8 +1006,11 @@ DOCKER_TEST_CURL_RETRY_COUNT ?= 10
 DOCKER_TEST_CURL_RETRY_DELAY ?= 5
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
-docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
+docker-test: docker-build stop	## execute smoke test of built images (validate that they boot, reply and test passes)
 	@echo "Smoke test of built application docker images"
+	cp "$(APP_INI_DEFAULT)" "$(APP_ROOT)/tests/smoke/weaver.ini"
+	sed -i "$(APP_ROOT)/tests/smoke/weaver.ini" -e 's|mongodb.host = localhost|mongodb.host = mongodb|g'
+	sed -i "$(APP_ROOT)/tests/smoke/weaver.ini" -e 's|localhost:27017|mongodb:27017|g'
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
 	@echo "Pinging Weaver API entrypoint to validate response..."
 	@wget \
