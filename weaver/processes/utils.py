@@ -548,6 +548,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     except HTTPException:
         raise
     links = process.links(container)
+    loc_url = next(link["href"] for link in links if link["rel"] == "self")
     process_summary["links"] = links
     data = {
         "description": sd.OkPostProcessesResponse.description,
@@ -556,7 +557,13 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     }
     if deployment_profile_name:
         data["deploymentProfileName"] = deployment_profile_name
-    return HTTPCreated(json=data)
+    headers = {
+        "Content-Type": ContentType.APP_JSON,
+        "Content-Location": loc_url,
+        "Location": loc_url,
+    }
+    http_cls = HTTPOk if overwrite else HTTPCreated
+    return http_cls(json=data, headers=headers)
 
 
 def _save_deploy_process(process, override, container):
