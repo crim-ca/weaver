@@ -1307,6 +1307,71 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def compute_file_digest_multibase(file_path, hash_algorithm="sha256"):
+    # type: (str, str) -> str
+    """
+    Computes the multibase-encoded multihash digest of a file for resource integrity verification.
+
+    Implements W3C VC Data Integrity specification for ``digestMultibase``.
+
+    .. seealso::
+        - :rfc:`9052`: COSE hash algorithms
+        - W3C VC Data Integrity: https://www.w3.org/TR/vc-data-integrity/#resource-integrity
+        - Multibase: https://github.com/multiformats/multibase
+        - Multihash: https://github.com/multiformats/multihash
+
+    :param file_path: Path to the file to compute the digest for.
+    :param hash_algorithm: Hash algorithm to use (default: sha256).
+    :return: Multibase-encoded multihash string (e.g., "zQmdf...").
+    :raises ImportError: If multiformats library is not installed.
+    :raises ValueError: If the file does not exist or cannot be read.
+    """
+    try:
+        from multiformats import multibase, multihash
+    except ImportError as exc:
+        raise ImportError(
+            "The 'multiformats' library is required to compute digestMultibase. "
+            "Install it with: pip install multiformats"
+        ) from exc
+
+    import hashlib
+
+    if not os.path.isfile(file_path):
+        raise ValueError(f"File not found or not accessible: [{file_path}]")
+
+    # Compute the file hash
+    hash_func = getattr(hashlib, hash_algorithm, None)
+    if not hash_func:
+        raise ValueError(f"Unsupported hash algorithm: [{hash_algorithm}]")
+
+    hash_obj = hash_func()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(8192):
+            hash_obj.update(chunk)
+    digest = hash_obj.digest()
+
+    # Create multihash (includes hash algorithm identifier)
+    # Map common hash algorithms to multihash codes
+    # See: https://github.com/multiformats/multicodec/blob/master/table.csv
+    hash_codes = {
+        "sha256": 0x12,  # sha2-256
+        "sha512": 0x13,  # sha2-512
+        "sha1": 0x11,    # sha1
+        "md5": 0xd5,     # md5
+    }
+    hash_code = hash_codes.get(hash_algorithm)
+    if not hash_code:
+        raise ValueError(f"Hash algorithm [{hash_algorithm}] not supported for multihash encoding")
+
+    # Encode as multihash: <hash-code><digest-length><digest-bytes>
+    mhash = multihash.wrap(digest, hash_code)
+
+    # Encode with multibase (base58btc is standard, represented by 'z' prefix)
+    digest_multibase = multibase.encode(mhash, "base58btc")
+
+    return digest_multibase
+
+
 def get_href_headers(
     path,                                   # type: str
     download_headers=False,                 # type: bool
