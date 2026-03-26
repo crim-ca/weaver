@@ -2,6 +2,7 @@ import difflib
 import errno
 import fnmatch
 import functools
+import hashlib
 import importlib.util
 import inspect
 import io
@@ -36,6 +37,7 @@ from botocore.exceptions import ClientError, HTTPClientError
 from bs4 import BeautifulSoup
 from celery.app import Celery
 from dateutil.parser import parse as parse_dt
+from multiformats import multibase, multihash
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -1323,18 +1325,8 @@ def compute_file_digest_multibase(file_path, hash_algorithm="sha256"):
     :param file_path: Path to the file to compute the digest for.
     :param hash_algorithm: Hash algorithm to use (default: sha256).
     :return: Multibase-encoded multihash string (e.g., "zQmdf...").
-    :raises ImportError: If multiformats library is not installed.
     :raises ValueError: If the file does not exist or cannot be read.
     """
-    try:
-        from multiformats import multibase, multihash
-    except ImportError as exc:
-        raise ImportError(
-            "The 'multiformats' library is required to compute digestMultibase. "
-            "Install it with: pip install multiformats"
-        ) from exc
-
-    import hashlib
 
     if not os.path.isfile(file_path):
         raise ValueError(f"File not found or not accessible: [{file_path}]")
