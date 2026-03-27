@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support for multibase-encoded multihash file digests for resource integrity verification following W3C VC Data Integrity specification. 
+  Job outputs now include ``digestMultibase`` for local files, with additional ``file:checksum`` and ``file:byte_order`` metadata for 
+  STAC collection items. (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_)
 
 Fixes:
 ------

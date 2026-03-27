@@ -115,6 +115,9 @@ pystac_client
 python-box
 python-dateutil
 pytz
+# multiformats for digestMultibase (W3C VC Data Integrity)
+# provides multibase and multihash encoding for resource integrity verification
+multiformats>=0.3.1
 pywps==4.7.0
 pyyaml>=5.4
 rdflib>=5  # pyup: ignore
