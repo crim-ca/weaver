@@ -2301,6 +2301,10 @@ def test_compute_file_digest_multibase():
         with pytest.raises(ValueError, match="Unsupported hash algorithm"):
             compute_file_digest_multibase(test_file, hash_algorithm="unsupported_algo")
 
+        # e.g., blake2b is in hashlib but not in hash_codes mapping
+        with pytest.raises(ValueError, match=r"not supported for multihash encoding"):
+            compute_file_digest_multibase(test_file, hash_algorithm="blake2b")
+
 
 def test_create_metalink():
     with contextlib.ExitStack() as stack:
