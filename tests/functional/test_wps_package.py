@@ -46,6 +46,7 @@ from tests.utils import (
     mocked_wps_output,
     setup_aws_s3_bucket
 )
+from weaver import ogc_definitions as ogc_def
 from weaver.execute import (
     ExecuteCollectionFormat,
     ExecuteControlOption,
@@ -156,7 +157,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
@@ -174,7 +175,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"id": self._testMethodName},  # not nested under 'process'
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
@@ -213,7 +214,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         cwl = self.retrieve_payload("EchoProcess", "package", local=True)
         body = {
             "processDescription": ref,
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
 
@@ -237,10 +238,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                         "crs": {
                             "type": "string",
                             "format": "uri",
-                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "default": ogc_def.OGC_DEF_CRS_CRS84_URI,
                             "enum": [
-                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                                ogc_def.OGC_DEF_CRS_CRS84_URI,
+                                ogc_def.OGC_DEF_CRS_CRS84H_URI,
                             ]
                         },
                         "bbox": {
@@ -254,14 +255,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     },
                     "required": ["bbox"],
                     # merged:
-                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "format": sd.OGC_API_PROC_BBOX_FORMAT,
                     # added:
-                    "$id": sd.OGC_API_BBOX_SCHEMA,
+                    "$id": sd.OGC_API_PROC_BBOX_SCHEMA,
                 },
                 {
                     "type": "string",
-                    "format": sd.OGC_API_BBOX_FORMAT,
-                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
+                    "format": sd.OGC_API_PROC_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_PROC_BBOX_SCHEMA,
                 }
             ]
         }
@@ -381,10 +382,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                         "crs": {
                             "type": "string",
                             "format": "uri",
-                            "default": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                            "default": ogc_def.OGC_DEF_CRS_CRS84_URI,
                             "enum": [
-                                "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-                                "http://www.opengis.net/def/crs/OGC/0/CRS84h",
+                                ogc_def.OGC_DEF_CRS_CRS84_URI,
+                                ogc_def.OGC_DEF_CRS_CRS84H_URI,
                             ]
                         },
                         "bbox": {
@@ -398,14 +399,14 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     },
                     "required": ["bbox"],
                     # merged:
-                    "format": sd.OGC_API_BBOX_FORMAT,
+                    "format": sd.OGC_API_PROC_BBOX_FORMAT,
                     # added:
-                    "$id": sd.OGC_API_BBOX_SCHEMA,
+                    "$id": sd.OGC_API_PROC_BBOX_SCHEMA,
                 },
                 {
                     "type": "string",
-                    "format": sd.OGC_API_BBOX_FORMAT,
-                    "contentSchema": sd.OGC_API_BBOX_SCHEMA,
+                    "format": sd.OGC_API_PROC_BBOX_FORMAT,
+                    "contentSchema": sd.OGC_API_PROC_BBOX_SCHEMA,
                 }
             ]
         }
@@ -559,7 +560,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     }
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
@@ -625,7 +626,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "abstract": "this is a test",
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -724,7 +725,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     ]
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -865,7 +866,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     #   as CWL output, so there isn't much to compare against from the WPS list.
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": {
                 "cwlVersion": "v1.0",
                 "class": "CommandLineTool",
@@ -976,7 +977,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     ],
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{
                 "unit": {
                     "cwlVersion": "v1.0",
@@ -1033,7 +1034,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         cwl = self.retrieve_payload("EchoSecrets", "package", local=True)
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         _, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
@@ -1243,7 +1244,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "type": ProcessType.BUILTIN,
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         with contextlib.ExitStack() as stack_exec:
@@ -1292,7 +1293,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "abstract": "this is a test",
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
 
@@ -1498,7 +1499,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     ]
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -1740,7 +1741,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     ]
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -1870,7 +1871,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     {"id": "io_min_str_max_unbounded", "minOccurs": "1", "maxOccurs": "unbounded"},
                 ]
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         try:
@@ -1923,7 +1924,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     }
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OGC)
@@ -1960,7 +1961,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": proc}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
@@ -2041,7 +2042,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
@@ -2177,7 +2178,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "abstract": "this is a test",
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         try:
@@ -2328,7 +2329,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "abstract": "this is a test",
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         try:
@@ -2410,7 +2411,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
 
         data = self.retrieve_payload("EchoBoundingBox", "execute", local=True)
         bbox = data["bboxInput"]
-        assert bbox["crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84", (
+        assert bbox["crs"] == ogc_def.OGC_DEF_CRS_CRS84_URI, (
             "Input BBOX expects an explicit CRS reference URI. "
             "This is used to validate interpretation of CRS by WPS data type handlers."
         )
@@ -2431,7 +2432,12 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             results = self.monitor_job(status_url)
 
         # note: following CRS format is not valid unless nested under 'value' (ie: schema allows it as "object" value)
-        expect_bbox = {"bbox": bbox["bbox"], "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"}
+        expect_bbox = {
+            "bbox": bbox["bbox"],
+            "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
+            "format": sd.OGC_API_PROC_BBOX_FORMAT,
+            "schema": sd.OGC_API_PROC_BBOX_SCHEMA,
+        }
         assert results
         assert "bboxOutput" in results
         assert results["bboxOutput"] == expect_bbox, (
@@ -2738,7 +2744,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
@@ -2790,7 +2796,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
@@ -3286,7 +3292,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         }
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)
@@ -3357,7 +3363,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     # "inputs": {}  # updated after
                 },
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
 
@@ -3406,7 +3412,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     "abstract": "this is a test",
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -3503,7 +3509,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     ]
                 }
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
@@ -3574,7 +3580,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": f"mock://{resources.WPS_LITERAL_COMPLEX_IO_XML}"}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
@@ -3673,7 +3679,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": f"mock://{resources.WPS_ENUM_ARRAY_IO_XML}"}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI
         }
         desc, pkg = self.deploy_process(body, describe_schema=ProcessSchema.OLD, mock_requests_only_local=False)
 
@@ -5050,8 +5056,8 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         }
 
     @parameterized.expand([
-        (sd.OGC_API_PROC_PROFILE_RESULTS_URL, None),
-        (None, sd.OGC_API_PROC_PROFILE_RESULTS_URL),
+        (sd.OGC_API_PROC_PROFILE_RESULTS_URI, None),
+        (None, sd.OGC_API_PROC_PROFILE_RESULTS_URI),
     ])
     @pytest.mark.oap_part1
     def test_execute_single_output_response_results_profile_content_negotiation(self, profile_header, profile_query):
@@ -5097,10 +5103,10 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_RESULTS_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_RESULTS_URI in profile[0]
 
         profile = get_header("Content-Profile", resp.headers)
-        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
+        assert profile == sd.OGC_API_PROC_PROFILE_RESULTS_URI
 
         # validate the results based on original execution request
         results = resp.json
@@ -6365,7 +6371,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             "processDescription": {
                 "process": {"id": self._testMethodName}
             },
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
         }
         self.deploy_process(body)

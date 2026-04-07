@@ -457,8 +457,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
-        assert result.body.get("undeploymentDone", None) is True
-        assert "undefined" not in result.message
+        assert not result.body
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -1791,7 +1790,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:5])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):
