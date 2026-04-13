@@ -3134,54 +3134,53 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Test that job results include digestMultibase for file outputs.
         """
+        # Use the class-level output directory
+        wps_output_dir = self.settings["weaver.wps_output_dir"]
 
-        with contextlib.ExitStack() as stack:
-            # Setup temporary directories and test file
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            wps_output_dir = os.path.join(tmp_dir, "wps-outputs")
-            os.makedirs(wps_output_dir, exist_ok=True)
+        # Create a test output file
+        job_id = "test-job-digest-123"
+        job_output_dir = os.path.join(wps_output_dir, job_id)
+        os.makedirs(job_output_dir, exist_ok=True)
 
-            # Create a test output file
-            job_id = "test-job-digest-123"
-            job_output_dir = os.path.join(wps_output_dir, job_id)
-            os.makedirs(job_output_dir, exist_ok=True)
+        test_file = os.path.join(job_output_dir, "output.txt")
+        test_content = b"Test output file for digestMultibase validation"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
 
-            test_file = os.path.join(job_output_dir, "output.txt")
-            test_content = b"Test output file for digestMultibase validation"
-            with open(test_file, "wb") as f:
-                f.write(test_content)
+        # Create settings with output URL constructed from weaver URL
+        settings = dict(self.settings)
+        settings["weaver.wps_output_url"] = f"{self.settings['weaver.url']}/wps-outputs"
 
-            # Create a job with file results
+        # Create a job with file results
+        job = self.make_job(
+            task_id=job_id,
+            process="test-process",
+            service=None,
+            status="successful",
+            progress=100,
+            access="public",
+            results=[
+                {
+                    "id": "output",
+                    "href": f"{job_id}/output.txt",
+                    "mimeType": ContentType.TEXT_PLAIN,
+                }
+            ],
+        )
 
-            job = self.make_job(
-                task_id=job_id,
-                process="test-process",
-                service=None,
-                status="successful",
-                progress=100,
-                access="public",
-                results=[
-                    {
-                        "id": "output",
-                        "href": f"{job_id}/output.txt",
-                        "mimeType": ContentType.TEXT_PLAIN,
-                    }
-                ],
-            )
+        # Get results with OGC schema (should include digestMultibase)
+        results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
 
-            # Get results with OGC schema (should include digestMultibase)
-            results, _ = get_results(job, self.settings, schema=JobInputsOutputsSchema.OGC)
+        # Verify digestMultibase is included
+        assert "output" in results
+        output_result = results["output"]
+        assert "digestMultibase" in output_result, "digestMultibase should be included for file outputs"
+        assert isinstance(output_result["digestMultibase"], str)
+        assert output_result["digestMultibase"].startswith("m"), "digestMultibase should use base64 encoding"
 
-            # Verify digestMultibase is included
-            assert "output" in results
-            output_result = results["output"]
-            assert "digestMultibase" in output_result, "digestMultibase should be included for file outputs"
-            assert isinstance(output_result["digestMultibase"], str)
-            assert output_result["digestMultibase"].startswith("m"), "digestMultibase should use base64 encoding"
-
-            # Verify the digest is valid and deterministic
-            expected_digest = compute_file_digest_multibase(test_file)
-            assert output_result["digestMultibase"] == expected_digest
+        # Verify the digest is valid and deterministic
+        expected_digest = compute_file_digest_multibase(test_file)
+        assert output_result["digestMultibase"] == expected_digest
 
 
 @pytest.mark.oap_part1
