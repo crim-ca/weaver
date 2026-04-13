@@ -1,4 +1,3 @@
-import hashlib
 import io
 import math
 import os
@@ -607,14 +606,6 @@ def get_results(  # pylint: disable=R1260
                         digest_mb = compute_file_digest_multibase(file_path)
                         output["digestMultibase"] = digest_mb
 
-                        # For STAC collection items, also add file:checksum and file:byte_order
-                        if "stac" in out_id.lower() or "collection" in out_id.lower():
-                            hash_obj = hashlib.sha256()
-                            with open(file_path, "rb") as f:
-                                while chunk := f.read(8192):
-                                    hash_obj.update(chunk)
-                            output["file:checksum"] = hash_obj.hexdigest()
-                            output["file:byte_order"] = "big-endian"
                 except (OSError, ValueError, ImportError):
                     # If file is not accessible or multiformats not available, skip digest
                     pass

@@ -60,6 +60,7 @@ from weaver.utils import (
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    compute_file_digest_multibase,
     create_metalink,
     explode_headers,
     fetch_directory,
@@ -2262,7 +2263,6 @@ def test_compute_file_digest_multibase():
     """
     Test computation of digestMultibase for W3C VC Data Integrity resource integrity verification.
     """
-    from weaver.utils import compute_file_digest_multibase
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a test file with known content
@@ -2276,7 +2276,7 @@ def test_compute_file_digest_multibase():
 
         # Verify digest format
         assert isinstance(digest, str), "Digest should be a string"
-        assert digest.startswith("z"), "Digest should start with 'z' (base58btc encoding)"
+        assert digest.startswith("m"), "Digest should start with 'm' (base64 encoding)"
         assert len(digest) > 10, "Digest should be a reasonable length"
 
         # Verify digest is deterministic
@@ -2291,7 +2291,7 @@ def test_compute_file_digest_multibase():
 
         # Test with different hash algorithm
         digest_sha512 = compute_file_digest_multibase(test_file, hash_algorithm="sha512")
-        assert digest_sha512.startswith("z"), "SHA-512 digest should also use base58btc"
+        assert digest_sha512.startswith("m"), "SHA-512 digest should also use base64"
         assert digest_sha512 != digest3, "Different hash algorithms should produce different digests"
 
         # Test error cases

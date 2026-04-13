@@ -76,6 +76,9 @@ mako
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
 #mistune>=2.0.3,<2.1
+# multiformats for digestMultibase (W3C VC Data Integrity)
+# provides multibase and multihash encoding for resource integrity verification
+multiformats>=0.3.1
 mypy_boto3_s3
 numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
@@ -115,9 +118,6 @@ pystac_client
 python-box
 python-dateutil
 pytz
-# multiformats for digestMultibase (W3C VC Data Integrity)
-# provides multibase and multihash encoding for resource integrity verification
-multiformats>=0.3.1
 pywps==4.7.0
 pyyaml>=5.4
 rdflib>=5  # pyup: ignore

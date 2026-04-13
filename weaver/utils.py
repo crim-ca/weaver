@@ -1309,22 +1309,26 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
-def compute_file_digest_multibase(file_path, hash_algorithm="sha256"):
-    # type: (str, str) -> str
+def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_encoding="base64"):
+    # type: (str, str, str) -> str
     """
     Computes the multibase-encoded multihash digest of a file for resource integrity verification.
 
     Implements W3C VC Data Integrity specification for ``digestMultibase``.
 
     .. seealso::
+        - :rfc:`4648`: Base64 encoding
         - :rfc:`9052`: COSE hash algorithms
-        - W3C VC Data Integrity: https://www.w3.org/TR/vc-data-integrity/#resource-integrity
-        - Multibase: https://github.com/multiformats/multibase
-        - Multihash: https://github.com/multiformats/multihash
+        - `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_
+        - `Multibase <https://github.com/multiformats/multibase>`_
+        - `Multihash <https://github.com/multiformats/multihash>`_
 
     :param file_path: Path to the file to compute the digest for.
-    :param hash_algorithm: Hash algorithm to use (default: sha256).
-    :return: Multibase-encoded multihash string (e.g., "zQmdf...").
+    :param hash_algorithm: Hash algorithm to use (default: ``sha256``).
+    :param multibase_encoding:
+        Multibase encoding to use (default: ``base64`` for techno-agnostic compatibility).
+        Common options include ``base64``, ``base64url``, ``base58btc``.
+    :return: Multibase-encoded multihash string (e.g., ``mEiB7M...`` for ``base64``, ``zQmdf...`` for ``base58btc``).
     :raises ValueError: If the file does not exist or cannot be read.
     """
 
@@ -1344,7 +1348,7 @@ def compute_file_digest_multibase(file_path, hash_algorithm="sha256"):
 
     # Create multihash (includes hash algorithm identifier)
     # Map common hash algorithms to multihash codes
-    # See: https://github.com/multiformats/multicodec/blob/master/table.csv
+    # See: `multicodec table <https://github.com/multiformats/multicodec/blob/master/table.csv>`_
     hash_codes = {
         "sha256": 0x12,  # sha2-256
         "sha512": 0x13,  # sha2-512
@@ -1358,8 +1362,8 @@ def compute_file_digest_multibase(file_path, hash_algorithm="sha256"):
     # Encode as multihash: <hash-code><digest-length><digest-bytes>
     mhash = multihash.wrap(digest, hash_code)
 
-    # Encode with multibase (base58btc is standard, represented by 'z' prefix)
-    digest_multibase = multibase.encode(mhash, "base58btc")
+    # Encode with multibase
+    digest_multibase = multibase.encode(mhash, multibase_encoding)
 
     return digest_multibase
 

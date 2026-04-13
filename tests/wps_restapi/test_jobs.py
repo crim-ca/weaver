@@ -3,7 +3,6 @@ import copy
 import datetime
 import logging
 import os
-import re
 import shutil
 import tempfile
 import warnings
@@ -45,14 +44,14 @@ from weaver.execute import (
 )
 from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
-from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import explode_headers, get_path_kvp, now
+from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema
+from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema, get_results
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -3152,15 +3151,7 @@ class WpsRestApiJobsTest(JobUtils):
             with open(test_file, "wb") as f:
                 f.write(test_content)
 
-            # Setup mock settings
-            settings = {
-                "weaver.url": "https://localhost",
-                "weaver.wps_output_dir": wps_output_dir,
-                "weaver.wps_output_url": "https://localhost/wps-outputs",
-            }
-
             # Create a job with file results
-            from weaver.wps_restapi.jobs.utils import get_results
 
             job = self.make_job(
                 task_id=job_id,
@@ -3179,85 +3170,18 @@ class WpsRestApiJobsTest(JobUtils):
             )
 
             # Get results with OGC schema (should include digestMultibase)
-            from weaver.processes.constants import JobInputsOutputsSchema
-            results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
+            results, _ = get_results(job, self.settings, schema=JobInputsOutputsSchema.OGC)
 
             # Verify digestMultibase is included
             assert "output" in results
             output_result = results["output"]
             assert "digestMultibase" in output_result, "digestMultibase should be included for file outputs"
             assert isinstance(output_result["digestMultibase"], str)
-            assert output_result["digestMultibase"].startswith("z"), "digestMultibase should use base58btc encoding"
+            assert output_result["digestMultibase"].startswith("m"), "digestMultibase should use base64 encoding"
 
             # Verify the digest is valid and deterministic
-            from weaver.utils import compute_file_digest_multibase
             expected_digest = compute_file_digest_multibase(test_file)
             assert output_result["digestMultibase"] == expected_digest
-
-    def test_job_results_stac_collection_fields(self):
-        """
-        Test that STAC collection outputs include file:checksum and file:byte_order fields.
-        """
-
-        with contextlib.ExitStack() as stack:
-            # Setup temporary directories and test file
-            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
-            wps_output_dir = os.path.join(tmp_dir, "wps-outputs")
-            os.makedirs(wps_output_dir, exist_ok=True)
-
-            # Create a test STAC collection file
-            job_id = "test-job-stac-456"
-            job_output_dir = os.path.join(wps_output_dir, job_id)
-            os.makedirs(job_output_dir, exist_ok=True)
-
-            stac_file = os.path.join(job_output_dir, "stac_collection.json")
-            stac_content = b'{"type": "Collection", "id": "test-collection"}'
-            with open(stac_file, "wb") as f:
-                f.write(stac_content)
-
-            # Setup mock settings
-            settings = {
-                "weaver.url": "https://localhost",
-                "weaver.wps_output_dir": wps_output_dir,
-                "weaver.wps_output_url": "https://localhost/wps-outputs",
-            }
-
-            # Create a job with STAC collection result
-            from weaver.wps_restapi.jobs.utils import get_results
-
-            job = self.make_job(
-                task_id=job_id,
-                process="test-process",
-                service=None,
-                status="successful",
-                progress=100,
-                access="public",
-                results=[
-                    {
-                        "id": "stac_collection",  # output id contains 'stac' or 'collection'
-                        "href": f"{job_id}/stac_collection.json",
-                        "mimeType": ContentType.APP_JSON,
-                    }
-                ],
-            )
-
-            # Get results
-            from weaver.processes.constants import JobInputsOutputsSchema
-            results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
-
-            # Verify STAC-specific fields are included
-            assert "stac_collection" in results
-            stac_result = results["stac_collection"]
-            assert "digestMultibase" in stac_result
-            assert "file:checksum" in stac_result, "file:checksum should be included for STAC collections"
-            assert "file:byte_order" in stac_result, "file:byte_order should be included for STAC collections"
-
-            # Verify checksum format (should be hex)
-            assert isinstance(stac_result["file:checksum"], str)
-            assert re.fullmatch(r"[0-9a-f]{64}", stac_result["file:checksum"]
-                                ), "Checksum should be 64 hex characters (SHA-256)"
-
-            assert stac_result["file:byte_order"] == "big-endian"
 
 
 @pytest.mark.oap_part1
