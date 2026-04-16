@@ -609,14 +609,18 @@ this level of fined-grained control is not required.
     ``{processID}`` portion as their identifier.
 
 If the user desires a specific version to deploy, the ``PUT`` request should be used with the appropriate ``version``
-within the request body. It is although up to the user to provide the full definition of that :term:`Process`,
-as ``PUT`` request will completely replace the previous definition rather than transfer over previous updates
-(i.e: ``PATCH`` requests).
+within the request body. However, it is up to the user to provide the full definition of that updated :term:`Process`,
+since ``PUT`` request will *"replace"* the updated definition from scratch, taking exactly the contents provided in
+the request, rather than transfer over missing parameters from the old :term:`Process` (i.e: as ``PATCH`` request does).
 
 Even when a :term:`Process` is *"replaced"* using ``PUT``, the older revision is not actually removed and undeployed
-(``DELETE`` request). It is therefore still possible to refer to the old revision using explicit references with the
-corresponding ``version``. `Weaver` keeps track of revisions by corresponding ``{processID}`` entries such that if
-the latest revision is undeployed, the previous revision will automatically become the latest once again. For complete
+(``DELETE`` request). Instead, the referenced ``processID`` is is replaced to its explicit ``{processID}:{version}``
+revision, and the new definition is swapped as the new ``processID`` reference. It is therefore still possible to refer
+to the old revision using explicit references with the corresponding ``version``, while the ``processID`` will appear
+as *"replaced"* from the point of view of a client not aware of `Weaver`'s revision management.
+
+`Weaver` keeps track of revisions by corresponding ``{processID}`` entries such that if the latest revision is
+undeployed, the previous revision in semantic order will automatically become the latest once again. For complete
 replacement, the user should instead perform a ``DELETE`` of all existing revisions (to avoid conflicts) followed by a
 new :ref:`Deploy <proc_op_deploy>` request.
 
@@ -3197,7 +3201,7 @@ Following is a summary of relevant parameters impacting content negotiation.
 
 .. rubric:: Notes
 
-.. [#noteEncoding]
+.. [#noteParamEncoding]
     Depending on the location and the specific name of the query parameters or headers, certain encodings are enforced.
     For example, the ``Link`` header is defined by :rfc:`6906`, which **requires** its ``href`` to be an :term:`URI`.
     In such case, shorthand notation like ``rel=profile, href=cloud-optimized`` is **not allowed**.

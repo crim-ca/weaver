@@ -7,6 +7,7 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
     HTTPForbidden,
+    HTTPNoContent,
     HTTPNotFound,
     HTTPOk,
     HTTPServiceUnavailable,
@@ -160,6 +161,7 @@ def get_processes(request):
             ("Link", make_link_header(link))
             for link in body["links"]
         ])
+        request.response.headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
         return Box(body)
 
     except ServiceException as exc:
@@ -308,8 +310,8 @@ def get_local_process(request):
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
-                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, rel="profile")),
-                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URL),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
                 ("Content-Type", ctype_yaml),
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
@@ -320,8 +322,8 @@ def get_local_process(request):
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
                 ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
                 ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
-                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, rel="profile")),
-                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URL),
+                ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, rel="profile")),
+                ("Content-Profile", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
             ])
             return Box(offering)
         else:  # HTML
@@ -488,11 +490,7 @@ def delete_local_process(request):
             "cause": {"jobs": [str(job.id) for job in jobs]}
         })
     if proc_store.delete_process(process_id, visibility=Visibility.PUBLIC):
-        return HTTPOk(json={
-            "description": sd.OkDeleteProcessResponse.description,
-            "identifier": process_id,
-            "undeploymentDone": True,
-        })
+        return HTTPNoContent()
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 
