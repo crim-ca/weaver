@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import JSON
 
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
+TRANSFORM_PATH = os.path.join(RESOURCES_PATH, "transform")
 EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
 FUNCTIONAL_APP_PKG = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/application-packages"))
 
