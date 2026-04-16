@@ -88,12 +88,17 @@
 .. _feature-w3c-desc: https://www.w3.org/TR/sdw-bp/#spatial-things-features-and-geometry
 .. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
 .. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
+.. old CQL (draft v1) document not available directly in portal, use alternate export/backup
+.. export: https://files.ogc.org/external/380746787cd5607e6d10bfb7424ccc174f2d733fd456dd72f6cd5bc056dc28b5
 .. |filter-simple-cql| replace:: Simple CQL
-.. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. .. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. _filter-simple-cql: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-core
 .. |filter-cql-json| replace:: CQL-JSON
-.. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. .. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. _filter-cql-json: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-json
 .. |filter-cql-text| replace:: CQL-Text
-.. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. _filter-cql-text: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
 .. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
