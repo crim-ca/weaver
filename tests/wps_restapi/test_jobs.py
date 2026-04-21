@@ -1932,6 +1932,313 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
 
+    @pytest.mark.oap_part4
+    def test_job_result_index_success(self):
+        """
+        Test successful retrieval of indexed values from job result arrays.
+        """
+        # Create job with array results
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {"id": "array_output", "value": ["first", "second", "third"]},
+                {"id": "single_output", "value": "not_an_array"},
+            ],
+        )
+
+        # Test retrieving first element (index 0)
+        path = f"/jobs/{new_job.id}/results/array_output/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == "first"
+
+        # Test retrieving second element (index 1)
+        path = f"/jobs/{new_job.id}/results/array_output/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == "second"
+
+        # Test retrieving third element (index 2)
+        path = f"/jobs/{new_job.id}/results/array_output/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == "third"
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_invalid_index(self):
+        """
+        Test error when index parameter is not a valid integer.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test with non-integer index
+        path = f"/jobs/{new_job.id}/results/output/abc"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "InvalidIndex"
+        assert "valid integer" in resp.json["detail"]
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_negative_index(self):
+        """
+        Test error when index is negative.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test with negative index
+        path = f"/jobs/{new_job.id}/results/output/-1"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "InvalidIndex"
+        assert "non-negative" in resp.json["detail"]
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_out_of_range(self):
+        """
+        Test error when index is out of range for the output array.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],  # length 3, valid indices 0-2
+        )
+
+        # Test with index beyond array length
+        path = f"/jobs/{new_job.id}/results/output/5"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "IndexOutOfRange"
+        assert "out of range" in resp.json["detail"]
+        assert resp.json["cause"]["index"] == 5
+        assert resp.json["cause"]["length"] == 3
+
+        # Test with index exactly at array length (should fail)
+        path = f"/jobs/{new_job.id}/results/output/3"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "IndexOutOfRange"
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_output_not_found(self):
+        """
+        Test error when requested output ID doesn't exist.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "existing_output", "value": ["a", "b"]}],
+        )
+
+        # Test with non-existent output ID
+        path = f"/jobs/{new_job.id}/results/nonexistent_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "NoSuchOutput"
+        assert "not found" in resp.json["detail"]
+        assert "nonexistent_output" in resp.json["detail"]
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_output_not_array(self):
+        """
+        Test error when trying to index into a non-array output.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {"id": "string_output", "value": "just a string"},
+                {"id": "number_output", "value": 42},
+                {"id": "object_output", "value": {"key": "value"}},
+            ],
+        )
+
+        # Test with string output
+        path = f"/jobs/{new_job.id}/results/string_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "OutputNotArray"
+        assert "not an array" in resp.json["detail"]
+        assert resp.json["cause"]["type"] == "str"
+
+        # Test with number output
+        path = f"/jobs/{new_job.id}/results/number_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "OutputNotArray"
+        assert resp.json["cause"]["type"] == "int"
+
+        # Test with object output
+        path = f"/jobs/{new_job.id}/results/object_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "OutputNotArray"
+        assert resp.json["cause"]["type"] == "dict"
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_job_not_successful(self):
+        """
+        Test error when job is not in successful status.
+        """
+        # Test with accepted job
+        job_accepted = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_accepted",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.ACCEPTED,
+            progress=0,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_accepted.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "JobResultsNotReady"
+
+        # Test with running job
+        job_running = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_running",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.RUNNING,
+            progress=50,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_running.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "JobResultsNotReady"
+
+        # Test with failed job
+        job_failed = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_failed",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.FAILED,
+            progress=50,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_failed.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "JobResultsFailed"
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_job_dismissed(self):
+        """
+        Test error when job has been dismissed.
+        """
+        job_dismissed = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.DISMISSED,
+            progress=0,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_dismissed.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 410
+        assert resp.json["title"] == "JobDismissed"
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_complex_values(self):
+        """
+        Test retrieval of complex values (objects, nested arrays) from indexed arrays.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "complex_array",
+                    "value": [
+                        {"name": "first", "value": 1},
+                        {"name": "second", "value": 2},
+                        ["nested", "array"],
+                    ]
+                },
+            ],
+        )
+
+        # Test retrieving object from array
+        path = f"/jobs/{new_job.id}/results/complex_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "first", "value": 1}
+
+        # Test retrieving another object
+        path = f"/jobs/{new_job.id}/results/complex_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "second", "value": 2}
+
+        # Test retrieving nested array
+        path = f"/jobs/{new_job.id}/results/complex_array/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == ["nested", "array"]
+
+    @pytest.mark.oap_part4
+    def test_job_result_index_process_scoped(self):
+        """
+        Test indexed result access through process-scoped endpoint.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test process-scoped endpoint
+        path = f"/processes/{self.process_public.identifier}/jobs/{new_job.id}/results/output/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == "b"
+
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4
     def test_job_update_locked(self, status):
