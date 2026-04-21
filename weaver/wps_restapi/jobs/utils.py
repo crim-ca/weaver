@@ -17,7 +17,8 @@ from pyramid.httpexceptions import (
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
-    HTTPOk
+    HTTPOk,
+    HTTPUnprocessableEntity
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
@@ -860,6 +861,94 @@ def get_job_results_response(
     #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
     out_fmt = None
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+
+
+def get_job_result_by_index(
+    job,            # type: Job
+    output_id,      # type: str
+    index,          # type: int
+    *,              # force named keyword arguments after
+    container,      # type: AnySettingsContainer
+):                  # type: (...) -> AnyResponseType
+    """
+    Retrieve a specific indexed value from a job result array.
+
+    Given an output that is an array (or multi-value result), this function retrieves
+    a specific element by its zero-based index and returns it as JSON.
+
+    Example:
+        /jobs/{jobId}/results/output_array/0  -> returns first element
+        /jobs/{jobId}/results/output_array/1  -> returns second element
+
+    :param job: Job from which to retrieve the indexed result.
+    :param output_id: Identifier of the output containing the array.
+    :param index: Zero-based index of the element to retrieve (must be a valid integer).
+    :param container: Container giving access to instance settings.
+    :return: HTTP response with the indexed element as JSON.
+    :raises HTTPBadRequest: If index is negative or out of range.
+    :raises HTTPNotFound: If the output ID is not found in the job results.
+    :raises HTTPUnprocessableEntity: If the output is not an array.
+    """
+    raise_job_dismissed(job, container)
+    raise_job_bad_status_success(job, container)
+
+    # Validate index is non-negative
+    if index < 0:
+        raise HTTPBadRequest(json={
+            "title": "InvalidIndex",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": "Index must be non-negative.",
+            "status": HTTPBadRequest.code,
+            "value": index
+        })
+
+    # Get the raw results directly from the job
+    output_result = None
+    for result in job.results:
+        result_id = get_any_id(result)
+        if result_id == output_id:
+            output_result = result
+            break
+
+    if output_result is None:
+        available_ids = [get_any_id(r) for r in job.results]
+        raise HTTPNotFound(json={
+            "title": "NoSuchOutput",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+            "detail": f"Output '{output_id}' not found in job results.",
+            "status": HTTPNotFound.code,
+            "cause": f"Available outputs: {available_ids}" if available_ids else None,
+            "value": output_id
+        })
+
+    # Get the value from the result
+    output_value = get_any_value(output_result)
+
+    # Check if the output is an array/multi-value
+    if not isinstance(output_value, list):
+        raise HTTPUnprocessableEntity(json={
+            "title": "OutputNotArray",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": f"Output '{output_id}' is not an array. Index access only applies to array outputs.",
+            "status": HTTPUnprocessableEntity.code,
+            "cause": {"output": output_id, "type": type(output_value).__name__}
+        })
+
+    # Check if index is within bounds
+    if index >= len(output_value):
+        raise HTTPBadRequest(json={
+            "title": "IndexOutOfRange",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": f"Index {index} is out of range for output '{output_id}' (length: {len(output_value)}).",
+            "status": HTTPBadRequest.code,
+            "cause": {"index": index, "length": len(output_value), "output": output_id}
+        })
+
+    # Extract the indexed element from the array
+    indexed_element = output_value[index]
+
+    # Return the indexed element as JSON
+    return HTTPOk(json=indexed_element)
 
 
 def generate_or_resolve_result(

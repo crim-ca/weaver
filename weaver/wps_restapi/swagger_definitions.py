@@ -394,6 +394,10 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
+job_results_index_service = Service(
+    name="job_results_index",
+    path=f"{job_results_service.path}/{{output_id}}/{{index}}"
+)
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
 job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
@@ -422,6 +426,10 @@ process_execution_service = Service(name="process_execution", path=f"{process_se
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
+process_results_index_service = Service(
+    name="process_results_index",
+    path=process_service.path + job_results_index_service.path
+)
 process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
@@ -468,6 +476,10 @@ provider_execution_service = Service(name="provider_execution", path=f"{provider
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
+provider_results_index_service = Service(
+    name="provider_results_index",
+    path=provider_service.path + process_results_index_service.path
+)
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
 provider_exceptions_service = Service(
@@ -4025,6 +4037,30 @@ class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
 
 
 class JobResultsEndpoint(JobPath):
+    header = RequestHeadersNoBody()
+
+
+class JobResultsIndexPath(JobPath):
+    output_id = AnyIdentifier(
+        description="Output identifier of the process result.",
+        example="output_data"
+    )
+    index = ExtendedSchemaNode(
+        Integer(),
+        description="Zero-based index into the array of output values.",
+        example=0
+    )
+
+
+class JobResultsIndexEndpoint(JobResultsIndexPath):
+    header = RequestHeadersNoBody()
+
+
+class ProcessResultsIndexEndpoint(LocalProcessPath, JobResultsIndexPath):
+    header = RequestHeadersNoBody()
+
+
+class ProviderResultsIndexEndpoint(ProviderProcessPath, JobResultsIndexPath):
     header = RequestHeadersNoBody()
 
 
@@ -9038,6 +9074,25 @@ get_job_results_responses = {
 }
 get_provider_results_responses = copy(get_job_results_responses)
 get_provider_results_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+get_job_results_index_responses = {
+    "200": OkGetJobResultsResponse(description="Retrieved single indexed result value.", examples={
+        "IndexedJobResult": {
+            "summary": "Retrieved indexed result from job output array.",
+            "value": "single-value-at-index",
+        }
+    }),
+    "400": BadRequestResponseSchema(description="Invalid index parameter or index out of range."),
+    "404": NotFoundJobResponseSchema(description="Output ID not found."),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(description="Output is not an array."),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_provider_results_index_responses = copy(get_job_results_index_responses)
+get_provider_results_index_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_job_exceptions_responses = {
