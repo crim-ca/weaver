@@ -876,8 +876,7 @@ def get_job_result_by_index(
     Given an output that is an array (or multi-value result), this function retrieves
     a specific element by its zero-based index and returns it as JSON.
 
-    Example
-    -------
+    For Example
         /jobs/{jobId}/results/output_array/0  -> returns first element
         /jobs/{jobId}/results/output_array/1  -> returns second element
 
