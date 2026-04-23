@@ -2784,6 +2784,8 @@ class Process(Base):
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ])
         if self.version:
+            # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+            # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
             proc_tag = f"{proc_list}/{self.tag}"
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
             links.extend([

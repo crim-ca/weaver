@@ -99,6 +99,7 @@ def get_conformance(category, settings):
     ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
     ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
     ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"
+    ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # not yet defined
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -499,6 +500,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/conf/ogcapppkg/replace-body",
         f"{ogcapi_proc_part2}/conf/ogcapppkg/replace-response",
         f"{ogcapi_proc_part2}/req/cwl",
+        f"{ogcapi_proc_part2}/req/cwl/body",
         f"{ogcapi_proc_part2}/req/cwl/execution-unit",
         f"{ogcapi_proc_part2}/req/cwl/deploy-body",
         # FIXME: multi-CWL $graph (class: Workflow), must allow section of 1 with 'w' query param
@@ -509,6 +511,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/cwl/replace-body",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/additional-status-codes",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-body",
+        f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-response-insert",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/deploy-body-ogcapppkg",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-cwl",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-ogcapppkg",
@@ -528,6 +531,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-content-type",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-put-op",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response",
+        f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response-body",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-unsupported-content-type",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/static/indicator",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/delete-op",
@@ -536,6 +540,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/dru/mutable-process",
         f"{ogcapi_proc_part2}/req/dru/test-process",
         f"{ogcapi_proc_part2}/req/ogcapppkg",
+        f"{ogcapi_proc_part2}/req/ogcapppkg/body",
         f"{ogcapi_proc_part2}/req/ogcapppkg/deploy-body",
         # FIXME: support 'docker' direct deployment without CWL?
         # f"{ogcapi_proc_part2}/req/ogcapppkg/execution-unit-docker",
@@ -609,6 +614,10 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/provenance/inputs-get-op",
         f"{ogcapi_proc_part4}/req/provenance/inputs-response",
     ] if ogcapi_proc_prov else []) + [
+        # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+        # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
+        f"{ogcapi_proc_part5}/rec/versioning/replace-response-links"
+    ] + [
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
