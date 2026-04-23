@@ -15,6 +15,9 @@ Changes:
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
   and run their tests with ``tests/functional/code-sprint/test-servers/weaver-localhost`` definitions in the CI.
+- Add variable HTTP 200/201 OK/Created response for `Process` update (*Replace* of DRU) dynamically selected based on
+  the nature of the upsert operation (update/insert) leading to an in-place replacement or distinct `Process` instance
+  (relates to `opengeospatial/ogcapi-processes#578 <https://github.com/opengeospatial/ogcapi-processes/pull/578>`_).
 - Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.
 - Add support of ``WeaverClient`` and the `CLI` with `Process` and `Provider` IDs provided directly as their full URI.
 - Add support of ``WeaverClient`` and the `CLI` to ``deploy`` a `CWL` definition directly as ``application/cwl+json``.
@@ -40,8 +43,6 @@ Fixes:
 - Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
 - Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
 - Fix missing ``Location`` header in ``HTTP 201 Created`` response of `Process` deployment.
-- Fix ``HTTP 200 OK`` not employed on a `Process` update operation (``PUT``/``PATCH`` replace).
-  An ``HTTP 201 Created`` was used instead since update functionality is implemented with the same code as deployment.
 - Fix ``HTTP 204 No Content`` not employed on a ``DELETE`` `Process` operation. An ``HTTP 200 OK`` was returned instead.
 
 .. _changes_6.10.0:
