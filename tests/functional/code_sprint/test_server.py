@@ -592,9 +592,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         headers = {"Content-Type": ContentType.APP_OGC_PKG_JSON}
         replace_path = f"{TEST_SERVER_BASE_URL}/processes/{replace_id}"
         result = self.client._request("PUT", replace_path, json=body, headers=headers)
-        assert result.status_code in [200, 202, 204], (
-            "Replace should respond with 200/204 if immediate or 202 if accepted "
-            "(/req/deploy-replace-undeploy/replace-response)."
+        assert result.status_code in [200, 201, 202, 204], (
+            "Replace should respond with 200/204 if update was immediately applied in-place, "
+            "with 202 if accepted but not yet completed (/req/deploy-replace-undeploy/replace-response) or "
+            "with 201 if replaced by distinct instance (/per/deploy-replace-undeploy/replace-response-insert)."
         )
 
         result = self.client.describe(replace_id)
@@ -640,9 +641,10 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         headers = {"Content-Type": ContentType.APP_CWL_JSON}
         replace_path = f"{TEST_SERVER_BASE_URL}/processes/{new_id}"
         result = self.client._request("PUT", replace_path, json=revised_pkg, headers=headers)
-        assert result.status_code in [200, 202, 204], (
-            "Replace should respond with 200/204 if immediate or 202 if accepted "
-            "(/req/deploy-replace-undeploy/replace-response)."
+        assert result.status_code in [200, 201, 202, 204], (
+            "Replace should respond with 200/204 if update was immediately applied in-place, "
+            "with 202 if accepted but not yet completed (/req/deploy-replace-undeploy/replace-response) or "
+            "with 201 if replaced by distinct instance (/per/deploy-replace-undeploy/replace-response-insert)."
         )
 
         result = self.client.describe(new_id)
