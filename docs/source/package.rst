@@ -1,5 +1,4 @@
 .. include:: references.rst
-.. _package:
 .. _application-package:
 
 .. shortcuts for visualization
@@ -1622,6 +1621,9 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
     |                                           |      }                                                |
     |                                           |    }                                                  |
     +-------------------------------------------+-------------------------------------------------------+
+
+
+.. _app_pkg_metadata:
 
 Metadata
 -----------------------

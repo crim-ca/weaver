@@ -6,6 +6,7 @@ import json
 import os
 import re
 import tempfile
+import urllib.parse
 import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
@@ -34,7 +35,13 @@ from tests.utils import (
 from weaver import WEAVER_ROOT_DIR
 from weaver.datatype import AuthenticationTypes, Process, Service
 from weaver.exceptions import JobNotFound, ProcessNotFound
-from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteTransmissionMode
+from weaver.execute import (
+    ExecuteControlOption,
+    ExecuteMode,
+    ExecuteResponse,
+    ExecuteReturnPreference,
+    ExecuteTransmissionMode
+)
 from weaver.formats import (
     EDAM_MAPPING,
     EDAM_NAMESPACE,
@@ -207,7 +214,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             process_id = self.fully_qualified_test_name()
         body = {
             "processDescription": {},
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             "executionUnit": []
         }
         meta = {
@@ -307,12 +314,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URI in profile[0]
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -764,12 +771,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_PROC_DESC_URI in profile[0]
 
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_name()
@@ -1401,7 +1408,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         headers = {"Content-Type": content_type}
         desc = self.deploy_process_make_visible_and_fetch_deployed(cwl, process_id, headers=headers, assert_io=False)
         pkg = self.get_application_package(process_id)
-        assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+        assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
         # once parsed, CWL I/O are converted to listing form
         # rest should remain intact with the original definition
@@ -1479,7 +1486,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "class": "CommandLineTool",
             "requirements": {
                 CWL_REQUIREMENT_APP_DOCKER: {
-                    "dockerPull": "python:3.7-alpine"
+                    "dockerPull": "python:3.12-alpine"
                 }
             },
             "baseCommand": ["python3", "-V"],
@@ -1519,11 +1526,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": unit,
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1584,7 +1591,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {"processDescription": {"process": ows_ctx}}  # optional 'executionUnit' since 'owsContext' has href
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1635,11 +1642,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": [{"unit": cwl}],
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1694,11 +1701,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": cwl,
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1753,11 +1760,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": {"unit": cwl, "type": ContentType.APP_CWL_JSON},
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
 
             # once parsed, CWL I/O are converted to listing form
             # rest should remain intact with the original definition
@@ -1814,7 +1821,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "cudaDeviceCountMin": 1,
                 "cudaDeviceCountMax": 8
             }
-            docker_requirement = {"dockerPull": "python:3.7-alpine"}
+            docker_requirement = {"dockerPull": "python:3.12-alpine"}
             cwl = {
                 "class": "CommandLineTool",
                 "cwlVersion": "v1.2",
@@ -1840,11 +1847,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": p_id}},
                 "executionUnit": [{"unit": cwl}],
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
             }
             desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
             pkg = self.get_application_package(p_id)
-            assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+            assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
             assert desc["process"]["id"] == p_id
             assert pkg["hints"]["cwltool:CUDARequirement"] == cuda_requirements
             assert pkg["hints"]["DockerRequirement"] == docker_requirement
@@ -1853,7 +1860,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             network_access_requirement = {"networkAccess": True}
-            docker_requirement = {"dockerPull": "python:3.7-alpine"}
+            docker_requirement = {"dockerPull": "python:3.12-alpine"}
             for req_type in ["hints", "requirements"]:  # type: Literal["hints", "requirements"]
                 cwl = {
                     "class": "CommandLineTool",
@@ -1877,11 +1884,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 body = {
                     "processDescription": {"process": {"id": p_id}},
                     "executionUnit": [{"unit": cwl}],
-                    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+                    "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
                 }
                 desc = self.deploy_process_make_visible_and_fetch_deployed(body, p_id, assert_io=False)
                 pkg = self.get_application_package(p_id)
-                assert desc["deploymentProfile"] == "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+                assert desc["deploymentProfile"] == sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI
                 assert desc["process"]["id"] == p_id
                 assert pkg[req_type]["NetworkAccess"] == network_access_requirement
                 assert pkg[req_type]["DockerRequirement"] == docker_requirement
@@ -1933,7 +1940,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"unit": cwl}],
             # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -1995,7 +2002,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
                 "executionUnit": [{"href": tmp_href}],
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
             self.validate_wps1_package(
@@ -2058,7 +2065,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 }},
                 "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}],  # just to fulfill schema validation
                 # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+                "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             ows_ctx = ows_context_href(tmp_http)
             body["processDescription"]["process"].update(ows_ctx)
@@ -2112,7 +2119,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             }},
             "executionUnit": [{"unit": cwl}],
             # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -2170,7 +2177,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
         self.validate_wps1_package(
@@ -2230,7 +2237,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_WPS1_GETCAP_URL}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
 
@@ -2357,7 +2364,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         data = {
             "processDescription": {"process": {"id": "invalid-process:1.2.3"}},
             "executionUnit": [{"unit": cwl}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
         }
         resp = self.app.post_json("/processes", params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422]
@@ -2649,7 +2656,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "title": "Updated CWL"
             }},
             "executionUnit": [{"unit": cwl_v2}],
-            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+            "deploymentProfileName": sd.OGC_API_PROC_PROFILE_DOCKER_APP_URI,
         }
         v2 = "2.0.0"  # not explicitly provided, expected resolved MAJOR update for revision
         resp = self.app.put_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
@@ -2743,7 +2750,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         del_ver = versions[3]  # pick any not latest
         path = f"/processes/{p_id}:{del_ver}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 204
 
         # check that revision was properly removed
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
@@ -2764,7 +2771,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         latest_ver = versions[-1]
         path = f"/processes/{p_id}:{latest_ver}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 204
 
         resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
         assert resp.status_code == 200
@@ -2774,10 +2781,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_delete_process_success(self):
         path = f"/processes/{self.process_public.identifier}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200, f"Error: {resp.text}"
-        assert resp.content_type == ContentType.APP_JSON
-        assert resp.json["identifier"] == self.process_public.identifier
-        assert isinstance(resp.json["undeploymentDone"], bool) and resp.json["undeploymentDone"]
+        assert resp.status_code == 204, f"Error: {resp.text}"
+        assert "Content-Type" not in resp.headers
         with pytest.raises(ProcessNotFound):
             self.process_store.fetch_by_id(self.process_public.identifier)
 
@@ -3023,6 +3028,586 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 assert str(job.id) == resp.json["jobID"]
                 assert job.task_id == Status.ACCEPTED  # temporary value until processed by celery
                 assert job.process == proc_id
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_simple_literal_inputs(self):
+        """
+        Test KVP-encoded execution with simple literal inputs (string, numeric, boolean).
+
+        Validates:
+        - REQ_string-input-value.adoc
+        - REQ_numeric-input-value.adoc
+        - REQ_boolean-input-value.adoc
+        """
+        # Deploy test process with literal inputs
+        body = self.get_process_deploy_template(
+            process_id="kvp-literal-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "stringInput": {"type": "string"},
+                    "intInput": {"type": "int"},
+                    "floatInput": {"type": "float"},
+                    "boolInput": {"type": "boolean"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201], f"Deployment failed: {resp.text}"
+
+        # Execute with KVP
+        proc = "kvp-literal-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "stringInput": "test message",
+                "intInput": "42",
+                "floatInput": "3.14",
+                "boolInput": "true",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+            assert "jobID" in resp.json
+            assert "location" in resp.json
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_array_input(self):
+        """
+        Test KVP-encoded execution with array inputs using multi-value notation.
+
+        Validates:
+        - REQ_array-input-value.adoc
+        - REQ_input-cardinality.adoc
+        """
+        # Deploy test process with array input
+        body = self.get_process_deploy_template(
+            process_id="kvp-array-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "values": {"type": "string[]"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-array-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            # Multiple values for same key - represents array
+            params = [
+                ("values", "value1"),
+                ("values", "value2"),
+                ("values", "value3"),
+            ]
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_input_by_reference(self):
+        """
+        Test KVP-encoded execution with input by reference using qualifiers.
+
+        Validates:
+        - REQ_input-by-reference.adoc
+        - REQ_complex-input-value.adoc
+        """
+        # Deploy test process with File input
+        body = self.get_process_deploy_template(
+            process_id="kvp-reference-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "cat",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "fileInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-reference-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "fileInput[href]": "http://example.com/test.txt",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_binary_input_value(self):
+        """
+        Test KVP-encoded execution with binary input value (base64-encoded).
+
+        Validates:
+        - REQ_binary-input-value.adoc
+        - REQ_binary-input-value-qualified.adoc
+        """
+        # Deploy test process with File input
+        body = self.get_process_deploy_template(
+            process_id="kvp-binary-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "cat",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "binaryInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-binary-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            test_data = b"test binary data"
+            encoded = base64.b64encode(test_data).decode("ascii")
+
+            params = {
+                "binaryInput[value]": encoded,
+                "binaryInput[type]": ContentType.APP_OCTET_STREAM,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_bbox_input(self):
+        """
+        Test KVP-encoded execution with bounding box input.
+
+        Validates:
+        - REQ_bbox-input-value.adoc
+        - REQ_bbox-crs-input-value.adoc
+
+        .. note::
+            Bounding box inputs are converted to File type in CWL (not record type).
+            The bbox data with coordinates and CRS is stored as JSON file content.
+        """
+        # Deploy test process with bbox input as File (bbox is converted to JSON file)
+        body = self.get_process_deploy_template(
+            process_id="kvp-bbox-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "python:3.12-alpine"
+                    }
+                },
+                "inputs": {
+                    "bbox": {
+                        "type": "File",
+                        "format": "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/bbox.yaml",
+                    },
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-bbox-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "bbox": "5.8,47.2,15.1,55.1",
+                "bbox[crs]": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_output_specifications(self):
+        """
+        Test KVP-encoded execution with output specifications (include, mediaType).
+
+        Validates:
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/core/requirements/kvp-execute/REQ_output.adoc
+        """
+        # Deploy test process with multiple outputs
+        body = self.get_process_deploy_template(
+            process_id="kvp-output-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "message": {"type": "string"},
+                },
+                "outputs": {
+                    "output1": {"type": "File", "outputBinding": {"glob": "output1.txt"}},
+                    "output2": {"type": "File", "outputBinding": {"glob": "output2.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-output-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "message": "test",
+                "output1[include]": "true",
+                "output2[include]": "true",
+                "output2[mediaType]": ContentType.APP_JSON,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_response_format(self):
+        """
+        Test KVP-encoded execution with response format control (response[f], response[prefer]).
+
+        Validates:
+        - REQ_f-definition.adoc
+        - REQ_f-response.adoc
+        - REQ_prefer-definition.adoc
+        - REQ_prefer-response.adoc
+        """
+        # Deploy simple test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-response-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "input": {"type": "string"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-response-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            # Test with response[f] and response[prefer]
+            path = f"/processes/{proc}/execution"
+            params = {
+                "input": "test",
+                "response[f]": OutputFormat.JSON,
+                "response[prefer]": f"return={ExecuteReturnPreference.MINIMAL}",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+            # Verify response format was applied (should be JSON)
+            assert resp.content_type == ContentType.APP_JSON
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_mixed_input_types(self):
+        """
+        Test KVP-encoded execution with mix of literal, reference, and qualified inputs.
+
+        Validates combination of multiple OGC requirements in single request.
+        """
+        # Deploy test process with various input types
+        body = self.get_process_deploy_template(
+            process_id="kvp-mixed-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "textInput": {"type": "string"},
+                    "numberInput": {"type": "int"},
+                    "fileInput": {"type": "File"},
+                },
+                "outputs": {
+                    "output": {"type": "File", "outputBinding": {"glob": "output.txt"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-mixed-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "textInput": "hello world",
+                "numberInput": "123",
+                "fileInput[href]": "http://example.com/data.txt",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+            assert "jobID" in resp.json
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_schema_qualified_output(self):
+        """
+        Test KVP-encoded execution with output schema qualifier.
+
+        Validates output format specifications with schema.
+        """
+        # Deploy test process with structured output
+        body = self.get_process_deploy_template(
+            process_id="kvp-schema-output-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "input": {"type": "string"},
+                },
+                "outputs": {
+                    "result": {"type": "File", "outputBinding": {"glob": "result.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-schema-output-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            schema = urllib.parse.quote('{"type":"object"}')  # URL-encoded JSON schema
+
+            params = {
+                "input": "test",
+                "result[include]": "true",
+                "result[mediaType]": ContentType.APP_JSON,
+                "result[schema]": schema,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_encoding_qualifier(self):
+        """
+        Test KVP-encoded execution with encoding qualifier for output.
+
+        Validates format specifications with encoding.
+        """
+        # Deploy test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-encoding-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "python:3.12-alpine"
+                    }
+                },
+                "inputs": {
+                    "data": {"type": "string"},
+                },
+                "outputs": {
+                    "compressed": {"type": "File", "outputBinding": {"glob": "output.gz"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-encoding-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "data": "test data",
+                "compressed[include]": "true",
+                "compressed[mediaType]": ContentType.APP_JSON,
+                "compressed[encoding]": "gzip",
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
+
+    @pytest.mark.kvp
+    def test_execute_process_kvp_profile_qualifier(self):
+        """
+        Test KVP-encoded execution with profile qualifier for input and output.
+
+        Validates that profile specifications are correctly parsed and applied.
+        """
+        # Deploy test process
+        body = self.get_process_deploy_template(
+            process_id="kvp-profile-test",
+            cwl=cast("CWL", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "requirements": {
+                    "DockerRequirement": {
+                        "dockerPull": "alpine:latest"
+                    }
+                },
+                "inputs": {
+                    "features": {"type": "File"},
+                },
+                "outputs": {
+                    "result": {"type": "File", "outputBinding": {"glob": "result.json"}},
+                },
+            })
+        )
+        path = "/processes"
+        resp = self.app.post_json(path, params=body, headers=self.json_headers)
+        assert resp.status_code in [200, 201]
+
+        proc = "kvp-profile-test"
+        task = f"job-{fully_qualified_name(self)}"
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+
+            path = f"/processes/{proc}/execution"
+            params = {
+                "features[href]": "http://example.com/features.json",
+                "features[mediaType]": ContentType.APP_GEOJSON,
+                "features[profile]": "http://www.opengis.net/spec/ogcapi-features-1/1.0",
+                "result[include]": "true",
+                "result[mediaType]": ContentType.APP_JSON,
+                "result[profile]": "http://www.opengis.net/spec/ogcapi-processes-1/1.0",
+                "response[prefer]": ExecuteControlOption.ASYNC,
+            }
+            resp = self.app.get(path, params=params, headers=self.json_headers)
+            assert resp.status_code == 201, f"Error: {resp.text}"
 
     def test_get_process_visibility_expected_response(self):
         for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:

@@ -359,8 +359,8 @@ if TYPE_CHECKING:
 
     KVP_Value = Optional[str]
     KVP_Item = Union[KVP_Value, Sequence[KVP_Value]]
-    KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
-    KVP = Dict[str, List[KVP_Item]]
+    KVP_Container = Union[Sequence[Tuple[Optional[str], KVP_Item]], Dict[Optional[str], KVP_Item]]
+    KVP = Dict[str, KVP_Container]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
     EnvContainer = Dict[str, AnyValueType]

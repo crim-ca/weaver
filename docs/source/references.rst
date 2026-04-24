@@ -88,12 +88,17 @@
 .. _feature-w3c-desc: https://www.w3.org/TR/sdw-bp/#spatial-things-features-and-geometry
 .. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
 .. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
+.. old CQL (draft v1) document not available directly in portal, use alternate export/backup
+.. export: https://files.ogc.org/external/380746787cd5607e6d10bfb7424ccc174f2d733fd456dd72f6cd5bc056dc28b5
 .. |filter-simple-cql| replace:: Simple CQL
-.. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. .. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. _filter-simple-cql: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-core
 .. |filter-cql-json| replace:: CQL-JSON
-.. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. .. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. _filter-cql-json: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-json
 .. |filter-cql-text| replace:: CQL-Text
-.. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. _filter-cql-text: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
 .. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
@@ -139,6 +144,8 @@
 .. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
 .. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
 .. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
+.. |ogc-api-proc-part1-kvp| replace:: *OGC API - Processes* - Part 1: Core KVP-Encoded Execute
+.. _ogc-api-proc-part1-kvp: https://docs.ogc.org/DRAFTS/18-062r3.html#rc_kvp-execute
 .. |ogc-api-proc-exec-mode| replace:: *OGC API - Processes* - Execution Mode
 .. _ogc-api-proc-exec-mode: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode
 .. |ogc-api-proc-exec-responses-sync| replace:: *OGC API - Processes* - Execution Responses (sync)
@@ -181,7 +188,7 @@
 .. |openeo| replace:: openEO
 .. _openeo: https://openeo.org/
 .. |openeo-api| replace:: openEO API
-.. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
+.. _openeo-api: https://api.openeo.org
 .. |openeo-api-profile| replace:: openEO API Profiles
 .. _openeo-api-profile: https://openeo.org/documentation/1.0/developers/profiles/api.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification

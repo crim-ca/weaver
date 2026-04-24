@@ -20,7 +20,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, cast, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -152,6 +152,14 @@ if TYPE_CHECKING:
         "cache": NotRequired[bool],
         "cache_enabled": NotRequired[bool],
     }, total=False)
+    RequestOptionsConfigMatcher = TypedDict("RequestOptionsConfigMatcher", {
+        "url": Required[Union[str, List[str]]],
+        "method": NotRequired[Union[AnyRequestMethod, Literal["*"], List[Union[AnyRequestMethod, Literal["*"]]]]],
+    }, total=True)
+    RequestOptionsConfigEntry = Union[RequestOptions, RequestOptionsConfigMatcher]
+    RequestOptionsSpecification = TypedDict("RequestOptionsSpecification", {
+        "requests": List[RequestOptionsConfigEntry],
+    }, total=True)
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
 
@@ -673,8 +681,8 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
-def get_response_profile(request, request_headers=None):
-    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+def get_response_profile(request=None, request_headers=None):
+    # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer]) -> Optional[str]
     """
     Obtains the desired response profile based on request parameters.
 
@@ -697,16 +705,18 @@ def get_response_profile(request, request_headers=None):
     :param request_headers: Additional headers to consider for profile extraction.
     :return: Matched profile value if found.
     """
-    query_params = get_request_args(request)
+    query_params = get_request_args(request) if request else {}
     profile_query = query_params.get("profile")
     if profile_query:
         return profile_query or None
 
     headers = {}
-    if hasattr(request, "headers"):
+    if request and hasattr(request, "headers"):
         headers.update(request.headers)
     if request_headers:
         headers.update(request_headers)
+    if not headers:
+        return None
 
     content_profile = get_header("Accept-Profile", headers)
     if content_profile:
@@ -721,6 +731,8 @@ def get_response_profile(request, request_headers=None):
             pair_sep=";",
             nested_pair_sep=None,
             accumulate_keys=False,
+            unescape_quotes=True,
+            strip_spaces=True,
         )
         content_profile = content_params.get("profile")
         if content_profile:
@@ -756,16 +768,18 @@ def get_request_args(request):
     return dict(params)
 
 
-def parse_kvp(query,                    # type: str
-              key_value_sep="=",        # type: str
-              pair_sep=";",             # type: str
-              nested_pair_sep="",       # type: Optional[str]
-              multi_value_sep=",",      # type: Optional[str]
-              accumulate_keys=True,     # type: bool
-              unescape_quotes=True,     # type: bool
-              strip_spaces=True,        # type: bool
-              case_insensitive=True,    # type: bool
-              ):                        # type: (...) -> KVP
+def parse_kvp(
+    query,                  # type: Union[str, Dict[str, Any]]
+    key_value_sep="=",      # type: str
+    pair_sep=";",           # type: str
+    nested_pair_sep="",     # type: Optional[str]
+    multi_value_sep=",",    # type: Optional[str]
+    accumulate_keys=True,   # type: bool
+    unescape_quotes=True,   # type: bool
+    strip_spaces=True,      # type: bool
+    case_insensitive=True,  # type: bool
+    deep_object=False,      # type: bool
+):                          # type: (...) -> KVP
     """
     Parse key-value pairs using specified separators.
 
@@ -782,18 +796,44 @@ def parse_kvp(query,                    # type: str
     the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
     except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
 
-    .. code-blocK:: python
+    .. code-block:: python
 
         >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3", pair_sep="&", nested_pair_sep=";")
         {
-            'format': ['json'],
-            'inputs': {
-                'key1': ['value1'],
-                'key2': ['val2', 'val3']
+            "format": ["json"],
+            "inputs": {
+                "key1": ["value1"],
+                "key2": ["val2", "val3"]
             }
         }
 
-    :param query: Definition to be parsed as :term:`KVP`.
+    When :paramref:`deep_object` is enabled, keys with bracket notation like ``{key}[{qualifier}]={val}`` will be
+    parsed into nested dictionaries. This follows the :term:`OpenAPI` ``deepObject`` style parameter serialization.
+
+    .. code-block:: python
+
+        >> parse_kvp("input[href]=url&input[type]=text", pair_sep="&", deep_object=True)
+        {
+            "input": {
+                "href": ["url"],
+                "type": ["text"]
+            }
+        }
+
+    With :paramref:`deep_object` enabled, if the case where both ``{key}`` and ``{key}[{qualifier}]`` is encountered,
+    the simple value (without qualifier) will be stored under ``None`` key within the nested dictionary.
+
+    .. code-block:: python
+
+        >> parse_kvp("bbox=1,2,3,4&bbox[crs]=EPSG:4326", pair_sep="&", deep_object=True)
+        {
+            "bbox": {
+                None: ["1,2,3,4"],
+                "crs": ["EPSG:4326"]
+            }
+        }
+
+    :param query: Definition to be parsed as :term:`KVP`. Can be a query string or an already-parsed dict.
     :param key_value_sep: Separator that delimits the keys from their values.
     :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
     :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
@@ -806,57 +846,87 @@ def parse_kvp(query,                    # type: str
     :param case_insensitive:
         Whether to consider keys as case-insensitive.
         If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
-    :return: Parsed KVP.
+    :param deep_object:
+        Whether to parse bracket notation ``key[qualifier]`` as nested objects similar to :term:`OpenAPI` ``deepObject``
+        style serialization. When collisions occur (both ``key`` and ``key[qualifier]`` exist), the simple value
+        is stored under ``None`` key. Parsing is performed more like a "shallow-object" since nested objects will not
+        be parsed into deeper levels to preserve the original parsing of sub-values as encoded binary data,
+        array lists, :term:`JSON` structures, etc.
+    :return: Parsed :term:`KVP`.
     :raises HTTPBadRequest: If parsing cannot be accomplished based on parsing conditions.
     """
     if not query:
         return {}
-    kvp_items = query.split(pair_sep)
-    kvp = {}
-    for item in kvp_items:
-        k_v = item.split(key_value_sep, 1)
-        if len(k_v) < 2:
-            key = k_v[0]
-            val = []
-        else:
-            key, val = k_v
-            if key_value_sep in val and nested_pair_sep:
-                val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
-                                pair_sep=nested_pair_sep, nested_pair_sep=None,
-                                accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
-                                strip_spaces=strip_spaces, case_insensitive=case_insensitive)
-        if isinstance(val, str):  # in case nested KVP already processed
-            arr = val.split(multi_value_sep) if multi_value_sep else [val]
-            for i, val_item in enumerate(list(arr)):
-                if strip_spaces:
-                    val_item = val_item.strip()
-                if unescape_quotes and (
-                    (val_item.startswith("'") and val_item.endswith("'")) or
-                    (val_item.startswith("\"") and val_item.endswith("\""))
-                ):
-                    val_item = val_item[1:-1]
-                arr[i] = val_item
-            val = arr
-        if case_insensitive:
-            key = key.lower()
-        if strip_spaces:
-            key = key.strip()
-        if key in kvp:
-            if not accumulate_keys:
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for this query.",
-                    "value": str(query),
-                })
-            if isinstance(val, dict) or isinstance(kvp[key], dict):
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
-                    "value": str(query),
-                })
-            kvp[key].extend(val)
-        else:
-            kvp[key] = val
+
+    # If query is already a dict, skip string parsing and
+    # use it directly as KVP base for further processing
+    if isinstance(query, dict):
+        kvp = query
+    else:
+        # Parse query string into KVP dict
+        kvp_items = query.split(pair_sep)
+        kvp = {}
+        for item in kvp_items:
+            k_v = item.split(key_value_sep, 1)
+            if len(k_v) < 2:
+                key = k_v[0]
+                val = []
+            else:
+                key, val = k_v
+                if key_value_sep in val and nested_pair_sep:
+                    val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
+                                    pair_sep=nested_pair_sep, nested_pair_sep=None,
+                                    accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
+                                    strip_spaces=strip_spaces, case_insensitive=case_insensitive)
+            if isinstance(val, str):  # in case nested KVP already processed
+                arr = val.split(multi_value_sep) if multi_value_sep else [val]
+                for i, val_item in enumerate(list(arr)):
+                    if strip_spaces:
+                        val_item = val_item.strip()
+                    if unescape_quotes and (
+                        (val_item.startswith("'") and val_item.endswith("'")) or
+                        (val_item.startswith("\"") and val_item.endswith("\""))
+                    ):
+                        val_item = val_item[1:-1]
+                    arr[i] = val_item
+                val = arr
+            if case_insensitive:
+                key = key.lower()
+            if strip_spaces:
+                key = key.strip()
+            if key in kvp:
+                if not accumulate_keys:
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for this query.",
+                        "value": str(query),
+                    })
+                if isinstance(val, dict) or isinstance(kvp[key], dict):
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
+                        "value": str(query),
+                    })
+                kvp[key].extend(val)
+            else:
+                kvp[key] = val
+
+    if deep_object:
+        deep_kvp = {}
+        for key, val in kvp.items():
+            if "[" in key and key.endswith("]"):
+                base_key, qualifier = key[:-1].split("[", 1)
+                # Handle collision: both 'key' and 'key[qualifier]' exist
+                if base_key in deep_kvp and not isinstance(deep_kvp[base_key], dict):
+                    deep_kvp[base_key] = {None: deep_kvp[base_key]}
+                deep_kvp.setdefault(base_key, {})[qualifier] = val
+            else:
+                if key in deep_kvp and isinstance(deep_kvp[key], dict):
+                    deep_kvp[key][None] = val
+                else:
+                    deep_kvp[key] = val
+        return deep_kvp
+
     return kvp
 
 
@@ -1955,7 +2025,7 @@ def get_no_cache_option(request_headers, **cache_options):
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
     cache_params = ["cache", "cache_enabled"]
-    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
+    no_cache = no_cache is True or any(asbool(cache_options.get(cache, True)) is False for cache in cache_params)
     return no_cache
 
 
@@ -1983,21 +2053,21 @@ def get_request_options(method, url, settings):
         )
         return {}
     settings = get_settings(settings)  # ensure settings, could be any container
-    req_opts_specs = settings.get("weaver.request_options", None)
+    req_opts_specs = cast("RequestOptionsSpecification", settings.get("weaver.request_options", None))
     if not isinstance(req_opts_specs, dict):
         # empty request options is valid (no file specified),
         # but none pre-processed by app means the settings come from unexpected source
         LOGGER.warning("Settings container provided by [%s] missing request options specification. "
                        "Request might not be executed with expected configuration.", get_caller_name(skip=2))
         return {}
-    request_options = {}
+    request_options = cast("RequestOptions", {})
     request_entries = req_opts_specs.get("requests", []) or []
     for req_opts in request_entries:
         req_meth = req_opts.get("method", "")
         if req_meth:
-            methods = req_meth if isinstance(req_meth, list) else [req_meth]
+            methods = req_meth if isinstance(req_meth, list) else req_meth.split(",")
             methods = [meth.upper() for meth in methods]
-            if method.upper() not in methods:
+            if method.upper() not in methods and "*" not in methods:
                 continue
         req_urls = req_opts.get("url")
         req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls

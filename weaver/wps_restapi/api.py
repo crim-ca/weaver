@@ -99,6 +99,7 @@ def get_conformance(category, settings):
     ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
     ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
     ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"
+    ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # not yet defined
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -178,6 +179,7 @@ def get_conformance(category, settings):
         f"{ogcapi_common}/req/oas30",  # OpenAPI 3.0
         # ogcapi_common + "/req/simple-query",
         # ogcapi_common + "/req/umd-collection",
+        f"{ogcapi_proc_core2}/conf/core",
         f"{ogcapi_proc_core1}/conf/core",
         f"{ogcapi_proc_core1}/conf/core/api-definition-op",
         f"{ogcapi_proc_core1}/conf/core/api-definition-success",
@@ -229,23 +231,31 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/conf/core/process-list-op",
         f"{ogcapi_proc_core1}/conf/core/process-list-success",
         f"{ogcapi_proc_core1}/conf/core/process-summary-links",
+        f"{ogcapi_proc_core2}/conf/callback",
         f"{ogcapi_proc_core1}/conf/callback",
         f"{ogcapi_proc_core1}/conf/callback/job-callback",
+        f"{ogcapi_proc_core2}/conf/dismiss",
         f"{ogcapi_proc_core1}/conf/dismiss",
     ] + ([
+        f"{ogcapi_proc_core2}/conf/html",
         f"{ogcapi_proc_core1}/conf/html",
         f"{ogcapi_proc_core1}/conf/html/content",
         f"{ogcapi_proc_core1}/conf/html/definition",
     ] if ogcapi_proc_html else []) + [
         f"{ogcapi_proc_core1}/conf/dismiss/job-dismiss-op",
         f"{ogcapi_proc_core1}/conf/dismiss/job-dismiss-success",
+        f"{ogcapi_proc_core2}/conf/json",
         f"{ogcapi_proc_core1}/conf/json",
         f"{ogcapi_proc_core1}/conf/json/content",
         f"{ogcapi_proc_core1}/conf/json/definition",
+        f"{ogcapi_proc_core2}/conf/job-list",
         f"{ogcapi_proc_core1}/conf/job-list",
-        # FIXME: KVP exec (https://github.com/crim-ca/weaver/issues/607, https://github.com/crim-ca/weaver/issues/445)
-        # f"{ogcapi_proc_core1}/conf/kvp-execute",
+        f"{ogcapi_proc_core2}/conf/kvp-execute",
         f"{ogcapi_proc_core1}/conf/oas30",
+        f"{ogcapi_proc_core2}/conf/oas",
+        f"{ogcapi_proc_core2}/conf/oas30",
+        # f"{ogcapi_proc_core2}/conf/oas31",
+        f"{ogcapi_proc_core2}/conf/ogc-process-description",
         f"{ogcapi_proc_core1}/conf/ogc-process-description",
         f"{ogcapi_proc_core1}/conf/ogc-process-description/links",
         # FIXME: https://github.com/crim-ca/weaver/issues/231
@@ -276,7 +286,11 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-minimal",
         f"{ogcapi_proc_core1}/rec/core/job-results-async-many-json-prefer-representation",
         f"{ogcapi_proc_core1}/per/core/job-results-async-many-other-formats",
-        f"{ogcapi_proc_core2}/req/core/job-results-exception/results-not-available",
+        f"{ogcapi_proc_core2}/req/core/job-results-exception-results-not-available",
+        # FIXME: /results/{id} (https://github.com/crim-ca/weaver/issues/18, https://github.com/crim-ca/weaver/pull/548)
+        #   see https://github.com/opengeospatial/ogcapi-processes/pull/531
+        #   when the requested outputID is not present within available results (originally requested)
+        # f"{ogcapi_proc_core2}/req/core/job-results-exception-no-such-output",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-none",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-minimal",
         f"{ogcapi_proc_core1}/rec/core/process-execute-sync-many-json-prefer-representation",
@@ -305,8 +319,8 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/core/http",
         f"{ogcapi_proc_core1}/req/core/job",
         f"{ogcapi_proc_core1}/req/core/job-exception-no-such-job",
-        f"{ogcapi_proc_core1}/req/core/job-results-exception/no-such-job",
-        f"{ogcapi_proc_core1}/req/core/job-results-exception/results-not-ready",
+        f"{ogcapi_proc_core1}/req/core/job-results-exception-no-such-job",
+        f"{ogcapi_proc_core1}/req/core/job-results-exception-results-not-ready",
         f"{ogcapi_proc_core1}/req/core/job-results-failed",
         f"{ogcapi_proc_core1}/req/core/job-results",
         f"{ogcapi_proc_core1}/req/core/job-results-async-document",
@@ -383,26 +397,26 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/req/job-list/status-response",
         f"{ogcapi_proc_core1}/req/job-list/type-definition",
         f"{ogcapi_proc_core1}/req/job-list/type-response",
-        # FIXME: KVP exec (https://github.com/crim-ca/weaver/issues/607, https://github.com/crim-ca/weaver/issues/445)
-        # f"{ogcapi_proc_core1}/req/kvp-execute",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/process-execute-op",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/f-definition",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/f-response",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/prefer-definition",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/input-query-parameters",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/input-query-parameter-values",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/string-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/numeric-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/boolean-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/complex-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/array-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/binary-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/binary-input-value-qualified",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/bbox-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/bbox-crs-input-value",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/input-by-reference",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/input-cardinality",
-        # f"{ogcapi_proc_core1}/req/kvp-execute/output",
+        f"{ogcapi_proc_core2}/req/kvp-execute",
+        f"{ogcapi_proc_core2}/req/kvp-execute/array-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/bbox-crs-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/bbox-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/binary-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/binary-input-value-qualified",
+        f"{ogcapi_proc_core2}/req/kvp-execute/boolean-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/complex-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/f-definition",
+        f"{ogcapi_proc_core2}/req/kvp-execute/f-response",
+        f"{ogcapi_proc_core2}/req/kvp-execute/input-by-reference",
+        f"{ogcapi_proc_core2}/req/kvp-execute/input-cardinality",
+        f"{ogcapi_proc_core2}/req/kvp-execute/input-query-parameter-values",
+        f"{ogcapi_proc_core2}/req/kvp-execute/input-query-parameters",
+        f"{ogcapi_proc_core2}/req/kvp-execute/numeric-input-value",
+        f"{ogcapi_proc_core2}/req/kvp-execute/output",
+        f"{ogcapi_proc_core2}/req/kvp-execute/prefer-definition",
+        f"{ogcapi_proc_core2}/req/kvp-execute/prefer-response",
+        f"{ogcapi_proc_core2}/req/kvp-execute/process-execute-op",
+        f"{ogcapi_proc_core2}/req/kvp-execute/string-input-value",
         f"{ogcapi_proc_core1}/req/oas30",  # OpenAPI 3.0
         f"{ogcapi_proc_core1}/req/oas30/completeness",
         f"{ogcapi_proc_core1}/req/oas30/exceptions-codes",
@@ -481,6 +495,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/conf/ogcapppkg/replace-body",
         f"{ogcapi_proc_part2}/conf/ogcapppkg/replace-response",
         f"{ogcapi_proc_part2}/req/cwl",
+        f"{ogcapi_proc_part2}/req/cwl/body",
         f"{ogcapi_proc_part2}/req/cwl/execution-unit",
         f"{ogcapi_proc_part2}/req/cwl/deploy-body",
         # FIXME: multi-CWL $graph (class: Workflow), must allow section of 1 with 'w' query param
@@ -491,6 +506,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/cwl/replace-body",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/additional-status-codes",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-body",
+        f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-response-insert",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/deploy-body-ogcapppkg",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-cwl",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-ogcapppkg",
@@ -510,6 +526,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-content-type",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-put-op",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response",
+        f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response-body",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-unsupported-content-type",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/static/indicator",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/delete-op",
@@ -518,6 +535,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/dru/mutable-process",
         f"{ogcapi_proc_part2}/req/dru/test-process",
         f"{ogcapi_proc_part2}/req/ogcapppkg",
+        f"{ogcapi_proc_part2}/req/ogcapppkg/body",
         f"{ogcapi_proc_part2}/req/ogcapppkg/deploy-body",
         # FIXME: support 'docker' direct deployment without CWL?
         # f"{ogcapi_proc_part2}/req/ogcapppkg/execution-unit-docker",
@@ -591,6 +609,10 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/provenance/inputs-get-op",
         f"{ogcapi_proc_part4}/req/provenance/inputs-response",
     ] if ogcapi_proc_prov else []) + [
+        # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+        # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
+        f"{ogcapi_proc_part5}/rec/versioning/replace-response-links"
+    ] + [
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)
         # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing

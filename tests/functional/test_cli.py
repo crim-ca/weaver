@@ -57,7 +57,7 @@ from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fully_qualified_name, get_registry
+from weaver.utils import fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
@@ -457,8 +457,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
-        assert result.body.get("undeploymentDone", None) is True
-        assert "undefined" not in result.message
+        assert not result.body
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -1081,6 +1080,49 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any(f"\"url\": \"{resources.TEST_REMOTE_SERVER_URL}\"" in line for line in lines)
         assert any(f"\"type\": \"{ProcessType.WPS_REMOTE}\"" in line for line in lines)
 
+    def test_deploy_cwl_data_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package.pop("id", None)
+        p_id = f"{self.test_process_prefix}deploy-cwl-data-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_cwl_file_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
+        data = load_file(package)
+        assert "id" not in data, "Undefined ID test precondition failed."
+        p_id = f"{self.test_process_prefix}deploy-cwl-file-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
     def test_deploy_no_process_id_option(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
         package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
@@ -1632,6 +1674,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_package_process(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
         package = self.retrieve_payload("Echo", "package", local=True)
+        p_id = "test-echo-get-package"
         lines = mocked_sub_requests(
             self.app, run_command,
             [
@@ -1640,13 +1683,13 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "--body", payload,
                 "--cwl", package,
-                "--id", "test-echo-get-package"
+                "--id", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
             only_local=True,
         )
-        assert any("\"id\": \"test-echo-get-package\"" in line for line in lines)
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -1654,7 +1697,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # weaver
                 "package",
                 "-u", self.url,
-                "-p", "test-echo-get-package"
+                "-p", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1668,6 +1711,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl.pop("$id", None)
         cwl.pop("$schema", None)
         pkg = package.copy()
+        pkg["id"] = p_id  # if only CWL package is provided (no extra body), the ID is injected to allow resolving it
         pkg["inputs"] = [{"id": key, **val} for key, val in package["inputs"].items()]  # pylint: disable=E1136
         pkg["outputs"] = [{"id": key, **val} for key, val in package["outputs"].items()]  # pylint: disable=E1136
         assert cwl == pkg
@@ -1802,7 +1846,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:5])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):

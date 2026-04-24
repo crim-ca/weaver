@@ -65,13 +65,13 @@ for each process.
     :alt: Requires Python 3.10+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.9.1.svg?logo=github
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.11.0.svg?logo=github
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/6.9.1...master
+    :target: https://github.com/crim-ca/weaver/compare/6.11.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-6.9.1-blue?logo=github
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.11.0-blue?logo=github
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/6.9.1
+    :target: https://github.com/crim-ca/weaver/tree/6.11.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver?logo=librariesdotio&logoColor=white
     :alt: Libraries.io Dependencies Status
@@ -85,9 +85,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.9.1&branch=6.9.1&logo=github
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.11.0&branch=6.11.0&logo=github
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.9.1
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.11.0
 
 .. |readthedocs_build_status| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
@@ -99,7 +99,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.9.1?label=tag&logo=docker
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.11.0?label=tag&logo=docker
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -294,12 +294,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:6.9.1
+    docker pull pavics/weaver:6.11.0
 
 For convenience, following tags are also available:
 
-- ``weaver:6.9.1-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:6.9.1-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:6.11.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:6.11.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
@@ -449,7 +449,14 @@ Corresponding reports are available online at the following locations:
 - |ogc-tb20-gdc-prov-demo-report|_
 - |ogc-tb20-gdc-usage-test-report|_
 
-.. fixme: Add the OGC Testbed-20 report references when published (https://github.com/crim-ca/weaver/issues/812).
+`Weaver` has been employed in the context of the |ogc-api-proc-code-sprint-2026-event|_, where it was used
+to validate its conformance implementation and to test interoperability capabilities of the |ogc-api-proc-part1-v2|_
+and |ogc-api-proc-part2|_ standards. Feedback was provided, allowing improvements related to advanced
+content negotiation capabilities to enable support of `Results Profile` representations in `Job` management.
+Amongst evaluated server implementations over the |ogc-api-proc-code-sprint-2026-test-suite|_, `Weaver` was able
+to strongly align with other participant and demonstrated the standard's capabilities. The ``WeaverClient`` was
+also employed to communicate with the participant's implementations, demonstrating its capacity to interoperate
+and interact with other non-`Weaver` |ogc-api-proc|_ compliant servers.
 
 The project is furthermore developed through the |DACCS-long| (|DACCS-grant|_)
 initiative and is employed by the `ClimateData.ca`_ / `DonneesClimatiques.ca`_ portal.
@@ -498,6 +505,10 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes - Part 4: Job Management*
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
+.. |ogc-api-proc-code-sprint-2026-event| replace:: *OGC API - Processes January 2026 Code Sprint*
+.. _ogc-api-proc-code-sprint-2026-event: https://github.com/opengeospatial/developer-events/wiki/OGC-API-Processes-January-2026-Code-Sprint
+.. |ogc-api-proc-code-sprint-2026-test-suite| replace:: *Code Sprint Test Suite Matrix*
+.. _ogc-api-proc-code-sprint-2026-test-suite: https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman
 .. |ogc-tb13-cloud-er| replace:: *OGC Testbed-13 - Cloud Engineering Report*
 .. _ogc-tb13-cloud-er: https://docs.ogc.org/per/17-035.html
 .. |ogc-tb14| replace:: *OGC Testbed-14*

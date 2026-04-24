@@ -8,6 +8,7 @@ import colander
 import mock
 import pytest
 
+from weaver import ogc_definitions as ogc_def
 from weaver.execute import ExecuteMode
 from weaver.formats import EDAM_NAMESPACE, EDAM_NAMESPACE_URL, IANA_NAMESPACE, IANA_NAMESPACE_URL, ContentType
 from weaver.processes.constants import (
@@ -190,9 +191,9 @@ def test_cwl_namespaces_var_not_conflict_namespace_name(test_value, expect_resul
         (
             {"input": {"bbox": [1, 2, 3, 4]}},
             {"input": {
-                "$schema": sd.OGC_API_BBOX_SCHEMA,
+                "$schema": sd.OGC_API_PROC_BBOX_SCHEMA,
                 "bbox": [1, 2, 3, 4],
-                "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
             }},
         ),
         (
@@ -200,14 +201,14 @@ def test_cwl_namespaces_var_not_conflict_namespace_name(test_value, expect_resul
             {
                 "input": [
                     {
-                        "$schema": sd.OGC_API_BBOX_SCHEMA,
+                        "$schema": sd.OGC_API_PROC_BBOX_SCHEMA,
                         "bbox": [1, 2, 3, 4],
-                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
                     },
                     {
-                        "$schema": sd.OGC_API_BBOX_SCHEMA,
+                        "$schema": sd.OGC_API_PROC_BBOX_SCHEMA,
                         "bbox": [5, 6, 7, 8, 9, 0],
-                        "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                        "crs": ogc_def.OGC_DEF_CRS_CRS84_URI,
                     }
                 ]
             },
