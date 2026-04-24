@@ -12,11 +12,23 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
+  (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
+  individual `Job` result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
+  If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
+- Return ``Link`` headers with ``rel="alternate"`` containing all possible output formats, allowing retrieval via query parameters
+  (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
+  from JSON data structures.
+- Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
+  extended from the original `Process` definition to provide alternate result representations without modifying the deployed
+  `Process` metadata.
 
 Fixes:
 ------
-- No change.
+- Fix ``OutputFormat.convert()`` returning ``bytes`` instead of ``str`` for XML/HTML conversions, causing write errors when
+  saving transformation results to files.
 
 .. _changes_6.11.0:
 

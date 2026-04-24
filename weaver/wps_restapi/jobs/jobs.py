@@ -6,6 +6,8 @@ from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPNoContent,
+    HTTPNotAcceptable,
+    HTTPNotFound,
     HTTPOk,
     HTTPPermanentRedirect,
     HTTPUnprocessableEntity,
@@ -27,7 +29,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
-from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, get_field
 from weaver.processes.execution import (
     submit_job,
     submit_job_dispatch_task,
@@ -38,6 +40,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
+from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
@@ -52,6 +55,7 @@ from weaver.wps_restapi.jobs.utils import (
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
     raise_job_dismissed,
+    resolve_result_single,
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
@@ -689,6 +693,90 @@ def get_job_outputs(request):
     return HTTPOk(json=outputs)
 
 
+@sd.provider_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderResultValueEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessResultValueEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    schema=sd.JobResultValueEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@sd.provider_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProviderAnyOutputEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessAnyOutputEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.JobAnyOutputEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_output(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve a specific output from a job execution.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+    settings = get_settings(request)
+    output_id = request.matchdict.get("output_id")
+
+    # Validate that the output ID exists in job results
+    results = [o for o in job.results if str(o["identifier"]) == output_id]
+    if not results:
+        available_ids = [str(o["identifier"]) for o in job.results]
+        raise HTTPNotFound(
+            json={
+                "title": "NoSuchOutput",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+                "detail": "The requested output ID is not available in the job results.",
+                "status": HTTPNotFound.code,
+                "cause": f"Available outputs: {available_ids}" if available_ids else output_id,
+                "value": output_id
+            }
+        )
+
+    result = results[0]
+    mime_type = get_field(result, "mime_type", search_variations=True, default="")
+    possible_media_types = CONVERSION_DICT.get(mime_type, [])
+    possible_media_types.append(mime_type)
+
+    # Get requested media-type. "*/*" if omit
+    accept = str(request.accept) if request.accept else "*/*"
+    headers = request.headers
+    result_media_type = get_field(result, "mimeType", search_variations=True)
+    result_media_type = guess_target_format(request, default=result_media_type)
+
+    if result_media_type not in possible_media_types:
+        raise HTTPNotAcceptable(json={
+            "title": "NotAcceptable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-common-1/1.0/not-acceptable",
+            "detail": "The requested output format cannot be generated for this output.",
+            "status": HTTPNotAcceptable.code,
+            "cause": (
+                f"Requested format '{result_media_type}' is not compatible "
+                f"with available formats: {possible_media_types}"
+            ),
+            "value": result_media_type
+        })
+
+    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+
+
 @sd.provider_results_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
     schema=sd.ProviderResultsEndpoint(),
@@ -901,7 +989,9 @@ def includeme(config):
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_result_value_service)
     config.add_cornice_service(sd.job_outputs_service)
+    config.add_cornice_service(sd.job_output_service)
     config.add_cornice_service(sd.job_inputs_service)
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
@@ -909,7 +999,9 @@ def includeme(config):
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_result_value_service)
     config.add_cornice_service(sd.process_outputs_service)
+    config.add_cornice_service(sd.process_output_service)
     config.add_cornice_service(sd.process_inputs_service)
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
@@ -917,7 +1009,9 @@ def includeme(config):
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_result_value_service)
     config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_output_service)
     config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)

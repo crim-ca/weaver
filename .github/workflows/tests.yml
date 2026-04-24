@@ -131,7 +131,7 @@ jobs:
         if: ${{ matrix.test-case != 'test-docker' }}
         # install package and dependencies directly,
         # skip sys/conda setup to use active python
-        run: make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
+        run: SUDO=sudo make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
       - name: Display Packages
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
