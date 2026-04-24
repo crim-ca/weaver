@@ -19,7 +19,7 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     steps:
-    - uses: github/issue-labeler@v3.2
+    - uses: github/issue-labeler@e1e476b20ce2c993cc87d07c19b60439bf6ecd93  # v4.0.0
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
         configuration-path: .github/labeler-words.yml

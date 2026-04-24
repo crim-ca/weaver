@@ -1,0 +1,109 @@
+# Dependabot configuration for automated dependency updates
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+    # Automatically group all GitHub Actions updates into a single PR
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Enable version updates with automatic rebasing
+    open-pull-requests-limit: 5
+    # Add reviewers and assignees
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "dependencies"
+      - "ci/operations"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Python dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "13:00"
+    # Group Python dependency updates intelligently
+    # Separate groups for different update types reduces risk
+    groups:
+      # Development dependencies (safer to update together)
+      python-dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Production patch updates (low risk, can be grouped)
+      python-production-patches:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+      # Production minor updates (medium risk, smaller group)
+      python-production-minor:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+      # Major updates stay separate (high risk, reviewed individually)
+    open-pull-requests-limit: 10
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "dependencies"
+      - "ci/operations"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "14:00"
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "dependencies"
+      - "ci/operations"
+      - "feature/docker"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+  # NPM dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "15:00"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "dependencies"
+      - "ci/operations"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+

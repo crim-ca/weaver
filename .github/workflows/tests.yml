@@ -22,7 +22,7 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
+        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf  # v5.4.0
         with:
           concurrent_skipping: "same_content_newer"
           skip_after_successful_duplicate: "true"
@@ -97,13 +97,13 @@ jobs:
             allow-failure: true
             test-case: test-workflow-only
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: "0"
       - name: Setup Python
         # skip python setup if running with docker
         if: ${{ matrix.test-case != 'test-docker' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "${{ matrix.python-version }}"
           cache: 'pip'
@@ -112,7 +112,7 @@ jobs:
         run: |
           echo "::set-output name=major:$(echo ${{ matrix.python-version }} | cut -d '.' -f 1)"
           echo "::set-output name=minor:$(echo ${{ matrix.python-version }} | cut -d '.' -f 2)"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         name: Check Proj Lib Pre-Built in Cache
         id: cache-proj
         with:
@@ -155,14 +155,14 @@ jobs:
       # flaky test analysis, which includes failed tests if applicable
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/test-results-action@cc5e039c452e8387e7d9e8a4b98dd67f7b8c7e68  # v1.0.0
         with:
           files: reports/coverage-junit.xml,!./cache
           flags: ${{ matrix.python-version }}
           token: ${{ secrets.CODECOV_TOKEN }}
       # coverage test analysis
       - name: Upload coverage report
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@15f9e36340c5e28df11a52d3b37008ee9e266696  # v5.2.0
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -208,7 +208,7 @@ jobs:
       # enabled provenance attestation during build/push (see Makefile for details)
       DOCKER_PROV: "true"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v6.0.0
         with:
           fetch-depth: "0"
       - name: Get Tag Version
@@ -221,7 +221,7 @@ jobs:
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3.3.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
