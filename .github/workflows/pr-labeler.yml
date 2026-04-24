@@ -25,7 +25,7 @@ jobs:
     # reference: https://github.com/actions/labeler
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/labeler@6095e77de1123486eca40fb6daa006e56429c246  # v6.0.1
+    - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b  # v6.0.1
       with:
         configuration-path: .github/labeler-files.yml
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -39,6 +39,6 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}  # WIP only works during PRs
     runs-on: ubuntu-latest
     steps:
-      - uses: wip/action@9e30929e353e2aabe1e70f1bc239450de4cd3bda  # v1.0.0
+      - uses: wip/action@950607d619136e6523c46ba3e3fbc7b90fc77fe8  # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
