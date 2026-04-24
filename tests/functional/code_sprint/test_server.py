@@ -70,7 +70,7 @@ def setup_client():
     # fully-qualified name (eg: 'weaver.cli.BasicAuthHandler', 'requests.auth.HTTPBasicAuth')
     auth_handler_ref = os.getenv("TEST_SERVER_AUTH_HANDLER")
     auth_handler = ValidateAuthHandlerAction.validate(auth_handler_ref)
-    auth = None if not auth_handler else parse_auth(dict(
+    auth = None if not auth_handler else parse_auth(dict(  # type: ignore
         auth_handler=auth_handler,
         auth_identity=os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
         auth_password=os.getenv("TEST_SERVER_AUTH_PASSWORD"),
@@ -148,6 +148,7 @@ class ServerOGCAPIProcessesBase:
 
 @pytest.mark.code_sprint
 @pytest.mark.functional
+@pytest.mark.online
 @pytest.mark.remote
 @pytest.mark.oap_part1
 class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
@@ -367,6 +368,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
 @pytest.mark.code_sprint
 @pytest.mark.functional
+@pytest.mark.online
 @pytest.mark.remote
 @pytest.mark.oap_part2
 class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):

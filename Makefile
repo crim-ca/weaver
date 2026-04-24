@@ -452,7 +452,7 @@ test-no-tb14-only: | mkdir-reports  	## run all tests except ones marked for 'Te
 
 .PHONY: test-code-sprint-only
 test-code-sprint-only: | mkdir-reports   	## run OGC Code Sprint tests (test against server specified by environment)
-	@echo "Running functional tests..."
+	@echo "Running code-sprint functional tests..."
 	@[ "${TEST_SERVER}" ] || ( echo ">> 'TEST_SERVER' is not set. Tests code-sprint requires a server to run."; exit 1 )
 	@$(call run_test,-m "code_sprint")
 
