@@ -2590,7 +2590,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         del_ver = versions[3]  # pick any not latest
         path = f"/processes/{p_id}:{del_ver}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 204
 
         # check that revision was properly removed
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
@@ -2611,7 +2611,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         latest_ver = versions[-1]
         path = f"/processes/{p_id}:{latest_ver}"
         resp = self.app.delete_json(path, headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 204
 
         resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
         assert resp.status_code == 200

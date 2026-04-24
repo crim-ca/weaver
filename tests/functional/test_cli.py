@@ -1663,6 +1663,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_package_process(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
         package = self.retrieve_payload("Echo", "package", local=True)
+        p_id = "test-echo-get-package"
         lines = mocked_sub_requests(
             self.app, run_command,
             [
@@ -1671,13 +1672,13 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "--body", payload,
                 "--cwl", package,
-                "--id", "test-echo-get-package"
+                "--id", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
             only_local=True,
         )
-        assert any("\"id\": \"test-echo-get-package\"" in line for line in lines)
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -1685,7 +1686,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # weaver
                 "package",
                 "-u", self.url,
-                "-p", "test-echo-get-package"
+                "-p", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1699,6 +1700,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl.pop("$id", None)
         cwl.pop("$schema", None)
         pkg = package.copy()
+        pkg["id"] = p_id  # if only CWL package is provided (no extra body), the ID is injected to allow resolving it
         pkg["inputs"] = [{"id": key, **val} for key, val in package["inputs"].items()]  # pylint: disable=E1136
         pkg["outputs"] = [{"id": key, **val} for key, val in package["outputs"].items()]  # pylint: disable=E1136
         assert cwl == pkg

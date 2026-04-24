@@ -1043,7 +1043,7 @@ class WeaverClient(object):
         if undeploy:
             LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
             result = self.undeploy(process_id=p_id, url=base)
-            if result.code not in [200, 404]:
+            if result.code not in [200, 204, 404]:
                 return OperationResult(False, "Failed requested undeployment prior deployment.",
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
         LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
