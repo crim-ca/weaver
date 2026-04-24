@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ""))
 EXAMPLES_PATH = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/examples")
 FUNCTIONAL_APP_PKG = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/application-packages"))
+FUNCTIONAL_CODE_SPRINT_SERVERS = os.path.abspath(os.path.join(RESOURCES_PATH, "../functional/code-sprint/test-servers"))
 
 GET_CAPABILITIES_TEMPLATE_URL = "{}?service=WPS&request=GetCapabilities&version=1.0.0"
 DESCRIBE_PROCESS_TEMPLATE_URL = "{}?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0"
@@ -76,7 +77,7 @@ def load_example(file_name, text=False, xml=False):
     return _load_path(file_path, text=text, xml=xml)
 
 
-def load_resource(file_name, text=False, xml=False):
-    # type: (str, bool, bool) -> Union[JSON, xml_util.XML, str]
-    file_path = os.path.join(RESOURCES_PATH, file_name)
+def load_resource(file_name, text=False, xml=False, dir=RESOURCES_PATH):
+    # type: (str, bool, bool, str) -> Union[JSON, xml_util.XML, str]
+    file_path = os.path.join(dir, file_name)
     return _load_path(file_path, text=text, xml=xml)
