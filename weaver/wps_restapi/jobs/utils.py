@@ -892,17 +892,15 @@ def get_job_result_by_index(
     raise_job_dismissed(job, container)
     raise_job_bad_status_success(job, container)
 
-    # Validate index is non-negative
     if index < 0:
         raise HTTPBadRequest(json={
-            "title": "InvalidIndex",
+            "title": "Job Output Invalid Index",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
             "detail": "Index must be non-negative.",
             "status": HTTPBadRequest.code,
             "value": index
         })
 
-    # Get the raw results directly from the job
     output_result = None
     for result in job.results:
         result_id = get_any_id(result)
@@ -913,7 +911,7 @@ def get_job_result_by_index(
     if output_result is None:
         available_ids = [get_any_id(r) for r in job.results]
         raise HTTPNotFound(json={
-            "title": "NoSuchOutput",
+            "title": "Job Output Not Found",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
             "detail": f"Output '{output_id}' not found in job results.",
             "status": HTTPNotFound.code,
@@ -921,33 +919,28 @@ def get_job_result_by_index(
             "value": output_id
         })
 
-    # Get the value from the result
     output_value = get_any_value(output_result)
 
-    # Check if the output is an array/multi-value
     if not isinstance(output_value, list):
         raise HTTPUnprocessableEntity(json={
-            "title": "OutputNotArray",
+            "title": "Job Output Not Array",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
             "detail": f"Output '{output_id}' is not an array. Index access only applies to array outputs.",
             "status": HTTPUnprocessableEntity.code,
             "cause": {"output": output_id, "type": type(output_value).__name__}
         })
 
-    # Check if index is within bounds
     if index >= len(output_value):
         raise HTTPBadRequest(json={
-            "title": "IndexOutOfRange",
+            "title": "Job Output Index Out of Range",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
             "detail": f"Index {index} is out of range for output '{output_id}' (length: {len(output_value)}).",
             "status": HTTPBadRequest.code,
             "cause": {"index": index, "length": len(output_value), "output": output_id}
         })
 
-    # Extract the indexed element from the array
     indexed_element = output_value[index]
 
-    # Return the indexed element as JSON
     return HTTPOk(json=indexed_element)
 
 

@@ -1932,7 +1932,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_success(self):
         """
         Test successful retrieval of indexed values from job result arrays.
@@ -1969,7 +1970,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json == "third"
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_invalid_index(self):
         """
         Test error when index parameter is not a valid integer.
@@ -1988,10 +1990,11 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/output/abc"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["title"] == "InvalidIndex"
+        assert resp.json["title"] == "Job Output Invalid Index"
         assert "valid integer" in resp.json["detail"]
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_negative_index(self):
         """
         Test error when index is negative.
@@ -2010,10 +2013,11 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/output/-1"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["title"] == "InvalidIndex"
+        assert resp.json["title"] == "Job Output Invalid Index"
         assert "non-negative" in resp.json["detail"]
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_out_of_range(self):
         """
         Test error when index is out of range for the output array.
@@ -2032,7 +2036,7 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/output/5"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["title"] == "IndexOutOfRange"
+        assert resp.json["title"] == "Job Output Index Out of Range"
         assert "out of range" in resp.json["detail"]
         assert resp.json["cause"]["index"] == 5
         assert resp.json["cause"]["length"] == 3
@@ -2041,9 +2045,10 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/output/3"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.json["title"] == "IndexOutOfRange"
+        assert resp.json["title"] == "Job Output Index Out of Range"
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_output_not_found(self):
         """
         Test error when requested output ID doesn't exist.
@@ -2062,11 +2067,12 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/nonexistent_output/0"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.json["title"] == "NoSuchOutput"
+        assert resp.json["title"] == "Job Output Not Found"
         assert "not found" in resp.json["detail"]
         assert "nonexistent_output" in resp.json["detail"]
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_output_not_array(self):
         """
         Test error when trying to index into a non-array output.
@@ -2089,7 +2095,7 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/string_output/0"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
-        assert resp.json["title"] == "OutputNotArray"
+        assert resp.json["title"] == "Job Output Not Array"
         assert "not an array" in resp.json["detail"]
         assert resp.json["cause"]["type"] == "str"
 
@@ -2097,17 +2103,18 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/number_output/0"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
-        assert resp.json["title"] == "OutputNotArray"
+        assert resp.json["title"] == "Job Output Not Array"
         assert resp.json["cause"]["type"] == "int"
 
         # Test with object output
         path = f"/jobs/{new_job.id}/results/object_output/0"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 422
-        assert resp.json["title"] == "OutputNotArray"
+        assert resp.json["title"] == "Job Output Not Array"
         assert resp.json["cause"]["type"] == "dict"
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_job_not_successful(self):
         """
         Test error when job is not in successful status.
@@ -2157,7 +2164,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 400
         assert resp.json["title"] == "JobResultsFailed"
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_job_dismissed(self):
         """
         Test error when job has been dismissed.
@@ -2176,7 +2184,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 410
         assert resp.json["title"] == "JobDismissed"
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_complex_values(self):
         """
         Test retrieval of complex values (objects, nested arrays) from indexed arrays.
@@ -2218,7 +2227,8 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json == ["nested", "array"]
 
-    @pytest.mark.oap_part4
+    @pytest.mark.job
+    @pytest.mark.oap_part1
     def test_job_result_index_process_scoped(self):
         """
         Test indexed result access through process-scoped endpoint.

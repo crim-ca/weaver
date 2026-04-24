@@ -763,7 +763,7 @@ def get_job_result_index(request):
         index = int(request.matchdict.get("index"))
     except (ValueError, TypeError):
         raise HTTPBadRequest(json={
-            "title": "InvalidIndex",
+            "title": "Job Output Invalid Index",
             "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
             "detail": "Index must be a valid integer.",
             "status": HTTPBadRequest.code,
