@@ -57,7 +57,7 @@ from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fully_qualified_name, get_registry
+from weaver.utils import fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
@@ -1075,6 +1075,49 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"id\": \"test-provider\"" in line for line in lines)
         assert any(f"\"url\": \"{resources.TEST_REMOTE_SERVER_URL}\"" in line for line in lines)
         assert any(f"\"type\": \"{ProcessType.WPS_REMOTE}\"" in line for line in lines)
+
+    def test_deploy_cwl_data_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package.pop("id", None)
+        p_id = f"{self.test_process_prefix}deploy-cwl-data-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_cwl_file_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
+        data = load_file(package)
+        assert "id" not in data, "Undefined ID test precondition failed."
+        p_id = f"{self.test_process_prefix}deploy-cwl-file-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_no_process_id_option(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)

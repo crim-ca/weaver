@@ -681,18 +681,20 @@ class WeaverClient(object):
                 p_id = process_id or cwl.get("id")
                 cwl["id"] = p_id  # override if provided by processID
             else:
-                p_desc = get_process_information(body)
+                p_desc = get_process_information(body or {})
                 p_id = get_any_id(p_desc, default=process_id)
             info = {"id": p_id}  # minimum requirement for process offering validation
             if (isinstance(cwl, str) and not cwl.startswith("{")) or isinstance(wps, str):
                 LOGGER.debug("Override loaded CWL into provided/loaded body for process: [%s]", p_id)
                 proc = get_process_definition(  # validate + extract
                     info,
-                    reference=cwl or wps,
+                    reference=cast(str, cwl or wps),
                     headers=headers,
                     container=settings,
                 )
-                body, headers = self._resolve_deploy_package(body, proc["package"], headers)
+                pkg = proc["package"]
+                pkg.setdefault("id", info["id"])
+                body, headers = self._resolve_deploy_package(body, pkg, headers)
             elif isinstance(cwl, str) and cwl.startswith("{") and cwl.endswith("}"):
                 LOGGER.debug("Override parsed CWL into provided/loaded body for process: [%s]", p_id)
                 pkg = yaml.safe_load(cwl)
@@ -704,7 +706,9 @@ class WeaverClient(object):
                     headers=headers,
                     container=settings,
                 )
-                body, headers = self._resolve_deploy_package(body, proc["package"], headers)
+                pkg = proc["package"]
+                pkg.setdefault("id", info["id"])
+                body, headers = self._resolve_deploy_package(body, pkg, headers)
             elif isinstance(cwl, dict):
                 LOGGER.debug("Override provided CWL into provided/loaded body for process: [%s]", p_id)
                 get_process_definition(  # validate only
