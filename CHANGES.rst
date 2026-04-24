@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.11.0:
+
+`6.11.0 <https://github.com/crim-ca/weaver/tree/6.11.0>`_ (2026-04-24)
+====================================================================================================================
+
+Changes:
+--------
 - Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
 - Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
   and run their tests with ``tests/functional/code-sprint/test-servers/weaver-localhost`` definitions in the CI.
