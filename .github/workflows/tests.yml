@@ -52,6 +52,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         allow-failure: [false]
+        test-server: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
@@ -94,8 +95,14 @@ jobs:
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
             python-version: "3.12"
-            allow-failure: true
+            allow-failure: false
             test-case: test-workflow-only
+          # OGC Code-Sprint tests
+          - os: ubuntu-latest
+            python-version: "3.12"
+            allow-failure: false
+            test-case: test-code-sprint-only
+            test-server: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -144,8 +151,29 @@ jobs:
       - name: Display Applicable Checks
         if: ${{ startsWith(matrix.test-case, 'check') }}
         run: make check-info
+      - name: Env Test Setup
+        if: ${{ matrix.test-server == true }}
+        uses: falti/dotenv-action@v1.2.0
+        with:
+          path: ./tests/functional/code_sprint/test-servers/weaver-localhost/test.env
+          ensure-exists: true
+          export-variables: true
+          log-variables: true
+          keys-case: bypass
+      - name: Start Test Instance
+        if: ${{ matrix.test-server == true }}
+        run: |
+          make stop start-only
+          sleep 10
       - name: Run Tests
-        run: make stop ${{ matrix.test-case }}
+        run: make ${{ matrix.test-case }}
+      - name: Display Test Logs (failure)
+        if: ${{ failure() && matrix.test-server == true }}
+        run: |
+          echo "=== Weaver Manager Logs ==="
+          cat /tmp/weaver-manager.log
+          echo "=== Weaver Worker Logs ==="
+          cat /tmp/weaver-worker.log
 
       # manually invoke reporting in case of test failure to still generate them
       # otherwise, they would have been generated automatically following the successful coverage run

@@ -1,4 +1,4 @@
-VERSION ?= 6.10.0
+VERSION ?= 6.11.0
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
@@ -11,6 +11,7 @@ APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
 APP_VERSION ?= $(VERSION)
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
+override APP_INI_DEFAULT := $(APP_ROOT)/config/$(APP_NAME).ini.example
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -422,7 +423,7 @@ test-unit-only: | mkdir-reports 		## run unit tests (skip long running and onlin
 .PHONY: test-func-only
 test-func-only: | mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
-	@$(call run_test,-m "functional")
+	@$(call run_test,-m "functional and not code_sprint")
 
 .PHONY: test-cli-only
 test-cli-only: | mkdir-reports   		## run WeaverClient and CLI tests
@@ -448,6 +449,12 @@ test-offline-only: | mkdir-reports  	## run offline tests (not marked as online)
 test-no-tb14-only: | mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
 	@$(call run_test,-m "not testbed14")
+
+.PHONY: test-code-sprint-only
+test-code-sprint-only: | mkdir-reports   	## run OGC Code Sprint tests (test against server specified by environment)
+	@echo "Running code-sprint functional tests..."
+	@[ "${TEST_SERVER}" ] || ( echo ">> 'TEST_SERVER' is not set. Tests code-sprint requires a server to run."; exit 1 )
+	@$(call run_test,-m "code_sprint")
 
 .PHONY: test-spec-only
 test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
@@ -637,7 +644,7 @@ check-imports-only: | mkdir-reports 	## check imports ordering and styles
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
-		isort --check-only --diff --recursive $(APP_ROOT) \
+		isort --check-only --diff $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: check-css-only
@@ -692,7 +699,7 @@ fix-imports-only: mkdir-reports	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-imports.txt"
 	@bash -c '$(CONDA_CMD) \
-		isort --recursive $(APP_ROOT) \
+		isort $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
 # FIXME: https://github.com/PyCQA/pycodestyle/issues/996
@@ -774,12 +781,19 @@ docs: install-doc clean-docs docs-only	## generate HTML documentation with Sphin
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 
+# tool to use for bumping version
+BUMP_TOOL ?= bump-my-version bump  # or 'bump2version'
+
 # Bumpversion 'dry' config
 # if 'dry' is specified as target, any bumpversion call using 'BUMP_XARGS' will not apply changes
 BUMP_XARGS ?= --verbose --allow-dirty
 ifeq ($(filter dry, $(MAKECMDGOALS)), dry)
 	BUMP_XARGS := $(BUMP_XARGS) --dry-run
 endif
+ifeq ($(BUMP_TOOL),bump2version)
+	BUMP_XARGS := $(BUMP_XARGS) patch
+endif
+
 .PHONY: dry
 dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VERSION=<x.y.z> bump dry]
 	@-echo > /dev/null
@@ -788,7 +802,7 @@ dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VER
 bump:	## bump version using VERSION specified as user input [make VERSION=<x.y.z> bump]
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
-	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+	@-bash -c '$(CONDA_CMD) $(BUMP_TOOL) $(BUMP_XARGS) --new-version "${VERSION}";'
 
 .PHONY: dist-pypi
 dist-pypi: install-sys dist-pypi-only	## publish package distribution on PyPI with dependencies preinstall
@@ -992,8 +1006,11 @@ DOCKER_TEST_CURL_RETRY_COUNT ?= 10
 DOCKER_TEST_CURL_RETRY_DELAY ?= 5
 DOCKER_TEST_EXEC_ARGS ?=
 .PHONY: docker-test
-docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
+docker-test: docker-build stop	## execute smoke test of built images (validate that they boot, reply and test passes)
 	@echo "Smoke test of built application docker images"
+	cp "$(APP_INI_DEFAULT)" "$(APP_ROOT)/tests/smoke/weaver.ini"
+	sed -i "$(APP_ROOT)/tests/smoke/weaver.ini" -e 's|mongodb.host = localhost|mongodb.host = mongodb|g'
+	sed -i "$(APP_ROOT)/tests/smoke/weaver.ini" -e 's|localhost:27017|mongodb:27017|g'
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) up -d
 	@echo "Pinging Weaver API entrypoint to validate response..."
 	@wget \
@@ -1032,17 +1049,95 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 ## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
 .PHONY: start
-start: install-run	## start application instance(s) with gunicorn (pserve)
-	@echo "Starting $(APP_NAME)..."
-	@bash -c '$(CONDA_CMD) exec pserve "$(APP_INI)" &'
+start: install-run start-only	## start application instance(s) after dependencies installation
+
+.PHONY: start-only
+start-only: start-manager-only start-worker-only	## start both manager and worker instances
+
+# Minimal pidfile-based start/stop for the two known services (manager, worker).
+# allow overrides via Makefile.config or environment
+MANAGER_PIDFILE ?= /tmp/$(APP_NAME)-manager.pid
+MANAGER_LOG ?= /tmp/$(APP_NAME)-manager.log
+WORKER_PIDFILE ?= /tmp/$(APP_NAME)-worker.pid
+WORKER_LOG ?= /tmp/$(APP_NAME)-worker.log
+
+.PHONY: setup-ini
+setup-ini:		## setup configuration INI file for application instances
+	@-echo "Setting up configuration file for application instances..."
+	@-mkdir -p "$(shell dirname $$(realpath "$(APP_INI)"))"
+	@[ -f "$(APP_INI)" ] && echo "Using configuration INI: [$(APP_INI)]" || true
+	@[ -f "$(APP_INI)" ] || ( \
+		echo "Creating configuration INI: [$(APP_INI)] from [$(APP_INI_DEFAULT)]" && \
+		cp "$(APP_INI_DEFAULT)" "$(APP_INI)" \
+	)
+
+.PHONY: start-manager-only
+start-manager-only: setup-ini	## start application instance(s) with pserve (manager)
+	@echo "Starting $(APP_NAME) [manager]..."
+	@bash -c '\
+		mkdir -p $$(dirname "$(MANAGER_LOG)"); \
+ 		nohup bash -lc "\
+ 			$(CONDA_CMD) exec \
+ 			pserve \"$(APP_INI)\"" >>"$(MANAGER_LOG)" 2>&1 & \
+ 			echo $$! > "$(MANAGER_PIDFILE)"; \
+ 		echo "Started manager -> $(MANAGER_PIDFILE)"'
+
+.PHONY: start-worker-only
+start-worker-only: setup-ini	## start worker instance(s) with celery
+	@echo "Starting $(APP_NAME) [worker]..."
+	@bash -c '\
+		mkdir -p $$(dirname "$(WORKER_LOG)"); \
+		nohup bash -lc "\
+			$(CONDA_CMD) exec \
+			celery -A pyramid_celery.celery_app worker -B -E --ini \"$(APP_INI)\"" >>"$(WORKER_LOG)" 2>&1 & \
+			echo $$! > "$(WORKER_PIDFILE)"; \
+		echo "Started worker -> $(WORKER_PIDFILE)"'
 
 .PHONY: stop
-stop: 		## kill application instance(s) started with gunicorn (pserve)
-	@(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"
+stop: stop-manager stop-worker		## stop application instance(s) as needed
+
+.PHONY: stop-manager
+stop-manager: 		## stop application instance(s) started with pserve (manager)
+	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
+		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ]; then \
+			kill $$pid 2>/dev/null || true; sleep 1; \
+			if kill -0 $$pid 2>/dev/null; then kill -9 $$pid 2>/dev/null || true; fi; \
+			rm -f "$(MANAGER_PIDFILE)"; echo "Stopped manager (PID $$pid)"; \
+		else \
+			echo "Invalid pidfile; removing"; rm -f "$(MANAGER_PIDFILE)"; \
+		fi; \
+	else \
+		(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"; \
+	fi'
+
+.PHONY: stop-worker
+stop-worker: 		## stop worker instance(s) started with celery
+	@bash -c 'if [ -f "$(WORKER_PIDFILE)" ]; then \
+		pid=$$(cat "$(WORKER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ]; then \
+			kill $$pid 2>/dev/null || true; sleep 1; \
+			if kill -0 $$pid 2>/dev/null; then kill -9 $$pid 2>/dev/null || true; fi; \
+			rm -f "$(WORKER_PIDFILE)"; echo "Stopped worker (PID $$pid)"; \
+		else \
+			echo "Invalid pidfile; removing"; rm -f "$(WORKER_PIDFILE)"; \
+		fi; \
+	else \
+		echo "No worker pidfile ($(WORKER_PIDFILE)) - nothing to stop"; \
+	fi'
 
 .PHONY: stat
 stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
-	@lsof -i :4001 || echo "No instance running"
+	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
+		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ] && kill -0 $$pid 2>/dev/null; then \
+			ps -p $$pid -o pid,cmd; \
+		else \
+			echo "No manager instance running"; \
+		fi; \
+	else \
+		lsof -i :4001 || echo "No instance running"; \
+	fi'
 
 # Reapply config if overrides were defined.
 # Ensure overrides take precedence over targets and auto-resolution logic of variables.
