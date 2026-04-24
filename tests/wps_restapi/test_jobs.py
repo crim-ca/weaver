@@ -44,14 +44,14 @@ from weaver.execute import (
 )
 from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
-from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import explode_headers, get_path_kvp, now
+from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema
+from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema, get_results
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -3129,6 +3129,58 @@ class WpsRestApiJobsTest(JobUtils):
         results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
         results_scripts = results_divs[-1].find("script")
         assert not results_scripts, "When job failed, unavailable results causes no fetching button on the HTML page."
+
+    def test_job_results_with_digest_multibase(self):
+        """
+        Test that job results include digestMultibase for file outputs.
+        """
+        # Use the class-level output directory
+        wps_output_dir = self.settings["weaver.wps_output_dir"]
+
+        # Create a test output file
+        job_id = "test-job-digest-123"
+        job_output_dir = os.path.join(wps_output_dir, job_id)
+        os.makedirs(job_output_dir, exist_ok=True)
+
+        test_file = os.path.join(job_output_dir, "output.txt")
+        test_content = b"Test output file for digestMultibase validation"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Create settings with output URL constructed from weaver URL
+        settings = dict(self.settings)
+        settings["weaver.wps_output_url"] = f"{self.settings['weaver.url']}/wps-outputs"
+
+        # Create a job with file results
+        job = self.make_job(
+            task_id=job_id,
+            process="test-process",
+            service=None,
+            status="successful",
+            progress=100,
+            access="public",
+            results=[
+                {
+                    "id": "output",
+                    "href": f"{job_id}/output.txt",
+                    "mimeType": ContentType.TEXT_PLAIN,
+                }
+            ],
+        )
+
+        # Get results with OGC schema (should include digestMultibase)
+        results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
+
+        # Verify digestMultibase is included
+        assert "output" in results
+        output_result = results["output"]
+        assert "digestMultibase" in output_result, "digestMultibase should be included for file outputs"
+        assert isinstance(output_result["digestMultibase"], str)
+        assert output_result["digestMultibase"].startswith("m"), "digestMultibase should use base64 encoding"
+
+        # Verify the digest is valid and deterministic
+        expected_digest = compute_file_digest_multibase(test_file)
+        assert output_result["digestMultibase"] == expected_digest
 
 
 @pytest.mark.oap_part1

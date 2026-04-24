@@ -60,6 +60,7 @@ from weaver.utils import (
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    compute_file_digest_multibase,
     create_metalink,
     explode_headers,
     fetch_directory,
@@ -2341,6 +2342,53 @@ def test_retry_on_condition(errors, raises, conditions, retries):
 
     run_test()
     run_test(1, keyword="test")
+
+
+def test_compute_file_digest_multibase():
+    """
+    Test computation of digestMultibase for W3C VC Data Integrity resource integrity verification.
+    """
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create a test file with known content
+        test_file = os.path.join(tmpdir, "test_file.txt")
+        test_content = b"Hello, World! This is a test file for digestMultibase."
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Compute digest
+        digest = compute_file_digest_multibase(test_file)
+
+        # Verify digest format
+        assert isinstance(digest, str), "Digest should be a string"
+        assert digest.startswith("m"), "Digest should start with 'm' (base64 encoding)"
+        assert len(digest) > 10, "Digest should be a reasonable length"
+
+        # Verify digest is deterministic
+        digest2 = compute_file_digest_multibase(test_file)
+        assert digest == digest2, "Same file should produce the same digest"
+
+        # Modify file and verify digest changes
+        with open(test_file, "wb") as f:
+            f.write(test_content + b" Modified!")
+        digest3 = compute_file_digest_multibase(test_file)
+        assert digest != digest3, "Modified file should produce different digest"
+
+        # Test with different hash algorithm
+        digest_sha512 = compute_file_digest_multibase(test_file, hash_algorithm="sha512")
+        assert digest_sha512.startswith("m"), "SHA-512 digest should also use base64"
+        assert digest_sha512 != digest3, "Different hash algorithms should produce different digests"
+
+        # Test error cases
+        with pytest.raises(ValueError, match="File not found"):
+            compute_file_digest_multibase(os.path.join(tmpdir, "nonexistent.txt"))
+
+        with pytest.raises(ValueError, match="Unsupported hash algorithm"):
+            compute_file_digest_multibase(test_file, hash_algorithm="unsupported_algo")
+
+        # e.g., blake2b is in hashlib but not in hash_codes mapping
+        with pytest.raises(ValueError, match=r"not supported for multihash encoding"):
+            compute_file_digest_multibase(test_file, hash_algorithm="blake2b")
 
 
 def test_create_metalink():

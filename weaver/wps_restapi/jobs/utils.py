@@ -59,6 +59,7 @@ from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    compute_file_digest_multibase,
     data2str,
     fetch_file,
     get_any_id,
@@ -587,6 +588,29 @@ def get_results(  # pylint: disable=R1260
                     for field in ["encoding", "schema"]:
                         if field in result:
                             output["format"][field] = val_item[field]
+
+                # Add digestMultibase for resource integrity verification (W3C VC Data Integrity)
+                # Only compute for local files that can be accessed
+                try:
+                    file_path = val_data
+                    if file_path.startswith(wps_url):
+                        file_path = map_wps_output_location(file_path, settings, exists=True, url=False)
+                    elif file_path.startswith("file://"):
+                        file_path = file_path[7:]
+                    elif not file_path.startswith(("/", "http://", "https://", "s3://")):
+                        # relative path, resolve against WPS output directory
+                        wps_dir = get_wps_output_dir(settings)
+                        file_path = os.path.join(wps_dir, str(job.id), file_path)
+
+                    # Only compute digest for local files
+                    if os.path.isfile(file_path):
+                        digest_mb = compute_file_digest_multibase(file_path)
+                        output["digestMultibase"] = digest_mb
+
+                except (OSError, ValueError, ImportError):
+                    # If file is not accessible or multiformats not available, skip digest
+                    pass
+
             elif not is_ref:
                 dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
                 if ogc_api:
