@@ -11,7 +11,7 @@ jobs:
       CHANGES_HTML: ${{ github.workspace }}/reports/CHANGES_${{ github.ref_name }}.html
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
       with:
         fetch-depth: "0"
     - name: Generate Archive
@@ -38,7 +38,7 @@ jobs:
 
     - name: Run Zenodo Publish
       id: deploy_zenodo
-      uses: rseng/zenodo-release@0.0.21
+      uses: rseng/zenodo-release@a9c88701a0176df755015f8ca4cf8cc754162f27  # v0.0.21
       with:
         token: ${{ secrets.ZENODO_TOKEN }}
         version: ${{ github.ref_name }}
