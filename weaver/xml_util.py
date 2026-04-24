@@ -56,12 +56,12 @@ def fromstring(text, parser=XML_PARSER):
     # type: (AnyStr, lxml_etree.XMLParser) -> XML
     from weaver.utils import str2bytes
 
-    return _lxml_fromstring(str2bytes(text), parser=parser)  # nosec: B410
+    return _lxml_fromstring(str2bytes(text), parser=parser)  # type: ignore  # nosec: B410
 
 
 def parse(source, parser=XML_PARSER):
     # type: (Union[str, BufferedReader], lxml_etree.XMLParser) -> XMLTree
-    return lxml_etree.parse(source, parser=parser)  # nosec: B410
+    return lxml_etree.parse(source, parser=parser)  # type: ignore  # nosec: B410
 
 
 # override OWSLib call with adjusted method reference with configured parser enforced
@@ -89,12 +89,11 @@ def _lxml_tree_parser_maker(**parser_kwargs):
         "no_network": True,
         "remove_pis": True,
         "huge_tree": False,
-        "strip_cdata": True,
         "recover": True,
     })
     return lxml_etree.HTMLParser(**parser_kwargs)
 
 
 HTML_PARSER = _lxml_tree_parser_maker()
-HTML_TREE_BUILDER = LXMLTreeBuilder(parser=_lxml_tree_parser_maker)
+HTML_TREE_BUILDER = LXMLTreeBuilder(parser=_lxml_tree_parser_maker)  # type: ignore
 LXML_TREE_BUILDER = HTML_TREE_BUILDER
