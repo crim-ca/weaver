@@ -33,7 +33,7 @@ updates:
       include: "scope"
 
   # Python dependencies (pip)
-  # No grouping - each dependency gets its own PR
+  # Group patch/minor updates to reduce PR count; major updates get individual PRs
   # Minor/patch updates are auto-approved; major updates require manual review
   - package-ecosystem: "pip"
     directory: "/"
@@ -41,6 +41,16 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "13:00"
+    groups:
+      # Group all patch updates together (safest, unlikely to break)
+      python-patch-updates:
+        update-types:
+          - "patch"
+      # Group minor updates together (safer than major)
+      python-minor-updates:
+        update-types:
+          - "minor"
+      # Major updates remain ungrouped for individual review
     rebase-strategy: "disabled"
     open-pull-requests-limit: 10
     reviewers:
