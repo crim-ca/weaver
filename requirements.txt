@@ -50,7 +50,7 @@ cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.1.1
-dnspython>=2.6.1  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
+dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.1
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
