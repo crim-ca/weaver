@@ -2,9 +2,8 @@
 # Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 # NOTE: auto-rebase strategy
-#   Disable auto-rebase to avoid too many CI runs on each PR merged
-#   Consider that it is "close enough" if the latest state it was tested at,
-#   and master will re-test the actual latest state when merged anyway
+#   With grouping enabled, auto-rebase impact is manageable (2-3 PRs vs 10+)
+#   PRs are kept up-to-date with master and can auto-merge when CI passes
 
 version: 2
 updates:
@@ -20,7 +19,7 @@ updates:
       github-actions:
         patterns:
           - "*"
-    rebase-strategy: "disabled"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 5
     # Add reviewers and assignees
     reviewers:
@@ -51,7 +50,7 @@ updates:
         update-types:
           - "minor"
       # Major updates remain ungrouped for individual review
-    rebase-strategy: "disabled"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 10
     reviewers:
       - "fmigneault"
@@ -70,7 +69,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "14:00"
-    rebase-strategy: "disabled"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
@@ -92,7 +91,7 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
-    rebase-strategy: "disabled"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
