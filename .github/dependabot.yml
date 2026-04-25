@@ -1,6 +1,11 @@
 # Dependabot configuration for automated dependency updates
 # Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# NOTE: auto-rebase strategy
+#   Disable auto-rebase to avoid too many CI runs on each PR merged
+#   Consider that it is "close enough" if the latest state it was tested at,
+#   and master will re-test the actual latest state when merged anyway
+
 version: 2
 updates:
   # GitHub Actions dependencies
@@ -15,14 +20,14 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # Enable version updates with automatic rebasing
+    rebase-strategy: "disabled"
     open-pull-requests-limit: 5
     # Add reviewers and assignees
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
+      - "ci/tests"
     commit-message:
       prefix: "ci"
       include: "scope"
@@ -36,11 +41,11 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "13:00"
+    rebase-strategy: "disabled"
     open-pull-requests-limit: 10
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
     commit-message:
       prefix: "deps"
@@ -55,11 +60,11 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "14:00"
+    rebase-strategy: "disabled"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
       - "feature/docker"
     commit-message:
@@ -77,12 +82,13 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+    rebase-strategy: "disabled"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
+      - "ci/tests"
     commit-message:
       prefix: "deps"
       include: "scope"
