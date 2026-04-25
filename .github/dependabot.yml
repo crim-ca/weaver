@@ -28,32 +28,14 @@ updates:
       include: "scope"
 
   # Python dependencies (pip)
+  # No grouping - each dependency gets its own PR
+  # Minor/patch updates are auto-approved; major updates require manual review
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "13:00"
-    # Group Python dependency updates intelligently
-    # Separate groups for different update types reduces risk
-    groups:
-      # Development dependencies (safer to update together)
-      python-dev-dependencies:
-        dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
-      # Production patch updates (low risk, can be grouped)
-      python-production-patches:
-        dependency-type: "production"
-        update-types:
-          - "patch"
-      # Production minor updates (medium risk, smaller group)
-      python-production-minor:
-        dependency-type: "production"
-        update-types:
-          - "minor"
-      # Major updates stay separate (high risk, reviewed individually)
     open-pull-requests-limit: 10
     reviewers:
       - "fmigneault"
@@ -65,16 +47,14 @@ updates:
       include: "scope"
 
   # Docker dependencies
+  # No grouping for Docker dependencies - all updates need manual review
+  # due to potential breaking changes in container environments
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "14:00"
-    groups:
-      docker-dependencies:
-        patterns:
-          - "*"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"

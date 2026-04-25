@@ -41,6 +41,6 @@ jobs:
     permissions:
       statuses: write
     steps:
-      - uses: wip/action@950607d619136e6523c46ba3e3fbc7b90fc77fe8  # v1.0.0
+      - uses: wip/action@5d388554862715b5f75a3e9916f84ba9f2ecc23e  # v1.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
