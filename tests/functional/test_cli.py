@@ -463,6 +463,217 @@ class TestWeaverClient(TestWeaverClientBase):
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
         assert resp.status_code == 404
 
+    @pytest.mark.oap_part2
+    def test_replace_with_simple_metadata(self):
+        """
+        Test replace operation with simple metadata fields (PATCH-level update).
+        """
+        test_id = f"{self.test_process_prefix}replace-simple-metadata"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+        assert result.body["processSummary"]["version"] == "1.0"
+
+        # Update title and description
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            metadata={"title": "Updated Title", "description": "Updated description"}
+        )
+        assert result.success
+        assert result.body["version"] == "1.0.1", "PATCH-level change should bump patch version"
+
+        # Verify the changes were applied
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert result.body["title"] == "Updated Title"
+        assert result.body["description"] == "Updated description"
+
+    @pytest.mark.oap_part2
+    def test_replace_with_keywords(self):
+        """
+        Test replace operation with keywords (PATCH-level update, appended).
+        """
+        test_id = f"{self.test_process_prefix}replace-keywords"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+        original_keywords = result.body["processSummary"]["keywords"]
+
+        # Add new keywords
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            metadata={"keywords": ["climate", "weather"]}
+        )
+        assert result.success
+        assert result.body["version"] == "1.0.1"
+
+        # Verify keywords were appended
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert "climate" in result.body["keywords"]
+        assert "weather" in result.body["keywords"]
+        for keyword in original_keywords:
+            assert keyword in result.body["keywords"], "Original keywords should be preserved"
+
+    @pytest.mark.oap_part2
+    def test_replace_with_metadata_field_links(self):
+        """
+        Test replace operation with process metadata field containing link entries.
+        """
+        test_id = f"{self.test_process_prefix}replace-metadata-links"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+
+        # Add metadata entries (link-based)
+        metadata_updates = {
+            "metadata": [
+                {"role": "https://schema.org/author", "rel": "author",
+                 "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"},
+                {"role": "https://schema.org/codeRepository",
+                 "rel": "repository", "href": "https://github.com/example/repo"}
+            ]
+        }
+        result = mocked_sub_requests(self.app, self.client.replace, test_id, metadata=metadata_updates)
+        assert result.success
+        assert result.body["version"] == "1.0.1"
+
+        # Verify metadata was added
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert "metadata" in result.body
+        metadata_roles = [m.get("role") for m in result.body["metadata"]]
+        assert "https://schema.org/author" in metadata_roles
+        assert "https://schema.org/codeRepository" in metadata_roles
+
+    @pytest.mark.oap_part2
+    def test_replace_with_metadata_field_values(self):
+        """
+        Test replace operation with process metadata field containing value entries.
+        """
+        test_id = f"{self.test_process_prefix}replace-metadata-values"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+
+        # Add metadata entries (value-based)
+        metadata_updates = {
+            "metadata": [
+                {"role": "https://schema.org/name", "value": "John Doe"},
+                {"role": "https://schema.org/license", "value": "Apache-2.0"}
+            ]
+        }
+        result = mocked_sub_requests(self.app, self.client.replace, test_id, metadata=metadata_updates)
+        assert result.success
+        assert result.body["version"] == "1.0.1"
+
+        # Verify metadata was added
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert "metadata" in result.body
+        # Find the value entries
+        name_entry = next((m for m in result.body["metadata"] if m.get("role") == "https://schema.org/name"), None)
+        license_entry = next((m for m in result.body["metadata"] if m.get("role") == "https://schema.org/license"), None)
+        assert name_entry is not None
+        assert name_entry["value"] == "John Doe"
+        assert license_entry is not None
+        assert license_entry["value"] == "Apache-2.0"
+
+    @pytest.mark.oap_part2
+    def test_replace_with_visibility(self):
+        """
+        Test replace operation with visibility (MINOR-level update).
+        """
+        test_id = f"{self.test_process_prefix}replace-visibility"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+        assert result.body["processSummary"]["version"] == "1.0.0"
+
+        # Change visibility to private
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            metadata={"visibility": Visibility.PRIVATE}
+        )
+        assert result.success
+        assert result.body["version"] == "1.1.0", "MINOR-level change should bump minor version"
+
+        # Verify visibility was changed (describe should now require auth or fail)
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert not result.success
+        assert result.code == 403
+
+    @pytest.mark.oap_part2
+    def test_replace_additive_body_and_metadata(self):
+        """
+        Test that body/cwl and metadata parameters work additively.
+        """
+        test_id = f"{self.test_process_prefix}replace-additive"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        original_title = payload["processDescription"]["process"]["title"]
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+
+        # Replace with original body but override title
+        new_title = "Overridden Title"
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            body=payload, metadata={"title": new_title, "keywords": ["override-test"]}
+        )
+        assert result.success
+
+        # Verify title was overridden
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert result.body["title"] == new_title, "Metadata should override body field"
+        assert result.body["title"] != original_title
+        assert "override-test" in result.body["keywords"]
+
+    @pytest.mark.oap_part2
+    def test_replace_with_version_explicit(self):
+        """
+        Test replace operation with explicit version number.
+        """
+        test_id = f"{self.test_process_prefix}replace-explicit-version"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+
+        # Update with explicit version
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            metadata={"title": "Version Test"}, version="2.5.0"
+        )
+        assert result.success
+        assert result.body["version"] == "2.5.0", "Explicit version should be used"
+
+        # Verify version
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert result.body["version"] == "2.5.0"
+
+    @pytest.mark.oap_part2
+    def test_replace_with_http_method_patch(self):
+        """
+        Test replace operation with PATCH method explicitly.
+        """
+        test_id = f"{self.test_process_prefix}replace-patch-method"
+        payload = copy.deepcopy(self.test_payload["Echo"])
+        result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
+        assert result.success
+
+        # Update using PATCH method
+        result = mocked_sub_requests(
+            self.app, self.client.replace, test_id,
+            metadata={"title": "PATCH Test"}, http_method="PATCH"
+        )
+        assert result.success
+        assert result.body["version"] == "1.0.1"
+
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert result.body["title"] == "PATCH Test"
+
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
         assert self.test_payload["Echo"]["processDescription"]["process"]["version"] == "1.0", (
