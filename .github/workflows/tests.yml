@@ -104,7 +104,7 @@ jobs:
             test-case: test-code-sprint-only
             test-server: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: "0"
       - name: Setup Python
@@ -183,14 +183,14 @@ jobs:
       # flaky test analysis, which includes failed tests if applicable
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/test-results-action@1eb481b01f349d82be85db73edfcb2fc62637dfb  # v1.0.0
+        uses: codecov/test-results-action@1b5b448b98e58ba90d1a1a1d9fcb72ca2263be46  # v1.0.0
         with:
           files: reports/coverage-junit.xml,!./cache
           flags: ${{ matrix.python-version }}
           token: ${{ secrets.CODECOV_TOKEN }}
       # coverage test analysis
       - name: Upload coverage report
-        uses: codecov/codecov-action@bc114756858cde29e12b6c88f6224db397f7447a  # v5.2.0
+        uses: codecov/codecov-action@5a605bd92782ce0810fa3b8acc235c921b497052  # v5.2.0
         if: ${{ success() && matrix.test-case == 'test-coverage-only' }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -236,7 +236,7 @@ jobs:
       # enabled provenance attestation during build/push (see Makefile for details)
       DOCKER_PROV: "true"
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: "0"
       - name: Get Tag Version
@@ -249,7 +249,7 @@ jobs:
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
       - name: Login to DockerHub
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3.3.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
