@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Implement the `CLI` ``replace`` operation to update an existing `Process` definition
+  (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
 
 Fixes:
 ------
