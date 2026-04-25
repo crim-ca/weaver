@@ -1,6 +1,10 @@
 # Dependabot configuration for automated dependency updates
 # Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# NOTE: auto-rebase strategy
+#   With grouping enabled, auto-rebase impact is manageable (2-3 PRs vs 10+)
+#   PRs are kept up-to-date with master and can auto-merge when CI passes
+
 version: 2
 updates:
   # GitHub Actions dependencies
@@ -15,71 +19,61 @@ updates:
       github-actions:
         patterns:
           - "*"
-    # Enable version updates with automatic rebasing
+    rebase-strategy: "auto"
     open-pull-requests-limit: 5
     # Add reviewers and assignees
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
+      - "ci/tests"
     commit-message:
       prefix: "ci"
       include: "scope"
 
   # Python dependencies (pip)
+  # Group patch/minor updates to reduce PR count; major updates get individual PRs
+  # Minor/patch updates are auto-approved; major updates require manual review
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "13:00"
-    # Group Python dependency updates intelligently
-    # Separate groups for different update types reduces risk
     groups:
-      # Development dependencies (safer to update together)
-      python-dev-dependencies:
-        dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
-      # Production patch updates (low risk, can be grouped)
-      python-production-patches:
-        dependency-type: "production"
+      # Group all patch updates together (safest, unlikely to break)
+      python-patch-updates:
         update-types:
           - "patch"
-      # Production minor updates (medium risk, smaller group)
-      python-production-minor:
-        dependency-type: "production"
+      # Group minor updates together (safer than major)
+      python-minor-updates:
         update-types:
           - "minor"
-      # Major updates stay separate (high risk, reviewed individually)
+      # Major updates remain ungrouped for individual review
+    rebase-strategy: "auto"
     open-pull-requests-limit: 10
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
     commit-message:
       prefix: "deps"
       include: "scope"
 
   # Docker dependencies
+  # No grouping for Docker dependencies - all updates need manual review
+  # due to potential breaking changes in container environments
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "14:00"
-    groups:
-      docker-dependencies:
-        patterns:
-          - "*"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
       - "feature/docker"
     commit-message:
@@ -97,12 +91,13 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 3
     reviewers:
       - "fmigneault"
     labels:
-      - "dependencies"
       - "ci/operations"
+      - "ci/tests"
     commit-message:
       prefix: "deps"
       include: "scope"
