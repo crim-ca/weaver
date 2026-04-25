@@ -176,7 +176,7 @@ jobs:
         run: make check-info
       - name: Env Test Setup
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-server == true }}
-        uses: falti/dotenv-action@v1.2.0
+        uses: falti/dotenv-action@73fafca04177425fd3e0a0849257015ae9d42034  # v1.2.0
         with:
           path: ./tests/functional/code_sprint/test-servers/weaver-localhost/test.env
           ensure-exists: true
