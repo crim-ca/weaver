@@ -161,10 +161,6 @@ jobs:
           pip freeze
           npm list
           make version
-      #- name: Setup Environment Variables
-      #  uses: c-py/action-dotenv-to-setenv@3e796a97c9746d8a3e19461421d94b75528b4ad4  # v2
-      #  with:
-      #    env-file: ./ci/weaver.env
       - name: Display Environment Variables
         if: ${{ steps.should_skip_test.outputs.skip != 'true' }}
         run: |
