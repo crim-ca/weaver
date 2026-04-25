@@ -1,6 +1,6 @@
-# Auto-approve safe Dependabot PRs that pass all checks
-# Only auto-approves minor/patch updates for npm and GitHub Actions
-# Critical dependencies (Docker, Python) and major updates require manual review
+# Auto-approve and auto-merge safe Dependabot PRs that pass all checks
+# Only auto-approves/merges minor/patch updates for npm/pip and all GitHub Actions updates
+# Critical dependencies (Docker) and major updates require manual review
 # Reference: https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions
 
 name: Dependabot Auto-merge
@@ -28,7 +28,7 @@ jobs:
       # Auto-approve only safe Dependabot PRs:
       # - GitHub Actions (all updates - low risk, sandboxed)
       # - NPM minor/patch updates (grouped, relatively safe)
-      # - Python/pip minor/patch updates (safe incremental updates)
+      # - Python/pip minor/patch updates (grouped, safe incremental updates)
       # Excludes:
       # - Docker updates (breaking changes, manual review required)
       # - Major updates (breaking changes, manual review required)
@@ -38,6 +38,18 @@ jobs:
           (steps.metadata.outputs.package-ecosystem == 'npm' && steps.metadata.outputs.update-type != 'version-update:semver-major') ||
           (steps.metadata.outputs.package-ecosystem == 'pip' && steps.metadata.outputs.update-type != 'version-update:semver-major')
         run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Enable auto-merge for approved PRs
+      # PR will merge automatically once all required checks pass
+      - name: Enable auto-merge
+        if: |
+          (steps.metadata.outputs.package-ecosystem == 'github_actions') ||
+          (steps.metadata.outputs.package-ecosystem == 'npm' && steps.metadata.outputs.update-type != 'version-update:semver-major') ||
+          (steps.metadata.outputs.package-ecosystem == 'pip' && steps.metadata.outputs.update-type != 'version-update:semver-major')
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
