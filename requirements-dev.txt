@@ -13,7 +13,7 @@ build
 bump-my-version
 codacy-coverage
 coverage
-doc8>=1.1.2
+doc8>=2.0.0
 docformatter>=1.7.7
 flake8>=7
 flynt
