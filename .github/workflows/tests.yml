@@ -203,7 +203,7 @@ jobs:
       # flaky test analysis, which includes failed tests if applicable
       - name: Upload test results to Codecov
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && !cancelled() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/test-results-action@1b5b448b98e58ba90d1a1a1d9fcb72ca2263be46  # v1.0.0
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3  # v1.2.1
         with:
           files: reports/coverage-junit.xml,!./cache
           flags: ${{ matrix.python-version }}
@@ -211,7 +211,7 @@ jobs:
       # coverage test analysis
       - name: Upload coverage report
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && success() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/codecov-action@5a605bd92782ce0810fa3b8acc235c921b497052  # v5.2.0
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./reports/coverage.xml
