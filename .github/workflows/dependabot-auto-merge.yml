@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   dependabot:
-    runs-on: ubuntu-latest
     # Only run on Dependabot PRs
     if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
     steps:
       - name: Dependabot metadata
         id: metadata
