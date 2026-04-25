@@ -57,7 +57,7 @@
       ],
       [
         "remark-lint-table-cell-padding",
-        false
+        "padded"
       ]
     ]
   },
