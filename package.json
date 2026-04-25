@@ -11,7 +11,8 @@
     "stylelint": "^17.9.0",
     "stylelint-config-standard": "^40.0.0",
     "stylelint-scss": "^7.0.0",
-    "stylelint-csstree-validator": "^4.0.0"
+    "stylelint-csstree-validator": "^4.0.0",
+    "@stylistic/stylelint-plugin": "^5.1.0"
   },
   "remarkConfig": {
     "settings": {
@@ -58,6 +59,9 @@
   },
   "stylelint": {
     "extends": "stylelint-config-standard",
+    "plugins": [
+      "@stylistic/stylelint-plugin"
+    ],
     "ignoreFiles": [
       "docs/_build/**",
       "docs/build/**"
@@ -66,6 +70,8 @@
       "block-no-empty": null,
       "color-no-invalid-hex": true,
       "color-hex-length": "long",
+      "@stylistic/color-hex-case": "upper",
+      "@stylistic/indentation": 4,
       "property-no-vendor-prefix": null,
       "no-descending-specificity": null
     }
