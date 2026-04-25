@@ -54,6 +54,10 @@
       [
         "lint-unordered-list-marker-style",
         "consistent"
+      ],
+      [
+        "remark-lint-table-cell-padding",
+        false
       ]
     ]
   },
