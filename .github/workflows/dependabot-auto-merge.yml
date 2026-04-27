@@ -6,7 +6,7 @@
 name: Dependabot Auto-merge
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -15,11 +15,19 @@ permissions:
 
 jobs:
   dependabot:
-    # Only run on Dependabot PRs
-    if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
+      - name: Debug Context
+        run: |
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "PR Author: ${{ github.event.pull_request.user.login }}"
+          echo "Is Dependabot: ${{ github.actor == 'dependabot[bot]' }}"
+          echo "Should proceed: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
+
       - name: Dependabot metadata
+        # Only fetch metadata if this is actually a Dependabot PR
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
         id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
         with:
