@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
+  conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.
 - Add support for indexed array access to job results via ``/results/{output_id}/{index}`` endpoints
   (resolves `#759 <https://github.com/crim-ca/weaver/issues/759>`_).
 
