@@ -1,134 +1,176 @@
 # label rules used by PR labelers to match repository files
-# references:
-#   original: https://github.com/actions/labeler
-#   extended: https://github.com/ilyam8/periodic-pr-labeler
+# reference: https://github.com/actions/labeler (v5+ format)
+# migration guide: https://github.com/actions/labeler/releases/tag/v5.0.0
 
 ## CI
 # all automation-related steps and files
 
 ci/operations:
-  - .*  # all '.<>' files
-  - ".github/**"
-  - MANIFEST.in
-  - hooks/**/*
-  - Makefile*
-  - Dockerfile*
-  - setup.*
-  - requirements*
-  - tests/smoke/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.*'  # all '.<>' files
+      - '.github/**'
+      - 'MANIFEST.in'
+      - 'hooks/**/*'
+      - 'Makefile*'
+      - 'Dockerfile*'
+      - 'setup.*'
+      - 'requirements*'
+      - 'tests/smoke/**/*'
 
 ci/doc:
-  - "*.rst"
-  # ignore changelog as doc would almost always be tagged
-  - "!CHANGES.rst"
-  - "*.example"
-  - LICENCE*
-  - docs/**/*
-  - weaver/wps_restapi/api.py
-  - weaver/wps_restapi/colander_extras.py
-  - weaver/wps_restapi/swagger_definitions.py
-  - weaver/wps_restapi/templates/swagger_ui.mako
+  - changed-files:
+    - any-glob-to-any-file:
+      - '*.rst'
+      - '*.example'
+      - 'LICENCE*'
+      - 'docs/**/*'
+      - 'weaver/wps_restapi/api.py'
+      - 'weaver/wps_restapi/colander_extras.py'
+      - 'weaver/wps_restapi/swagger_definitions.py'
+      - 'weaver/wps_restapi/templates/swagger_ui.mako'
+    - all-globs-to-all-files:
+      # ignore changelog as doc would almost always be tagged
+      - '!CHANGES.rst'
 
 ci/tests:
-  - tests/**/*
-  - weaver/processes/wps_default.py
-  - weaver/processes/wps_testing.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**/*'
+      - 'weaver/processes/wps_default.py'
+      - 'weaver/processes/wps_testing.py'
 
 ## Triage
 
 triage/security:
-  - weaver/visibility.py
-  - SECURITY.rst
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/visibility.py'
+      - 'SECURITY.rst'
 
 ## Features
 # specific components of the code base
 
 feature/db:
-  - weaver/datatype.py
-  - weaver/database/**/*
-  - weaver/store/**/*
-  - weaver/sort.py
-  - tests/test_datatype.py
-  - tests/test_mongodb.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/datatype.py'
+      - 'weaver/database/**/*'
+      - 'weaver/store/**/*'
+      - 'weaver/sort.py'
+      - 'tests/test_datatype.py'
+      - 'tests/test_mongodb.py'
 
 feature/cli:
-  - weaver/cli.py
-  - docs/source/cli.rst
-  - tests/test_cli.py
-  - tests/functional/test_cli.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/cli.py'
+      - 'docs/source/cli.rst'
+      - 'tests/test_cli.py'
+      - 'tests/functional/test_cli.py'
 
 feature/docker:
-  - tests/functional/test_docker_app.py
-  - tests/smoke/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/functional/test_docker_app.py'
+      - 'tests/smoke/**/*'
 
 feature/oas:
-  - weaver/wps_restapi/templates/swagger_ui.mako
-  - weaver/wps_restapi/colander_extras.py
-  - weaver/wps_restapi/swagger_definitions.py
-  - docs/source/api.rst
-  - tests/test_schemas.py
-  - tests/functional/test_colander_extras.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps_restapi/templates/swagger_ui.mako'
+      - 'weaver/wps_restapi/colander_extras.py'
+      - 'weaver/wps_restapi/swagger_definitions.py'
+      - 'docs/source/api.rst'
+      - 'tests/test_schemas.py'
+      - 'tests/functional/test_colander_extras.py'
 
 feature/CWL:
-  - weaver/processes/wps_process_base.py
-  - weaver/processes/wps_package.py
-  - weaver/processes/wps_workflow.py
-  - tests/processes/test_wps_package.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/wps_process_base.py'
+      - 'weaver/processes/wps_package.py'
+      - 'weaver/processes/wps_workflow.py'
+      - 'tests/processes/test_wps_package.py'
 
 feature/HTML:
-  - weaver/wps_restapi/templates/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps_restapi/templates/**/*'
 
 feature/opensearch:
-  - weaver/processes/opensearch.py
-  - tests/test_opensearch.py
-  - tests/opensearch/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/opensearch.py'
+      - 'tests/test_opensearch.py'
+      - 'tests/opensearch/**/*'
 
 # -- Files that *always* impact jobs --
 feature/job:
-  - weaver/execute.py
-  - weaver/sort.py
-  - weaver/wps_restapi/jobs/**/*
-  - weaver/wps_restapi/templates/notification_email_example.mako
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/execute.py'
+      - 'weaver/sort.py'
+      - 'weaver/wps_restapi/jobs/**/*'
+      - 'weaver/wps_restapi/templates/notification_email_example.mako'
 
 feature/providers:
-  - weaver/wps_restapi/providers/**/*
-  - tests/functional/test_wps_provider.py
-  - tests/wps_restapi/test_providers.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps_restapi/providers/**/*'
+      - 'tests/functional/test_wps_provider.py'
+      - 'tests/wps_restapi/test_providers.py'
 
 feature/quotation:
-  - weaver/quotation/**/*
-  - weaver/wps_restapi/quotation/**
-  - docs/source/quotation.rst
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/quotation/**/*'
+      - 'weaver/wps_restapi/quotation/**'
+      - 'docs/source/quotation.rst'
 
 feature/vault:
-  - weaver/vault/**/*
-  - tests/test_vault.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/vault/**/*'
+      - 'tests/test_vault.py'
 
 ## -- WPS processes --
 
 process/builtin:
-  - weaver/processes/builtin/**/*
-  - tests/functional/test_builtin.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/builtin/**/*'
+      - 'tests/functional/test_builtin.py'
 
 process/wps1:
-  - weaver/wps.py
-  - weaver/processes/wps1*
-  - tests/functional/test_wps_app.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps.py'
+      - 'weaver/processes/wps1*'
+      - 'tests/functional/test_wps_app.py'
 
 process/wps2:
-  - weaver/wps.py
-  - weaver/processes/wps2*
-  - tests/functional/test_wps_app.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps.py'
+      - 'weaver/processes/wps2*'
+      - 'tests/functional/test_wps_app.py'
 
 process/wps3:
-  - weaver/wps_restapi/**/*
-  - tests/processes/test_wps3_process.py
-  - tests/wps_restapi/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/wps_restapi/**/*'
+      - 'tests/processes/test_wps3_process.py'
+      - 'tests/wps_restapi/**/*'
 
 process/esgf-cwt:
-  - weaver/processes/esgf*
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/esgf*'
 
 process/workflow:
-  - weaver/processes/wps_workflow.py
-  - tests/functional/test_ems_end2end.py
-  - tests/functional/test_workflow.py
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/wps_workflow.py'
+      - 'tests/functional/test_ems_end2end.py'
+      - 'tests/functional/test_workflow.py'
