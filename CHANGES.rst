@@ -16,6 +16,21 @@ Changes:
   `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification 
   following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification. 
   Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
+- Add support for indexed array access to job results via ``/results/{output_id}/{index}`` endpoints
+  (resolves `#759 <https://github.com/crim-ca/weaver/issues/759>`_).
+
+  This allows retrieving individual elements from array-type job outputs using zero-based indexing.
+  Available on job-only, process-scoped, and provider-scoped result endpoints:
+
+  - ``/jobs/{jobID}/results/{output_id}/{index}``
+  - ``/processes/{processID}/jobs/{jobID}/results/{output_id}/{index}``
+  - ``/providers/{providerID}/processes/{processID}/jobs/{jobID}/results/{output_id}/{index}``
+
+  The endpoint returns HTTP 400 for invalid or out-of-range indices, HTTP 404 when the output is not found,
+  and HTTP 422 when attempting to index into non-array outputs.
+
+  Added utility function ``get_job_result_by_index()`` in ``weaver.wps_restapi.jobs.utils`` to handle
+  indexed result retrieval with comprehensive validation and error handling.
 
 Fixes:
 ------
