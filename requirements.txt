@@ -49,7 +49,7 @@ cwltool @ git+https://github.com/crim-ca/cwltool.git@allow-uid-gid-rootless
 cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
-cwlprov==0.1.1
+cwlprov==0.2.1
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.1
 duration
@@ -80,7 +80,7 @@ mypy_boto3_s3
 numpy>=1.22.2
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
-owslib==0.32.1
+owslib==0.35.0
 PasteDeploy>=3.1.0; python_version >= "3.12"
 pint
 psutil
