@@ -27,7 +27,7 @@ moto>=4.0.8
 mypy
 parameterized
 path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pytest-plugins/issues/224)
-pluggy>=0.7
+pluggy>=1.6.0
 pycodestyle>=2.11.0; python_version >= "3.12"
 pytest
 pytest-dependency
