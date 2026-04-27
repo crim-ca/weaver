@@ -10,6 +10,8 @@ concurrency:
 
 jobs:
   greeting:
+    # Skip for Dependabot - greetings are intended for human contributors only
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       issues: write
