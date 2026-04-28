@@ -24,6 +24,10 @@ Changes:
 - Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
   extended from the original `Process` definition to provide alternate result representations without modifying the deployed
   `Process` metadata.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded 
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification 
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification. 
+  Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
 - Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
   conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.
 - Add support for indexed array access to job results via ``/results/{output_id}/{index}`` endpoints
