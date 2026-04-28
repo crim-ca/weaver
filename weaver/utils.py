@@ -1321,6 +1321,21 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def create_content_id(resource_id, context_id):
+    # type: (AnyUUID, AnyUUID) -> str
+    """
+    Generates a unique ``Content-ID`` from provided IDs.
+
+    .. seealso::
+        - Format of ``Content-ID`` header is defined under :rfc:`2392`.
+        - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.
+    :param resource_id: Identifier of the resource unique within the context.
+    :param context_id: Identifier that provides a unique reference across contexts.
+    :returns: The ``Content-ID`` representation that can be directly employed as header.
+    """
+    return f"<{resource_id}@{context_id}>"
+
+
 def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_encoding="base64"):
     # type: (str, str, str) -> str
     """
@@ -1507,9 +1522,8 @@ def get_href_headers(
 
     headers = {}
     if content_headers:
-        content_id = content_id.strip("<>") if isinstance(content_id, str) else ""
         if content_id:
-            headers["Content-ID"] = f"<{content_id}>"
+            headers["Content-ID"] = content_id
         if location_headers:
             headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
@@ -1550,6 +1564,7 @@ def make_link_header(
     type=None,      # type: Optional[str]  # noqa
     title=None,     # type: Optional[str]
     charset=None,   # type: Optional[str]
+    **kwargs,       # type: Optional[str]
 ):                  # type: (...) -> str
     """
     Creates the HTTP Link (:rfc:`8288`) header value from input parameters or a dictionary representation.
@@ -1562,6 +1577,7 @@ def make_link_header(
         Parameter :paramref:`rel` is optional to allow unpacking with a single parameter,
         but its value is required to form a valid ``Link`` header.
     """
+    params = {}
     if isinstance(href, dict):
         rel = rel or href.get("rel")
         type = type or href.get("type")  # noqa
@@ -1580,6 +1596,9 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
+    if params:
+        for key, val in params.items():
+            link += f"; {key}={val}"
     return link
 
 

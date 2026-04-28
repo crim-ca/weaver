@@ -1,0 +1,7 @@
+cairosvg
+fpdf
+multipagetiff
+pandas
+Pillow
+python-magic
+rasterio
