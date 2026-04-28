@@ -45,6 +45,7 @@ from weaver.wps_restapi.jobs.utils import (
     get_job,
     get_job_io_schema_query,
     get_job_list_links,
+    get_job_result_by_index,
     get_job_results_response,
     get_job_status_schema,
     get_job_status_wps_xml_response,
@@ -721,6 +722,57 @@ def get_job_results(request):
     return resp
 
 
+@sd.provider_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderResultsIndexEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_provider_results_index_responses,
+)
+@sd.process_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessResultsIndexEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_job_results_index_responses,
+)
+@sd.job_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    schema=sd.JobResultsIndexEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_job_results_index_responses,
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_result_index(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve a specific indexed value from a job result array.
+
+    Given an output that is an array (or multi-value result), this endpoint allows retrieving
+    a specific element by its zero-based index.
+
+    Example:
+        /jobs/{jobId}/results/output_array/0  -> returns first element
+        /jobs/{jobId}/results/output_array/1  -> returns second element
+    """
+    job = get_job(request)
+    output_id = request.matchdict.get("output_id")
+
+    try:
+        index = int(request.matchdict.get("index"))
+    except (ValueError, TypeError):
+        raise HTTPBadRequest(json={
+            "title": "Job Output Invalid Index",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": "Index must be a valid integer.",
+            "status": HTTPBadRequest.code,
+            "value": request.matchdict.get("index")
+        })
+
+    return get_job_result_by_index(job, output_id, index, container=request)
+
+
 @sd.provider_exceptions_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
     schema=sd.ProviderExceptionsEndpoint(),
@@ -901,6 +953,7 @@ def includeme(config):
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_results_index_service)
     config.add_cornice_service(sd.job_outputs_service)
     config.add_cornice_service(sd.job_inputs_service)
     config.add_cornice_service(sd.job_exceptions_service)
@@ -909,6 +962,7 @@ def includeme(config):
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_results_index_service)
     config.add_cornice_service(sd.process_outputs_service)
     config.add_cornice_service(sd.process_inputs_service)
     config.add_cornice_service(sd.process_exceptions_service)
@@ -917,6 +971,7 @@ def includeme(config):
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_results_index_service)
     config.add_cornice_service(sd.provider_outputs_service)
     config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.provider_exceptions_service)

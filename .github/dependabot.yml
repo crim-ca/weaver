@@ -1,0 +1,104 @@
+# Dependabot configuration for automated dependency updates
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+# NOTE: auto-rebase strategy
+#   With grouping enabled, auto-rebase impact is manageable (2-3 PRs vs 10+)
+#   PRs are kept up-to-date with master and can auto-merge when CI passes
+
+version: 2
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+    # Automatically group all GitHub Actions updates into a single PR
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 5
+    # Add reviewers and assignees
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "ci/operations"
+      - "ci/tests"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Python dependencies (pip)
+  # Group patch/minor updates to reduce PR count; major updates get individual PRs
+  # Minor/patch updates are auto-approved; major updates require manual review
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "13:00"
+    groups:
+      # Group all patch updates together (safest, unlikely to break)
+      python-patch-updates:
+        update-types:
+          - "patch"
+      # Group minor updates together (safer than major)
+      python-minor-updates:
+        update-types:
+          - "minor"
+      # Major updates remain ungrouped for individual review
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "ci/operations"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Docker dependencies
+  # No grouping for Docker dependencies - all updates need manual review
+  # due to potential breaking changes in container environments
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "14:00"
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "ci/operations"
+      - "feature/docker"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+  # NPM dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "15:00"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "fmigneault"
+    labels:
+      - "ci/operations"
+      - "ci/tests"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+

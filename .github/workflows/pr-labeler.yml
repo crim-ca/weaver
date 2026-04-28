@@ -1,16 +1,14 @@
 # This workflow will triage pull requests and apply a label based on the
 # paths that are modified in the pull request.
 #
-# To use this workflow, you will need to set up a .github/labeler.yml
-# file with configuration.  For more information, see:
-# https://github.com/actions/labeler/blob/master/README.md
+# To use this workflow, you will need to set up a .github/labeler-files.yml
+# file with configuration. For more information, see:
+# https://github.com/actions/labeler
 
 name: Pull Request Labeler
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  schedule:
-    - cron: '0 */12 * * *'
 
 # cancel the current workflow if another commit was pushed on the same PR or reference
 # uses the GitHub workflow name to avoid collision with other workflows running on the same PR/reference
@@ -18,32 +16,34 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
-  original-labeler:
-    # reference: https://github.com/actions/labeler
+  labeler:
+    # Skip for Dependabot - labels are already applied via dependabot.yml config
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/labeler@v2
+    # reference: https://github.com/actions/labeler
+    - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b  # v6.0.1
       with:
         configuration-path: .github/labeler-files.yml
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
-  extended-labeler:
-    # reference: https://github.com/ilyam8/periodic-pr-labeler
-    runs-on: ubuntu-latest
-    steps:
-      - uses: docker://docker.io/ilyam8/periodic-pr-labeler:latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          LABEL_MAPPINGS_FILE: .github/labeler-files.yml
+        sync-labels: false
+
   wip:
+    # Skip for Dependabot - automated PRs are never marked as WIP, and we don't want re-trigger on other events
+    if: ${{ github.actor != 'dependabot[bot]' && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
     # reference: https://github.com/wip/action
     # mark PRs with following keywords in the title: wip, work in progress, :construction:
     # blocks merge of these branches using requirement:
     #   [Settings > Branch > master > Protect matching branches > Require > check status with "WIP (action)"]
-    if: ${{ github.event_name == 'pull_request' }}  # WIP only works during PRs
-    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
     steps:
-      - uses: wip/action@v1
+      - uses: wip/action@5d388554862715b5f75a3e9916f84ba9f2ecc23e  # v1.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

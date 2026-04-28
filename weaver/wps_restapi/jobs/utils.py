@@ -17,7 +17,8 @@ from pyramid.httpexceptions import (
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
-    HTTPOk
+    HTTPOk,
+    HTTPUnprocessableEntity
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
@@ -59,6 +60,7 @@ from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    compute_file_digest_multibase,
     data2str,
     fetch_file,
     get_any_id,
@@ -587,6 +589,32 @@ def get_results(  # pylint: disable=R1260
                     for field in ["encoding", "schema"]:
                         if field in result:
                             output["format"][field] = val_item[field]
+
+                # Add digestMultibase for resource integrity verification (W3C VC Data Integrity)
+                # Only compute for local files that can be accessed
+                try:
+                    file_path = val_data
+                    if file_path.startswith(wps_url):
+                        file_path = map_wps_output_location(file_path, settings, exists=True, url=False)
+                    elif file_path.startswith("file://"):
+                        file_path = file_path[7:]
+                    elif not file_path.startswith(("/", "http://", "https://", "s3://")):
+                        # relative path, resolve against WPS output directory
+                        wps_dir = get_wps_output_dir(settings)
+                        file_path = os.path.join(wps_dir, str(job.id), file_path)
+
+                    # Only compute digest for local files
+                    if os.path.isfile(file_path):
+                        digest_mb = compute_file_digest_multibase(file_path)
+                        output["digestMultibase"] = digest_mb
+
+                except (OSError, ValueError, ImportError) as exc:
+                    # If file is not accessible or multiformats not available, skip digest
+                    LOGGER.warning(
+                        "Could not compute digestMultibase for output file [%s] of job [%s]: %s",
+                        file_path, job.id, exc
+                    )
+
             elif not is_ref:
                 dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
                 if ogc_api:
@@ -876,6 +904,87 @@ def get_job_results_response(
     #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
     out_fmt = None
     return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+
+
+def get_job_result_by_index(
+    job,            # type: Job
+    output_id,      # type: str
+    index,          # type: int
+    *,              # force named keyword arguments after
+    container,      # type: AnySettingsContainer
+):                  # type: (...) -> AnyResponseType
+    """
+    Retrieve a specific indexed value from a job result array.
+
+    Given an output that is an array (or multi-value result), this function retrieves
+    a specific element by its zero-based index and returns it as JSON.
+
+    For Example
+        /jobs/{jobId}/results/output_array/0  -> returns first element
+        /jobs/{jobId}/results/output_array/1  -> returns second element
+
+    :param job: Job from which to retrieve the indexed result.
+    :param output_id: Identifier of the output containing the array.
+    :param index: Zero-based index of the element to retrieve (must be a valid integer).
+    :param container: Container giving access to instance settings.
+    :return: HTTP response with the indexed element as JSON.
+    :raises HTTPBadRequest: If index is negative or out of range.
+    :raises HTTPNotFound: If the output ID is not found in the job results.
+    :raises HTTPUnprocessableEntity: If the output is not an array.
+    """
+    raise_job_dismissed(job, container)
+    raise_job_bad_status_success(job, container)
+
+    if index < 0:
+        raise HTTPBadRequest(json={
+            "title": "Job Output Invalid Index",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": "Index must be non-negative.",
+            "status": HTTPBadRequest.code,
+            "value": index
+        })
+
+    output_result = None
+    for result in job.results:
+        result_id = get_any_id(result)
+        if result_id == output_id:
+            output_result = result
+            break
+
+    if output_result is None:
+        available_ids = [get_any_id(r) for r in job.results]
+        raise HTTPNotFound(json={
+            "title": "Job Output Not Found",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+            "detail": f"Output '{output_id}' not found in job results.",
+            "status": HTTPNotFound.code,
+            "cause": f"Available outputs: {available_ids}" if available_ids else None,
+            "value": output_id
+        })
+
+    output_value = get_any_value(output_result)
+
+    if not isinstance(output_value, list):
+        raise HTTPUnprocessableEntity(json={
+            "title": "Job Output Not Array",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": f"Output '{output_id}' is not an array. Index access only applies to array outputs.",
+            "status": HTTPUnprocessableEntity.code,
+            "cause": {"output": output_id, "type": type(output_value).__name__}
+        })
+
+    if index >= len(output_value):
+        raise HTTPBadRequest(json={
+            "title": "Job Output Index Out of Range",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "detail": f"Index {index} is out of range for output '{output_id}' (length: {len(output_value)}).",
+            "status": HTTPBadRequest.code,
+            "cause": {"index": index, "length": len(output_value), "output": output_id}
+        })
+
+    indexed_element = output_value[index]
+
+    return HTTPOk(json=indexed_element)
 
 
 def generate_or_resolve_result(

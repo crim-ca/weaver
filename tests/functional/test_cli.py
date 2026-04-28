@@ -57,7 +57,7 @@ from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fully_qualified_name, get_registry, load_file
+from weaver.utils import compute_file_digest_multibase, fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
@@ -899,9 +899,13 @@ class TestWeaverClient(TestWeaverClientBase):
             #   even though both of these statuses are used internally at distinct execution steps.
             running_statuses = JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]
             job_id = result.body["jobID"]
+            output_href = f"{get_wps_output_url(self.settings)}/{job_id}/output/stdout.log"
+            output_path = map_wps_output_location(output_href, self.settings, exists=True)
+            digest_multibase = compute_file_digest_multibase(output_path)
             expect_outputs = {
                 "output": {
-                    "href": f"{get_wps_output_url(self.settings)}/{job_id}/output/stdout.log",
+                    'digestMultibase': digest_multibase,
+                    "href": output_href,
                     "type": ContentType.TEXT_PLAIN,
                     "format": {"mediaType": ContentType.TEXT_PLAIN},
                 }
