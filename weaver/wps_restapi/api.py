@@ -269,6 +269,9 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core1}/per/core/process-execute-input-inline-bbox",
         f"{ogcapi_proc_core1}/per/core/process-execute-sync-job",
         f"{ogcapi_proc_core2}/per/core/process-execute-sync-one-result",
+        f"{ogcapi_proc_core2}/per/core/process-exception-job-gone",
+        # f"{ogcapi_proc_core2}/per/core/process-exception-process-gone",  # NOT justed by our implementation
+        f"{ogcapi_proc_core2}/per/core/job-results-exception-job-gone",
         f"{ogcapi_proc_core1}/per/core/limit-response",
         f"{ogcapi_proc_core1}/per/core/limit-default-minimum-maximum",
         f"{ogcapi_proc_core1}/per/core/prev",
