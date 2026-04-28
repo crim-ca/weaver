@@ -608,9 +608,12 @@ def get_results(  # pylint: disable=R1260
                         digest_mb = compute_file_digest_multibase(file_path)
                         output["digestMultibase"] = digest_mb
 
-                except (OSError, ValueError, ImportError):
+                except (OSError, ValueError, ImportError) as exc:
                     # If file is not accessible or multiformats not available, skip digest
-                    pass
+                    LOGGER.warning(
+                        "Could not compute digestMultibase for output file [%s] of job [%s]: %s",
+                        file_path, job.id, exc
+                    )
 
             elif not is_ref:
                 dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
