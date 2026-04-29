@@ -2641,6 +2641,7 @@ class WeaverClient(object):
         results_profile=null,   # type: Union[Type[null], Optional[str]]
         output_format=None,     # type: Optional[AnyOutputFormat]
         output_links=None,      # type: Optional[Sequence[str]]
+        output_ids=None,        # type: Optional[Sequence[Union[str, Tuple[str, int]]]]
     ):                          # type: (...) -> OperationResult
         """
         Obtain the results of a successful :term:`Job` execution.
@@ -2665,6 +2666,10 @@ class WeaverClient(object):
             Output IDs that are expected in ``Link`` headers, and that should be retrieved (or downloaded) as results.
             This is not performed automatically since there can be a lot of ``Links`` in responses, and output IDs
             could have conflicting ``rel`` names with other indicative links.
+        :param output_ids:
+            Output IDs that should be collected from the results.
+            If the output happens to be an array of data/file results, an optional index can also be provided to
+            extract only these entries. However,
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -2681,13 +2686,19 @@ class WeaverClient(object):
             "Accept": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
         })
-        # if profile was omitted but outputs were explicitly requested as links,
+        # If profile was omitted but outputs were explicitly requested as links,
         # consider that the user intends to retrieve them as Link headers, and therefore
-        # the Results JSON response profile embedding outputs is not expected behaviour
-        if results_profile is null and not output_links:
+        # the Results JSON response profile embedding outputs is not expected behaviour.
+        # If specific output ID/index are requested, we prefer the results profile to filter.
+        if (results_profile is null and not output_links) or output_ids:
             headers["Accept-Profile"] = sd.OGC_API_PROC_PROFILE_RESULTS_URI
         elif results_profile:
             headers["Accept-Profile"] = results_profile
+        # FIXME:
+        #   use query param to prefilter outputs IDs, however we must proceed manually for ../{N} indices
+        #   (https://docs.ogc.org/DRAFTS/18-062r3.html#req_core_job-results-param-outputs)
+        # if output_ids:
+
         resp = self._request("GET", result_url,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
