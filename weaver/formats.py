@@ -1263,6 +1263,24 @@ def json_default_handler(obj):
     raise TypeError(f"Type {type(obj)} not serializable.")
 
 
+@overload
+def repr_json(data, **__):
+    # type: (None, **Any) -> None
+    ...
+
+
+@overload
+def repr_json(data, **__):
+    # type: (Any, **Any) -> str
+    ...
+
+
+@overload
+def repr_json(data, force_string=True, **__):
+    # type: (Any, Literal[True], **Any) -> str
+    ...
+
+
 def repr_json(data, force_string=True, ensure_ascii=False, indent=2, separators=None, **kwargs):
     # type: (Any, bool, bool, Optional[int], Optional[Tuple[str, str]], **Any) -> Union[JSON, str, None]
     """
